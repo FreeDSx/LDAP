@@ -1,0 +1,30 @@
+{
+  "name": "phpds/ldap",
+  "description": "A Pure PHP LDAP library",
+  "homepage": "https://github.com/phpDS/ldap",
+  "keywords": [
+    "LDAP"
+  ],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Chad Sikorra",
+      "email": "Chad.Sikorra@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">=7.1"
+  },
+  "require-dev": {
+    "phpspec/phpspec": "^4.0"
+  },
+  "suggest": {
+    "ext-openssl": "For SSL/TLS support."
+  },
+  "config": {
+    "bin-dir": "bin"
+  },
+  "autoload": {
+    "psr-4": {"PhpDs\\Ldap\\": "src/PhpDs/Ldap"}
+  }
+}
