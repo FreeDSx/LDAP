@@ -38,13 +38,13 @@ class ControlFactory
     ];
 
     /**
-     * Retrieve the Request Response/Request class given a protocol number and the ASN1.
+     * Retrieve the control class for a given OID and ASN1.
      *
      * @param AbstractType $asn1
-     * @return ProtocolElementInterface
+     * @return Control
      * @throws ProtocolException
      */
-    public static function get(AbstractType $asn1)
+    public static function get(AbstractType $asn1) : Control
     {
         if (!($asn1 instanceof SequenceType && $asn1->getChild(0) && $asn1->getChild(0) instanceof OctetStringType)) {
             throw new ProtocolException('The control either is not a sequence or has no OID value attached.');
@@ -60,7 +60,7 @@ class ControlFactory
      * @param string $oid
      * @return bool
      */
-    public static function has(string $oid)
+    public static function has(string $oid) : bool
     {
         return isset(self::$map[$oid]);
     }

@@ -79,7 +79,7 @@ class Asn1
     /**
      * @return NullType
      */
-    public static function null()
+    public static function null() : NullType
     {
         return new NullType();
     }
@@ -88,7 +88,7 @@ class Asn1
      * @param string $string
      * @return OctetStringType
      */
-    public static function octetString(string $string)
+    public static function octetString(string $string) : OctetStringType
     {
         return new OctetStringType($string);
     }
@@ -97,7 +97,7 @@ class Asn1
      * @param AbstractType[] ...$types
      * @return SetType
      */
-    public static function set(AbstractType ...$types)
+    public static function set(AbstractType ...$types) : SetType
     {
         return new SetType(...$types);
     }
@@ -106,7 +106,7 @@ class Asn1
      * @param AbstractType[] ...$types
      * @return SetOfType
      */
-    public static function setOf(AbstractType ...$types)
+    public static function setOf(AbstractType ...$types) : SetOfType
     {
         return new SetOfType(...$types);
     }
@@ -115,7 +115,7 @@ class Asn1
      * @param string $dn
      * @return LdapDn
      */
-    public static function ldapDn(string $dn)
+    public static function ldapDn(string $dn) : LdapDn
     {
         return new LdapDn($dn);
     }
@@ -124,7 +124,7 @@ class Asn1
      * @param string $oid
      * @return LdapOid
      */
-    public static function ldapOid(string $oid)
+    public static function ldapOid(string $oid) : LdapOid
     {
         return new LdapOid($oid);
     }
@@ -133,7 +133,7 @@ class Asn1
      * @param string $ldapString
      * @return LdapString
      */
-    public static function ldapString(string $ldapString)
+    public static function ldapString(string $ldapString) : LdapString
     {
         return new LdapString($ldapString);
     }

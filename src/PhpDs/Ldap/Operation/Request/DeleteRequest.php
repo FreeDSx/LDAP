@@ -37,7 +37,7 @@ class DeleteRequest implements RequestInterface
      */
     public function __construct($dn)
     {
-        $this->dn = $dn instanceof Dn ? $dn : new Dn($dn);
+        $this->setDn($dn);
     }
 
     /**
@@ -59,11 +59,17 @@ class DeleteRequest implements RequestInterface
         return $this->dn;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function toAsn1(): AbstractType
     {
         return Asn1::application(self::APP_TAG, Asn1::ldapDn($this->dn->toString()));
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public static function fromAsn1(AbstractType $type)
     {
         self::validate($type);

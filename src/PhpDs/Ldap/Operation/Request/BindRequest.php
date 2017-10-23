@@ -51,7 +51,7 @@ abstract class BindRequest implements RequestInterface
     /**
      * @return int
      */
-    public function getVersion()
+    public function getVersion() : int
     {
         return $this->version;
     }
@@ -70,7 +70,7 @@ abstract class BindRequest implements RequestInterface
     /**
      * @return string
      */
-    public function getUsername()
+    public function getUsername() : string
     {
         return $this->username;
     }

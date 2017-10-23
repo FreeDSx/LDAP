@@ -13,7 +13,7 @@ namespace PhpDs\Ldap\Protocol;
 use PhpDs\Ldap\Asn1\Type\AbstractType;
 
 /**
- * Methods needed to transform an object to ASN1 representation.
+ * Methods needed to transform an object to/from ASN1 representation.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

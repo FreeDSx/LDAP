@@ -95,7 +95,7 @@ class Entry implements \IteratorAggregate, \Countable
      * @param string|Attribute $attribute
      * @return bool
      */
-    public function has($attribute)
+    public function has($attribute) : bool
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute);
 
@@ -129,7 +129,7 @@ class Entry implements \IteratorAggregate, \Countable
      *
      * @return array
      */
-    public function toArray()
+    public function toArray() : array
     {
         $attributes = [];
 
@@ -171,7 +171,7 @@ class Entry implements \IteratorAggregate, \Countable
      * @param array $attributes
      * @return Entry
      */
-    public static function create(string $dn, array $attributes = [])
+    public static function create(string $dn, array $attributes = []) : Entry
     {
         /** @var Attribute[] $entryAttr */
         $entryAttr = [];

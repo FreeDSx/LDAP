@@ -37,7 +37,7 @@ class ControlBag implements \IteratorAggregate, \Countable
      * @param string|Control $control
      * @return bool
      */
-    public function has($control)
+    public function has($control) : bool
     {
         if ($control instanceof Control) {
             return array_search($control, $this->controls, true) !== false;

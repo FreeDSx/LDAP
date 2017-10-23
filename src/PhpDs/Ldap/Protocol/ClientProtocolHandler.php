@@ -215,7 +215,7 @@ class ClientProtocolHandler
      * @param LdapMessageResponse $message
      * @throws ConnectionException
      */
-    protected function handleUnsolicitedNotification(LdapMessageResponse $message)
+    protected function handleUnsolicitedNotification(LdapMessageResponse $message) : void
     {
         /** @var ExtendedResponse $response */
         $response = $message->getResponse();
@@ -234,7 +234,7 @@ class ClientProtocolHandler
      * @param LdapMessageRequest $messageTo
      * @param LdapMessageResponse $messageFrom
      */
-    protected function handleExtendedResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom)
+    protected function handleExtendedResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom) : void
     {
         if ($messageTo->getMessageId() !== $messageFrom->getMessageId() || !$messageTo->getRequest() instanceof ExtendedRequest) {
             return;
@@ -257,7 +257,7 @@ class ClientProtocolHandler
      * @param LdapMessageRequest $messageTo
      * @throws ConnectionException
      */
-    protected function handleStartTls(LdapMessageRequest $messageTo)
+    protected function handleStartTls(LdapMessageRequest $messageTo) : void
     {
         $messageFrom = null;
 
@@ -336,7 +336,7 @@ class ClientProtocolHandler
     /**
      * @return TcpClient
      */
-    protected function tcp()
+    protected function tcp() : TcpClient
     {
         if ($this->tcp === null) {
             $this->tcp = $this->pool->connect();
@@ -348,7 +348,7 @@ class ClientProtocolHandler
     /**
      * @return ClientMessageQueue
      */
-    protected function queue()
+    protected function queue() : ClientMessageQueue
     {
         if ($this->queue === null) {
             $this->queue = new ClientMessageQueue($this->tcp(), $this->encoder);

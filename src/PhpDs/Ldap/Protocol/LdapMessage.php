@@ -93,7 +93,7 @@ abstract class LdapMessage implements ProtocolElementInterface
      *
      * @return ControlBag
      */
-    public function controls()
+    public function controls() : ControlBag
     {
         return $this->controls;
     }
@@ -121,9 +121,7 @@ abstract class LdapMessage implements ProtocolElementInterface
     }
 
     /**
-     * @param AbstractType $type
-     * @return LdapMessage
-     * @throws ProtocolException
+     * {@inheritdoc}
      */
     public static function fromAsn1(AbstractType $type)
     {

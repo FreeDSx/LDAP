@@ -73,7 +73,7 @@ class OperationFactory
      * @param int $operation
      * @return bool
      */
-    public static function has(int $operation)
+    public static function has(int $operation) : bool
     {
         return isset(self::$map[$operation]);
     }

@@ -193,7 +193,7 @@ class TcpClient
     /**
      * @return bool
      */
-    public function isOpen()
+    public function isOpen() : bool
     {
         return is_resource($this->tcp);
     }
@@ -218,6 +218,9 @@ class TcpClient
         return $this;
     }
 
+    /**
+     * @return resource
+     */
     protected function createSocketContext()
     {
         $sslOpts = $this->sslOpts;

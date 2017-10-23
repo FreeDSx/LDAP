@@ -59,7 +59,7 @@ class Attribute implements \IteratorAggregate, \Countable
      * @param string $value
      * @return bool
      */
-    public function has(string $value)
+    public function has(string $value) : bool
     {
         return array_search($value, $this->values) !== false;
     }

@@ -98,7 +98,7 @@ class Change
      * @param string[] ...$values
      * @return Change
      */
-    public static function add($attribute, ...$values)
+    public static function add($attribute, ...$values) : Change
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
 
@@ -113,7 +113,7 @@ class Change
      * @param string[] ...$values
      * @return Change
      */
-    public static function delete($attribute, ...$values)
+    public static function delete($attribute, ...$values) : Change
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
 
@@ -128,7 +128,7 @@ class Change
      * @param string[] ...$values
      * @return Change
      */
-    public static function replace($attribute, ...$values)
+    public static function replace($attribute, ...$values)  : Change
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
 
@@ -142,7 +142,7 @@ class Change
      * @param string|Attribute $attribute
      * @return Change
      */
-    public static function reset($attribute)
+    public static function reset($attribute) : Change
     {
         $attribute = $attribute instanceof Attribute ? new Attribute($attribute->getName()) : new Attribute($attribute);
 

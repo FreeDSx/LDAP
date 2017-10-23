@@ -75,7 +75,7 @@ class SortKey
      * @param string $orderingRule
      * @return $this
      */
-    public function setOrderingRule(string $orderingRule)
+    public function setOrderingRule(?string $orderingRule)
     {
         $this->orderingRule = $orderingRule;
 

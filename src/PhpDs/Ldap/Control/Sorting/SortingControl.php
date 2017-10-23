@@ -72,11 +72,17 @@ class SortingControl extends Control
         return $this->sortKeys;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public static function fromAsn1(AbstractType $type)
     {
         // TODO: Implement fromAsn1() method.
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function toAsn1(): AbstractType
     {
         $this->controlValue = Asn1::sequenceOf();

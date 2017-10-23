@@ -76,7 +76,7 @@ class ModifyDnRequest implements RequestInterface
      * @param string}Dn $dn
      * @return $this
      */
-    public function setDn(string $dn)
+    public function setDn($dn)
     {
         $this->dn = $dn instanceof Dn ? $dn : new Dn($dn);
 
@@ -92,7 +92,7 @@ class ModifyDnRequest implements RequestInterface
     }
 
     /**
-     * @param string $newRdn
+     * @param string|Rdn $newRdn
      * @return $this
      */
     public function setNewRdn($newRdn)

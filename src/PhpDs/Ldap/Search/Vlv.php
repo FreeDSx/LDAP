@@ -222,7 +222,7 @@ class Vlv
      * @todo Is there a better way to determine if we are already at the end of the list based on last received?
      * @return bool
      */
-    public function isAtEndOfList()
+    public function isAtEndOfList() : bool
     {
         if ($this->control === null) {
             return false;
@@ -237,7 +237,7 @@ class Vlv
      * @todo Is there a better way to determine if we are already at the start of the list based on last received?
      * @return bool
      */
-    public function isAtStartOfList()
+    public function isAtStartOfList() : bool
     {
         if ($this->control === null) {
             return false;

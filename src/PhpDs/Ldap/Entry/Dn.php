@@ -103,7 +103,7 @@ class Dn implements \IteratorAggregate, \Countable
     /**
      * @return Rdn[]
      */
-    public function toArray()
+    public function toArray() : array
     {
         if ($this->pieces !== null) {
             return $this->pieces;

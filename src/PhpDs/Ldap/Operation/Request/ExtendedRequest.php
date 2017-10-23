@@ -127,6 +127,9 @@ class ExtendedRequest implements RequestInterface
         return Asn1::application(self::APP_TAG, $asn1);
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public static function fromAsn1(AbstractType $type)
     {
         // TODO: Implement fromAsn1() method.

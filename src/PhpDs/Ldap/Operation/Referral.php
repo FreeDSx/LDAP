@@ -31,11 +31,17 @@ class Referral
         $this->referral = $referral;
     }
 
+    /**
+     * @return string
+     */
     public function toString() : string
     {
         return $this->referral;
     }
 
+    /**
+     * @return string
+     */
     public function __toString()
     {
         return $this->referral;

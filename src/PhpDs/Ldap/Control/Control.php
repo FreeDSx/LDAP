@@ -88,7 +88,7 @@ class Control implements ProtocolElementInterface
     /**
      * @return string
      */
-    public function getTypeOid()
+    public function getTypeOid() : string
     {
         return $this->controlType;
     }
