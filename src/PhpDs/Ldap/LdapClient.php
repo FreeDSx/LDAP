@@ -83,7 +83,7 @@ class LdapClient
      * @param Control[] ...$controls
      * @return \PhpDs\Ldap\Entry\Entry[]
      */
-    public function search(SearchRequest $request, Control ...$controls)
+    public function search(SearchRequest $request, Control ...$controls) : array
     {
         /** @var \PhpDs\Ldap\Operation\Response\SearchResponse $response */
         $response = $this->send($request, ...$controls)->getResponse();
@@ -98,7 +98,7 @@ class LdapClient
      * @param int $size
      * @return Paging
      */
-    public function paging(SearchRequest $search, ?int $size = null)
+    public function paging(SearchRequest $search, ?int $size = null) : Paging
     {
         return new Paging($this, $search, $size ?? $this->options['page_size']);
     }
@@ -111,7 +111,7 @@ class LdapClient
      * @param int $afterCount
      * @return Vlv
      */
-    public function vlv(SearchRequest $search, $sort, int $afterCount)
+    public function vlv(SearchRequest $search, $sort, int $afterCount) : Vlv
     {
         return new Vlv($this, $search, $sort, $afterCount);
     }
