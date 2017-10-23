@@ -11,6 +11,8 @@ It supports encryption of the LDAP connection through TLS via the OpenSSL extens
 
 # Getting Started
 
+**Note**: This library is still under heavy development. Use with caution.
+
 Install via composer:
 
 ```bash
