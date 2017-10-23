@@ -19,17 +19,4 @@ use PhpDs\Ldap\Protocol\ProtocolElementInterface;
  */
 interface ResponseInterface extends ProtocolElementInterface
 {
-    const TYPE = [
-        'BIND' => 1,
-        'SEARCH_ENTRY' => 4,
-        'SEARCH_DONE' => 5,
-        'MODIFY' => 7,
-        'ADD' => 9,
-        'DELETE' => 11,
-        'MODIFY_DN' => 13,
-        'COMPARE' => 15,
-        'SEARCH_REFERENCE' => 19,
-        'EXTENDED' => 24,
-        'INTERMEDIATE' => 25,
-    ];
 }
