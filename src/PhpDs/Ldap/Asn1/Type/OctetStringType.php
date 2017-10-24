@@ -15,7 +15,7 @@ namespace PhpDs\Ldap\Asn1\Type;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class OctetStringType extends AbstractStringType
+class OctetStringType extends AbstractType
 {
     protected $tagNumber = self::TAG_TYPE_OCTET_STRING;
 

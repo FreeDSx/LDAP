@@ -19,7 +19,6 @@ use PhpDs\Ldap\Asn1\Type\IntegerType;
 use PhpDs\Ldap\Asn1\Type\NullType;
 use PhpDs\Ldap\Asn1\Type\OctetStringType;
 use PhpDs\Ldap\Asn1\Type\SequenceType;
-use PhpDs\Ldap\Asn1\Type\AbstractStringType;
 use PhpDs\Ldap\Asn1\Type\SetType;
 use PhpDs\Ldap\Exception\EncoderException;
 use PhpDs\Ldap\Exception\InvalidArgumentException;
@@ -332,7 +331,7 @@ class BerEncoder implements EncoderInterface
             case $type instanceof EnumeratedType:
                 $bytes = $this->encodeInteger($type);
                 break;
-            case $type instanceof AbstractStringType:
+            case $type instanceof OctetStringType:
                 $bytes = $type->getValue();
                 break;
             case $type instanceof ConstructedTypeInterface:
