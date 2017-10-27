@@ -70,8 +70,17 @@ class SimpleBindRequest extends BindRequest
      */
     protected function validate(): void
     {
-        if (empty($this->username) || empty($this->password)) {
+        if ($this->isEmpty($this->username) || $this->isEmpty($this->password)) {
             throw new BindException('A simple bind must have a non-empty username and password.');
         }
+    }
+
+    /**
+     * @param $value
+     * @return bool
+     */
+    protected function isEmpty($value)
+    {
+        return empty($value) && $value !== '0';
     }
 }

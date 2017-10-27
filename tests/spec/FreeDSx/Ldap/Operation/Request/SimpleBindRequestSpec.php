@@ -65,6 +65,17 @@ class SimpleBindRequestSpec extends ObjectBehavior
         $this->shouldNotThrow(BindException::class)->duringToAsn1();
     }
 
+    function it_should_correctly_detect_a_zero_string_as_non_empty()
+    {
+        $this->setUsername('foo');
+        $this->setPassword('0');
+
+        $this->shouldNotThrow(BindException::class)->duringToAsn1();
+
+        $this->setUsername('0');
+        $this->shouldNotThrow(BindException::class)->duringToAsn1();
+    }
+
     function it_should_generate_correct_asn1()
     {
         $this->setUsername('foo')->setPassword('bar');
