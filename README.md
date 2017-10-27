@@ -16,7 +16,7 @@ It supports encryption of the LDAP connection through TLS via the OpenSSL extens
 Install via composer:
 
 ```bash
-composer require phpds/ldap
+composer require freedsx/ldap
 ```
 
 Use the LdapClient class and the helper classes:
