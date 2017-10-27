@@ -1,7 +1,7 @@
 {
-  "name": "phpds/ldap",
+  "name": "freedsx/ldap",
   "description": "A Pure PHP LDAP library",
-  "homepage": "https://github.com/phpDS/ldap",
+  "homepage": "https://github.com/FreeDSx/LDAP",
   "keywords": [
     "LDAP"
   ],
@@ -25,6 +25,6 @@
     "bin-dir": "bin"
   },
   "autoload": {
-    "psr-4": {"PhpDs\\Ldap\\": "src/PhpDs/Ldap"}
+    "psr-4": {"FreeDSx\\Ldap\\": "src/FreeDSx/Ldap"}
   }
 }

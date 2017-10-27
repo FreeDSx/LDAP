@@ -1,5 +1,5 @@
-# phpDS LDAP
-phpDS LDAP is a pure PHP LDAP library. It has no requirement on the core PHP LDAP extension. This library currently implements
+# FreeDSx
+FreeDSx is a pure PHP LDAP library. It has no requirement on the core PHP LDAP extension. This library currently implements
 most client functionality described in [RFC 4511](https://tools.ietf.org/html/rfc4511). It also implements some other
 features from various RFCs:
 
@@ -22,9 +22,9 @@ composer require phpds/ldap
 Use the LdapClient class and the helper classes:
 
 ```php
-use PhpDs\Ldap\LdapClient;
-use PhpDs\Ldap\Operations;
-use PhpDs\Ldap\Search\Filters;
+use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Search\Filters;
 
 $ldap = new LdapClient([
     # Servers are tried in order until one connects
