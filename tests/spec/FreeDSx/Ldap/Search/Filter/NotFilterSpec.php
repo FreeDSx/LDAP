@@ -35,6 +35,6 @@ class NotFilterSpec extends ObjectBehavior
 
     function it_should_generate_correct_asn1()
     {
-        $this->toAsn1()->shouldBeLike(Asn1::context(2, Filters::equal('foo', 'bar')->toAsn1()));
+        $this->toAsn1()->shouldBeLike(Asn1::context(2, Asn1::sequence(Filters::equal('foo', 'bar')->toAsn1())));
     }
 }
