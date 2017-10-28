@@ -11,6 +11,7 @@
 namespace spec\FreeDSx\Ldap\Entry;
 
 use FreeDSx\Ldap\Entry\Rdn;
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use PhpSpec\ObjectBehavior;
 
 class RdnSpec extends ObjectBehavior
@@ -51,5 +52,10 @@ class RdnSpec extends ObjectBehavior
 
         $this->getName()->shouldBeEqualTo('cn');
         $this->getValue()->shouldBeEqualTo('foobar');
+    }
+
+    function it_should_error_when_constructing_an_rdn_that_is_invalid()
+    {
+        $this->shouldThrow(InvalidArgumentException::class)->during('create', ['foobar']);
     }
 }

@@ -101,12 +101,15 @@ class Rdn
         // @todo Simplify this logic somehow?
         $obj = null;
         foreach ($pieces as $piece) {
-            list($name, $value) = explode('=', $piece, 2);
+            $parts = explode('=', $piece, 2);
+            if (count($parts) !== 2) {
+                throw new InvalidArgumentException(sprintf('The RDN "%s" is invalid.', $piece));
+            }
             if ($obj === null) {
-                $obj = new self($name, $value);
+                $obj = new self($parts[0], $parts[1]);
             } else {
                 /** @var Rdn $obj */
-                $obj->additional[] = new self($name, $value);
+                $obj->additional[] = new self($parts[0], $parts[1]);
             }
         }
 
