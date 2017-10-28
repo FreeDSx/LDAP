@@ -62,19 +62,12 @@ trait ConstructedTypeTrait
 
     /**
      * @param int $index
-     * @return AbstractType
+     * @return null|AbstractType
      * @throws InvalidArgumentException
      */
-    public function getChild(int $index) : AbstractType
+    public function getChild(int $index) : ?AbstractType
     {
-        if (!isset($this->children[$index])) {
-            throw new InvalidArgumentException(sprintf(
-                'Index %s does not exist.',
-                $index
-            ));
-        }
-
-        return $this->children[$index];
+        return $this->children[$index] ?? null;
     }
 
     /**

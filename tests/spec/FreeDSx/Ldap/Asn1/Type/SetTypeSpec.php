@@ -67,6 +67,16 @@ class SetTypeSpec extends ObjectBehavior
         ]);
     }
 
+    function it_should_get_a_child_if_it_exists()
+    {
+        $this->getChild(0)->shouldBeAnInstanceOf(IntegerType::class);
+    }
+
+    function it_should_be_null_when_getting_a_child_that_does_not_exist()
+    {
+        $this->getChild(9)->shouldBeNull();
+    }
+
     function it_should_have_a_default_tag_type()
     {
         $this->getTagNumber()->shouldBeEqualTo(AbstractType::TAG_TYPE_SET);
