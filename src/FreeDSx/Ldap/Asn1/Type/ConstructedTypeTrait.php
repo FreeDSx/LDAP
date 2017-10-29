@@ -90,4 +90,12 @@ trait ConstructedTypeTrait
     {
         return count($this->children);
     }
+
+    /**
+     * @return \ArrayIterator
+     */
+    public function getIterator()
+    {
+        return new \ArrayIterator($this->children);
+    }
 }

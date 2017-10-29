@@ -39,6 +39,11 @@ class SequenceTypeSpec extends ObjectBehavior
         $this->shouldImplement('\Countable');
     }
 
+    function it_should_implement_iterator_aggregate()
+    {
+        $this->shouldImplement('\IteratorAggregate');
+    }
+
     function it_should_set_children()
     {
         $this->setChildren(new IntegerType(1), new IntegerType(2));

@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Asn1\Type;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class SequenceType extends AbstractType implements ConstructedTypeInterface, \Countable
+class SequenceType extends AbstractType implements ConstructedTypeInterface, \Countable, \IteratorAggregate
 {
     use ConstructedTypeTrait;
 
