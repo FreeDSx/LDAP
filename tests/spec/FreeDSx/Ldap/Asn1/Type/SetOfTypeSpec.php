@@ -34,6 +34,11 @@ class SetOfTypeSpec extends ObjectBehavior
         $this->shouldImplement(ConstructedTypeInterface::class);
     }
 
+    function it_should_implement_countable()
+    {
+        $this->shouldImplement('\Countable');
+    }
+
     function it_should_set_children()
     {
         $this->setChildren(new IntegerType(1), new IntegerType(2));
@@ -79,5 +84,10 @@ class SetOfTypeSpec extends ObjectBehavior
     function it_should_have_a_default_tag_type()
     {
         $this->getTagNumber()->shouldBeEqualTo(AbstractType::TAG_TYPE_SET);
+    }
+
+    function it_should_get_a_count()
+    {
+        $this->count()->shouldBeEqualTo(2);
     }
 }

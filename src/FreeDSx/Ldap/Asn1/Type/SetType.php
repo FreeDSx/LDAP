@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Asn1\Type;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class SetType extends AbstractType implements ConstructedTypeInterface
+class SetType extends AbstractType implements ConstructedTypeInterface, \Countable
 {
     use ConstructedTypeTrait;
 
