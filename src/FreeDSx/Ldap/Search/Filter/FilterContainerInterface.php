@@ -15,22 +15,44 @@ namespace FreeDSx\Ldap\Search\Filter;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-interface FilterContainerInterface
+interface FilterContainerInterface extends FilterInterface
 {
     /**
+     * Add a filter.
+     *
      * @param FilterInterface[] ...$filters
      * @return $this
      */
     public function add(FilterInterface ...$filters);
 
     /**
+     * Get the filters.
+     *
+     * @return FilterInterface[]|FilterContainerInterface[]
+     */
+    public function get() : array;
+
+    /**
+     * Check if a filter exists.
+     *
+     * @param FilterInterface $filter
+     * @return bool
+     */
+    public function has(FilterInterface $filter) : bool;
+
+    /**
+     * Remove a specific filter.
+     *
+     * @param FilterInterface[] ...$filters
+     * @return $this
+     */
+    public function remove(FilterInterface ...$filters);
+
+    /**
+     * Set the filters.
+     *
      * @param FilterInterface[] ...$filters
      * @return $this
      */
     public function set(FilterInterface ...$filters);
-
-    /**
-     * @return FilterInterface[]|FilterContainerInterface[]
-     */
-    public function get() : array;
 }

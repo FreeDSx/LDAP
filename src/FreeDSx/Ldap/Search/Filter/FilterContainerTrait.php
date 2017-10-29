@@ -50,7 +50,7 @@ trait FilterContainerTrait
      * @param FilterInterface $filter
      * @return bool
      */
-    public function has(FilterInterface $filter)
+    public function has(FilterInterface $filter) : bool
     {
         return array_search($filter, $this->filters, true) !== false;
     }

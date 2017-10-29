@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Search\Filter;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class AndFilter implements FilterInterface
+class AndFilter implements FilterContainerInterface
 {
     use FilterContainerTrait;
 

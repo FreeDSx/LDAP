@@ -12,6 +12,7 @@ namespace spec\FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
+use FreeDSx\Ldap\Search\Filter\FilterContainerInterface;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use PhpSpec\ObjectBehavior;
@@ -31,6 +32,11 @@ class AndFilterSpec extends ObjectBehavior
     function it_should_implement_fiter_interface()
     {
         $this->shouldImplement(FilterInterface::class);
+    }
+
+    function it_should_implement_filter_container_interface()
+    {
+        $this->shouldImplement(FilterContainerInterface::class);
     }
 
     function it_should_get_the_filters_it_contains()
