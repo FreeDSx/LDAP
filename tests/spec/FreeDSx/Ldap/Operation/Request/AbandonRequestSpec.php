@@ -11,6 +11,7 @@
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use PhpSpec\ObjectBehavior;
 
@@ -41,5 +42,10 @@ class AbandonRequestSpec extends ObjectBehavior
     {
         $this::fromAsn1(Asn1::application(16, Asn1::integer(1)))
             ->shouldBeLike(new AbandonRequest(1));
+    }
+
+    function it_should_not_allow_non_integers_from_ASN1()
+    {
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::application(16, Asn1::octetString(1))]);
     }
 }

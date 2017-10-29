@@ -11,9 +11,12 @@
 namespace spec\FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filter\FilterContainerInterface;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Search\Filters;
 use PhpSpec\ObjectBehavior;
 
@@ -88,5 +91,18 @@ class AndFilterSpec extends ObjectBehavior
             Filters::equal('foo', 'bar')->toAsn1(),
             Filters::gte('foo', '2')->toAsn1()
         )));
+    }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $and = new AndFilter(new EqualityFilter('foo', 'bar'), new SubstringFilter('bar', 'foo'));
+
+        $this::fromAsn1($and->toAsn1())->shouldBeLike($and);
+    }
+
+    function it_should_not_be_constructed_from_invalid_asn1()
+    {
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence()]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::octetString('foo')]);
     }
 }

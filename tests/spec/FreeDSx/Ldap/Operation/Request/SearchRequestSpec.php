@@ -13,6 +13,7 @@ namespace spec\FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use PhpSpec\ObjectBehavior;
@@ -108,5 +109,29 @@ class SearchRequestSpec extends ObjectBehavior
             (new EqualityFilter('cn', 'foo'))->toAsn1(),
             Asn1::sequenceOf()
         )));
+    }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $search = (new SearchRequest(new EqualityFilter('foo', 'bar'), 'cn'))
+            ->base('dc,=foo,dc=bar')
+            ->timeLimit(10)
+            ->sizeLimit(5)
+            ->useBaseScope()
+            ->setAttributesOnly(true)
+            ->setDereferenceAliases(2);
+
+        $this::fromAsn1($search->toAsn1())->shouldBeLike($search);
+    }
+
+    function it_should_not_be_constructed_from_invalid_asn1()
+    {
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::set()]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence()]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence()]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
+            Asn1::integer(5),
+            Asn1::octetString('foo')
+        )]);
     }
 }

@@ -12,6 +12,7 @@ namespace spec\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use PhpSpec\ObjectBehavior;
@@ -81,5 +82,24 @@ class PasswordModifyRequestSpec extends ObjectBehavior
             Asn1::context(0, Asn1::ldapOid(ExtendedRequest::OID_PWD_MODIFY)),
             Asn1::context(1, Asn1::octetString($encoder->encode(Asn1::sequence())))
         )));
+    }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $passwdMod = new PasswordModifyRequest('foo', 'bar', '12345');
+        $this::fromAsn1($passwdMod->toAsn1())->shouldBeLike($passwdMod->setValue(null));
+
+        $passwdMod = new PasswordModifyRequest(null, 'bar', '12345');
+        $this::fromAsn1($passwdMod->toAsn1())->shouldBeLike($passwdMod->setValue(null));
+
+        $passwdMod = new PasswordModifyRequest('foo', null, '12345');
+        $this::fromAsn1($passwdMod->toAsn1())->shouldBeLike($passwdMod->setValue(null));
+    }
+
+    function it_should_not_be_constructed_from_invalid_asn1()
+    {
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [
+            (new ExtendedRequest('foo'))->setValue(Asn1::set())->toAsn1()
+        ]);
     }
 }

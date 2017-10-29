@@ -12,7 +12,10 @@ namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\OctetStringType;
+use FreeDSx\Ldap\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 
 /**
@@ -91,7 +94,17 @@ class CompareRequest implements RequestInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        // TODO: Implement fromAsn1() method.
+        if (!($type instanceof SequenceType && count($type->getChildren()) === 2)) {
+            throw new ProtocolException('The compare request is malformed');
+        }
+        $dn = $type->getChild(0);
+        $ava = $type->getChild(1);
+
+        if (!$dn instanceof OctetStringType) {
+            throw new ProtocolException('The compare request is malformed.');
+        }
+
+        return new self($dn->getValue(), EqualityFilter::fromAsn1($ava));
     }
 
     /**

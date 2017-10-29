@@ -11,6 +11,7 @@
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use PhpSpec\ObjectBehavior;
 
@@ -49,5 +50,26 @@ class ExtendedRequestSpec extends ObjectBehavior
             Asn1::context(0, Asn1::ldapOid(ExtendedRequest::OID_START_TLS)),
             Asn1::context(1, Asn1::octetString('foo'))
         )));
+    }
+
+    function it_should_be_constructed_from_asn1_with_no_value()
+    {
+        $request = new ExtendedRequest('foo');
+
+        $this::fromAsn1($request->toAsn1())->shouldBeLike($request);
+    }
+
+    function it_should_be_constructed_from_asn1_with_a_value()
+    {
+        $request = new ExtendedRequest('foo', 'bar');
+
+        $this::fromAsn1($request->toAsn1())->shouldBeLike($request);
+    }
+
+    function it_should_detect_invalid_asn1()
+    {
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::octetString('foo')]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence()]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(Asn1::octetString('foo'))]);
     }
 }

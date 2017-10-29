@@ -11,6 +11,7 @@
 namespace spec\FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filter\NotFilter;
 use FreeDSx\Ldap\Search\Filters;
 use PhpSpec\ObjectBehavior;
@@ -36,5 +37,12 @@ class NotFilterSpec extends ObjectBehavior
     function it_should_generate_correct_asn1()
     {
         $this->toAsn1()->shouldBeLike(Asn1::context(2, Asn1::sequence(Filters::equal('foo', 'bar')->toAsn1())));
+    }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $this::fromAsn1((new NotFilter(Filters::equal('foo', 'bar')))->toAsn1())->shouldBeLike(
+            new NotFilter(new EqualityFilter('foo', 'bar'))
+        );
     }
 }

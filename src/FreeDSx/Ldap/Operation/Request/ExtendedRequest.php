@@ -13,6 +13,9 @@ namespace FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\OctetStringType;
+use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 
 /**
@@ -132,6 +135,51 @@ class ExtendedRequest implements RequestInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        // TODO: Implement fromAsn1() method.
+        return new self(...self::parseAsn1ExtendedRequest($type));
+    }
+
+    /**
+     * @param AbstractType $type
+     * @return AbstractType
+     * @throws ProtocolException
+     */
+    protected static function decodeEncodedValue(AbstractType $type) : ?AbstractType
+    {
+        [1 => $value] = self::parseAsn1ExtendedRequest($type);
+
+        return $value !== null ? (new BerEncoder())->decode($value) : null;
+    }
+
+    /**
+     * @param AbstractType $type
+     * @return array
+     * @throws ProtocolException
+     */
+    protected static function parseAsn1ExtendedRequest(AbstractType $type)
+    {
+        if (!($type instanceof SequenceType && (count($type) === 1 || count($type) === 2))) {
+            throw new ProtocolException('The extended request is malformed 1');
+        }
+        $oid = null;
+        $value = null;
+
+        foreach ($type->getChildren() as $child) {
+            if ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 0) {
+                $oid = $child;
+            } elseif ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 1) {
+                $value = $child;
+            }
+        }
+        if ($oid === null || !$oid instanceof OctetStringType) {
+            throw new ProtocolException('The extended request is malformed 2');
+        }
+        if ($value !== null && !$value instanceof OctetStringType) {
+            throw new ProtocolException('The extended request is malformed 3');
+        }
+        if ($value !== null) {
+            $value = $value->getValue();
+        }
+
+        return [$oid->getValue(), $value];
     }
 }

@@ -12,6 +12,7 @@ namespace spec\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use PhpSpec\ObjectBehavior;
@@ -85,5 +86,21 @@ class SimpleBindRequestSpec extends ObjectBehavior
             Asn1::ldapDn('foo'),
             Asn1::context(0, Asn1::octetString('bar'))
         )));
+    }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $bind = new SimpleBindRequest('foo', 'bar');
+
+        $this::fromAsn1($bind->toAsn1())->shouldBeLike($bind);
+    }
+
+    function it_should_not_be_constructed_from_invalid_asn1()
+    {
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::octetString('foo')]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
+            Asn1::octetString('foo'),
+            Asn1::integer(3)
+        )]);
     }
 }

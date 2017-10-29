@@ -11,7 +11,11 @@
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\IncompleteType;
+use FreeDSx\Ldap\Asn1\Type\OctetStringType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Checks for the presence of an attribute (ie. whether or not it contains a value). RFC 4511, 4.5.1.7.5
@@ -45,6 +49,11 @@ class PresentFilter implements FilterInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        // TODO: Implement fromAsn1() method.
+        $type = $type instanceof IncompleteType ? (new BerEncoder())->complete($type, AbstractType::TAG_TYPE_OCTET_STRING) : $type;
+        if (!($type instanceof OctetStringType)) {
+            throw new ProtocolException('The present filter is malformed');
+        }
+
+        return new self($type->getValue());
     }
 }

@@ -11,7 +11,12 @@
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\IncompleteType;
+use FreeDSx\Ldap\Asn1\Type\OctetStringType;
+use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 
 /**
@@ -164,6 +169,58 @@ class SubstringFilter implements FilterInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        //@todo implement me...
+        $encoder = new BerEncoder();
+        $type = $type instanceof IncompleteType ? $encoder->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
+        if (!($type instanceof SequenceType && count($type->getChildren()) === 2)) {
+            throw new ProtocolException('The substring type is malformed');
+        }
+
+        $attrType = $type->getChild(0);
+        $substrings = $type->getChild(1);
+        if (!($attrType instanceof OctetStringType && $substrings instanceof SequenceType && count($substrings) > 0)) {
+            throw new ProtocolException('The substring filter is malformed.');
+        }
+        [$startsWith, $endsWith, $contains] = self::parseSubstrings($substrings);
+
+        return new self($attrType->getValue(), $startsWith, $endsWith, ...$contains);
+    }
+
+    /**
+     * @param $substrings
+     * @return array
+     * @throws ProtocolException
+     */
+    protected static function parseSubstrings(SequenceType $substrings) : array
+    {
+        $startsWith = null;
+        $endsWith = null;
+        $contains = [];
+
+        /** @var AbstractType $substring */
+        foreach ($substrings as $substring) {
+            if ($substring->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
+                throw new ProtocolException('The substring filter is malformed.');
+            }
+            # Starts With and Ends With can occur only once each. Contains can occur multiple times.
+            if ($substring->getTagNumber() === 0) {
+                if ($startsWith) {
+                    throw new ProtocolException('The substring filter is malformed.');
+                } else {
+                    $startsWith = $substring;
+                }
+            } elseif ($substring->getTagNumber() === 1) {
+                $contains[] = $substring->getValue();
+            } elseif ($substring->getTagNumber() === 2) {
+                if ($endsWith) {
+                    throw new ProtocolException('The substring filter is malformed.');
+                } else {
+                    $endsWith = $substring;
+                }
+            } else {
+                throw new ProtocolException('The substring filter is malformed.');
+            }
+        }
+
+        return [$startsWith ? $startsWith->getValue() : null, $endsWith ? $endsWith->getValue() : null, $contains];
     }
 }

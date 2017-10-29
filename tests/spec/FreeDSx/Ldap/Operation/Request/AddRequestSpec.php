@@ -12,6 +12,7 @@ namespace spec\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use PhpSpec\ObjectBehavior;
 
@@ -56,5 +57,52 @@ class AddRequestSpec extends ObjectBehavior
                 )
             )
         )));
+    }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $add = new AddRequest(Entry::create('cn=foo,dc=foo,dc=bar', ['cn' => 'foo', 'sn' => ['foo', 'bar']]));
+
+        $this::fromAsn1($add->toAsn1())->shouldBeLike($add);
+    }
+
+    function it_should_detect_a_malformed_asn1_request()
+    {
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::octetString('foo')]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
+            Asn1::octetString('foo'),
+            Asn1::integer(2)
+        )]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
+            Asn1::octetString('foo'),
+            Asn1::sequence(),
+            Asn1::octetString('bar')
+        )]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
+            Asn1::octetString('foo'),
+            Asn1::sequence(),
+            Asn1::octetString('bar')
+        )]);
+    }
+
+    function it_should_detect_a_malformed_asn1_request_partial_attribute()
+    {
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
+            Asn1::octetString('foo'),
+            Asn1::sequence(
+                Asn1::sequence(
+                    Asn1::octetString('foo')
+                )
+            )
+        )]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
+            Asn1::octetString('foo'),
+            Asn1::sequence(
+                Asn1::sequence(
+                    Asn1::octetString('foo'),
+                    Asn1::sequence()
+                )
+            )
+        )]);
     }
 }

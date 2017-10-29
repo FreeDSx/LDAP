@@ -12,8 +12,13 @@ namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\OctetStringType;
+use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Asn1\Type\SetType;
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * A request to add an entry to LDAP. RFC 4511, 4.7.
@@ -79,7 +84,44 @@ class AddRequest implements RequestInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        // TODO: Implement fromAsn1() method.
+        if (!($type instanceof SequenceType && count($type) === 2)) {
+            throw new ProtocolException('The add request is malformed: %s');
+        }
+
+        $dn = $type->getChild(0);
+        $attrList = $type->getChild(1);
+        if (!($dn instanceof OctetStringType && $attrList instanceof SequenceType)) {
+            throw new ProtocolException('The add request is malformed.');
+        }
+        $dn = new Dn($dn->getValue());
+
+        $attributes = [];
+        foreach ($attrList as $attrListing) {
+            if (!($attrListing instanceof SequenceType && count($attrListing->getChildren()) == 2)) {
+                throw new ProtocolException(sprintf(
+                    'Expected a sequence type, but received: %s',
+                    get_class($attrListing)
+                ));
+            }
+
+            $attrType = $attrListing->getChild(0);
+            $vals = $attrListing->getChild(1);
+            if (!($attrType instanceof OctetStringType && $vals instanceof SetType)) {
+                throw new ProtocolException('The add request is malformed.');
+            }
+
+            $attrValues = [];
+            foreach ($vals as $val) {
+                if (!$val instanceof OctetStringType) {
+                    throw new ProtocolException('The add request is malformed.');
+                }
+                $attrValues[] = $val->getValue();
+            }
+
+            $attributes[] = new Attribute($attrType->getValue(), ...$attrValues);
+        }
+
+        return new self(new Entry($dn, ...$attributes));
     }
 
     /**

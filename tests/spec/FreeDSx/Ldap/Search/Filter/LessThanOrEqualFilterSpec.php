@@ -49,4 +49,9 @@ class LessThanOrEqualFilterSpec extends ObjectBehavior
             Asn1::octetString('bar')
         )));
     }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $this::fromAsn1((new LessThanOrEqualFilter('foo', 'bar'))->toAsn1())->shouldBeLike(new LessThanOrEqualFilter('foo', 'bar'));
+    }
 }

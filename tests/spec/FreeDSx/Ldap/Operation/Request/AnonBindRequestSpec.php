@@ -11,8 +11,11 @@
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
+use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use PhpSpec\ObjectBehavior;
 
 class AnonBindRequestSpec extends ObjectBehavior
@@ -50,5 +53,32 @@ class AnonBindRequestSpec extends ObjectBehavior
             Asn1::ldapDn(''),
             Asn1::context(0, Asn1::octetString(''))
         )));
+    }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $anon = new AnonBindRequest('foo', 2);
+
+        $this::fromAsn1($anon->toAsn1())->shouldBeLike($anon);
+    }
+
+    function it_should_check_that_a_password_is_empty_properly()
+    {
+        $this::fromAsn1((new SimpleBindRequest('foo', '0'))->toAsn1())->shouldNotBeAnInstanceOf(AnonBindRequest::class);
+    }
+
+    function it_should_detect_invalid_asn1()
+    {
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::integer(2)]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence()]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
+            Asn1::octetString('foo'),
+            Asn1::integer(2)
+        )]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
+            Asn1::integer(3),
+            Asn1::octetString('foo'),
+            Asn1::context(3, Asn1::octetString('foo'))
+        )]);
     }
 }

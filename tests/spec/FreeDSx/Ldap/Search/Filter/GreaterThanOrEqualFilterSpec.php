@@ -49,4 +49,9 @@ class GreaterThanOrEqualFilterSpec extends ObjectBehavior
             Asn1::octetString('bar')
         )));
     }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $this::fromAsn1((new GreaterThanOrEqualFilter('foo', 'bar'))->toAsn1())->shouldBeLike(new GreaterThanOrEqualFilter('foo', 'bar'));
+    }
 }

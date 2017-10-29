@@ -41,4 +41,9 @@ class PresentFilterSpec extends ObjectBehavior
     {
         $this->toAsn1()->shouldBeLike(Asn1::context(7, Asn1::ldapString('foo')));
     }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $this::fromAsn1((new PresentFilter('foo'))->toAsn1())->shouldBeLike(new PresentFilter('foo'));
+    }
 }

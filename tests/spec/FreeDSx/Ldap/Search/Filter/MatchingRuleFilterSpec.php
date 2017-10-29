@@ -101,4 +101,11 @@ class MatchingRuleFilterSpec extends ObjectBehavior
             Asn1::context(4, Asn1::boolean(true))
         )));
     }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $rule = new MatchingRuleFilter('foo', 'foo', 'bar', true);
+
+        $this->fromAsn1($rule->toAsn1())->shouldBeLike($rule);
+    }
 }

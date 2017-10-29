@@ -11,7 +11,12 @@
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\IncompleteType;
+use FreeDSx\Ldap\Asn1\Type\OctetStringType;
+use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Common methods for filters using attribute value assertions.
@@ -72,10 +77,17 @@ trait AttributeValueAssertionTrait
      */
     public static function fromAsn1(AbstractType $type)
     {
-        /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $type */
-        new self(
-            $type->getChild(0)->getValue(),
-            $type->getChild(1)->getValue()
-        );
+        $type = $type instanceof IncompleteType ? (new BerEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
+        if (!($type instanceof SequenceType && count($type) === 2)) {
+            throw new ProtocolException('The attribute value assertion is malformed.');
+        }
+
+        $attribute = $type->getChild(0);
+        $value = $type->getChild(1);
+        if (!($attribute instanceof OctetStringType && $value instanceof OctetStringType)) {
+            throw new ProtocolException('The attribute value assertion is malformed.');
+        }
+
+        return new self($attribute->getValue(), $value->getValue());
     }
 }

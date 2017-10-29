@@ -12,9 +12,16 @@ namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\BooleanType;
+use FreeDSx\Ldap\Asn1\Type\EnumeratedType;
+use FreeDSx\Ldap\Asn1\Type\IntegerType;
+use FreeDSx\Ldap\Asn1\Type\OctetStringType;
+use FreeDSx\Ldap\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 
 /**
@@ -371,7 +378,45 @@ class SearchRequest implements RequestInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        // TODO: Implement fromAsn1() method.
+        if (!($type instanceof SequenceType && count($type) === 8)) {
+            throw new ProtocolException('The search request is malformed');
+        }
+        $baseDn = $type->getChild(0);
+        $scope = $type->getChild(1);
+        $deref = $type->getChild(2);
+        $sizeLimit = $type->getChild(3);
+        $timeLimit = $type->getChild(4);
+        $typesOnly = $type->getChild(5);
+        $filter = FilterFactory::get($type->getChild(6));
+        $attributes = $type->getChild(7);
+
+        if (!($baseDn instanceof OctetStringType
+            && $scope instanceof EnumeratedType
+            && $deref instanceof EnumeratedType
+            && $sizeLimit instanceof IntegerType
+            && $timeLimit instanceof IntegerType
+            && $typesOnly instanceof BooleanType
+            && $attributes instanceof SequenceType)) {
+            throw new ProtocolException('The search request is malformed');
+        }
+
+        $attrList = [];
+        foreach ($attributes->getChildren() as $attribute) {
+            if (!$attribute instanceof OctetStringType) {
+                throw new ProtocolException('The search request is malformed.');
+            }
+            $attrList[] = new Attribute($attribute->getValue());
+        }
+
+        $search = new self($filter, ...$attrList);
+        $search->scope = $scope->getValue();
+        $search->baseDn = $baseDn->getValue();
+        $search->derefAliases = $deref->getValue();
+        $search->sizeLimit = $sizeLimit->getValue();
+        $search->timeLimit = $timeLimit->getValue();
+        $search->attributesOnly = $typesOnly->getValue();
+
+        return $search;
     }
 
     /**

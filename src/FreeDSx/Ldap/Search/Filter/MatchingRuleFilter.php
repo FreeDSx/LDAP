@@ -11,7 +11,13 @@
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\BooleanType;
+use FreeDSx\Ldap\Asn1\Type\IncompleteType;
+use FreeDSx\Ldap\Asn1\Type\OctetStringType;
+use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Represents an extensible matching rule filter. RFC 4511, 4.5.1.7.7
@@ -143,7 +149,46 @@ class MatchingRuleFilter implements FilterInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        //@todo implement me...
+        $type = $type instanceof IncompleteType ? (new BerEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
+        if (!($type instanceof SequenceType && (count($type) >= 1 && count($type) <= 4))) {
+            throw new ProtocolException('The matching rule filter is malformed');
+        }
+        $matchingRule = null;
+        $matchingType = null;
+        $matchValue = null;
+        $useDnAttr = null;
+
+        foreach ($type->getChildren() as $child) {
+            if ($child->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
+                continue;
+            }
+            if ($child->getTagNumber() === 1) {
+                $matchingRule = $child;
+            } elseif ($child->getTagNumber() === 2) {
+                $matchingType = $child;
+            } elseif ($child->getTagNumber() === 3) {
+                $matchValue = $child;
+            } elseif ($child->getTagNumber() === 4) {
+                $useDnAttr = $child;
+            }
+        }
+        if (!$matchValue instanceof OctetStringType) {
+            throw new ProtocolException('The matching rule filter is malformed.');
+        }
+        if ($matchingRule && !$matchingRule instanceof OctetStringType) {
+            throw new ProtocolException('The matching rule filter is malformed.');
+        }
+        if ($matchingType && !$matchingType instanceof OctetStringType) {
+            throw new ProtocolException('The matching rule filter is malformed.');
+        }
+        if ($useDnAttr && !$useDnAttr instanceof BooleanType) {
+            throw new ProtocolException('The matching rule filter is malformed.');
+        }
+        $matchingRule = $matchingRule ? $matchingRule->getValue() : null;
+        $matchingType = $matchingType ? $matchingType->getValue() : null;
+        $useDnAttr = $useDnAttr ? $useDnAttr->getValue() : false;
+
+        return new self($matchingRule, $matchingType, $matchValue->getValue(), $useDnAttr);
     }
 
     /**

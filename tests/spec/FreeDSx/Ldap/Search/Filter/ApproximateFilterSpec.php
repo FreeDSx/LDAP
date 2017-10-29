@@ -49,4 +49,9 @@ class ApproximateFilterSpec extends ObjectBehavior
             Asn1::octetString('bar')
         )));
     }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $this::fromAsn1((new ApproximateFilter('foo', 'bar'))->toAsn1())->shouldBeLike(new ApproximateFilter('foo', 'bar'));
+    }
 }

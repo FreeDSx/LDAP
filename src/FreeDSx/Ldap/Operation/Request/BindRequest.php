@@ -12,6 +12,10 @@ namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\IntegerType;
+use FreeDSx\Ldap\Asn1\Type\OctetStringType;
+use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Represents a base bind request. RFC 4511, 4.2
@@ -94,7 +98,32 @@ abstract class BindRequest implements RequestInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        // TODO: Implement fromAsn1() method.
+        if (!($type instanceof SequenceType && count($type) === 3)) {
+            throw new ProtocolException('The bind request in malformed');
+        }
+        $version = $type->getChild(0);
+        $name = $type->getChild(1);
+        $auth = $type->getChild(2);
+
+        if (!($version instanceof IntegerType && $name instanceof OctetStringType)) {
+            throw new ProtocolException('The bind request in malformed');
+        }
+        $version = $version->getValue();
+        $name = $name->getValue();
+
+        if ($auth->getTagNumber() !== 0) {
+            throw new ProtocolException(sprintf(
+                'Only a simple bind is currently supported, but got: %s',
+                $auth->getTagNumber()
+            ));
+        }
+        $auth = $auth->getValue();
+
+        if (empty($auth) && $auth !== '0') {
+            return new AnonBindRequest($name, $version);
+        } else {
+            return new SimpleBindRequest($name, $auth, $version);
+        }
     }
 
     /**

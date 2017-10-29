@@ -11,7 +11,12 @@
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\IncompleteType;
+use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 
 /**
  * Represents the negation of a filter. RFC 4511, 4.5.1
@@ -67,6 +72,11 @@ class NotFilter implements FilterInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        // TODO: Implement fromAsn1() method.
+        $type = $type instanceof IncompleteType ? (new BerEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
+        if (!($type instanceof SequenceType && count($type) === 1)) {
+            throw new ProtocolException('The not filter is malformed');
+        }
+
+        return new self(FilterFactory::get($type->getChild(0)));
     }
 }

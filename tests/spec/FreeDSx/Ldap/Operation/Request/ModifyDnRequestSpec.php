@@ -13,6 +13,7 @@ namespace spec\FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Rdn;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use PhpSpec\ObjectBehavior;
 
@@ -68,5 +69,27 @@ class ModifyDnRequestSpec extends ObjectBehavior
             Asn1::boolean(true),
             Asn1::context(0, Asn1::ldapDn('dc=foobar'))
         )));
+    }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $req = new ModifyDnRequest('foo', 'cn=bar', false, 'foobar');
+        $this::fromAsn1($req->toAsn1())->shouldBeLike($req);
+
+        $req = new ModifyDnRequest('foo', 'cn=bar', false);
+        $this::fromAsn1($req->toAsn1())->shouldBeLike($req);
+    }
+
+    function it_should_not_be_constructed_from_invalid_asn1()
+    {
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::octetString('foo')]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence()]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(Asn1::integer(1))]);
+        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
+            Asn1::octetString('foo'),
+            Asn1::octetString('cn=foo'),
+            Asn1::boolean(true),
+            Asn1::octetString('foobar')
+        )]);
     }
 }

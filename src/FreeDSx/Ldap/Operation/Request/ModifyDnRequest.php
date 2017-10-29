@@ -12,8 +12,12 @@ namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\BooleanType;
+use FreeDSx\Ldap\Asn1\Type\OctetStringType;
+use FreeDSx\Ldap\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Rdn;
+use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * A Modify DN Request. RFC 4511, 4.9
@@ -148,7 +152,26 @@ class ModifyDnRequest implements RequestInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        //@todo implement me...
+        if (!($type instanceof SequenceType && count($type) >= 3 && count($type) <= 4)) {
+            throw new ProtocolException('The modify dn request is malformed');
+        }
+        $entry = $type->getChild(0);
+        $newRdn = $type->getChild(1);
+        $deleteOldRdn = $type->getChild(2);
+        $newSuperior = $type->getChild(3);
+
+        if (!($entry instanceof OctetStringType && $newRdn instanceof OctetStringType && $deleteOldRdn instanceof BooleanType)) {
+            throw new ProtocolException('The modify dn request is malformed');
+        }
+        if ($newSuperior && !($newSuperior->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $newSuperior->getTagNumber() === 0)) {
+            throw new ProtocolException('The modify dn request is malformed');
+        }
+        if ($newSuperior && !$newSuperior instanceof OctetStringType) {
+            throw new ProtocolException('The modify dn request is malformed');
+        }
+        $newSuperior = $newSuperior ? $newSuperior->getValue() : null;
+
+        return new self($entry->getValue(), $newRdn->getValue(), $deleteOldRdn->getValue(), $newSuperior);
     }
 
     /**

@@ -85,4 +85,21 @@ class SubstringFilterSpec extends ObjectBehavior
 
         $this->shouldThrow(RuntimeException::class)->duringToAsn1();
     }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $substring = new SubstringFilter('foo', 'foo', 'bar', 'foobar', 'wee');
+        $this::fromAsn1($substring->toAsn1())->shouldBeLike($substring);
+
+        $substring = new SubstringFilter('foo', 'foo', 'bar');
+        $this::fromAsn1($substring->toAsn1())->shouldBeLike($substring);
+
+        $substring = new SubstringFilter('foo', 'foo');
+        $this::fromAsn1($substring->toAsn1())->shouldBeLike($substring);
+
+        $substring = new SubstringFilter('foo', null, 'foo');
+        $this::fromAsn1($substring->toAsn1())->shouldBeLike($substring);
+        $substring = new SubstringFilter('foo', null, null, 'foo', 'bar');
+        $this::fromAsn1($substring->toAsn1())->shouldBeLike($substring);
+    }
 }

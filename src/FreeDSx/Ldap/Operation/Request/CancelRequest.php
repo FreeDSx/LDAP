@@ -12,6 +12,9 @@ namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\IntegerType;
+use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapMessage;
 
 /**
@@ -67,5 +70,18 @@ class CancelRequest extends ExtendedRequest
         $this->requestValue = Asn1::sequence(Asn1::integer($this->messageId));
 
         return parent::toAsn1();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public static function fromAsn1(AbstractType $type)
+    {
+        $value = self::decodeEncodedValue($type);
+        if (!($value instanceof SequenceType && $value->getChild(0) instanceof IntegerType)) {
+            throw new ProtocolException('The cancel request value is malformed.');
+        }
+
+        return new self($value->getChild(0)->getValue());
     }
 }

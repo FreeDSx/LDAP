@@ -12,6 +12,8 @@ namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\IntegerType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * RFC 4511, 4.11.
@@ -61,6 +63,10 @@ class AbandonRequest implements RequestInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
+        if (!$type instanceof IntegerType) {
+            throw new ProtocolException('The abandon request is malformed');
+        }
+
         return new self($type->getValue());
     }
 

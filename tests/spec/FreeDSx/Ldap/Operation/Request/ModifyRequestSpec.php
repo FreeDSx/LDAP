@@ -5,6 +5,7 @@ namespace spec\FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use PhpSpec\ObjectBehavior;
 
@@ -68,5 +69,27 @@ class ModifyRequestSpec extends ObjectBehavior
                 )
             )
         )));
+    }
+
+    function it_should_be_constructed_from_asn1()
+    {
+        $req = new ModifyRequest(
+            'foo',
+            Change::add('foo', 'bar'),
+            Change::delete('bar', 'foo'),
+            Change::replace('foobar', 'foo')
+        );
+
+        $this::fromAsn1($req->toAsn1())->shouldBeLike($req);
+    }
+
+    function it_should_not_be_constructed_asn1_with_invalid_changes()
+    {
+
+    }
+
+    function it_should_not_be_constructed_asn1_with_invalid_partial_attributes()
+    {
+
     }
 }

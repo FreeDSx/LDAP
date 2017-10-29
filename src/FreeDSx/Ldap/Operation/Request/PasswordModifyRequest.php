@@ -12,6 +12,8 @@ namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * RFC 3062. A password modify extended request.
@@ -128,5 +130,42 @@ class PasswordModifyRequest extends ExtendedRequest
         }
 
         return parent::toAsn1();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public static function fromAsn1(AbstractType $type)
+    {
+        $request = self::decodeEncodedValue($type);
+        if (!$request) {
+            return new self();
+        }
+        if (!($request instanceof SequenceType)) {
+            throw new ProtocolException('The password modify request is malformed.');
+        }
+
+        $userIdentity = null;
+        $oldPasswd = null;
+        $newPasswd = null;
+        foreach ($request as $value) {
+            /** @var AbstractType $value */
+            if ($value->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
+                throw new ProtocolException('The password modify request is malformed');
+            }
+            if ($value->getTagNumber() === 0) {
+                $userIdentity = $value;
+            } elseif ($value->getTagNumber() === 1) {
+                $oldPasswd = $value;
+            } elseif ($value->getTagNumber() === 2) {
+                $newPasswd = $value;
+            }
+        }
+
+        return new self(
+            $userIdentity !== null ? $userIdentity->getValue() : null,
+            $oldPasswd !== null ? $oldPasswd->getValue() : null,
+            $newPasswd !== null ? $newPasswd->getValue() : null
+        );
     }
 }
