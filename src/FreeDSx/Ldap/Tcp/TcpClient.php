@@ -193,7 +193,7 @@ class TcpClient
     /**
      * @return bool
      */
-    public function isOpen() : bool
+    public function isConnected() : bool
     {
         return is_resource($this->tcp);
     }

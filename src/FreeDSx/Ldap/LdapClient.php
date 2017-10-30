@@ -215,7 +215,7 @@ class LdapClient
      */
     public function __destruct()
     {
-        if ($this->handler && $this->handler->getTcpClient() !== null && $this->handler->getTcpClient()->isOpen()) {
+        if ($this->handler && $this->handler->getTcpClient() !== null && $this->handler->getTcpClient()->isConnected()) {
             $this->unbind();
         }
     }
