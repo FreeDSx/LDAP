@@ -11,6 +11,7 @@
 namespace spec\FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
@@ -21,7 +22,7 @@ class SearchResponseSpec extends ObjectBehavior
 {
     function let()
     {
-        $this->beConstructedWith(new LdapResult(0, 'dc=foo,dc=bar', 'foo', new Referral('foo')), Entry::create('foo'), Entry::create('bar'));
+        $this->beConstructedWith(new LdapResult(0, 'dc=foo,dc=bar', 'foo', new Referral('foo')), new Entries(...[Entry::create('foo'), Entry::create('bar')]));
     }
 
     function it_is_initializable()
@@ -39,9 +40,9 @@ class SearchResponseSpec extends ObjectBehavior
 
     function it_should_get_the_entries()
     {
-        $this->getEntries()->shouldBeLike([
+        $this->getEntries()->shouldBeLike(new Entries(...[
            Entry::create('foo'),
            Entry::create('bar')
-        ]);
+        ]));
     }
 }

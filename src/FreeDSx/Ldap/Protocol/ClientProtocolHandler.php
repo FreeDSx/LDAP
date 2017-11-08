@@ -14,6 +14,7 @@ use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
 use FreeDSx\Ldap\Asn1\Encoder\EncoderInterface;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -309,7 +310,7 @@ class ClientProtocolHandler
         /** @var LdapMessageResponse $done */
         return new LdapMessageResponse(
             $done->getMessageId(),
-            new SearchResponse($done->getResponse(), ...$entries),
+            new SearchResponse($done->getResponse(), new Entries(...$entries)),
             ...$done->controls()->toArray()
         );
     }

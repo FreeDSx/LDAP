@@ -14,6 +14,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -81,9 +82,9 @@ class LdapClient
      *
      * @param SearchRequest $request
      * @param Control[] ...$controls
-     * @return \FreeDSx\Ldap\Entry\Entry[]
+     * @return \FreeDSx\Ldap\Entry\Entries
      */
-    public function search(SearchRequest $request, Control ...$controls) : array
+    public function search(SearchRequest $request, Control ...$controls) : Entries
     {
         /** @var \FreeDSx\Ldap\Operation\Response\SearchResponse $response */
         $response = $this->send($request, ...$controls)->getResponse();
