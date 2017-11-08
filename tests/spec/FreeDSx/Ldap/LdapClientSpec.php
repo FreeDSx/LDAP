@@ -10,6 +10,7 @@
 
 namespace spec\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\LdapResult;
@@ -45,9 +46,9 @@ class LdapClientSpec extends ObjectBehavior
     {
         $search = Operations::search(Filters::equal('foo', 'bar'));
 
-        $handler->send($search)->shouldBeCalled()->willReturn(new LdapMessageResponse(1, new SearchResponse(new LdapResult(0, ''), Entry::create('dc=foo,dc=bar'))));
+        $handler->send($search)->shouldBeCalled()->willReturn(new LdapMessageResponse(1, new SearchResponse(new LdapResult(0, ''), new Entries(Entry::create('dc=foo,dc=bar')))));
 
-        $this->search($search)->shouldBeLike([Entry::create('dc=foo,dc=bar')]);
+        $this->search($search)->shouldBeLike(new Entries(Entry::create('dc=foo,dc=bar')));
     }
 
     function it_should_bind($handler)

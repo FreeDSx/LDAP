@@ -15,6 +15,7 @@ use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Control\Vlv\VlvControl;
 use FreeDSx\Ldap\Control\Vlv\VlvResponseControl;
+use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -247,15 +248,15 @@ class Vlv
     }
 
     /**
-     * @return \FreeDSx\Ldap\Entry\Entry[]
+     * @return Entries
      */
-    public function getEntries()
+    public function getEntries() : Entries
     {
         return $this->send();
     }
 
     /**
-     * @return \FreeDSx\Ldap\Entry\Entry[]
+     * @return Entries
      * @throws ProtocolException
      */
     protected function send()

@@ -11,6 +11,7 @@
 namespace spec\FreeDSx\Ldap\Search;
 
 use FreeDSx\Ldap\Control\PagingControl;
+use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\LdapResult;
@@ -26,7 +27,7 @@ class PagingSpec extends ObjectBehavior
     {
         $client->send($search, new PagingControl(1000, ''))->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(0, '', ''), Entry::create('foo'), Entry::create('bar')),
+            new SearchResponse(new LdapResult(0, '', ''), new Entries(Entry::create('foo'), Entry::create('bar'))),
             new PagingControl(100, 'foo')
         ));
 
@@ -54,7 +55,7 @@ class PagingSpec extends ObjectBehavior
         $client->send($search, new PagingControl(100, ''))->willReturn(
             new LdapMessageResponse(
                 1,
-                new SearchResponse(new LdapResult(0, '', '')),
+                new SearchResponse(new LdapResult(0, '', ''), new Entries()),
                 new PagingControl(0, '')
             )
         );
@@ -67,7 +68,7 @@ class PagingSpec extends ObjectBehavior
     {
         $client->send($search, new PagingControl(0, 'foo'))->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(0, '', '')),
+            new SearchResponse(new LdapResult(0, '', ''), new Entries()),
             new PagingControl(0, 'foo')
         ));
 
@@ -84,6 +85,6 @@ class PagingSpec extends ObjectBehavior
 
     function it_should_get_the_entries_from_the_response()
     {
-        $this->getEntries()->shouldBeLike([Entry::create('foo'), Entry::create('bar')]);
+        $this->getEntries()->shouldBeLike(new Entries(Entry::create('foo'), Entry::create('bar')));
     }
 }

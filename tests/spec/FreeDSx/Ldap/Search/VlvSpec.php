@@ -14,6 +14,7 @@ use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Control\Vlv\VlvControl;
 use FreeDSx\Ldap\Control\Vlv\VlvResponseControl;
+use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -41,7 +42,7 @@ class VlvSpec extends ObjectBehavior
 
         $client->send(Argument::any(), Argument::any(), new SortingControl(new SortKey('foo')))->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(50, 150,0, 'foo')
         ));
 
@@ -54,7 +55,7 @@ class VlvSpec extends ObjectBehavior
 
         $client->send(Argument::any(), Argument::any(), new SortingControl(new SortKey('foo'), new SortKey('bar')))->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(50, 150,0, 'foo')
         ));
 
@@ -65,7 +66,7 @@ class VlvSpec extends ObjectBehavior
     {
         $client->send(Argument::any(), new VlvControl(0, 100, 1000, 0, null, null), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(50, 150,0, 'foo')
         ));
 
@@ -77,7 +78,7 @@ class VlvSpec extends ObjectBehavior
     {
         $client->send(Argument::any(), new VlvControl(0, 100, 1000, 0, null, null), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(50, 150,0, 'foo')
         ));
 
@@ -94,7 +95,7 @@ class VlvSpec extends ObjectBehavior
     {
         $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(250, 150,0, 'foo')
         ));
 
@@ -106,7 +107,7 @@ class VlvSpec extends ObjectBehavior
     {
         $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(0, 200,0, 'foo')
         ));
 
@@ -118,7 +119,7 @@ class VlvSpec extends ObjectBehavior
     {
         $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(10, 200,0, 'foo')
         ));
 
@@ -130,7 +131,7 @@ class VlvSpec extends ObjectBehavior
     {
         $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(1, 200,0, 'foo')
         ));
 
@@ -143,7 +144,7 @@ class VlvSpec extends ObjectBehavior
     {
         $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(200, 200,0, 'foo')
         ));
 
@@ -156,7 +157,7 @@ class VlvSpec extends ObjectBehavior
     {
         $client->send(Argument::any(), new VlvControl(25, 75, 1, 0), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(1, 200,0, 'foo')
         ));
 
@@ -169,7 +170,7 @@ class VlvSpec extends ObjectBehavior
     {
         $client->send(Argument::any(), new VlvControl(0, 100, 1, 100), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(150, 200,0, 'foo')
         ));
 
@@ -182,13 +183,13 @@ class VlvSpec extends ObjectBehavior
     {
         $client->send(Argument::any(), new VlvControl(0, 100, 1, 100), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(1, 200,0, 'foo')
         ));
 
         $client->send(Argument::any(), new VlvControl(0, 100, 20, 200, null, 'foo'), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(20, 200,0, 'foo')
         ));
 
@@ -205,13 +206,13 @@ class VlvSpec extends ObjectBehavior
     {
         $client->send(Argument::any(), new VlvControl(0, 100, 50, 100), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(100, 200,0, 'foo')
         ));
 
         $client->send(Argument::any(), new VlvControl(0, 100, 80, 200, null, 'foo'), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
-            new SearchResponse(new LdapResult(1, '','')),
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(80, 200,0, 'foo')
         ));
 

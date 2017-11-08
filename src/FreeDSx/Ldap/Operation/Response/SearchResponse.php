@@ -10,7 +10,7 @@
 
 namespace FreeDSx\Ldap\Operation\Response;
 
-use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Operation\LdapResult;
 
 /**
@@ -21,24 +21,24 @@ use FreeDSx\Ldap\Operation\LdapResult;
 class SearchResponse extends LdapResult
 {
     /**
-     * @var Entry[]
+     * @var Entries
      */
     protected $entries;
 
     /**
      * @param LdapResult $result
-     * @param Entry[] ...$entries
+     * @param Entries $entries
      */
-    public function __construct(LdapResult $result, Entry ...$entries)
+    public function __construct(LdapResult $result, Entries $entries)
     {
         $this->entries = $entries;
         parent::__construct($result->resultCode, $result->dn, $result->diagnosticMessage, ...$result->referrals);
     }
 
     /**
-     * @return Entry[]
+     * @return Entries
      */
-    public function getEntries() : array
+    public function getEntries() : Entries
     {
         return $this->entries;
     }

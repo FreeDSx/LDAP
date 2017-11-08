@@ -13,6 +13,7 @@ namespace FreeDSx\Ldap\Search;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Control\PagingControl;
+use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -92,9 +93,9 @@ class Paging
      * Get the next set of entries of results.
      *
      * @param int|null $size
-     * @return \FreeDSx\Ldap\Entry\Entry[]
+     * @return Entries
      */
-    public function getEntries(?int $size = null)
+    public function getEntries(?int $size = null) : Entries
     {
         return $this->send($size);
     }
@@ -124,7 +125,7 @@ class Paging
 
     /**
      * @param int|null $size
-     * @return \FreeDSx\Ldap\Entry\Entry[]
+     * @return Entries
      * @throws ProtocolException
      */
     protected function send(?int $size = null)

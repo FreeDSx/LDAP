@@ -14,6 +14,7 @@ use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
 use FreeDSx\Ldap\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
@@ -24,7 +25,7 @@ class LdapMessageResponseSpec extends ObjectBehavior
 {
     function let()
     {
-        $this->beConstructedWith(1, new SearchResponse(new SearchResultDone(0, 'dc=foo,dc=bar', '')), new Control('foo'));
+        $this->beConstructedWith(1, new SearchResponse(new SearchResultDone(0, 'dc=foo,dc=bar', ''), new Entries()), new Control('foo'));
     }
 
     function it_is_initializable()
