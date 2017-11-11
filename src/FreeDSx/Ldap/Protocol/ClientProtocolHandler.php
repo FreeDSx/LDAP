@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -89,14 +90,15 @@ class ClientProtocolHandler
 
     /**
      * @param array $options
-     * @param EncoderInterface|null $encoder
+     * @param ClientMessageQueue|null $queue
      * @param TcpPool|null $pool
      */
-    public function __construct(array $options, EncoderInterface $encoder = null, TcpPool $pool = null)
+    public function __construct(array $options, ClientMessageQueue $queue = null, TcpPool $pool = null)
     {
         $this->options = $options;
         $this->encoder = new BerEncoder();
-        $this->pool = new TcpPool($options);
+        $this->pool = $pool ?: new TcpPool($options);
+        $this->queue = $queue;
         $this->controls = new ControlBag();
     }
 
@@ -119,7 +121,9 @@ class ClientProtocolHandler
     /**
      * @param RequestInterface $request
      * @param Control[] $controls
-     * @return null|LdapMessageResponse
+     * @return LdapMessageResponse|null
+     * @throws ConnectionException
+     * @throws UnsolicitedNotificationException
      */
     public function send(RequestInterface $request, Control ...$controls) : ?LdapMessageResponse
     {
@@ -128,7 +132,20 @@ class ClientProtocolHandler
             $request,
             ...array_merge($this->controls->toArray(), $controls)
         );
-        $messageFrom = $this->handleRequest($messageTo);
+
+        try {
+            $messageFrom = $this->handleRequest($messageTo);
+        } catch (UnsolicitedNotificationException $exception) {
+            if ($exception->getOid() === ExtendedResponse::OID_NOTICE_OF_DISCONNECTION) {
+                $this->closeTcp();
+                throw new ConnectionException(
+                    sprintf('The remote server has disconnected the session. %s', $exception->getMessage()),
+                    $exception->getCode()
+                );
+            }
+
+            throw $exception;
+        }
 
         if ($messageFrom) {
             $this->handleResponse($messageTo, $messageFrom);
@@ -145,9 +162,7 @@ class ClientProtocolHandler
      */
     protected function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom) : void
     {
-        if ($this->isUnsolicited($messageFrom)) {
-            $this->handleUnsolicitedNotification($messageFrom);
-        } elseif ($messageFrom->getResponse() instanceof ExtendedResponse) {
+        if ($messageFrom->getResponse() instanceof ExtendedResponse) {
             $this->handleExtendedResponse($messageTo, $messageFrom);
         }
         $result = $messageFrom->getResponse();
@@ -170,7 +185,7 @@ class ClientProtocolHandler
             );
         }
 
-        $this->throwProtocolException($result);
+        throw new ProtocolException($result->getDiagnosticMessage(), $result->getResultCode());
     }
 
     /**
@@ -194,41 +209,10 @@ class ClientProtocolHandler
         } elseif ($request instanceof SearchRequest) {
             $messageFrom = $this->handleSearchResponse($messageTo);
         } else {
-            $messageFrom = $this->queue()->getMessage();
+            $messageFrom = $this->queue()->getMessage($messageTo->getMessageId());
         }
 
         return $messageFrom;
-    }
-
-    /**
-     * Check for an unsolicited notification message. It is defined as being a message with an ID of zero and a response
-     * of the ExtendedResponse type.
-     *
-     * @param null|LdapMessageResponse $message
-     * @return bool
-     */
-    protected function isUnsolicited(?LdapMessageResponse $message)
-    {
-        return $message->getMessageId() === 0 && $message->getResponse() instanceof ExtendedResponse;
-    }
-
-    /**
-     * @param LdapMessageResponse $message
-     * @throws ConnectionException
-     */
-    protected function handleUnsolicitedNotification(LdapMessageResponse $message) : void
-    {
-        /** @var ExtendedResponse $response */
-        $response = $message->getResponse();
-        if ($response->getName() === ExtendedResponse::OID_NOTICE_OF_DISCONNECTION) {
-            $this->closeTcp();
-            throw new ConnectionException(
-                sprintf('The remove server has disconnected the session. %s', $response->getDiagnosticMessage()),
-                $response->getResultCode()
-            );
-        }
-
-        $this->throwProtocolException($response);
     }
 
     /**
@@ -237,7 +221,7 @@ class ClientProtocolHandler
      */
     protected function handleExtendedResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom) : void
     {
-        if ($messageTo->getMessageId() !== $messageFrom->getMessageId() || !$messageTo->getRequest() instanceof ExtendedRequest) {
+        if (!$messageTo->getRequest() instanceof ExtendedRequest) {
             return;
         }
 
@@ -260,14 +244,7 @@ class ClientProtocolHandler
      */
     protected function handleStartTls(LdapMessageRequest $messageTo) : void
     {
-        $messageFrom = null;
-
-        /** @var LdapMessageResponse $message */
-        foreach ($this->queue()->getMessages() as $message) {
-            if ($message->getMessageId() === $messageTo->getMessageId()) {
-                $messageFrom = $message;
-            }
-        }
+        $messageFrom = $this->queue()->getMessage($messageTo->getMessageId());
 
         if ($messageFrom->getResponse()->getResultCode() !== ResultCode::SUCCESS) {
             throw new ConnectionException(sprintf(
@@ -290,14 +267,7 @@ class ClientProtocolHandler
 
         while ($done === null) {
             /** @var LdapMessageResponse $message */
-            foreach ($this->queue()->getMessages() as $message) {
-                if ($this->isUnsolicited($message)) {
-                    $this->handleUnsolicitedNotification($message);
-                }
-                // @todo This should not be ignored...
-                if ($message->getMessageId() !== $messageTo->getMessageId()) {
-                    continue;
-                }
+            foreach ($this->queue()->getMessages($messageTo->getMessageId()) as $message) {
                 $response = $message->getResponse();
                 if ($response instanceof SearchResultEntry) {
                     $entries[] = $response->getEntry();
@@ -313,15 +283,6 @@ class ClientProtocolHandler
             new SearchResponse($done->getResponse(), new Entries(...$entries)),
             ...$done->controls()->toArray()
         );
-    }
-
-    /**
-     * @param LdapResult $result
-     * @throws ProtocolException
-     */
-    protected function throwProtocolException(LdapResult $result)
-    {
-        throw new ProtocolException($result->getDiagnosticMessage(), $result->getResultCode());
     }
 
     /**
