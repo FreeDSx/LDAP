@@ -13,7 +13,7 @@ namespace FreeDSx\Ldap\Tcp;
 use FreeDSx\Ldap\Exception\ConnectionException;
 
 /**
- * Given a selection of hosts, connect to one and return the TcpClient.
+ * Given a selection of hosts, connect to one and return the TCP Socket.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -40,6 +40,7 @@ class TcpPool
         'ssl_peer_name',
         'timeout_connect',
         'timeout_read',
+        'port',
     ];
 
     /**
@@ -52,10 +53,10 @@ class TcpPool
 
     /**
      * @param null|string $server
-     * @return TcpClient
+     * @return Socket
      * @throws ConnectionException
      */
-    public function connect(?string $server = null) : TcpClient
+    public function connect(?string $server = null) : Socket
     {
         $servers = $server ? [$server] : $this->options['servers'];
 
@@ -63,7 +64,7 @@ class TcpPool
         $tcp = null;
         foreach ($servers as $server) {
             try {
-                $tcp = (new TcpClient($server, $this->options['port'], $this->getTcpOptions()))->connect();
+                $tcp = Socket::create($server, $this->getTcpOptions());
                 break;
             } catch (\Exception $e) {
                 $lastEx = $e;

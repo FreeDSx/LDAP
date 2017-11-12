@@ -35,14 +35,14 @@ use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Tcp\ClientMessageQueue;
-use FreeDSx\Ldap\Tcp\TcpClient;
+use FreeDSx\Ldap\Tcp\Socket;
 use FreeDSx\Ldap\Tcp\TcpPool;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
 class ClientProtocolHandlerSpec extends ObjectBehavior
 {
-    function let(TcpPool $pool, TcpClient $client, ClientMessageQueue $queue)
+    function let(TcpPool $pool, Socket $client, ClientMessageQueue $queue)
     {
         $pool->connect()->willReturn($client);
         $this->beConstructedWith([], $queue, $pool);

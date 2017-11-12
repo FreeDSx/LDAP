@@ -18,12 +18,12 @@ use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Tcp\ClientMessageQueue;
-use FreeDSx\Ldap\Tcp\TcpClient;
+use FreeDSx\Ldap\Tcp\Socket;
 use PhpSpec\ObjectBehavior;
 
 class ClientMessageQueueSpec extends ObjectBehavior
 {
-    function let(TcpClient $tcp)
+    function let(Socket $tcp)
     {
         $this->beConstructedWith($tcp, new BerEncoder());
     }

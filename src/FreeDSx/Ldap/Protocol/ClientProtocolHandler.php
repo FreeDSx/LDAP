@@ -32,8 +32,8 @@ use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
 use FreeDSx\Ldap\Tcp\ClientMessageQueue;
+use FreeDSx\Ldap\Tcp\Socket;
 use FreeDSx\Ldap\Tcp\TcpPool;
-use FreeDSx\Ldap\Tcp\TcpClient;
 
 /**
  * Handles client specific protocol communication details.
@@ -59,7 +59,7 @@ class ClientProtocolHandler
     protected $pool;
 
     /**
-     * @var TcpClient
+     * @var Socket
      */
     protected $tcp;
 
@@ -111,9 +111,9 @@ class ClientProtocolHandler
     }
 
     /**
-     * @return null|TcpClient
+     * @return null|Socket
      */
-    public function getTcpClient() : ?TcpClient
+    public function getTcpClient() : ?Socket
     {
         return $this->tcp;
     }
@@ -296,9 +296,9 @@ class ClientProtocolHandler
     }
 
     /**
-     * @return TcpClient
+     * @return Socket
      */
-    protected function tcp() : TcpClient
+    protected function tcp() : Socket
     {
         if ($this->tcp === null) {
             $this->tcp = $this->pool->connect();
