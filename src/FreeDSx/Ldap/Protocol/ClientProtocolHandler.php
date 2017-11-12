@@ -232,7 +232,7 @@ class ClientProtocolHandler
         }
 
         //@todo Should not have to do this. But the extended response name OID from the request is needed to complete.
-        $response = ExtendedResponseFactory::get($messageTo->getRequest()->toAsn1(), $request->getName());
+        $response = ExtendedResponseFactory::get($messageFrom->getResponse()->toAsn1(), $request->getName());
         $prop = (new \ReflectionClass(LdapMessageResponse::class))->getProperty('response');
         $prop->setAccessible(true);
         $prop->setValue($messageFrom, $response);

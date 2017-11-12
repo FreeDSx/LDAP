@@ -19,12 +19,14 @@ use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
@@ -98,6 +100,13 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         $client->close()->shouldBeCalled();
 
         $this->send(new UnbindRequest())->shouldBeNull();
+    }
+
+    function it_should_handle_an_extended_response_that_has_a_mapped_class($queue)
+    {
+        $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(0, ''))));
+
+        $this->send(new PasswordModifyRequest())->shouldBeLike(new LdapMessageResponse(1, new PasswordModifyResponse(new LdapResult(0, ''))));
     }
 
     function it_should_close_the_tcp_socket_on_a_disconnect_notice_and_throw_a_connection_exception($queue, $client)
