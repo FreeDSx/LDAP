@@ -62,7 +62,6 @@ class ClientMessageQueue
         while ($this->buffer !== false) {
             $type = null;
             try {
-                /** @var LdapMessageResponse $response */
                 $type = $this->encoder->decode($this->buffer);
                 $this->buffer = false;
 
