@@ -27,11 +27,6 @@ use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 abstract class MessageQueue
 {
     /**
-     * @var string
-     */
-    protected $pduClass = LdapMessage::class;
-
-    /**
      * @var Socket
      */
     protected $tcp;
@@ -89,9 +84,9 @@ abstract class MessageQueue
 
     /**
      * @param int|null $id
-     * @return LdapMessage|LdapMessageResponse|LdapMessageRequest
+     * @return null|LdapMessage|LdapMessageResponse|LdapMessageRequest
      */
-    public function getMessage(?int $id = null) : LdapMessage
+    public function getMessage(?int $id = null) : ?LdapMessage
     {
         return $this->getMessages($id)->current();
     }
