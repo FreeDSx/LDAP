@@ -6,6 +6,7 @@ features from various RFCs:
 * Paging Control Support ([RFC 2696](https://tools.ietf.org/html/rfc2696))
 * VLV Control Support ([draft-ietf-ldapext-ldapv3-vlv-09](https://www.ietf.org/archive/id/draft-ietf-ldapext-ldapv3-vlv-09.txt))
 * Server Side Sort Control ([RFC 2891](https://tools.ietf.org/html/rfc2891))
+* Password Modify Request ([RFC 3062](https://tools.ietf.org/html/rfc3062))
 
 It supports encryption of the LDAP connection through TLS via the OpenSSL extension if available.
 
