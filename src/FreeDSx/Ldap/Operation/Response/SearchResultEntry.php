@@ -61,11 +61,11 @@ class SearchResultEntry implements ResponseInterface
         $attributes = [];
 
         /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $type */
-        foreach ($type->getChild(1)->getChildren() as $partialAttribute) {
+        foreach ($type->getChild(1) as $partialAttribute) {
             $values = [];
 
             /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $partialAttribute */
-            foreach ($partialAttribute->getChild(1)->getChildren() as $attrValue) {
+            foreach ($partialAttribute->getChild(1) as $attrValue) {
                 /** @var \FreeDSx\Ldap\Asn1\Type\OctetStringType $attrValue */
                 $values[] = $attrValue->getValue();
             }
@@ -84,15 +84,17 @@ class SearchResultEntry implements ResponseInterface
         /** @var SequenceType $asn1 */
         $asn1 = Asn1::application(self::TAG_NUMBER, Asn1::sequence());
 
-        $asn1->addChild(Asn1::ldapDn($this->entry->getDn()->toString()));
+        $partialAttributes = Asn1::sequenceOf();
         foreach ($this->entry->getAttributes() as $attribute) {
-            $asn1->addChild(Asn1::sequence(
+            $partialAttributes->addChild(Asn1::sequence(
                 Asn1::ldapString($attribute->getName()),
                 Asn1::setOf(...array_map(function ($v) {
                     return Asn1::octetString($v);
                 }, $attribute->getValues()))
             ));
         }
+        $asn1->addChild(Asn1::ldapDn($this->entry->getDn()->toString()));
+        $asn1->addChild($partialAttributes);
 
         return $asn1;
     }

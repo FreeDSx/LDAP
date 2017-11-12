@@ -55,4 +55,19 @@ class SearchResultEntrySpec extends ObjectBehavior
 
         $this->getEntry()->shouldBeLike(Entry::create('dc=foo,dc=bar', ['cn' => ['foo'], 'sn' => ['foo', 'bar']]));
     }
+
+    function it_should_generate_correct_asn1()
+    {
+        $this->toAsn1()->shouldBeLike(Asn1::application(4, Asn1::sequence(
+            Asn1::ldapDn('cn=foo,dc=foo,dc=bar'),
+            Asn1::sequenceOf(
+                Asn1::sequence(
+                    Asn1::ldapString('cn'),
+                    Asn1::setOf(
+                        Asn1::octetString('foo')
+                    )
+                )
+            )
+        )));
+    }
 }
