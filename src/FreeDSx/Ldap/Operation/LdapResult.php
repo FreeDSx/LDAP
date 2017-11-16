@@ -108,7 +108,7 @@ class LdapResult implements ResponseInterface
      * @param string $diagnosticMessage
      * @param Referral[] $referrals
      */
-    public function __construct(int $resultCode, string $dn, string $diagnosticMessage = '', Referral ...$referrals)
+    public function __construct(int $resultCode, string $dn = '', string $diagnosticMessage = '', Referral ...$referrals)
     {
         $this->resultCode = $resultCode;
         $this->dn = new Dn($dn);
