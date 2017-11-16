@@ -13,7 +13,6 @@ namespace FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\OctetStringType;
 use FreeDSx\Ldap\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
@@ -158,7 +157,7 @@ class ExtendedRequest implements RequestInterface
     protected static function parseAsn1ExtendedRequest(AbstractType $type)
     {
         if (!($type instanceof SequenceType && (count($type) === 1 || count($type) === 2))) {
-            throw new ProtocolException('The extended request is malformed 1');
+            throw new ProtocolException('The extended request is malformed');
         }
         $oid = null;
         $value = null;
@@ -170,11 +169,8 @@ class ExtendedRequest implements RequestInterface
                 $value = $child;
             }
         }
-        if ($oid === null || !$oid instanceof OctetStringType) {
-            throw new ProtocolException('The extended request is malformed 2');
-        }
-        if ($value !== null && !$value instanceof OctetStringType) {
-            throw new ProtocolException('The extended request is malformed 3');
+        if ($oid === null) {
+            throw new ProtocolException('The extended request is malformed');
         }
         if ($value !== null) {
             $value = $value->getValue();
