@@ -111,7 +111,7 @@ class Socket
      */
     public function write(string $data)
     {
-        fwrite($this->socket, $data);
+        @fwrite($this->socket, $data);
 
         return $this;
     }
