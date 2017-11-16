@@ -313,7 +313,7 @@ class ClientProtocolHandler
     protected function queue() : ClientMessageQueue
     {
         if ($this->queue === null) {
-            $this->queue = new ClientMessageQueue($this->tcp(), $this->encoder);
+            $this->queue = new ClientMessageQueue($this->tcp());
         }
 
         return $this->queue;

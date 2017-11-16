@@ -25,7 +25,7 @@ class ClientMessageQueueSpec extends ObjectBehavior
 {
     function let(Socket $tcp)
     {
-        $this->beConstructedWith($tcp, new BerEncoder());
+        $this->beConstructedWith($tcp);
     }
 
     function it_is_initializable()
