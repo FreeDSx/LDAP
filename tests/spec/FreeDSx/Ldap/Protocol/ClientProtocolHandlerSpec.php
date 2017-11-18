@@ -14,7 +14,7 @@ use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
-use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
@@ -120,8 +120,8 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
 
     function it_should_not_throw_an_exception_if_specified($queue)
     {
-        $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::INVALID_DN_SYNTAX, 'foo')));
+        $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::INVALID_DN_SYNTAX, '', 'foo')));
 
-        $this->shouldThrow(ProtocolException::class)->during('send', [new DeleteRequest('foo')]);
+        $this->shouldThrow(new OperationException('foo', ResultCode::INVALID_DN_SYNTAX))->during('send', [new DeleteRequest('foo')]);
     }
 }

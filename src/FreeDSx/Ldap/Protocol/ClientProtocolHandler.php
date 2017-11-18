@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
-use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
@@ -158,7 +158,7 @@ class ClientProtocolHandler
      * @param LdapMessageRequest $messageTo
      * @param LdapMessageResponse $messageFrom
      * @throws BindException
-     * @throws ProtocolException
+     * @throws OperationException
      */
     protected function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom) : void
     {
@@ -185,7 +185,7 @@ class ClientProtocolHandler
             );
         }
 
-        throw new ProtocolException($result->getDiagnosticMessage(), $result->getResultCode());
+        throw new OperationException($result->getDiagnosticMessage(), $result->getResultCode());
     }
 
     /**
