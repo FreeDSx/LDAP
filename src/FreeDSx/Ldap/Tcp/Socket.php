@@ -52,6 +52,19 @@ class Socket
     /**
      * @var array
      */
+    protected $sslOptsMap = [
+        'ssl_allow_self_signed' => 'allow_self_signed',
+        'ssl_ca_cert' => 'ca_file',
+        'ssl_crypto_type' => 'crypto_type',
+        'ssl_peer_name' => 'peer_name',
+        'ssl_cert' => 'local_cert',
+        'ssl_cert_key' => 'local_pk',
+        'ssl_cert_passphrase' => 'passphrase',
+    ];
+
+    /**
+     * @var array
+     */
     protected $sslOpts = [
         'allow_self_signed' => false,
         'verify_peer' => true,
@@ -66,13 +79,13 @@ class Socket
     protected $options = [
         'port' => 389,
         'use_ssl' => false,
+        'ssl_crypto_type' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_1_CLIENT | STREAM_CRYPTO_METHOD_TLS_CLIENT,
         'ssl_validate_cert' => true,
         'ssl_allow_self_signed' => null,
         'ssl_ca_cert' => null,
         'ssl_peer_name' => null,
         'timeout_connect' => 3,
         'timeout_read' => 15,
-        'crypto_type' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_1_CLIENT | STREAM_CRYPTO_METHOD_TLS_CLIENT,
     ];
 
     /**
@@ -165,7 +178,7 @@ class Socket
     public function encrypt(bool $encrypt)
     {
         stream_set_blocking($this->socket, true);
-        $result = stream_socket_enable_crypto($this->socket, $encrypt, $this->options['crypto_type']);
+        $result = stream_socket_enable_crypto($this->socket, $encrypt, $this->options['ssl_crypto_type']);
         stream_set_blocking($this->socket, false);
 
         if ($result === false) {
@@ -227,18 +240,11 @@ class Socket
     protected function createSocketContext()
     {
         $sslOpts = $this->sslOpts;
-
-        if (isset($this->options['ssl_allow_self_signed'])) {
-            $sslOpts['allow_self_signed'] = $this->options['ssl_allow_self_signed'];
+        foreach ($this->sslOptsMap as $optName => $sslOptsName) {
+            if (isset($this->options[$optName])) {
+                $sslOpts[$sslOptsName] = $this->options[$optName];
+            }
         }
-        if (isset($this->options['ssl_ca_cert'])) {
-            $sslOpts['ca_file'] = $this->options['ssl_ca_cert'];
-        }
-        if (isset($this->options['ssl_peer_name'])) {
-            $sslOpts['peer_name'] = $this->options['ssl_peer_name'];
-        }
-
-        $sslOpts['crypto_type'] = $this->options['crypto_type'];
         if ($this->options['ssl_validate_cert'] === false) {
             $sslOpts = array_merge($sslOpts, [
                 'allow_self_signed' => true,
