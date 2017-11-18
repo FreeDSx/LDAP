@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Exception\ConnectionException;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class TcpPool
+class SocketPool
 {
     /**
      * @var array

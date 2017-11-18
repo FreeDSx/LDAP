@@ -33,7 +33,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
 use FreeDSx\Ldap\Tcp\ClientMessageQueue;
 use FreeDSx\Ldap\Tcp\Socket;
-use FreeDSx\Ldap\Tcp\TcpPool;
+use FreeDSx\Ldap\Tcp\SocketPool;
 
 /**
  * Handles client specific protocol communication details.
@@ -54,7 +54,7 @@ class ClientProtocolHandler
     ];
 
     /**
-     * @var TcpPool
+     * @var SocketPool
      */
     protected $pool;
 
@@ -91,13 +91,13 @@ class ClientProtocolHandler
     /**
      * @param array $options
      * @param ClientMessageQueue|null $queue
-     * @param TcpPool|null $pool
+     * @param SocketPool|null $pool
      */
-    public function __construct(array $options, ClientMessageQueue $queue = null, TcpPool $pool = null)
+    public function __construct(array $options, ClientMessageQueue $queue = null, SocketPool $pool = null)
     {
         $this->options = $options;
         $this->encoder = new BerEncoder();
-        $this->pool = $pool ?: new TcpPool($options);
+        $this->pool = $pool ?: new SocketPool($options);
         $this->queue = $queue;
         $this->controls = new ControlBag();
     }
@@ -113,7 +113,7 @@ class ClientProtocolHandler
     /**
      * @return null|Socket
      */
-    public function getTcpClient() : ?Socket
+    public function getSocket() : ?Socket
     {
         return $this->tcp;
     }

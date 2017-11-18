@@ -32,7 +32,7 @@ class LdapClientSpec extends ObjectBehavior
 {
     function let(ClientProtocolHandler $handler)
     {
-        $handler->getTcpClient()->willReturn(null);
+        $handler->getSocket()->willReturn(null);
         $this->beConstructedWith(['servers' => ['foo']]);
         $this->setProtocolHandler($handler);
     }

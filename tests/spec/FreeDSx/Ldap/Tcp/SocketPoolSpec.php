@@ -10,10 +10,10 @@
 
 namespace spec\FreeDSx\Ldap\Tcp;
 
-use FreeDSx\Ldap\Tcp\TcpPool;
+use FreeDSx\Ldap\Tcp\SocketPool;
 use PhpSpec\ObjectBehavior;
 
-class TcpPoolSpec extends ObjectBehavior
+class SocketPoolSpec extends ObjectBehavior
 {
     function let()
     {
@@ -22,6 +22,6 @@ class TcpPoolSpec extends ObjectBehavior
 
     function it_is_initializable()
     {
-        $this->shouldHaveType(TcpPool::class);
+        $this->shouldHaveType(SocketPool::class);
     }
 }
