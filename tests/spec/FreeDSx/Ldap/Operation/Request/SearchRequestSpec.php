@@ -120,8 +120,14 @@ class SearchRequestSpec extends ObjectBehavior
             ->useBaseScope()
             ->setAttributesOnly(true)
             ->setDereferenceAliases(2);
+        $this->beConstructedThrough('fromAsn1', [$search->toAsn1()]);
 
-        $this::fromAsn1($search->toAsn1())->shouldBeLike($search);
+        $this->getBaseDn()->shouldBeLike(new Dn('dc,=foo,dc=bar'));
+        $this->getSizeLimit()->shouldBeEqualTo(5);
+        $this->getTimeLimit()->shouldBeEqualTo(10);
+        $this->getScope()->shouldBeEqualTo(SearchRequest::SCOPE_BASE_OBJECT);
+        $this->getAttributesOnly()->shouldBeEqualTo(true);
+        $this->getDereferenceAliases()->shouldBeEqualTo(2);
     }
 
     function it_should_not_be_constructed_from_invalid_asn1()

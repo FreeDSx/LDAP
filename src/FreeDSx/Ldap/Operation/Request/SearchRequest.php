@@ -155,7 +155,6 @@ class SearchRequest implements RequestInterface
         return $this->setBaseDn($dn);
     }
 
-
     /**
      * Set the search scope for all children underneath the base DN.
      *
@@ -409,12 +408,12 @@ class SearchRequest implements RequestInterface
         }
 
         $search = new self($filter, ...$attrList);
-        $search->scope = $scope->getValue();
-        $search->baseDn = $baseDn->getValue();
-        $search->derefAliases = $deref->getValue();
-        $search->sizeLimit = $sizeLimit->getValue();
-        $search->timeLimit = $timeLimit->getValue();
-        $search->attributesOnly = $typesOnly->getValue();
+        $search->setScope($scope->getValue());
+        $search->setBaseDn($baseDn->getValue());
+        $search->setDereferenceAliases($deref->getValue());
+        $search->setSizeLimit($sizeLimit->getValue());
+        $search->setTimeLimit($timeLimit->getValue());
+        $search->setAttributesOnly($typesOnly->getValue());
 
         return $search;
     }
