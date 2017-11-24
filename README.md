@@ -1,7 +1,7 @@
 # FreeDSx
 FreeDSx is a pure PHP LDAP library. It has no requirement on the core PHP LDAP extension. This library currently implements
-most client functionality described in [RFC 4511](https://tools.ietf.org/html/rfc4511). It also implements some other
-features from various RFCs:
+most client functionality described in [RFC 4511](https://tools.ietf.org/html/rfc4511) and some very limited LDAP server
+functionality. It also implements some other client features from various RFCs:
 
 * Paging Control Support ([RFC 2696](https://tools.ietf.org/html/rfc2696))
 * VLV Control Support ([draft-ietf-ldapext-ldapv3-vlv-09](https://www.ietf.org/archive/id/draft-ietf-ldapext-ldapv3-vlv-09.txt))
