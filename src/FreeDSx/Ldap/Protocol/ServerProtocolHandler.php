@@ -15,9 +15,9 @@ use FreeDSx\Ldap\Asn1\Encoder\EncoderInterface;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
@@ -125,7 +125,7 @@ class ServerProtocolHandler
             $this->dispatchRequests();
         // Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with a
         // result code of protocol error.
-        } catch (EncoderException $e) {
+        } catch (EncoderException|ProtocolException $e) {
             $this->sendNoticeOfDisconnect('The message encoding is malformed.');
         } catch (\Exception|\Throwable $e) {
             if ($this->socket->isConnected()) {

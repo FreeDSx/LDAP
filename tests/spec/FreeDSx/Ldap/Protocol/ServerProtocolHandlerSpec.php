@@ -14,7 +14,9 @@ use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
@@ -180,6 +182,32 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $handler->modifyDn(Argument::any(), Argument::any())->shouldNotBeCalled();
 
         $this->setRequestHandler($handler);
+        $this->handle();
+    }
+
+    function it_should_send_a_notice_of_disconnect_on_a_protocol_exception_from_the_message_queue($socket, $queue)
+    {
+        $queue->getMessage()->willThrow(new ProtocolException());
+
+        $encoder = new BerEncoder();
+        $socket->write($encoder->encode((new LdapMessageResponse(0, new ExtendedResponse(
+            new LdapResult(ResultCode::PROTOCOL_ERROR, '', 'The message encoding is malformed.'),
+            ExtendedResponse::OID_NOTICE_OF_DISCONNECTION
+        )))->toAsn1()))->shouldBeCalled();
+
+        $this->handle();
+    }
+
+    function it_should_send_a_notice_of_disconnect_on_an_encoder_exception_from_the_message_queue($socket, $queue)
+    {
+        $queue->getMessage()->willThrow(new EncoderException());
+
+        $encoder = new BerEncoder();
+        $socket->write($encoder->encode((new LdapMessageResponse(0, new ExtendedResponse(
+            new LdapResult(ResultCode::PROTOCOL_ERROR, '', 'The message encoding is malformed.'),
+            ExtendedResponse::OID_NOTICE_OF_DISCONNECTION
+        )))->toAsn1()))->shouldBeCalled();
+
         $this->handle();
     }
 
