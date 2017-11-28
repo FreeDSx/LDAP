@@ -208,4 +208,16 @@ class Filters
     {
         return new ApproximateFilter($attribute, $value);
     }
+
+    /**
+     * Create a filter object based off a string LDAP filter. For example, the filter "(cn=foo)" would return an
+     * equality filter object.
+     *
+     * @param string $filter
+     * @return FilterInterface
+     */
+    public static function raw(string $filter) : FilterInterface
+    {
+        return FilterParser::parse($filter);
+    }
 }

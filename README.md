@@ -7,6 +7,7 @@ functionality. It also implements some other client features from various RFCs:
 * VLV Control Support ([draft-ietf-ldapext-ldapv3-vlv-09](https://www.ietf.org/archive/id/draft-ietf-ldapext-ldapv3-vlv-09.txt))
 * Server Side Sort Control ([RFC 2891](https://tools.ietf.org/html/rfc2891))
 * Password Modify Request ([RFC 3062](https://tools.ietf.org/html/rfc3062))
+* String Representation of Search Filters ([RFC 4515](https://tools.ietf.org/search/rfc4515))
 
 It supports encryption of the LDAP connection through TLS via the OpenSSL extension if available.
 
@@ -40,7 +41,9 @@ $ldap->bind('user@example.local', '12345');
 # Build up a LDAP filter using the helper methods
 $filter = Filters::and(
     Filters::equal('objectClass', 'user'),
-    Filters::startsWith('cn', 'S')
+    Filters::startsWith('cn', 'S'),
+    # Add a filter object based off a raw string filter...
+    Filters::raw('(telephoneNumber=*)')
 );
 # Create a search operation to be used based on the above filter
 $search = Operations::search($filter, 'cn');

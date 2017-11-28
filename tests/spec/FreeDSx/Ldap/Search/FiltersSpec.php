@@ -13,6 +13,7 @@ namespace spec\FreeDSx\Ldap\Search;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\LessThanOrEqualFilter;
@@ -103,5 +104,11 @@ class FiltersSpec extends ObjectBehavior
     function it_should_create_a_not_filter()
     {
         $this::not(new EqualityFilter('foo', 'bar'))->shouldBeLike(new NotFilter(new EqualityFilter('foo', 'bar')));
+    }
+
+    function it_should_create_a_filter_from_a_raw_string_filter()
+    {
+        $this::raw('(foo=*)')->shouldBeLike(new PresentFilter('foo'));
+        $this::raw('foo=bar')->shouldBeLike(new EqualityFilter('foo', 'bar'));
     }
 }
