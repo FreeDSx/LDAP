@@ -42,6 +42,16 @@ class OrFilterSpec extends ObjectBehavior
         $this->shouldImplement(FilterContainerInterface::class);
     }
 
+    function it_should_implement_countable()
+    {
+        $this->shouldImplement('\Countable');
+    }
+
+    function it_should_implement_iterator_aggregate()
+    {
+        $this->shouldImplement('\IteratorAggregate');
+    }
+
     function it_should_get_the_filters_it_contains()
     {
         $this->get()->shouldBeLike([
@@ -121,5 +131,10 @@ class OrFilterSpec extends ObjectBehavior
     function it_should_have_a_filter_as_a_toString_representation()
     {
         $this->__toString()->shouldBeEqualTo('(|(foo=bar)(foo>=2))');
+    }
+
+    function it_should_get_the_count()
+    {
+        $this->count()->shouldBeEqualTo(2);
     }
 }

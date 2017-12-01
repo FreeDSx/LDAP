@@ -122,6 +122,22 @@ trait FilterContainerTrait
     }
 
     /**
+     * @return \ArrayIterator
+     */
+    public function getIterator()
+    {
+        return new \ArrayIterator($this->filters ?? []);
+    }
+
+    /**
+     * @return int
+     */
+    public function count()
+    {
+        return count($this->filters ?? []);
+    }
+
+    /**
      * @return string
      */
     public function __toString()

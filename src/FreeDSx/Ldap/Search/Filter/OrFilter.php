@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Search\Filter;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class OrFilter implements FilterContainerInterface
+class OrFilter implements FilterContainerInterface, \IteratorAggregate, \Countable
 {
     use FilterContainerTrait;
 
