@@ -70,6 +70,25 @@ class NotFilter implements FilterInterface
     /**
      * {@inheritdoc}
      */
+    public function toString(): string
+    {
+        return self::PAREN_LEFT
+            .self::OPERATOR_NOT
+            .$this->filter->toString()
+            .self::PAREN_RIGHT;
+    }
+
+    /**
+     * @return string
+     */
+    public function __toString()
+    {
+        return $this->toString();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
     public static function fromAsn1(AbstractType $type)
     {
         $type = $type instanceof IncompleteType ? (new BerEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;

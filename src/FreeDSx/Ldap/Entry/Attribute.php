@@ -17,6 +17,16 @@ namespace FreeDSx\Ldap\Entry;
  */
 class Attribute implements \IteratorAggregate, \Countable
 {
+    use EscapeTrait;
+
+    protected const ESCAPE_MAP = [
+        '\\' => '\5c',
+        '*' => '\2a',
+        '(' => '\28',
+        ')' => '\29',
+        "\x00" => '\00',
+    ];
+
     /**
      * @var string
      */
@@ -158,5 +168,21 @@ class Attribute implements \IteratorAggregate, \Countable
     public function __toString()
     {
         return implode(', ', $this->values);
+    }
+
+    /**
+     * Escape an attribute value for a filter.
+     *
+     * @param string $value
+     * @return string
+     */
+    public static function escape(string $value) : string
+    {
+        if (self::shouldNotEscape($value)) {
+            return $value;
+        }
+        $value = str_replace(array_keys(self::ESCAPE_MAP), array_values(self::ESCAPE_MAP), $value);
+
+        return self::escapeNonPrintable($value);
     }
 }

@@ -47,6 +47,14 @@ class PresentFilter implements FilterInterface
     /**
      * {@inheritdoc}
      */
+    public function toString() : string
+    {
+        return self::PAREN_LEFT.$this->attribute.self::FILTER_EQUAL.'*'.self::PAREN_RIGHT;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
     public static function fromAsn1(AbstractType $type)
     {
         $type = $type instanceof IncompleteType ? (new BerEncoder())->complete($type, AbstractType::TAG_TYPE_OCTET_STRING) : $type;

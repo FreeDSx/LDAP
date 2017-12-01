@@ -58,4 +58,24 @@ class RdnSpec extends ObjectBehavior
     {
         $this->shouldThrow(InvalidArgumentException::class)->during('create', ['foobar']);
     }
+
+    function it_should_escape_an_rdn_value_with_leading_and_trailing_spaces()
+    {
+        $this::escape(' foo,= bar ')->shouldBeEqualTo('\20foo\2c= bar\20');
+    }
+
+    function it_should_escape_an_rdn_value_with_a_leading_pound_sign()
+    {
+        $this::escape('# foo ')->shouldBeEqualTo('\23 foo\20');
+    }
+
+    function it_should_escape_required_values()
+    {
+        $this::escape('\foo + "bar", > bar < foo;')->shouldBeEqualTo('\5cfoo \2b \22bar\22\2c \3e bar \3c foo\3b');
+    }
+
+    function it_should_escape_all_characters()
+    {
+        $this::escapeAll('# foo ')->shouldBeEqualTo('\23\20\66\6f\6f\20');
+    }
 }

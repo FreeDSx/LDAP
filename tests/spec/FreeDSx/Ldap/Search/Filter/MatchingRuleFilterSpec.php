@@ -108,4 +108,27 @@ class MatchingRuleFilterSpec extends ObjectBehavior
 
         $this->fromAsn1($rule->toAsn1())->shouldBeLike($rule);
     }
+
+    function it_should_get_the_string_filter_representation()
+    {
+        $this->toString()->shouldBeEqualTo('(bar:foo:=foobar)');
+    }
+
+    function it_should_get_the_filter_representation_with_a_dn_match()
+    {
+        $this->setUseDnAttributes(true);
+
+        $this->toString()->shouldBeEqualTo('(bar:foo:dn:=foobar)');
+    }
+
+    function it_should_have_a_filter_as_a_toString_representation()
+    {
+        $this->__toString()->shouldBeEqualTo('(bar:foo:=foobar)');
+    }
+
+    function it_should_escape_values_on_the_string_representation()
+    {
+        $this->beConstructedWith('foo', 'bar', ')(bar=*5');
+        $this->toString()->shouldBeEqualTo('(bar:foo:=\29\28bar=\2a5)');
+    }
 }

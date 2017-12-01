@@ -16,6 +16,7 @@ use FreeDSx\Ldap\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Asn1\Type\OctetStringType;
 use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 
@@ -162,6 +163,32 @@ class SubstringFilter implements FilterInterface
            Asn1::ldapString($this->attribute),
            $substrings
         ));
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function toString(): string
+    {
+        $filter = self::PAREN_LEFT.$this->attribute.self::FILTER_EQUAL;
+
+        $value = '';
+        if (!empty($this->contains)) {
+            $value = array_map(function($value) {
+                return Attribute::escape($value);
+            }, $this->contains);
+            $value = '*'.implode('*', $value).'*';
+        }
+        if ($this->startsWith !== null) {
+            $startsWith = Attribute::escape($this->startsWith);
+            $value = ($value === '' ? $startsWith.'*' : $startsWith).$value;
+        }
+        if ($this->endsWith !== null) {
+            $endsWith = Attribute::escape($this->endsWith);
+            $value = $value.($value === '' ? '*'.$endsWith : $endsWith);
+        }
+
+        return $filter.$value.self::PAREN_RIGHT;
     }
 
     /**

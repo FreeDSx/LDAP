@@ -110,6 +110,28 @@ trait FilterContainerTrait
     /**
      * {@inheritdoc}
      */
+    public function toString() : string
+    {
+        return self::PAREN_LEFT
+            .self::FILTER_OPERATOR
+            .implode('', array_map(function ($filter) {
+                /** @var FilterInterface $filter */
+                return $filter->toString();
+            }, $this->filters))
+            .self::PAREN_RIGHT;
+    }
+
+    /**
+     * @return string
+     */
+    public function __toString()
+    {
+        return $this->toString();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
     public static function fromAsn1(AbstractType $type)
     {
         $type = $type instanceof IncompleteType ? (new BerEncoder())->complete($type, AbstractType::TAG_TYPE_SET) : $type;

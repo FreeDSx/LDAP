@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Asn1\Type\BooleanType;
 use FreeDSx\Ldap\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Asn1\Type\OctetStringType;
 use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
@@ -147,6 +148,53 @@ class MatchingRuleFilter implements FilterInterface
     /**
      * {@inheritdoc}
      */
+    public function toAsn1() : AbstractType
+    {
+        /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $matchingRule */
+        $matchingRule = Asn1::context(self::CHOICE_TAG, Asn1::sequence());
+
+        if ($this->matchingRule !== null) {
+            $matchingRule->addChild(Asn1::context(1, Asn1::ldapString($this->matchingRule)));
+        }
+        if ($this->attribute !== null) {
+            $matchingRule->addChild(Asn1::context(2, Asn1::ldapString($this->attribute)));
+        }
+        $matchingRule->addChild(Asn1::context(3, Asn1::octetString($this->value)));
+        $matchingRule->addChild(Asn1::context(4, Asn1::boolean($this->useDnAttributes)));
+
+        return $matchingRule;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function toString(): string
+    {
+        $filter = '';
+        if ($this->attribute) {
+            $filter = $this->attribute;
+        }
+        if ($this->matchingRule) {
+            $filter .= ':'.$this->matchingRule;
+        }
+        if ($this->useDnAttributes) {
+            $filter .= ':dn';
+        }
+
+        return self::PAREN_LEFT.$filter.self::FILTER_EXT.Attribute::escape($this->value).self::PAREN_RIGHT;
+    }
+
+    /**
+     * @return string
+     */
+    public function __toString()
+    {
+        return $this->toString();
+    }
+
+    /**
+     * {@inheritdoc}
+     */
     public static function fromAsn1(AbstractType $type)
     {
         $type = $type instanceof IncompleteType ? (new BerEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
@@ -189,25 +237,5 @@ class MatchingRuleFilter implements FilterInterface
         $useDnAttr = $useDnAttr ? $useDnAttr->getValue() : false;
 
         return new self($matchingRule, $matchingType, $matchValue->getValue(), $useDnAttr);
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1() : AbstractType
-    {
-        /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $matchingRule */
-        $matchingRule = Asn1::context(self::CHOICE_TAG, Asn1::sequence());
-
-        if ($this->matchingRule !== null) {
-            $matchingRule->addChild(Asn1::context(1, Asn1::ldapString($this->matchingRule)));
-        }
-        if ($this->attribute !== null) {
-            $matchingRule->addChild(Asn1::context(2, Asn1::ldapString($this->attribute)));
-        }
-        $matchingRule->addChild(Asn1::context(3, Asn1::octetString($this->value)));
-        $matchingRule->addChild(Asn1::context(4, Asn1::boolean($this->useDnAttributes)));
-
-        return $matchingRule;
     }
 }

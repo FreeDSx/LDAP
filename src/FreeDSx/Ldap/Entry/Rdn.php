@@ -19,6 +19,18 @@ use FreeDSx\Ldap\Exception\InvalidArgumentException;
  */
 class Rdn
 {
+    use EscapeTrait;
+
+    public const ESCAPE_MAP = [
+        '\\' => '\\5c',
+        '"' => '\\22',
+        '+' => '\\2b',
+        ',' => '\\2c',
+        ';' => '\\3b',
+        '<' => '\\3c',
+        '>' => '\\3e',
+    ];
+
     /**
      * @var string
      */
@@ -118,5 +130,28 @@ class Rdn
         }
 
         return $obj;
+    }
+
+    /**
+     * Escape an RDN value.
+     *
+     * @param string $value
+     * @return string
+     */
+    public static function escape(string $value) : string
+    {
+        if (self::shouldNotEscape($value)) {
+            return $value;
+        }
+        $value = str_replace(array_keys(self::ESCAPE_MAP), array_values(self::ESCAPE_MAP), $value);
+
+        if ($value[0] === '#' || $value[0] === ' ') {
+            $value = ($value[0] === '#' ? '\23' : '\20').substr($value, 1);
+        }
+        if ($value[-1] === ' ') {
+            $value = substr_replace($value, '\20',-1, 1);
+        }
+
+        return self::escapeNonPrintable($value);
     }
 }

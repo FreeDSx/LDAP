@@ -19,5 +19,7 @@ class OrFilter implements FilterContainerInterface
 {
     use FilterContainerTrait;
 
+    protected const FILTER_OPERATOR = self::OPERATOR_OR;
+
     protected const CHOICE_TAG = 1;
 }

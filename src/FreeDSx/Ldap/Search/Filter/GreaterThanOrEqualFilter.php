@@ -20,4 +20,6 @@ class GreaterThanOrEqualFilter implements FilterInterface
     use AttributeValueAssertionTrait;
 
     protected const CHOICE_TAG = 5;
+
+    protected const FILTER_TYPE = self::FILTER_GTE;
 }

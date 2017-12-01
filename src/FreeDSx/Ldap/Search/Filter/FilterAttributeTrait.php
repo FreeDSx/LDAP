@@ -40,4 +40,12 @@ trait FilterAttributeTrait
 
         return $this;
     }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function __toString()
+    {
+        return $this->toString();
+    }
 }

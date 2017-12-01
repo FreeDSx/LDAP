@@ -20,4 +20,6 @@ class EqualityFilter implements FilterInterface
     use AttributeValueAssertionTrait;
 
     protected const CHOICE_TAG = 3;
+
+    protected const FILTER_TYPE = self::FILTER_EQUAL;
 }

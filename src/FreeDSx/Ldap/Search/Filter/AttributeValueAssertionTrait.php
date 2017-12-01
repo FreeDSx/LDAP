@@ -16,6 +16,7 @@ use FreeDSx\Ldap\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Asn1\Type\OctetStringType;
 use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
@@ -70,6 +71,18 @@ trait AttributeValueAssertionTrait
             Asn1::ldapString($this->attribute),
             Asn1::octetString($this->value)
         ));
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function toString() : string
+    {
+        return self::PAREN_LEFT
+            .$this->attribute
+            .self::FILTER_TYPE
+            .Attribute::escape($this->value)
+            .self::PAREN_RIGHT;
     }
 
     /**

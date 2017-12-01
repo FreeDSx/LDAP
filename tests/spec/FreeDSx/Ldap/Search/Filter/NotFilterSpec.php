@@ -45,4 +45,20 @@ class NotFilterSpec extends ObjectBehavior
             new NotFilter(new EqualityFilter('foo', 'bar'))
         );
     }
+
+    function it_should_get_the_string_filter_representation()
+    {
+        $this->toString()->shouldBeEqualTo('(!(foo=bar))');
+    }
+
+    function it_should_have_a_filter_as_a_toString_representation()
+    {
+        $this->__toString()->shouldBeEqualTo('(!(foo=bar))');
+    }
+
+    function it_should_escape_values_on_the_string_representation()
+    {
+        $this->beConstructedWith(Filters::equal('foo', '*bar'));
+        $this->toString()->shouldBeEqualTo('(!(foo=\2abar))');
+    }
 }

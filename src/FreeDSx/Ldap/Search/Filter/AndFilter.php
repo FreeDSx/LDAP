@@ -19,5 +19,7 @@ class AndFilter implements FilterContainerInterface
 {
     use FilterContainerTrait;
 
+    protected const FILTER_OPERATOR = self::OPERATOR_AND;
+
     protected const CHOICE_TAG = 0;
 }

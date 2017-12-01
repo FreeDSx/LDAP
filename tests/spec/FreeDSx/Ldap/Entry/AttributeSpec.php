@@ -91,4 +91,24 @@ class AttributeSpec extends ObjectBehavior
         $this->equals(new Attribute('CN'))->shouldBeEqualTo(true);
         $this->equals(new Attribute('foo'))->shouldBeEqualTo(false);
     }
+
+    function it_should_escape_a_value()
+    {
+        $this::escape("(foo=*\bar)\x00")->shouldBeEqualTo('\28foo=\2a\5cbar\29\00');
+    }
+
+    function it_should_escape_a_value_to_complete_hex()
+    {
+        $this::escapeAll("foobar")->shouldBeEqualTo('\66\6f\6f\62\61\72');
+    }
+
+    function it_should_ignore_an_empty_value_when_escaping()
+    {
+        $this::escape('')->shouldBeLike('');
+    }
+
+    function it_should_not_escape_a_string_that_is_already_hex_encoded()
+    {
+        $this::escape('\66\6f\6f\62\61\72')->shouldBeEqualTo('\66\6f\6f\62\61\72');
+    }
 }

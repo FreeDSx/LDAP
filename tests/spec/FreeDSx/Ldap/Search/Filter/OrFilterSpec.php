@@ -105,4 +105,21 @@ class OrFilterSpec extends ObjectBehavior
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence()]);
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::octetString('foo')]);
     }
+
+    function it_should_get_the_string_filter_representation()
+    {
+        $this->toString()->shouldBeEqualTo('(|(foo=bar)(foo>=2))');
+    }
+
+    function it_should_get_the_string_filter_representation_with_nested_containers()
+    {
+        $this->add(Filters::and(Filters::equal('foo', 'bar')));
+
+        $this->toString()->shouldBeEqualTo('(|(foo=bar)(foo>=2)(&(foo=bar)))');
+    }
+
+    function it_should_have_a_filter_as_a_toString_representation()
+    {
+        $this->__toString()->shouldBeEqualTo('(|(foo=bar)(foo>=2))');
+    }
 }

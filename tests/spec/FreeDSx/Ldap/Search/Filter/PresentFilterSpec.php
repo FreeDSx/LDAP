@@ -46,4 +46,14 @@ class PresentFilterSpec extends ObjectBehavior
     {
         $this::fromAsn1((new PresentFilter('foo'))->toAsn1())->shouldBeLike(new PresentFilter('foo'));
     }
+
+    function it_should_get_the_string_filter_representation()
+    {
+        $this->toString()->shouldBeEqualTo('(foo=*)');
+    }
+
+    function it_should_have_a_filter_as_a_toString_representation()
+    {
+        $this->__toString()->shouldBeEqualTo('(foo=*)');
+    }
 }
