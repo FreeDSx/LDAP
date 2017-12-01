@@ -58,9 +58,14 @@ class FilterParser
     /**
      * @param string $filter
      * @return FilterInterface
+     * @throws FilterParseException
      */
     public static function parse(string $filter) : FilterInterface
     {
+        if ($filter === '') {
+            throw new FilterParseException('The filter cannot be empty.');
+        }
+
         return (new self($filter))->parseFilterString(0, true)[1];
     }
 
@@ -408,7 +413,7 @@ class FilterParser
                     } elseif (isset($this->filter[$i]) && $this->filter[$i] === FilterInterface::PAREN_LEFT) {
                         $i = $this->nextClosingParenthesis($i);
                     # An empty container is not allowed...
-                    } elseif ($this->filter[$i] === FilterInterface::PAREN_RIGHT) {
+                    } elseif (isset($this->filter[$i]) && $this->filter[$i] === FilterInterface::PAREN_RIGHT) {
                         throw new FilterParseException(sprintf(
                             'The filter container near position %s is empty.',
                             $i
@@ -416,7 +421,8 @@ class FilterParser
                     # Any other conditions possible? This shouldn't happen unless the filter is malformed..
                     } else {
                         throw new FilterParseException(sprintf(
-                            'Unexpected value after "(" at position %s: %s',
+                            'Unexpected value after "%s" at position %s: %s',
+                            $this->filter[$i - 1] ?? '',
                             $i + 1,
                             $this->filter[$i + 1] ?? ''
                         ));

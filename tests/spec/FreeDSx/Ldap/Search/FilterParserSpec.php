@@ -186,4 +186,14 @@ class FilterParserSpec extends ObjectBehavior
     {
         $this->shouldThrow(FilterParseException::class)->during('parse', ['(&)']);
     }
+
+    function it_should_error_on_an_empty_filter()
+    {
+        $this->shouldThrow(FilterParseException::class)->during('parse', ['']);
+    }
+
+    function it_should_error_on_a_malformed_container()
+    {
+        $this->shouldThrow(FilterParseException::class)->during('parse', ['(&']);
+    }
 }
