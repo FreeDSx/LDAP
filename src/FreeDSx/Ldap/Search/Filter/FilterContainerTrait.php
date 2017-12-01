@@ -126,7 +126,7 @@ trait FilterContainerTrait
      */
     public function getIterator()
     {
-        return new \ArrayIterator($this->filters ?? []);
+        return new \ArrayIterator($this->filters);
     }
 
     /**
@@ -134,7 +134,7 @@ trait FilterContainerTrait
      */
     public function count()
     {
-        return count($this->filters ?? []);
+        return count($this->filters);
     }
 
     /**
