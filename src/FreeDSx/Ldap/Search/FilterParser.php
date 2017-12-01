@@ -26,40 +26,6 @@ class FilterParser
 {
     protected const MATCHING_RULE = '/^([a-zA-Z0-9\.]+)?(\:dn)?(\:([a-zA-Z0-9\.]+))?$/';
 
-    protected const PAREN_LEFT = '(';
-
-    protected const PAREN_RIGHT = ')';
-
-    protected const OPERATOR_AND = '&';
-
-    protected const OPERATOR_OR = '|';
-
-    protected const OPERATOR_NOT = '!';
-
-    protected const FILTER_EQUAL = '=';
-
-    protected const FILTER_APPROX = '~=';
-
-    protected const FILTER_GTE = '>=';
-
-    protected const FILTER_LTE = '<=';
-
-    protected const FILTER_EXT = ':=';
-
-    protected const OPERATORS = [
-        self::OPERATOR_NOT,
-        self::OPERATOR_OR,
-        self::OPERATOR_AND,
-    ];
-
-    protected const FILTERS = [
-        self::FILTER_EQUAL,
-        self::FILTER_APPROX,
-        self::FILTER_GTE,
-        self::FILTER_LTE,
-        self::FILTER_EXT,
-    ];
-
     /**
      * @var string
      */
@@ -127,11 +93,11 @@ class FilterParser
      */
     protected function isAtFilterContainer(int $pos) : bool
     {
-        if (!$this->startsWith(self::PAREN_LEFT, $pos)) {
+        if (!$this->startsWith(FilterInterface::PAREN_LEFT, $pos)) {
             return false;
         }
 
-        foreach (self::OPERATORS as $compOp) {
+        foreach (FilterInterface::OPERATORS as $compOp) {
             if ($this->startsWith($compOp, $pos + 1)) {
                 return true;
             }
@@ -163,12 +129,12 @@ class FilterParser
         $endAt = $this->containers[$this->depth]['endAt'];
         $operator = substr($this->filter, $startAt + 1, 1);
 
-        if ($operator === self::OPERATOR_NOT) {
+        if ($operator === FilterInterface::OPERATOR_NOT) {
             return [$endAt, $this->getNotFilterObject($startAt, $endAt)];
         }
 
         $startAt += 2;
-        $filter = $operator === self::OPERATOR_AND ? new AndFilter() : new OrFilter();
+        $filter = $operator === FilterInterface::OPERATOR_AND ? new AndFilter() : new OrFilter();
         while ($endAt !== ($startAt + 1)) {
             [$startAt, $childFilter] = $this->parseFilterString($startAt);
             $filter->add($childFilter);
@@ -194,7 +160,7 @@ class FilterParser
         $filterType = null;
         $valueStartsAt = null;
         for ($i = $startAt; $i < $endAt; $i++) {
-            foreach (self::FILTERS as $op) {
+            foreach (FilterInterface::FILTERS as $op) {
                 if ($this->filter[$i] === $op) {
                     $filterType = $op;
                 } elseif (($i + 1) < $endAt && $this->filter[$i].$this->filter[$i + 1] === $op) {
@@ -238,7 +204,7 @@ class FilterParser
         $parenthesis = true;
 
         # A filter without an opening parenthesis is only valid if it is the root. And it cannot have a closing parenthesis.
-        if ($isRoot && !$this->startsWith(self::PAREN_LEFT, $startAt)) {
+        if ($isRoot && !$this->startsWith(FilterInterface::PAREN_LEFT, $startAt)) {
             $parenthesis = false;
             $pos = false;
             try {
@@ -248,7 +214,7 @@ class FilterParser
                 throw new FilterParseException(sprintf('The ")" at char %s has no matching parenthesis', $pos));
             }
         # If this is not a root filter, it must start with an opening parenthesis.
-        } elseif (!$isRoot && !$this->startsWith(self::PAREN_LEFT, $startAt)) {
+        } elseif (!$isRoot && !$this->startsWith(FilterInterface::PAREN_LEFT, $startAt)) {
             throw new FilterParseException(sprintf(
                 'The character "%s" at position %s was unexpected. Expected "(".',
                 $this->filter[$startAt],
@@ -273,7 +239,7 @@ class FilterParser
         if ($filterType === null) {
             throw new FilterParseException(sprintf(
                 'Expected one of "%s" in the filter after position %s, but received none.',
-                implode(', ', self::FILTERS),
+                implode(', ', FilterInterface::FILTERS),
                 $startsAt
             ));
         }
@@ -294,13 +260,13 @@ class FilterParser
      */
     protected function getComparisonFilterObject(string $operator, string $attribute, string $value) : FilterInterface
     {
-        if ($operator === self::FILTER_LTE) {
+        if ($operator === FilterInterface::FILTER_LTE) {
             return Filters::lessThanOrEqual($attribute, $this->unescapeValue($value));
-        } elseif ($operator === self::FILTER_GTE) {
+        } elseif ($operator === FilterInterface::FILTER_GTE) {
             return Filters::greaterThanOrEqual($attribute, $this->unescapeValue($value));
-        } elseif ($operator === self::FILTER_APPROX) {
+        } elseif ($operator === FilterInterface::FILTER_APPROX) {
             return Filters::approximate($attribute, $this->unescapeValue($value));
-        } elseif ($operator === self::FILTER_EXT) {
+        } elseif ($operator === FilterInterface::FILTER_EXT) {
             return $this->getMatchingRuleFilterObject($attribute, $this->unescapeValue($value));
         }
 
@@ -428,9 +394,9 @@ class FilterParser
         $child = null;
         for ($i = 0; $i < $this->length; $i++) {
             # Detect an unescaped left parenthesis
-            if ($this->filter[$i] === self::PAREN_LEFT) {
+            if ($this->filter[$i] === FilterInterface::PAREN_LEFT) {
                 # Is the parenthesis followed by an (ie. |, &, !) operator? If so it can contain children ...
-                if (isset($this->filter[$i + 1]) && in_array($this->filter[$i + 1], self::OPERATORS)) {
+                if (isset($this->filter[$i + 1]) && in_array($this->filter[$i + 1], FilterInterface::OPERATORS)) {
                     $child = $child === null ? 0 : $child + 1;
                     $this->containers[$child] = ['startAt' => $i, 'endAt' => null];
 
@@ -439,10 +405,10 @@ class FilterParser
                     if ($this->isAtFilterContainer($i)) {
                         $i--;
                     # Comparison filter inside the container...
-                    } elseif (isset($this->filter[$i]) && $this->filter[$i] === self::PAREN_LEFT) {
+                    } elseif (isset($this->filter[$i]) && $this->filter[$i] === FilterInterface::PAREN_LEFT) {
                         $i = $this->nextClosingParenthesis($i);
                     # An empty container is not allowed...
-                    } elseif ($this->filter[$i] === self::PAREN_RIGHT) {
+                    } elseif ($this->filter[$i] === FilterInterface::PAREN_RIGHT) {
                         throw new FilterParseException(sprintf(
                             'The filter container near position %s is empty.',
                             $i
@@ -460,7 +426,7 @@ class FilterParser
                     $i = $this->nextClosingParenthesis($i + 1);
                 }
             # We have reached a closing parenthesis of a container, work backwards from those defined to set the ending.
-            } elseif ($this->filter[$i] === self::PAREN_RIGHT) {
+            } elseif ($this->filter[$i] === FilterInterface::PAREN_RIGHT) {
                 $matchFound = false;
                 foreach (array_reverse($this->containers, true) as $ci => $info) {
                     if ($info['endAt'] === null) {
@@ -494,7 +460,7 @@ class FilterParser
     {
         for ($i = $startAt; $i < $this->length; $i++) {
             # Look for the char, but ignore it if it is escaped
-            if ($this->filter[$i] === self::PAREN_RIGHT) {
+            if ($this->filter[$i] === FilterInterface::PAREN_RIGHT) {
                 return $i;
             }
         }
