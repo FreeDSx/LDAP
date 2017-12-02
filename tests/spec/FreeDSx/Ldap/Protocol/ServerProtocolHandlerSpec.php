@@ -413,6 +413,43 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
+    function it_should_only_return_specific_attributes_from_the_RootDSE_if_requested($queue, $handler, $socket)
+    {
+        $search = (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope()->setAttributesOnly(true);
+        $queue->getMessage()->willReturn(
+            new LdapMessageRequest(1, $search),
+            null
+        );
+
+        $encoder = new BerEncoder();
+        $socket->write($encoder->encode((new LdapMessageResponse(1, new SearchResultEntry(Entry::create('', [
+            'namingContexts' => [],
+            'supportedExtension' => [],
+            'supportedLDAPVersion' => [],
+            'vendorName' => [],
+        ]))))->toAsn1()))->shouldBeCalled();
+        $handler->search(Argument::any(), Argument::any())->shouldNotBeCalled();
+
+        $this->setRequestHandler($handler);
+        $this->handle();
+    }
+
+    function it_should_only_return_attributes_from_the_RootDSE_if_requested($queue, $handler, $socket)
+    {
+        $search = (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope()->setAttributes('namingcontexts');
+        $queue->getMessage()->willReturn(
+            new LdapMessageRequest(1, $search),
+            null
+        );
+
+        $encoder = new BerEncoder();
+        $socket->write($encoder->encode((new LdapMessageResponse(1, new SearchResultEntry(Entry::create('', ['namingContexts' => 'dc=FreeDSx,dc=local',]))))->toAsn1()))->shouldBeCalled();
+        $handler->search(Argument::any(), Argument::any())->shouldNotBeCalled();
+
+        $this->setRequestHandler($handler);
+        $this->handle();
+    }
+
     function it_should_not_allow_a_request_handler_as_an_object($queue, $socket)
     {
         $this->shouldThrow(RuntimeException::class)->during('__construct', [$socket, ['request_handler' => new GenericRequestHandler()], $queue]);
@@ -427,4 +464,6 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
     {
         $this->shouldNotThrow(RuntimeException::class)->during('__construct', [$socket, ['request_handler' => ProxyRequestHandler::class], $queue]);
     }
+
+
 }

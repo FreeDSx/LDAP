@@ -12,6 +12,7 @@ namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
 use FreeDSx\Ldap\Asn1\Encoder\EncoderInterface;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
@@ -403,9 +404,45 @@ class ServerProtocolHandler
         if (isset($this->options['alt_server'])) {
             $entry['altServer'] = $this->options['alt_server'];
         }
+
+        /** @var SearchRequest $request */
+        $request = $message->getRequest();
+        $entry = $this->filterEntryAttributes($request, $entry);
         $this->sendEntries($message, new Entries(Entry::create('', $entry)));
 
         return ResponseFactory::get($message->getRequest(), ResultCode::SUCCESS);
+    }
+
+    /**
+     * Filters attributes from an entry to return only what was requested.
+     *
+     * @param SearchRequest $request
+     * @param array $entry
+     * @return array
+     */
+    protected function filterEntryAttributes(SearchRequest $request, array $entry)
+    {
+        # Only return specific attributes if requested.
+        if (!empty($request->getAttributes())) {
+            $onlyThese = [];
+            foreach ($request->getAttributes() as $attribute) {
+                foreach (array_keys($entry) as $dseAttr) {
+                    if ($attribute->equals(new Attribute($dseAttr))) {
+                        $onlyThese[$dseAttr] = $entry[$dseAttr];
+                    }
+                }
+            }
+            $entry = $onlyThese;
+        }
+
+        # Return attributes only if requested.
+        if ($request->getAttributesOnly()) {
+            foreach (array_keys($entry) as $attr) {
+                $entry[$attr] = [];
+            }
+        }
+
+        return $entry;
     }
 
     /**
