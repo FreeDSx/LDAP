@@ -197,6 +197,7 @@ class BerEncoderSpec extends ObjectBehavior
     function it_should_throw_a_partial_PDU_exception_without_enough_data_to_decode_length()
     {
         $this->shouldThrow(new PartialPduException('Not enough data to decode the length.'))->duringDecode(hex2bin('048301ff'));
+        $this->shouldNotThrow(PartialPduException::class)->during('decode', [hex2bin('30840000003702010264840000002e0426434e3d436861642c434e3d55736572732c44433d6c646170746f6f6c732c44433d6c6f63616c308400000000')]);
     }
 
     function it_should_detect_a_context_specific_tag_type_correctly()

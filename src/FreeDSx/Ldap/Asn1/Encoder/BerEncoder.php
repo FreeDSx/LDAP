@@ -204,7 +204,7 @@ class BerEncoder implements EncoderInterface
             if ($info['length_length'] === 127) {
                 throw new EncoderException('The decoded length cannot be equal to 127 bytes.');
             }
-            if ($info['length_length'] + 2 > strlen($bytes)) {
+            if ($info['length_length'] + 1 > strlen($bytes)) {
                 throw new PartialPduException('Not enough data to decode the length.');
             }
 
