@@ -90,7 +90,7 @@ echo "Diagnostic: ".$response->getDiagnosticMessage().PHP_EOL;
 echo "DN: ".$response->getDn().PHP_EOL;
 
 # Check each control returned by the server...
-foreach($message->getControls() as $control) {
+foreach($message->controls() as $control) {
     echo "Control: ".$control->getTypeOid().PHP_EOL;
 }
 ```
