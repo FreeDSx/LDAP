@@ -10,8 +10,11 @@
 
 namespace spec\FreeDSx\Ldap\Control;
 
+use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
 use PhpSpec\ObjectBehavior;
+use FreeDSx\Ldap\Asn1\Asn1;
 
 class PwdPolicyResponseControlSpec extends ObjectBehavior
 {
@@ -42,5 +45,37 @@ class PwdPolicyResponseControlSpec extends ObjectBehavior
 
     function it_should_be_constructed_from_asn1()
     {
+        $encoder = new BerEncoder();
+
+        $this->beConstructedThrough('fromAsn1', [Asn1::sequence(
+            Asn1::ldapOid(Control::OID_PWD_POLICY),
+            Asn1::boolean(false),
+            Asn1::octetString($encoder->encode(Asn1::sequence(
+                Asn1::context(0, Asn1::sequence(Asn1::context(0, Asn1::integer(100)))),
+                Asn1::context(1, Asn1::enumerated(2))
+            )))
+        )]);
+
+        $this->getTimeBeforeExpiration()->shouldBeEqualTo(100);
+        $this->getError()->shouldBeEqualTo(2);
+        $this->getTypeOid()->shouldBeEqualTo(Control::OID_PWD_POLICY);
+        $this->getCriticality()->shouldBeEqualTo(false);
+    }
+
+    function it_should_generate_correct_asn1()
+    {
+        $this->beConstructedWith(100, null, 2);
+
+        $encoder = new BerEncoder();
+        $this->toAsn1()->shouldBeLike(
+            Asn1::sequence(
+                Asn1::ldapOid(Control::OID_PWD_POLICY),
+                Asn1::boolean(false),
+                Asn1::octetString($encoder->encode(Asn1::sequence(
+                    Asn1::context(0, Asn1::sequence(Asn1::context(0, Asn1::integer(100)))),
+                    Asn1::context(1, Asn1::enumerated(2))
+                )))
+            )
+        );
     }
 }

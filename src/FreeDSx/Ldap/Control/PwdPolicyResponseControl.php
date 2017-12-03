@@ -10,9 +10,12 @@
 
 namespace FreeDSx\Ldap\Control;
 
+use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * Represents a password policy response. draft-behera-ldap-password-policy-09
@@ -32,7 +35,6 @@ use FreeDSx\Ldap\Asn1\Type\SequenceType;
  *         passwordTooYoung            (7),
  *         passwordInHistory           (8) } OPTIONAL }
  *
- * @todo Unsure how the decoding/encoding is handled for the Choice here.
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 class PwdPolicyResponseControl extends Control
@@ -89,11 +91,43 @@ class PwdPolicyResponseControl extends Control
         return $this->error;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function toAsn1(): AbstractType
     {
-        // TODO: Implement toAsn1() method.
+        $response = Asn1::sequence();
+        $warning = null;
+        $error = null;
+
+        if ($this->graceAuthRemaining !== null && $this->timeBeforeExpiration !== null) {
+            throw new ProtocolException('The password policy response cannot have both a time expiration and a grace auth value.');
+        }
+        if ($this->timeBeforeExpiration !== null) {
+            $warning = Asn1::context(0, Asn1::sequence(
+                Asn1::context(0, Asn1::integer($this->timeBeforeExpiration))
+            ));
+        }
+        if ($this->graceAuthRemaining !== null) {
+            $warning = Asn1::context(0, Asn1::sequence(
+                Asn1::context(1, Asn1::integer($this->graceAuthRemaining))
+            ));
+        }
+
+        if ($warning) {
+            $response->addChild($warning);
+        }
+        if ($this->error) {
+            $response->addChild(Asn1::context(1, Asn1::enumerated($this->error)));
+        }
+        $this->controlValue = $response;
+
+        return parent::toAsn1();
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public static function fromAsn1(AbstractType $type)
     {
         /** @var SequenceType $response */
@@ -106,15 +140,26 @@ class PwdPolicyResponseControl extends Control
         $encoder = new BerEncoder();
         foreach ($response->getChildren() as $child) {
             if ($child->getTagNumber() === 0) {
-                /** @var ChoiceType $child */
-                $warning = $child->getChild(0);
-                if ($warning->getTagNumber() === 0) {
-                    $timeBeforeExpiration = $warning->getValue();
-                } elseif ($warning->getTagNumber() === 1) {
-                    $graceAttemptsRemaining = $warning->getValue();
+                /** @var IncompleteType $child */
+                $warnings = $encoder->complete($child, AbstractType::TAG_TYPE_SEQUENCE, [
+                    AbstractType::TAG_CLASS_CONTEXT_SPECIFIC => [
+                        0 => AbstractType::TAG_TYPE_INTEGER,
+                        1 => AbstractType::TAG_TYPE_INTEGER,
+                    ],
+                ]);
+                /** @var AbstractType $warning */
+                foreach ($warnings as $warning) {
+                    if ($warning->getTagNumber() === 0) {
+                        $timeBeforeExpiration = $warning->getValue();
+                        break;
+                    } elseif ($warning->getTagNumber() === 1) {
+                        $graceAttemptsRemaining = $warning->getValue();
+                        break;
+                    }
                 }
             } elseif ($child->getTagNumber() === 1) {
-                $error = $encoder->complete($child->getValue(), AbstractType::TAG_TYPE_ENUMERATED);
+                /** @var IncompleteType $child */
+                $error = $encoder->complete($child, AbstractType::TAG_TYPE_ENUMERATED)->getValue();
             }
         }
         $control = new self($timeBeforeExpiration, $graceAttemptsRemaining, $error);
