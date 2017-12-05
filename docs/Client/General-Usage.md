@@ -18,8 +18,13 @@ contains helpers for searching that are covered in other docs.
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Exception\BindException;
 
-# Construct the LDAP client. Pass an array of servers to try to connect to.
-$ldap = new LdapClient(['servers' => ['dc01', 'dc02']]);
+# Construct the LDAP client with an array of options...
+$ldap = new LdapClient([
+    # The base_dn as the default for all searches (if not explicitly defined)
+    'base_dn' => 'dc=domain,dc=local',
+    # An array of servers to try to connect to
+    'servers' => ['dc01', 'dc02'],
+]);
 
 # Bind to LDAP with a username and password.
 try {
@@ -112,7 +117,7 @@ Setting a control to be sent for every request:
 use FreeDSx\Ldap\Controls;
 
 # Use the factory method of the Controls class to construct a control to set globally on the client.
-# The SDFlags control is specific the Active Directory and impacts the Security Descriptor.
+# The SDFlags control is specific to Active Directory and impacts the Security Descriptor.
 $ldap->controls()->add(Controls::sdFlags(7));
 ```
 
