@@ -18,8 +18,10 @@ use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Paging;
 use FreeDSx\Ldap\Search\Vlv;
 
@@ -75,6 +77,22 @@ class LdapClient
     public function bind(string $username, string $password)
     {
         return $this->handler->send(Operations::bind($username, $password)->setVersion($this->options['version']));
+    }
+
+    /**
+     * Check whether or not an entry matches an equality filter.
+     *
+     * @param string|\FreeDSx\Ldap\Entry\Dn $dn
+     * @param EqualityFilter $filter
+     * @param Control[] ...$controls
+     * @return bool
+     */
+    public function compare($dn, EqualityFilter $filter, Control ...$controls)
+    {
+        /** @var \FreeDSx\Ldap\Operation\Response\CompareResponse $response */
+        $response = $this->send(Operations::compare($dn, $filter), ...$controls)->getResponse();
+
+        return $response->getResultCode() === ResultCode::COMPARE_TRUE;
     }
 
     /**

@@ -18,8 +18,10 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
+use FreeDSx\Ldap\Operation\Response\CompareResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -88,6 +90,20 @@ class LdapClientSpec extends ObjectBehavior
         $handler->send(Operations::extended(ExtendedRequest::OID_WHOAMI))->willReturn(new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(0, ''), null, 'foo')));
 
         $this->whoami()->shouldBeEqualTo('foo');
+    }
+
+    function it_should_return_a_correct_compare_response_on_a_match($handler)
+    {
+        $handler->send(Operations::compare('cn=foo', Filters::equal('foo', 'bar')))->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_TRUE)));
+
+        $this->compare('cn=foo', Filters::equal('foo', 'bar'))->shouldBeEqualTo(true);
+    }
+
+    function it_should_return_a_correct_compare_response_on_a_non_match($handler)
+    {
+        $handler->send(Operations::compare('cn=foo', Filters::equal('foo', 'bar')))->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_FALSE)));
+
+        $this->compare('cn=foo', Filters::equal('foo', 'bar'))->shouldBeEqualTo(false);
     }
 
     function it_should_get_the_options()
