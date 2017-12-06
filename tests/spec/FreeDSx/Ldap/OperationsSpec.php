@@ -74,7 +74,7 @@ class OperationsSpec extends ObjectBehavior
 
     function it_should_create_a_compare_operation()
     {
-        $this::compare('cn=foo,dc=example,dc=local', new EqualityFilter('foo', 'bar'))->shouldBeLike(new CompareRequest('cn=foo,dc=example,dc=local', new EqualityFilter('foo', 'bar')));
+        $this::compare('cn=foo,dc=example,dc=local', 'foo', 'bar')->shouldBeLike(new CompareRequest('cn=foo,dc=example,dc=local', new EqualityFilter('foo', 'bar')));
     }
 
     function it_should_create_an_unbind_operation()

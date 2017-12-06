@@ -92,7 +92,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
 
     function it_should_send_a_compare_request_and_return_false_on_no_match($client, $context)
     {
-        $compare = Operations::compare('foo', Filters::equal('foo', 'bar'));
+        $compare = Operations::compare('foo', 'foo', 'bar');
 
         $client->send($compare)->shouldBeCalled()->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_FALSE)));
 
@@ -101,7 +101,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
 
     function it_should_send_a_compare_request_and_return_true_on_match($client, $context)
     {
-        $compare = Operations::compare('foo', Filters::equal('foo', 'bar'));
+        $compare = Operations::compare('foo', 'foo', 'bar');
 
         $client->send($compare)->shouldBeCalled()->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_TRUE)));
 

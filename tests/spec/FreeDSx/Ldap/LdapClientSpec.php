@@ -94,16 +94,16 @@ class LdapClientSpec extends ObjectBehavior
 
     function it_should_return_a_correct_compare_response_on_a_match($handler)
     {
-        $handler->send(Operations::compare('cn=foo', Filters::equal('foo', 'bar')))->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_TRUE)));
+        $handler->send(Operations::compare('cn=foo', 'foo', 'bar'))->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_TRUE)));
 
-        $this->compare('cn=foo', Filters::equal('foo', 'bar'))->shouldBeEqualTo(true);
+        $this->compare('cn=foo', 'foo', 'bar')->shouldBeEqualTo(true);
     }
 
     function it_should_return_a_correct_compare_response_on_a_non_match($handler)
     {
-        $handler->send(Operations::compare('cn=foo', Filters::equal('foo', 'bar')))->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_FALSE)));
+        $handler->send(Operations::compare('cn=foo', 'foo', 'bar'))->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_FALSE)));
 
-        $this->compare('cn=foo', Filters::equal('foo', 'bar'))->shouldBeEqualTo(false);
+        $this->compare('cn=foo', 'foo', 'bar')->shouldBeEqualTo(false);
     }
 
     function it_should_get_the_options()

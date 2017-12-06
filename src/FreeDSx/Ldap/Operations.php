@@ -29,7 +29,6 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\LdapMessage;
-use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 
@@ -97,13 +96,16 @@ class Operations
     }
 
     /**
+     * A comparison operation to check if an entry has an attribute with a certain value.
+     *
      * @param string|Dn $dn
-     * @param EqualityFilter $filter
+     * @param string $attributeName
+     * @param string $value
      * @return CompareRequest
      */
-    public static function compare($dn, EqualityFilter $filter)
+    public static function compare($dn, string $attributeName, string $value)
     {
-        return new CompareRequest($dn, $filter);
+        return new CompareRequest($dn, Filters::equal($attributeName, $value));
     }
 
     /**

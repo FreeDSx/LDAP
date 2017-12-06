@@ -21,7 +21,6 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Paging;
 use FreeDSx\Ldap\Search\Vlv;
 
@@ -80,17 +79,18 @@ class LdapClient
     }
 
     /**
-     * Check whether or not an entry matches an equality filter.
+     * Check whether or not an entry matches a certain attribute and value.
      *
      * @param string|\FreeDSx\Ldap\Entry\Dn $dn
-     * @param EqualityFilter $filter
+     * @param string $attributeName
+     * @param string $value
      * @param Control[] ...$controls
      * @return bool
      */
-    public function compare($dn, EqualityFilter $filter, Control ...$controls)
+    public function compare($dn, string $attributeName, string $value, Control ...$controls)
     {
         /** @var \FreeDSx\Ldap\Operation\Response\CompareResponse $response */
-        $response = $this->send(Operations::compare($dn, $filter), ...$controls)->getResponse();
+        $response = $this->send(Operations::compare($dn, $attributeName, $value), ...$controls)->getResponse();
 
         return $response->getResultCode() === ResultCode::COMPARE_TRUE;
     }

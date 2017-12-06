@@ -162,17 +162,11 @@ if (!$entry) {
 Perform a simple equality check against an entry DN to see if it passes:
 
 ```php
-use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Search\Filters;
-
-# The DN to compare against
-$dn = 'cn=foo,dc=domain,dc=local';
-
-# The comparison must be an equality filter
-if ($ldap->compare($dn, Filters::equal('title', 'SysAdmin'))) {
-    echo "The DN '$dn' matches!";
+# The comparison needs the DN (string or object) and an attribute name and value
+if ($ldap->compare('cn=foo,dc=domain,dc=local', 'title', 'SysAdmin')) {
+    echo "The DN '$dn' has a title containing SysAdmin!";
 } else {
-    echo "The DN '$dn' does not match.";
+    echo "The DN '$dn' does not have a title that matches.";
 }
 ```
 
