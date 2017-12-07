@@ -25,6 +25,14 @@ class SortKeySpec extends ObjectBehavior
         $this->shouldHaveType(SortKey::class);
     }
 
+    function it_should_be_constructed_via_reverse_order()
+    {
+        $this->beConstructedWith('cn', true);
+
+        $this->getUseReverseOrder()->shouldBeEqualTo(true);
+
+    }
+
     function it_should_not_use_reverse_order_by_default()
     {
         $this->getUseReverseOrder()->shouldBeEqualTo(false);

@@ -59,7 +59,7 @@ class SortingControlSpec extends ObjectBehavior
 
     function it_should_generate_correct_asn1()
     {
-        $this->addSortKeys(new SortKey('foobar', 'bleh', true));
+        $this->addSortKeys(new SortKey('foobar', true, 'bleh'));
 
         $encoder = new BerEncoder();
         $this->toAsn1()->shouldBeLike(Asn1::sequence(
@@ -75,5 +75,10 @@ class SortingControlSpec extends ObjectBehavior
                 )
             )))
         ));
+    }
+
+    function it_should_be_constructed_from_asn1()
+    {
+
     }
 }

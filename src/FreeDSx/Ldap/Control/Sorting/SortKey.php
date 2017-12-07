@@ -34,10 +34,10 @@ class SortKey
 
     /**
      * @param string $attribute
-     * @param null|string $orderingRule
      * @param bool $useReverseOrder
+     * @param null|string $orderingRule
      */
-    public function __construct(string $attribute, ?string $orderingRule = null, bool $useReverseOrder = false)
+    public function __construct(string $attribute, bool $useReverseOrder = false, ?string $orderingRule = null)
     {
         $this->attribute = $attribute;
         $this->orderingRule = $orderingRule;
