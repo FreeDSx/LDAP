@@ -4,6 +4,7 @@
   * [Read Search](#read-search)
   * [List Search](#list-search)
   * [Subtree Search](#subtree-search)
+* [Sorting](#sorting)
 * [Paging](#paging)
 * [VLV](#vlv)
 * [Filters](#filters)
@@ -87,6 +88,45 @@ $entry = $ldap->search(Operations::searchRead('cn=foo,dc=domain,dc=local'))->fir
 if ($entry) {
     echo $entry->getDn().PHP_EOL;
     var_dump($entry->toArray());
+}
+```
+
+## Sorting
+
+You can sort searches by a specific attribute, or set of attributes, and a direction by using a server side sort control.
+This control will sort the results in ascending order by default:
+
+```php
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Controls;
+
+$filter = Filters::and(Filters::equal('objectClass', 'user'), Filters::present('sn')));
+
+# Sort the results by last name
+$entries = $ldap->search(Operations::search($filter, 'sn'), Controls::sort('sn'));
+
+foreach ($entries as $entry) {
+    echo "sn: ".$entry->get('sn').PHP_EOL;
+}
+```
+
+Sort by last name in descending order by using a sort key object:
+
+```php
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Controls;
+use FreeDSx\Ldap\Control\Sorting\SortKey;
+
+$filter = Filters::and(Filters::equal('objectClass', 'user'), Filters::present('sn')));
+
+# Sort the results by last name. Set descending order by pass true as the second argument.
+$sortKey = new SortKey('sn', true)
+$entries = $ldap->search(Operations::search($filter, 'sn'), Controls::sort($sortKey));
+
+foreach ($entries as $entry) {
+    echo "sn: ".$entry->get('sn').PHP_EOL;
 }
 ```
 
