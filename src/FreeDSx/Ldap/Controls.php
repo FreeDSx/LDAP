@@ -78,19 +78,6 @@ class Controls
     }
 
     /**
-     * Create a server sort using just a simple attribute name, with an optional ordering rule and whether to reverse.
-     *
-     * @param string $attribute
-     * @param string $orderingRule
-     * @param bool $reverseOrder
-     * @return SortingControl
-     */
-    public function simpleSort(string $attribute, string $orderingRule = '', bool $reverseOrder = false) : SortingControl
-    {
-        return new SortingControl(new SortKey($attribute, $orderingRule, $reverseOrder));
-    }
-
-    /**
      * Create a control for a subtree delete. On a delete request this will do a recursive delete from the DN and all
      * of its children.
      *

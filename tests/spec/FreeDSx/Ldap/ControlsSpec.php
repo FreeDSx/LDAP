@@ -12,6 +12,8 @@ namespace spec\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Control\Ad\SdFlagsControl;
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\Sorting\SortingControl;
+use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Control\Vlv\VlvControl;
@@ -54,5 +56,15 @@ class ControlsSpec extends ObjectBehavior
     function it_should_create_a_subtree_delete_control()
     {
         $this->subtreeDelete()->shouldBeLike(new Control(Control::OID_SUBTREE_DELETE));
+    }
+
+    function it_should_create_a_sorting_control_using_a_string()
+    {
+        $this->sort('cn')->shouldBeLike(new SortingControl(new SortKey('cn')));
+    }
+
+    function it_should_create_a_sorting_control_using_a_sort_key()
+    {
+        $this->sort(new SortKey('foo'))->shouldBeLike(new SortingControl(new SortKey('foo')));
     }
 }
