@@ -100,4 +100,28 @@ class SortKey
 
         return $this;
     }
+
+    /**
+     * Create an ascending sort key.
+     *
+     * @param string $attribute
+     * @param null|string $matchRule
+     * @return SortKey
+     */
+    public static function ascending(string $attribute, ?string $matchRule = null)
+    {
+        return new self($attribute, false, $matchRule);
+    }
+
+    /**
+     * Create a descending sort key.
+     *
+     * @param string $attribute
+     * @param null|string $matchRule
+     * @return SortKey
+     */
+    public static function descending(string $attribute, ?string $matchRule = null)
+    {
+        return new self($attribute, true, $matchRule);
+    }
 }

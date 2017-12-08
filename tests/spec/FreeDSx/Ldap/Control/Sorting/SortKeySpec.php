@@ -33,6 +33,22 @@ class SortKeySpec extends ObjectBehavior
 
     }
 
+    function it_should_be_constructed_ascending()
+    {
+        $this->beConstructedThrough('ascending', ['foo']);
+
+        $this->getUseReverseOrder()->shouldBeEqualTo(false);
+        $this->getAttribute()->shouldBeEqualTo('foo');
+    }
+
+    function it_should_be_constructed_descending()
+    {
+        $this->beConstructedThrough('descending', ['foo']);
+
+        $this->getUseReverseOrder()->shouldBeEqualTo(true);
+        $this->getAttribute()->shouldBeEqualTo('foo');
+    }
+
     function it_should_not_use_reverse_order_by_default()
     {
         $this->getUseReverseOrder()->shouldBeEqualTo(false);

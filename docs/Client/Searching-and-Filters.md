@@ -121,8 +121,8 @@ use FreeDSx\Ldap\Control\Sorting\SortKey;
 
 $filter = Filters::and(Filters::equal('objectClass', 'user'), Filters::present('sn')));
 
-# Sort the results by last name. Set descending order by pass true as the second argument.
-$sortKey = new SortKey('sn', true)
+# Sort the results by last name in descending order
+$sortKey = SortKey::descending('sn');
 $entries = $ldap->search(Operations::search($filter, 'sn'), Controls::sort($sortKey));
 
 foreach ($entries as $entry) {
