@@ -11,9 +11,18 @@ functionality. It also implements some other client features from various RFCs:
 
 It supports encryption of the LDAP connection through TLS via the OpenSSL extension if available.
 
-# Getting Started
+# Documentation
 
-**Note**: This library is still under heavy development. Use with caution.
+* [LDAP Client](/docs/Client)
+  * [Configuration](/docs/Client/Configuration.md)
+  * [General Usage](/docs/Client/General-Usage.md)
+  * [Operations](/docs/Client/Operations.md)
+  * [Searching and Filters](/docs/Client/Searching-and-Filters.md)
+* [LDAP Server](/docs/Server)
+  * [Configuration](/docs/Server/Configuration.md)
+  * [General Usage](/docs/Server/General-Usage.md)
+
+# Getting Started
 
 Install via composer:
 
