@@ -174,7 +174,7 @@ use FreeDSx\Ldap\Search\Filters;
 # Create a search operation
 $search = Operations::search(Filters::equal('objectClass', 'user'), 'cn');
 
-# Create a VLV search request. The second paramter (required) is the attribute to sort by.
+# Create a VLV search request. The second parameter (required) is the attribute to sort by.
 # The final paramter is how many entries to retrieve past the starting point.
 $vlv = $client->vlv($search, 'cn', 100);
 
