@@ -92,11 +92,4 @@ class ClientMessageQueueSpec extends ObjectBehavior
         $tcp->read()->willReturn(false);
         $this->getMessage()->shouldBeNull();
     }
-
-    /**
-     * @todo Need yieldLike and iterateLike matchers. These are currently on phpspec master branch, not released.
-     */
-    function it_should_get_multiple_messages($tcp)
-    {
-    }
 }
