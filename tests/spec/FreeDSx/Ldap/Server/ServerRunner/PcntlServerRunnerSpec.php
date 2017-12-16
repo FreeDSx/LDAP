@@ -14,6 +14,7 @@ use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\Tcp\Socket;
 use FreeDSx\Ldap\Tcp\SocketServer;
+use PhpSpec\Exception\Example\SkippingException;
 use PhpSpec\ObjectBehavior;
 
 class PcntlServerRunnerSpec extends ObjectBehavior
@@ -35,6 +36,9 @@ class PcntlServerRunnerSpec extends ObjectBehavior
 
     function it_should_send_incoming_requests_to_the_server_protocol_handler(SocketServer $server, Socket $client)
     {
+        if (!extension_loaded('pcntl')) {
+            throw new SkippingException('The PCNTL extension is required for this spec.');
+        }
         $server->accept()->willReturn($client, null);
         $client->read()->willReturn(false);
         $client->close()->willReturn(null);
