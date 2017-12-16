@@ -207,6 +207,7 @@ echo sprintf('At offset %s out of %s.', $vlv->listOffset(), $vlv->listSize()).PH
 All filters can be constructed using the factory methods available on `FreeDSx\Ldap\Search\Filters`. The filter object is
 then passed on to the search request.
 
+------------------
 #### And
 
 Generates a logical 'and' statement by adding multiple filters together.
@@ -225,6 +226,7 @@ $filter = Filters::and(
 };
 ```
 
+------------------
 #### Or
 
 Generates a logical 'or' statement by adding multiple filters together.
@@ -241,6 +243,7 @@ $filter = Filters::or(
 };
 ```
 
+------------------
 #### Negation
 
 Negate a filter by wrapping it in a 'not' statement.
@@ -252,6 +255,7 @@ use FreeDSx\Ldap\Search\Filters;
 $filter = Filters::not(Filters::contains('title', 'Manager'));
 ```
 
+------------------
 #### Equality
 
 Checks that an attribute has a specific value.
@@ -263,6 +267,7 @@ use FreeDSx\Ldap\Search\Filters;
 $filter = Filters::equal('givenName', 'Bob');
 ```
 
+------------------
 #### Approximate
 
 Checks that an attribute value matches the approximate matching algorithm used by the LDAP (phonetic, spelling variations,
@@ -276,6 +281,7 @@ use FreeDSx\Ldap\Search\Filters;
 $filter = Filters::approximate('givenName', 'Jon');
 ```
 
+------------------
 #### Starts With
 
 Checks that an attribute value starts with something specific.
@@ -298,6 +304,7 @@ use FreeDSx\Ldap\Search\Filters;
 $filter = Filters::endsWith('physicalDeliveryOfficeName', 'Michigan');
 ```
 
+------------------
 #### Contains
 
 Checks that an attribute value contains something specific.
@@ -309,6 +316,7 @@ use FreeDSx\Ldap\Search\Filters;
 $filter = Filters::contains('title', 'admin');
 ```
 
+------------------
 #### Present
 
 Checks if there is anything value present/set on a specific attribute.
@@ -320,6 +328,7 @@ use FreeDSx\Ldap\Search\Filters;
 $filter = Filters::present('telephoneNumber');
 ```
 
+------------------
 #### Greater Than or Equal
 
 Checks if an attribute value is greater than or equal to a specific value.
@@ -331,6 +340,7 @@ use FreeDSx\Ldap\Search\Filters;
 $filter = Filters::gte('whenCreated', '20170101000000.0Z');
 ```
 
+------------------
 #### Less Than or Equal
 
 Checks if an attribute value is less than or equal to a specific value.
