@@ -1,4 +1,4 @@
-# FreeDSx
+# FreeDSx [![Build Status](https://travis-ci.org/FreeDSx/LDAP.svg?branch=master)](https://travis-ci.org/FreeDSx/LDAP)[![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/github/freedsx/ldap?branch=master&svg=true)](https://ci.appveyor.com/project/ChadSikorra/ldap)
 FreeDSx is a pure PHP LDAP library. It has no requirement on the core PHP LDAP extension. This library currently implements
 most client functionality described in [RFC 4511](https://tools.ietf.org/html/rfc4511) and some very limited LDAP server
 functionality. It also implements some other client features from various RFCs:
