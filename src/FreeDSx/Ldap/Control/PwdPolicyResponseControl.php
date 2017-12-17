@@ -116,7 +116,7 @@ class PwdPolicyResponseControl extends Control
         if ($warning) {
             $response->addChild($warning);
         }
-        if ($this->error) {
+        if ($this->error !== null) {
             $response->addChild(Asn1::context(1, Asn1::enumerated($this->error)));
         }
         $this->controlValue = $response;
