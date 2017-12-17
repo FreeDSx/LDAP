@@ -77,7 +77,7 @@ class Vlv
     /**
      * @param LdapClient $client
      * @param SearchRequest $search
-     * @param SortingControl|string $sort
+     * @param SortingControl|\FreeDSx\Ldap\Control\Sorting\SortKey|string $sort
      * @param int $before
      * @param int $after
      */
@@ -249,6 +249,7 @@ class Vlv
 
     /**
      * @return Entries
+     * @throws ProtocolException
      */
     public function getEntries() : Entries
     {
