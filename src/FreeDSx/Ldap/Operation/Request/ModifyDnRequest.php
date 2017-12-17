@@ -77,7 +77,7 @@ class ModifyDnRequest implements RequestInterface
     }
 
     /**
-     * @param string}Dn $dn
+     * @param string|Dn $dn
      * @return $this
      */
     public function setDn($dn)
