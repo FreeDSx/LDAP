@@ -98,7 +98,6 @@ class PwdPolicyResponseControl extends Control
     {
         $response = Asn1::sequence();
         $warning = null;
-        $error = null;
 
         if ($this->graceAuthRemaining !== null && $this->timeBeforeExpiration !== null) {
             throw new ProtocolException('The password policy response cannot have both a time expiration and a grace auth value.');
