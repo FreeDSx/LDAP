@@ -56,7 +56,7 @@ class ExtendedRequest implements RequestInterface
     protected $requestName;
 
     /**
-     * @var null
+     * @var null|AbstractType|ProtocolElementInterface|string
      */
     protected $requestValue;
 
@@ -115,7 +115,7 @@ class ExtendedRequest implements RequestInterface
     {
         $asn1 =  Asn1::sequence(Asn1::context(0, Asn1::ldapOid($this->requestName)));
 
-        if ($this->requestValue) {
+        if ($this->requestValue !== null) {
             $value = $this->requestValue;
             $encoder = new BerEncoder();
             if ($this->requestValue instanceof AbstractType) {
