@@ -140,9 +140,9 @@ class LdapClient
      *
      * @param RequestInterface $request
      * @param Control[] ...$controls
-     * @return LdapMessageResponse
+     * @return LdapMessageResponse|null
      */
-    public function send(RequestInterface $request, Control ...$controls) : LdapMessageResponse
+    public function send(RequestInterface $request, Control ...$controls) : ?LdapMessageResponse
     {
         return $this->handler->send($request, ...$controls);
     }
