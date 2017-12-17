@@ -51,4 +51,19 @@ class SortingResponseControlSpec extends ObjectBehavior
             )))
         ))->setValue(null)->shouldBeLike(new SortingResponseControl(0, 'cn'));
     }
+
+    function it_should_generate_correct_asn1()
+    {
+        $encoder = new BerEncoder();
+        $this->toAsn1()->shouldBeLike(
+            Asn1::sequence(
+                Asn1::ldapOid(Control::OID_SORTING_RESPONSE),
+                Asn1::boolean(false),
+                Asn1::octetString($encoder->encode(Asn1::sequence(
+                    Asn1::enumerated(0),
+                    Asn1::context(0, Asn1::octetString('cn'))
+                )))
+            )
+        );
+    }
 }
