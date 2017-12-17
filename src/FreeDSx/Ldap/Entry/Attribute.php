@@ -38,7 +38,7 @@ class Attribute implements \IteratorAggregate, \Countable
     protected $lcAttribute;
 
     /**
-     * @var string{}
+     * @var string[]
      */
     protected $values = [];
 
