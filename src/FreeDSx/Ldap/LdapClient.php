@@ -176,7 +176,7 @@ class LdapClient
      *
      * @return string
      */
-    public function whoami() : string
+    public function whoami() : ?string
     {
         /** @var \FreeDSx\Ldap\Operation\Response\ExtendedResponse $response */
         $response = $this->send(Operations::whoami())->getResponse();
