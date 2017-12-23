@@ -165,6 +165,41 @@ class Entry implements \IteratorAggregate, \Countable
     }
 
     /**
+     * @param $name
+     * @return Attribute|null
+     */
+    public function __get($name)
+    {
+        return $this->get($name);
+    }
+
+    /**
+     * @param $name
+     * @param $value
+     */
+    public function __set($name, $value)
+    {
+        $this->add($name, ...(is_array($value) ? $value : [$value]));
+    }
+
+    /**
+     * @param $name
+     * @return bool
+     */
+    public function __isset($name)
+    {
+        return $this->has($name);
+    }
+
+    /**
+     * @param $name
+     */
+    public function __unset($name)
+    {
+        $this->remove($name);
+    }
+
+    /**
      * Construct an entry from an associative array.
      *
      * @param string $dn

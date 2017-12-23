@@ -110,4 +110,36 @@ class EntrySpec extends ObjectBehavior
         $this->has(new Attribute('cn'))->shouldBeEqualTo(true);
         $this->has(new Attribute('bleh'))->shouldBeEqualTo(false);
     }
+
+    function it_should_get_an_attribute_through_the_magic_get()
+    {
+        $this->__get('CN')->getName()->shouldBeEqualTo('cn');
+    }
+
+    function it_should_get_null_on_an_attribute_that_doesnt_exist_through_the_magic_get()
+    {
+        $this->__get('foo')->shouldBeNull();
+    }
+
+    function it_should_set_an_attribute_through_the_magic_set()
+    {
+        $this->__set('foo', 'bar');
+        $this->__set('bar', ['foo', 'bar']);
+
+        $this->get('foo')->getValues()->shouldBeEqualTo(['bar']);
+        $this->get('bar')->getValues()->shouldBeEqualTo(['foo', 'bar']);
+    }
+
+    function it_should_check_if_an_attribute_exists_through_the_magic_isset()
+    {
+        $this->__isset('CN')->shouldBeEqualTo(true);
+        $this->__isset('foo')->shouldBeEqualTo(false);
+    }
+
+    function it_should_remove_a_variable_through_the_magic_unset()
+    {
+        $this->__unset('cn');
+
+        $this->get('cn')->shouldBeNull();
+    }
 }
