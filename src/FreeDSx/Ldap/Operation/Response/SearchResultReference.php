@@ -12,7 +12,7 @@ namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Operation\Referral;
+use FreeDSx\Ldap\LdapUrl;
 
 /**
  * A search result reference. RFC 4511, 4.5.3.
@@ -27,20 +27,20 @@ class SearchResultReference implements ResponseInterface
     protected const TAG_NUMBER = 19;
 
     /**
-     * @var Referral[]
+     * @var LdapUrl[]
      */
-    protected $referrals;
+    protected $referrals = [];
 
     /**
-     * @param Referral[] ...$referrals
+     * @param LdapUrl[] ...$referrals
      */
-    public function __construct(Referral ...$referrals)
+    public function __construct(LdapUrl ...$referrals)
     {
         $this->referrals = $referrals;
     }
 
     /**
-     * @return Referral[]
+     * @return LdapUrl[]
      */
     public function getReferrals() : array
     {
@@ -56,7 +56,7 @@ class SearchResultReference implements ResponseInterface
 
         /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $type */
         foreach ($type->getChildren() as $referral) {
-            $referrals[] = new Referral($referral->getValue());
+            $referrals[] = LdapUrl::parse($referral->getValue());
         }
 
         return new self(...$referrals);

@@ -15,6 +15,8 @@ use FreeDSx\Ldap\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\UrlParseException;
+use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\Response\ResponseInterface;
 
 /**
@@ -98,17 +100,17 @@ class LdapResult implements ResponseInterface
     protected $diagnosticMessage;
 
     /**
-     * @var Referral[]
+     * @var LdapUrl[]
      */
-    protected $referrals;
+    protected $referrals = [];
 
     /**
      * @param int $resultCode
      * @param string $dn
      * @param string $diagnosticMessage
-     * @param Referral[] $referrals
+     * @param LdapUrl[] $referrals
      */
-    public function __construct(int $resultCode, string $dn = '', string $diagnosticMessage = '', Referral ...$referrals)
+    public function __construct(int $resultCode, string $dn = '', string $diagnosticMessage = '', LdapUrl ...$referrals)
     {
         $this->resultCode = $resultCode;
         $this->dn = new Dn($dn);
@@ -133,7 +135,7 @@ class LdapResult implements ResponseInterface
     }
 
     /**
-     * @return array
+     * @return LdapUrl[]
      */
     public function getReferrals() : array
     {
@@ -197,7 +199,11 @@ class LdapResult implements ResponseInterface
             if ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 3) {
                 /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $child */
                 foreach ($child->getChildren() as $ldapUrl) {
-                    $referrals[] = new Referral($ldapUrl->getValue());
+                    try {
+                        $referrals[] = LdapUrl::parse($ldapUrl->getValue());
+                    } catch (UrlParseException $e) {
+                        throw new ProtocolException($e->getMessage());
+                    }
                 }
             }
         }

@@ -11,15 +11,15 @@
 namespace spec\FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\Response\SearchResultReference;
-use FreeDSx\Ldap\Operation\Referral;
 use PhpSpec\ObjectBehavior;
 
 class SearchResultReferenceSpec extends ObjectBehavior
 {
     function let()
     {
-        $this->beConstructedWith(new Referral('foo'), new Referral('bar'));
+        $this->beConstructedWith(new LdapUrl('foo'), new LdapUrl('bar'));
     }
 
     function it_is_initializable()
@@ -30,21 +30,21 @@ class SearchResultReferenceSpec extends ObjectBehavior
     function it_should_get_the_referrals()
     {
         $this->getReferrals()->shouldBeLike([
-            new Referral('foo'),
-            new Referral('bar')
+            new LdapUrl('foo'),
+            new LdapUrl('bar')
         ]);
     }
 
     function it_should_be_constructed_from_asn1()
     {
         $this->beConstructedThrough('fromAsn1', [Asn1::application(19, Asn1::sequenceOf(
-            Asn1::ldapString('foo'),
-            Asn1::ldapString('bar')
+            Asn1::ldapString('ldap://foo'),
+            Asn1::ldapString('ldap://bar')
         ))]);
 
         $this->getReferrals()->shouldBeLike([
-            new Referral('foo'),
-            new Referral('bar')
+            new LdapUrl('foo'),
+            new LdapUrl('bar')
         ]);
     }
 }

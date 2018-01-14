@@ -44,8 +44,8 @@ class ExtendedResponseSpec extends ObjectBehavior
             Asn1::ldapDn('dc=foo,dc=bar'),
             Asn1::ldapString('foo'),
             Asn1::context(3, Asn1::sequence(
-                Asn1::ldapString('foo'),
-                Asn1::ldapString('bar')
+                Asn1::ldapString('ldap://foo'),
+                Asn1::ldapString('ldap://bar')
             )),
             Asn1::context(10, Asn1::ldapOid('foo')),
             Asn1::context(11, Asn1::octetString('bar'))

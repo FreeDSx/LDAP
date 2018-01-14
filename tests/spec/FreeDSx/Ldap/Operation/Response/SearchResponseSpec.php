@@ -13,16 +13,16 @@ namespace spec\FreeDSx\Ldap\Operation\Response;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
-use FreeDSx\Ldap\Operation\Referral;
 use PhpSpec\ObjectBehavior;
 
 class SearchResponseSpec extends ObjectBehavior
 {
     function let()
     {
-        $this->beConstructedWith(new LdapResult(0, 'dc=foo,dc=bar', 'foo', new Referral('foo')), new Entries(...[Entry::create('foo'), Entry::create('bar')]));
+        $this->beConstructedWith(new LdapResult(0, 'dc=foo,dc=bar', 'foo', new LdapUrl('foo')), new Entries(...[Entry::create('foo'), Entry::create('bar')]));
     }
 
     function it_is_initializable()
@@ -35,7 +35,7 @@ class SearchResponseSpec extends ObjectBehavior
         $this->getResultCode()->shouldBeEqualTo(0);
         $this->getDn()->shouldBeLike(new Dn('dc=foo,dc=bar'));
         $this->getDiagnosticMessage()->shouldBeEqualTo('foo');
-        $this->getReferrals()->shouldBeLike([new Referral('foo')]);
+        $this->getReferrals()->shouldBeLike([new LdapUrl('foo')]);
     }
 
     function it_should_get_the_entries()

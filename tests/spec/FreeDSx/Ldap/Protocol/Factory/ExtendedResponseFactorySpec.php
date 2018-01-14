@@ -12,8 +12,8 @@ namespace spec\FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
+use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
-use FreeDSx\Ldap\Operation\Referral;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
@@ -47,14 +47,14 @@ class ExtendedResponseFactorySpec extends ObjectBehavior
             Asn1::ldapDn('dc=foo,dc=bar'),
             Asn1::ldapString('foo'),
             Asn1::context(3, Asn1::sequence(
-                Asn1::ldapString('foo'),
-                Asn1::ldapString('bar')
+                Asn1::ldapString('ldap://foo'),
+                Asn1::ldapString('ldap://bar')
             )),
             Asn1::context(11, Asn1::octetString($encoder->encode(Asn1::sequence(
                 Asn1::context(0, Asn1::octetString('bleep-blorp'))
             ))))
         )), ExtendedRequest::OID_PWD_MODIFY)->shouldBeLike(new PasswordModifyResponse(
-            new LdapResult(0, 'dc=foo,dc=bar', 'foo', new Referral('foo'), new Referral('bar')),
+            new LdapResult(0, 'dc=foo,dc=bar', 'foo', new LdapUrl('foo'), new LdapUrl('bar')),
             'bleep-blorp'
         ));
     }

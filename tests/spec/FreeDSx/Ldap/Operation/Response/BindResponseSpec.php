@@ -12,16 +12,16 @@ namespace spec\FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
-use FreeDSx\Ldap\Operation\Referral;
 use PhpSpec\ObjectBehavior;
 
 class BindResponseSpec extends ObjectBehavior
 {
     function let()
     {
-        $this->beConstructedWith(new LdapResult(0, 'foo', 'bar', new Referral('foo')), 'foo');
+        $this->beConstructedWith(new LdapResult(0, 'foo', 'bar', new LdapUrl('foo')), 'foo');
     }
 
     function it_is_initializable()
@@ -39,7 +39,7 @@ class BindResponseSpec extends ObjectBehavior
         $this->getResultCode()->shouldBeEqualTo(0);
         $this->getDn()->shouldBeLike(new Dn('foo'));
         $this->getDiagnosticMessage()->shouldBeLike('bar');
-        $this->getReferrals()->shouldBeLike([new Referral('foo')]);
+        $this->getReferrals()->shouldBeLike([new LdapUrl('foo')]);
     }
 
     function it_should_be_constructed_from_asn1()
@@ -49,7 +49,7 @@ class BindResponseSpec extends ObjectBehavior
             Asn1::ldapDn('dc=foo,dc=bar'),
             Asn1::ldapString('foo'),
             Asn1::context(3, Asn1::sequence(
-                Asn1::ldapString('foo')
+                Asn1::ldapString('ldap://foo')
             )),
             Asn1::context(7, Asn1::octetString('foo'))
         ))]);
@@ -58,6 +58,6 @@ class BindResponseSpec extends ObjectBehavior
         $this->getResultCode()->shouldBeEqualTo(0);
         $this->getDn()->shouldBeLike(new Dn('dc=foo,dc=bar'));
         $this->getDiagnosticMessage()->shouldBeEqualTo('foo');
-        $this->getReferrals()->shouldBeLike([new Referral('foo')]);
+        $this->getReferrals()->shouldBeLike([new LdapUrl('foo')]);
     }
 }
