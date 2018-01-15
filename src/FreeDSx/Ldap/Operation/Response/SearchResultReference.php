@@ -12,6 +12,8 @@ namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\UrlParseException;
 use FreeDSx\Ldap\LdapUrl;
 
 /**
@@ -56,7 +58,12 @@ class SearchResultReference implements ResponseInterface
 
         /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $type */
         foreach ($type->getChildren() as $referral) {
-            $referrals[] = LdapUrl::parse($referral->getValue());
+            try {
+                $referrals[] =  LdapUrl::parse($referral->getValue());
+            } catch (UrlParseException $e) {
+                throw new ProtocolException($e->getMessage());
+            }
+
         }
 
         return new self(...$referrals);
@@ -67,8 +74,9 @@ class SearchResultReference implements ResponseInterface
      */
     public function toAsn1(): AbstractType
     {
-        return Asn1::application(self::TAG_NUMBER, Asn1::sequence(array_map(function ($ref) {
-            return Asn1::ldapString($ref->toString);
+        return Asn1::application(self::TAG_NUMBER, Asn1::sequence(...array_map(function ($ref) {
+            /** @var LdapUrl $ref */
+            return Asn1::ldapString($ref->toString());
         }, $this->referrals)));
     }
 }
