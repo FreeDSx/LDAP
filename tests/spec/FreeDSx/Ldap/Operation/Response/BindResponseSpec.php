@@ -11,6 +11,8 @@
 namespace spec\FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
+use FreeDSx\Ldap\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
@@ -44,13 +46,12 @@ class BindResponseSpec extends ObjectBehavior
 
     function it_should_be_constructed_from_asn1()
     {
+        $encoder = new BerEncoder();
         $this->beConstructedThrough('fromAsn1', [Asn1::application(1, Asn1::sequence(
             Asn1::enumerated(0),
             Asn1::ldapDn('dc=foo,dc=bar'),
             Asn1::ldapString('foo'),
-            Asn1::context(3, Asn1::sequence(
-                Asn1::ldapString('ldap://foo')
-            )),
+            Asn1::context(3, new IncompleteType($encoder->encode(Asn1::ldapString('ldap://foo')))),
             Asn1::context(7, Asn1::octetString('foo'))
         ))]);
 

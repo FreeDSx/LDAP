@@ -12,6 +12,7 @@ namespace spec\FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
+use FreeDSx\Ldap\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -46,9 +47,9 @@ class ExtendedResponseFactorySpec extends ObjectBehavior
             Asn1::enumerated(0),
             Asn1::ldapDn('dc=foo,dc=bar'),
             Asn1::ldapString('foo'),
-            Asn1::context(3, Asn1::sequence(
-                Asn1::ldapString('ldap://foo'),
-                Asn1::ldapString('ldap://bar')
+            Asn1::context(3, new IncompleteType(
+                $encoder->encode(Asn1::ldapString('ldap://foo'))
+                .$encoder->encode(Asn1::ldapString('ldap://bar'))
             )),
             Asn1::context(11, Asn1::octetString($encoder->encode(Asn1::sequence(
                 Asn1::context(0, Asn1::octetString('bleep-blorp'))
