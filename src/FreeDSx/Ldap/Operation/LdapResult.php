@@ -11,6 +11,7 @@
 namespace FreeDSx\Ldap\Operation;
 
 use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Dn;
@@ -198,6 +199,7 @@ class LdapResult implements ResponseInterface
         foreach ($type->getChildren() as $child) {
             if ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 3) {
                 /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $child */
+                $child = (new BerEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
                 foreach ($child->getChildren() as $ldapUrl) {
                     try {
                         $referrals[] = LdapUrl::parse($ldapUrl->getValue());

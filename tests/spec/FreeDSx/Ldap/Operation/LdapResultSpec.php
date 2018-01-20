@@ -11,6 +11,8 @@
 namespace spec\FreeDSx\Ldap\Operation;
 
 use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
+use FreeDSx\Ldap\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapUrl;
@@ -51,13 +53,14 @@ class LdapResultSpec extends ObjectBehavior
 
     function it_should_be_constructed_from_asn1()
     {
+        $encoder = new BerEncoder();
         $this->beConstructedThrough('fromAsn1', [Asn1::sequence(
             Asn1::enumerated(0),
             Asn1::ldapDn('dc=foo,dc=bar'),
             Asn1::ldapString('foo'),
-            Asn1::context(3, Asn1::sequence(
-                Asn1::ldapString('ldap://foo'),
-                Asn1::ldapString('ldap://bar')
+            Asn1::context(3, new IncompleteType(
+                $encoder->encode(Asn1::ldapString('ldap://foo'))
+                .$encoder->encode(Asn1::ldapString('ldap://bar'))
             ))
         )]);
 
@@ -72,13 +75,14 @@ class LdapResultSpec extends ObjectBehavior
 
     function it_should_throw_a_protocol_exception_if_the_referral_cannot_be_parsed()
     {
+        $encoder = new BerEncoder();
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
             Asn1::enumerated(0),
             Asn1::ldapDn('dc=foo,dc=bar'),
             Asn1::ldapString('foo'),
-            Asn1::context(3, Asn1::sequence(
-                Asn1::ldapString('ldap://foo'),
-                Asn1::ldapString('bar')
+            Asn1::context(3, new IncompleteType(
+                $encoder->encode(Asn1::ldapString('ldap://foo'))
+                .$encoder->encode(Asn1::ldapString('bar'))
             ))
         )]);
     }
