@@ -115,9 +115,9 @@ Use this with the referral option set to `follow`. Set this option to a class im
 You must implement two methods:
 
 ```php
-chase(LdapMessageRequest $request, LdapUrl $referral, ?BindRequest $bind) : ?BindRequest;
+public function chase(LdapMessageRequest $request, LdapUrl $referral, ?BindRequest $bind) : ?BindRequest;
 
-client(array $options) : LdapClient;
+public function client(array $options) : LdapClient;
 ```
 
 Using this you can implement your own logic for whether or not to follow a referral and what credentials should be used.
