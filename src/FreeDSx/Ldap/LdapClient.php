@@ -31,6 +31,12 @@ use FreeDSx\Ldap\Search\Vlv;
  */
 class LdapClient
 {
+    public const REFERRAL_IGNORE = 'ignore';
+
+    public const REFERRAL_FOLLOW = 'follow';
+
+    public const REFERRAL_THROW = 'throw';
+
     /**
      * @var array
      */
@@ -48,6 +54,9 @@ class LdapClient
         'ssl_peer_name' => null,
         'timeout_connect' => 3,
         'timeout_read' => 15,
+        'referral' => 'ignore',
+        'referral_chaser' => null,
+        'referral_limit' => 10,
         'logger' => null,
     ];
 

@@ -18,7 +18,14 @@ use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ReferralException;
+use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Exception\SkipReferralException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
+use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\LdapUrl;
+use FreeDSx\Ldap\Operation\Request\DnRequestInterface;
+use FreeDSx\Ldap\ReferralChaserInterface;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -31,6 +38,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Tcp\ClientMessageQueue;
 use FreeDSx\Ldap\Tcp\Socket;
 use FreeDSx\Ldap\Tcp\SocketPool;
@@ -87,6 +95,11 @@ class ClientProtocolHandler
      * @var int
      */
     protected $messageId = 0;
+
+    /**
+     * @var BindRequest
+     */
+    protected $bind;
 
     /**
      * @param array $options
@@ -147,6 +160,27 @@ class ClientProtocolHandler
             throw $exception;
         }
 
+        if ($messageFrom && $messageFrom->getResponse()->getResultCode() === ResultCode::REFERRAL) {
+            $result = $messageFrom->getResponse();
+            switch ($this->options['referral']) {
+                case 'throw':
+                    throw new ReferralException($result->getDiagnosticMessage(), ...$result->getReferrals());
+                    break;
+                case 'follow':
+                    return $this->handleReferral($messageTo, $messageFrom);
+                    break;
+                case 'ignore':
+                    break;
+                default:
+                    throw new RuntimeException(sprintf(
+                        'The referral option "%s" is invalid.',
+                        $this->options['referral']
+                    ));
+            }
+        }
+        if ($request instanceof BindRequest) {
+            $this->bind = $request;
+        }
         if ($messageFrom) {
             $this->handleResponse($messageTo, $messageFrom);
         }
@@ -179,6 +213,7 @@ class ClientProtocolHandler
         }
 
         if ($messageTo->getRequest() instanceof BindRequest) {
+            $this->bind = null;
             throw new BindException(
                 sprintf('Unable to bind to LDAP. %s', $result->getDiagnosticMessage()),
                 $result->getResultCode()
@@ -213,6 +248,125 @@ class ClientProtocolHandler
         }
 
         return $messageFrom;
+    }
+
+    /**
+     * @param LdapMessageRequest $messageTo
+     * @param LdapMessageResponse $messageFrom
+     * @return LdapMessageResponse|null
+     * @throws ReferralException
+     */
+    protected function handleReferral(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom)
+    {
+        $referralChaser = $this->options['referral_chaser'];
+        if (!($referralChaser === null || $referralChaser instanceof ReferralChaserInterface)) {
+            throw new RuntimeException(sprintf('The referral_chaser must implement "%s" or be null.', ReferralChaserInterface::class));
+        }
+
+        # Initialize a referral context to track the referrals we have already visited as well as count.
+        if (!isset($this->options['_referral_context'])) {
+            $this->options['_referral_context'] = new ReferralContext($this->bind);
+        }
+
+        foreach ($messageFrom->getResponse()->getReferrals() as $referral) {
+            # We must skip referrals we have already visited to avoid a referral loop
+            if ($this->options['_referral_context']->hasReferral($referral)) {
+                continue;
+            }
+
+            $this->options['_referral_context']->addReferral($referral);
+            if ($this->options['_referral_context']->count() > $this->options['referral_limit']) {
+                throw new OperationException(sprintf(
+                    'The referral limit of %s has been reached.',
+                    $this->options['referral_limit']
+                ));
+            }
+
+            $bind = $this->options['_referral_context']->getBindRequest();
+            try {
+                if ($referralChaser) {
+                    $bind = $referralChaser->chase($messageTo, $referral, $bind);
+                }
+            } catch (SkipReferralException $e) {
+                continue;
+            }
+            $options = $this->options;
+            $options['servers'] = $referral->getHost() !== null ? [$referral->getHost()] : [];
+            $options['port'] = $referral->getPort() ?? 389;
+            $options['use_ssl'] = $referral->getUseSsl();
+
+            # Each referral could potentially modify different aspects of the request, depending on the URL. Clone it
+            # here, merge the options, then use that request to send to LDAP. This makes sure we don't accidentally mix
+            # options from different referrals.
+            $request = clone $messageTo->getRequest();
+            $this->mergeReferralOptions($request, $referral);
+
+            try {
+                $client = $referralChaser !== null ? $referralChaser->client($options) : new LdapClient($options);
+
+                # If we have a referral on a bind request, then do not bind initially.
+                #
+                # It's not clear that this should even be allowed, though RFC 4511 makes no indication that referrals
+                # should not be followed on a bind request. The problem is that while we bind on a different server,
+                # this client continues on with a different bind state, which seems confusing / problematic.
+                if ($bind && !$messageTo->getRequest() instanceof BindRequest) {
+                    $client->send($bind);
+                }
+
+                $response = $client->send($messageTo->getRequest(), ...$messageTo->controls());
+                unset($this->options['_referral_context']);
+
+                return $response;
+            # Skip referrals that fail due to connection issues and not other issues
+            } catch (ConnectionException $e) {
+                continue;
+            # If the referral encountered other referrals but exhausted them, continue to the next one.
+            } catch (OperationException $e) {
+                if ($e->getCode() === ResultCode::REFERRAL) {
+                    continue;
+                }
+                # Other operation errors should bubble up, so throw it
+                unset($this->options['_referral_context']);
+                throw  $e;
+            } catch (\Throwable $e) {
+                unset($this->options['_referral_context']);
+                throw $e;
+            }
+        }
+
+        # If we have exhausted all referrals consider it an operation exception.
+        unset($this->options['_referral_context']);
+        throw new OperationException(
+            $messageFrom->getResponse()->getDiagnosticMessage(),
+            ResultCode::REFERRAL
+        );
+    }
+
+    /**
+     * @param RequestInterface $request
+     * @param LdapUrl $referral
+     */
+    protected function mergeReferralOptions(RequestInterface $request, LdapUrl $referral) : void
+    {
+        if ($referral->getDn() !== null && $request instanceof SearchRequest) {
+            $request->setBaseDn($referral->getDn());
+        } elseif ($referral->getDn() !== null && $request instanceof DnRequestInterface) {
+            $request->setDn($referral->getDn());
+        }
+
+        if ($referral->getScope() !== null && $request instanceof SearchRequest) {
+            if ($referral->getScope() === LdapUrl::SCOPE_SUB) {
+                $request->setScope(SearchRequest::SCOPE_WHOLE_SUBTREE);
+            } elseif ($referral->getScope() === LdapUrl::SCOPE_BASE) {
+                $request->setScope(SearchRequest::SCOPE_SINGLE_LEVEL);
+            } else {
+                $request->setScope(SearchRequest::SCOPE_BASE_OBJECT);
+            }
+        }
+
+        if ($referral->getFilter() !== null && $request instanceof SearchRequest) {
+            $request->setFilter(Filters::raw($referral->getFilter()));
+        }
     }
 
     /**

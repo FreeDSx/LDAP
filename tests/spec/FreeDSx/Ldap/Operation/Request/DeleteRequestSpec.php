@@ -14,6 +14,7 @@ use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
+use FreeDSx\Ldap\Operation\Request\DnRequestInterface;
 use PhpSpec\ObjectBehavior;
 
 class DeleteRequestSpec extends ObjectBehavior
@@ -26,6 +27,11 @@ class DeleteRequestSpec extends ObjectBehavior
     function it_is_initializable()
     {
         $this->shouldHaveType(DeleteRequest::class);
+    }
+
+    function it_should_implement_the_DnRequestInterface()
+    {
+        $this->shouldImplement(DnRequestInterface::class);
     }
 
     function it_should_set_the_dn()

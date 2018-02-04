@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class DeleteRequest implements RequestInterface
+class DeleteRequest implements RequestInterface, DnRequestInterface
 {
     protected const APP_TAG = 10;
 

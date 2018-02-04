@@ -15,7 +15,11 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ReferralException;
+use FreeDSx\Ldap\Exception\SkipReferralException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
+use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -33,6 +37,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\ReferralChaserInterface;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Tcp\ClientMessageQueue;
 use FreeDSx\Ldap\Tcp\Socket;
@@ -123,5 +128,98 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::INVALID_DN_SYNTAX, '', 'foo')));
 
         $this->shouldThrow(new OperationException('foo', ResultCode::INVALID_DN_SYNTAX))->during('send', [new DeleteRequest('foo')]);
+    }
+
+    function it_should_ignore_referrals_if_specified($queue, $pool)
+    {
+        $this->beConstructedWith(['referral' => 'ignore'], $queue, $pool);
+        $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', 'foo', new LdapUrl('foo'))));
+
+        $this->send(new DeleteRequest('foo'))->shouldBeLike(new LdapMessageResponse(
+            1,
+            new DeleteResponse(ResultCode::REFERRAL, '', 'foo', new LdapUrl('foo'))
+        ));
+    }
+
+    function it_should_throw_an_exception_on_referrals_if_specified($queue, $pool)
+    {
+        $this->beConstructedWith(['referral' => 'throw'], $queue, $pool);
+        $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', 'foo', new LdapUrl('foo'))));
+
+        $this->shouldThrow(ReferralException::class)->during('send', [new DeleteRequest('foo')]);
+    }
+
+    function it_should_follow_referrals_with_a_referral_chaser_if_specified(ReferralChaserInterface $chaser, $queue, $pool, LdapClient $ldapClient)
+    {
+        $this->beConstructedWith(['referral' => 'follow', 'referral_limit' => 10, 'referral_chaser' => $chaser], $queue, $pool);
+        $chaser->client(Argument::any())->willReturn($ldapClient);
+        $bind = new SimpleBindRequest('foo', 'bar');
+        $chaser->chase(Argument::any(), Argument::any(), Argument::any())->willReturn($bind);
+        $ldapClient->send($bind)->shouldBeCalled()->willReturn(null);
+
+        $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', '', new LdapUrl('foo'))));
+        $message = new LdapMessageResponse(2, new DeleteResponse(0));
+        $ldapClient->send(new DeleteRequest('foo'))->shouldBeCalled()->willReturn($message);
+        $this->send(new DeleteRequest('foo'))->shouldBeLike($message);
+    }
+
+    function it_should_throw_an_exception_if_the_referral_limit_is_reached(ReferralChaserInterface $chaser, $queue, $pool)
+    {
+        $this->beConstructedWith(['referral' => 'follow', 'referral_limit' => -1, 'referral_chaser' => $chaser], $queue, $pool);
+
+        $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', '', new LdapUrl('foo'))));
+        $this->shouldThrow(OperationException::class)->during('send', [new DeleteRequest('foo')]);
+    }
+
+    function it_should_throw_an_exception_if_all_referrals_have_been_tried_and_follow_is_specified(ReferralChaserInterface $chaser, $queue, $pool)
+    {
+        $this->beConstructedWith(['referral' => 'follow', 'referral_limit' => 10, 'referral_chaser' => $chaser], $queue, $pool);
+        $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', '', new LdapUrl('foo'))));
+
+        $chaser->chase(Argument::any(), Argument::any(), Argument::any())->willThrow(new SkipReferralException());
+        $this->shouldThrow(OperationException::class)->during('send', [new DeleteRequest('foo')]);
+    }
+
+    function it_should_continue_to_the_next_referral_if_a_connection_exception_is_thrown(ReferralChaserInterface $chaser, $queue, $pool, LdapClient $ldapClient)
+    {
+        $this->beConstructedWith(['referral' => 'follow', 'referral_limit' => 10, 'referral_chaser' => $chaser], $queue, $pool);
+        $chaser->client(Argument::any())->willReturn($ldapClient);
+        $bind = new SimpleBindRequest('foo', 'bar');
+        $chaser->chase(Argument::any(), Argument::any(), Argument::any())->willReturn($bind);
+        $ldapClient->send($bind)->shouldBeCalled()->willThrow(new ConnectionException(), 1);
+        $ldapClient->send($bind)->shouldBeCalled()->willReturn(null, 2);
+
+        $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', '', new LdapUrl('foo'), new LdapUrl('bar'))));
+        $message = new LdapMessageResponse(2, new DeleteResponse(0));
+        $ldapClient->send(new DeleteRequest('foo'))->shouldBeCalled()->willReturn($message);
+        $this->send(new DeleteRequest('foo'))->shouldBeLike($message);
+    }
+
+    function it_should_continue_to_the_next_referral_if_an_operation_exception_with_a_referral_result_code_is_thrown(ReferralChaserInterface $chaser, $queue, $pool, LdapClient $ldapClient)
+    {
+        $this->beConstructedWith(['referral' => 'follow', 'referral_limit' => 10, 'referral_chaser' => $chaser], $queue, $pool);
+        $chaser->client(Argument::any())->willReturn($ldapClient);
+        $bind = new SimpleBindRequest('foo', 'bar');
+        $chaser->chase(Argument::any(), Argument::any(), Argument::any())->willReturn($bind);
+        $ldapClient->send($bind)->shouldBeCalled()->willReturn(null);
+
+        $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', '', new LdapUrl('foo'), new LdapUrl('bar'))));
+        $message = new LdapMessageResponse(2, new DeleteResponse(0));
+        $ldapClient->send(new DeleteRequest('foo'))->shouldBeCalled()->willThrow(new OperationException('fail', ResultCode::REFERRAL), 1);
+        $ldapClient->send(new DeleteRequest('foo'))->shouldBeCalled()->willReturn($message, 2);
+        $this->send(new DeleteRequest('foo'))->shouldBeLike($message);
+    }
+
+    function it_should_not_bind_on_the_referral_client_initially_if_the_referral_is_for_a_bind_request(ReferralChaserInterface $chaser, $queue, $pool, LdapClient $ldapClient)
+    {
+        $this->beConstructedWith(['referral' => 'follow', 'referral_limit' => 10, 'referral_chaser' => $chaser], $queue, $pool);
+        $chaser->client(Argument::any())->willReturn($ldapClient);
+        $chaser->chase(Argument::any(), Argument::any(), Argument::any())->willReturn(new SimpleBindRequest('foo', 'bar'));
+        $ldapClient->send(Argument::any())->shouldBeCalledTimes(1);
+
+        $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new BindResponse(new LdapResult(ResultCode::REFERRAL, '', '', new LdapUrl('foo')))));
+        $message = new LdapMessageResponse(1, new BindResponse(new LdapResult(0)));
+        $ldapClient->send(new SimpleBindRequest('foo', 'bar'))->shouldBeCalled()->willReturn($message);
+        $this->send(new SimpleBindRequest('foo', 'bar'))->shouldBeLike($message);
     }
 }

@@ -14,6 +14,7 @@ use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Operation\Request\DnRequestInterface;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use PhpSpec\ObjectBehavior;
 
@@ -27,6 +28,11 @@ class ModifyDnRequestSpec extends ObjectBehavior
     function it_is_initializable()
     {
         $this->shouldHaveType(ModifyDnRequest::class);
+    }
+
+    function it_should_implement_the_DnRequestInterface()
+    {
+        $this->shouldImplement(DnRequestInterface::class);
     }
 
     function it_should_set_the_dn()

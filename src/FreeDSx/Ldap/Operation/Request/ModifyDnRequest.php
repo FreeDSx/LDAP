@@ -30,7 +30,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ModifyDnRequest implements RequestInterface
+class ModifyDnRequest implements RequestInterface, DnRequestInterface
 {
     protected const APP_TAG = 12;
 

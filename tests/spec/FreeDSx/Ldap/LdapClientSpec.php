@@ -122,6 +122,9 @@ class LdapClientSpec extends ObjectBehavior
             'ssl_peer_name' => null,
             'timeout_connect' => 3,
             'timeout_read' => 15,
+            'referral' => 'ignore',
+            'referral_chaser' => null,
+            'referral_limit' => 10,
             'logger' => null,
         ]);
     }

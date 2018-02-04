@@ -7,6 +7,7 @@ use FreeDSx\Ldap\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
+use FreeDSx\Ldap\Operation\Request\DnRequestInterface;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use PhpSpec\ObjectBehavior;
 
@@ -20,6 +21,11 @@ class CompareRequestSpec extends ObjectBehavior
     function it_is_initializable()
     {
         $this->shouldHaveType(CompareRequest::class);
+    }
+
+    function it_should_implement_the_DnRequestInterface()
+    {
+        $this->shouldImplement(DnRequestInterface::class);
     }
 
     function it_should_set_the_dn()

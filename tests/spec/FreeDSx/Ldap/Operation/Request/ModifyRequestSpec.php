@@ -5,8 +5,8 @@ namespace spec\FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Operation\Request\DnRequestInterface;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use PhpSpec\ObjectBehavior;
 
@@ -18,6 +18,11 @@ class ModifyRequestSpec extends ObjectBehavior
             'cn=foo,dc=foo,dc=bar',
             Change::replace('foo', 'bar'), Change::add('sn', 'bleep', 'blorp')
         );
+    }
+
+    function it_should_implement_the_DnRequestInterface()
+    {
+        $this->shouldImplement(DnRequestInterface::class);
     }
 
     function it_is_initializable()

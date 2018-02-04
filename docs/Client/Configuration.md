@@ -9,6 +9,9 @@ LDAP Client Configuration
     * [timeout_connect](#timeout_connect)
     * [timeout_read](#timeout_read)
     * [version](#version)
+    * [referral](#referral)
+    * [referral_limit](#referral_limit)
+    * [referral_chaser](#referral_chaser)
 * [SSL and TLS Options](#ssl-and-tls-options)
     * [use_ssl](#use_ssl)
     * [ssl_validate_cert](#ssl_validate_cert)
@@ -82,6 +85,49 @@ The LDAP version to use.
 **Note**: This library was designed around version 3 only. Changing this may produce unexpected behavior.
 
 **Default**: `3`
+
+------------------
+#### referral
+
+The referral handling strategy to use. It must be one of:
+
+* `ignore`: Referrals are not followed, nor do they cause an exception to be thrown.
+* `throw`: When a referral is encountered it throws a ReferralException, which contains the referral object(s).
+* `follow`: Referrals will be followed until a result is found or the `referral_limit` is reached.  
+
+When you choose to follow referrals, it will bind to the referral destination using your previous bind request (if there
+was one). If you need more control over the bind or what referrals are followed then use the `referral_chaser` option.
+
+**Default**: `ignore`
+
+------------------
+#### referral_limit
+
+The limit to the number of referrals to follow while trying to complete a request. Once this limit is reached an
+OperationException with a code of referral is thrown. 
+
+**Default**: 10
+
+------------------
+#### referral_chaser
+
+Use this with the referral option set to `follow`. Set this option to a class implementing `FreeDSx\Ldap\ReferralChaserInterface`.
+You must implement two methods:
+
+```php
+chase(LdapMessageRequest $request, LdapUrl $referral, ?BindRequest $bind) : ?BindRequest;
+
+client(array $options) : LdapClient;
+```
+
+Using this you can implement your own logic for whether or not to follow a referral and what credentials should be used.
+You can skip a referral by throwing `FreeDSx\Ldap\Exception\SkipReferralException`. If you skip all referrals then a 
+ReferralException will be thrown.
+
+Using the `client($options)` method you can control how your LdapClient is constructed for the referral and perform any
+needed logic beforehand, such as a StartTLS command.
+
+**Default**: `null`
 
 ## SSL and TLS Options
 
