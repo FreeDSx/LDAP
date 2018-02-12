@@ -27,6 +27,7 @@ class LdapServer
     protected $options = [
         'ip' => '0.0.0.0',
         'port' => 389,
+        'idle_timeout' => 600,
         'require_authentication' => true,
         'allow_anonymous' => false,
         'request_handler' => null,

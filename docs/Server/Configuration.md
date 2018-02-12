@@ -4,6 +4,7 @@ LDAP Server Configuration
 * [General Options](#general-options)
     * [ip](#ip)
     * [port](#port)
+    * [idle_timeout](#idle_timeout)
     * [require_authentication](#require_authentication)
     * [allow_anonymous](#allow_anonymous)
     * [request_handler](#request_handler)
@@ -49,6 +50,14 @@ first 1024 ports, it will require administrative access when running the server.
 than 1024 instead if needed.
 
 **Default**: `389`
+
+------------------
+#### idle_timeout
+
+Consider an idle client to timeout after this period of time (in seconds) and disconnect their LDAP session. If set to
+-1, the client can idle indefinitely and not timeout the connection to the server.
+
+**Default**: `600`
 
 ------------------
 #### require_authentication

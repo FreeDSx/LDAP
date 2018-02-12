@@ -16,6 +16,7 @@ use FreeDSx\Ldap\Tcp\Socket;
 use FreeDSx\Ldap\Tcp\SocketServer;
 use PhpSpec\Exception\Example\SkippingException;
 use PhpSpec\ObjectBehavior;
+use Prophecy\Argument;
 
 class PcntlServerRunnerSpec extends ObjectBehavior
 {
@@ -42,7 +43,8 @@ class PcntlServerRunnerSpec extends ObjectBehavior
         $server->accept()->willReturn($client, null);
         $client->read()->willReturn(false);
         $client->close()->willReturn(null);
-
+        $client->isConnected()->willReturn(true);
+        $client->write(Argument::any())->willReturn(null);
         $server->removeClient($client)->willReturn(null);
 
         $this->run($server);

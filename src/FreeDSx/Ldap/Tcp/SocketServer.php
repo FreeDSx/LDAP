@@ -28,6 +28,7 @@ class SocketServer extends Socket
         'ssl_cert_passphrase' => null,
         'ssl_crypto_type' => STREAM_CRYPTO_METHOD_TLSv1_2_SERVER | STREAM_CRYPTO_METHOD_TLSv1_1_SERVER | STREAM_CRYPTO_METHOD_TLS_SERVER,
         'ssl_validate_cert' => false,
+        'idle_timeout' => 600,
     ];
 
     /**
@@ -85,7 +86,9 @@ class SocketServer extends Socket
     {
         $socket = @stream_socket_accept($this->socket, $timeout);
         if ($socket) {
-            $socket = new Socket($socket, $this->options);
+            $socket = new Socket($socket, array_merge($this->options, [
+                'timeout_read' => $this->options['idle_timeout']
+            ]));
             $this->clients[] = $socket;
         }
 
