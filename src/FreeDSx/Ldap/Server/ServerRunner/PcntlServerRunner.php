@@ -56,7 +56,7 @@ class PcntlServerRunner implements ServerRunnerInterface
             } else if ($pid === 0) {
                 (new ServerProtocolHandler($socket, $this->options))->handle();
                 $this->server->removeClient($socket);
-                break;
+                exit;
             }
         }
     }
