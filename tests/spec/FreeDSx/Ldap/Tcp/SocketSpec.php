@@ -15,11 +15,6 @@ use PhpSpec\ObjectBehavior;
 
 class SocketSpec extends ObjectBehavior
 {
-    function let()
-    {
-        $this->beConstructedWith('localhost');
-    }
-
     function it_is_initializable()
     {
         $this->shouldHaveType(Socket::class);

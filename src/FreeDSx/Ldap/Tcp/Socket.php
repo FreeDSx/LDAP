@@ -96,6 +96,9 @@ class Socket
     {
         $this->socket = $resource;
         $this->options = array_merge($this->options, $options);
+        if ($this->socket) {
+            $this->setStreamOpts();
+        }
     }
 
     /**
@@ -114,6 +117,7 @@ class Socket
                 stream_set_blocking($this->socket, false);
             }
         }
+        stream_set_blocking($this->socket, true);
 
         return $data;
     }
@@ -217,6 +221,7 @@ class Socket
                 $this->errorMessage
             ));
         }
+        $this->setStreamOpts();
         $this->isEncrypted = $this->options['use_ssl'];
 
         return $this;
@@ -257,5 +262,13 @@ class Socket
         ]);
 
         return $this->context;
+    }
+
+    /**
+     * Sets options on the stream that must be done after it is a resource.
+     */
+    protected function setStreamOpts() : void
+    {
+        stream_set_timeout($this->socket, $this->options['timeout_read']);
     }
 }

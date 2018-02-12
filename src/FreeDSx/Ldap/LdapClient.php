@@ -53,7 +53,7 @@ class LdapClient
         'ssl_ca_cert' => null,
         'ssl_peer_name' => null,
         'timeout_connect' => 3,
-        'timeout_read' => 15,
+        'timeout_read' => 10,
         'referral' => 'ignore',
         'referral_chaser' => null,
         'referral_limit' => 10,

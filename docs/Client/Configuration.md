@@ -75,7 +75,7 @@ The timeout period (in seconds) when connecting to an LDAP server initially.
 
 The timeout period (in seconds) when reading data from a server.
 
-**Default**: `15`
+**Default**: `10`
 
 ------------------
 #### version
