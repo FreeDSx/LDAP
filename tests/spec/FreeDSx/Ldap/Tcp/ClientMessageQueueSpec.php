@@ -11,6 +11,7 @@
 namespace spec\FreeDSx\Ldap\Tcp;
 
 use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
+use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\LdapResult;
@@ -31,13 +32,6 @@ class ClientMessageQueueSpec extends ObjectBehavior
     function it_is_initializable()
     {
         $this->shouldHaveType(ClientMessageQueue::class);
-    }
-
-    function it_should_return_empty_if_tcp_read_returns_false($tcp)
-    {
-        $tcp->read()->willReturn(false);
-
-        $this->getMessages()->current()->shouldBeEqualTo(null);
     }
 
     function it_should_return_a_single_message_on_tcp_read($tcp)
@@ -87,9 +81,9 @@ class ClientMessageQueueSpec extends ObjectBehavior
         $this->getMessage()->shouldBeLike($message);
     }
 
-    function it_should_return_null_on_get_message_when_there_is_none($tcp)
+    function it_should_throw_an_exception_on_get_message_when_there_is_none($tcp)
     {
         $tcp->read()->willReturn(false);
-        $this->getMessage()->shouldBeNull();
+        $this->shouldThrow(ConnectionException::class)->duringGetMessage();
     }
 }

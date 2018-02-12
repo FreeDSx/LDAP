@@ -12,12 +12,11 @@ namespace FreeDSx\Ldap\Tcp;
 
 use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
 use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\PartialPduException;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 
 /**
  * Used to retrieve message envelopes from the TCP stream.
@@ -53,12 +52,20 @@ abstract class MessageQueue
     /**
      * @param int|null $id
      * @return \Generator
-     * @throws ProtocolException
-     * @throws UnsolicitedNotificationException
+     * @throws ConnectionException
      */
     public function getMessages(?int $id = null)
     {
         $this->buffer = ($this->buffer !== false) ? $this->buffer : $this->tcp->read();
+
+        # Likely an unsolicited notification for a remote disconnect. For some reason, this forces it to be caught in
+        # that case (but down below). This exception directly below is never thrown in that case. But the remote
+        # disconnect message is never caught if this block is not here. Why???
+        #
+        # @todo PHP bug? Or logic issue with my generator use?
+        if ($this->buffer === false) {
+            throw new ConnectionException('The connection to the LDAP server has been lost.');
+        }
 
         while ($this->buffer !== false) {
             $type = null;
