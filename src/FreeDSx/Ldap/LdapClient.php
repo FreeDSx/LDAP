@@ -15,6 +15,7 @@ use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -102,6 +103,21 @@ class LdapClient
         $response = $this->send(Operations::compare($dn, $attributeName, $value), ...$controls)->getResponse();
 
         return $response->getResultCode() === ResultCode::COMPARE_TRUE;
+    }
+
+    /**
+     * Update an existing entry.
+     *
+     * @param Entry $entry
+     * @param Control[] ...$controls
+     * @return LdapMessageResponse
+     */
+    public function update(Entry $entry, Control ...$controls) : LdapMessageResponse
+    {
+        $response = $this->send(Operations::modify($entry->getDn(), ...$entry->changes()), ...$controls);
+        $entry->changes()->reset();
+
+        return $response;
     }
 
     /**

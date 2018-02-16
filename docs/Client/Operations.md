@@ -64,23 +64,28 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Exception\OperationException;
 
 # Search for an entry object to get its current attributes / values
-$entry = $ldap->search(Operations::searchRead('cn=foo,dc=domain,dc=local'))->first();
+$dn = 'cn=foo,dc=domain,dc=local';
+$attributes = ['telephoneNumber', 'ipPhone', 'title'];
+$entry = $ldap->search(Operations::searchRead($dn, ...$attributes))->first();
 
-# Construct an array of changes after checking the entry
-$changes = [];
+# Add a value to an attribute
 if (!$entry->get('telephoneNumber')) {
-    $changes[] = Change::add('telephoneNumber', '555-5555');
+    $entry->add('telephoneNumber', '555-5555');
 }
+# Remove any values an attribute may have
 if ($entry->has('title')) {
-    $changes[] = Change::reset('title');
+    $entry->reset('title');
 }
+# Delete a specific value for an attribute
 if ($entry->get('ipPhone')->has('12345')) {
-    $changes[] = Change::delete('ipPhone', '12345');
+    $entry->delete('ipPhone', '12345');
 }
+# Set a value for an attribute. This replaces any value it may, or may not, have.
+$entry->set('description', 'Employee');
 
-# Modify an entry using its DN and a set of Change objects
+# Send the built up changes back to LDAP to update the entry.
 try {
-    $ldap->send(Operations::modify($entry->getDn(), ...$changes));
+    $ldap->update($entry);
 } catch (OperationException $e) {
     echo sprintf('Error modifying entry (%s): %s', $e->getCode(), $e->getMessage());
 }

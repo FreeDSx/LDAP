@@ -11,6 +11,8 @@
 namespace spec\FreeDSx\Ldap\Entry;
 
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Change;
+use FreeDSx\Ldap\Entry\Changes;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use PhpSpec\ObjectBehavior;
@@ -89,14 +91,14 @@ class EntrySpec extends ObjectBehavior
         $this->get(new Attribute('cn'))->getName()->shouldBeEqualTo('cn');
     }
 
-    function it_should_remove_an_attribute_using_a_string()
+    function it_should_reset_an_attribute_using_a_string()
     {
-        $this->remove('cn')->get('cn')->shouldBeNull();
+        $this->reset('cn')->get('cn')->shouldBeNull();
     }
 
     function it_should_remove_an_attribute_using_an_attribute()
     {
-        $this->remove(new Attribute('cn'))->get('cn')->shouldBeNull();
+        $this->reset(new Attribute('cn'))->get('cn')->shouldBeNull();
     }
 
     function if_should_check_if_it_has_an_attribute_using_a_string()
@@ -141,5 +143,65 @@ class EntrySpec extends ObjectBehavior
         $this->__unset('cn');
 
         $this->get('cn')->shouldBeNull();
+    }
+
+    function it_should_add_to_an_attributes_values_if_it_already_exists_while_adding()
+    {
+        $this->add('cn', 'bar');
+        $this->get('cn')->getValues()->shouldBeEqualTo(['foo', 'bar']);
+
+        $this->add(new Attribute('telephonenumber', '789'));
+        $this->get('telephoneNumber')->getValues()->shouldBeEqualTo(['123', '456', '789']);
+
+        $this->add('sn','smith');
+        $this->get('sn')->getValues()->shouldBeLike(['smith']);
+    }
+
+    function it_should_remove_an_attributes_values_if_it_already_exists_when_deleting()
+    {
+        $this->remove('telephonenumber', '123');
+        $this->get('telephoneNumber')->getValues()->shouldNotContain(['123']);
+
+        $this->remove(new Attribute('telephonenumber', '456'));
+        $this->get('telephoneNumber')->getValues()->shouldBeEqualTo([]);
+    }
+
+    function it_should_not_generate_a_delete_change_when_no_values_are_provided()
+    {
+        $this->remove('telephonenumber');
+        $this->changes()->toArray()->shouldBeEqualTo([]);
+    }
+
+    function it_should_generate_a_delete_change_when_unsetting_an_attribute()
+    {
+        $this->__unset('telephonenumber');
+
+        $this->changes()->toArray()[0]->getAttribute()->getName()->shouldBeEqualTo('telephonenumber');
+        $this->changes()->toArray()[0]->getAttribute()->getValues()->shouldBeEqualTo([]);
+        $this->changes()->toArray()[0]->getType()->shouldBeEqualTo(Change::TYPE_DELETE);
+
+    }
+
+    function it_should_generate_a_replace_change_when_setting_an_attribute()
+    {
+        $this->set('cn', 'foo');
+
+        $this->changes()->toArray()[0]->getAttribute()->getName()->shouldBeEqualTo('cn');
+        $this->changes()->toArray()[0]->getAttribute()->getValues()->shouldBeEqualTo(['foo']);
+        $this->changes()->toArray()[0]->getType()->shouldBeEqualTo(Change::TYPE_REPLACE);
+    }
+
+    function it_should_generate_an_add_change_when_adding_an_attribute()
+    {
+        $this->add('sn', 'Smith');
+
+        $this->changes()->toArray()[0]->getAttribute()->getName()->shouldBeEqualTo('sn');
+        $this->changes()->toArray()[0]->getAttribute()->getValues()->shouldBeEqualTo(['Smith']);
+        $this->changes()->toArray()[0]->getType()->shouldBeEqualTo(Change::TYPE_ADD);
+    }
+
+    function it_should_get_the_changes()
+    {
+        $this->changes()->shouldBeAnInstanceOf(Changes::class);
     }
 }

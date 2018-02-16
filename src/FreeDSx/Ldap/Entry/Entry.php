@@ -28,6 +28,11 @@ class Entry implements \IteratorAggregate, \Countable
     protected $dn;
 
     /**
+     * @var Changes
+     */
+    protected $changes;
+
+    /**
      * @param string|Dn $dn
      * @param Attribute[] ...$attributes
      */
@@ -35,10 +40,11 @@ class Entry implements \IteratorAggregate, \Countable
     {
         $this->dn = $dn instanceof Dn ? $dn : new Dn($dn);
         $this->attributes = $attributes;
+        $this->changes = new Changes();
     }
 
     /**
-     * Add an attribute (simple string or Attribute object). The values or only added if a simple string is passed.
+     * Add an attribute and its values.
      *
      * @param string $attribute
      * @param array ...$values
@@ -46,26 +52,93 @@ class Entry implements \IteratorAggregate, \Countable
      */
     public function add($attribute, ...$values)
     {
-        $this->attributes[] = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
+        $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
+
+        $exists = false;
+        foreach ($this->attributes as $i => $attr) {
+            if ($attr->equals($attribute)) {
+                $exists = true;
+                $this->attributes[$i]->add(...$attribute->getValues());
+                break;
+            }
+        }
+        if (!$exists) {
+            $this->attributes[] = $attribute;
+        }
+        $this->changes->add(Change::add(clone $attribute));
 
         return $this;
     }
 
     /**
-     * Remove an attribute (simple string or Attribute object).
+     * Remove an attribute's value(s).
      *
      * @param string|Attribute $attribute
+     * @param array ...$values
      * @return $this
      */
-    public function remove($attribute)
+    public function remove($attribute, ...$values)
     {
-        $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute);
+        $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
 
+        if (!empty($attribute->getValues())) {
+            foreach ($this->attributes as $i => $attr) {
+                if ($attr->equals($attribute)) {
+                    $this->attributes[$i]->remove(...$attribute->getValues());
+                    break;
+                }
+            }
+            $this->changes->add(Change::delete(clone $attribute));
+        }
+
+        return $this;
+    }
+
+    /**
+     * Reset an attribute, which removes any values it may have.
+     *
+     * @param string[]|Attribute[] ...$attributes
+     * @return $this
+     */
+    public function reset(...$attributes)
+    {
+        foreach ($attributes as $attribute) {
+            $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute);
+            foreach ($this->attributes as $i => $attr) {
+                if ($attr->equals($attribute)) {
+                    unset($this->attributes[$i]);
+                    break;
+                }
+            }
+            $this->changes()->add(Change::reset(clone $attribute));
+        }
+
+        return $this;
+    }
+
+    /**
+     * Set an attribute on the entry, replacing any value(s) that may exist on it.
+     *
+     * @param string|Attribute $attribute
+     * @param array ...$values
+     * @return $this
+     */
+    public function set($attribute, ...$values)
+    {
+        $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
+
+        $exists = false;
         foreach ($this->attributes as $i => $attr) {
             if ($attr->equals($attribute)) {
-                unset($this->attributes[$i]);
+                $exists = true;
+                $this->attributes[$i] = $attribute;
+                break;
             }
         }
+        if (!$exists) {
+            $this->attributes[] = $attribute;
+        }
+        $this->changes->add(Change::replace(clone $attribute));
 
         return $this;
     }
@@ -125,6 +198,16 @@ class Entry implements \IteratorAggregate, \Countable
     }
 
     /**
+     * Get the changes accumulated for this entry.
+     *
+     * @return Changes
+     */
+    public function changes() : Changes
+    {
+        return $this->changes;
+    }
+
+    /**
      * Get the entry representation as an associative array.
      *
      * @return array
@@ -179,7 +262,7 @@ class Entry implements \IteratorAggregate, \Countable
      */
     public function __set($name, $value)
     {
-        $this->add($name, ...(is_array($value) ? $value : [$value]));
+        $this->set($name, ...(is_array($value) ? $value : [$value]));
     }
 
     /**
@@ -196,7 +279,7 @@ class Entry implements \IteratorAggregate, \Countable
      */
     public function __unset($name)
     {
-        $this->remove($name);
+        $this->reset($name);
     }
 
     /**

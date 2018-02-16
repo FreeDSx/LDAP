@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\CompareResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Operation\Response\ModifyResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
@@ -104,6 +105,16 @@ class LdapClientSpec extends ObjectBehavior
         $handler->send(Operations::compare('cn=foo', 'foo', 'bar'))->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_FALSE)));
 
         $this->compare('cn=foo', 'foo', 'bar')->shouldBeEqualTo(false);
+    }
+
+    function it_should_send_a_modify_operation_on_update($handler)
+    {
+        $entry = Entry::create('cn=foo,dc=local', ['cn' => 'foo']);
+        $entry->set('sn', 'bar');
+        $handler->send(Operations::modify($entry->getDn(), ...$entry->changes()))->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(1, new ModifyResponse(ResultCode::SUCCESS)));
+
+        $this->update($entry);
     }
 
     function it_should_get_the_options()
