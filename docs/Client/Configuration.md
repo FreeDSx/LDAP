@@ -59,7 +59,8 @@ The port to connect to on the LDAP server.
 ------------------
 #### servers
 
-An array of LDAP servers. When connecting the servers are tried in order until one connects. 
+An array of LDAP servers or a single server name as a string. When connecting the servers are tried in order until one 
+connects. 
 
 **Default**: `[]`
 

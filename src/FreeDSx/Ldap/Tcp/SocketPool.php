@@ -58,7 +58,11 @@ class SocketPool
      */
     public function connect(?string $server = null) : Socket
     {
-        $servers = $server ? [$server] : $this->options['servers'];
+        if ($server) {
+            $servers = [$server];
+        } else {
+            $servers = is_array($this->options['servers']) ? $this->options['servers'] : [$this->options['servers']];
+        }
 
         $lastEx = null;
         $tcp = null;
