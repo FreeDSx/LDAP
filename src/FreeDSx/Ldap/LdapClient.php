@@ -83,7 +83,7 @@ class LdapClient
      * @return LdapMessageResponse
      * @throws \FreeDSx\Ldap\Exception\BindException
      */
-    public function bind(string $username, string $password)
+    public function bind(string $username, string $password) : LdapMessageResponse
     {
         return $this->handler->send(Operations::bind($username, $password)->setVersion($this->options['version']));
     }
@@ -97,7 +97,7 @@ class LdapClient
      * @param Control[] ...$controls
      * @return bool
      */
-    public function compare($dn, string $attributeName, string $value, Control ...$controls)
+    public function compare($dn, string $attributeName, string $value, Control ...$controls) : bool
     {
         /** @var \FreeDSx\Ldap\Operation\Response\CompareResponse $response */
         $response = $this->send(Operations::compare($dn, $attributeName, $value), ...$controls)->getResponse();
