@@ -66,7 +66,7 @@ use FreeDSx\Ldap\Search\Filters;
 $filter = Filters::equal('objectClass', 'organizationalUnit')
 
 # Grab all entries at the root, select only the 'ou' attribute
-$entries = $ldap->search(Operations::searchList($filter, 'dc=domain,dc=local', 'ou'));
+$entries = $ldap->search(Operations::list($filter, 'dc=domain,dc=local', 'ou'));
 
 foreach ($entries as $entry) {
     echo "ou: ".$entry->get('ou').PHP_EOL;
@@ -80,9 +80,9 @@ The read search gets the entry defined by the base DN. It will only return one e
 ```php
 use FreeDSx\Ldap\Operations;
 
-# Use the searchRead() method of operations to search for a specific entry.
+# Use the read() method of operations to search for a specific entry.
 # Search returns an entries object. Grab the first entry (null if it doesnt exist).
-$entry = $ldap->search(Operations::searchRead('cn=foo,dc=domain,dc=local'))->first();
+$entry = $ldap->search(Operations::read('cn=foo,dc=domain,dc=local'))->first();
 
 # Entry may be null if it doesnt exist
 if ($entry) {

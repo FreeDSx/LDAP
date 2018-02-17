@@ -213,7 +213,7 @@ class Operations
      * @param array ...$attributes
      * @return SearchRequest
      */
-    public static function searchRead($baseDn, ...$attributes)
+    public static function read($baseDn, ...$attributes)
     {
         return (new SearchRequest(Filters::present('objectClass'), ...$attributes))->base($baseDn)->useBaseScope();
     }
@@ -226,7 +226,7 @@ class Operations
      * @param array ...$attributes
      * @return SearchRequest
      */
-    public static function searchList(FilterInterface $filter, $baseDn, ...$attributes)
+    public static function list(FilterInterface $filter, $baseDn, ...$attributes)
     {
         return (new SearchRequest($filter, ...$attributes))->base($baseDn)->useSingleLevelScope();
     }

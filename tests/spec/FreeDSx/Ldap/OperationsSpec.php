@@ -109,11 +109,11 @@ class OperationsSpec extends ObjectBehavior
 
     function it_should_create_a_base_object_search()
     {
-        $this::searchRead('dc=foo,dc=bar')->shouldBeLike(
+        $this::read('dc=foo,dc=bar')->shouldBeLike(
             (new SearchRequest(Filters::present('objectClass')))->useBaseScope()->base('dc=foo,dc=bar')
         );
 
-        $this::searchRead('dc=foo,dc=bar', 'foo', 'bar')->shouldBeLike(
+        $this::read('dc=foo,dc=bar', 'foo', 'bar')->shouldBeLike(
             (new SearchRequest(Filters::present('objectClass')))
                 ->useBaseScope()
                 ->base('dc=foo,dc=bar')
@@ -123,7 +123,7 @@ class OperationsSpec extends ObjectBehavior
 
     function it_should_create_a_single_level_search()
     {
-        $this::searchList(Filters::equal('foo', 'bar'), 'dc=foo,dc=bar', 'cn')->shouldBeLike(
+        $this::list(Filters::equal('foo', 'bar'), 'dc=foo,dc=bar', 'cn')->shouldBeLike(
             (new SearchRequest(Filters::equal('foo', 'bar', 'cn'), 'cn'))->base('dc=foo,dc=bar')->useSingleLevelScope()
         );
     }
