@@ -20,7 +20,6 @@ All of these operations are constructed with methods on the `FreeDSx\Ldap\Operat
 Add an entry to LDAP and catch an operation exception:
 
 ```php
-use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 
@@ -32,7 +31,7 @@ $entry = Entry::create('cn=foo,dc=domain,dc=local', [
 
 # Add the entry to LDAP by passing it to the add request and sending it with the client
 try {
-    $ldap->send(Operations::add($entry));
+    $ldap->create($entry);
 } catch (OperationException $e) {
     echo sprintf('Error adding entry (%s): %s', $e->getCode(), $e->getMessage());
 }
@@ -43,14 +42,31 @@ try {
 Delete an entry from LDAP using its distinguished name and catch an operation exception:
 
 ```php
-use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Exception\OperationException;
 
 # Delete an entry using its DN. This can also be a DN object from an entry: $entry->getDn()
 try {
-    $ldap->send(Operations::delete('cn=foo,dc=domain,dc=local'));
+    $ldap->delete('cn=foo,dc=domain,dc=local');
 } catch (OperationException $e) {
     echo sprintf('Error deleting entry (%s): %s', $e->getCode(), $e->getMessage());
+}
+```
+
+Delete entries using the results of a search:
+
+```php
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Search\Filters;
+
+$entries = $ldap->search(Operations::search(Filters::contains('title', 'manager')));
+
+foreach ($entries as $entry) {
+    try {
+        $ldap->delete($entry);
+    } catch (OperationException $e) {
+        echo sprintf('Error deleting entry "%s" (%s): %s', $entry, $e->getCode(), $e->getMessage());
+    }
 }
 ```
 
@@ -59,14 +75,12 @@ try {
 Modify an entry object by deleting/adding/removing attribute values and catch an operation exception:
 
 ```php
-use FreeDSx\Ldap\Entry\Change;
-use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Exception\OperationException;
 
 # Search for an entry object to get its current attributes / values
 $dn = 'cn=foo,dc=domain,dc=local';
 $attributes = ['telephoneNumber', 'ipPhone', 'title'];
-$entry = $ldap->search(Operations::searchRead($dn, ...$attributes))->first();
+$entry = $ldap->search(Operations::read($dn, ...$attributes))->first();
 
 # Add a value to an attribute
 if (!$entry->get('telephoneNumber')) {

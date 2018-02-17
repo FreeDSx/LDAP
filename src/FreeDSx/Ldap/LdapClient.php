@@ -106,6 +106,33 @@ class LdapClient
     }
 
     /**
+     * Create a new entry.
+     *
+     * @param Entry $entry
+     * @param Control[] ...$controls
+     * @return LdapMessageResponse
+     */
+    public function create(Entry $entry, Control ...$controls) : LdapMessageResponse
+    {
+        $response = $this->send(Operations::add($entry), ...$controls);
+        $entry->changes()->reset();
+
+        return $response;
+    }
+
+    /**
+     * Delete an entry.
+     *
+     * @param string $entry
+     * @param Control[] ...$controls
+     * @return LdapMessageResponse
+     */
+    public function delete(string $entry, Control ...$controls) : LdapMessageResponse
+    {
+        return $this->send(Operations::delete($entry), ...$controls);
+    }
+
+    /**
      * Update an existing entry.
      *
      * @param Entry $entry

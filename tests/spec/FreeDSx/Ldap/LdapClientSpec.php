@@ -17,8 +17,10 @@ use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
+use FreeDSx\Ldap\Operation\Response\AddResponse;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\CompareResponse;
+use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
@@ -115,6 +117,24 @@ class LdapClientSpec extends ObjectBehavior
             ->willReturn(new LdapMessageResponse(1, new ModifyResponse(ResultCode::SUCCESS)));
 
         $this->update($entry);
+    }
+
+    function it_should_send_an_add_operation_on_create($handler)
+    {
+        $entry = Entry::create('cn=foo,dc=local', ['cn' => 'foo']);
+        $handler->send(Operations::add($entry))->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(1, new AddResponse(ResultCode::SUCCESS)));
+
+        $this->create($entry);
+    }
+
+    function it_should_send_a_delete_operation_on_delete($handler)
+    {
+        $entry = new Entry('cn=foo,dc=local');
+        $handler->send(Operations::delete('cn=foo,dc=local'))->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::SUCCESS)));
+
+        $this->delete($entry);
     }
 
     function it_should_get_the_options()
