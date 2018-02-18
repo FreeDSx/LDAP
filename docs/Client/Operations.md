@@ -78,9 +78,7 @@ Modify an entry object by deleting/adding/removing attribute values and catch an
 use FreeDSx\Ldap\Exception\OperationException;
 
 # Search for an entry object to get its current attributes / values
-$dn = 'cn=foo,dc=domain,dc=local';
-$attributes = ['telephoneNumber', 'ipPhone', 'title'];
-$entry = $ldap->search(Operations::read($dn, ...$attributes))->first();
+$entry = $ldap->read('cn=foo,dc=domain,dc=local');
 
 # Add a value to an attribute
 if (!$entry->get('telephoneNumber')) {

@@ -16,6 +16,7 @@ use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -118,6 +119,26 @@ class LdapClient
         $entry->changes()->reset();
 
         return $response;
+    }
+
+    /**
+     * Read an entry.
+     *
+     * @param string $entry
+     * @param array $attributes
+     * @param Control[] ...$controls
+     * @return Entry|null
+     */
+    public function read(string $entry, $attributes = [], Control ...$controls) : ?Entry
+    {
+        try {
+            return $this->search(Operations::read($entry, ...$attributes), ...$controls)->first();
+        } catch (OperationException $e) {
+            if ($e->getCode() === ResultCode::NO_SUCH_OBJECT) {
+                return null;
+            }
+            throw $e;
+        }
     }
 
     /**

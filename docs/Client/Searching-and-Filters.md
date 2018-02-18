@@ -80,11 +80,10 @@ The read search gets the entry defined by the base DN. It will only return one e
 ```php
 use FreeDSx\Ldap\Operations;
 
-# Use the read() method of operations to search for a specific entry.
-# Search returns an entries object. Grab the first entry (null if it doesnt exist).
-$entry = $ldap->search(Operations::read('cn=foo,dc=domain,dc=local'))->first();
+# Use the read() method of the LDAP client to search for a specific entry.
+$entry = $ldap->read('cn=foo,dc=domain,dc=local');
 
-# Entry may be null if it doesnt exist
+# Entry will be null if it doesn't exist
 if ($entry) {
     echo $entry->getDn().PHP_EOL;
     var_dump($entry->toArray());

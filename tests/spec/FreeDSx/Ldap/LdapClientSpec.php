@@ -12,6 +12,7 @@ namespace spec\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -135,6 +136,35 @@ class LdapClientSpec extends ObjectBehavior
             ->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::SUCCESS)));
 
         $this->delete($entry);
+    }
+
+    function it_should_send_a_base_search_on_a_read_and_return_an_entry($handler)
+    {
+        $entry = new Entry('cn=foo,dc=local');
+        $handler->send(Operations::read('cn=foo,dc=local'))->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(1, new SearchResponse(new LdapResult(ResultCode::SUCCESS), new Entries(
+                $entry
+            ))));
+
+        $this->read($entry)->shouldBeEqualTo($entry);
+    }
+
+    function it_should_send_a_base_search_on_a_read_and_return_null_if_it_does_not_exist($handler)
+    {
+        $entry = new Entry('cn=foo,dc=local');
+        $handler->send(Operations::read('cn=foo,dc=local'))->shouldBeCalled()
+            ->willThrow(new OperationException('', ResultCode::NO_SUCH_OBJECT));
+
+        $this->read($entry)->shouldBeNull();
+    }
+
+    function it_should_send_a_base_search_on_a_read_and_throw_an_unrelated_operation_exception($handler)
+    {
+        $entry = new Entry('cn=foo,dc=local');
+        $handler->send(Operations::read('cn=foo,dc=local'))->shouldBeCalled()
+            ->willThrow(new OperationException('', ResultCode::INSUFFICIENT_ACCESS_RIGHTS));
+
+        $this->shouldThrow(OperationException::class)->during('read', [$entry]);
     }
 
     function it_should_get_the_options()
