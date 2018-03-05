@@ -92,14 +92,13 @@ The LDAP version to use.
 
 The referral handling strategy to use. It must be one of:
 
-* `ignore`: Referrals are not followed, nor do they cause an exception to be thrown.
 * `throw`: When a referral is encountered it throws a ReferralException, which contains the referral object(s).
 * `follow`: Referrals will be followed until a result is found or the `referral_limit` is reached.  
 
 When you choose to follow referrals, it will bind to the referral destination using your previous bind request (if there
 was one). If you need more control over the bind or what referrals are followed then use the `referral_chaser` option.
 
-**Default**: `ignore`
+**Default**: `throw`
 
 ------------------
 #### referral_limit

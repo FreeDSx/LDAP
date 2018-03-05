@@ -123,25 +123,7 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         $this->shouldThrow(ConnectionException::class)->during('send', [new DeleteRequest('foo')]);
     }
 
-    function it_should_not_throw_an_exception_if_specified($queue)
-    {
-        $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::INVALID_DN_SYNTAX, '', 'foo')));
-
-        $this->shouldThrow(new OperationException('foo', ResultCode::INVALID_DN_SYNTAX))->during('send', [new DeleteRequest('foo')]);
-    }
-
-    function it_should_ignore_referrals_if_specified($queue, $pool)
-    {
-        $this->beConstructedWith(['referral' => 'ignore'], $queue, $pool);
-        $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', 'foo', new LdapUrl('foo'))));
-
-        $this->send(new DeleteRequest('foo'))->shouldBeLike(new LdapMessageResponse(
-            1,
-            new DeleteResponse(ResultCode::REFERRAL, '', 'foo', new LdapUrl('foo'))
-        ));
-    }
-
-    function it_should_throw_an_exception_on_referrals_if_specified($queue, $pool)
+    function it_should_throw_an_exception_on_referrals($queue, $pool)
     {
         $this->beConstructedWith(['referral' => 'throw'], $queue, $pool);
         $queue->getMessage(1)->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', 'foo', new LdapUrl('foo'))));

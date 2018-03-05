@@ -169,8 +169,6 @@ class ClientProtocolHandler
                 case 'follow':
                     return $this->handleReferral($messageTo, $messageFrom);
                     break;
-                case 'ignore':
-                    break;
                 default:
                     throw new RuntimeException(sprintf(
                         'The referral option "%s" is invalid.',
