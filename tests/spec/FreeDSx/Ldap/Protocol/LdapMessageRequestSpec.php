@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Protocol;
 
-use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Protocol\LdapMessage;
@@ -53,7 +53,7 @@ class LdapMessageRequestSpec extends ObjectBehavior
     {
         $this->toAsn1()->shouldBeLike(Asn1::sequence(
             Asn1::integer(1),
-            Asn1::application(10, Asn1::ldapDn('dc=foo,dc=bar')),
+            Asn1::application(10, Asn1::octetString('dc=foo,dc=bar')),
             Asn1::context(0, Asn1::sequenceOf((new Control('foo'))->toAsn1()))
         ));
     }

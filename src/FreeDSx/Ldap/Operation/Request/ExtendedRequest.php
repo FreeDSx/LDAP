@@ -10,11 +10,11 @@
 
 namespace FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 
 /**
@@ -113,11 +113,11 @@ class ExtendedRequest implements RequestInterface
      */
     public function toAsn1(): AbstractType
     {
-        $asn1 =  Asn1::sequence(Asn1::context(0, Asn1::ldapOid($this->requestName)));
+        $asn1 =  Asn1::sequence(Asn1::context(0, Asn1::octetString($this->requestName)));
 
         if ($this->requestValue !== null) {
             $value = $this->requestValue;
-            $encoder = new BerEncoder();
+            $encoder = new LdapEncoder();
             if ($this->requestValue instanceof AbstractType) {
                 $value = $encoder->encode($this->requestValue);
             } elseif ($this->requestValue instanceof ProtocolElementInterface) {
@@ -146,7 +146,7 @@ class ExtendedRequest implements RequestInterface
     {
         [1 => $value] = self::parseAsn1ExtendedRequest($type);
 
-        return $value !== null ? (new BerEncoder())->decode($value) : null;
+        return $value !== null ? (new LdapEncoder())->decode($value) : null;
     }
 
     /**

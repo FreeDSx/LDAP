@@ -10,10 +10,10 @@
 
 namespace FreeDSx\Ldap\Tcp;
 
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Exception\PartialPduException;
+use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\ConnectionException;
-use FreeDSx\Ldap\Exception\PartialPduException;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -31,7 +31,7 @@ abstract class MessageQueue
     protected $tcp;
 
     /**
-     * @var BerEncoder
+     * @var LdapEncoder
      */
     protected $encoder;
 
@@ -46,7 +46,7 @@ abstract class MessageQueue
     public function __construct(Socket $tcp)
     {
         $this->tcp = $tcp;
-        $this->encoder = new BerEncoder();
+        $this->encoder = new LdapEncoder();
     }
 
     /**

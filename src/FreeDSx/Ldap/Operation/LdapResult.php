@@ -10,10 +10,10 @@
 
 namespace FreeDSx\Ldap\Operation;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UrlParseException;
@@ -158,12 +158,12 @@ class LdapResult implements ResponseInterface
     {
         $result = Asn1::sequence(
             Asn1::enumerated($this->resultCode),
-            Asn1::ldapDn($this->dn),
-            Asn1::ldapString($this->diagnosticMessage)
+            Asn1::octetString($this->dn),
+            Asn1::octetString($this->diagnosticMessage)
         );
         if (!empty($this->referrals)) {
             $result->addChild(Asn1::context(3, Asn1::sequence(...array_map(function ($v) {
-                return Asn1::ldapString($v);
+                return Asn1::octetString($v);
             }, $this->referrals))));
         }
         if ($this->tagNumber === null) {
@@ -195,11 +195,11 @@ class LdapResult implements ResponseInterface
         }
         $referrals = [];
 
-        /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $type*/
+        /** @var \FreeDSx\Asn1\Type\SequenceType $type*/
         foreach ($type->getChildren() as $child) {
             if ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 3) {
-                /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $child */
-                $child = (new BerEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
+                /** @var \FreeDSx\Asn1\Type\SequenceType $child */
+                $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
                 foreach ($child->getChildren() as $ldapUrl) {
                     try {
                         $referrals[] = LdapUrl::parse($ldapUrl->getValue());

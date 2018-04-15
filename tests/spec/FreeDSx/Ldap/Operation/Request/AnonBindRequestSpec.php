@@ -10,8 +10,8 @@
 
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
@@ -50,7 +50,7 @@ class AnonBindRequestSpec extends ObjectBehavior
     {
         $this->toAsn1()->shouldBeLike(Asn1::application(0, Asn1::sequence(
             Asn1::integer(3),
-            Asn1::ldapDn(''),
+            Asn1::octetString(''),
             Asn1::context(0, Asn1::octetString(''))
         )));
     }

@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Protocol\Factory;
 
-use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
@@ -49,6 +49,6 @@ class OperationFactorySpec extends ObjectBehavior
 
     function it_should_get_an_operation_mapped_by_the_asn1_type()
     {
-        $this::get(Asn1::application(10, Asn1::ldapDn('cn=foo,dc=foo,dc=bar')))->shouldBeLike(new DeleteRequest('cn=foo,dc=foo,dc=bar'));
+        $this::get(Asn1::application(10, Asn1::octetString('cn=foo,dc=foo,dc=bar')))->shouldBeLike(new DeleteRequest('cn=foo,dc=foo,dc=bar'));
     }
 }

@@ -10,12 +10,12 @@
 
 namespace FreeDSx\Ldap\Search\Filter;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\IncompleteType;
-use FreeDSx\Ldap\Asn1\Type\SetType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Asn1\Type\SetType;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 
 /**
@@ -150,7 +150,7 @@ trait FilterContainerTrait
      */
     public static function fromAsn1(AbstractType $type)
     {
-        $type = $type instanceof IncompleteType ? (new BerEncoder())->complete($type, AbstractType::TAG_TYPE_SET) : $type;
+        $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_SET) : $type;
         if (!($type instanceof SetType)) {
             throw new ProtocolException('The filter is malformed');
         }

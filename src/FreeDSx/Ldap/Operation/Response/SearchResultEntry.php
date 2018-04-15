@@ -10,9 +10,9 @@
 
 namespace FreeDSx\Ldap\Operation\Response;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 
@@ -60,13 +60,13 @@ class SearchResultEntry implements ResponseInterface
     {
         $attributes = [];
 
-        /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $type */
+        /** @var \FreeDSx\Asn1\Type\SequenceType $type */
         foreach ($type->getChild(1) as $partialAttribute) {
             $values = [];
 
-            /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $partialAttribute */
+            /** @var \FreeDSx\Asn1\Type\SequenceType $partialAttribute */
             foreach ($partialAttribute->getChild(1) as $attrValue) {
-                /** @var \FreeDSx\Ldap\Asn1\Type\OctetStringType $attrValue */
+                /** @var \FreeDSx\Asn1\Type\OctetStringType $attrValue */
                 $values[] = $attrValue->getValue();
             }
 
@@ -87,13 +87,13 @@ class SearchResultEntry implements ResponseInterface
         $partialAttributes = Asn1::sequenceOf();
         foreach ($this->entry->getAttributes() as $attribute) {
             $partialAttributes->addChild(Asn1::sequence(
-                Asn1::ldapString($attribute->getName()),
+                Asn1::octetString($attribute->getName()),
                 Asn1::setOf(...array_map(function ($v) {
                     return Asn1::octetString($v);
                 }, $attribute->getValues()))
             ));
         }
-        $asn1->addChild(Asn1::ldapDn($this->entry->getDn()->toString()));
+        $asn1->addChild(Asn1::octetString($this->entry->getDn()->toString()));
         $asn1->addChild($partialAttributes);
 
         return $asn1;

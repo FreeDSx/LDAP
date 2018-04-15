@@ -10,13 +10,13 @@
 
 namespace FreeDSx\Ldap\Search\Filter;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\BooleanType;
-use FreeDSx\Ldap\Asn1\Type\IncompleteType;
-use FreeDSx\Ldap\Asn1\Type\OctetStringType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\BooleanType;
+use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\ProtocolException;
 
@@ -150,14 +150,14 @@ class MatchingRuleFilter implements FilterInterface
      */
     public function toAsn1() : AbstractType
     {
-        /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $matchingRule */
+        /** @var \FreeDSx\Asn1\Type\SequenceType $matchingRule */
         $matchingRule = Asn1::context(self::CHOICE_TAG, Asn1::sequence());
 
         if ($this->matchingRule !== null) {
-            $matchingRule->addChild(Asn1::context(1, Asn1::ldapString($this->matchingRule)));
+            $matchingRule->addChild(Asn1::context(1, Asn1::octetString($this->matchingRule)));
         }
         if ($this->attribute !== null) {
-            $matchingRule->addChild(Asn1::context(2, Asn1::ldapString($this->attribute)));
+            $matchingRule->addChild(Asn1::context(2, Asn1::octetString($this->attribute)));
         }
         $matchingRule->addChild(Asn1::context(3, Asn1::octetString($this->value)));
         $matchingRule->addChild(Asn1::context(4, Asn1::boolean($this->useDnAttributes)));
@@ -197,7 +197,7 @@ class MatchingRuleFilter implements FilterInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        $type = $type instanceof IncompleteType ? (new BerEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
+        $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
         if (!($type instanceof SequenceType && (count($type) >= 1 && count($type) <= 4))) {
             throw new ProtocolException('The matching rule filter is malformed');
         }

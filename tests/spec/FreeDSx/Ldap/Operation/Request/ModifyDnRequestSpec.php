@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -62,18 +62,18 @@ class ModifyDnRequestSpec extends ObjectBehavior
     function it_should_generate_correct_asn1()
     {
         $this->toAsn1()->shouldBeLike(Asn1::application(12, Asn1::sequence(
-            Asn1::ldapDn('cn=foo,dc=foo,dc=bar'),
-            Asn1::ldapString('cn=bar'),
+            Asn1::octetString('cn=foo,dc=foo,dc=bar'),
+            Asn1::octetString('cn=bar'),
             Asn1::boolean(true)
         )));
 
         $this->setNewParentDn('dc=foobar');
 
         $this->toAsn1()->shouldBeLike(Asn1::application(12, Asn1::sequence(
-            Asn1::ldapDn('cn=foo,dc=foo,dc=bar'),
-            Asn1::ldapString('cn=bar'),
+            Asn1::octetString('cn=foo,dc=foo,dc=bar'),
+            Asn1::octetString('cn=bar'),
             Asn1::boolean(true),
-            Asn1::context(0, Asn1::ldapDn('dc=foobar'))
+            Asn1::context(0, Asn1::octetString('dc=foobar'))
         )));
     }
 

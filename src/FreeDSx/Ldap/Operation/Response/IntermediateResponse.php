@@ -10,9 +10,9 @@
 
 namespace FreeDSx\Ldap\Operation\Response;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
@@ -95,7 +95,7 @@ class IntermediateResponse implements ResponseInterface
         $response = Asn1::sequence();
 
         if ($this->responseName !== null) {
-            $response->addChild(Asn1::context(0, Asn1::ldapOid($this->responseName)));
+            $response->addChild(Asn1::context(0, Asn1::octetString($this->responseName)));
         }
         if ($this->responseValue !== null) {
             $response->addChild(Asn1::context(1, Asn1::octetString($this->responseValue)));

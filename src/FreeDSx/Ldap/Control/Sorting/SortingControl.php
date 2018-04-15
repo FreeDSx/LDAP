@@ -10,14 +10,14 @@
 
 namespace FreeDSx\Ldap\Control\Sorting;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\IncompleteType;
-use FreeDSx\Ldap\Asn1\Type\OctetStringType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 /**
  * A Server Side Sorting request control value. RFC 2891.
@@ -98,7 +98,7 @@ class SortingControl extends Control
             $matchRule = null;
             $useReverseOrder = false;
 
-            $encoder = new BerEncoder();
+            $encoder = new LdapEncoder();
             /** @var AbstractType $keyItem */
             foreach ($sequence as $keyItem) {
                 if ($keyItem instanceof OctetStringType && $keyItem->getTagClass() === AbstractType::TAG_CLASS_UNIVERSAL) {
@@ -131,9 +131,9 @@ class SortingControl extends Control
         $this->controlValue = Asn1::sequenceOf();
 
         foreach ($this->sortKeys as $sortKey) {
-            $child = Asn1::sequence(Asn1::ldapString($sortKey->getAttribute()));
+            $child = Asn1::sequence(Asn1::octetString($sortKey->getAttribute()));
             if ($sortKey->getOrderingRule() !== null) {
-                $child->addChild(Asn1::context(0, Asn1::ldapString($sortKey->getOrderingRule())));
+                $child->addChild(Asn1::context(0, Asn1::octetString($sortKey->getOrderingRule())));
             }
             if ($sortKey->getUseReverseOrder()) {
                 $child->addChild(Asn1::context(1, Asn1::boolean(true)));

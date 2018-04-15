@@ -10,9 +10,9 @@
 
 namespace FreeDSx\Ldap\Operation\Response;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Operation\LdapResult;
 
 /**

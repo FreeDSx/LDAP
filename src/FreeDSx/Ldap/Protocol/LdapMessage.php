@@ -10,12 +10,11 @@
 
 namespace FreeDSx\Ldap\Protocol;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\IntegerType;
-use FreeDSx\Ldap\Asn1\Type\SequenceOfType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\IntegerType;
+use FreeDSx\Asn1\Type\SequenceOfType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -131,8 +130,8 @@ abstract class LdapMessage implements ProtocolElementInterface
         /** @var SequenceType $type */
         foreach ($type->getChildren() as $child) {
             if ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 0) {
-                /** @var \FreeDSx\Ldap\Asn1\Type\IncompleteType $child */
-                $child = (new BerEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
+                /** @var \FreeDSx\Asn1\Type\IncompleteType $child */
+                $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
                 /** @var SequenceOfType $child */
                 foreach ($child->getChildren() as $control) {
                     $controls[] = ControlFactory::get($control);

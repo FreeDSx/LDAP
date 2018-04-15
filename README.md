@@ -69,3 +69,93 @@ while ($paging->hasEntries()) {
     }
 }
 ```
+
+# CRUD Operations:
+
+* [Create](#create)
+* [Read](#read)
+* [Update](#update)
+* [Delete](#delete)
+
+## Create
+
+```php
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+
+# Create a new LDAP entry object
+$entry = (new Entry('cn=foo,dc=domain,dc=local'))
+   ->set('objectClass','top', 'group')
+   ->set('sAMAccountName', 'foo');
+
+# Create the entry with the LDAP client
+try {
+    $ldap->create($entry);
+} catch (OperationException $e) {
+    echo sprintf('Error adding entry (%s): %s', $e->getCode(), $e->getMessage()).PHP_EOL;
+}
+```
+
+## Read
+
+```php
+# Use the read() method of the LDAP client to search for a specific entry.
+# Optionally pass an array of attributes to select as the second argument.
+$entry = $ldap->read('cn=foo,dc=domain,dc=local');
+
+# Entry will be null if it doesn't exist
+if ($entry) {
+    echo $entry.PHP_EOL;
+    var_dump($entry->toArray());
+}
+```
+
+## Update
+
+```php
+use FreeDSx\Ldap\Exception\OperationException;
+
+# Search for an entry object to get its current attributes / values
+$entry = $ldap->read('cn=foo,php7.1dc=domain,dc=local');
+
+# Add a value to an attribute
+if (!$entry->get('telephoneNumber')) {
+    $entry->add('telephoneNumber', '555-5555');
+}
+# Remove any values an attribute may have
+if ($entry->has('title')) {
+    $entry->reset('title');
+}
+# Delete a specific value for an attribute
+if ($entry->get('ipPhone')->has('12345')) {
+    $entry->delete('ipPhone', '12345');
+}
+# Set a value for an attribute. This replaces any value it may, or may not, have.
+$entry->set('description', 'Employee');
+
+# Send the built up changes back to LDAP to update the entry via the LDAP client update method.
+try {
+    $ldap->update($entry);
+} catch (OperationException $e) {
+    echo sprintf('Error modifying entry (%s): %s', $e->getCode(), $e->getMessage()).PHP_EOL;;
+}
+```
+
+## Delete
+
+```php
+use FreeDSx\Ldap\Exception\OperationException;
+
+# Search for the entry object to delete
+$entry = $ldap->read('cn=foo,dc=domain,dc=local');
+
+# Pass the entry object to the delete method of the LDAP client if it was found.
+# You could also pass a DN object or a simple DN as a string.
+if ($entry) {
+    try {
+        $ldap->delete($entry);
+    } catch (OperationException $e) {
+        echo sprintf('Error deleting entry (%s): %s', $e->getCode(), $e->getMessage()).PHP_EOL;;
+    }
+}
+```

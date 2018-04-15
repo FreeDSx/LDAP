@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Search\Filter;
 
-use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use PhpSpec\ObjectBehavior;
@@ -45,7 +45,7 @@ class ApproximateFilterSpec extends ObjectBehavior
     function it_should_generate_correct_asn1()
     {
         $this->toAsn1()->shouldBeLike(Asn1::context(8, Asn1::sequence(
-            Asn1::ldapString('foo'),
+            Asn1::octetString('foo'),
             Asn1::octetString('bar')
         )));
     }

@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Operation\Response;
 
-use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\Response\SearchResultReference;
@@ -39,8 +39,8 @@ class SearchResultReferenceSpec extends ObjectBehavior
     function it_should_be_constructed_from_asn1()
     {
         $this->beConstructedThrough('fromAsn1', [Asn1::application(19, Asn1::sequence(
-            Asn1::ldapString('ldap://foo'),
-            Asn1::ldapString('ldap://bar')
+            Asn1::octetString('ldap://foo'),
+            Asn1::octetString('ldap://bar')
         ))]);
 
         $this->getReferrals()->shouldBeLike([
@@ -52,16 +52,16 @@ class SearchResultReferenceSpec extends ObjectBehavior
     function it_should_generate_correct_asn1()
     {
         $this::toAsn1()->shouldBeLike(Asn1::application(19, Asn1::sequence(
-            Asn1::ldapString('ldap://foo/'),
-            Asn1::ldapString('ldap://bar/')
+            Asn1::octetString('ldap://foo/'),
+            Asn1::octetString('ldap://bar/')
         )));
     }
 
     function it_should_throw_a_protocol_exception_if_the_referral_cannot_be_parsed()
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::application(19, Asn1::sequence(
-            Asn1::ldapString('ldap://foo/'),
-            Asn1::ldapString('?bar')
+            Asn1::octetString('ldap://foo/'),
+            Asn1::octetString('?bar')
         ))]);
     }
 }

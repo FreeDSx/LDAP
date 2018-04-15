@@ -10,8 +10,8 @@
 
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Type\NullType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\NullType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use PhpSpec\ObjectBehavior;

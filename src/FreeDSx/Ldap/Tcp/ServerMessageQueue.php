@@ -10,7 +10,7 @@
 
 namespace FreeDSx\Ldap\Tcp;
 
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 

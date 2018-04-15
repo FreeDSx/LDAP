@@ -10,13 +10,13 @@
 
 namespace FreeDSx\Ldap\Control;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\BooleanType;
-use FreeDSx\Ldap\Asn1\Type\OctetStringType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\BooleanType;
+use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 
 /**
@@ -137,12 +137,12 @@ class Control implements ProtocolElementInterface
     public function toAsn1(): AbstractType
     {
         $asn1 = Asn1::sequence(
-            Asn1::ldapOid($this->controlType),
+            Asn1::octetString($this->controlType),
             Asn1::boolean($this->criticality)
         );
 
         if ($this->controlValue !== null) {
-            $encoder = new BerEncoder();
+            $encoder = new LdapEncoder();
             if ($this->controlValue instanceof AbstractType) {
                 $value = $encoder->encode($this->controlValue);
             } elseif ($this->controlValue instanceof ProtocolElementInterface) {
@@ -214,7 +214,7 @@ class Control implements ProtocolElementInterface
             throw new ProtocolException('The received control is malformed. Unable to get the encoded value.');
         }
 
-        return (new BerEncoder())->decode($value);
+        return (new LdapEncoder())->decode($value);
     }
 
     /**

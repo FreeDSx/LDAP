@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Search\Filter;
 
-use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use PhpSpec\ObjectBehavior;
@@ -48,7 +48,7 @@ class SubstringFilterSpec extends ObjectBehavior
     function it_should_generate_correct_asn1()
     {
         $this->toAsn1()->shouldBeLike(Asn1::context(4, Asn1::sequence(
-            Asn1::ldapString('foo'),
+            Asn1::octetString('foo'),
             Asn1::sequenceOf(
                 Asn1::context(0, Asn1::octetString('f')),
                 Asn1::context(1, Asn1::octetString('o')),
@@ -59,7 +59,7 @@ class SubstringFilterSpec extends ObjectBehavior
 
         $this->setStartsWith(null);
         $this->toAsn1()->shouldBeLike(Asn1::context(4, Asn1::sequence(
-            Asn1::ldapString('foo'),
+            Asn1::octetString('foo'),
             Asn1::sequenceOf(
                 Asn1::context(1, Asn1::octetString('o')),
                 Asn1::context(1, Asn1::octetString('bar')),
@@ -69,7 +69,7 @@ class SubstringFilterSpec extends ObjectBehavior
 
         $this->setEndsWith(null);
         $this->toAsn1()->shouldBeLike(Asn1::context(4, Asn1::sequence(
-            Asn1::ldapString('foo'),
+            Asn1::octetString('foo'),
             Asn1::sequenceOf(
                 Asn1::context(1, Asn1::octetString('o')),
                 Asn1::context(1, Asn1::octetString('bar'))

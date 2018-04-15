@@ -10,10 +10,10 @@
 
 namespace FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\OctetStringType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
@@ -113,7 +113,7 @@ class CompareRequest implements RequestInterface, DnRequestInterface
     public function toAsn1(): AbstractType
     {
         return Asn1::application(self::APP_TAG, Asn1::sequence(
-            Asn1::ldapDn($this->dn->toString()),
+            Asn1::octetString($this->dn->toString()),
             Asn1::universal(AbstractType::TAG_TYPE_SEQUENCE, $this->filter->toAsn1())
         ));
     }

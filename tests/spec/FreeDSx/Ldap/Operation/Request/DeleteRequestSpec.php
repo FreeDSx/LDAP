@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
@@ -42,7 +42,7 @@ class DeleteRequestSpec extends ObjectBehavior
 
     function it_should_generate_correct_asn1()
     {
-        $this->toAsn1()->shouldBeLike(Asn1::application(10, Asn1::ldapDn('cn=foo,dc=foo,dc=bar')));
+        $this->toAsn1()->shouldBeLike(Asn1::application(10, Asn1::octetString('cn=foo,dc=foo,dc=bar')));
     }
 
     function it_should_be_constructed_from_asn1()

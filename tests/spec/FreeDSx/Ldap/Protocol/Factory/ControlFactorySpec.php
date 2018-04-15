@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Protocol\Factory;
 
-use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Exception\ProtocolException;

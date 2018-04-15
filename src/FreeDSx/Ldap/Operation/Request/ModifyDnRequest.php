@@ -10,11 +10,11 @@
 
 namespace FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\BooleanType;
-use FreeDSx\Ldap\Asn1\Type\OctetStringType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\BooleanType;
+use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -179,15 +179,15 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
      */
     public function toAsn1(): AbstractType
     {
-        /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $asn1 */
+        /** @var \FreeDSx\Asn1\Type\SequenceType $asn1 */
         $asn1 = Asn1::application(self::APP_TAG, Asn1::sequence(
-            Asn1::ldapDn($this->dn->toString()),
+            Asn1::octetString($this->dn->toString()),
             // @todo Make a RDN type. Future validation purposes?
-            Asn1::ldapString($this->newRdn->toString()),
+            Asn1::octetString($this->newRdn->toString()),
             Asn1::boolean($this->deleteOldRdn)
         ));
         if ($this->newParentDn !== null) {
-            $asn1->addChild(Asn1::context(0, Asn1::ldapDn($this->newParentDn->toString())));
+            $asn1->addChild(Asn1::context(0, Asn1::octetString($this->newParentDn->toString())));
         }
 
         return $asn1;

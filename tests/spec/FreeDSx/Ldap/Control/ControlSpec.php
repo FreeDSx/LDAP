@@ -10,10 +10,10 @@
 
 namespace spec\FreeDSx\Ldap\Control;
 
-use FreeDSx\Ldap\Asn1\Type\BooleanType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\BooleanType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Protocol\Element\LdapOid;
 use PhpSpec\ObjectBehavior;
 
 class ControlSpec extends ObjectBehavior
@@ -53,17 +53,17 @@ class ControlSpec extends ObjectBehavior
 
     function it_should_generate_correct_ASN1()
     {
-        $this->toAsn1()->shouldBeLike(new SequenceType(
-           new LdapOid('foo'),
-           new BooleanType(false)
+        $this->toAsn1()->shouldBeLike(Asn1::sequence(
+           Asn1::octetString('foo'),
+           Asn1::boolean(false)
         ));
     }
 
     function it_should_be_constructed_from_ASN1()
     {
-        $this->beConstructedThrough('fromAsn1', [new SequenceType(
-            new LdapOid('foobar'),
-            new BooleanType(true)
+        $this->beConstructedThrough('fromAsn1', [Asn1::sequence(
+            Asn1::octetString('foobar'),
+            Asn1::boolean(true)
         )]);
 
         $this->getTypeOid()->shouldBeEqualTo('foobar');

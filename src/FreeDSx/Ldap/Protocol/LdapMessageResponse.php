@@ -10,7 +10,7 @@
 
 namespace FreeDSx\Ldap\Protocol;
 
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Response\ResponseInterface;

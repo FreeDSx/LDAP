@@ -10,8 +10,8 @@
 
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
@@ -49,10 +49,10 @@ class PasswordModifyRequestSpec extends ObjectBehavior
 
     function it_should_generate_correct_asn1()
     {
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
 
         $this->toAsn1()->shouldBeLike(Asn1::application(23, Asn1::sequence(
-            Asn1::context(0, Asn1::ldapOid(ExtendedRequest::OID_PWD_MODIFY)),
+            Asn1::context(0, Asn1::octetString(ExtendedRequest::OID_PWD_MODIFY)),
             Asn1::context(1, Asn1::octetString($encoder->encode(Asn1::sequence(
                 Asn1::context(0, Asn1::octetString('foo')),
                 Asn1::context(1, Asn1::octetString('bar')),
@@ -62,7 +62,7 @@ class PasswordModifyRequestSpec extends ObjectBehavior
 
         $this->setUsername(null);
         $this->toAsn1()->shouldBeLike(Asn1::application(23, Asn1::sequence(
-            Asn1::context(0, Asn1::ldapOid(ExtendedRequest::OID_PWD_MODIFY)),
+            Asn1::context(0, Asn1::octetString(ExtendedRequest::OID_PWD_MODIFY)),
             Asn1::context(1, Asn1::octetString($encoder->encode(Asn1::sequence(
                 Asn1::context(1, Asn1::octetString('bar')),
                 Asn1::context(2, Asn1::octetString('12345'))
@@ -71,7 +71,7 @@ class PasswordModifyRequestSpec extends ObjectBehavior
 
         $this->setOldPassword(null);
         $this->toAsn1()->shouldBeLike(Asn1::application(23, Asn1::sequence(
-            Asn1::context(0, Asn1::ldapOid(ExtendedRequest::OID_PWD_MODIFY)),
+            Asn1::context(0, Asn1::octetString(ExtendedRequest::OID_PWD_MODIFY)),
             Asn1::context(1, Asn1::octetString($encoder->encode(Asn1::sequence(
                 Asn1::context(2, Asn1::octetString('12345'))
             ))))
@@ -79,7 +79,7 @@ class PasswordModifyRequestSpec extends ObjectBehavior
 
         $this->setNewPassword(null);
         $this->toAsn1()->shouldBeLike(Asn1::application(23, Asn1::sequence(
-            Asn1::context(0, Asn1::ldapOid(ExtendedRequest::OID_PWD_MODIFY)),
+            Asn1::context(0, Asn1::octetString(ExtendedRequest::OID_PWD_MODIFY)),
             Asn1::context(1, Asn1::octetString($encoder->encode(Asn1::sequence())))
         )));
     }

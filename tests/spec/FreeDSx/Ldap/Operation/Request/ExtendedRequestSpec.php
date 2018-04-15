@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use PhpSpec\ObjectBehavior;
@@ -41,13 +41,13 @@ class ExtendedRequestSpec extends ObjectBehavior
     function it_should_generate_correct_asn1()
     {
         $this->toAsn1()->shouldBeLike(Asn1::application(23, Asn1::sequence(
-            Asn1::context(0, Asn1::ldapOid(ExtendedRequest::OID_START_TLS))
+            Asn1::context(0, Asn1::octetString(ExtendedRequest::OID_START_TLS))
         )));
 
         $this->setValue('foo');
 
         $this->toAsn1()->shouldBeLike(Asn1::application(23, Asn1::sequence(
-            Asn1::context(0, Asn1::ldapOid(ExtendedRequest::OID_START_TLS)),
+            Asn1::context(0, Asn1::octetString(ExtendedRequest::OID_START_TLS)),
             Asn1::context(1, Asn1::octetString('foo'))
         )));
     }

@@ -10,15 +10,15 @@
 
 namespace FreeDSx\Ldap\Search\Filter;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\IncompleteType;
-use FreeDSx\Ldap\Asn1\Type\OctetStringType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 /**
  * Represents a substring filter. RFC 4511, 4.5.1.7.2.
@@ -160,7 +160,7 @@ class SubstringFilter implements FilterInterface
         }
 
         return Asn1::context(self::CHOICE_TAG, Asn1::sequence(
-           Asn1::ldapString($this->attribute),
+           Asn1::octetString($this->attribute),
            $substrings
         ));
     }
@@ -196,7 +196,7 @@ class SubstringFilter implements FilterInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $type = $type instanceof IncompleteType ? $encoder->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
         if (!($type instanceof SequenceType && count($type->getChildren()) === 2)) {
             throw new ProtocolException('The substring type is malformed');

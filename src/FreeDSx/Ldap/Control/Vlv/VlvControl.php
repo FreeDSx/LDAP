@@ -10,8 +10,8 @@
 
 namespace FreeDSx\Ldap\Control\Vlv;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;

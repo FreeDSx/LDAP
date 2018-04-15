@@ -10,11 +10,11 @@
 
 namespace FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\OctetStringType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Asn1\Type\SetType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Type\SetType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
@@ -133,7 +133,7 @@ class AddRequest implements RequestInterface
 
         /** @var Attribute $attribute */
         foreach ($this->entry as $attribute) {
-            $attr = Asn1::sequence(Asn1::ldapString($attribute->getName()));
+            $attr = Asn1::sequence(Asn1::octetString($attribute->getName()));
 
             $attrValues = Asn1::setOf(...array_map(function ($value) {
                 return Asn1::octetString($value);
@@ -143,7 +143,7 @@ class AddRequest implements RequestInterface
         }
 
         return Asn1::application(self::APP_TAG, Asn1::sequence(
-            Asn1::ldapDn($this->entry->getDn()->toString()),
+            Asn1::octetString($this->entry->getDn()->toString()),
             $attributeList
         ));
     }

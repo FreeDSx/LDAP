@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Search\Filter;
 
-use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use PhpSpec\ObjectBehavior;
@@ -39,7 +39,7 @@ class PresentFilterSpec extends ObjectBehavior
 
     function it_should_generate_correct_asn1()
     {
-        $this->toAsn1()->shouldBeLike(Asn1::context(7, Asn1::ldapString('foo')));
+        $this->toAsn1()->shouldBeLike(Asn1::context(7, Asn1::octetString('foo')));
     }
 
     function it_should_be_constructed_from_asn1()

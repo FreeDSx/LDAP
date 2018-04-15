@@ -10,13 +10,13 @@
 
 namespace FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\BooleanType;
-use FreeDSx\Ldap\Asn1\Type\EnumeratedType;
-use FreeDSx\Ldap\Asn1\Type\IntegerType;
-use FreeDSx\Ldap\Asn1\Type\OctetStringType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\BooleanType;
+use FreeDSx\Asn1\Type\EnumeratedType;
+use FreeDSx\Asn1\Type\IntegerType;
+use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -428,7 +428,7 @@ class SearchRequest implements RequestInterface
         }
 
         return Asn1::application(self::APP_TAG, Asn1::sequence(
-            Asn1::ldapDn($this->baseDn),
+            Asn1::octetString($this->baseDn),
             Asn1::enumerated($this->scope),
             Asn1::enumerated($this->derefAliases),
             Asn1::integer($this->sizeLimit),
@@ -437,7 +437,7 @@ class SearchRequest implements RequestInterface
             $this->filter->toAsn1(),
             Asn1::sequenceOf(...array_map(function ($attr) {
                 /** @var Attribute $attr */
-                return Asn1::ldapString($attr instanceof Attribute ? $attr->getName() : $attr);
+                return Asn1::octetString($attr instanceof Attribute ? $attr->getName() : $attr);
             }, $this->attributes))
          ));
     }

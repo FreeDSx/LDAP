@@ -10,9 +10,9 @@
 
 namespace FreeDSx\Ldap\Protocol\Factory;
 
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\OctetStringType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;

@@ -10,11 +10,11 @@
 
 namespace FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\IntegerType;
-use FreeDSx\Ldap\Asn1\Type\OctetStringType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\IntegerType;
+use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
@@ -88,7 +88,7 @@ abstract class BindRequest implements RequestInterface
 
         return Asn1::application(self::APP_TAG, Asn1::sequence(
             Asn1::integer($this->version),
-            Asn1::ldapDn($this->username),
+            Asn1::octetString($this->username),
             $this->getAsn1AuthChoice()
         ));
     }

@@ -10,9 +10,9 @@
 
 namespace FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 
@@ -64,7 +64,7 @@ class DeleteRequest implements RequestInterface, DnRequestInterface
      */
     public function toAsn1(): AbstractType
     {
-        return Asn1::application(self::APP_TAG, Asn1::ldapDn($this->dn->toString()));
+        return Asn1::application(self::APP_TAG, Asn1::octetString($this->dn->toString()));
     }
 
     /**

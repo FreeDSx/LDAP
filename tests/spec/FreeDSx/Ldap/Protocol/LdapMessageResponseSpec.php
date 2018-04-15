@@ -10,9 +10,9 @@
 
 namespace spec\FreeDSx\Ldap\Protocol;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Type\IncompleteType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
+use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
@@ -50,16 +50,16 @@ class LdapMessageResponseSpec extends ObjectBehavior
 
     function it_should_be_constructed_from_ASN1()
     {
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
 
         $this->beConstructedThrough('fromAsn1',[Asn1::sequence(
             Asn1::integer(3),
             Asn1::application(11, Asn1::sequence(
                 Asn1::integer(0),
-                Asn1::ldapDn('dc=foo,dc=bar'),
+                Asn1::octetString('dc=foo,dc=bar'),
                 Asn1::octetString('')
             )),
-            Asn1::context(0, new IncompleteType($encoder->encode((new Control('foo'))->toAsn1())))
+            Asn1::context(0, (new IncompleteType($encoder->encode((new Control('foo'))->toAsn1())))->setIsConstructed(true))
         )]);
 
         $this->getMessageId()->shouldBeEqualTo(3);

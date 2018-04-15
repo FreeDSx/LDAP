@@ -10,7 +10,7 @@
 
 namespace FreeDSx\Ldap\Protocol;
 
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\AbstractType;
 
 /**
  * Methods needed to transform an object to/from ASN1 representation.

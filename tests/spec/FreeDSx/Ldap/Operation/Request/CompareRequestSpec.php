@@ -2,8 +2,8 @@
 
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
@@ -43,7 +43,7 @@ class CompareRequestSpec extends ObjectBehavior
     function it_should_generate_correct_asn1()
     {
         $this->toAsn1()->shouldBeLike(Asn1::application(14, Asn1::sequence(
-            Asn1::ldapDn('dc=foo,dc=bar'),
+            Asn1::octetString('dc=foo,dc=bar'),
             Asn1::universal(AbstractType::TAG_TYPE_SEQUENCE, (new EqualityFilter('foo', 'bar'))->toAsn1())
         )));
     }

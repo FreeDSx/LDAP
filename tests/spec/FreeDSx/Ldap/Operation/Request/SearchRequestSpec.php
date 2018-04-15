@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -100,7 +100,7 @@ class SearchRequestSpec extends ObjectBehavior
         $this->setBaseDn('dc=foo,dc=bar');
 
         $this->toAsn1()->shouldBeLike(Asn1::application(3, Asn1::sequence(
-            Asn1::ldapDn('dc=foo,dc=bar'),
+            Asn1::octetString('dc=foo,dc=bar'),
             Asn1::enumerated(2),
             Asn1::enumerated(0),
             Asn1::integer(0),

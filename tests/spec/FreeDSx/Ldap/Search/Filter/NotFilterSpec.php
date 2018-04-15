@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Search\Filter;
 
-use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filter\NotFilter;
 use FreeDSx\Ldap\Search\Filters;

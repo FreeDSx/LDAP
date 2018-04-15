@@ -10,11 +10,11 @@
 
 namespace spec\FreeDSx\Ldap\Protocol;
 
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
@@ -79,7 +79,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->beConstructedWith($socket, ['ssl_cert' => 'foo.pem'], $queue);
 
         $queue->getMessage()->willReturn(new LdapMessageRequest(1, new ExtendedRequest(ExtendedRequest::OID_START_TLS)), null);
-        $response = (new BerEncoder())->encode((new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(0), ExtendedRequest::OID_START_TLS)))->toAsn1());
+        $response = (new LdapEncoder())->encode((new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(0), ExtendedRequest::OID_START_TLS)))->toAsn1());
         $socket->write($response)->shouldBeCalled();
         $socket->block(true)->shouldBeCalled();
         $socket->isEncrypted()->willReturn(false);
@@ -93,7 +93,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->beConstructedWith($socket, ['ssl_cert' => null], $queue);
 
         $queue->getMessage()->willReturn(new LdapMessageRequest(1, new ExtendedRequest(ExtendedRequest::OID_START_TLS)), null);
-        $response = (new BerEncoder())->encode((new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(ResultCode::PROTOCOL_ERROR), ExtendedRequest::OID_START_TLS)))->toAsn1());
+        $response = (new LdapEncoder())->encode((new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(ResultCode::PROTOCOL_ERROR), ExtendedRequest::OID_START_TLS)))->toAsn1());
         $socket->write($response)->shouldBeCalled();
         $socket->encrypt(true)->shouldNotBeCalled();
 
@@ -105,7 +105,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->beConstructedWith($socket, ['ssl_cert' => 'foo.pem'], $queue);
         $queue->getMessage()->willReturn(new LdapMessageRequest(1, new ExtendedRequest(ExtendedRequest::OID_START_TLS)), null);
 
-        $response = (new BerEncoder())->encode((new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(ResultCode::OPERATIONS_ERROR, '', 'The current LDAP session is already encrypted.'), ExtendedRequest::OID_START_TLS)))->toAsn1());
+        $response = (new LdapEncoder())->encode((new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(ResultCode::OPERATIONS_ERROR, '', 'The current LDAP session is already encrypted.'), ExtendedRequest::OID_START_TLS)))->toAsn1());
         $socket->write($response)->shouldBeCalled();
         $socket->isEncrypted()->willReturn(true);
         $socket->encrypt(true)->shouldNotBeCalled();
@@ -124,7 +124,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         );
         $handler->bind('cn=foo,dc=foo,dc=nar', 'foo')->shouldBeCalled()->willReturn(true);
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $socket->write($encoder->encode((new LdapMessageResponse(1, new BindResponse(new LdapResult(0))))->toAsn1()))->shouldBeCalled();
         $socket->write($encoder->encode((new LdapMessageResponse(2, new ExtendedResponse(new LdapResult(0), null,'dn:cn=foo,dc=foo,dc=nar')))->toAsn1()))->shouldBeCalled();
 
@@ -141,7 +141,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         );
         $handler->bind('foo@bar.local', 'foo')->willReturn(true);
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $socket->write($encoder->encode((new LdapMessageResponse(2, new ExtendedResponse(new LdapResult(0), null,'u:foo@bar.local')))->toAsn1()))->shouldBeCalled();
 
         $this->setRequestHandler($handler);
@@ -152,7 +152,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
     {
         $queue->getMessage()->willReturn(new LdapMessageRequest(2, new ExtendedRequest(ExtendedRequest::OID_WHOAMI)), null);
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $socket->write($encoder->encode((new LdapMessageResponse(2, new ExtendedResponse(new LdapResult(0), null, '')))->toAsn1()))->shouldBeCalled();
 
         $this->handle();
@@ -165,7 +165,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $socket->write($encoder->encode((new LdapMessageResponse(1, new BindResponse(new LdapResult(ResultCode::AUTH_METHOD_UNSUPPORTED, '','Anonymous binds are not allowed.'))))->toAsn1()))->shouldBeCalled();
         $this->handle();
     }
@@ -177,7 +177,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $socket->write($encoder->encode((new LdapMessageResponse(1, new ModifyDnResponse(ResultCode::INSUFFICIENT_ACCESS_RIGHTS, 'cn=foo,dc=bar', 'Authentication required.')))->toAsn1()))->shouldBeCalled();
         $handler->modifyDn(Argument::any(), Argument::any())->shouldNotBeCalled();
 
@@ -189,7 +189,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
     {
         $queue->getMessage()->willThrow(new ProtocolException());
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $socket->write($encoder->encode((new LdapMessageResponse(0, new ExtendedResponse(
             new LdapResult(ResultCode::PROTOCOL_ERROR, '', 'The message encoding is malformed.'),
             ExtendedResponse::OID_NOTICE_OF_DISCONNECTION
@@ -202,7 +202,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
     {
         $queue->getMessage()->willThrow(new EncoderException());
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $socket->write($encoder->encode((new LdapMessageResponse(0, new ExtendedResponse(
             new LdapResult(ResultCode::PROTOCOL_ERROR, '', 'The message encoding is malformed.'),
             ExtendedResponse::OID_NOTICE_OF_DISCONNECTION
@@ -215,7 +215,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
     {
         $queue->getMessage()->willReturn(new LdapMessageRequest(0, new ExtendedRequest(ExtendedRequest::OID_START_TLS)), null);
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $socket->write($encoder->encode((new LdapMessageResponse(0, new ExtendedResponse(new LdapResult(
             ResultCode::PROTOCOL_ERROR,
             '',
@@ -232,7 +232,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             new LdapMessageRequest(1, new ExtendedRequest(ExtendedRequest::OID_WHOAMI)),
             null
         );
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
 
         $socket->write($encoder->encode((new LdapMessageResponse(0, new ExtendedResponse(new LdapResult(ResultCode::PROTOCOL_ERROR, '', 'The message ID 1 is not valid.'))))->toAsn1()))->shouldBeCalled();
         $this->handle();
@@ -332,7 +332,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $entries = new Entries(Entry::create('dc=foo,dc=bar', ['cn' => 'foo']), Entry::create('dc=bar,dc=foo', ['cn' => 'bar']));
         $resultEntry = $encoder->encode((new LdapMessageResponse(2, new SearchResultEntry(Entry::create('dc=foo,dc=bar', ['cn' => 'foo']))))->toAsn1());
         $resultEntry .= $encoder->encode((new LdapMessageResponse(2, new SearchResultEntry(Entry::create('dc=bar,dc=foo', ['cn' => 'bar']))))->toAsn1());
@@ -363,7 +363,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $socket->write($encoder->encode((new LdapMessageResponse(1, new BindResponse(new LdapResult(
             ResultCode::PROTOCOL_ERROR,
             '',
@@ -383,7 +383,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $handler->modify(Argument::any(), $modify)->shouldBeCalled()->willThrow(new OperationException('Foo.', ResultCode::CONFIDENTIALITY_REQUIRED));
         $socket->write($encoder->encode((new LdapMessageResponse(2, new ModifyResponse(ResultCode::CONFIDENTIALITY_REQUIRED, 'cn=foo,dc=bar', 'Foo.')))->toAsn1()))->shouldBeCalled();
         $this->setRequestHandler($handler);
@@ -398,7 +398,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $socket->write($encoder->encode((new LdapMessageResponse(1, new SearchResultEntry(Entry::create('', [
             'namingContexts' => 'dc=FreeDSx,dc=local',
             'supportedExtension' => [
@@ -421,7 +421,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $socket->write($encoder->encode((new LdapMessageResponse(1, new SearchResultEntry(Entry::create('', [
             'namingContexts' => [],
             'supportedExtension' => [],
@@ -442,7 +442,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $socket->write($encoder->encode((new LdapMessageResponse(1, new SearchResultEntry(Entry::create('', ['namingContexts' => 'dc=FreeDSx,dc=local',]))))->toAsn1()))->shouldBeCalled();
         $handler->search(Argument::any(), Argument::any())->shouldNotBeCalled();
 

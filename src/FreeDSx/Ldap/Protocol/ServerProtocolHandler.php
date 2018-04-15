@@ -10,13 +10,11 @@
 
 namespace FreeDSx\Ldap\Protocol;
 
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Encoder\EncoderInterface;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
@@ -94,7 +92,7 @@ class ServerProtocolHandler
     protected $token;
 
     /**
-     * @var EncoderInterface
+     * @var LdapEncoder
      */
     protected $encoder;
 
@@ -114,7 +112,7 @@ class ServerProtocolHandler
         $this->queue = $queue ?? new ServerMessageQueue($socket);
         $this->options = array_merge($this->options, $options);
         $this->validateAndSetRequestHandler();
-        $this->encoder = new BerEncoder();
+        $this->encoder = new LdapEncoder();
     }
 
     /**

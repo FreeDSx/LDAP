@@ -10,7 +10,7 @@
 
 namespace FreeDSx\Ldap\Protocol\Factory;
 
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;

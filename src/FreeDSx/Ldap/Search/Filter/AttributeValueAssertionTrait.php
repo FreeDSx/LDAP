@@ -10,12 +10,12 @@
 
 namespace FreeDSx\Ldap\Search\Filter;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\IncompleteType;
-use FreeDSx\Ldap\Asn1\Type\OctetStringType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\ProtocolException;
 
@@ -68,7 +68,7 @@ trait AttributeValueAssertionTrait
     public function toAsn1() : AbstractType
     {
         return Asn1::context(self::CHOICE_TAG, Asn1::sequence(
-            Asn1::ldapString($this->attribute),
+            Asn1::octetString($this->attribute),
             Asn1::octetString($this->value)
         ));
     }
@@ -90,7 +90,7 @@ trait AttributeValueAssertionTrait
      */
     public static function fromAsn1(AbstractType $type)
     {
-        $type = $type instanceof IncompleteType ? (new BerEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
+        $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
         if (!($type instanceof SequenceType && count($type) === 2)) {
             throw new ProtocolException('The attribute value assertion is malformed.');
         }

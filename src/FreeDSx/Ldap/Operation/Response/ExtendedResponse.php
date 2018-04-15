@@ -10,12 +10,12 @@
 
 namespace FreeDSx\Ldap\Operation\Response;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\LdapResult;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 
 /**
@@ -99,10 +99,10 @@ class ExtendedResponse extends LdapResult
         $asn1 = parent::toAsn1();
 
         if ($this->responseName !== null) {
-            $asn1->addChild(Asn1::context(10, Asn1::ldapOid($this->responseName)));
+            $asn1->addChild(Asn1::context(10, Asn1::octetString($this->responseName)));
         }
         if ($this->responseValue !== null) {
-            $encoder = new BerEncoder();
+            $encoder = new LdapEncoder();
             $value = $this->responseValue;
             if ($value instanceof AbstractType) {
                 $value = $encoder->encode($value);
@@ -123,7 +123,7 @@ class ExtendedResponse extends LdapResult
     {
         $info = [0 => null, 1 => null];
 
-        /** @var \FreeDSx\Ldap\Asn1\Type\SequenceType $type */
+        /** @var \FreeDSx\Asn1\Type\SequenceType $type */
         foreach ($type->getChildren() as $child) {
             if ($child->getTagNumber() === 10) {
                 $info[0] = $child->getValue();
@@ -158,6 +158,6 @@ class ExtendedResponse extends LdapResult
         }
         [1 => $value] = self::parseExtendedResponse($type);
 
-        return $value === null ? null : (new BerEncoder())->decode($value);
+        return $value === null ? null : (new LdapEncoder())->decode($value);
     }
 }

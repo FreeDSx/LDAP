@@ -10,8 +10,8 @@
 
 namespace spec\FreeDSx\Ldap\Control\Sorting;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
 use PhpSpec\ObjectBehavior;
@@ -40,10 +40,10 @@ class SortingResponseControlSpec extends ObjectBehavior
 
     function it_should_be_constructed_from_asn1()
     {
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
 
         $this::fromAsn1(Asn1::sequence(
-            Asn1::ldapOid(Control::OID_SORTING_RESPONSE),
+            Asn1::octetString(Control::OID_SORTING_RESPONSE),
             Asn1::boolean(false),
             Asn1::octetString($encoder->encode(Asn1::sequence(
                 Asn1::enumerated(0),
@@ -54,10 +54,10 @@ class SortingResponseControlSpec extends ObjectBehavior
 
     function it_should_generate_correct_asn1()
     {
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $this->toAsn1()->shouldBeLike(
             Asn1::sequence(
-                Asn1::ldapOid(Control::OID_SORTING_RESPONSE),
+                Asn1::octetString(Control::OID_SORTING_RESPONSE),
                 Asn1::boolean(false),
                 Asn1::octetString($encoder->encode(Asn1::sequence(
                     Asn1::enumerated(0),

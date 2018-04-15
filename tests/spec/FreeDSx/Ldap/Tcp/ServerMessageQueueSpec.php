@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Tcp;
 
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -32,7 +32,7 @@ class ServerMessageQueueSpec extends ObjectBehavior
 
     function it_should_continue_on_during_partial_PDUs($tcp)
     {
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $message = new LdapMessageRequest(1, new DeleteRequest('dc=foo,dc=bar'));
 
         $encoded = $encoder->encode($message->toAsn1());
@@ -46,7 +46,7 @@ class ServerMessageQueueSpec extends ObjectBehavior
 
     function it_should_return_a_single_message_on_tcp_read($tcp)
     {
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $message = new LdapMessageRequest(1, new DeleteRequest('dc=foo,dc=bar'));
 
         $tcp->read()->willReturn($encoder->encode($message->toAsn1()));

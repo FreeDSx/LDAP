@@ -10,8 +10,6 @@
 
 namespace FreeDSx\Ldap\Protocol;
 
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Encoder\EncoderInterface;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Entries;
@@ -77,7 +75,7 @@ class ClientProtocolHandler
     protected $queue;
 
     /**
-     * @var EncoderInterface
+     * @var LdapEncoder
      */
     protected $encoder;
 
@@ -109,7 +107,7 @@ class ClientProtocolHandler
     public function __construct(array $options, ClientMessageQueue $queue = null, SocketPool $pool = null)
     {
         $this->options = $options;
-        $this->encoder = new BerEncoder();
+        $this->encoder = new LdapEncoder();
         $this->pool = $pool ?: new SocketPool($options);
         $this->queue = $queue;
         $this->controls = new ControlBag();

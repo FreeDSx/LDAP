@@ -10,12 +10,12 @@
 
 namespace FreeDSx\Ldap\Control;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
-use FreeDSx\Ldap\Asn1\Type\AbstractType;
-use FreeDSx\Ldap\Asn1\Type\IncompleteType;
-use FreeDSx\Ldap\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 /**
  * Represents a password policy response. draft-behera-ldap-password-policy-09
@@ -136,7 +136,7 @@ class PwdPolicyResponseControl extends Control
         $timeBeforeExpiration = null;
         $graceAttemptsRemaining = null;
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         foreach ($response->getChildren() as $child) {
             if ($child->getTagNumber() === 0) {
                 /** @var IncompleteType $child */

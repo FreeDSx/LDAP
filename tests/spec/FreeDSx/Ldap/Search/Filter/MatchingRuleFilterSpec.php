@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Search\Filter;
 
-use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
 use PhpSpec\ObjectBehavior;
@@ -74,23 +74,23 @@ class MatchingRuleFilterSpec extends ObjectBehavior
     function it_should_generate_correct_asn1()
     {
         $this->toAsn1()->shouldBeLike(Asn1::context(9, Asn1::sequence(
-            Asn1::context(1, Asn1::ldapString('foo')),
-            Asn1::context(2, Asn1::ldapString('bar')),
+            Asn1::context(1, Asn1::octetString('foo')),
+            Asn1::context(2, Asn1::octetString('bar')),
             Asn1::context(3, Asn1::octetString('foobar')),
             Asn1::context(4, Asn1::boolean(false))
         )));
 
         $this->setUseDnAttributes(true);
         $this->toAsn1()->shouldBeLike(Asn1::context(9, Asn1::sequence(
-            Asn1::context(1, Asn1::ldapString('foo')),
-            Asn1::context(2, Asn1::ldapString('bar')),
+            Asn1::context(1, Asn1::octetString('foo')),
+            Asn1::context(2, Asn1::octetString('bar')),
             Asn1::context(3, Asn1::octetString('foobar')),
             Asn1::context(4, Asn1::boolean(true))
         )));
 
         $this->setMatchingRule(null);
         $this->toAsn1()->shouldBeLike(Asn1::context(9, Asn1::sequence(
-            Asn1::context(2, Asn1::ldapString('bar')),
+            Asn1::context(2, Asn1::octetString('bar')),
             Asn1::context(3, Asn1::octetString('foobar')),
             Asn1::context(4, Asn1::boolean(true))
         )));

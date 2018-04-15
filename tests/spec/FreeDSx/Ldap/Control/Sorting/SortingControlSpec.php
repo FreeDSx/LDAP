@@ -10,8 +10,8 @@
 
 namespace spec\FreeDSx\Ldap\Control\Sorting;
 
-use FreeDSx\Ldap\Asn1\Asn1;
-use FreeDSx\Ldap\Asn1\Encoder\BerEncoder;
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
@@ -62,16 +62,16 @@ class SortingControlSpec extends ObjectBehavior
     {
         $this->addSortKeys(new SortKey('foobar', true, 'bleh'));
 
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $this->toAsn1()->shouldBeLike(Asn1::sequence(
-            Asn1::ldapOid(Control::OID_SORTING),
+            Asn1::octetString(Control::OID_SORTING),
             Asn1::boolean(false),
             Asn1::octetString($encoder->encode(Asn1::sequenceOf(
-                Asn1::sequence(Asn1::ldapString('foo')),
-                Asn1::sequence(Asn1::ldapString('bar')),
+                Asn1::sequence(Asn1::octetString('foo')),
+                Asn1::sequence(Asn1::octetString('bar')),
                 Asn1::sequence(
-                    Asn1::ldapString('foobar'),
-                    Asn1::context(0, Asn1::ldapString('bleh')),
+                    Asn1::octetString('foobar'),
+                    Asn1::context(0, Asn1::octetString('bleh')),
                     Asn1::context(1, Asn1::boolean(true))
                 )
             )))
@@ -80,16 +80,16 @@ class SortingControlSpec extends ObjectBehavior
 
     function it_should_be_constructed_from_asn1()
     {
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $this::fromAsn1(Asn1::sequence(
-            Asn1::ldapOid(Control::OID_SORTING),
+            Asn1::octetString(Control::OID_SORTING),
             Asn1::boolean(false),
             Asn1::octetString($encoder->encode(Asn1::sequenceOf(
                 Asn1::sequence(Asn1::octetString('foo')),
                 Asn1::sequence(Asn1::octetString('bar')),
                 Asn1::sequence(
                     Asn1::octetString('foobar'),
-                    Asn1::context(0, Asn1::ldapString('bleh')),
+                    Asn1::context(0, Asn1::octetString('bleh')),
                     Asn1::context(1, Asn1::boolean(true))
                 )
             )))
@@ -102,9 +102,9 @@ class SortingControlSpec extends ObjectBehavior
 
     function it_should_throw_an_error_parsing_sorting_keys_with_no_attribute()
     {
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
-            Asn1::ldapOid(Control::OID_SORTING),
+            Asn1::octetString(Control::OID_SORTING),
             Asn1::boolean(false),
             Asn1::octetString($encoder->encode(Asn1::sequenceOf(
                 Asn1::sequence(Asn1::octetString(''))
@@ -114,9 +114,9 @@ class SortingControlSpec extends ObjectBehavior
 
     function it_should_throw_an_error_parsing_sorting_keys_with_unexpected_values()
     {
-        $encoder = new BerEncoder();
+        $encoder = new LdapEncoder();
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
-            Asn1::ldapOid(Control::OID_SORTING),
+            Asn1::octetString(Control::OID_SORTING),
             Asn1::boolean(false),
             Asn1::octetString($encoder->encode(Asn1::sequenceOf(
                 Asn1::sequence(Asn1::octetString('foo'), Asn1::enumerated(1))

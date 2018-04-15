@@ -10,7 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Asn1\Asn1;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
@@ -40,16 +40,16 @@ class AddRequestSpec extends ObjectBehavior
         $this->beConstructedWith(Entry::create('cn=foo,dc=foo,dc=bar', ['cn' => 'foo', 'sn' => ['foo', 'bar']]));
 
         $this->toAsn1()->shouldBeLike(Asn1::application(8, Asn1::sequence(
-            Asn1::ldapDn('cn=foo,dc=foo,dc=bar'),
+            Asn1::octetString('cn=foo,dc=foo,dc=bar'),
             Asn1::sequenceOf(
                 Asn1::sequence(
-                    Asn1::ldapString('cn'),
+                    Asn1::octetString('cn'),
                     Asn1::setOf(
                         Asn1::octetString('foo')
                     )
                 ),
                 Asn1::sequence(
-                    Asn1::ldapString('sn'),
+                    Asn1::octetString('sn'),
                     Asn1::setOf(
                         Asn1::octetString('foo'),
                         Asn1::octetString('bar')
