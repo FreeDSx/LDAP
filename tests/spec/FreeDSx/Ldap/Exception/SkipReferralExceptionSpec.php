@@ -1,6 +1,6 @@
 <?php
 /**
- * This file is part of the FreeDSx package.
+ * This file is part of the FreeDSx LDAP package.
  *
  * (c) Chad Sikorra <Chad.Sikorra@gmail.com>
  *

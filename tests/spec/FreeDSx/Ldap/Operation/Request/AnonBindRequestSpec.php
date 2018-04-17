@@ -1,6 +1,6 @@
 <?php
 /**
- * This file is part of the FreeDSx package.
+ * This file is part of the FreeDSx LDAP package.
  *
  * (c) Chad Sikorra <Chad.Sikorra@gmail.com>
  *
@@ -11,7 +11,6 @@
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Operation\Request\BindRequest;

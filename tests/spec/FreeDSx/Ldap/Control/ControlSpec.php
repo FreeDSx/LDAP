@@ -1,6 +1,6 @@
 <?php
 /**
- * This file is part of the FreeDSx package.
+ * This file is part of the FreeDSx LDAP package.
  *
  * (c) Chad Sikorra <Chad.Sikorra@gmail.com>
  *
@@ -11,8 +11,6 @@
 namespace spec\FreeDSx\Ldap\Control;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Asn1\Type\BooleanType;
-use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use PhpSpec\ObjectBehavior;
 
