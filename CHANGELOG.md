@@ -1,6 +1,16 @@
 CHANGELOG
 =========
 
+0.4.0 (2018-04-20)
+------------------
+* Moved ASN.1 to its own library.
+* Add a create convenience method to the LdapClient to create a single LDAP entry.
+* Add a read convenience method to the LdapClient to return a single LDAP entry.
+* Add an update convenience method to the LdapClient to update a single LDAP entry.
+* Add a delete convenience method to the LdapClient to delete a single LDAP entry.
+* Rename searchRead() and searchList() operation methods to read() and list().
+* Throw an exception on referrals by default. Do not allow ignoring them, only following them.
+
 0.3.0 (2018-02-12)
 ------------------
 * Implement referral handling options.
