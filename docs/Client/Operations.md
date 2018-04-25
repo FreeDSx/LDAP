@@ -13,7 +13,8 @@ for common operations, along with factory methods for standard operations:
 * [Compare Request](#compare-request)
 * [Password Modify Request](#password-modify-request)
 
-All of these operations are constructed with methods on the `FreeDSx\Ldap\Operations` class.
+Basic CRUD methods are available on the LdapClient, while all of these operations are constructed with methods on the 
+`FreeDSx\Ldap\Operations` class.
 
 ## Add Request
 
@@ -29,7 +30,7 @@ $entry = Entry::create('cn=foo,dc=domain,dc=local', [
     'sAMAccountName' => 'foo',
 ]);
 
-# Add the entry to LDAP by passing it to the add request and sending it with the client
+# Add the entry to LDAP by passing it to the create method of the client...
 try {
     $ldap->create($entry);
 } catch (OperationException $e) {
@@ -44,7 +45,7 @@ Delete an entry from LDAP using its distinguished name and catch an operation ex
 ```php
 use FreeDSx\Ldap\Exception\OperationException;
 
-# Delete an entry using its DN. This can also be a DN object from an entry: $entry->getDn()
+# Delete an entry using its DN. This can also be a DN object from an entry ( $entry->getDn() ) or the entry itself.
 try {
     $ldap->delete('cn=foo,dc=domain,dc=local');
 } catch (OperationException $e) {
@@ -163,8 +164,8 @@ Search for a single entry:
 ```php
 use FreeDSx\Ldap\Operations;
 
-# Pass search read a DN to query. Use the search() helper, grab the first entry...
-$entry = $ldap->search(Operations::searchRead('cn=foo,dc=domain,dc=local'))->first();
+# Pass a DN to the read() method to grab the entry...
+$entry = $ldap->read('cn=foo,dc=domain,dc=local');
 
 if (!$entry) {
     echo "The LDAP entry was not found.";
