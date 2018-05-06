@@ -123,6 +123,13 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         $this->shouldThrow(ConnectionException::class)->during('send', [new DeleteRequest('foo')]);
     }
 
+    function it_should_throw_a_ldap_specific_connection_exception_on_socket_issues($queue)
+    {
+        $queue->getMessage(Argument::any())->willThrow(new \FreeDSx\Socket\Exception\ConnectionException('foo'));
+
+        $this->shouldThrow(new ConnectionException('foo'))->during('send', [new DeleteRequest('dc=foo')]);
+    }
+
     function it_should_throw_a_protocol_exception_on_an_unexpected_id($queue)
     {
         $queue->getMessage(1)->willReturn(new LdapMessageResponse(2, new ExtendedResponse(new LdapResult(0, ''))));

@@ -450,8 +450,13 @@ class ClientProtocolHandler
      */
     protected function getMessageWithId(int $id) : LdapMessageResponse
     {
-        /** @var LdapMessageResponse $message */
-        $message = $this->queue()->getMessage($id);
+        # Throw a more LDAP specific connection exception
+        try {
+            /** @var LdapMessageResponse $message */
+            $message = $this->queue()->getMessage($id);
+        } catch (\FreeDSx\Socket\Exception\ConnectionException $exception) {
+            throw new ConnectionException($exception->getMessage(), $exception->getCode(), $exception);
+        }
 
         if ($message->getMessageId() === 0 && $message->getResponse() instanceof ExtendedResponse) {
             /** @var ExtendedResponse $response */
