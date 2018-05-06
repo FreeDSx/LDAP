@@ -16,6 +16,7 @@ use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Exception\SkipReferralException;
@@ -37,9 +38,9 @@ use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Tcp\ClientMessageQueue;
-use FreeDSx\Ldap\Tcp\Socket;
-use FreeDSx\Ldap\Tcp\SocketPool;
+use FreeDSx\Socket\MessageQueue;
+use FreeDSx\Socket\Socket;
+use FreeDSx\Socket\SocketPool;
 
 /**
  * Handles client specific protocol communication details.
@@ -70,7 +71,7 @@ class ClientProtocolHandler
     protected $tcp;
 
     /**
-     * @var ClientMessageQueue
+     * @var MessageQueue
      */
     protected $queue;
 
@@ -101,10 +102,10 @@ class ClientProtocolHandler
 
     /**
      * @param array $options
-     * @param ClientMessageQueue|null $queue
+     * @param MessageQueue|null $queue
      * @param SocketPool|null $pool
      */
-    public function __construct(array $options, ClientMessageQueue $queue = null, SocketPool $pool = null)
+    public function __construct(array $options, MessageQueue $queue = null, SocketPool $pool = null)
     {
         $this->options = $options;
         $this->encoder = new LdapEncoder();
@@ -222,6 +223,7 @@ class ClientProtocolHandler
     /**
      * @param LdapMessageRequest $messageTo
      * @return null|LdapMessageResponse
+     * @throws UnsolicitedNotificationException
      */
     protected function handleRequest(LdapMessageRequest $messageTo) : ?LdapMessageResponse
     {
@@ -240,7 +242,7 @@ class ClientProtocolHandler
         } elseif ($request instanceof SearchRequest) {
             $messageFrom = $this->handleSearchResponse($messageTo);
         } else {
-            $messageFrom = $this->queue()->getMessage($messageTo->getMessageId());
+            $messageFrom = $this->getMessageWithId($messageTo->getMessageId());
         }
 
         return $messageFrom;
@@ -250,9 +252,9 @@ class ClientProtocolHandler
      * @param LdapMessageRequest $messageTo
      * @param LdapMessageResponse $messageFrom
      * @return LdapMessageResponse|null
-     * @throws ReferralException
+     * @throws OperationException
      */
-    protected function handleReferral(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom)
+    protected function handleReferral(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom) : ?LdapMessageResponse
     {
         $referralChaser = $this->options['referral_chaser'];
         if (!($referralChaser === null || $referralChaser instanceof ReferralChaserInterface)) {
@@ -394,7 +396,7 @@ class ClientProtocolHandler
      */
     protected function handleStartTls(LdapMessageRequest $messageTo) : void
     {
-        $messageFrom = $this->queue()->getMessage($messageTo->getMessageId());
+        $messageFrom = $this->getMessageWithId($messageTo->getMessageId());
 
         if ($messageFrom->getResponse()->getResultCode() !== ResultCode::SUCCESS) {
             throw new ConnectionException(sprintf(
@@ -436,6 +438,43 @@ class ClientProtocolHandler
     }
 
     /**
+     * Grabs a message from the queue while checking for two separate things:
+     *
+     *  - Unsolicited notification messages, which is a message with an ID of zero and an ExtendedResponse type.
+     *  - Unexpected message ID responses if we expect a specific message ID to be returned.
+     *
+     * @param int $id
+     * @return LdapMessageResponse
+     * @throws ProtocolException
+     * @throws UnsolicitedNotificationException
+     */
+    protected function getMessageWithId(int $id) : LdapMessageResponse
+    {
+        /** @var LdapMessageResponse $message */
+        $message = $this->queue()->getMessage($id);
+
+        if ($message->getMessageId() === 0 && $message->getResponse() instanceof ExtendedResponse) {
+            /** @var ExtendedResponse $response */
+            $response = $message->getResponse();
+            throw new UnsolicitedNotificationException(
+                $response->getDiagnosticMessage(),
+                $response->getResultCode(),
+                null,
+                $response->getName()
+            );
+        }
+        if ($id !== $message->getMessageId()) {
+            throw new ProtocolException(sprintf(
+                'Expected a LDAP PDU with an ID %s, but received ID %s.',
+                $id,
+                $message->getMessageId()
+            ));
+        }
+
+        return $message;
+    }
+
+    /**
      * Closes the TCP connection and resets the message ID back to 0.
      */
     protected function closeTcp() : void
@@ -458,12 +497,12 @@ class ClientProtocolHandler
     }
 
     /**
-     * @return ClientMessageQueue
+     * @return MessageQueue
      */
-    protected function queue() : ClientMessageQueue
+    protected function queue() : MessageQueue
     {
         if ($this->queue === null) {
-            $this->queue = new ClientMessageQueue($this->tcp());
+            $this->queue = new MessageQueue($this->tcp(), $this->encoder, LdapMessageResponse::class);
         }
 
         return $this->queue;

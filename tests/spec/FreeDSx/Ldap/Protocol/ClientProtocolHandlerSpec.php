@@ -15,9 +15,9 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\Exception\SkipReferralException;
-use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
@@ -39,15 +39,15 @@ use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\ReferralChaserInterface;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
-use FreeDSx\Ldap\Tcp\ClientMessageQueue;
-use FreeDSx\Ldap\Tcp\Socket;
-use FreeDSx\Ldap\Tcp\SocketPool;
+use FreeDSx\Socket\Socket;
+use FreeDSx\Socket\SocketPool;
+use FreeDSx\Socket\MessageQueue;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
 class ClientProtocolHandlerSpec extends ObjectBehavior
 {
-    function let(SocketPool $pool, Socket $client, ClientMessageQueue $queue)
+    function let(SocketPool $pool, Socket $client, MessageQueue $queue)
     {
         $pool->connect()->willReturn($client);
         $this->beConstructedWith([], $queue, $pool);
@@ -116,11 +116,18 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
 
     function it_should_close_the_tcp_socket_on_a_disconnect_notice_and_throw_a_connection_exception($queue, $client)
     {
-        $queue->getMessage(Argument::any())->willThrow(new UnsolicitedNotificationException('foo', 0, null, ExtendedResponse::OID_NOTICE_OF_DISCONNECTION));
+        $queue->getMessage(Argument::any())->willReturn(new LdapMessageResponse(0, new ExtendedResponse(new LdapResult(ResultCode::PROTOCOL_ERROR), ExtendedResponse::OID_NOTICE_OF_DISCONNECTION)));
         $client->write(Argument::any())->willReturn(null);
         $client->close()->shouldBeCalled();
 
         $this->shouldThrow(ConnectionException::class)->during('send', [new DeleteRequest('foo')]);
+    }
+
+    function it_should_throw_a_protocol_exception_on_an_unexpected_id($queue)
+    {
+        $queue->getMessage(1)->willReturn(new LdapMessageResponse(2, new ExtendedResponse(new LdapResult(0, ''))));
+
+        $this->shouldThrow(new ProtocolException('Expected a LDAP PDU with an ID 1, but received ID 2.'))->during('send', [new DeleteRequest('dc=foo')]);
     }
 
     function it_should_throw_an_exception_on_referrals($queue, $pool)

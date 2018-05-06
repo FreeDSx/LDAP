@@ -12,7 +12,7 @@ namespace spec\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
-use FreeDSx\Ldap\Tcp\SocketServer;
+use FreeDSx\Socket\SocketServer;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 

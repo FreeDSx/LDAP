@@ -12,8 +12,8 @@ namespace spec\FreeDSx\Ldap\Server\ServerRunner;
 
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
-use FreeDSx\Ldap\Tcp\Socket;
-use FreeDSx\Ldap\Tcp\SocketServer;
+use FreeDSx\Socket\Socket;
+use FreeDSx\Socket\SocketServer;
 use PhpSpec\Exception\Example\SkippingException;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;

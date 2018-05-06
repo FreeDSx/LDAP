@@ -12,7 +12,7 @@ namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
-use FreeDSx\Ldap\Tcp\SocketServer;
+use FreeDSx\Socket\SocketServer;
 
 /**
  * The LDAP server.

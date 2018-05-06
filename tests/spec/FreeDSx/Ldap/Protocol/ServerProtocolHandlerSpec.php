@@ -43,14 +43,14 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
-use FreeDSx\Ldap\Tcp\ServerMessageQueue;
-use FreeDSx\Ldap\Tcp\Socket;
+use FreeDSx\Socket\MessageQueue;
+use FreeDSx\Socket\Socket;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
 class ServerProtocolHandlerSpec extends ObjectBehavior
 {
-    function let(Socket $socket, ServerMessageQueue $queue, RequestHandlerInterface $handler)
+    function let(Socket $socket, MessageQueue $queue, RequestHandlerInterface $handler)
     {
         $socket->close()->willReturn(null);
         $socket->write(Argument::any())->willReturn($socket);

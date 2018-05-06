@@ -10,7 +10,7 @@
 
 namespace FreeDSx\Ldap\Server\ServerRunner;
 
-use FreeDSx\Ldap\Tcp\SocketServer;
+use FreeDSx\Socket\SocketServer;
 
 /**
  * Runs the TCP server, accepts client connections, dispatches client connections to the server protocol handler.

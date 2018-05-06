@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Factory\ControlFactory;
 use FreeDSx\Ldap\Protocol\Factory\OperationFactory;
+use FreeDSx\Socket\PduInterface;
 
 /**
  * The LDAP Message envelope (PDU). RFC 4511, 4.1.1
@@ -57,7 +58,7 @@ use FreeDSx\Ldap\Protocol\Factory\OperationFactory;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-abstract class LdapMessage implements ProtocolElementInterface
+abstract class LdapMessage implements ProtocolElementInterface, PduInterface
 {
     /**
      * @var int

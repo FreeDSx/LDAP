@@ -12,7 +12,7 @@ namespace FreeDSx\Ldap\Server\ServerRunner;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
-use FreeDSx\Ldap\Tcp\SocketServer;
+use FreeDSx\Socket\SocketServer;
 
 /**
  * Uses PNCTL to fork incoming requests and send them to the server protocol handler.
