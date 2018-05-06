@@ -116,7 +116,7 @@ if ($entry) {
 use FreeDSx\Ldap\Exception\OperationException;
 
 # Search for an entry object to get its current attributes / values
-$entry = $ldap->read('cn=foo,php7.1dc=domain,dc=local');
+$entry = $ldap->read('cn=foo,dc=domain,dc=local');
 
 # Add a value to an attribute
 if (!$entry->get('telephoneNumber')) {
