@@ -10,6 +10,7 @@
 
 namespace spec\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Control\Ad\ExtendedDnControl;
 use FreeDSx\Ldap\Control\Ad\SdFlagsControl;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
@@ -66,5 +67,10 @@ class ControlsSpec extends ObjectBehavior
     function it_should_create_a_sorting_control_using_a_sort_key()
     {
         $this->sort(new SortKey('foo'))->shouldBeLike(new SortingControl(new SortKey('foo')));
+    }
+
+    function it_should_create_an_extended_dn_control()
+    {
+        $this->extendedDn()->shouldBeLike(new ExtendedDnControl());
     }
 }

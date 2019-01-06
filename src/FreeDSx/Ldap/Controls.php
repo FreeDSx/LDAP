@@ -10,6 +10,7 @@
 
 namespace FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Control\Ad\ExtendedDnControl;
 use FreeDSx\Ldap\Control\Ad\SdFlagsControl;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
@@ -36,6 +37,17 @@ class Controls
     public static function create(string $oid, $criticality = false, $value = null) : Control
     {
         return new Control($oid, $criticality, $value);
+    }
+
+    /**
+     * Create an AD ExtendedDn control.
+     *
+     * @param bool $useHexFormat
+     * @return ExtendedDnControl
+     */
+    public static function extendedDn(bool $useHexFormat = false) : ExtendedDnControl
+    {
+        return new ExtendedDnControl($useHexFormat);
     }
 
     /**
