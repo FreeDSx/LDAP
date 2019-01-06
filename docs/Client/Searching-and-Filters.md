@@ -318,7 +318,7 @@ $filter = Filters::contains('title', 'admin');
 ------------------
 #### Present
 
-Checks if there is anything value present/set on a specific attribute.
+Checks if there is any value present/set on a specific attribute.
 
 ```php
 use FreeDSx\Ldap\Search\Filters;
