@@ -13,6 +13,7 @@ namespace FreeDSx\Ldap\Protocol\Factory;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Control\Ad\DirSyncResponseControl;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
@@ -35,6 +36,7 @@ class ControlFactory
         Control::OID_PAGING => PagingControl::class,
         Control::OID_SORTING_RESPONSE => SortingResponseControl::class,
         Control::OID_VLV_RESPONSE => VlvResponseControl::class,
+        Control::OID_DIR_SYNC => DirSyncResponseControl::class,
     ];
 
     /**

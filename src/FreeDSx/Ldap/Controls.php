@@ -10,6 +10,7 @@
 
 namespace FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Control\Ad\DirSyncRequestControl;
 use FreeDSx\Ldap\Control\Ad\ExtendedDnControl;
 use FreeDSx\Ldap\Control\Ad\SdFlagsControl;
 use FreeDSx\Ldap\Control\Control;
@@ -37,6 +38,19 @@ class Controls
     public static function create(string $oid, $criticality = false, $value = null) : Control
     {
         return new Control($oid, $criticality, $value);
+    }
+
+    /**
+     * Creates an AD DirSync request control.
+     *
+     * @param int $flags
+     * @param string $cookie
+     * @param int $maxBytes
+     * @return DirSyncRequestControl
+     */
+    public static function dirSync(int $flags = DirSyncRequestControl::FLAG_INCREMENTAL_VALUES, string $cookie = '', int $maxBytes = 2147483647)
+    {
+        return new DirSyncRequestControl($flags, $cookie, $maxBytes);
     }
 
     /**

@@ -10,6 +10,7 @@
 
 namespace spec\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Control\Ad\DirSyncRequestControl;
 use FreeDSx\Ldap\Control\Ad\ExtendedDnControl;
 use FreeDSx\Ldap\Control\Ad\SdFlagsControl;
 use FreeDSx\Ldap\Control\Control;
@@ -72,5 +73,17 @@ class ControlsSpec extends ObjectBehavior
     function it_should_create_an_extended_dn_control()
     {
         $this->extendedDn()->shouldBeLike(new ExtendedDnControl());
+    }
+
+    function it_should_create_a_dir_sync_control()
+    {
+        $this->dirSync()->shouldBeLike(new DirSyncRequestControl());
+    }
+
+    function it_should_create_a_dir_sync_control_with_options()
+    {
+        $this->dirSync(DirSyncRequestControl::FLAG_INCREMENTAL_VALUES|DirSyncRequestControl::FLAG_OBJECT_SECURITY, 'foo')->shouldBeLike(
+            new DirSyncRequestControl(DirSyncRequestControl::FLAG_INCREMENTAL_VALUES|DirSyncRequestControl::FLAG_OBJECT_SECURITY, 'foo')
+        );
     }
 }

@@ -31,6 +31,8 @@ use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
  */
 class Control implements ProtocolElementInterface
 {
+    public const OID_DIR_SYNC = '1.2.840.113556.1.4.841';
+
     public const OID_EXTENDED_DN = '1.2.840.113556.1.4.529';
 
     public const OID_PAGING = '1.2.840.113556.1.4.319';
