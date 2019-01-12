@@ -11,6 +11,7 @@
 namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Control\Ad\DirSyncRequestControl;
+use FreeDSx\Ldap\Control\Ad\ExpectedEntryCountControl;
 use FreeDSx\Ldap\Control\Ad\ExtendedDnControl;
 use FreeDSx\Ldap\Control\Ad\SdFlagsControl;
 use FreeDSx\Ldap\Control\Control;
@@ -51,6 +52,18 @@ class Controls
     public static function dirSync(int $flags = DirSyncRequestControl::FLAG_INCREMENTAL_VALUES, string $cookie = '', int $maxBytes = 2147483647)
     {
         return new DirSyncRequestControl($flags, $cookie, $maxBytes);
+    }
+
+    /**
+     * Create an AD ExpectedEntryCount control to help restrict / validate the amount of entries returned from a search.
+     *
+     * @param int $min
+     * @param int $max
+     * @return ExpectedEntryCountControl
+     */
+    public static function expectedEntryCount(int $min, int $max) : ExpectedEntryCountControl
+    {
+        return new ExpectedEntryCountControl($min, $max);
     }
 
     /**

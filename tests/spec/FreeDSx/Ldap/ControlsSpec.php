@@ -11,6 +11,7 @@
 namespace spec\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Control\Ad\DirSyncRequestControl;
+use FreeDSx\Ldap\Control\Ad\ExpectedEntryCountControl;
 use FreeDSx\Ldap\Control\Ad\ExtendedDnControl;
 use FreeDSx\Ldap\Control\Ad\SdFlagsControl;
 use FreeDSx\Ldap\Control\Control;
@@ -85,5 +86,10 @@ class ControlsSpec extends ObjectBehavior
         $this->dirSync(DirSyncRequestControl::FLAG_INCREMENTAL_VALUES|DirSyncRequestControl::FLAG_OBJECT_SECURITY, 'foo')->shouldBeLike(
             new DirSyncRequestControl(DirSyncRequestControl::FLAG_INCREMENTAL_VALUES|DirSyncRequestControl::FLAG_OBJECT_SECURITY, 'foo')
         );
+    }
+
+    function it_should_create_an_expected_entry_count_control()
+    {
+        $this->expectedEntryCount(1, 100)->shouldBeLike(new ExpectedEntryCountControl(1, 100));
     }
 }

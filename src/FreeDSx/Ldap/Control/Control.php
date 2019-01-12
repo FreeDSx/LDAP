@@ -33,6 +33,8 @@ class Control implements ProtocolElementInterface
 {
     public const OID_DIR_SYNC = '1.2.840.113556.1.4.841';
 
+    public const OID_EXPECTED_ENTRY_COUNT = '1.2.840.113556.1.4.2211';
+
     public const OID_EXTENDED_DN = '1.2.840.113556.1.4.529';
 
     public const OID_PAGING = '1.2.840.113556.1.4.319';
@@ -40,6 +42,10 @@ class Control implements ProtocolElementInterface
     public const OID_PWD_POLICY = '1.3.6.1.4.1.42.2.27.8.5.1';
 
     public const OID_SD_FLAGS = '1.2.840.113556.1.4.801';
+
+    public const OID_SHOW_DELETED = '1.2.840.113556.1.4.417';
+
+    public const OID_SHOW_RECYCLED = '1.2.840.113556.1.4.2064';
 
     public const OID_SUBTREE_DELETE = '1.2.840.113556.1.4.805';
 
