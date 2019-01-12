@@ -10,6 +10,8 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
+
 /**
  * Represents a collection of entry objects.
  *
@@ -23,11 +25,78 @@ class Entries implements \Countable, \IteratorAggregate
     protected $entries = [];
 
     /**
-     * @param Entry[] ...$entries
+     * @param Entry ...$entries
      */
     public function __construct(Entry ...$entries)
     {
         $this->entries = $entries;
+    }
+
+    /**
+     * @param Entry ...$entries
+     * @return $this
+     */
+    public function add(Entry ...$entries)
+    {
+        $this->entries = array_merge($this->entries, $entries);
+
+        return $this;
+    }
+
+    /**
+     * @param Entry ...$entries
+     * @return $this
+     */
+    public function remove(Entry ...$entries)
+    {
+        foreach ($entries as $entry) {
+            if (($index = array_search($entry, $this->entries)) !== false) {
+                unset($this->entries[$index]);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Check whether or not an entry (either an Entry object or string DN) exists within the entries.
+     *
+     * @param $entry
+     * @return bool
+     */
+    public function has($entry) : bool
+    {
+        if ($entry instanceof Entry) {
+            return (array_search($entry, $this->entries) !== false);
+        }
+        if (!is_string($entry)) {
+            throw new InvalidArgumentException('To check for an entry you must use an Entry object or string.');
+        }
+
+        foreach ($this->entries as $entryObj) {
+            if ((string)$entry === $entryObj->getDn()->toString()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Get an entry from the collection by its DN.
+     *
+     * @param string $dn
+     * @return Entry|null
+     */
+    public function get(string $dn) : ?Entry
+    {
+        foreach ($this->entries as $entry) {
+            if ($entry->getDn()->toString() === $dn) {
+                return $entry;
+            }
+        }
+
+        return null;
     }
 
     /**

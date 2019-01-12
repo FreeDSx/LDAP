@@ -12,6 +12,7 @@ namespace spec\FreeDSx\Ldap\Entry;
 
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use PhpSpec\ObjectBehavior;
 
 class EntriesSpec extends ObjectBehavior
@@ -63,6 +64,57 @@ class EntriesSpec extends ObjectBehavior
         $this->beConstructedWith(...[]);
 
         $this->last()->shouldBeNull();
+    }
+
+    function it_should_add_entries()
+    {
+        $this->add(new Entry('cn=new'), new Entry('cn=another'));
+        $this->count()->shouldBeEqualTo(4);
+    }
+
+    function it_should_remove_entries()
+    {
+        $entry1 = new Entry('cn=new');
+        $entry2 = new Entry('cn=another');
+        $this->add($entry1, $entry2);
+        $this->remove($entry1, $entry2);
+        $this->count()->shouldBeEqualTo(2);
+    }
+
+    function it_should_not_remove_entries_if_they_dont_exist()
+    {
+        $this->remove(new Entry('cn=meh'));
+        $this->count()->shouldBeEqualTo(2);
+    }
+
+    function it_should_check_if_an_entry_object_is_in_the_collection()
+    {
+        $entry = new Entry('cn=meh');
+        $this->has($entry)->shouldBeEqualTo(false);
+        $this->add($entry);
+        $this->has($entry)->shouldBeEqualTo(true);
+
+    }
+
+    function it_should_check_if_an_entry_is_in_the_collection_by_dn()
+    {
+        $this->has('foo')->shouldBeEqualTo(true);
+        $this->has('cn=meh')->shouldBeEqualTo(false);
+    }
+
+    function it_should_throw_an_exception_if_checking_for_an_entry_without_an_entry_or_string()
+    {
+        $this->shouldThrow(InvalidArgumentException::class)->during('has', [false]);
+    }
+
+    function it_should_get_an_entry_by_dn()
+    {
+        $this->get('foo')->shouldBeLike(new Entry('foo'));
+    }
+
+    function it_should_return_null_when_trying_to_get_an_entry_that_doesnt_exist()
+    {
+        $this->get('meh')->shouldBeNull();
     }
 
     function it_should_get_the_array_of_entries()
