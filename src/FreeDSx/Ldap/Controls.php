@@ -15,6 +15,7 @@ use FreeDSx\Ldap\Control\Ad\ExpectedEntryCountControl;
 use FreeDSx\Ldap\Control\Ad\ExtendedDnControl;
 use FreeDSx\Ldap\Control\Ad\PolicyHintsControl;
 use FreeDSx\Ldap\Control\Ad\SdFlagsControl;
+use FreeDSx\Ldap\Control\Ad\SetOwnerControl;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
@@ -110,6 +111,17 @@ class Controls
     public static function pwdPolicy(bool $criticality = true) : Control
     {
         return new Control(Control::OID_PWD_POLICY, $criticality);
+    }
+
+    /**
+     * Create an AD Set Owner control. Pass it a string SID and use when adding objects to set the owner.
+     *
+     * @param string $sid
+     * @return SetOwnerControl
+     */
+    public static function setOwner(string $sid) : SetOwnerControl
+    {
+        return new SetOwnerControl($sid);
     }
 
     /**

@@ -15,6 +15,7 @@ use FreeDSx\Ldap\Control\Ad\ExpectedEntryCountControl;
 use FreeDSx\Ldap\Control\Ad\ExtendedDnControl;
 use FreeDSx\Ldap\Control\Ad\PolicyHintsControl;
 use FreeDSx\Ldap\Control\Ad\SdFlagsControl;
+use FreeDSx\Ldap\Control\Ad\SetOwnerControl;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
@@ -97,5 +98,10 @@ class ControlsSpec extends ObjectBehavior
     function it_should_create_a_policy_hints_control()
     {
         $this::policyHints()->shouldBeLike(new PolicyHintsControl());
+    }
+
+    function it_should_create_a_set_owners_sid()
+    {
+        $this::setOwner('foo')->shouldBeLike(new SetOwnerControl('foo'));
     }
 }

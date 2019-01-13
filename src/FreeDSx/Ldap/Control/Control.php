@@ -43,6 +43,8 @@ class Control implements ProtocolElementInterface
 
     public const OID_PWD_POLICY = '1.3.6.1.4.1.42.2.27.8.5.1';
 
+    public const OID_SET_OWNER = '1.2.840.113556.1.4.2255';
+
     public const OID_SD_FLAGS = '1.2.840.113556.1.4.801';
 
     public const OID_SHOW_DELETED = '1.2.840.113556.1.4.417';
