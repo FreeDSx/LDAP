@@ -39,6 +39,8 @@ class Control implements ProtocolElementInterface
 
     public const OID_PAGING = '1.2.840.113556.1.4.319';
 
+    public const OID_POLICY_HINTS = '1.2.840.113556.1.4.2239';
+
     public const OID_PWD_POLICY = '1.3.6.1.4.1.42.2.27.8.5.1';
 
     public const OID_SD_FLAGS = '1.2.840.113556.1.4.801';

@@ -13,6 +13,7 @@ namespace spec\FreeDSx\Ldap;
 use FreeDSx\Ldap\Control\Ad\DirSyncRequestControl;
 use FreeDSx\Ldap\Control\Ad\ExpectedEntryCountControl;
 use FreeDSx\Ldap\Control\Ad\ExtendedDnControl;
+use FreeDSx\Ldap\Control\Ad\PolicyHintsControl;
 use FreeDSx\Ldap\Control\Ad\SdFlagsControl;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
@@ -91,5 +92,10 @@ class ControlsSpec extends ObjectBehavior
     function it_should_create_an_expected_entry_count_control()
     {
         $this->expectedEntryCount(1, 100)->shouldBeLike(new ExpectedEntryCountControl(1, 100));
+    }
+
+    function it_should_create_a_policy_hints_control()
+    {
+        $this::policyHints()->shouldBeLike(new PolicyHintsControl());
     }
 }

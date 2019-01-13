@@ -13,6 +13,7 @@ namespace FreeDSx\Ldap;
 use FreeDSx\Ldap\Control\Ad\DirSyncRequestControl;
 use FreeDSx\Ldap\Control\Ad\ExpectedEntryCountControl;
 use FreeDSx\Ldap\Control\Ad\ExtendedDnControl;
+use FreeDSx\Ldap\Control\Ad\PolicyHintsControl;
 use FreeDSx\Ldap\Control\Ad\SdFlagsControl;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
@@ -87,6 +88,17 @@ class Controls
     public static function paging(int $size, $cookie = '') : PagingControl
     {
         return new PagingControl($size, $cookie);
+    }
+
+    /**
+     * Create an AD Policy Hints control. This enforces password constraints when modifying an AD password.
+     *
+     * @param bool $isEnabled
+     * @return PolicyHintsControl
+     */
+    public static function policyHints(bool $isEnabled = true) : PolicyHintsControl
+    {
+        return new PolicyHintsControl($isEnabled);
     }
 
     /**
