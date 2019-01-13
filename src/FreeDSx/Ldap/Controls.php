@@ -125,6 +125,26 @@ class Controls
     }
 
     /**
+     * Create an AD Show Deleted control. This will return deleted AD entries in a search.
+     *
+     * @return Control
+     */
+    public static function showDeleted() : Control
+    {
+        return self::create(Control::OID_SHOW_DELETED, true);
+    }
+
+    /**
+     * Create an AD Show Recycled control. This will return recycled AD entries in a search.
+     *
+     * @return Control
+     */
+    public static function showRecycled() : Control
+    {
+        return self::create(Control::OID_SHOW_RECYCLED, true);
+    }
+
+    /**
      * Create a server side sort with a set of SortKey objects, or simple set of attribute names.
      *
      * @param SortKey[]|string ...$sortKeys

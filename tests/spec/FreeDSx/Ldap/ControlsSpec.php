@@ -100,8 +100,18 @@ class ControlsSpec extends ObjectBehavior
         $this::policyHints()->shouldBeLike(new PolicyHintsControl());
     }
 
-    function it_should_create_a_set_owners_sid()
+    function it_should_create_a_set_owners_control()
     {
         $this::setOwner('foo')->shouldBeLike(new SetOwnerControl('foo'));
+    }
+
+    function it_should_create_a_show_deleted_control()
+    {
+        $this::showDeleted()->shouldBeLike(new Control(Control::OID_SHOW_DELETED, true));
+    }
+
+    function it_should_create_a_show_recycled_control()
+    {
+        $this::showRecycled()->shouldBeLike(new Control(Control::OID_SHOW_RECYCLED, true));
     }
 }
