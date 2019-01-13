@@ -23,6 +23,8 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Search\DirSync;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Paging;
 use FreeDSx\Ldap\Search\Vlv;
 
@@ -206,6 +208,19 @@ class LdapClient
     public function vlv(SearchRequest $search, $sort, int $afterCount) : Vlv
     {
         return new Vlv($this, $search, $sort, $afterCount);
+    }
+
+    /**
+     * A helper for performing a DirSync search operation against AD.
+     *
+     * @param string|null $rootNc
+     * @param FilterInterface|null $filter
+     * @param mixed ...$attributes
+     * @return DirSync
+     */
+    public function dirSync(?string $rootNc = null, FilterInterface $filter = null, ...$attributes) : DirSync
+    {
+        return new DirSync($this, $rootNc, $filter, ...$attributes);
     }
 
     /**

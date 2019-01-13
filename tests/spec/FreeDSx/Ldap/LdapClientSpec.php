@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Search\DirSync;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Search\Paging;
 use FreeDSx\Ldap\Search\Vlv;
@@ -73,6 +74,11 @@ class LdapClientSpec extends ObjectBehavior
     function it_should_construct_a_vlv_helper()
     {
         $this->vlv(Operations::search(Filters::equal('foo', 'bar')), 'cn', 100)->shouldBeAnInstanceOf(Vlv::class);
+    }
+
+    function it_should_construct_a_dirsync_helper()
+    {
+        $this->dirSync()->shouldBeAnInstanceOf(DirSync::class);
     }
 
     function it_should_start_tls($handler)
