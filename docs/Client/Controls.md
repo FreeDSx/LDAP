@@ -59,10 +59,10 @@ $client->delete('cn=foo,dc=example,dc=local', Controls::subtreeDelete());
 The create method is a way for generating arbitrary controls using the following parameters (in order):
  
  * A specific string OID
- * A boolean indicating if the control criticality
+ * A boolean indicating the control criticality
  * An optional value, which can be an ASN.1 AbstractType object from the FreeDSx/ASN.1 library.
 
-In its most simple for, pass it a string OID:
+In its most simple form, pass it a string OID:
 
 ```php
 use FreeDSx\Ldap\Controls;
@@ -83,7 +83,7 @@ use FreeDSx\Asn1\Asn1;
 $asn1 = Asn1::sequence(Asn1::integer(7));
 
 # Construct the control, add the ASN.1 structure as the value (third argument)
-# The second argument is a bool that specifies whether or not the control is critical
+# The second argument is a boolean that specifies whether or not the control is critical
 # The value will get properly encoded when it is sent
 $control = Controls::create('1.2.840.113556.1.4.801', true, $asn1);
 ```
@@ -189,6 +189,9 @@ Creates a Server Side Sort control to help sort results received from a search.
 For more information on this control, see the documentation under [sorting in the search docs](Searching-and-Filters.md#sorting) 
 
 ## subtreeDelete
+
+Creates an AD control that, when used in the context of a deletion operation, deletes all children entries underneath the
+entry being deleted (essentially a recursive deletion). This control has no additional parameters.
 
 ## vlv
 
