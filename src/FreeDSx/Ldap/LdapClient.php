@@ -84,7 +84,7 @@ class LdapClient
      * @param string $username
      * @param string $password
      * @return LdapMessageResponse
-     * @throws \FreeDSx\Ldap\Exception\BindException
+     * @throws Exception\BindException
      */
     public function bind(string $username, string $password) : LdapMessageResponse
     {
@@ -97,7 +97,7 @@ class LdapClient
      * @param string|\FreeDSx\Ldap\Entry\Dn $dn
      * @param string $attributeName
      * @param string $value
-     * @param Control[] ...$controls
+     * @param Control ...$controls
      * @return bool
      */
     public function compare($dn, string $attributeName, string $value, Control ...$controls) : bool
@@ -112,7 +112,7 @@ class LdapClient
      * Create a new entry.
      *
      * @param Entry $entry
-     * @param Control[] ...$controls
+     * @param Control ...$controls
      * @return LdapMessageResponse
      */
     public function create(Entry $entry, Control ...$controls) : LdapMessageResponse
@@ -128,14 +128,15 @@ class LdapClient
      *
      * @param string $entry
      * @param array $attributes
-     * @param Control[] ...$controls
+     * @param Control ...$controls
      * @return Entry|null
+     * @throws Exception\OperationException
      */
     public function read(string $entry, $attributes = [], Control ...$controls) : ?Entry
     {
         try {
             return $this->search(Operations::read($entry, ...$attributes), ...$controls)->first();
-        } catch (OperationException $e) {
+        } catch (Exception\OperationException $e) {
             if ($e->getCode() === ResultCode::NO_SUCH_OBJECT) {
                 return null;
             }
@@ -147,7 +148,7 @@ class LdapClient
      * Delete an entry.
      *
      * @param string $entry
-     * @param Control[] ...$controls
+     * @param Control ...$controls
      * @return LdapMessageResponse
      */
     public function delete(string $entry, Control ...$controls) : LdapMessageResponse
@@ -159,7 +160,7 @@ class LdapClient
      * Update an existing entry.
      *
      * @param Entry $entry
-     * @param Control[] ...$controls
+     * @param Control ...$controls
      * @return LdapMessageResponse
      */
     public function update(Entry $entry, Control ...$controls) : LdapMessageResponse
@@ -174,7 +175,7 @@ class LdapClient
      * Send a search response and return the entries.
      *
      * @param SearchRequest $request
-     * @param Control[] ...$controls
+     * @param Control ...$controls
      * @return \FreeDSx\Ldap\Entry\Entries
      */
     public function search(SearchRequest $request, Control ...$controls) : Entries
@@ -227,8 +228,9 @@ class LdapClient
      * Send a request operation to LDAP.
      *
      * @param RequestInterface $request
-     * @param Control[] ...$controls
+     * @param Control ...$controls
      * @return LdapMessageResponse|null
+     * @throws OperationException
      */
     public function send(RequestInterface $request, Control ...$controls) : ?LdapMessageResponse
     {
