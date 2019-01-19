@@ -134,7 +134,11 @@ class ClientProtocolHandler
      * @param RequestInterface $request
      * @param Control[] $controls
      * @return LdapMessageResponse|null
+     * @throws BindException
      * @throws ConnectionException
+     * @throws OperationException
+     * @throws ProtocolException
+     * @throws ReferralException
      * @throws UnsolicitedNotificationException
      */
     public function send(RequestInterface $request, Control ...$controls) : ?LdapMessageResponse
@@ -157,6 +161,8 @@ class ClientProtocolHandler
             }
 
             throw $exception;
+        } catch (\FreeDSx\Socket\Exception\ConnectionException $exception) {
+            throw new ConnectionException($exception->getMessage(), $exception->getCode(), $exception);
         }
 
         if ($messageFrom && $messageFrom->getResponse()->getResultCode() === ResultCode::REFERRAL) {
@@ -190,6 +196,7 @@ class ClientProtocolHandler
      * @param LdapMessageResponse $messageFrom
      * @throws BindException
      * @throws OperationException
+     * @throws ProtocolException
      */
     protected function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom) : void
     {
@@ -223,7 +230,11 @@ class ClientProtocolHandler
     /**
      * @param LdapMessageRequest $messageTo
      * @return null|LdapMessageResponse
+     * @throws ConnectionException
+     * @throws ProtocolException
      * @throws UnsolicitedNotificationException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function handleRequest(LdapMessageRequest $messageTo) : ?LdapMessageResponse
     {
@@ -370,6 +381,7 @@ class ClientProtocolHandler
     /**
      * @param LdapMessageRequest $messageTo
      * @param LdapMessageResponse $messageFrom
+     * @throws ProtocolException
      */
     protected function handleExtendedResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom) : void
     {
@@ -393,6 +405,10 @@ class ClientProtocolHandler
     /**
      * @param LdapMessageRequest $messageTo
      * @throws ConnectionException
+     * @throws ProtocolException
+     * @throws UnsolicitedNotificationException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function handleStartTls(LdapMessageRequest $messageTo) : void
     {
@@ -411,6 +427,8 @@ class ClientProtocolHandler
     /**
      * @param LdapMessage $messageTo
      * @return LdapMessageResponse
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function handleSearchResponse(LdapMessage $messageTo) : LdapMessageResponse
     {
@@ -447,16 +465,13 @@ class ClientProtocolHandler
      * @return LdapMessageResponse
      * @throws ProtocolException
      * @throws UnsolicitedNotificationException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function getMessageWithId(int $id) : LdapMessageResponse
     {
-        # Throw a more LDAP specific connection exception
-        try {
-            /** @var LdapMessageResponse $message */
-            $message = $this->queue()->getMessage($id);
-        } catch (\FreeDSx\Socket\Exception\ConnectionException $exception) {
-            throw new ConnectionException($exception->getMessage(), $exception->getCode(), $exception);
-        }
+        /** @var LdapMessageResponse $message */
+        $message = $this->queue()->getMessage($id);
 
         if ($message->getMessageId() === 0 && $message->getResponse() instanceof ExtendedResponse) {
             /** @var ExtendedResponse $response */
@@ -491,6 +506,7 @@ class ClientProtocolHandler
 
     /**
      * @return Socket
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function tcp() : Socket
     {
@@ -503,6 +519,7 @@ class ClientProtocolHandler
 
     /**
      * @return MessageQueue
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function queue() : MessageQueue
     {
