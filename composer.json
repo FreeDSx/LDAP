@@ -18,7 +18,7 @@
     "freedsx/socket": "^0.2.0"
   },
   "require-dev": {
-    "phpspec/phpspec": "^4.0"
+    "phpspec/phpspec": "^5.0"
   },
   "suggest": {
     "ext-openssl": "For SSL/TLS support."
