@@ -43,7 +43,7 @@ use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\Server\RequestContext;
-use FreeDSx\Socket\MessageQueue;
+use FreeDSx\Socket\Queue\MessageQueue;
 use FreeDSx\Socket\Socket;
 
 /**
@@ -112,7 +112,7 @@ class ServerProtocolHandler
         $this->options = array_merge($this->options, $options);
         $this->validateAndSetRequestHandler();
         $this->encoder = new LdapEncoder();
-        $this->queue = $queue ?? new MessageQueue($socket, $this->encoder, LdapMessageRequest::class);
+        $this->queue = $queue ?? new LdapRequestQueue($socket, $this->encoder);
     }
 
     /**

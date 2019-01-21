@@ -38,7 +38,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Socket\MessageQueue;
+use FreeDSx\Socket\Queue\MessageQueue;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketPool;
 
@@ -524,7 +524,7 @@ class ClientProtocolHandler
     protected function queue() : MessageQueue
     {
         if ($this->queue === null) {
-            $this->queue = new MessageQueue($this->tcp(), $this->encoder, LdapMessageResponse::class);
+            $this->queue = new LdapResponseQueue($this->tcp(), $this->encoder);
         }
 
         return $this->queue;
