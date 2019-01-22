@@ -193,7 +193,7 @@ class LdapUrl
     }
 
     /**
-     * @param LdapUrlExtension[] ...$extensions
+     * @param LdapUrlExtension ...$extensions
      * @return $this
      */
     public function setExtensions(LdapUrlExtension ...$extensions)
@@ -284,19 +284,19 @@ class LdapUrl
         $url = new LdapUrl($pieces['host'] ?? null);
         $url->setUseSsl($pieces['scheme'] === 'ldaps');
         $url->setPort($pieces['port'] ?? null);
-        $url->setDn((isset($pieces['path']) && $pieces['path'] !== '/') ? self::decode(ltrim($pieces['path'], '/')) : null);
+        $url->setDn((isset($pieces['path']) && $pieces['path'] !== '/') ? self::decode(\ltrim($pieces['path'], '/')) : null);
 
         $query = explode('?', $pieces['query'] ?? '');
         if (!empty($query)) {
-            $url->setAttributes(...($query[0] === '' ? [] : explode(',', $query[0])));
+            $url->setAttributes(...($query[0] === '' ? [] : \explode(',', $query[0])));
             $url->setScope(isset($query[1]) && $query[1] !== '' ? $query[1] : null);
             $url->setFilter(isset($query[2]) && $query[2] !== '' ? self::decode($query[2]) : null);
 
             $extensions = [];
             if (isset($query[3]) && $query[3] !== '') {
-                $extensions = array_map(function ($ext) {
+                $extensions = \array_map(function ($ext) {
                     return LdapUrlExtension::parse($ext);
-                }, explode(',', $query[3]));
+                }, \explode(',', $query[3]));
             }
             $url->setExtensions(...$extensions);
         }
@@ -311,23 +311,23 @@ class LdapUrl
      */
     protected static function explodeUrl(string $url) : array
     {
-        $pieces = parse_url($url);
+        $pieces = \parse_url($url);
 
         if ($pieces === false || !isset($pieces['scheme'])) {
             # We are on our own here if it's an empty host, as parse_url will not treat it as valid, though it is valid
             # for LDAP URLs. In the case of an empty host a client should determine what host to connect to.
-            if (!preg_match('/^(ldaps?)\:\/\/\/(.*)$/', $url, $matches)) {
+            if (!\preg_match('/^(ldaps?)\:\/\/\/(.*)$/', $url, $matches)) {
                 throw new UrlParseException(sprintf('The LDAP URL is malformed: %s', $url));
             }
             $query = null;
             $path = null;
 
             # Check for query parameters but no path...
-            if (strlen($matches[2]) > 0 && $matches[2][0] === '?') {
+            if (\strlen($matches[2]) > 0 && $matches[2][0] === '?') {
                 $query = substr($matches[2], 1);
             # Check if there are any query parameters and a possible path...
-            } elseif (strpos($matches[2], '?') !== false) {
-                $parts = explode('?', $matches[2], 2);
+            } elseif (\strpos($matches[2], '?') !== false) {
+                $parts = \explode('?', $matches[2], 2);
                 $path = $parts[0];
                 $query = isset($parts[1]) ? $parts[1] : null;
             # A path only...
@@ -341,7 +341,7 @@ class LdapUrl
                 'query' => $query,
             ];
         }
-        $pieces['scheme'] = strtolower($pieces['scheme']);
+        $pieces['scheme'] = \strtolower($pieces['scheme']);
 
         if (!($pieces['scheme'] === 'ldap' || $pieces['scheme'] === 'ldaps')) {
             throw new UrlParseException(sprintf('The URL scheme "%s" is not valid. It must be "ldap" or "ldaps".', $pieces['scheme']));
@@ -360,7 +360,7 @@ class LdapUrl
         $query = [];
 
         if (!empty($this->attributes)) {
-            $query[0] = implode(',', array_map(function ($v) {
+            $query[0] = \implode(',', \array_map(function ($v) {
                 /** @var $v Attribute */
                 return self::encode($v->getName());
             }, $this->attributes));
@@ -372,16 +372,16 @@ class LdapUrl
             $query[2] = self::encode($this->filter);
         }
         if (!empty($this->extensions)) {
-            $query[3] = implode(',', $this->extensions);
+            $query[3] = \implode(',', $this->extensions);
         }
 
         if (empty($query)) {
             return '';
         }
 
-        end($query);
-        $last = key($query);
-        reset($query);
+        \end($query);
+        $last = \key($query);
+        \reset($query);
 
         # This is so we stop at the last query part that was actually set, but also capture cases where the first and
         # third were set but not the second.

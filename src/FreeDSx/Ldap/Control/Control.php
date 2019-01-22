@@ -201,7 +201,7 @@ class Control implements ProtocolElementInterface
      */
     protected static function mergeControlData(Control $control, AbstractType $type)
     {
-        if (!($type instanceof SequenceType && count($type->getChildren()) <= 3)) {
+        if (!($type instanceof SequenceType && \count($type->getChildren()) <= 3)) {
             throw new ProtocolException(sprintf(
                 'The received control is malformed. Expected at least 3 sequence values. Received %s.',
                 count($type->getChildren())

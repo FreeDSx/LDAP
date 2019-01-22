@@ -31,7 +31,7 @@ class LdapMessageResponse extends LdapMessage
     /**
      * @param int $messageId
      * @param ResponseInterface $response
-     * @param Control[] ...$controls
+     * @param Control ...$controls
      */
     public function __construct(int $messageId, ResponseInterface $response, Control ...$controls)
     {

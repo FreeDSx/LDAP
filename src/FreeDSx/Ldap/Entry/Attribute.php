@@ -53,7 +53,7 @@ class Attribute implements \IteratorAggregate, \Countable
     }
 
     /**
-     * @param string[] ...$values
+     * @param string ...$values
      * @return $this
      */
     public function add(string ...$values)
@@ -75,7 +75,7 @@ class Attribute implements \IteratorAggregate, \Countable
     }
 
     /**
-     * @param string[] ...$values
+     * @param string ...$values
      * @return $this
      */
     public function remove(string ...$values)
@@ -104,7 +104,7 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * Set the values for the attribute.
      *
-     * @param string[] ...$values
+     * @param string ...$values
      * @return $this
      */
     public function set(string ...$values)
@@ -143,7 +143,7 @@ class Attribute implements \IteratorAggregate, \Countable
      */
     public function count()
     {
-        return count($this->values);
+        return \count($this->values);
     }
 
     /**
@@ -153,10 +153,10 @@ class Attribute implements \IteratorAggregate, \Countable
     public function equals(Attribute $attribute) : bool
     {
         if ($this->lcAttribute === null) {
-            $this->lcAttribute = strtolower($this->attribute);
+            $this->lcAttribute = \strtolower($this->attribute);
         }
         if ($attribute->lcAttribute === null) {
-            $attribute->lcAttribute = strtolower($attribute->attribute);
+            $attribute->lcAttribute = \strtolower($attribute->attribute);
         }
 
         return $this->lcAttribute === $attribute->lcAttribute;
@@ -167,7 +167,7 @@ class Attribute implements \IteratorAggregate, \Countable
      */
     public function __toString()
     {
-        return implode(', ', $this->values);
+        return \implode(', ', $this->values);
     }
 
     /**
@@ -181,7 +181,7 @@ class Attribute implements \IteratorAggregate, \Countable
         if (self::shouldNotEscape($value)) {
             return $value;
         }
-        $value = str_replace(array_keys(self::ESCAPE_MAP), array_values(self::ESCAPE_MAP), $value);
+        $value = \str_replace(\array_keys(self::ESCAPE_MAP), \array_values(self::ESCAPE_MAP), $value);
 
         return self::escapeNonPrintable($value);
     }

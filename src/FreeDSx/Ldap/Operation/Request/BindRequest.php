@@ -98,7 +98,7 @@ abstract class BindRequest implements RequestInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        if (!($type instanceof SequenceType && count($type) === 3)) {
+        if (!($type instanceof SequenceType && \count($type) === 3)) {
             throw new ProtocolException('The bind request in malformed');
         }
         $version = $type->getChild(0);

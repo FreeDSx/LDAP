@@ -34,7 +34,7 @@ class Entry implements \IteratorAggregate, \Countable
 
     /**
      * @param string|Dn $dn
-     * @param Attribute[] ...$attributes
+     * @param Attribute ...$attributes
      */
     public function __construct($dn, Attribute ...$attributes)
     {
@@ -236,7 +236,7 @@ class Entry implements \IteratorAggregate, \Countable
      */
     public function count()
     {
-        return count($this->attributes);
+        return \count($this->attributes);
     }
 
     /**
@@ -262,7 +262,7 @@ class Entry implements \IteratorAggregate, \Countable
      */
     public function __set($name, $value)
     {
-        $this->set($name, ...(is_array($value) ? $value : [$value]));
+        $this->set($name, ...(\is_array($value) ? $value : [$value]));
     }
 
     /**
@@ -295,7 +295,7 @@ class Entry implements \IteratorAggregate, \Countable
         $entryAttr = [];
 
         foreach ($attributes as $attribute => $value) {
-            $entryAttr[] = new Attribute($attribute, ...(is_array($value) ? $value : [$value]));
+            $entryAttr[] = new Attribute($attribute, ...(\is_array($value) ? $value : [$value]));
         }
 
         return new self($dn, ...$entryAttr);

@@ -435,7 +435,7 @@ class SearchRequest implements RequestInterface
             Asn1::integer($this->timeLimit),
             Asn1::boolean($this->attributesOnly),
             $this->filter->toAsn1(),
-            Asn1::sequenceOf(...array_map(function ($attr) {
+            Asn1::sequenceOf(...\array_map(function ($attr) {
                 /** @var Attribute $attr */
                 return Asn1::octetString($attr instanceof Attribute ? $attr->getName() : $attr);
             }, $this->attributes))

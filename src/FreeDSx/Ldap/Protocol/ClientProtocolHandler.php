@@ -146,7 +146,7 @@ class ClientProtocolHandler
         $messageTo = new LdapMessageRequest(
             ++$this->messageId,
             $request,
-            ...array_merge($this->controls->toArray(), $controls)
+            ...\array_merge($this->controls->toArray(), $controls)
         );
 
         try {
@@ -212,7 +212,7 @@ class ClientProtocolHandler
 
         # The success code above should satisfy the majority of cases. This checks if the result code is really a non
         # error condition defined in RFC 4511, A.1
-        if (in_array($result->getResultCode(), self::NON_ERROR_CODES)) {
+        if (\in_array($result->getResultCode(), self::NON_ERROR_CODES)) {
             return;
         }
 
@@ -427,7 +427,6 @@ class ClientProtocolHandler
     /**
      * @param LdapMessage $messageTo
      * @return LdapMessageResponse
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function handleSearchResponse(LdapMessage $messageTo) : LdapMessageResponse
@@ -465,7 +464,6 @@ class ClientProtocolHandler
      * @return LdapMessageResponse
      * @throws ProtocolException
      * @throws UnsolicitedNotificationException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function getMessageWithId(int $id) : LdapMessageResponse

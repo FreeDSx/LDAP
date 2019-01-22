@@ -37,7 +37,7 @@ class SortingControl extends Control
     protected $sortKeys = [];
 
     /**
-     * @param SortKey[] ...$sortKeys
+     * @param SortKey ...$sortKeys
      */
     public function __construct(SortKey ...$sortKeys)
     {
@@ -46,7 +46,7 @@ class SortingControl extends Control
     }
 
     /**
-     * @param SortKey[] ...$sortKeys
+     * @param SortKey ...$sortKeys
      * @return $this
      */
     public function addSortKeys(SortKey ...$sortKeys)
@@ -59,7 +59,7 @@ class SortingControl extends Control
     }
 
     /**
-     * @param SortKey[] ...$sortKeys
+     * @param SortKey ...$sortKeys
      * @return $this
      */
     public function setSortKeys(SortKey ...$sortKeys)

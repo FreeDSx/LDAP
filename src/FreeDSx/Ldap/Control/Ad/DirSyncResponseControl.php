@@ -130,7 +130,7 @@ class DirSyncResponseControl extends Control
      */
     protected static function validate(AbstractType $type)
     {
-        if (!($type instanceof SequenceType && count($type) === 3)) {
+        if (!($type instanceof SequenceType && \count($type) === 3)) {
             throw new ProtocolException('A DirSyncResponse control value must be a sequence type with 3 children.');
         }
         if (!$type->getChild(0) instanceof IntegerType) {

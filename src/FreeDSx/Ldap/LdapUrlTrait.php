@@ -45,9 +45,9 @@ trait LdapUrlTrait
      */
     protected static function encode(?string $value) : string
     {
-        return str_replace(
-            array_keys(self::$escapeMap),
-            array_values(self::$escapeMap),
+        return \str_replace(
+            \array_keys(self::$escapeMap),
+            \array_values(self::$escapeMap),
             $value
         );
     }
@@ -60,9 +60,9 @@ trait LdapUrlTrait
      */
     protected static function decode(string $value) : string
     {
-        return str_ireplace(
-            array_values(self::$escapeMap),
-            array_keys(self::$escapeMap),
+        return \str_ireplace(
+            \array_values(self::$escapeMap),
+            \array_keys(self::$escapeMap),
             $value
         );
     }

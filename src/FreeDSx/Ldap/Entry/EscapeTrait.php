@@ -29,7 +29,7 @@ trait EscapeTrait
             return $value;
         }
 
-        return '\\'.implode('\\', str_split(bin2hex($value), 2));
+        return '\\'.\implode('\\', \str_split(\bin2hex($value), 2));
     }
 
     /**
@@ -40,8 +40,8 @@ trait EscapeTrait
      */
     protected static function escapeNonPrintable(string $value) : string
     {
-        return preg_replace_callback('/([\x00-\x1F\x7F])/', function($matches) {
-            return '\\'.bin2hex($matches[1]);
+        return \preg_replace_callback('/([\x00-\x1F\x7F])/', function($matches) {
+            return '\\'.\bin2hex($matches[1]);
         }, $value);
     }
 
@@ -51,6 +51,6 @@ trait EscapeTrait
      */
     protected static function shouldNotEscape(string $value)
     {
-        return (preg_match('/^(\\\\[0-9A-Fa-f]{2})+$/', $value)  || $value === '');
+        return (\preg_match('/^(\\\\[0-9A-Fa-f]{2})+$/', $value)  || $value === '');
     }
 }

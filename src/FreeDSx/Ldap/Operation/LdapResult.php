@@ -162,7 +162,7 @@ class LdapResult implements ResponseInterface
             Asn1::octetString($this->diagnosticMessage)
         );
         if (!empty($this->referrals)) {
-            $result->addChild(Asn1::context(3, Asn1::sequence(...array_map(function ($v) {
+            $result->addChild(Asn1::context(3, Asn1::sequence(...\array_map(function ($v) {
                 return Asn1::octetString($v);
             }, $this->referrals))));
         }

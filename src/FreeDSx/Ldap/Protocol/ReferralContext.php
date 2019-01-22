@@ -32,7 +32,7 @@ class ReferralContext
 
     /**
      * @param BindRequest|null $bindRequest
-     * @param LdapUrl[] ...$referrals
+     * @param LdapUrl ...$referrals
      */
     public function __construct(?BindRequest $bindRequest, LdapUrl ...$referrals)
     {
@@ -49,7 +49,7 @@ class ReferralContext
     }
 
     /**
-     * @param LdapUrl ...$referral
+     * @param LdapUrl $referral
      * @return $this
      */
     public function addReferral(LdapUrl $referral)
@@ -66,7 +66,7 @@ class ReferralContext
     public function hasReferral(LdapUrl $url) : bool
     {
         foreach ($this->referrals as $referral) {
-            if (strtolower($referral->toString()) === strtolower($url->toString())) {
+            if (\strtolower($referral->toString()) === \strtolower($url->toString())) {
                 return true;
             }
         }
@@ -87,6 +87,6 @@ class ReferralContext
      */
     public function count()
     {
-        return count($this->referrals);
+        return \count($this->referrals);
     }
 }

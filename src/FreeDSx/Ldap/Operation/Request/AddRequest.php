@@ -97,7 +97,7 @@ class AddRequest implements RequestInterface
 
         $attributes = [];
         foreach ($attrList as $attrListing) {
-            if (!($attrListing instanceof SequenceType && count($attrListing->getChildren()) == 2)) {
+            if (!($attrListing instanceof SequenceType && \count($attrListing->getChildren()) == 2)) {
                 throw new ProtocolException(sprintf(
                     'Expected a sequence type, but received: %s',
                     get_class($attrListing)
@@ -135,7 +135,7 @@ class AddRequest implements RequestInterface
         foreach ($this->entry as $attribute) {
             $attr = Asn1::sequence(Asn1::octetString($attribute->getName()));
 
-            $attrValues = Asn1::setOf(...array_map(function ($value) {
+            $attrValues = Asn1::setOf(...\array_map(function ($value) {
                 return Asn1::octetString($value);
             }, $attribute->getValues()));
 

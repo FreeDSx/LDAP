@@ -24,7 +24,7 @@ class ControlBag implements \IteratorAggregate, \Countable
 
     /**
      * ControlBag constructor.
-     * @param Control[] ...$controls
+     * @param Control ...$controls
      */
     public function __construct(Control ...$controls)
     {
@@ -40,7 +40,7 @@ class ControlBag implements \IteratorAggregate, \Countable
     public function has($control) : bool
     {
         if ($control instanceof Control) {
-            return array_search($control, $this->controls, true) !== false;
+            return \array_search($control, $this->controls, true) !== false;
         }
 
         foreach ($this->controls as $ctrl) {
@@ -72,7 +72,7 @@ class ControlBag implements \IteratorAggregate, \Countable
     /**
      * Add more controls.
      *
-     * @param Control[] ...$controls
+     * @param Control ...$controls
      * @return $this
      */
     public function add(Control ...$controls)
@@ -87,7 +87,7 @@ class ControlBag implements \IteratorAggregate, \Countable
     /**
      * Set the controls.
      *
-     * @param Control[] ...$controls
+     * @param Control ...$controls
      * @return $this
      */
     public function set(Control ...$controls)
@@ -107,7 +107,7 @@ class ControlBag implements \IteratorAggregate, \Countable
     {
         foreach ($controls as $control) {
             if ($control instanceof Control) {
-                if (($i = array_search($control, $this->controls, true)) !== false) {
+                if (($i = \array_search($control, $this->controls, true)) !== false) {
                     unset($this->controls[$i]);
                 }
             } else {
@@ -149,7 +149,7 @@ class ControlBag implements \IteratorAggregate, \Countable
      */
     public function count()
     {
-        return count($this->controls);
+        return \count($this->controls);
     }
 
     /**

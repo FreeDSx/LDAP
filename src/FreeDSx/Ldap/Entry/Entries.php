@@ -38,7 +38,7 @@ class Entries implements \Countable, \IteratorAggregate
      */
     public function add(Entry ...$entries)
     {
-        $this->entries = array_merge($this->entries, $entries);
+        $this->entries = \array_merge($this->entries, $entries);
 
         return $this;
     }
@@ -50,7 +50,7 @@ class Entries implements \Countable, \IteratorAggregate
     public function remove(Entry ...$entries)
     {
         foreach ($entries as $entry) {
-            if (($index = array_search($entry, $this->entries)) !== false) {
+            if (($index = \array_search($entry, $this->entries)) !== false) {
                 unset($this->entries[$index]);
             }
         }
@@ -67,9 +67,9 @@ class Entries implements \Countable, \IteratorAggregate
     public function has($entry) : bool
     {
         if ($entry instanceof Entry) {
-            return (array_search($entry, $this->entries) !== false);
+            return (\array_search($entry, $this->entries) !== false);
         }
-        if (!is_string($entry)) {
+        if (!\is_string($entry)) {
             throw new InvalidArgumentException('To check for an entry you must use an Entry object or string.');
         }
 
@@ -145,6 +145,6 @@ class Entries implements \Countable, \IteratorAggregate
      */
     public function count()
     {
-        return count($this->entries);
+        return \count($this->entries);
     }
 }

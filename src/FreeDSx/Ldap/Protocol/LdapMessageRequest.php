@@ -30,7 +30,7 @@ class LdapMessageRequest extends LdapMessage
     /**
      * @param int $messageId
      * @param RequestInterface $request
-     * @param Control[] ...$controls
+     * @param Control ...$controls
      */
     public function __construct(int $messageId, RequestInterface $request, Control ...$controls)
     {

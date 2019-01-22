@@ -122,7 +122,7 @@ class PagingControl extends Control
      */
     protected static function validate(AbstractType $type)
     {
-        if (!($type instanceof SequenceType && count($type) === 2)) {
+        if (!($type instanceof SequenceType && \count($type) === 2)) {
             throw new ProtocolException('A paged control value must be a sequence type with 2 children.');
         }
         if (!$type->getChild(0) instanceof IntegerType) {

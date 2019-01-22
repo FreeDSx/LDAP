@@ -57,11 +57,11 @@ class Dn implements \IteratorAggregate, \Countable
         if ($this->pieces === null) {
             $this->parse();
         }
-        if (count($this->pieces) < 2) {
+        if (\count($this->pieces) < 2) {
             return null;
         }
 
-        return new Dn(implode(',', array_slice($this->pieces, 1)));
+        return new Dn(\implode(',', \array_slice($this->pieces, 1)));
     }
 
     /**
@@ -89,7 +89,7 @@ class Dn implements \IteratorAggregate, \Countable
             $this->parse();
         }
 
-        return count($this->pieces);
+        return \count($this->pieces);
     }
 
     /**
@@ -118,7 +118,7 @@ class Dn implements \IteratorAggregate, \Countable
      */
     protected function parse() : void
     {
-        $pieces = preg_split('/(?<!\\\\),/', $this->dn);
+        $pieces = \preg_split('/(?<!\\\\),/', $this->dn);
         $pieces = $pieces === false ? [] : $pieces;
 
         if (empty($pieces)) {
@@ -126,7 +126,7 @@ class Dn implements \IteratorAggregate, \Countable
         }
 
         foreach ($pieces as $i => $piece) {
-            $pieces[$i] = Rdn::create(ltrim($piece));
+            $pieces[$i] = Rdn::create(\ltrim($piece));
         }
 
         $this->pieces = $pieces;

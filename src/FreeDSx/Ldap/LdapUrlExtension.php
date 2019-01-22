@@ -107,10 +107,10 @@ class LdapUrlExtension
      */
     public function toString() : string
     {
-        $ext = ($this->isCritical ? '!' : '').str_replace(',', '%2c', self::encode($this->name));
+        $ext = ($this->isCritical ? '!' : '').\str_replace(',', '%2c', self::encode($this->name));
 
         if ($this->value !== null) {
-            $ext .= '='.str_replace(',', '%2c', self::encode($this->value));
+            $ext .= '='.\str_replace(',', '%2c', self::encode($this->value));
         }
 
         return $ext;
@@ -134,15 +134,15 @@ class LdapUrlExtension
         if (!preg_match('/!?\w+(=.*)?/', $extension)) {
             throw new UrlParseException(sprintf('The LDAP URL extension is malformed: %s', $extension));
         }
-        $pieces = explode('=', $extension, 2);
+        $pieces = \explode('=', $extension, 2);
 
         $isCritical = !empty($pieces[0]) && $pieces[0][0] === '!';
         if ($isCritical) {
-            $pieces[0] = substr($pieces[0], 1);
+            $pieces[0] = \substr($pieces[0], 1);
         }
 
-        $name = str_ireplace('%2c', ',', self::decode($pieces[0]));
-        $value = isset($pieces[1]) ? str_ireplace('%2c', ',', self::decode($pieces[1])) : null;
+        $name = \str_ireplace('%2c', ',', self::decode($pieces[0]));
+        $value = isset($pieces[1]) ? \str_ireplace('%2c', ',', self::decode($pieces[1])) : null;
 
         return new self($name, $value, $isCritical);
     }

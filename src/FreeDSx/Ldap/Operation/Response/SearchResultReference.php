@@ -34,7 +34,7 @@ class SearchResultReference implements ResponseInterface
     protected $referrals = [];
 
     /**
-     * @param LdapUrl[] ...$referrals
+     * @param LdapUrl ...$referrals
      */
     public function __construct(LdapUrl ...$referrals)
     {
@@ -59,7 +59,7 @@ class SearchResultReference implements ResponseInterface
         /** @var \FreeDSx\Asn1\Type\SequenceType $type */
         foreach ($type->getChildren() as $referral) {
             try {
-                $referrals[] =  LdapUrl::parse($referral->getValue());
+                $referrals[] = LdapUrl::parse($referral->getValue());
             } catch (UrlParseException $e) {
                 throw new ProtocolException($e->getMessage());
             }
@@ -74,7 +74,7 @@ class SearchResultReference implements ResponseInterface
      */
     public function toAsn1(): AbstractType
     {
-        return Asn1::application(self::TAG_NUMBER, Asn1::sequence(...array_map(function ($ref) {
+        return Asn1::application(self::TAG_NUMBER, Asn1::sequence(...\array_map(function ($ref) {
             /** @var LdapUrl $ref */
             return Asn1::octetString($ref->toString());
         }, $this->referrals)));

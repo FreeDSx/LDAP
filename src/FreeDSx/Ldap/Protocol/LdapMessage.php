@@ -19,8 +19,9 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Factory\ControlFactory;
-use FreeDSx\Ldap\Protocol\Factory\OperationFactory;
 use FreeDSx\Socket\PduInterface;
+use FreeDSx\Ldap\Operation\Request;
+use FreeDSx\Ldap\Operation\Response;
 
 /**
  * The LDAP Message envelope (PDU). RFC 4511, 4.1.1
@@ -72,7 +73,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
 
     /**
      * @param int $messageId
-     * @param Control[] ...$controls
+     * @param Control ...$controls
      */
     public function __construct(int $messageId, Control ...$controls)
     {
@@ -142,7 +143,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
 
         return new static(
             $type->getChild(0)->getValue(),
-            OperationFactory::get($type->getChild(1)),
+            self::constructOperation($type->getChild(1)),
             ...$controls
         );
     }
@@ -164,7 +165,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                 get_class($type)
             ));
         }
-        if (count($type->getChildren()) < 2) {
+        if (\count($type->getChildren()) < 2) {
             throw new ProtocolException(sprintf(
                 'Expected an ASN1 sequence with at least 2 elements, but it has %s',
                 count($type->getChildren())
@@ -177,4 +178,81 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
             ));
         }
     }
+
+    /**
+     * @param AbstractType $asn1
+     * @return ProtocolElementInterface
+     * @throws ProtocolException
+     */
+    protected static function constructOperation(AbstractType $asn1) : ProtocolElementInterface
+    {
+        switch ($asn1->getTagNumber()) {
+            case 0:
+                return Request\BindRequest::fromAsn1($asn1);
+                break;
+            case 1:
+                return Response\BindResponse::fromAsn1($asn1);
+                break;
+            case 2:
+                return Request\UnbindRequest::fromAsn1($asn1);
+                break;
+            case 3:
+                return Request\SearchRequest::fromAsn1($asn1);
+                break;
+            case 4:
+                return Response\SearchResultEntry::fromAsn1($asn1);
+                break;
+            case 5:
+                return Response\SearchResultDone::fromAsn1($asn1);
+                break;
+            case 6:
+                return Request\ModifyRequest::fromAsn1($asn1);
+                break;
+            case 7:
+                return Response\ModifyResponse::fromAsn1($asn1);
+                break;
+            case 8:
+                return Request\AddRequest::fromAsn1($asn1);
+                break;
+            case 9:
+                return Response\AddResponse::fromAsn1($asn1);
+                break;
+            case 10:
+                return Request\DeleteRequest::fromAsn1($asn1);
+                break;
+            case 11:
+                return Response\DeleteResponse::fromAsn1($asn1);
+                break;
+            case 12:
+                return Request\ModifyDnRequest::fromAsn1($asn1);
+                break;
+            case 13:
+                return Response\ModifyDnResponse::fromAsn1($asn1);
+                break;
+            case 14:
+                return Request\CompareRequest::fromAsn1($asn1);
+                break;
+            case 15:
+                return Response\CompareResponse::fromAsn1($asn1);
+                break;
+            case 19:
+                return Response\SearchResultReference::fromAsn1($asn1);
+                break;
+            case 23:
+                return Request\ExtendedRequest::fromAsn1($asn1);
+                break;
+            case 24:
+                return Response\ExtendedResponse::fromAsn1($asn1);
+                break;
+            case 25:
+                return Response\IntermediateResponse::fromAsn1($asn1);
+                break;
+        }
+
+        throw new ProtocolException(sprintf(
+            'The tag %s for the LDAP operation is not supported.',
+            $asn1->getTagNumber()
+        ));
+    }
+
 }

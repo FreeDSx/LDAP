@@ -152,7 +152,7 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        if (!($type instanceof SequenceType && count($type) >= 3 && count($type) <= 4)) {
+        if (!($type instanceof SequenceType && \count($type) >= 3 && \count($type) <= 4)) {
             throw new ProtocolException('The modify dn request is malformed');
         }
         $entry = $type->getChild(0);

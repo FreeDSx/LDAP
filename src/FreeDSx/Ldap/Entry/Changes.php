@@ -23,7 +23,7 @@ class Changes implements \Countable, \IteratorAggregate
     protected $changes = [];
 
     /**
-     * @param Change[] ...$changes
+     * @param Change ...$changes
      */
     public function __construct(Change ...$changes)
     {
@@ -33,7 +33,7 @@ class Changes implements \Countable, \IteratorAggregate
     /**
      * Add a change to the list.
      *
-     * @param Change[] ...$changes
+     * @param Change ...$changes
      * @return $this
      */
     public function add(Change ...$changes)
@@ -53,19 +53,19 @@ class Changes implements \Countable, \IteratorAggregate
      */
     public function has(Change $change)
     {
-        return array_search($change, $this->changes, true) !== false;
+        return \array_search($change, $this->changes, true) !== false;
     }
 
     /**
      * Remove a change from the list.
      *
-     * @param Change[] ...$changes
+     * @param Change ...$changes
      * @return $this
      */
     public function remove(Change ...$changes)
     {
         foreach ($changes as $change) {
-            if (($index = array_search($change, $this->changes, true)) !== false) {
+            if (($index = \array_search($change, $this->changes, true)) !== false) {
                 unset($this->changes[$index]);
             }
         }
@@ -88,7 +88,7 @@ class Changes implements \Countable, \IteratorAggregate
     /**
      * Set the change list to just these changes.
      *
-     * @param Change[] ...$changes
+     * @param Change ...$changes
      * @return $this
      */
     public function set(Change ...$changes)
