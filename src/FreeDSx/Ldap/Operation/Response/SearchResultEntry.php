@@ -61,11 +61,11 @@ class SearchResultEntry implements ResponseInterface
         $attributes = [];
 
         /** @var \FreeDSx\Asn1\Type\SequenceType $type */
-        foreach ($type->getChild(1) as $partialAttribute) {
+        foreach ($type->getChild(1)->getChildren() as $partialAttribute) {
             $values = [];
 
             /** @var \FreeDSx\Asn1\Type\SequenceType $partialAttribute */
-            foreach ($partialAttribute->getChild(1) as $attrValue) {
+            foreach ($partialAttribute->getChild(1)->getChildren() as $attrValue) {
                 /** @var \FreeDSx\Asn1\Type\OctetStringType $attrValue */
                 $values[] = $attrValue->getValue();
             }

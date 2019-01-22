@@ -224,7 +224,7 @@ class SubstringFilter implements FilterInterface
         $contains = [];
 
         /** @var AbstractType $substring */
-        foreach ($substrings as $substring) {
+        foreach ($substrings->getChildren() as $substring) {
             if ($substring->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
                 throw new ProtocolException('The substring filter is malformed.');
             }

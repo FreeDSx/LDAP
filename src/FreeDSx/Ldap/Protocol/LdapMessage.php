@@ -165,7 +165,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                 get_class($type)
             ));
         }
-        if (\count($type->getChildren()) < 2) {
+        if (!$type->getChild(1)) {
             throw new ProtocolException(sprintf(
                 'Expected an ASN1 sequence with at least 2 elements, but it has %s',
                 count($type->getChildren())

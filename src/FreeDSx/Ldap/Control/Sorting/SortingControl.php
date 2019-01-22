@@ -89,7 +89,7 @@ class SortingControl extends Control
 
         $sortKeys = [];
         /** @var SequenceType $response */
-        foreach ($response as $sequence) {
+        foreach ($response->getChildren() as $sequence) {
             if (!$response instanceof SequenceType) {
                 throw new ProtocolException('The sort key is malformed.');
             }
@@ -100,7 +100,7 @@ class SortingControl extends Control
 
             $encoder = new LdapEncoder();
             /** @var AbstractType $keyItem */
-            foreach ($sequence as $keyItem) {
+            foreach ($sequence->getChildren() as $keyItem) {
                 if ($keyItem instanceof OctetStringType && $keyItem->getTagClass() === AbstractType::TAG_CLASS_UNIVERSAL) {
                     $attrName = $keyItem->getValue();
                 } elseif ($keyItem->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $keyItem->getTagNumber() === 0) {

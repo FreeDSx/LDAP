@@ -147,7 +147,7 @@ class PwdPolicyResponseControl extends Control
                     ],
                 ]);
                 /** @var AbstractType $warning */
-                foreach ($warnings as $warning) {
+                foreach ($warnings->getChildren() as $warning) {
                     if ($warning->getTagNumber() === 0) {
                         $timeBeforeExpiration = $warning->getValue();
                         break;

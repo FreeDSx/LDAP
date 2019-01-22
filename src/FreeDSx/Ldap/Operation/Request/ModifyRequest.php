@@ -114,7 +114,7 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
         }
 
         $changeList = [];
-        foreach ($changes as $change) {
+        foreach ($changes->getChildren() as $change) {
             $changeList[] = self::parseChange($change);
         }
 

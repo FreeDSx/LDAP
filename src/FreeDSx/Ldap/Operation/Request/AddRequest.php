@@ -96,7 +96,7 @@ class AddRequest implements RequestInterface
         $dn = new Dn($dn->getValue());
 
         $attributes = [];
-        foreach ($attrList as $attrListing) {
+        foreach ($attrList->getChildren() as $attrListing) {
             if (!($attrListing instanceof SequenceType && \count($attrListing->getChildren()) == 2)) {
                 throw new ProtocolException(sprintf(
                     'Expected a sequence type, but received: %s',
@@ -111,7 +111,7 @@ class AddRequest implements RequestInterface
             }
 
             $attrValues = [];
-            foreach ($vals as $val) {
+            foreach ($vals->getChildren() as $val) {
                 if (!$val instanceof OctetStringType) {
                     throw new ProtocolException('The add request is malformed.');
                 }
