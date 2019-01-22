@@ -13,12 +13,12 @@ namespace FreeDSx\Ldap\Protocol;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IntegerType;
+use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceOfType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\Factory\ControlFactory;
 use FreeDSx\Socket\PduInterface;
 use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Operation\Response;
@@ -73,9 +73,9 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
 
     /**
      * @param int $messageId
-     * @param Control ...$controls
+     * @param Control\Control ...$controls
      */
-    public function __construct(int $messageId, Control ...$controls)
+    public function __construct(int $messageId, Control\Control ...$controls)
     {
         $this->messageId = $messageId;
         $this->controls = new ControlBag(...$controls);
@@ -136,7 +136,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                 $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
                 /** @var SequenceOfType $child */
                 foreach ($child->getChildren() as $control) {
-                    $controls[] = ControlFactory::get($control);
+                    $controls[] = self::constructControl($control);
                 }
             }
         }
@@ -255,4 +255,34 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
         ));
     }
 
+    /**
+     * @param AbstractType $asn1
+     * @return Control\Control
+     * @throws ProtocolException
+     */
+    protected static function constructControl(AbstractType $asn1) : Control\Control
+    {
+        if (!($asn1 instanceof SequenceType && $asn1->getChild(0) && $asn1->getChild(0) instanceof OctetStringType)) {
+            throw new ProtocolException('The control either is not a sequence or has no OID value attached.');
+        }
+
+        $oid = $asn1->getChild(0)->getValue();
+        switch ($oid) {
+            case Control\Control::OID_PAGING:
+                return Control\PagingControl::fromAsn1($asn1);
+                break;
+            case Control\Control::OID_SORTING_RESPONSE;
+                return Control\Sorting\SortingResponseControl::fromAsn1($asn1);
+                break;
+            case Control\Control::OID_VLV_RESPONSE:
+                return Control\Vlv\VlvResponseControl::fromAsn1($asn1);
+                break;
+            case Control\Control::OID_DIR_SYNC:
+                return Control\Ad\DirSyncResponseControl::fromAsn1($asn1);
+                break;
+            default:
+                return Control\Control::fromAsn1($asn1);
+                break;
+        }
+    }
 }
