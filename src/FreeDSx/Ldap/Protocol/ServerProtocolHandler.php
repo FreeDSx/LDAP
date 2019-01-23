@@ -109,7 +109,7 @@ class ServerProtocolHandler
     public function __construct(Socket $socket, array $options = [], MessageQueue $queue = null)
     {
         $this->socket = $socket;
-        $this->options = array_merge($this->options, $options);
+        $this->options = \array_merge($this->options, $options);
         $this->validateAndSetRequestHandler();
         $this->encoder = new LdapEncoder();
         $this->queue = $queue ?? new LdapRequestQueue($socket, $this->encoder);
@@ -207,20 +207,20 @@ class ServerProtocolHandler
     {
         $buffer = '';
 
-        foreach ($entries as $entry) {
+        foreach ($entries->toArray() as $entry) {
             $buffer .= $this->encoder->encode((new LdapMessageResponse(
                 $message->getMessageId(),
                 new SearchResultEntry($entry)
             ))->toAsn1());
 
-            $bufferLen = strlen($buffer);
+            $bufferLen = \strlen($buffer);
             if ($bufferLen >= $this->bufferSize) {
-                $this->socket->write(substr($buffer, 0, $this->bufferSize));
-                $buffer = $bufferLen > $this->bufferSize ? substr($buffer, $this->bufferSize) : '';
+                $this->socket->write(\substr($buffer, 0, $this->bufferSize));
+                $buffer = $bufferLen > $this->bufferSize ? \substr($buffer, $this->bufferSize) : '';
             }
         }
 
-        if (strlen($buffer) > 0) {
+        if (\strlen($buffer)) {
             $this->socket->write($buffer);
         }
     }
@@ -242,7 +242,7 @@ class ServerProtocolHandler
 
             return false;
         }
-        if (in_array($message->getMessageId(), $this->messageIds, true)) {
+        if (\in_array($message->getMessageId(), $this->messageIds, true)) {
             $this->sendExtendedError(
                 sprintf('The message ID %s is not valid.', $message->getMessageId()),
                 ResultCode::PROTOCOL_ERROR
@@ -374,7 +374,7 @@ class ServerProtocolHandler
         return $request->getScope() === SearchRequest::SCOPE_BASE_OBJECT
             && $request->getBaseDn()->toString() === ''
             && $filter instanceof PresentFilter
-            && strtolower($filter->getAttribute()) === 'objectclass';
+            && \strtolower($filter->getAttribute()) === 'objectclass';
     }
 
     /**
@@ -424,7 +424,7 @@ class ServerProtocolHandler
         if (!empty($request->getAttributes())) {
             $onlyThese = [];
             foreach ($request->getAttributes() as $attribute) {
-                foreach (array_keys($entry) as $dseAttr) {
+                foreach (\array_keys($entry) as $dseAttr) {
                     if ($attribute->equals(new Attribute($dseAttr))) {
                         $onlyThese[$dseAttr] = $entry[$dseAttr];
                     }
@@ -435,7 +435,7 @@ class ServerProtocolHandler
 
         # Return attributes only if requested.
         if ($request->getAttributesOnly()) {
-            foreach (array_keys($entry) as $attr) {
+            foreach (\array_keys($entry) as $attr) {
                 $entry[$attr] = [];
             }
         }
@@ -472,7 +472,7 @@ class ServerProtocolHandler
     protected function handleStartTls(LdapMessageRequest $message) : void
     {
         # If we don't have a SSL cert or the OpenSSL extension is not available, then we can do nothing...
-        if (!isset($this->options['ssl_cert']) || !extension_loaded('openssl')) {
+        if (!isset($this->options['ssl_cert']) || !\extension_loaded('openssl')) {
             $this->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
                 new LdapResult(ResultCode::PROTOCOL_ERROR),
                 ExtendedRequest::OID_START_TLS
@@ -528,19 +528,19 @@ class ServerProtocolHandler
             $this->handler = new GenericRequestHandler();
             return;
         }
-        if (!is_string($this->options['request_handler'])) {
+        if (!\is_string($this->options['request_handler'])) {
             throw new RuntimeException(sprintf(
                 'The request handler must be a string class name, got %s.',
                 gettype($this->options['request_handler'])
             ));
         }
-        if (!class_exists($this->options['request_handler'])) {
+        if (!\class_exists($this->options['request_handler'])) {
             throw new RuntimeException(sprintf(
                 'The request handler class does not exist: %s',
                 $this->options['request_handler']
             ));
         }
-        if (!is_subclass_of($this->options['request_handler'], RequestHandlerInterface::class)) {
+        if (!\is_subclass_of($this->options['request_handler'], RequestHandlerInterface::class)) {
             throw new RuntimeException(sprintf(
                 'The request handler class must implement "%s"',
                 RequestHandlerInterface::class
