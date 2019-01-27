@@ -132,7 +132,7 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
             $changeSeq = Asn1::sequence(Asn1::enumerated($change->getType()));
 
             $changeSeq->addChild(Asn1::sequence(
-                Asn1::octetString($change->getAttribute()->getName()),
+                Asn1::octetString($change->getAttribute()->getName(true)),
                 Asn1::setOf(...\array_map(function ($value) {
                     return Asn1::octetString($value);
                 }, $change->getAttribute()->getValues()))

@@ -87,7 +87,7 @@ class SearchResultEntry implements ResponseInterface
         $partialAttributes = Asn1::sequenceOf();
         foreach ($this->entry->getAttributes() as $attribute) {
             $partialAttributes->addChild(Asn1::sequence(
-                Asn1::octetString($attribute->getName()),
+                Asn1::octetString($attribute->getName(true)),
                 Asn1::setOf(...array_map(function ($v) {
                     return Asn1::octetString($v);
                 }, $attribute->getValues()))

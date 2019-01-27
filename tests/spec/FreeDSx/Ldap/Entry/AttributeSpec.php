@@ -11,6 +11,8 @@
 namespace spec\FreeDSx\Ldap\Entry;
 
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Option;
+use FreeDSx\Ldap\Entry\Options;
 use PhpSpec\ObjectBehavior;
 
 class AttributeSpec extends ObjectBehavior
@@ -40,6 +42,23 @@ class AttributeSpec extends ObjectBehavior
         $this->getName()->shouldBeEqualTo('cn');
     }
 
+    function it_should_get_the_name_with_options_if_specified()
+    {
+        $this->getOptions()->add('foo');
+        
+        $this->getName(true)->shouldBeEqualTo('cn;foo');
+    }
+    
+    function it_should_return_false_for_hasOptions_when_there_are_none()
+    {
+        $this->hasOptions()->shouldBeEqualTo(false);    
+    }
+    
+    function it_should_get_options()
+    {
+        $this->getOptions()->shouldBeLike(new Options());    
+    }
+    
     function it_should_get_the_values()
     {
         $this->getValues()->shouldBeEqualTo(['foo', 'bar']);
@@ -92,6 +111,27 @@ class AttributeSpec extends ObjectBehavior
         $this->equals(new Attribute('foo'))->shouldBeEqualTo(false);
     }
 
+    function it_should_check_if_it_equals_another_attribute_with_options()
+    {
+        $this->equals(new Attribute('cn;foo'))->shouldBeEqualTo(false);
+        $this->getOptions()->add('foo');
+        $this->equals(new Attribute('cn;foo'))->shouldBeEqualTo(true);
+    }
+    
+    function it_should_be_check_equality_with_the_name_only_by_default()
+    {
+        $this->getOptions()->add('foo');
+
+        $this->equals(new Attribute('cn'))->shouldBeEqualTo(true);
+    }
+
+    function it_should_be_check_equality_with_name_and_options_when_strict_is_set()
+    {
+        $this->getOptions()->add('foo');
+
+        $this->equals(new Attribute('cn'), true)->shouldBeEqualTo(false);
+    }
+    
     function it_should_escape_a_value()
     {
         $this::escape("(foo=*\bar)\x00")->shouldBeEqualTo('\28foo=\2a\5cbar\29\00');
@@ -110,5 +150,13 @@ class AttributeSpec extends ObjectBehavior
     function it_should_not_escape_a_string_that_is_already_hex_encoded()
     {
         $this::escape('\66\6f\6f\62\61\72')->shouldBeEqualTo('\66\6f\6f\62\61\72');
+    }
+
+    function it_should_parse_options_in_the_attribute()
+    {
+        $this->beConstructedWith('foo;lang-en-us', 'bar');
+        
+        $this->getName()->shouldBeEqualTo('foo');
+        $this->getOptions()->shouldBeLike(new Options(new Option('lang-en-us')));
     }
 }

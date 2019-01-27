@@ -54,15 +54,9 @@ class Entry implements \IteratorAggregate, \Countable
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
 
-        $exists = false;
-        foreach ($this->attributes as $i => $attr) {
-            if ($attr->equals($attribute)) {
-                $exists = true;
-                $this->attributes[$i]->add(...$attribute->getValues());
-                break;
-            }
-        }
-        if (!$exists) {
+        if (($exists = $this->get($attribute, true)) !== null) {
+            $exists->add(...$attribute->getValues());
+        } else {
             $this->attributes[] = $attribute;
         }
         $this->changes->add(Change::add(clone $attribute));
@@ -82,11 +76,8 @@ class Entry implements \IteratorAggregate, \Countable
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
 
         if (!empty($attribute->getValues())) {
-            foreach ($this->attributes as $i => $attr) {
-                if ($attr->equals($attribute)) {
-                    $this->attributes[$i]->remove(...$attribute->getValues());
-                    break;
-                }
+            if (($exists = $this->get($attribute, true)) !== null) {
+                $exists->remove(...$attribute->getValues());
             }
             $this->changes->add(Change::delete(clone $attribute));
         }
@@ -105,7 +96,7 @@ class Entry implements \IteratorAggregate, \Countable
         foreach ($attributes as $attribute) {
             $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute);
             foreach ($this->attributes as $i => $attr) {
-                if ($attr->equals($attribute)) {
+                if ($attr->equals($attribute, true)) {
                     unset($this->attributes[$i]);
                     break;
                 }
@@ -129,7 +120,7 @@ class Entry implements \IteratorAggregate, \Countable
 
         $exists = false;
         foreach ($this->attributes as $i => $attr) {
-            if ($attr->equals($attribute)) {
+            if ($attr->equals($attribute, true)) {
                 $exists = true;
                 $this->attributes[$i] = $attribute;
                 break;
@@ -147,14 +138,15 @@ class Entry implements \IteratorAggregate, \Countable
      * Get a specific attribute by name (or Attribute object).
      *
      * @param string|Attribute $attribute
+     * @param bool $strict If set to true, then options on the attribute must also match.
      * @return null|Attribute
      */
-    public function get($attribute) : ?Attribute
+    public function get($attribute, bool $strict = false) : ?Attribute
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute);
 
         foreach ($this->attributes as $attr) {
-            if ($attribute->equals($attr)) {
+            if ($attr->equals($attribute, $strict)) {
                 return $attr;
             }
         }
@@ -166,19 +158,14 @@ class Entry implements \IteratorAggregate, \Countable
      * Check if a specific attribute exists on the entry.
      *
      * @param string|Attribute $attribute
+     * @param bool $strict
      * @return bool
      */
-    public function has($attribute) : bool
+    public function has($attribute, bool $strict = false) : bool
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute);
 
-        foreach ($this->attributes as $attr) {
-            if ($attr->equals($attribute)) {
-                return true;
-            }
-        }
-
-        return false;
+        return (bool) $this->get($attribute, $strict);
     }
 
     /**
@@ -217,7 +204,7 @@ class Entry implements \IteratorAggregate, \Countable
         $attributes = [];
 
         foreach ($this->attributes as $attribute) {
-            $attributes[$attribute->getName()] = $attribute->getValues();
+            $attributes[$attribute->getName(true)] = $attribute->getValues();
         }
 
         return $attributes;

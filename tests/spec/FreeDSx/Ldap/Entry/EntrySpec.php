@@ -23,7 +23,9 @@ class EntrySpec extends ObjectBehavior
     {
         $this->beConstructedWith(new Dn('cn=foo,dc=example,dc=local'),
             new Attribute('cn', 'foo'),
-            new Attribute('telephoneNumber', '123', '456')
+            new Attribute('telephoneNumber', '123', '456'),
+            new Attribute('cn;lang-en-us', 'bar'),
+            new Attribute('member;range=0-*', 'dc=foo')
         );
     }
 
@@ -63,12 +65,14 @@ class EntrySpec extends ObjectBehavior
         $this->toArray()->shouldBeEqualTo([
             'cn' => ['foo'],
             'telephoneNumber' => [ '123', '456'],
+            'cn;lang-en-us' => ['bar'],
+            'member;range=0-*' => ['dc=foo']
         ]);
     }
 
     function it_should_get_the_count_as_the_amount_of_attributes_in_the_entry()
     {
-        $this->count()->shouldBeEqualTo(2);
+        $this->count()->shouldBeEqualTo(4);
     }
 
     function it_should_have_a_string_representation_of_the_dn()
@@ -90,15 +94,36 @@ class EntrySpec extends ObjectBehavior
     {
         $this->get(new Attribute('cn'))->getName()->shouldBeEqualTo('cn');
     }
-
+    
+    function it_should_get_an_attribute_with_options_using_only_the_name()
+    {
+        $this->get('cn')->getValues()->shouldBeEqualTo(['foo']);
+    }
+    
+    function it_should_get_an_attribute_with_options_using_the_options()
+    {
+        $this->get('cn;lang-en-us')->getValues()->shouldBeLike(['bar']);
+    }
+    
+    function it_should_not_get_an_attribute_with_the_same_name_if_the_requested_options_are_not_the_same()
+    {
+        $this->get('member;foo')->shouldBeNull();
+    }
+    
+    function it_should_respect_the_strict_option_for_getting_an_attribute()
+    {
+        $this->get('member', true)->shouldBeNull();
+        $this->get('member')->shouldBeAnInstanceOf(Attribute::class);
+    }
+    
     function it_should_reset_an_attribute_using_a_string()
     {
-        $this->reset('cn')->get('cn')->shouldBeNull();
+        $this->reset('cn')->get('cn', true)->shouldBeNull();
     }
 
     function it_should_remove_an_attribute_using_an_attribute()
     {
-        $this->reset(new Attribute('cn'))->get('cn')->shouldBeNull();
+        $this->reset(new Attribute('cn'))->get('cn', true)->shouldBeNull();
     }
 
     function if_should_check_if_it_has_an_attribute_using_a_string()
@@ -142,7 +167,7 @@ class EntrySpec extends ObjectBehavior
     {
         $this->__unset('cn');
 
-        $this->get('cn')->shouldBeNull();
+        $this->get('cn', true)->shouldBeNull();
     }
 
     function it_should_add_to_an_attributes_values_if_it_already_exists_while_adding()

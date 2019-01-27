@@ -43,6 +43,11 @@ class Attribute implements \IteratorAggregate, \Countable
     protected $values = [];
 
     /**
+     * @var null|Options
+     */
+    protected $options;
+
+    /**
      * @param string $attribute
      * @param string[] ...$values
      */
@@ -71,7 +76,7 @@ class Attribute implements \IteratorAggregate, \Countable
      */
     public function has(string $value) : bool
     {
-        return array_search($value, $this->values) !== false;
+        return \array_search($value, $this->values) !== false;
     }
 
     /**
@@ -81,7 +86,7 @@ class Attribute implements \IteratorAggregate, \Countable
     public function remove(string ...$values)
     {
         foreach ($values as $value) {
-            if (($i = array_search($value, $this->values)) !== false) {
+            if (($i = \array_search($value, $this->values)) !== false) {
                 unset($this->values[$i]);
             }
         }
@@ -115,10 +120,16 @@ class Attribute implements \IteratorAggregate, \Countable
     }
 
     /**
+     * @param bool $withOptions
      * @return string
      */
-    public function getName() : string
+    public function getName(bool $withOptions = false) : string
     {
+        $this->initOptions();
+        if ($withOptions && $this->hasOptions()) {
+            return $this->attribute.';'.$this->options->toString();
+        }
+        
         return $this->attribute;
     }
 
@@ -128,6 +139,26 @@ class Attribute implements \IteratorAggregate, \Countable
     public function getValues() : array
     {
         return $this->values;
+    }
+
+    /**
+     * @return Options
+     */
+    public function getOptions() : Options 
+    {
+        $this->initOptions();
+        
+        return $this->options;
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasOptions() : bool 
+    {
+        $this->initOptions();
+        
+        return (bool) $this->options->toArray();
     }
 
     /**
@@ -148,18 +179,28 @@ class Attribute implements \IteratorAggregate, \Countable
 
     /**
      * @param Attribute $attribute
+     * @param bool $strict If set to true, then options must also match.
      * @return bool
      */
-    public function equals(Attribute $attribute) : bool
+    public function equals(Attribute $attribute, bool $strict = false) : bool
     {
+        $this->initOptions();
+        $attribute->initOptions();
         if ($this->lcAttribute === null) {
             $this->lcAttribute = \strtolower($this->attribute);
         }
         if ($attribute->lcAttribute === null) {
             $attribute->lcAttribute = \strtolower($attribute->attribute);
         }
+        $nameMatches = ($this->lcAttribute === $attribute->lcAttribute);
 
-        return $this->lcAttribute === $attribute->lcAttribute;
+        # Only the name of the attribute is checked for by default.
+        # If strict is selected, or the attribute to be checked has explicit options, then the opposing attribute must too
+        if ($strict || $attribute->hasOptions()) {
+            return $nameMatches && ($this->getOptions()->toString(true) === $attribute->getOptions()->toString(true));
+        }
+
+        return $nameMatches;
     }
 
     /**
@@ -184,5 +225,23 @@ class Attribute implements \IteratorAggregate, \Countable
         $value = \str_replace(\array_keys(self::ESCAPE_MAP), \array_values(self::ESCAPE_MAP), $value);
 
         return self::escapeNonPrintable($value);
+    }
+
+    /**
+     * A one time check and load of any attribute options.
+     */
+    protected function initOptions() : void
+    {
+        if ($this->options !== null) {
+            return;
+        }
+        if (\strpos($this->attribute, ';') === false) {
+            $this->options = new Options();
+            
+            return;
+        }
+        $options = \explode(';', $this->attribute);
+        $this->attribute = \array_shift($options);
+        $this->options = new Options(...$options);
     }
 }

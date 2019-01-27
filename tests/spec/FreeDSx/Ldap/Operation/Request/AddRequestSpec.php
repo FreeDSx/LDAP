@@ -63,7 +63,7 @@ class AddRequestSpec extends ObjectBehavior
     {
         $add = new AddRequest(Entry::create('cn=foo,dc=foo,dc=bar', ['cn' => 'foo', 'sn' => ['foo', 'bar']]));
 
-        $this::fromAsn1($add->toAsn1())->shouldBeLike($add);
+        $this::fromAsn1($add->toAsn1())->shouldBeLike(new AddRequest(Entry::create('cn=foo,dc=foo,dc=bar', ['cn' => 'foo', 'sn' => ['foo', 'bar']])));
     }
 
     function it_should_detect_a_malformed_asn1_request()

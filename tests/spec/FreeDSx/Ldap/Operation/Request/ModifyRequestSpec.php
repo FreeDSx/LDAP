@@ -86,7 +86,12 @@ class ModifyRequestSpec extends ObjectBehavior
             Change::replace('foobar', 'foo')
         );
 
-        $this::fromAsn1($req->toAsn1())->shouldBeLike($req);
+        $this::fromAsn1($req->toAsn1())->shouldBeLike(new ModifyRequest(
+            'foo',
+            Change::add('foo', 'bar'),
+            Change::delete('bar', 'foo'),
+            Change::replace('foobar', 'foo')
+        ));
     }
 
     function it_should_not_be_constructed_from_asn1_with_an_invalid_dn_type()

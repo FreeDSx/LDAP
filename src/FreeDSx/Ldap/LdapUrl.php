@@ -362,7 +362,7 @@ class LdapUrl
         if (!empty($this->attributes)) {
             $query[0] = \implode(',', \array_map(function ($v) {
                 /** @var $v Attribute */
-                return self::encode($v->getName());
+                return self::encode($v->getName(true));
             }, $this->attributes));
         }
         if ($this->scope !== null) {
