@@ -144,7 +144,7 @@ class Change
      */
     public static function reset($attribute) : Change
     {
-        $attribute = $attribute instanceof Attribute ? new Attribute($attribute->getName(true)) : new Attribute($attribute);
+        $attribute = $attribute instanceof Attribute ? new Attribute($attribute->getDescription()) : new Attribute($attribute);
 
         return new self(self::TYPE_DELETE, $attribute);
     }

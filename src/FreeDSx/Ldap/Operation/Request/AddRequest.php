@@ -133,7 +133,7 @@ class AddRequest implements RequestInterface
 
         /** @var Attribute $attribute */
         foreach ($this->entry->getAttributes() as $attribute) {
-            $attr = Asn1::sequence(Asn1::octetString($attribute->getName(true)));
+            $attr = Asn1::sequence(Asn1::octetString($attribute->getDescription()));
 
             $attrValues = Asn1::setOf(...\array_map(function ($value) {
                 return Asn1::octetString($value);

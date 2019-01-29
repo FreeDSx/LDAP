@@ -58,6 +58,8 @@ class Attribute implements \IteratorAggregate, \Countable
     }
 
     /**
+     * Add a value, or values, to the attribute.
+     * 
      * @param string ...$values
      * @return $this
      */
@@ -71,6 +73,8 @@ class Attribute implements \IteratorAggregate, \Countable
     }
 
     /**
+     * Check if the attribute has a specific value.
+     * 
      * @param string $value
      * @return bool
      */
@@ -80,6 +84,8 @@ class Attribute implements \IteratorAggregate, \Countable
     }
 
     /**
+     * Remove a specific value, or values, from an attribute.
+     * 
      * @param string ...$values
      * @return $this
      */
@@ -120,20 +126,30 @@ class Attribute implements \IteratorAggregate, \Countable
     }
 
     /**
-     * @param bool $withOptions
+     * Gets the name (AttributeType) portion of the AttributeDescription, which excludes the options.
+     * 
      * @return string
      */
-    public function getName(bool $withOptions = false) : string
+    public function getName() : string
     {
         $this->initOptions();
-        if ($withOptions && $this->hasOptions()) {
-            return $this->attribute.';'.$this->options->toString();
-        }
-        
+
         return $this->attribute;
     }
 
     /**
+     * Gets the full AttributeDescription (RFC 4512, 2.5), which contains the attribute type (name) and options.
+     * 
+     * @return string
+     */
+    public function getDescription() : string
+    {
+        return $this->getName().($this->hasOptions() ? ';'.$this->options->toString() : '');
+    }
+
+    /**
+     * Gets any values associated with the attribute.
+     * 
      * @return array
      */
     public function getValues() : array
@@ -142,6 +158,8 @@ class Attribute implements \IteratorAggregate, \Countable
     }
 
     /**
+     * Gets the options within the AttributeDescription (semi-colon separated list of options).
+     * 
      * @return Options
      */
     public function getOptions() : Options 

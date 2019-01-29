@@ -204,7 +204,7 @@ class Entry implements \IteratorAggregate, \Countable
         $attributes = [];
 
         foreach ($this->attributes as $attribute) {
-            $attributes[$attribute->getName(true)] = $attribute->getValues();
+            $attributes[$attribute->getDescription()] = $attribute->getValues();
         }
 
         return $attributes;

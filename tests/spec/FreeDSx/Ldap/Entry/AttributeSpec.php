@@ -40,20 +40,23 @@ class AttributeSpec extends ObjectBehavior
     function it_should_get_the_name()
     {
         $this->getName()->shouldBeEqualTo('cn');
+        $this->getOptions()->add('foo');
+        $this->getName()->shouldBeEqualTo('cn');
+        
     }
 
-    function it_should_get_the_name_with_options_if_specified()
+    function it_should_get_the_complete_attribute_description()
     {
+        $this->getDescription()->shouldBeEqualTo('cn');
         $this->getOptions()->add('foo');
-        
-        $this->getName(true)->shouldBeEqualTo('cn;foo');
+        $this->getDescription()->shouldBeEqualTo('cn;foo');
     }
-    
+
     function it_should_return_false_for_hasOptions_when_there_are_none()
     {
         $this->hasOptions()->shouldBeEqualTo(false);    
     }
-    
+
     function it_should_get_options()
     {
         $this->getOptions()->shouldBeLike(new Options());    
