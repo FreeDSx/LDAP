@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\DirSync;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Search\Paging;
+use FreeDSx\Ldap\Search\RangeRetrieval;
 use FreeDSx\Ldap\Search\Vlv;
 use PhpSpec\ObjectBehavior;
 
@@ -81,6 +82,11 @@ class LdapClientSpec extends ObjectBehavior
         $this->dirSync()->shouldBeAnInstanceOf(DirSync::class);
     }
 
+    function it_should_construct_a_range_retrieval_helper()
+    {
+        $this->range()->shouldBeAnInstanceOf(RangeRetrieval::class);    
+    }
+    
     function it_should_start_tls($handler)
     {
         $handler->send(Operations::extended(ExtendedRequest::OID_START_TLS))->shouldBeCalled()->willReturn(null);

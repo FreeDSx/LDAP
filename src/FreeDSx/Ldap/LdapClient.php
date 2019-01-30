@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\DirSync;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Paging;
+use FreeDSx\Ldap\Search\RangeRetrieval;
 use FreeDSx\Ldap\Search\Vlv;
 
 /**
@@ -274,6 +275,16 @@ class LdapClient
         return $response->getValue();
     }
 
+    /**
+     * Get a helper class for handling ranged attributes.
+     * 
+     * @return RangeRetrieval
+     */
+    public function range() : RangeRetrieval
+    {
+        return new RangeRetrieval($this);    
+    }
+    
     /**
      * Access to add/set/remove/reset the controls to be used for each request. If you want request specific controls in
      * addition to these, then pass them as a parameter to the send() method.
