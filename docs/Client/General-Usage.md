@@ -106,6 +106,8 @@ returned from the server.
 
 ## Using Controls
 
+**Note**: For more complete information on using LDAP controls, see [this doc](Controls.md).
+
 Using specific LDAP controls you can affect the way certain LDAP operations happen. There are two ways to send controls:
 
 * A global set of controls that are sent with every request going to LDAP.

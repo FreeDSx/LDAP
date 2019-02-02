@@ -47,6 +47,9 @@ $ldap = new LdapClient([
     'base_dn' => 'dc=example,dc=local'
 ]);
 
+# Encrypt the connection prior to binding
+$ldap->startTls();
+
 # Bind to LDAP with a specific user.
 $ldap->bind('user@example.local', '12345');
 
