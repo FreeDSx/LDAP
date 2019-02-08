@@ -141,12 +141,12 @@ class LdapRequestHandler extends GenericRequestHandler
     public function search(RequestContext $context, SearchRequest $search): Entries
     {
         return new Entries(
-            Entry::create('cn=Foo,dc=FreeDSx,dc=local', [
+            Entry::fromArray('cn=Foo,dc=FreeDSx,dc=local', [
                 'cn' => 'Foo',
                 'sn' => 'Bar',
                 'givenName' => 'Foo',
             ]),
-            Entry::create('cn=Chad,dc=FreeDSx,dc=local', [
+            Entry::fromArray('cn=Chad,dc=FreeDSx,dc=local', [
                 'cn' => 'Chad',
                 'sn' => 'Sikorra',
                 'givenName' => 'Chad',

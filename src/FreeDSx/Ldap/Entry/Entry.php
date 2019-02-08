@@ -270,13 +270,25 @@ class Entry implements \IteratorAggregate, \Countable
     }
 
     /**
-     * Construct an entry from an associative array.
+     * An alias of fromArray().
      *
      * @param string $dn
      * @param array $attributes
      * @return Entry
      */
     public static function create(string $dn, array $attributes = []) : Entry
+    {
+        return self::fromArray($dn, $attributes);
+    }
+
+    /**
+     * Construct an entry from an associative array.
+     *
+     * @param string $dn
+     * @param array $attributes
+     * @return Entry
+     */
+    public static function fromArray(string $dn, array $attributes = []) : Entry
     {
         /** @var Attribute[] $entryAttr */
         $entryAttr = [];

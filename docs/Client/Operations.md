@@ -25,7 +25,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 
 # Create a new LDAP entry object using a simple array of values
-$entry = Entry::create('cn=foo,dc=domain,dc=local', [
+$entry = Entry::fromArray('cn=foo,dc=domain,dc=local', [
     'objectClass' => ['top', 'group'],
     'sAMAccountName' => 'foo',
 ]);

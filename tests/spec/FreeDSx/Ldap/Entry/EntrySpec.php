@@ -46,9 +46,23 @@ class EntrySpec extends ObjectBehavior
         $this->getDn()->shouldBeLike(new Dn('cn=foo,dc=example,dc=local'));
     }
 
-    function it_should_be_constructed_from_an_array()
+    function it_should_be_constructed_from_an_array_using_create()
     {
         $this->beConstructedThrough('create', ['cn=foobar,dc=example,dc=local', [
+            'cn' => 'foobar',
+            'telephoneNumber' => ['123', '456'],
+        ]]);
+
+        $this->getDn()->shouldBeLike(new Dn('cn=foobar,dc=example,dc=local'));
+        $this->getAttributes()->shouldBeLike([
+            new Attribute('cn', 'foobar'),
+            new Attribute('telephoneNumber', '123', '456')
+        ]);
+    }
+
+    function it_should_be_constructed_from_an_array_using_fromArray()
+    {
+        $this->beConstructedThrough('fromArray', ['cn=foobar,dc=example,dc=local', [
             'cn' => 'foobar',
             'telephoneNumber' => ['123', '456'],
         ]]);

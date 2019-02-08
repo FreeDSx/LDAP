@@ -83,7 +83,7 @@ use FreeDSx\Ldap\Entry\Entry;
 
 # Use the 'send()' method to send an operation request to LDAP
 # We also use the 'add()' factory method for Operations and construct an Entry object 
-$message = $ldap->send(Operations::add(Entry::create('cn=foo,dc=domain,dc=local', [
+$message = $ldap->send(Operations::add(Entry::fromArray('cn=foo,dc=domain,dc=local', [
     'objectClass' => ['top', 'group'],
     'sAMAccountName' => 'foo',
 ])));
