@@ -16,6 +16,7 @@ It supports encryption of the LDAP connection through TLS via the OpenSSL extens
 * [LDAP Client](/docs/Client)
   * [Configuration](/docs/Client/Configuration.md)
   * [General Usage](/docs/Client/General-Usage.md)
+  * [Entries](/docs/Client/Entries.md)
   * [Operations](/docs/Client/Operations.md)
   * [Controls](/docs/Client/Controls.md)
   * [Searching and Filters](/docs/Client/Searching-and-Filters.md)
