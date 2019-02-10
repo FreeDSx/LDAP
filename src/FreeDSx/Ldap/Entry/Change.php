@@ -92,6 +92,38 @@ class Change
     }
 
     /**
+     * @return bool
+     */
+    public function isAdd() : bool
+    {
+        return $this->modType === self::TYPE_ADD;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isDelete() : bool
+    {
+        return $this->modType === self::TYPE_DELETE && \count($this->attribute->getValues()) !== 0;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isReplace() : bool
+    {
+        return $this->modType === self::TYPE_REPLACE;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isReset() : bool
+    {
+        return $this->modType === self::TYPE_DELETE && \count($this->attribute->getValues()) === 0;
+    }
+
+    /**
      * Add the values contained in the attribute, creating the attribute if necessary.
      *
      * @param string|Attribute $attribute

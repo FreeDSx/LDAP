@@ -77,4 +77,36 @@ class ChangeSpec extends ObjectBehavior
         $this->getAttribute()->shouldBeLike(new Attribute('foo', 'bar'));
         $this->getType()->shouldBeEqualTo(Change::TYPE_REPLACE);
     }
+
+    function it_should_check_whether_it_is_an_add()
+    {
+        $this->isAdd()->shouldBeEqualTo(false);
+        $this->setType(Change::TYPE_ADD);
+        $this->isAdd()->shouldBeEqualTo(true);
+    }
+
+    function it_should_check_whether_it_is_a_delete()
+    {
+        $this->isDelete()->shouldBeEqualTo(false);
+        $this->setType(Change::TYPE_DELETE);
+        $this->isDelete()->shouldBeEqualTo(true);
+        $this->setAttribute(new Attribute('foo'));
+        $this->isDelete()->shouldBeEqualTo(false);
+    }
+
+    function it_should_check_whether_it_is_a_replace()
+    {
+        $this->isReplace()->shouldBeEqualTo(true);
+        $this->setType(Change::TYPE_ADD);
+        $this->isReplace()->shouldBeEqualTo(false);
+    }
+
+    function it_should_check_whether_it_is_a_reset()
+    {
+        $this->isReset()->shouldBeEqualTo(false);
+        $this->setType(Change::TYPE_DELETE);
+        $this->isReset()->shouldBeEqualTo(false);
+        $this->setAttribute(new Attribute('foo'));
+        $this->isReset()->shouldBeEqualTo(true);
+    }
 }
