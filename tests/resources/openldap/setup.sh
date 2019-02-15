@@ -88,7 +88,7 @@ sed -i -e 's|^SLAPD_SERVICES="\(.*\)"|SLAPD_SERVICES="ldap:/// ldapi:/// ldaps:/
 adduser openldap ssl-cert
 chgrp ssl-cert /etc/ssl/private/slapd.key
 chmod g+r /etc/ssl/private/slapd.key
-chmod o-r /etc/ssl/private/slapd.crt
+chmod o-r /etc/ssl/private/slapd.key
 
 # Needed so we can access LDAP via the proper name in the cert...
 echo "127.0.0.1 ldap.example.com" >> /etc/hosts
