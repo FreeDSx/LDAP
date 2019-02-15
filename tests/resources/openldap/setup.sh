@@ -37,7 +37,7 @@ chown -R openldap.openldap /var/lib/ldap
 service slapd start
 
 # Import the test data ...
-/usr/bin/time ldapadd -x -D "cn=admin,dc=example,dc=com" -w 12345 -h localhost -p 389 -f ./tests/resources/openldap/data.ldif
+/usr/bin/time ldapadd -x -D "cn=admin,dc=example,dc=com" -w 12345 -h localhost -p 389 -f ./tests/resources/openldap/data.ldif > /dev/null
 
 # The CA cert is auto-generated and committed via a separate script
 cp "./tests/resources/cert/data/cert.pem" "/usr/local/share/ca-certificates/example.crt"
