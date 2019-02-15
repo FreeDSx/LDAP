@@ -11,7 +11,7 @@
 set -e
 set -x
 
-setvice slapd stop
+service slapd stop
 
 # Remove existing data, reconfigure...
 cp -v /var/lib/ldap/DB_CONFIG ./DB_CONFIG
