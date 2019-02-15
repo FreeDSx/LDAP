@@ -1,4 +1,4 @@
 cn = example
 ca
 cert_signing_key
-expiration_days = 1095
+expiration_days = 3650
