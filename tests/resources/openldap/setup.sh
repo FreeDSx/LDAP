@@ -40,8 +40,8 @@ service slapd start
 /usr/bin/time ldapadd -x -D "cn=admin,dc=example,dc=com" -w 12345 -h localhost -p 389 -f ./tests/resources/openldap/data.ldif
 
 # The CA cert is auto-generated and committed via a separate script
-cp "./test/resources/cert/data/cert.pem" "/usr/local/share/ca-certificates/example.crt"
-cp "./test/resources/cert/data/key.pem" "/etc/ssl/private/example.key"
+cp "./tests/resources/cert/data/cert.pem" "/usr/local/share/ca-certificates/example.crt"
+cp "./tests/resources/cert/data/key.pem" "/etc/ssl/private/example.key"
 
 update-ca-certificates
 
