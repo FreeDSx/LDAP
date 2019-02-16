@@ -81,8 +81,9 @@ chgrp ssl-cert /etc/ssl/private/slapd.key
 chmod g+r /etc/ssl/private/slapd.key
 chmod o-r /etc/ssl/private/slapd.key
 
-# Needed so we can access LDAP via the proper name in the cert...
+# Needed so we can access LDAP via the proper name in the cert, final one to test a failure...
 echo "127.0.0.1 ldap.example.com" >> /etc/hosts
 echo "127.0.0.1 example.com" >> /etc/hosts
+echo "127.0.0.1 ldap.foo.com" >> /etc/hosts
 
 service slapd restart

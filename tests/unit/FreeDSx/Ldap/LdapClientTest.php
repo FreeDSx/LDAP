@@ -12,6 +12,7 @@ namespace unit\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Response\AddResponse;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
@@ -173,6 +174,22 @@ class LdapClientTest extends LdapTestCase
 
     public function testStartTls()
     {
+        $this->client->startTls();
+        $this->assertTrue(true);
+    }
+
+    public function testStartTlsFailure()
+    {
+        $this->client = $this->getClient(['servers' => 'ldap.foo.com']);
+
+        $this->expectException(ConnectionException::class);
+        $this->client->startTls();
+    }
+
+    public function testStartTlsIgnoreCertValidation()
+    {
+        $this->client = $this->getClient(['servers' => 'ldap.foo.com', 'ssl_validate_cert' => false]);
+
         $this->client->startTls();
         $this->assertTrue(true);
     }
