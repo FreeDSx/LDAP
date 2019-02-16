@@ -39,36 +39,27 @@ service slapd start
 # Import the test data ...
 /usr/bin/time ldapadd -x -D "cn=admin,dc=example,dc=com" -w 12345 -h localhost -p 389 -f ./tests/resources/openldap/data.ldif > /dev/null
 
-# The CA cert is auto-generated and committed via a separate script
-cp "./tests/resources/cert/data/cert.pem" "/usr/local/share/ca-certificates/example.crt"
-cp "./tests/resources/cert/data/key.pem" "/etc/ssl/private/example.key"
+# Generate the CA cert
+certtool --generate-privkey > /etc/ssl/private/example.key
+certtool --generate-self-signed \
+  --load-privkey /etc/ssl/private/example.key \
+  --template ./tests/resources/openldap/ca.info \
+  --outfile /usr/local/share/ca-certificates/example.crt
 
 update-ca-certificates
 
+# Generate the actual cert used by slapd...
 certtool --generate-privkey \
   --bits 2048 \
   --outfile /etc/ssl/private/slapd.key
-
-sh -c "cat > /etc/ssl/slapd.info <<EOF
-organization = Example
-cn = ldap.example.com
-dns_name = ldap.example.com
-dns_name = example.com
-dns_name = localhost
-tls_www_server
-encryption_key
-signing_key
-expiration_days = 1095
-EOF"
-
-# Generate the actual cert used by slapd and modify the config to use it
 certtool --generate-certificate \
   --load-privkey /etc/ssl/private/slapd.key \
-  --load-ca-certificate "/usr/local/share/ca-certificates/example.crt" \
-  --load-ca-privkey "/etc/ssl/private/example.key" \
-  --template /etc/ssl/slapd.info \
+  --load-ca-certificate /usr/local/share/ca-certificates/example.crt \
+  --load-ca-privkey /etc/ssl/private/example.key \
+  --template ./tests/resources/openldap/slapd.info \
   --outfile /etc/ssl/certs/slapd.crt
 
+# Need to modify the config to actually use the generated cert...
 ldapmodify -Y EXTERNAL -H ldapi:/// <<EOF | true
 dn: cn=config
 add: olcTLSCACertificateFile

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<phpunit backupGlobals="false"
+         backupStaticAttributes="false"
+         colors="true"
+         convertErrorsToExceptions="true"
+         convertNoticesToExceptions="true"
+         convertWarningsToExceptions="true"
+         processIsolation="false"
+         stopOnFailure="false"
+         bootstrap="vendor/autoload.php"
+>
+    <testsuites>
+        <testsuite name="FreeDSx LDAP Unit Tests">
+            <directory>./tests/unit</directory>
+        </testsuite>
+    </testsuites>
+
+    <php>
+        <env name="LDAP_SERVER" value="ldap.example.com"/>
+        <env name="LDAP_USERNAME" value="cn=admin,dc=example,dc=com"/>
+        <env name="LDAP_PASSWORD" value="12345"/>
+        <env name="LDAP_BASE_DN" value="dc=example,dc=com"/>
+        <env name="LDAP_PORT" value="389"/>
+        <env name="LDAP_CA_CERT" value=""/>
+    </php>
+
+</phpunit>
