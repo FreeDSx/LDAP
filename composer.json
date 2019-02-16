@@ -18,7 +18,8 @@
     "freedsx/socket": "^0.2.0"
   },
   "require-dev": {
-    "phpspec/phpspec": "^5.0"
+    "phpspec/phpspec": "^5.0",
+    "phpunit/phpunit": "^7.0"
   },
   "suggest": {
     "ext-openssl": "For SSL/TLS support."
@@ -28,5 +29,8 @@
   },
   "autoload": {
     "psr-4": {"FreeDSx\\Ldap\\": "src/FreeDSx/Ldap"}
+  },
+  "autoload-dev": {
+    "psr-4": {"unit\\FreeDSx\\Ldap\\": "tests/unit/FreeDSx/Ldap"}
   }
 }

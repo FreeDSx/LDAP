@@ -5,6 +5,14 @@ php:
   - 7.2
   - 7.3
 
+addons:
+  apt:
+    packages:
+      - ldap-utils
+      - slapd
+      - gnutls-bin
+      - ssl-cert
+
 cache:
   directories:
     - $HOME/.composer/cache/files
@@ -12,7 +20,12 @@ cache:
 before_install:
   - composer self-update
 
-install: composer update $COMPOSER_FLAGS --prefer-dist
+install:
+  - composer update $COMPOSER_FLAGS --prefer-dist
+
+before_script:
+  - sudo ./tests/resources/openldap/setup.sh
 
 script:
   - bin/phpspec run --format=pretty --no-interaction
+  - bin/phpunit
