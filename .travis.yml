@@ -28,3 +28,4 @@ before_script:
 
 script:
   - bin/phpspec run --format=pretty --no-interaction
+  - bin/phpunit
