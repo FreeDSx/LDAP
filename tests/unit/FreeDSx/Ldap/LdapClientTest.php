@@ -183,7 +183,7 @@ class LdapClientTest extends LdapTestCase
         $this->client = $this->getClient(['servers' => 'ldap.foo.com']);
 
         $this->expectException(ConnectionException::class);
-        $this->client->startTls();
+        @$this->client->startTls();
     }
 
     public function testStartTlsIgnoreCertValidation()
