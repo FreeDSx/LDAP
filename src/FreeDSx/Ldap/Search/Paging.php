@@ -134,7 +134,9 @@ class Paging
         $message = $this->client->send($this->search, Controls::paging($size ?? $this->size, $cookie));
 
         $this->control = $message->controls()->get(Control::OID_PAGING);
-        if (!$this->control) {
+        # OpenLDAP returns no paging control in response to an abandon request. However, other LDAP implementations do;
+        # such as Active Directory. It's not clear from the paging RFC which is correct.
+        if (!$this->control && $size !== 0) {
             throw new ProtocolException('Expected a paging control, but received none.');
         }
 
