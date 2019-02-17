@@ -140,12 +140,38 @@ class VlvSpec extends ObjectBehavior
         $this->isAtStartOfList()->shouldBeEqualTo(true);
     }
 
+    function it_should_check_if_we_are_at_the_start_of_the_list_based_on_the_offset_and_before_value($client)
+    {
+        $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+            1,
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
+            new VlvResponseControl(101, 200,0, 'foo')
+        ));
+        $this->beforePosition(100);
+        $this->isAtStartOfList()->shouldBeEqualTo(false);
+        $this->getEntries();
+        $this->isAtStartOfList()->shouldBeEqualTo(true);
+    }
+
     function it_should_check_if_we_are_at_the_end_of_the_list($client)
     {
         $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(200, 200,0, 'foo')
+        ));
+
+        $this->isAtEndOfList()->shouldBeEqualTo(false);
+        $this->getEntries();
+        $this->isAtEndOfList()->shouldBeEqualTo(true);
+    }
+
+    function it_should_check_if_we_are_at_the_end_of_the_list_based_on_the_offset_and_after_value($client)
+    {
+        $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+            1,
+            new SearchResponse(new LdapResult(1, '',''), new Entries()),
+            new VlvResponseControl(101, 200,0, 'foo')
         ));
 
         $this->isAtEndOfList()->shouldBeEqualTo(false);
