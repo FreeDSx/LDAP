@@ -22,4 +22,4 @@ before_test:
 
 test_script:
   - cd C:\projects\freedsx-ldap
-  - bin\phpspec.bat run --format=pretty --no-interaction
+  - bin\phpspec.bat run --no-interaction

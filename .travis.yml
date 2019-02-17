@@ -27,5 +27,5 @@ before_script:
   - sudo ./tests/resources/openldap/setup.sh
 
 script:
-  - bin/phpspec run --format=pretty --no-interaction
+  - bin/phpspec run --no-interaction
   - bin/phpunit
