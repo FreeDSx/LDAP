@@ -55,7 +55,7 @@ chmod o-r ${SLAPD_KEY}
 
 # Some initial imports...
 slapadd -F ${SLAPD_CONF} -b "cn=config" -l ${RESOURCE_PATH}/ldif/conf.ldif
-#slapadd -F ${SLAPD_CONF} -b "cn=config" -l ${RESOURCE_PATH}/ldif/tls.ldif
+slapadd -F ${SLAPD_CONF} -b "cn=config" -l ${RESOURCE_PATH}/ldif/modules.ldif
 slapadd -F ${SLAPD_CONF} -b "cn=config" -l ${RESOURCE_PATH}/ldif/memberof.ldif
 slapadd -F ${SLAPD_CONF} -b "cn=config" -l ${RESOURCE_PATH}/ldif/vlv.ldif
 
