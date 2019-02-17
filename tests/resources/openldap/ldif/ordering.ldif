@@ -1,0 +1,19 @@
+dn: cn={0}core,cn=schema,cn=config
+changetype: modify
+delete: olcAttributeTypes
+olcAttributeTypes: {1}( 2.5.4.4 NAME ( 'sn' 'surname' ) DESC 'RFC2256: last (f
+ amily) name(s) for which the entity is known by' SUP name )
+-
+add: olcAttributeTypes
+olcAttributeTypes: {1}( 2.5.4.4 NAME ( 'sn' 'surname' ) DESC 'RFC2256: last (f
+ amily) name(s) for which the entity is known by' SUP name ORDERING caseIgnore
+ OrderingMatch )
+-
+delete: olcAttributeTypes
+olcAttributeTypes: {35}( 2.5.4.42 NAME ( 'givenName' 'gn' ) DESC 'RFC2256: fir
+ st name(s) for which the entity is known by' SUP name )
+-
+add: olcAttributeTypes
+olcAttributeTypes: {35}( 2.5.4.42 NAME ( 'givenName' 'gn' ) DESC 'RFC2256: fir
+ st name(s) for which the entity is known by' SUP name ORDERING caseIgnoreOrde
+ ringMatch )

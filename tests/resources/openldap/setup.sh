@@ -81,3 +81,6 @@ grep 'ldap.example.com' /etc/hosts || echo "127.0.0.1 ldap.example.com" >> /etc/
 grep 'ldap.foo.com' /etc/hosts || echo "127.0.0.1 ldap.foo.com" >> /etc/hosts
 
 service slapd start
+
+# Need to add ordering for VLV / server-side-sort...
+ldapmodify -Y EXTERNAL -H ldapi:/// -f ${RESOURCE_PATH}/ldif/ordering.ldif
