@@ -5,6 +5,9 @@ olcPidFile: /var/run/slapd/slapd.pid
 olcArgsFile: /var/run/slapd/slapd.args
 olcLogLevel: 0
 olcToolThreads: 1
+olcTLSCACertificateFile: /usr/local/share/ca-certificates/example.crt
+olcTLSCertificateFile: /etc/ssl/certs/slapd.crt
+olcTLSCertificateKeyFile: /etc/ssl/private/slapd.key
 
 dn: olcDatabase={-1}frontend,cn=config
 objectClass: olcDatabaseConfig
