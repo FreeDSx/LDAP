@@ -1,0 +1,9 @@
+dn: cn=config
+add: olcTLSCACertificateFile
+olcTLSCACertificateFile: /usr/local/share/ca-certificates/example.crt
+-
+add: olcTLSCertificateFile
+olcTLSCertificateFile: /etc/ssl/certs/slapd.crt
+-
+add: olcTLSCertificateKeyFile
+olcTLSCertificateKeyFile: /etc/ssl/private/slapd.key

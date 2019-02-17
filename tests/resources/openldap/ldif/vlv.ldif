@@ -1,0 +1,11 @@
+dn: cn=module{0},cn=config
+changeType: modify
+add: olcModuleLoad
+olcModuleLoad: sssvlv.la
+
+dn: olcOverlay=sssvlv,olcDatabase={1}hdb,cn=config
+changeType: add
+objectClass: olcSssVlvConfig
+olcOverlay: sssvlv
+olcSssVlvMax: 10
+olcSssVlvMaxKeys: 5
