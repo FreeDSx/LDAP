@@ -67,6 +67,9 @@ objectClass: domain
 dc: example
 EOM
 
+# Import the test data, using quick mode to speed it up the bulk load...
+slapadd -q -F ${SLAPD_CONF} -l ${RESOURCE_PATH}/ldif/data.ldif
+
 # Used to enable "ldaps://" (never standardized from an RFC like StartTLS, though still commonly used) ...
 sed -i -e 's|^SLAPD_SERVICES="\(.*\)"|SLAPD_SERVICES="ldap:/// ldapi:/// ldaps:///"|' /etc/default/slapd
 
@@ -78,6 +81,3 @@ grep 'ldap.example.com' /etc/hosts || echo "127.0.0.1 ldap.example.com" >> /etc/
 grep 'ldap.foo.com' /etc/hosts || echo "127.0.0.1 ldap.foo.com" >> /etc/hosts
 
 service slapd start
-
-# Import the test data ...
-/usr/bin/time ldapadd -x -D "cn=admin,dc=example,dc=com" -w 12345 -h localhost -p 389 -f ${RESOURCE_PATH}/ldif/data.ldif > /dev/null
