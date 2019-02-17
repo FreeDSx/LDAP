@@ -1,4 +1,5 @@
 dn: cn=config
+changetype: modify
 add: olcTLSCACertificateFile
 olcTLSCACertificateFile: /usr/local/share/ca-certificates/example.crt
 -
