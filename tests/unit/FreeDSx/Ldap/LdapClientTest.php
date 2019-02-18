@@ -193,4 +193,20 @@ class LdapClientTest extends LdapTestCase
         $this->client->startTls();
         $this->assertTrue(true);
     }
+
+    public function testUseSsl()
+    {
+        $this->client = $this->getClient(['use_ssl' => true, 'port' => 636]);
+        $this->client->read('');
+
+        $this->assertTrue(true);
+    }
+
+    public function testUseSslFailure()
+    {
+        $this->client = $this->getClient(['servers' => 'ldap.foo.com', 'use_ssl' => true, 'port' => 636]);
+
+        $this->expectException(ConnectionException::class);
+        $this->client->read('');
+    }
 }
