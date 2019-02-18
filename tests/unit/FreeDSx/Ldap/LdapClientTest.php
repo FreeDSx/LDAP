@@ -35,7 +35,10 @@ class LdapClientTest extends LdapTestCase
 
     protected function tearDown()
     {
-        $this->client->unbind();
+        try {
+            @$this->client->unbind();
+        } catch (\Exception|\Throwable $exception) {
+        }
     }
 
     public function testUsernamePasswordBind()
@@ -208,5 +211,13 @@ class LdapClientTest extends LdapTestCase
 
         $this->expectException(ConnectionException::class);
         $this->client->read('');
+    }
+
+    public function testUseSslIgnoreCertValidation()
+    {
+        $this->client = $this->getClient(['servers' => 'ldap.foo.com', 'ssl_validate_cert' => false, 'use_ssl' => true, 'port' => 636]);
+
+        $this->client->read('');
+        $this->assertTrue(true);
     }
 }
