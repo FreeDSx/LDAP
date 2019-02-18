@@ -67,12 +67,8 @@ class VlvTest extends LdapTestCase
         $this->assertEquals(101, $this->vlv->getEntries()->count());
         $this->assertEquals(4900, $this->vlv->listOffset());
 
-        $this->vlv->beforePosition(100);
-        $this->assertEquals(201, $this->vlv->getEntries()->count());
-        $this->assertEquals(4900, $this->vlv->listOffset());
-
         $this->vlv->moveTo($this->vlv->listSize());
-        $this->assertEquals(101, $this->vlv->getEntries()->count());
+        $this->assertEquals(1, $this->vlv->getEntries()->count());
         $this->assertTrue($this->vlv->isAtEndOfList());
     }
 

@@ -3,4 +3,3 @@ objectClass: olcSssVlvConfig
 olcOverlay: sssvlv
 olcSssVlvMax: 50
 olcSssVlvMaxKeys: 50
-olcSssVlvMaxPerConn: 50
