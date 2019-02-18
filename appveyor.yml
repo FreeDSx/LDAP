@@ -13,6 +13,9 @@ install:
   - ps: Invoke-WebRequest "https://raw.githubusercontent.com/ChadSikorra/ps-install-php/master/Install-PHP.ps1" -OutFile "Install-PHP.ps1"
   - ps: .\Install-PHP.ps1 -Version $Env:PHP_VERSION -Highest -Arch x64 -Extensions openssl,mbstring
   - refreshenv
+  - ps: C:\projects\freedsx-ldap\tests\resources\activedirectory\Install-AD-Step1.ps1
+  - ps: Restart-Computer -Force
+  - ps: C:\projects\freedsx-ldap\tests\resources\activedirectory\Install-AD-Step2.ps1
   - cd C:\projects\freedsx-ldap
   - php -r "readfile('https://getcomposer.org/installer');" | php
 
