@@ -40,8 +40,9 @@ Get-ChildItem cert:\LocalMachine\Root | `
 Get-Certificate `
     -Template KerberosAuthentication `
     -DnsName example.com,$Env:COMPUTERNAME `
+    -SubjectName example.com
     -Confirm:$False `
     -CertStoreLocation cert:\LocalMachine\My
-ldifde -i -f "C:\projects\freedsx-ldap\tests\resources\activedirectory\ldif\tls.ldif"
-certutil -pulse
+#ldifde -i -f "C:\projects\freedsx-ldap\tests\resources\activedirectory\ldif\tls.ldif"
+#certutil -pulse
 
