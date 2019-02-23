@@ -5,9 +5,9 @@ Set-PSDebug -Trace 1
 
 Import-Module ServerManager
 
-# Installs the EntCA role, which on a DC automagically allows LDAPS / StartTLS
-Install-WindowsFeature Adcs-Cert-Authority
+Add-Content C:\Windows\System32\drivers\etc\hosts "`nfoo.com 127.0.0.1"
 
+# Installs the EntCA role, which on a DC automagically allows LDAPS / StartTLS
 Install-AdcsCertificationAuthority `
     -CAType EnterpriseRootCa `
     -Confirm:$False `
@@ -21,7 +21,6 @@ Enable-ADOptionalFeature `
     -Server $env:COMPUTERNAME `
     -Confirm:$False
 
-Install-WindowsFeature -IncludeManagementTools RSAT-ADDS-Tools
 ldifde -i -k -f "C:\projects\freedsx-ldap\tests\resources\activedirectory\data.ldif"
 
 # This is to mimic the OpenLDAP CI build admin user.
@@ -34,6 +33,7 @@ $AdminUser = New-ADUser `
     -GivenName "Admin" `
     -Path "DC=example,DC=com" `
     -SamAccountName "admin" `
-    -UserPrincipalName "admin@example.com"
+    -UserPrincipalName "admin@example.com" `
+    -ErrorAction Stop
 Add-ADGroupMember -Identity "Domain Admins" -Members "admin@example.com"
 Add-ADGroupMember -Identity "Enterprise Admins" -Members $Env:COMPUTERNAME

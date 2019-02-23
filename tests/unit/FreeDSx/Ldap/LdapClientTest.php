@@ -77,7 +77,6 @@ class LdapClientTest extends LdapTestCase
             'cn' => ['Foo'],
             'sn' => ['Bar'],
             'description' => ['FreeDSx Unit Test'],
-            'userPassword' => ['FreeDSx-Unit-Test'],
             'uid' => ['Foo'],
             'givenName' => ['Foo'],
         ];
@@ -103,7 +102,6 @@ class LdapClientTest extends LdapTestCase
             'l' => ['San Jose'],
             'postalAddress' => ['Product Testing$San Jose'],
             'manager' => ['cn=Ria Corace,ou=Product Development,dc=example,dc=com'],
-            'secretary' => ['cn=Melhem Donak,ou=Administrative,dc=example,dc=com'],
         ];
         $entry = $this->client->read('cn=Carmelina Esposito,ou=Product Testing,dc=example,dc=com', array_keys($attributes));
 
@@ -149,7 +147,7 @@ class LdapClientTest extends LdapTestCase
     {
         $this->bindClient($this->client);
 
-        $entries = $this->client->search(Operations::search(Filters::raw('(&(objectClass=inetOrgPerson)(cn=A*))')));
+        $entries = $this->client->search(Operations::search(Filters::raw('(&(|(objectClass=inetOrgPerson)(objectClass=User))(cn=A*))')));
         $this->assertInstanceOf(Entries::class, $entries);
         $this->assertEquals(843, $entries->count());
     }
@@ -158,7 +156,7 @@ class LdapClientTest extends LdapTestCase
     {
         $this->bindClient($this->client);
 
-        $entries = $this->client->search(Operations::list(Filters::raw('(&(objectClass=inetOrgPerson)(cn=A*))'), 'ou=Payroll,dc=example,dc=com'));
+        $entries = $this->client->search(Operations::list(Filters::raw('(&(|(objectClass=inetOrgPerson)(objectClass=User))(cn=A*))'), 'ou=Payroll,dc=example,dc=com'));
         $this->assertInstanceOf(Entries::class, $entries);
         $this->assertEquals(100, $entries->count());
 
@@ -183,7 +181,7 @@ class LdapClientTest extends LdapTestCase
 
     public function testStartTlsFailure()
     {
-        $this->client = $this->getClient(['servers' => 'ldap.foo.com']);
+        $this->client = $this->getClient(['servers' => 'foo.com']);
 
         $this->expectException(ConnectionException::class);
         @$this->client->startTls();
@@ -191,7 +189,7 @@ class LdapClientTest extends LdapTestCase
 
     public function testStartTlsIgnoreCertValidation()
     {
-        $this->client = $this->getClient(['servers' => 'ldap.foo.com', 'ssl_validate_cert' => false]);
+        $this->client = $this->getClient(['servers' => 'foo.com', 'ssl_validate_cert' => false]);
 
         $this->client->startTls();
         $this->assertTrue(true);
@@ -207,7 +205,7 @@ class LdapClientTest extends LdapTestCase
 
     public function testUseSslFailure()
     {
-        $this->client = $this->getClient(['servers' => 'ldap.foo.com', 'use_ssl' => true, 'port' => 636]);
+        $this->client = $this->getClient(['servers' => 'foo.com', 'use_ssl' => true, 'port' => 636]);
 
         $this->expectException(ConnectionException::class);
         $this->client->read('');
@@ -215,7 +213,7 @@ class LdapClientTest extends LdapTestCase
 
     public function testUseSslIgnoreCertValidation()
     {
-        $this->client = $this->getClient(['servers' => 'ldap.foo.com', 'ssl_validate_cert' => false, 'use_ssl' => true, 'port' => 636]);
+        $this->client = $this->getClient(['servers' => 'foo.com', 'ssl_validate_cert' => false, 'use_ssl' => true, 'port' => 636]);
 
         $this->client->read('');
         $this->assertTrue(true);
