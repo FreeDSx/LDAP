@@ -35,4 +35,5 @@ $AdminUser = New-ADUser `
     -Path "DC=example,DC=com" `
     -SamAccountName "admin" `
     -UserPrincipalName "admin@example.com"
-Add-ADGroupMember -Identity "Domain Admins" -Members $AdminUser
+Add-ADGroupMember -Identity "Domain Admins" -Members "admin@example.com"
+Add-ADGroupMember -Identity "Enterprise Admins" -Members $Env:COMPUTERNAME
