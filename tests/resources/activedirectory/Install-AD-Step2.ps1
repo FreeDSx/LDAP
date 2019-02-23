@@ -37,14 +37,5 @@ Get-ChildItem cert:\LocalMachine\Root | `
     Select-Object -First 1 | `
     Export-Certificate -FilePath "C:\projects\freedsx-ldap\tests\resources\cert\ca.crt"
 
-Get-Certificate `
-    -Template KerberosAuthentication `
-    -DnsName example.com,$Env:COMPUTERNAME `
-    -SubjectName example.com `
-    -Confirm:$False `
-    -CertStoreLocation cert:\LocalMachine\My
-Start-Process `
-    -FilePath "ldifde.exe" `
-    -ArgumentList '-i -f "C:\projects\freedsx-ldap\tests\resources\activedirectory\ldif\tls.ldif"' `
-    -Wait `
-    -Credential $Credential
+certutil.exe -SetCAtemplates +KerberosAuthentication
+certutil-exe –pulse
