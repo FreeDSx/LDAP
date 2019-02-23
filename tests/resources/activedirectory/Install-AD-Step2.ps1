@@ -5,7 +5,7 @@ Set-PSDebug -Trace 1
 
 Import-Module ServerManager
 
-Add-Content C:\Windows\System32\drivers\etc\hosts "`nfoo.com 127.0.0.1"
+Add-Content C:\Windows\System32\drivers\etc\hosts "`r`n127.0.0.1 foo.com"
 
 Install-WindowsFeature -IncludeManagementTools Adcs-Cert-Authority
 
