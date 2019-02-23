@@ -36,3 +36,6 @@ Get-ChildItem cert:\LocalMachine\Root | `
     Where-Object { $_.Subject -match $env:COMPUTERNAME } | `
     Select-Object -First 1 | `
     Export-Certificate -FilePath "C:\projects\freedsx-ldap\tests\resources\cert\ca.crt"
+
+# This forces AD to get a cert from the CA installed above to enable StartTLS / SSL...
+ldifde -i -f "C:\projects\freedsx-ldap\tests\resources\activedirectory\ldif\tls.ldif"
