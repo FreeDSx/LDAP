@@ -19,7 +19,7 @@
     <php>
         <env name="LDAP_SERVER" value="ldap.example.com"/>
         <env name="LDAP_USERNAME" value="cn=admin,dc=example,dc=com"/>
-        <env name="LDAP_PASSWORD" value="12345"/>
+        <env name="LDAP_PASSWORD" value="P@ssword12345"/>
         <env name="LDAP_BASE_DN" value="dc=example,dc=com"/>
         <env name="LDAP_PORT" value="389"/>
         <env name="LDAP_CA_CERT" value=""/>
