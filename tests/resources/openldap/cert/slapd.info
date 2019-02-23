@@ -1,7 +1,7 @@
 organization = Example
-cn = ldap.example.com
-dns_name = ldap.example.com
+cn = example.com
 dns_name = example.com
+dns_name = ldap.example.com
 dns_name = localhost
 tls_www_server
 encryption_key

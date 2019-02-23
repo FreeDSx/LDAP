@@ -77,8 +77,9 @@ chown -R openldap.openldap ${SLAPD_CONF}
 chown -R openldap.openldap ${SLAPD_DATA}
 
 # Needed so we can access LDAP via the proper name in the cert, final one to test a failure...
-grep 'ldap.example.com' /etc/hosts || echo "127.0.0.1 ldap.example.com" >> /etc/hosts
-grep 'ldap.foo.com' /etc/hosts || echo "127.0.0.1 ldap.foo.com" >> /etc/hosts
+grep '127.0.0.1 example.com' /etc/hosts || echo "127.0.0.1 example.com" >> /etc/hosts
+grep '127.0.0.1 ldap.example.com' /etc/hosts || echo "127.0.0.1 ldap.example.com" >> /etc/hosts
+grep 'foo.com' /etc/hosts || echo "127.0.0.1 ldap.foo.com" >> /etc/hosts
 
 service slapd start
 
