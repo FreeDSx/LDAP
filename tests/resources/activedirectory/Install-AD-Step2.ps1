@@ -12,7 +12,7 @@ Install-AdcsCertificationAuthority -CAType EnterpriseRootCa -Force
 # Enable the recycle bin, can use this for control tests
 Enable-ADOptionalFeature -Identity 'Recycle Bin Feature' -Scope ForestOrConfigurationSet -Target 'example.com' -Server $env:COMPUTERNAME
 
-Install-WindowsFeature -IncludeManagementTools -IncludeAllSubFeatures RSAT-ADDS-Tools
+Install-WindowsFeature -IncludeManagementTools RSAT-ADDS-Tools
 ldifde -i -k -f "C:\projects\freedsx-ldap\tests\resources\activedirectory\data.ldif"
 
 New-ADUser `
