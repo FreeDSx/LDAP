@@ -3,7 +3,7 @@
 
 Set-PSDebug -Trace 1
 
-Install-WindowsFeature -IncludeManagementTools AD-Domain-Services, RSAT-ADDS-Tools, Adcs-Cert-Authority
+Install-WindowsFeature -IncludeManagementTools AD-Domain-Services, RSAT-ADDS-Tools
 
 Import-Module ADDSDeployment
 Install-ADDSForest -CreateDnsDelegation:$false `
