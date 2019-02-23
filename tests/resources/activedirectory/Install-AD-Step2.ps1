@@ -30,3 +30,8 @@ Enable-ADOptionalFeature `
     -Server $env:COMPUTERNAME `
     -Confirm:$False `
     -Credential $Credential
+
+Get-ChildItem cert:\LocalMachine\Root | `
+    Where-Object { $_.Subject -match $env:COMPUTERNAME } | `
+    Select-Object -First 1 | `
+    Export-Certificate -FilePath "C:\projects\freedsx-ldap\tests\resources\cert\ca.crt"

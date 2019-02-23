@@ -34,6 +34,9 @@ certtool --generate-self-signed \
   --template ${RESOURCE_PATH}/cert/ca.info \
   --outfile ${CA_CERT}
 
+mkdir -p ./tests/resources/cert
+cp ${CA_CERT} ./tests/resources/cert/ca.crt
+
 update-ca-certificates
 
 # Generate the actual cert used by slapd...

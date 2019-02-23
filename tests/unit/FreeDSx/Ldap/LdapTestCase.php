@@ -24,7 +24,7 @@ class LdapTestCase extends TestCase
         $default = [
             'servers' => $_ENV['LDAP_SERVER'],
             'port' => $_ENV['LDAP_PORT'],
-            'ssl_ca_cert' => $_ENV['LDAP_CA_CERT'] === '' ? __DIR__.'../../../resources/cert/data/cert.pem' : $_ENV['LDAP_CA_CERT'],
+            'ssl_ca_cert' => $_ENV['LDAP_CA_CERT'] === '' ? __DIR__.'../../../resources/cert/ca.crt' : $_ENV['LDAP_CA_CERT'],
             'base_dn' => $_ENV['LDAP_BASE_DN'],
         ];
 
