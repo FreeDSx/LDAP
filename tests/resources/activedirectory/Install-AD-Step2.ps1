@@ -31,6 +31,7 @@ Enable-ADOptionalFeature `
     -Confirm:$False `
     -Credential $Credential
 
+New-Item -Path "C:\projects\freedsx-ldap\tests\resources" -Name "cert" -ItemType directory
 Get-ChildItem cert:\LocalMachine\Root | `
     Where-Object { $_.Subject -match $env:COMPUTERNAME } | `
     Select-Object -First 1 | `
