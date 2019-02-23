@@ -16,4 +16,5 @@ Install-ADDSForest -CreateDnsDelegation:$false `
     -LogPath "C:\Windows\NTDS" `
     -NoRebootOnCompletion:$true `
     -SysvolPath "C:\Windows\SYSVOL" `
+    -SafeModeAdministratorPassword (ConvertTo-SecureString "P@ssword12345" -AsPlainText -Force) `
     -Force:$true
