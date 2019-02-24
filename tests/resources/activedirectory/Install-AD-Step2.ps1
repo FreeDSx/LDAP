@@ -37,5 +37,9 @@ Get-ChildItem cert:\LocalMachine\Root | `
     Select-Object -First 1 | `
     Export-Certificate -FilePath "C:\projects\freedsx-ldap\tests\resources\cert\ca.crt"
 
-certutil.exe -SetCAtemplates +KerberosAuthentication
-certutil.exe -pulse
+certreq.exe -new "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.inf" "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.req"
+certreq -submit "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.req" "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.crt"
+certreq -accept -machine "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.crt"
+
+#certutil.exe -SetCAtemplates +KerberosAuthentication
+#certutil.exe -pulse

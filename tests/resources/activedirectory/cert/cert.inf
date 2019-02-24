@@ -1,0 +1,12 @@
+[Version]
+Signature="$Windows NT$"
+
+[NewRequest]
+Subject = "CN=APPVYR-WIN.EXAMPLE.COM"
+
+[Extensions]
+2.5.29.17 = "{text}"
+_continue_ = "dns=example.com&"
+
+[RequestAttributes]
+CertificateTemplate= KerberosAuthentication
