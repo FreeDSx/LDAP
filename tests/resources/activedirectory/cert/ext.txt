@@ -1,0 +1,3 @@
+ keyUsage=digitalSignature,keyEncipherment
+ extendedKeyUsage=serverAuth
+ subjectKeyIdentifier=hash
