@@ -18,6 +18,7 @@ $Credential = New-Object -TypeName System.Management.Automation.PSCredential -Ar
 # Installs the EntCA role, which on a DC automagically allows LDAPS / StartTLS
 Install-AdcsCertificationAuthority `
     -CAType EnterpriseRootCa `
+    -CACommonName "FreeDSx-CA" `
     -Confirm:$False `
     -Credential $Credential `
     -Force
@@ -38,8 +39,8 @@ Get-ChildItem cert:\LocalMachine\Root | `
     Export-Certificate -FilePath "C:\projects\freedsx-ldap\tests\resources\cert\ca.crt"
 
 certreq.exe -new "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.inf" "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.req"
-certreq -submit "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.req" "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.crt"
-certreq -accept -machine "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.crt"
+certreq.exe -submit -config ($Env:COMPUTERNAME + '\FreeDSx-CA') "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.req" "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.crt"
+certreq.exe -accept -machine "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.crt"
 
 #certutil.exe -SetCAtemplates +KerberosAuthentication
 #certutil.exe -pulse
