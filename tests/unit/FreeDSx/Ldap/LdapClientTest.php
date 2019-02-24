@@ -85,6 +85,9 @@ class LdapClientTest extends LdapTestCase
         $this->assertInstanceOf(AddResponse::class, $response);
         $this->assertEquals(0, $response->getResultCode());
 
+        # Testing across AD / OpenLDAP. Ignore the ObjectClass differences...
+        unset($attributes['objectClass']);
+
         $entry = $this->client->read('cn=Foo,dc=example,dc=com', array_keys($attributes));
         $this->assertEquals($attributes, $entry->toArray());
     }
@@ -94,7 +97,6 @@ class LdapClientTest extends LdapTestCase
         $this->bindClient($this->client);
 
         $attributes = [
-            'objectClass' => ['top', 'person', 'organizationalPerson', 'inetOrgPerson'],
             'cn' => ['Carmelina Esposito'],
             'sn' => ['Esposito'],
             'description' =>  ["This is Carmelina Esposito's description"],
@@ -106,7 +108,7 @@ class LdapClientTest extends LdapTestCase
         $entry = $this->client->read('cn=Carmelina Esposito,ou=Product Testing,dc=example,dc=com', array_keys($attributes));
 
         $this->assertInstanceOf(Entry::class, $entry);
-        $this->assertEquals($entry->getDn()->toString(), 'cn=Carmelina Esposito,ou=Product Testing,dc=example,dc=com');
+        $this->assertEquals(strtolower($entry->getDn()->toString()),strtolower('cn=Carmelina Esposito,ou=Product Testing,dc=example,dc=com'));
         $this->assertEquals($entry->toArray(), $attributes);
     }
 

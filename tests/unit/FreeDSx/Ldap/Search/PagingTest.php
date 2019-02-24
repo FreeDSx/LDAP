@@ -39,7 +39,10 @@ class PagingTest extends LdapTestCase
         $this->client = $this->getClient();
         $this->bindClient($this->client);
 
-        $this->search = Operations::search(Filters::equal('objectClass', 'inetOrgPerson'), 'cn');
+        $this->search = Operations::search(Filters::or(
+            Filters::equal('objectClass', 'user'),
+            Filters::equal('objectClass', 'inetOrgPerson')
+        ), 'cn');
         $this->paging = new Paging($this->client, $this->search);
     }
 
