@@ -32,4 +32,8 @@ certreq.exe -new "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\
 openssl.exe x509 -req -days 3650 -in "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.csr" -CA "C:\projects\freedsx-ldap\tests\resources\cert\ca.crt" -CAkey "C:\projects\freedsx-ldap\tests\resources\cert\ca.key" -extfile "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\ext.txt" -set_serial 01 -out "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\ldap.crt"
 certreq.exe -accept "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\ldap.crt"
 
-ldifde -i -f "C:\projects\freedsx-ldap\tests\resources\activedirectory\ldif\tls.ldif"
+Start-Process `
+    -FilePath "ldifde.exe" `
+    -ArgumentList '-i -f "C:\projects\freedsx-ldap\tests\resources\activedirectory\ldif\tls.ldif"' `
+    -Wait `
+    -Credential $Credential
