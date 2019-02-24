@@ -3,10 +3,13 @@ Signature="$Windows NT$"
 
 [NewRequest]
 Subject = "CN=EXAMPLE.COM"
+MachineKeySet = True
 
 [Extensions]
 2.5.29.17 = "{text}"
 _continue_ = "dns=appvyr-win.example.com&"
+_continue_ = "dns=ldap.example.com&"
+_continue_ = "dns=example.com&"
 
 [RequestAttributes]
 CertificateTemplate= KerberosAuthentication
