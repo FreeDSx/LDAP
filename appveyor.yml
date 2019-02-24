@@ -16,7 +16,6 @@ install:
   - ps: C:\projects\freedsx-ldap\tests\resources\activedirectory\Install-AD-Step1.ps1
   - ps: Start-Sleep -Seconds 5; Restart-Computer -Force; Start-Sleep -Seconds 5;
   - ps: C:\projects\freedsx-ldap\tests\resources\activedirectory\Install-AD-Step2.ps1
-  - ps: Start-Sleep -Seconds 5; Restart-Computer -Force; Start-Sleep -Seconds 5;
   - cd C:\projects\freedsx-ldap
   - php -r "readfile('https://getcomposer.org/installer');" | php
 
