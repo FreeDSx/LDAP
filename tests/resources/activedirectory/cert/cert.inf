@@ -3,7 +3,11 @@ Signature="$Windows NT$"
 
 [NewRequest]
 Subject = "CN=EXAMPLE.COM"
-MachineKeySet = True
+Exportable = TRUE
+KeyLength = 2048
+KeySpec = 1
+KeyUsage = 0xf0
+MachineKeySet = TRUE
 
 [Extensions]
 2.5.29.17 = "{text}"
@@ -12,4 +16,4 @@ _continue_ = "dns=ldap.example.com&"
 _continue_ = "dns=example.com&"
 
 [RequestAttributes]
-CertificateTemplate= KerberosAuthentication
+CertificateTemplate="KerberosAuthentication"
