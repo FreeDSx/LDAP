@@ -38,4 +38,4 @@ Get-ChildItem cert:\LocalMachine\Root | `
     Export-Certificate -FilePath "C:\projects\freedsx-ldap\tests\resources\cert\ca.crt"
 
 certutil.exe -SetCAtemplates +KerberosAuthentication
-certutil-exe -pulse
+certutil.exe -pulse
