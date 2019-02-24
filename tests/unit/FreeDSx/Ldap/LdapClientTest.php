@@ -147,7 +147,7 @@ class LdapClientTest extends LdapTestCase
     {
         $this->bindClient($this->client);
 
-        $entries = $this->client->search(Operations::search(Filters::raw('(&(|(objectClass=inetOrgPerson)(objectClass=User))(cn=A*))')));
+        $entries = $this->client->search(Operations::search(Filters::raw('(&(objectClass=inetOrgPerson)(cn=A*))')));
         $this->assertInstanceOf(Entries::class, $entries);
         $this->assertEquals(843, $entries->count());
     }
@@ -156,7 +156,7 @@ class LdapClientTest extends LdapTestCase
     {
         $this->bindClient($this->client);
 
-        $entries = $this->client->search(Operations::list(Filters::raw('(&(|(objectClass=inetOrgPerson)(objectClass=User))(cn=A*))'), 'ou=Payroll,dc=example,dc=com'));
+        $entries = $this->client->search(Operations::list(Filters::raw('(&(objectClass=inetOrgPerson)(cn=A*))'), 'ou=Payroll,dc=example,dc=com'));
         $this->assertInstanceOf(Entries::class, $entries);
         $this->assertEquals(100, $entries->count());
 
@@ -170,7 +170,7 @@ class LdapClientTest extends LdapTestCase
     {
         $this->bindClient($this->client);
 
-        $this->assertEquals('dn:'.$_ENV['LDAP_USERNAME'], $this->client->whoami());
+        $this->assertStringContainsString($_ENV['LDAP_USERNAME'], $this->client->whoami());
     }
 
     public function testStartTls()

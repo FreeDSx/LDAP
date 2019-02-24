@@ -24,10 +24,8 @@ class LdapTestCase extends TestCase
         $default = [
             'servers' => $_ENV['LDAP_SERVER'],
             'port' => $_ENV['LDAP_PORT'],
-            // 'ssl_ca_cert' => $_ENV['LDAP_CA_CERT'] === '' ? __DIR__.'/../../../resources/cert/ca.crt' : $_ENV['LDAP_CA_CERT'],
-            'ssl_ca_cert' => 'C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\ldap.crt',
+            'ssl_ca_cert' => $_ENV['LDAP_CA_CERT'] === '' ? __DIR__.'/../../../resources/cert/ca.crt' : $_ENV['LDAP_CA_CERT'],
             'base_dn' => $_ENV['LDAP_BASE_DN'],
-            'ssl_allow_self_signed' => true,
         ];
 
         return new LdapClient(array_merge($default, $options));

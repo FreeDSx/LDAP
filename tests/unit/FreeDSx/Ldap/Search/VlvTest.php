@@ -39,10 +39,7 @@ class VlvTest extends LdapTestCase
         $this->client = $this->getClient();
         $this->bindClient($this->client);
 
-        $this->search = Operations::search(Filters::or(
-            Filters::equal('objectClass', 'inetOrgPerson'),
-            Filters::equal('objectClass', 'User')
-        ), 'sn', 'givenName');
+        $this->search = Operations::search(Filters::equal('objectClass', 'inetOrgPerson'), 'sn', 'givenName');
         $this->vlv = new Vlv($this->client, $this->search, 'sn');
     }
 
