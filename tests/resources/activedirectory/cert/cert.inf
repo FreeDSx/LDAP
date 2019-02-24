@@ -2,7 +2,7 @@
 Signature="$Windows NT$"
 
 [NewRequest]
-Subject = "CN=APPVYR-WIN.EXAMPLE.COM"
+Subject = "CN=EXAMPLE.COM"
 KeySpec = 1
 KeyLength = 1024
 Exportable = TRUE
