@@ -82,7 +82,7 @@ class VlvTest extends LdapTestCase
         $this->vlv->moveTo(50);
 
         $this->assertEquals(201, $this->vlv->getEntries()->count());
-        $this->assertEquals(225, $this->vlv->listOffset());
+        $this->assertEquals(226, $this->vlv->listOffset());
 
         $this->vlv->moveForward(25);
         $this->assertEquals(201, $this->vlv->getEntries()->count());

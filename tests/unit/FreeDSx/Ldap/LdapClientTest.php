@@ -88,7 +88,7 @@ class LdapClientTest extends LdapTestCase
         # Testing across AD / OpenLDAP. Ignore the ObjectClass differences...
         unset($attributes['objectClass']);
 
-        $entry = $this->client->read('cn=Foo,dc=example,dc=com', array_keys($attributes));
+        $entry = $this->client->read('cn=Foo,ou=FreeDSx-Test,dc=example,dc=com', array_keys($attributes));
         $this->assertEquals($attributes, $entry->toArray());
     }
 
@@ -172,7 +172,7 @@ class LdapClientTest extends LdapTestCase
     {
         $this->bindClient($this->client);
 
-        $this->assertRegExp('/^(d|u):.*/', $this->client->whoami());
+        $this->assertRegExp('/^(dn|u):.*/', $this->client->whoami());
     }
 
     public function testStartTls()
