@@ -61,8 +61,8 @@ class LdapClientTest extends LdapTestCase
     {
         $this->bindClient($this->client);
 
-        $success = $this->client->compare('cn=Birgit Pankhurst,ou=Janitorial,dc=example,dc=com', 'cn', 'Birgit Pankhurst');
-        $failure = $this->client->compare('cn=Birgit Pankhurst,ou=Janitorial,dc=example,dc=com', 'cn', 'foo');
+        $success = $this->client->compare('cn=Birgit Pankhurst,ou=Janitorial,ou=FreeDSx-Test,dc=example,dc=com', 'cn', 'Birgit Pankhurst');
+        $failure = $this->client->compare('cn=Birgit Pankhurst,ou=Janitorial,ou=FreeDSx-Test,dc=example,dc=com', 'cn', 'foo');
 
         $this->assertTrue($success);
         $this->assertFalse($failure);
@@ -81,7 +81,7 @@ class LdapClientTest extends LdapTestCase
             'givenName' => ['Foo'],
         ];
 
-        $response = $this->client->create(Entry::fromArray('cn=Foo,dc=example,dc=com', $attributes))->getResponse();
+        $response = $this->client->create(Entry::fromArray('cn=Foo,ou=FreeDSx-Test,dc=example,dc=com', $attributes))->getResponse();
         $this->assertInstanceOf(AddResponse::class, $response);
         $this->assertEquals(0, $response->getResultCode());
 
@@ -108,7 +108,7 @@ class LdapClientTest extends LdapTestCase
         $entry = $this->client->read('cn=Carmelina Esposito,ou=Product Testing,dc=example,dc=com', array_keys($attributes));
 
         $this->assertInstanceOf(Entry::class, $entry);
-        $this->assertEquals(strtolower($entry->getDn()->toString()),strtolower('cn=Carmelina Esposito,ou=Product Testing,dc=example,dc=com'));
+        $this->assertEquals(strtolower($entry->getDn()->toString()),strtolower('cn=Carmelina Esposito,ou=Product Testing,ou=FreeDSx-Test,dc=example,dc=com'));
         $this->assertEquals($entry->toArray(), $attributes);
     }
 
@@ -116,7 +116,7 @@ class LdapClientTest extends LdapTestCase
     {
         $this->bindClient($this->client);
 
-        $response = $this->client->delete('cn=Foo,dc=example,dc=com')->getResponse();
+        $response = $this->client->delete('cn=Foo,ou=FreeDSx-Test,dc=example,dc=com')->getResponse();
         $this->assertInstanceOf(DeleteResponse::class, $response);
         $this->assertEquals(0, $response->getResultCode());
     }
@@ -125,7 +125,7 @@ class LdapClientTest extends LdapTestCase
     {
         $this->bindClient($this->client);
 
-        $entry = new Entry('cn=Kathrine Erbach,ou=Payroll,dc=example,dc=com');
+        $entry = new Entry('cn=Kathrine Erbach,ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com');
         $entry->reset('facsimileTelephoneNumber');
         $entry->add('mobile', '+1 555 555-5555', '+1 666 666-6666');
         $entry->remove('homePhone', '+1 510 991-4348');
@@ -136,7 +136,7 @@ class LdapClientTest extends LdapTestCase
         $this->assertEquals(0, $response->getResultCode());
         $this->assertEmpty($entry->changes()->toArray());
 
-        $modified = $this->client->read('cn=Kathrine Erbach,ou=Payroll,dc=example,dc=com', [
+        $modified = $this->client->read('cn=Kathrine Erbach,ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com', [
             'facsimileTelephoneNumber',
             'mobile',
             'homePhone',
@@ -158,13 +158,13 @@ class LdapClientTest extends LdapTestCase
     {
         $this->bindClient($this->client);
 
-        $entries = $this->client->search(Operations::list(Filters::raw('(&(objectClass=inetOrgPerson)(cn=A*))'), 'ou=Payroll,dc=example,dc=com'));
+        $entries = $this->client->search(Operations::list(Filters::raw('(&(objectClass=inetOrgPerson)(cn=A*))'), 'ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com'));
         $this->assertInstanceOf(Entries::class, $entries);
         $this->assertEquals(100, $entries->count());
 
         /** @var Entry $entry */
         foreach ($entries as $entry) {
-            $this->assertEquals('ou=Payroll,dc=example,dc=com',$entry->getDn()->getParent()->toString());
+            $this->assertEquals('ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com',$entry->getDn()->getParent()->toString());
         }
     }
 
@@ -172,7 +172,7 @@ class LdapClientTest extends LdapTestCase
     {
         $this->bindClient($this->client);
 
-        $this->assertStringContainsString($_ENV['LDAP_USERNAME'], $this->client->whoami());
+        $this->assertRegExp('/^(d|u):.*/', $this->client->whoami());
     }
 
     public function testStartTls()
