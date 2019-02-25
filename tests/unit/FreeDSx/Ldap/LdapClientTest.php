@@ -103,9 +103,8 @@ class LdapClientTest extends LdapTestCase
             'facsimileTelephoneNumber' => ['+1 415 116-9439'],
             'l' => ['San Jose'],
             'postalAddress' => ['Product Testing$San Jose'],
-            'manager' => ['cn=Ria Corace,ou=Product Development,dc=example,dc=com'],
         ];
-        $entry = $this->client->read('cn=Carmelina Esposito,ou=Product Testing,dc=example,dc=com', array_keys($attributes));
+        $entry = $this->client->read('cn=Carmelina Esposito,ou=Product Testing,ou=FreeDSx-Test,dc=example,dc=com', array_keys($attributes));
 
         $this->assertInstanceOf(Entry::class, $entry);
         $this->assertEquals(strtolower($entry->getDn()->toString()),strtolower('cn=Carmelina Esposito,ou=Product Testing,ou=FreeDSx-Test,dc=example,dc=com'));
@@ -127,7 +126,8 @@ class LdapClientTest extends LdapTestCase
 
         $entry = new Entry('cn=Kathrine Erbach,ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com');
         $entry->reset('facsimileTelephoneNumber');
-        $entry->add('mobile', '+1 555 555-5555', '+1 666 666-6666');
+        $entry->remove('mobile', '+1 510 957-7341');
+        $entry->add('mobile', '+1 555 555-5555');
         $entry->remove('homePhone', '+1 510 991-4348');
         $entry->set('title', 'Head Payroll Dude');
 
@@ -142,7 +142,7 @@ class LdapClientTest extends LdapTestCase
             'homePhone',
             'title',
         ]);
-        $this->assertEquals(['mobile' => ['+1 510 957-7341', '+1 555 555-5555', '+1 666 666-6666'], 'title' => ['Head Payroll Dude']], $modified->toArray());
+        $this->assertEquals(['mobile' => ['+1 555 555-5555'], 'title' => ['Head Payroll Dude']], $modified->toArray());
     }
 
     public function testSubSearchOperation()
@@ -164,7 +164,7 @@ class LdapClientTest extends LdapTestCase
 
         /** @var Entry $entry */
         foreach ($entries as $entry) {
-            $this->assertEquals('ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com',$entry->getDn()->getParent()->toString());
+            $this->assertEquals(strtolower('ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com'),strtolower($entry->getDn()->getParent()->toString()));
         }
     }
 
