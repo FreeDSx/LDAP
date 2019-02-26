@@ -72,6 +72,7 @@ EOM
 
 # Import the test data, using quick mode to speed up the bulk load...
 slapadd -q -F ${SLAPD_CONF} -l ${RESOURCE_PATH}/ldif/data.ldif
+slapadd -q -F ${SLAPD_CONF} -l ${RESOURCE_PATH}/ldif/data-group.ldif
 
 # Used to enable "ldaps://" (never standardized from an RFC like StartTLS, though still commonly used) ...
 sed -i -e 's|^SLAPD_SERVICES="\(.*\)"|SLAPD_SERVICES="ldap:/// ldapi:/// ldaps:///"|' /etc/default/slapd

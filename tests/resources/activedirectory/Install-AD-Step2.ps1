@@ -10,6 +10,7 @@ Add-Content C:\Windows\System32\drivers\etc\hosts "`r`n127.0.0.1 example.com"
 
 ldifde -h -i -f "C:\projects\freedsx-ldap\tests\resources\activedirectory\ldif\data.ldif"
 ldifde -h -i -f "C:\projects\freedsx-ldap\tests\resources\activedirectory\ldif\admin.ldif"
+ldifde -h -i -f "C:\projects\freedsx-ldap\tests\resources\activedirectory\ldif\data-group.ldif"
 
 $Password = ConvertTo-SecureString -String "P@ssword12345" -AsPlainText -Force
 $Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList ('admin@example.com', $Password)
