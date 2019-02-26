@@ -4,7 +4,7 @@ Signature="$Windows NT$"
 [NewRequest]
 Subject = "CN=APPVYR-WIN.EXAMPLE.COM"
 KeySpec = 1
-KeyLength = 1024
+KeyLength = 2048
 Exportable = TRUE
 MachineKeySet = TRUE
 SMIME = FALSE
@@ -12,7 +12,7 @@ PrivateKeyArchive = FALSE
 UserProtected = FALSE
 UseExistingKeySet = FALSE
 ProviderName = "Microsoft RSA SChannel Cryptographic Provider"
-ProviderType = 12
+HashAlgorithm = SHA256
 RequestType = PKCS10
 KeyUsage = 0xa0
 
