@@ -26,7 +26,7 @@ Enable-ADOptionalFeature `
 New-Item -Path "C:\projects\freedsx-ldap\tests\resources" -Name "cert" -ItemType directory
 
 openssl.exe genrsa -out "C:\projects\freedsx-ldap\tests\resources\cert\ca.key" 2048
-openssl.exe req -new -x509 -sha256 -days 3650 -key "C:\projects\freedsx-ldap\tests\resources\cert\ca.key" -out "C:\projects\freedsx-ldap\tests\resources\cert\ca.crt" -subj -subj "/C=US/ST=WI/L=Madison/O=FreeDSx/OU=DS/CN=example"
+openssl.exe req -new -x509 -sha256 -days 3650 -key "C:\projects\freedsx-ldap\tests\resources\cert\ca.key" -out "C:\projects\freedsx-ldap\tests\resources\cert\ca.crt" -subj "/C=US/ST=WI/L=Madison/O=FreeDSx/OU=DS/CN=example"
 Import-Certificate -Filepath "C:\projects\freedsx-ldap\tests\resources\cert\ca.crt" -CertStoreLocation cert:\LocalMachine\Root
 
 certreq.exe -new "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.inf" "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.csr"
