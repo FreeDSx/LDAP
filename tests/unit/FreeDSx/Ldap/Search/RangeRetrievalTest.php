@@ -39,7 +39,7 @@ class RangeRetrievalTest extends LdapTestCase
         parent::setUp();
     }
 
-    public function testRetrievelAll()
+    public function testRetrieveAll()
     {
         $result = $this->range->getAllValues('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com', 'member');
 
