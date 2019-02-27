@@ -16,6 +16,11 @@ use PHPUnit\Framework\TestCase;
 class LdapTestCase extends TestCase
 {
     /**
+     * @var bool
+     */
+    protected $isActiveDirectory;
+
+    /**
      * @param array $options
      * @return LdapClient
      */
@@ -38,5 +43,21 @@ class LdapTestCase extends TestCase
     protected function bindClient(LdapClient $client) : void
     {
         $client->bind($_ENV['LDAP_USERNAME'], $_ENV['LDAP_PASSWORD']);
+    }
+
+    /**
+     * @return bool
+     */
+    protected function isActiveDirectory() : bool
+    {
+        if ($this->isActiveDirectory === null) {
+            try {
+                $this->isActiveDirectory = $this->getClient()->read('')->has('forestFunctionality');
+            } catch (\Exception|\Throwable $e) {
+                $this->isActiveDirectory = false;
+            }
+        }
+
+        return $this->isActiveDirectory;
     }
 }
