@@ -16,6 +16,11 @@ use PHPUnit\Framework\TestCase;
 class LdapTestCase extends TestCase
 {
     /**
+     * @var bool
+     */
+    protected $isActiveDirectory;
+
+    /**
      * @param array $options
      * @return LdapClient
      */
@@ -24,7 +29,7 @@ class LdapTestCase extends TestCase
         $default = [
             'servers' => $_ENV['LDAP_SERVER'],
             'port' => $_ENV['LDAP_PORT'],
-            'ssl_ca_cert' => $_ENV['LDAP_CA_CERT'] === '' ? __DIR__.'../../../resources/cert/data/cert.pem' : $_ENV['LDAP_CA_CERT'],
+            'ssl_ca_cert' => $_ENV['LDAP_CA_CERT'] === '' ? __DIR__.'/../../../resources/cert/ca.crt' : $_ENV['LDAP_CA_CERT'],
             'base_dn' => $_ENV['LDAP_BASE_DN'],
         ];
 
@@ -38,5 +43,21 @@ class LdapTestCase extends TestCase
     protected function bindClient(LdapClient $client) : void
     {
         $client->bind($_ENV['LDAP_USERNAME'], $_ENV['LDAP_PASSWORD']);
+    }
+
+    /**
+     * @return bool
+     */
+    protected function isActiveDirectory() : bool
+    {
+        if ($this->isActiveDirectory === null) {
+            try {
+                $this->isActiveDirectory = $this->getClient()->read('')->has('forestFunctionality');
+            } catch (\Exception|\Throwable $e) {
+                $this->isActiveDirectory = false;
+            }
+        }
+
+        return $this->isActiveDirectory;
     }
 }

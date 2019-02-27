@@ -34,6 +34,9 @@ certtool --generate-self-signed \
   --template ${RESOURCE_PATH}/cert/ca.info \
   --outfile ${CA_CERT}
 
+mkdir -p ./tests/resources/cert
+cp ${CA_CERT} ./tests/resources/cert/ca.crt
+
 update-ca-certificates
 
 # Generate the actual cert used by slapd...
@@ -67,8 +70,9 @@ objectClass: domain
 dc: example
 EOM
 
-# Import the test data, using quick mode to speed it up the bulk load...
+# Import the test data, using quick mode to speed up the bulk load...
 slapadd -q -F ${SLAPD_CONF} -l ${RESOURCE_PATH}/ldif/data.ldif
+slapadd -q -F ${SLAPD_CONF} -l ${RESOURCE_PATH}/ldif/data-group.ldif
 
 # Used to enable "ldaps://" (never standardized from an RFC like StartTLS, though still commonly used) ...
 sed -i -e 's|^SLAPD_SERVICES="\(.*\)"|SLAPD_SERVICES="ldap:/// ldapi:/// ldaps:///"|' /etc/default/slapd
@@ -77,8 +81,9 @@ chown -R openldap.openldap ${SLAPD_CONF}
 chown -R openldap.openldap ${SLAPD_DATA}
 
 # Needed so we can access LDAP via the proper name in the cert, final one to test a failure...
-grep 'ldap.example.com' /etc/hosts || echo "127.0.0.1 ldap.example.com" >> /etc/hosts
-grep 'ldap.foo.com' /etc/hosts || echo "127.0.0.1 ldap.foo.com" >> /etc/hosts
+grep '127.0.0.1 example.com' /etc/hosts || echo "127.0.0.1 example.com" >> /etc/hosts
+grep '127.0.0.1 ldap.example.com' /etc/hosts || echo "127.0.0.1 ldap.example.com" >> /etc/hosts
+grep '127.0.0.1 foo.com' /etc/hosts || echo "127.0.0.1 foo.com" >> /etc/hosts
 
 service slapd start
 

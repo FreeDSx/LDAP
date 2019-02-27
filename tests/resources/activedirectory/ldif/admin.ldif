@@ -1,0 +1,35 @@
+dn: cn=admin,dc=example,dc=com
+changetype: add
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: User
+cn: admin
+sn: admin
+description: admin account
+userAccountControl: 514
+sAMAccountName: admin
+userPrincipalName: admin@example.com
+uid: admin
+givenName: admin
+
+dn: cn=admin,dc=example,dc=com
+changetype: modify
+replace: unicodePwd
+unicodePwd::IgBQAEAAcwBzAHcAbwByAGQAMQAyADMANAA1ACIA
+-
+replace: userAccountControl
+userAccountControl: 512
+-
+
+dn: cn=Domain Admins,cn=Users,dc=example,dc=com
+changeType: modify
+add: member
+member: cn=admin,dc=example,dc=com
+-
+
+dn: cn=Enterprise Admins,cn=Users,dc=example,dc=com
+changeType: modify
+add: member
+member: cn=admin,dc=example,dc=com
+-

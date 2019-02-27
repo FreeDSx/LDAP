@@ -1,0 +1,5 @@
+dn:
+changetype: modify
+add: renewServerCertificate
+renewServerCertificate: 1
+-

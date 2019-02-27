@@ -55,8 +55,8 @@ olcLastMod: TRUE
 olcSuffix: dc=example,dc=com
 olcDbDirectory: /var/lib/ldap
 olcRootDN: cn=admin,dc=example,dc=com
-# admin password: 12345
-olcRootPW: {SSHA}x/vzkkP6WJ/T0LiE427KNevqK6FNM+l5
+# admin password: P@ssword12345
+olcRootPW: {SSHA}sJrRL+47WbSnqqGDFaKdtHBXU8hT7l/i
 olcDbIndex: objectClass eq
 olcAccess: to attrs=userPassword,shadowLastChange
   by self write
