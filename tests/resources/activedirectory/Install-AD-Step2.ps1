@@ -8,6 +8,8 @@ Import-Module ServerManager
 Add-Content C:\Windows\System32\drivers\etc\hosts "`r`n127.0.0.1 foo.com"
 Add-Content C:\Windows\System32\drivers\etc\hosts "`r`n127.0.0.1 example.com"
 
+php "C:\projects\freedsx-ldap\tests\resources\activedirectory\generate-ldif.php"
+
 ldifde -h -i -f "C:\projects\freedsx-ldap\tests\resources\activedirectory\ldif\data.ldif"
 ldifde -h -i -f "C:\projects\freedsx-ldap\tests\resources\activedirectory\ldif\admin.ldif"
 ldifde -h -i -f "C:\projects\freedsx-ldap\tests\resources\activedirectory\ldif\data-group.ldif"
