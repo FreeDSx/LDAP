@@ -14,6 +14,7 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 
 /**
@@ -73,7 +74,7 @@ class SearchResultEntry implements ResponseInterface
             $attributes[] = new Attribute($partialAttribute->getChild(0)->getValue(), ...$values);
         }
 
-        return new self(new Entry($type->getChild(0)->getValue(), ...$attributes));
+        return new self(new Entry(new Dn($type->getChild(0)->getValue()), ...$attributes));
     }
 
     /**
