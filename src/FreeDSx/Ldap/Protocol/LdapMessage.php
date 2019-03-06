@@ -136,14 +136,102 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                 $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
                 /** @var SequenceOfType $child */
                 foreach ($child->getChildren() as $control) {
-                    $controls[] = self::constructControl($control);
+                    if (!($control instanceof SequenceType && $control->getChild(0) && $control->getChild(0) instanceof OctetStringType)) {
+                        throw new ProtocolException('The control either is not a sequence or has no OID value attached.');
+                    }
+                    switch ($control->getChild(0)->getValue()) {
+                        case Control\Control::OID_PAGING:
+                            $controls[] = Control\PagingControl::fromAsn1($control);
+                            break;
+                        case Control\Control::OID_SORTING_RESPONSE;
+                            $controls[] = Control\Sorting\SortingResponseControl::fromAsn1($control);
+                            break;
+                        case Control\Control::OID_VLV_RESPONSE:
+                            $controls[] = Control\Vlv\VlvResponseControl::fromAsn1($control);
+                            break;
+                        case Control\Control::OID_DIR_SYNC:
+                            $controls[] = Control\Ad\DirSyncResponseControl::fromAsn1($control);
+                            break;
+                        default:
+                            $controls[] = Control\Control::fromAsn1($control);
+                            break;
+                    }
                 }
             }
         }
 
+        $opAsn1 = $type->getChild(1);
+        switch ($opAsn1->getTagNumber()) {
+            case 0:
+                $operation = Request\BindRequest::fromAsn1($opAsn1);
+                break;
+            case 1:
+                $operation = Response\BindResponse::fromAsn1($opAsn1);
+                break;
+            case 2:
+                $operation = Request\UnbindRequest::fromAsn1($opAsn1);
+                break;
+            case 3:
+                $operation = Request\SearchRequest::fromAsn1($opAsn1);
+                break;
+            case 4:
+                $operation = Response\SearchResultEntry::fromAsn1($opAsn1);
+                break;
+            case 5:
+                $operation = Response\SearchResultDone::fromAsn1($opAsn1);
+                break;
+            case 6:
+                $operation = Request\ModifyRequest::fromAsn1($opAsn1);
+                break;
+            case 7:
+                $operation = Response\ModifyResponse::fromAsn1($opAsn1);
+                break;
+            case 8:
+                $operation = Request\AddRequest::fromAsn1($opAsn1);
+                break;
+            case 9:
+                $operation = Response\AddResponse::fromAsn1($opAsn1);
+                break;
+            case 10:
+                $operation = Request\DeleteRequest::fromAsn1($opAsn1);
+                break;
+            case 11:
+                $operation = Response\DeleteResponse::fromAsn1($opAsn1);
+                break;
+            case 12:
+                $operation = Request\ModifyDnRequest::fromAsn1($opAsn1);
+                break;
+            case 13:
+                $operation = Response\ModifyDnResponse::fromAsn1($opAsn1);
+                break;
+            case 14:
+                $operation = Request\CompareRequest::fromAsn1($opAsn1);
+                break;
+            case 15:
+                $operation = Response\CompareResponse::fromAsn1($opAsn1);
+                break;
+            case 19:
+                $operation = Response\SearchResultReference::fromAsn1($opAsn1);
+                break;
+            case 23:
+                $operation = Request\ExtendedRequest::fromAsn1($opAsn1);
+                break;
+            case 24:
+                $operation = Response\ExtendedResponse::fromAsn1($opAsn1);
+                break;
+            case 25:
+                $operation = Response\IntermediateResponse::fromAsn1($opAsn1);
+                break;
+            default:
+                throw new ProtocolException(sprintf(
+                    'The tag %s for the LDAP operation is not supported.',
+                    $opAsn1->getTagNumber()
+                ));
+        }
+
         return new static(
             $type->getChild(0)->getValue(),
-            self::constructOperation($type->getChild(1)),
+            $operation,
             ...$controls
         );
     }
@@ -176,113 +264,6 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                 'Expected an LDAP message ID, but got: %s',
                 get_class($type->getChild(0))
             ));
-        }
-    }
-
-    /**
-     * @param AbstractType $asn1
-     * @return ProtocolElementInterface
-     * @throws ProtocolException
-     */
-    protected static function constructOperation(AbstractType $asn1) : ProtocolElementInterface
-    {
-        switch ($asn1->getTagNumber()) {
-            case 0:
-                return Request\BindRequest::fromAsn1($asn1);
-                break;
-            case 1:
-                return Response\BindResponse::fromAsn1($asn1);
-                break;
-            case 2:
-                return Request\UnbindRequest::fromAsn1($asn1);
-                break;
-            case 3:
-                return Request\SearchRequest::fromAsn1($asn1);
-                break;
-            case 4:
-                return Response\SearchResultEntry::fromAsn1($asn1);
-                break;
-            case 5:
-                return Response\SearchResultDone::fromAsn1($asn1);
-                break;
-            case 6:
-                return Request\ModifyRequest::fromAsn1($asn1);
-                break;
-            case 7:
-                return Response\ModifyResponse::fromAsn1($asn1);
-                break;
-            case 8:
-                return Request\AddRequest::fromAsn1($asn1);
-                break;
-            case 9:
-                return Response\AddResponse::fromAsn1($asn1);
-                break;
-            case 10:
-                return Request\DeleteRequest::fromAsn1($asn1);
-                break;
-            case 11:
-                return Response\DeleteResponse::fromAsn1($asn1);
-                break;
-            case 12:
-                return Request\ModifyDnRequest::fromAsn1($asn1);
-                break;
-            case 13:
-                return Response\ModifyDnResponse::fromAsn1($asn1);
-                break;
-            case 14:
-                return Request\CompareRequest::fromAsn1($asn1);
-                break;
-            case 15:
-                return Response\CompareResponse::fromAsn1($asn1);
-                break;
-            case 19:
-                return Response\SearchResultReference::fromAsn1($asn1);
-                break;
-            case 23:
-                return Request\ExtendedRequest::fromAsn1($asn1);
-                break;
-            case 24:
-                return Response\ExtendedResponse::fromAsn1($asn1);
-                break;
-            case 25:
-                return Response\IntermediateResponse::fromAsn1($asn1);
-                break;
-        }
-
-        throw new ProtocolException(sprintf(
-            'The tag %s for the LDAP operation is not supported.',
-            $asn1->getTagNumber()
-        ));
-    }
-
-    /**
-     * @param AbstractType $asn1
-     * @return Control\Control
-     * @throws ProtocolException
-     */
-    protected static function constructControl(AbstractType $asn1) : Control\Control
-    {
-        if (!($asn1 instanceof SequenceType && $asn1->getChild(0) && $asn1->getChild(0) instanceof OctetStringType)) {
-            throw new ProtocolException('The control either is not a sequence or has no OID value attached.');
-        }
-
-        $oid = $asn1->getChild(0)->getValue();
-        switch ($oid) {
-            case Control\Control::OID_PAGING:
-                return Control\PagingControl::fromAsn1($asn1);
-                break;
-            case Control\Control::OID_SORTING_RESPONSE;
-                return Control\Sorting\SortingResponseControl::fromAsn1($asn1);
-                break;
-            case Control\Control::OID_VLV_RESPONSE:
-                return Control\Vlv\VlvResponseControl::fromAsn1($asn1);
-                break;
-            case Control\Control::OID_DIR_SYNC:
-                return Control\Ad\DirSyncResponseControl::fromAsn1($asn1);
-                break;
-            default:
-                return Control\Control::fromAsn1($asn1);
-                break;
         }
     }
 }
