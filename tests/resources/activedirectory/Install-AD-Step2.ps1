@@ -5,8 +5,8 @@ Set-PSDebug -Trace 1
 
 Import-Module ServerManager
 
-Add-Content C:\Windows\System32\drivers\etc\hosts "`r`n127.0.0.1 foo.com"
-Add-Content C:\Windows\System32\drivers\etc\hosts "`r`n127.0.0.1 example.com"
+Add-Content -Encoding ASCII "C:\Windows\System32\drivers\etc\hosts" "`r`n127.0.0.1 foo.com"
+Add-Content -Encoding ASCII "C:\Windows\System32\drivers\etc\hosts" "`r`n127.0.0.1 example.com"
 
 php "C:\projects\freedsx-ldap\tests\resources\activedirectory\generate-ldif.php"
 
@@ -31,7 +31,6 @@ New-Item -Path "C:\projects\freedsx-ldap\tests\resources" -Name "cert" -ItemType
 openssl.exe genrsa -out "C:\projects\freedsx-ldap\tests\resources\cert\ca.key" 2048
 openssl.exe req -new -x509 -sha256 -days 3650 -key "C:\projects\freedsx-ldap\tests\resources\cert\ca.key" -out "C:\projects\freedsx-ldap\tests\resources\cert\ca.crt" -subj "/C=US/ST=WI/L=Madison/O=FreeDSx/OU=DS/CN=example"
 Import-Certificate -Filepath "C:\projects\freedsx-ldap\tests\resources\cert\ca.crt" -CertStoreLocation cert:\LocalMachine\Root
-Import-Certificate -Filepath "C:\projects\freedsx-ldap\tests\resources\cert\ca.crt" -CertStoreLocation cert:\CurrentUser\Root
 
 certreq.exe -new "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.inf" "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.csr"
 openssl.exe x509 -req -sha256 -days 3650 -in "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\cert.csr" -CA "C:\projects\freedsx-ldap\tests\resources\cert\ca.crt" -CAkey "C:\projects\freedsx-ldap\tests\resources\cert\ca.key" -extfile "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\ext.txt" -CAcreateserial -out "C:\projects\freedsx-ldap\tests\resources\activedirectory\cert\ldap.crt"
