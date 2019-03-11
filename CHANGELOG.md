@@ -1,6 +1,24 @@
 CHANGELOG
 =========
 
+0.5.0 (2019-03-11)
+------------------
+* Vastly improved memory efficiency and performance in general (especially on large search results).
+* Add a DirSync helper class for Active Directory.
+* Add Active Directory specific controls: ExpectedEntryCount, SetOwner, ADPolicyHints, ShowDeleted, ShowRecycled
+* Add a range retrieval helper class to make it easier to work with ranged results from Active Directory.
+* Add a "rename()" convenience method to the LdapClient.
+* Add a "move()" convenience method to the LdapClient.
+* Add a "getDescription()" method to the Attribute class to retrieve the attribute with all options.
+* Add a "getOptions()" method the the Attribute class to iterate through options for an attribute.
+* Add a "fromArray" method to make constructing entry objects from arrays sound more natural.
+* Calling the LdapClient "read()" method with no arguments will now return the RootDSE by default.
+* Fix an OpenLDAP specific bug in the paging helper class. OpenLDAP does not return a control when aborting paging.
+* Fix an issue with the Socket class not recognizing the certificate authority cert specified in the options.
+* Implement OpenLDAP / Active Directory test servers with test data during CI runs for integration tests via PHPUnit.   
+* Moved the Socket classes to their own library so it can be used in other projects.
+* Add more complete documentation for working with Entry objects.
+
 0.4.0 (2018-04-20)
 ------------------
 * Moved ASN.1 to its own library.
