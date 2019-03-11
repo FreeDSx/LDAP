@@ -126,38 +126,56 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        self::validateAsn1($type);
-        $controls = [];
+        if (!$type instanceof SequenceType) {
+            throw new ProtocolException(sprintf(
+                'Expected an ASN1 sequence type, but got: %s',
+                get_class($type)
+            ));
+        }
+        $count = \count($type->getChildren());
+        if ($count < 2) {
+            throw new ProtocolException(sprintf(
+                'Expected an ASN1 sequence with at least 2 elements, but it has %s',
+                count($type->getChildren())
+            ));
+        }
 
-        /** @var SequenceType $type */
-        foreach ($type->getChildren() as $child) {
-            if ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 0) {
-                /** @var \FreeDSx\Asn1\Type\IncompleteType $child */
-                $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
-                /** @var SequenceOfType $child */
-                foreach ($child->getChildren() as $control) {
-                    if (!($control instanceof SequenceType && $control->getChild(0) && $control->getChild(0) instanceof OctetStringType)) {
-                        throw new ProtocolException('The control either is not a sequence or has no OID value attached.');
-                    }
-                    switch ($control->getChild(0)->getValue()) {
-                        case Control\Control::OID_PAGING:
-                            $controls[] = Control\PagingControl::fromAsn1($control);
-                            break;
-                        case Control\Control::OID_SORTING_RESPONSE;
-                            $controls[] = Control\Sorting\SortingResponseControl::fromAsn1($control);
-                            break;
-                        case Control\Control::OID_VLV_RESPONSE:
-                            $controls[] = Control\Vlv\VlvResponseControl::fromAsn1($control);
-                            break;
-                        case Control\Control::OID_DIR_SYNC:
-                            $controls[] = Control\Ad\DirSyncResponseControl::fromAsn1($control);
-                            break;
-                        default:
-                            $controls[] = Control\Control::fromAsn1($control);
-                            break;
+        $controls = [];
+        if ($count > 2) {
+            for ($i = 2; $i < $count; $i++) {
+                $child = $type->getChild($i);
+                if ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 0) {
+                    /** @var \FreeDSx\Asn1\Type\IncompleteType $child */
+                    $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
+                    /** @var SequenceOfType $child */
+                    foreach ($child->getChildren() as $control) {
+                        if (!($control instanceof SequenceType && $control->getChild(0) && $control->getChild(0) instanceof OctetStringType)) {
+                            throw new ProtocolException('The control either is not a sequence or has no OID value attached.');
+                        }
+                        switch ($control->getChild(0)->getValue()) {
+                            case Control\Control::OID_PAGING:
+                                $controls[] = Control\PagingControl::fromAsn1($control);
+                                break;
+                            case Control\Control::OID_SORTING_RESPONSE;
+                                $controls[] = Control\Sorting\SortingResponseControl::fromAsn1($control);
+                                break;
+                            case Control\Control::OID_VLV_RESPONSE:
+                                $controls[] = Control\Vlv\VlvResponseControl::fromAsn1($control);
+                                break;
+                            case Control\Control::OID_DIR_SYNC:
+                                $controls[] = Control\Ad\DirSyncResponseControl::fromAsn1($control);
+                                break;
+                            default:
+                                $controls[] = Control\Control::fromAsn1($control);
+                                break;
+                        }
                     }
                 }
             }
+        }
+
+        if (!(($mesageId = $type->getChild(0)) && $mesageId instanceof IntegerType)) {
+            throw new ProtocolException('Expected an LDAP message ID as an ASN.1 integer type. None received.');
         }
 
         $opAsn1 = $type->getChild(1);
@@ -230,7 +248,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
         }
 
         return new static(
-            $type->getChild(0)->getValue(),
+            $mesageId->getValue(),
             $operation,
             ...$controls
         );
@@ -240,30 +258,4 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
      * @return AbstractType
      */
     abstract protected function getOperationAsn1() : AbstractType;
-
-    /**
-     * @param AbstractType $type
-     * @throws ProtocolException
-     */
-    protected static function validateAsn1(AbstractType $type)
-    {
-        if (!$type instanceof SequenceType) {
-            throw new ProtocolException(sprintf(
-                'Expected an ASN1 sequence type, but got: %s',
-                get_class($type)
-            ));
-        }
-        if (!$type->getChild(1)) {
-            throw new ProtocolException(sprintf(
-                'Expected an ASN1 sequence with at least 2 elements, but it has %s',
-                count($type->getChildren())
-            ));
-        }
-        if (!$type->getChild(0) instanceof IntegerType) {
-            throw new ProtocolException(sprintf(
-                'Expected an LDAP message ID, but got: %s',
-                get_class($type->getChild(0))
-            ));
-        }
-    }
 }

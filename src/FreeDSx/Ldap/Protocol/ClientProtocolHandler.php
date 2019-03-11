@@ -434,7 +434,7 @@ class ClientProtocolHandler
         $entries = [];
         $done = null;
 
-        while ($done === null) {
+        do {
             /** @var LdapMessageResponse $message */
             foreach ($this->queue()->getMessages($messageTo->getMessageId()) as $message) {
                 $response = $message->getResponse();
@@ -444,7 +444,7 @@ class ClientProtocolHandler
                     $done = $message;
                 }
             }
-        }
+        } while(!$done);
 
         /** @var LdapMessageResponse $done */
         return new LdapMessageResponse(
@@ -471,7 +471,8 @@ class ClientProtocolHandler
         /** @var LdapMessageResponse $message */
         $message = $this->queue()->getMessage($id);
 
-        if ($message->getMessageId() === 0 && $message->getResponse() instanceof ExtendedResponse) {
+        $messageId = $message->getMessageId();
+        if ($messageId === 0 && $message->getResponse() instanceof ExtendedResponse) {
             /** @var ExtendedResponse $response */
             $response = $message->getResponse();
             throw new UnsolicitedNotificationException(
@@ -481,11 +482,11 @@ class ClientProtocolHandler
                 $response->getName()
             );
         }
-        if ($id !== $message->getMessageId()) {
+        if ($id !== $messageId) {
             throw new ProtocolException(sprintf(
                 'Expected a LDAP PDU with an ID %s, but received ID %s.',
                 $id,
-                $message->getMessageId()
+                $messageId
             ));
         }
 

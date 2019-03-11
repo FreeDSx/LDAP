@@ -106,7 +106,7 @@ class Entries implements \Countable, \IteratorAggregate
      */
     public function first() : ?Entry
     {
-        $entry = reset($this->entries);
+        $entry = \reset($this->entries);
 
         return $entry === false ? null : $entry;
     }
@@ -118,8 +118,8 @@ class Entries implements \Countable, \IteratorAggregate
      */
     public function last() : ?Entry
     {
-        $entry = end($this->entries);
-        reset($this->entries);
+        $entry = \end($this->entries);
+        \reset($this->entries);
 
         return $entry === false ? null : $entry;
     }

@@ -195,16 +195,21 @@ class LdapResult implements ResponseInterface
         }
         $referrals = [];
 
-        /** @var \FreeDSx\Asn1\Type\SequenceType $type*/
-        foreach ($type->getChildren() as $child) {
-            if ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 3) {
-                /** @var \FreeDSx\Asn1\Type\SequenceType $child */
-                $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
-                foreach ($child->getChildren() as $ldapUrl) {
-                    try {
-                        $referrals[] = LdapUrl::parse($ldapUrl->getValue());
-                    } catch (UrlParseException $e) {
-                        throw new ProtocolException($e->getMessage());
+        # Somewhat ugly minor optimization. Though it's probably less likely for most setups to get referrals.
+        # So only try to iterate them if we possibly have them.
+        $count = \count($type->getChildren());
+        if ($count > 3) {
+            for ($i = 3; $i < $count; $i++) {
+                $child = $type->getChild($i);
+                if ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 3) {
+                    /** @var \FreeDSx\Asn1\Type\SequenceType $child */
+                    $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
+                    foreach ($child->getChildren() as $ldapUrl) {
+                        try {
+                            $referrals[] = LdapUrl::parse($ldapUrl->getValue());
+                        } catch (UrlParseException $e) {
+                            throw new ProtocolException($e->getMessage());
+                        }
                     }
                 }
             }

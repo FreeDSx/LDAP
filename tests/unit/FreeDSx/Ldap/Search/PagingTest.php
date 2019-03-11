@@ -45,7 +45,10 @@ class PagingTest extends LdapTestCase
 
     protected function tearDown()
     {
-        $this->client->unbind();
+        try {
+            $this->client->unbind();
+        } catch (\Exception|\Throwable $e) {
+        }
     }
 
     public function testPagingAll()

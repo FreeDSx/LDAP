@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\CompareResponse;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Operation\Response\ModifyDnResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -148,6 +149,28 @@ class LdapClientSpec extends ObjectBehavior
             ->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::SUCCESS)));
 
         $this->delete($entry);
+    }
+
+    function it_should_send_a_modify_dn_operation_on_move($handler)
+    {
+        $entry = new Entry('cn=foo,dc=local');
+        $parent = new Entry('cn=bar,dc=local');
+
+        $handler->send(Operations::move('cn=foo,dc=local', 'cn=bar,dc=local'))->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(1, new ModifyDnResponse(ResultCode::SUCCESS)));
+
+        $this->move($entry, $parent);
+    }
+
+    function it_should_send_a_modify_dn_operation_on_rename($handler)
+    {
+        $entry = new Entry('cn=foo,dc=local');
+        $newRdn = 'cn=bar';
+
+        $handler->send(Operations::rename('cn=foo,dc=local', 'cn=bar'))->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(1, new ModifyDnResponse(ResultCode::SUCCESS)));
+
+        $this->rename($entry, $newRdn);
     }
 
     function it_should_send_a_base_search_on_a_read_and_return_an_entry($handler)

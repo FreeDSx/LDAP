@@ -21,47 +21,47 @@ class DirSyncTest extends LdapTestCase
     /**
      * @var LdapClient
      */
-    protected $client;
+    protected static $client;
 
     /**
      * @var DirSync
      */
-    protected $dirSync;
+    protected static $dirSync;
 
     /**
      * @var FilterInterface
      */
-    protected $filter;
+    protected static $filter;
 
-    protected function setUp()
+    public static function setUpBeforeClass()
     {
-        if (!$this->isActiveDirectory()) {
-            $this->markTestSkipped('Range retrieval is only testable against Active Directory.');
+        if (!self::isActiveDirectory()) {
+            self::markTestSkipped('Range retrieval is only testable against Active Directory.');
         } else {
-            $this->client = $this->getClient();
-            $this->bindClient($this->client);
+            self::$client = self::getClient();
+            self::bindClient(self::$client);
 
-            $this->filter = Filters::and(
+            self::$filter = Filters::and(
                 Filters::equal('objectClass', 'inetOrgPerson'),
                 Filters::not(Filters::equal('isDeleted', 'TRUE'))
             );
-            $this->dirSync = new DirSync($this->client, null, $this->filter, 'description');
+            self::$dirSync = new DirSync(self::$client, null, self::$filter, 'description');
         }
     }
 
     public function testPagingSync()
     {
-        $all = $this->dirSync->getChanges();
+        $all = self::$dirSync->getChanges();
 
-        while ($this->dirSync->hasChanges()) {
-            $all->add(...$this->dirSync->getChanges());
+        while (self::$dirSync->hasChanges()) {
+            $all->add(...self::$dirSync->getChanges());
         }
         $this->assertCount(10001, $all);
 
-        $entry = $this->client->read('cn=Vivie Niebudek,ou=Administrative,ou=FreeDSx-Test,dc=example,dc=com');
+        $entry = self::$client->read('cn=Vivie Niebudek,ou=Administrative,ou=FreeDSx-Test,dc=example,dc=com');
         $entry->set('description', 'foobar '.rand());
-        $this->client->update($entry);
+        self::$client->update($entry);
 
-        $this->assertCount(1, $this->dirSync->getChanges());
+        $this->assertCount(1, self::$dirSync->getChanges());
     }
 }

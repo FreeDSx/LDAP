@@ -9,6 +9,8 @@ Entries
     * [Set Values](#set-values)
     * [Remove Values](#remove-values)
     * [Reset Values](#reset-values)
+* [Renaming Entries](#renaming-entries)
+* [Moving Entries](#moving-entries)
 * [Entry Methods](#entry-methods)
     * [add](#add)
     * [remove](#remove)
@@ -201,6 +203,50 @@ if (!isset($entry->description)) {
 }
 unset($entry-otherIpPhone);
 ```
+
+## Renaming Entries
+
+Renaming an entry changes its RDN, giving it a new DN in the process. This operation can be performed by using the
+rename method of the LdapClient. It accepts the following arguments for the DN:
+
+* An Entry object (such as the result of a search).
+* A Dn object.
+* A string DN.
+
+The second argument (the new name / RDN) must be either:
+
+* An RDN object.
+* A string representing an RDN.
+
+By default this operation removes the old name (RDN) associated with the entry.
+
+```php
+# Grab the entry object...
+$entry = $client->read('cn=foo,dc=example,dc=com');
+
+# Rename the entry obejct...
+$client->rename($entry, 'cn=bar');
+
+# Optionally rename without removing the old RDN...
+$client->rename($entry, 'cn=foo', false);
+```
+
+## Moving Entries
+
+Moving an entry changes the parent DN, giving it a new spot in the directory. It accepts the following arguments for
+both the entry being moved and the new location / parent DN:
+
+* An Entry object (such as the result of search).
+* A Dn object.
+* A string DN.
+
+```php
+# Grab the entry to move...
+$entry = $client->read('cn=foo,dc=example,dc=com');
+
+# Move the entry obejct to a new location...
+$client->move($entry, 'ou=Terminated,dc=example,dc=com');
+``` 
  
 ## Entry Methods
 

@@ -173,6 +173,33 @@ class LdapClient
     }
 
     /**
+     * Move an entry to a new location.
+     *
+     * @param string|Entry $dn
+     * @param string|Entry $newParentDn
+     * @return LdapMessageResponse
+     * @throws OperationException
+     */
+    public function move($dn, $newParentDn) : LdapMessageResponse
+    {
+        return $this->send(Operations::move($dn, $newParentDn));
+    }
+
+    /**
+     * Rename an entry (changing the RDN).
+     *
+     * @param string|Entry $dn
+     * @param string $newRdn
+     * @param bool $deleteOldRdn
+     * @return LdapMessageResponse
+     * @throws OperationException
+     */
+    public function rename($dn, $newRdn, bool $deleteOldRdn = true) : LdapMessageResponse
+    {
+        return $this->send(Operations::rename($dn, $newRdn, $deleteOldRdn));
+    }
+
+    /**
      * Send a search response and return the entries.
      *
      * @param SearchRequest $request
