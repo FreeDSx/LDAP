@@ -133,7 +133,7 @@ class LdapClient
      * @return Entry|null
      * @throws Exception\OperationException
      */
-    public function read(string $entry, $attributes = [], Control ...$controls) : ?Entry
+    public function read(string $entry = '', $attributes = [], Control ...$controls) : ?Entry
     {
         try {
             return $this->search(Operations::read($entry, ...$attributes), ...$controls)->first();

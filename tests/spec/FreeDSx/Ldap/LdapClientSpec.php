@@ -184,6 +184,17 @@ class LdapClientSpec extends ObjectBehavior
         $this->read($entry)->shouldBeEqualTo($entry);
     }
 
+    function it_should_send_a_read_to_the_RootDSE_if_it_is_called_with_no_arguments($handler)
+    {
+        $entry = new Entry('');
+        $handler->send(Operations::read(''))->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(1, new SearchResponse(new LdapResult(ResultCode::SUCCESS), new Entries(
+                $entry
+            ))));
+
+        $this->read()->shouldBeEqualTo($entry);
+    }
+
     function it_should_send_a_base_search_on_a_read_and_return_null_if_it_does_not_exist($handler)
     {
         $entry = new Entry('cn=foo,dc=local');
