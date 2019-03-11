@@ -217,7 +217,9 @@ class LdapClientTest extends LdapTestCase
 
     public function testStartTls()
     {
+        self::$client = self::getClient();
         self::$client->startTls();
+
         $this->assertTrue(true);
     }
 
