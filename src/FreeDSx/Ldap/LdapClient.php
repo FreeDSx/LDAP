@@ -52,7 +52,6 @@ class LdapClient
         'base_dn' => null,
         'page_size' => 1000,
         'use_ssl' => false,
-        'use_tls' => false,
         'ssl_validate_cert' => true,
         'ssl_allow_self_signed' => null,
         'ssl_ca_cert' => null,
@@ -62,7 +61,6 @@ class LdapClient
         'referral' => 'throw',
         'referral_chaser' => null,
         'referral_limit' => 10,
-        'logger' => null,
     ];
 
     /**
