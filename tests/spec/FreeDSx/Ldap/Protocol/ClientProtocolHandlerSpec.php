@@ -83,4 +83,18 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
 
         $this->send($request)->shouldBeEqualTo(null);
     }
+
+    function it_should_throw_a_LDAP_specific_connection_exception_if_the_response_handler_throws_a_socket_exception(ResponseHandlerInterface $responseHandler, RequestHandlerInterface $requestHandler, LdapQueue $queue)
+    {
+        $request = new DeleteRequest('cn=foo');
+        $messageResponse = new LdapMessageResponse(1, new DeleteResponse(0));
+        $messageRequest = new LdapMessageRequest(1, $request);
+
+        $requestHandler->handleRequest($messageRequest,  $queue, [])->shouldBeCalledOnce()
+            ->willReturn($messageResponse);
+        $responseHandler->handleResponse($messageRequest, $messageResponse, $queue, [])->shouldBeCalledOnce()
+            ->willThrow(new \FreeDSx\Socket\Exception\ConnectionException('foo'));
+
+        $this->shouldThrow(ConnectionException::class)->during('send', [$request]);
+    }
 }

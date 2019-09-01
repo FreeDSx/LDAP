@@ -88,6 +88,16 @@ class ClientProtocolHandler
                 $this->queue(),
                 $this->options
             );
+            if ($messageFrom) {
+                $messageFrom = $this->protocolHandlerFactory->forResponse($messageTo->getRequest(), $messageFrom->getResponse())->handleResponse(
+                    $messageTo,
+                    $messageFrom,
+                    $this->queue(),
+                    $this->options
+                );
+            }
+
+            return $messageFrom;
         } catch (UnsolicitedNotificationException $exception) {
             if ($exception->getOid() === ExtendedResponse::OID_NOTICE_OF_DISCONNECTION) {
                 $this->queue()->close();
@@ -105,16 +115,6 @@ class ClientProtocolHandler
                 $exception
             );
         }
-        if ($messageFrom) {
-            $messageFrom = $this->protocolHandlerFactory->forResponse($messageTo->getRequest(), $messageFrom->getResponse())->handleResponse(
-                $messageTo,
-                $messageFrom,
-                $this->queue(),
-                $this->options
-            );
-        }
-
-        return $messageFrom;
     }
 
     /**
