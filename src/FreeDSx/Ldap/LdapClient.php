@@ -360,7 +360,7 @@ class LdapClient
      */
     public function __destruct()
     {
-        if ($this->handler && $this->handler->getSocket() !== null && $this->handler->getSocket()->isConnected()) {
+        if ($this->handler && $this->handler->isConnected()) {
             $this->unbind();
         }
     }

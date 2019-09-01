@@ -19,24 +19,12 @@ class ReferralContextSpec extends ObjectBehavior
 {
     function let()
     {
-        $this->beConstructedWith(new SimpleBindRequest('foo', 'bar'), new LdapUrl('foo'));
+        $this->beConstructedWith(new LdapUrl('foo'));
     }
 
     function it_is_initializable()
     {
         $this->shouldHaveType(ReferralContext::class);
-    }
-
-    function it_should_be_constructed_with_a_null_bind_request()
-    {
-        $this->beConstructedWith(null);
-
-        $this->getBindRequest()->shouldBeNull();
-    }
-
-    function it_should_get_the_bind_request()
-    {
-        $this->getBindRequest()->shouldBeLike(new SimpleBindRequest('foo', 'bar'));
     }
 
     function it_should_get_the_referrals()

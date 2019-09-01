@@ -43,7 +43,6 @@ use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\Server\RequestContext;
-use FreeDSx\Socket\Queue\MessageQueue;
 use FreeDSx\Socket\Socket;
 
 /**
@@ -72,7 +71,7 @@ class ServerProtocolHandler
     ];
 
     /**
-     * @var MessageQueue
+     * @var LdapQueue
      */
     protected $queue;
 
@@ -96,23 +95,13 @@ class ServerProtocolHandler
      */
     protected $encoder;
 
-    /**
-     * @var int
-     */
-    protected $bufferSize = 8192;
-
-    /**
-     * @param Socket $socket
-     * @param array $options
-     * @param MessageQueue|null $queue
-     */
-    public function __construct(Socket $socket, array $options = [], MessageQueue $queue = null)
+    public function __construct(Socket $socket, array $options = [], LdapQueue $queue = null)
     {
         $this->socket = $socket;
         $this->options = \array_merge($this->options, $options);
         $this->validateAndSetRequestHandler();
         $this->encoder = new LdapEncoder();
-        $this->queue = $queue ?? new LdapRequestQueue($socket, $this->encoder);
+        $this->queue = $queue ?? new LdapQueue($socket, $this->encoder, true);
     }
 
     /**
@@ -127,11 +116,11 @@ class ServerProtocolHandler
         } catch (EncoderException|ProtocolException $e) {
             $this->sendNoticeOfDisconnect('The message encoding is malformed.');
         } catch (\Exception|\Throwable $e) {
-            if ($this->socket->isConnected()) {
+            if ($this->queue->isConnected()) {
                 $this->sendNoticeOfDisconnect();
             }
         } finally {
-            $this->socket->close();
+            $this->queue->close();
         }
     }
 
@@ -191,7 +180,7 @@ class ServerProtocolHandler
             }
 
             if ($result) {
-                $this->sendMessage(new LdapMessageResponse($message->getMessageId(), $result));
+                $this->queue->sendMessage(new LdapMessageResponse($message->getMessageId(), $result));
             }
         }
     }
@@ -200,29 +189,22 @@ class ServerProtocolHandler
      * This is to send the request back in chunks of 8192 bytes (or whatever the buffer size is) to lessen the amount of
      * TCP writes we need to perform.
      *
+     * @todo wrap this logic into the queue when sending out messages.
      * @param LdapMessageRequest $message
      * @param Entries $entries
      */
     protected function sendEntries(LdapMessageRequest $message, Entries $entries) : void
     {
-        $buffer = '';
+        $messages = [];
 
         foreach ($entries->toArray() as $entry) {
-            $buffer .= $this->encoder->encode((new LdapMessageResponse(
+            $messages[] = new LdapMessageResponse(
                 $message->getMessageId(),
                 new SearchResultEntry($entry)
-            ))->toAsn1());
-
-            $bufferLen = \strlen($buffer);
-            if ($bufferLen >= $this->bufferSize) {
-                $this->socket->write(\substr($buffer, 0, $this->bufferSize));
-                $buffer = $bufferLen > $this->bufferSize ? \substr($buffer, $this->bufferSize) : '';
-            }
+            );
         }
 
-        if (\strlen($buffer)) {
-            $this->socket->write($buffer);
-        }
+        $this->queue->sendMessage(...$messages);
     }
 
     /**
@@ -234,7 +216,7 @@ class ServerProtocolHandler
     protected function validate(LdapMessageRequest $message) : bool
     {
         if ($message->getMessageId() === 0) {
-            $this->sendMessage(new LdapMessageResponse(0, new ExtendedResponse(new LdapResult(
+            $this->queue->sendMessage(new LdapMessageResponse(0, new ExtendedResponse(new LdapResult(
                 ResultCode::PROTOCOL_ERROR,
                 '',
                 'The message ID 0 cannot be used in a client request.'
@@ -270,7 +252,7 @@ class ServerProtocolHandler
      */
     protected function sendNoticeOfDisconnect(string $message = '') : void
     {
-        $this->sendMessage(new LdapMessageResponse(0, new ExtendedResponse(
+        $this->queue->sendMessage(new LdapMessageResponse(0, new ExtendedResponse(
             new LdapResult(ResultCode::PROTOCOL_ERROR, '', $message),
             ExtendedResponse::OID_NOTICE_OF_DISCONNECTION
         )));
@@ -282,7 +264,7 @@ class ServerProtocolHandler
      */
     protected function sendExtendedError(string $message, int $error) : void
     {
-        $this->sendMessage(new LdapMessageResponse(0, new ExtendedResponse(new LdapResult($error, '', $message))));
+        $this->queue->sendMessage(new LdapMessageResponse(0, new ExtendedResponse(new LdapResult($error, '', $message))));
     }
 
     /**
@@ -295,27 +277,17 @@ class ServerProtocolHandler
         $result = ResponseFactory::get($message->getRequest(), $resultCode, $diagnostic);
 
         if ($result) {
-            $this->sendMessage(new LdapMessageResponse($message->getMessageId(), $result));
+            $this->queue->sendMessage(new LdapMessageResponse($message->getMessageId(), $result));
         } else {
             $this->sendExtendedError($diagnostic, $resultCode);
         }
     }
 
     /**
-     * @param LdapMessageResponse $response
-     */
-    protected function sendMessage(LdapMessageResponse $response) : void
-    {
-        $this->socket->write($this->encoder->encode($response->toAsn1()));
-    }
-
-    /**
-     * @param LdapMessageRequest $message
-     * @param $context
      * @return ResponseInterface
      * @throws OperationException
      */
-    protected function sendToRequestHandler($message, $context): ResponseInterface
+    protected function sendToRequestHandler(LdapMessageRequest $message, RequestContext $context): ResponseInterface
     {
         $entries = null;
         $resultCode = ResultCode::SUCCESS;
@@ -473,27 +445,26 @@ class ServerProtocolHandler
     {
         # If we don't have a SSL cert or the OpenSSL extension is not available, then we can do nothing...
         if (!isset($this->options['ssl_cert']) || !\extension_loaded('openssl')) {
-            $this->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
+            $this->queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
                 new LdapResult(ResultCode::PROTOCOL_ERROR),
                 ExtendedRequest::OID_START_TLS
             )));
             return;
         }
         # If we are already encrypted, then consider this an operations error...
-        if ($this->socket->isEncrypted()) {
-            $this->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
+        if ($this->queue->isEncrypted()) {
+            $this->queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
                 new LdapResult(ResultCode::OPERATIONS_ERROR, '', 'The current LDAP session is already encrypted.'),
                 ExtendedRequest::OID_START_TLS
             )));
             return;
         }
-        $this->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
+        $this->queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
             new LdapResult(ResultCode::SUCCESS),
             ExtendedRequest::OID_START_TLS
         )));
 
-        $this->socket->block(true);
-        $this->socket->encrypt(true);
+        $this->queue->encrypt();
     }
 
     /**

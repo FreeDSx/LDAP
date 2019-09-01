@@ -17,6 +17,12 @@ use FreeDSx\Ldap\Exception\BindException;
 /**
  * Represents a simple bind request consisting of a username (dn, etc) and a password.
  *
+ * AuthenticationChoice ::= CHOICE {
+ *     simple                  [0] OCTET STRING,
+ *     -- 1 and 2 reserved
+ *     sasl                    [3] SaslCredentials,
+ *     ...  }
+ *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 class SimpleBindRequest extends BindRequest

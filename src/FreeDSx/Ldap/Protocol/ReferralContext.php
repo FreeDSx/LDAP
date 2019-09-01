@@ -11,7 +11,6 @@
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Ldap\LdapUrl;
-use FreeDSx\Ldap\Operation\Request\BindRequest;
 
 /**
  * Keeps track of referrals while they are being chased.
@@ -26,18 +25,11 @@ class ReferralContext
     protected $referrals = [];
 
     /**
-     * @var BindRequest|null
-     */
-    protected $bindRequest;
-
-    /**
-     * @param BindRequest|null $bindRequest
      * @param LdapUrl ...$referrals
      */
-    public function __construct(?BindRequest $bindRequest, LdapUrl ...$referrals)
+    public function __construct(LdapUrl ...$referrals)
     {
         $this->referrals = $referrals;
-        $this->bindRequest = $bindRequest;
     }
 
     /**
@@ -72,14 +64,6 @@ class ReferralContext
         }
 
         return false;
-    }
-
-    /**
-     * @return BindRequest|null
-     */
-    public function getBindRequest() : ?BindRequest
-    {
-        return $this->bindRequest;
     }
 
     /**

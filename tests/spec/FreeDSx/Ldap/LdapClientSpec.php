@@ -41,7 +41,7 @@ class LdapClientSpec extends ObjectBehavior
 {
     function let(ClientProtocolHandler $handler)
     {
-        $handler->getSocket()->willReturn(null);
+        $handler->isConnected()->willReturn(false);
         $this->beConstructedWith(['servers' => ['foo']]);
         $this->setProtocolHandler($handler);
     }
@@ -239,5 +239,20 @@ class LdapClientSpec extends ObjectBehavior
         $this->setOptions(['servers' => ['bar', 'foo']]);
 
         $this->getOptions()->shouldHaveKeyWithValue('servers', ['bar', 'foo']);
+    }
+
+    function it_should_unbind_on_destruct_if_connected($handler)
+    {
+        $handler->isConnected()->willReturn(true);
+        $handler->send(Operations::unbind())->shouldBeCalled();
+
+        $this->__destruct();
+    }
+
+    function it_should_not_unbind_on_destruct_if_not_connected($handler)
+    {
+        $handler->send(Operations::unbind())->shouldNotBeCalled();
+
+        $this->__destruct();
     }
 }

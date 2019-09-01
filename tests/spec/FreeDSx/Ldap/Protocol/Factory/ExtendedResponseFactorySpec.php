@@ -29,14 +29,14 @@ class ExtendedResponseFactorySpec extends ObjectBehavior
 
     function it_should_check_if_a_mapping_exists_for_a_specific_request_oid()
     {
-        $this::has(ExtendedRequest::OID_PWD_MODIFY)->shouldBeEqualTo(true);
-        $this::has('foo')->shouldBeEqualTo(false);
+        $this->has(ExtendedRequest::OID_PWD_MODIFY)->shouldBeEqualTo(true);
+        $this->has('foo')->shouldBeEqualTo(false);
     }
 
     function it_should_add_a_mapping_for_a_specific_oid()
     {
-        $this::set('foo', PasswordModifyResponse::class);
-        $this::has('foo')->shouldBeEqualTo(true);
+        $this->set('foo', PasswordModifyResponse::class);
+        $this->has('foo')->shouldBeEqualTo(true);
     }
 
     function it_should_get_a_mapping_based_on_an_oid_and_asn1()

@@ -37,7 +37,7 @@ class ExtendedResponseFactory
      * @param string $oid
      * @return null|ExtendedResponse
      */
-    public static function get(AbstractType $asn1, string $oid) : ?ExtendedResponse
+    public function get(AbstractType $asn1, string $oid) : ?ExtendedResponse
     {
         if (!self::has($oid)) {
             return null;
@@ -52,18 +52,15 @@ class ExtendedResponseFactory
      * @param string $oid
      * @return bool
      */
-    public static function has(string $oid)
+    public function has(string $oid)
     {
         return isset(self::$map[$oid]);
     }
 
     /**
      * Set a specific class for an operation. It must implement ProtocolElementInterface.
-     *
-     * @param string $oid
-     * @param $className
      */
-    public static function set(string $oid, $className) : void
+    public static function set(string $oid, string $className) : void
     {
         if (!class_exists($className)) {
             throw new InvalidArgumentException(sprintf(
