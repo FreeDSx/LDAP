@@ -76,13 +76,13 @@ class ClientProtocolHandler
      */
     public function send(RequestInterface $request, Control ...$controls) : ?LdapMessageResponse
     {
-        $messageTo = new LdapMessageRequest(
-            $this->queue()->generateId(),
-            $request,
-            ...\array_merge($this->controls->toArray(), $controls)
-        );
-
         try {
+            $messageTo = new LdapMessageRequest(
+                $this->queue()->generateId(),
+                $request,
+                ...\array_merge($this->controls->toArray(), $controls)
+            );
+
             $messageFrom = $this->protocolHandlerFactory->forRequest($messageTo->getRequest())->handleRequest(
                 $messageTo,
                 $this->queue(),
