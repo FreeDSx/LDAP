@@ -45,7 +45,7 @@ class PcntlServerRunnerSpec extends ObjectBehavior
         $client->close()->willReturn(null);
         $client->isConnected()->willReturn(true);
         $client->write(Argument::any())->willReturn(null);
-        $server->removeClient($client)->willReturn(null);
+        $server->removeClient($client)->shouldBeCalled();
 
         $this->run($server);
     }
