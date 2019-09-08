@@ -28,7 +28,7 @@ It supports encryption of the LDAP connection through TLS via the OpenSSL extens
 
 # Getting Started
 
-Install via composer:
+Install via [composer](https://getcomposer.org/download/):
 
 ```bash
 composer require freedsx/ldap
