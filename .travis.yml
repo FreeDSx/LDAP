@@ -4,6 +4,7 @@ php:
   - 7.1
   - 7.2
   - 7.3
+  - 7.4snapshot
 
 addons:
   apt:
@@ -15,17 +16,28 @@ addons:
 
 cache:
   directories:
-    - $HOME/.composer/cache/files
+    - $HOME/.composer/cache
 
 before_install:
   - composer self-update
 
 install:
-  - composer update $COMPOSER_FLAGS --prefer-dist
+  - travis_retry composer update $COMPOSER_FLAGS --prefer-dist
 
 before_script:
   - sudo ./tests/resources/openldap/setup.sh
 
 script:
-  - bin/phpspec run --no-interaction
-  - bin/phpunit
+  - vendor/bin/phpspec run --no-interaction
+  - vendor/bin/phpunit
+
+jobs:
+  allow_failures:
+    -   php: 7.4snapshot
+
+  include:
+    -   stage: Code Quality
+        php: 7.3
+        env: PHPStan
+        install: travis_retry composer install --prefer-dist
+        script: vendor/bin/phpstan analyse

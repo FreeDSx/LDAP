@@ -151,7 +151,7 @@ class LdapUrl
     public function setScope(?string $scope)
     {
         $scope = $scope === null ? $scope : strtolower($scope);
-        if ($scope !== null && !in_array($scope, [self::SCOPE_BASE, self::SCOPE_ONE, self::SCOPE_SUB])) {
+        if ($scope !== null && !in_array($scope, [self::SCOPE_BASE, self::SCOPE_ONE, self::SCOPE_SUB], true)) {
             throw new InvalidArgumentException(sprintf(
                 'The scope "%s" is not valid. It must be one of: %s, %s, %s',
                 $scope,
@@ -286,8 +286,8 @@ class LdapUrl
         $url->setPort($pieces['port'] ?? null);
         $url->setDn((isset($pieces['path']) && $pieces['path'] !== '/') ? self::decode(\ltrim($pieces['path'], '/')) : null);
 
-        $query = explode('?', $pieces['query'] ?? '');
-        if (!empty($query)) {
+        $query = \explode('?', $pieces['query'] ?? '');
+        if (\count($query) !== 0) {
             $url->setAttributes(...($query[0] === '' ? [] : \explode(',', $query[0])));
             $url->setScope(isset($query[1]) && $query[1] !== '' ? $query[1] : null);
             $url->setFilter(isset($query[2]) && $query[2] !== '' ? self::decode($query[2]) : null);
@@ -355,11 +355,11 @@ class LdapUrl
      *
      * @return string
      */
-    protected function getQueryString() : string
+    protected function getQueryString(): string
     {
         $query = [];
 
-        if (!empty($this->attributes)) {
+        if (\count($this->attributes) !== 0) {
             $query[0] = \implode(',', \array_map(function ($v) {
                 /** @var $v Attribute */
                 return self::encode($v->getDescription());
@@ -371,11 +371,11 @@ class LdapUrl
         if ($this->filter !== null) {
             $query[2] = self::encode($this->filter);
         }
-        if (!empty($this->extensions)) {
+        if (\count($this->extensions) !== 0) {
             $query[3] = \implode(',', $this->extensions);
         }
 
-        if (empty($query)) {
+        if (\count($query) === 0) {
             return '';
         }
 

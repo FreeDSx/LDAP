@@ -11,6 +11,7 @@
 namespace FreeDSx\Ldap\Server\RequestHandler;
 
 use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
@@ -30,69 +31,58 @@ interface RequestHandlerInterface
     /**
      * An add request.
      *
-     * @param RequestContext $context
-     * @param AddRequest $add
+     * @throws OperationException
      */
-    public function add(RequestContext $context, AddRequest $add);
+    public function add(RequestContext $context, AddRequest $add): void;
 
     /**
      * A compare request. This should return true or false for whether the compare matches or not.
      *
-     * @param RequestContext $context
-     * @param CompareRequest $compare
-     * @return bool
+     * @throws OperationException
      */
-    public function compare(RequestContext $context, CompareRequest $compare) : bool;
+    public function compare(RequestContext $context, CompareRequest $compare): bool;
 
     /**
      * A delete request.
      *
-     * @param RequestContext $context
-     * @param DeleteRequest $delete
+     * @throws OperationException
      */
-    public function delete(RequestContext $context, DeleteRequest $delete);
+    public function delete(RequestContext $context, DeleteRequest $delete): void;
 
     /**
      * An extended operation request.
      *
-     * @param RequestContext $context
-     * @param ExtendedRequest $extended
+     * @throws OperationException
      */
-    public function extended(RequestContext $context, ExtendedRequest $extended);
+    public function extended(RequestContext $context, ExtendedRequest $extended): void;
 
     /**
      * A request to modify an entry.
      *
-     * @param RequestContext $context
-     * @param ModifyRequest $modify
+     * @throws OperationException
      */
-    public function modify(RequestContext $context, ModifyRequest $modify);
+    public function modify(RequestContext $context, ModifyRequest $modify): void;
 
     /**
      * A request to modify the DN of an entry.
      *
-     * @param RequestContext $context
-     * @param ModifyDnRequest $modifyDn
+     * @throws OperationException
      */
-    public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn);
+    public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn): void;
 
     /**
      * A search request. This should return an entries collection object.
      *
-     * @param RequestContext $context
-     * @param SearchRequest $search
-     * @return Entries
+     * @throws OperationException
      */
-    public function search(RequestContext $context, SearchRequest $search) : Entries;
+    public function search(RequestContext $context, SearchRequest $search): Entries;
 
     /**
      * A simple username/password bind. It should simply return true or false for whether the username and password is
      * valid. You can also throw an operations exception, which is implicitly false, and provide an additional result
      * code and diagnostics.
      *
-     * @param string $username
-     * @param string $password
-     * @return bool
+     * @throws OperationException
      */
-    public function bind(string $username, string $password) : bool;
+    public function bind(string $username, string $password): bool;
 }

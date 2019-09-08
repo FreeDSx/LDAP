@@ -10,6 +10,8 @@
 
 namespace FreeDSx\Ldap\Control;
 
+use FreeDSx\Ldap\Exception\UnexpectedValueException;
+
 /**
  * Represents a set of controls.
  *
@@ -42,9 +44,12 @@ class ControlBag implements \IteratorAggregate, \Countable
         if ($control instanceof Control) {
             return \array_search($control, $this->controls, true) !== false;
         }
+        if (!\is_string($control)) {
+            throw new UnexpectedValueException('To check for a control you must use a string or Control object.');
+        }
 
         foreach ($this->controls as $ctrl) {
-            if ($ctrl->getTypeOid() === (string) $control) {
+            if ($ctrl->getTypeOid() === $control) {
                 return true;
             }
         }
@@ -110,12 +115,14 @@ class ControlBag implements \IteratorAggregate, \Countable
                 if (($i = \array_search($control, $this->controls, true)) !== false) {
                     unset($this->controls[$i]);
                 }
-            } else {
+            } elseif (\is_string($control)) {
                 foreach ($this->controls as $i => $ctrl) {
-                    if ($ctrl->getTypeOid() === (string) $control) {
+                    if ($ctrl->getTypeOid() === $control) {
                         unset($this->controls[$i]);
                     }
                 }
+            } else {
+                throw new UnexpectedValueException('To remove a control you must use a string or Control object.');
             }
         }
 

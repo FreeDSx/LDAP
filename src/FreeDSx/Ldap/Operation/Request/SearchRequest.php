@@ -147,7 +147,7 @@ class SearchRequest implements RequestInterface
     /**
      * Alias to setBaseDn. Convenience for a more fluent method call.
      *
-     * @param $dn
+     * @param string|Dn|null $dn
      * @return SearchRequest
      */
     public function base($dn)

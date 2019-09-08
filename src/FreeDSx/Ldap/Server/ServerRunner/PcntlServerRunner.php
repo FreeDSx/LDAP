@@ -47,7 +47,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     /**
      * {@inheritdoc}
      */
-    public function run(SocketServer $server)
+    public function run(SocketServer $server): void
     {
         $this->server = $server;
 

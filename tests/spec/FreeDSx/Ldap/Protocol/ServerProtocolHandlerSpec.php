@@ -39,7 +39,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
 {
     function let(LdapQueue $queue, ServerProtocolHandlerFactory $protocolHandlerFactory, ServerBindHandlerFactory $bindHandlerFactory, RequestHandlerInterface $dispatcher, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
     {
-        $queue->close()->willReturn(null);
+        $queue->close()->hasReturnVoid();
         $queue->isConnected()->willReturn(true);
         $queue->isEncrypted()->willReturn(false);
         $queue->sendMessage(Argument::any())->willReturn($queue);

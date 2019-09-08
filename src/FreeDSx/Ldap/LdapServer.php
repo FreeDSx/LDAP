@@ -61,7 +61,7 @@ class LdapServer
     /**
      * Runs the LDAP server. Binds the socket on the request IP/port and sends it to the server runner.
      */
-    public function run()
+    public function run(): void
     {
         $this->runner->run(SocketServer::bind($this->options['ip'], $this->options['port'], $this->options));
     }

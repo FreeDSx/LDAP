@@ -40,12 +40,10 @@ class RangeRetrieval
 
     /**
      * Get a specific ranged attribute by name from an entry. If it does not exist it will return null.
-     * 
-     * @param Entry $entry
-     * @param $attribute
-     * @return Attribute|null
+     *
+     * @param string|Attribute $attribute
      */
-    public function getRanged(Entry $entry, $attribute) : ?Attribute
+    public function getRanged(Entry $entry, $attribute): ?Attribute
     {
         $attribute = $attribute instanceof Attribute ? new Attribute($attribute->getName()) : new Attribute($attribute);
         

@@ -72,7 +72,7 @@ class Control implements ProtocolElementInterface
     protected $criticality;
 
     /**
-     * @var null|AbstractType|ProtocolElementInterface
+     * @var AbstractType|ProtocolElementInterface|string|null
      */
     protected $controlValue;
 
@@ -127,7 +127,7 @@ class Control implements ProtocolElementInterface
     }
 
     /**
-     * @param $controlValue
+     * @param AbstractType|ProtocolElementInterface|string|null $controlValue
      * @return $this
      */
     public function setValue($controlValue)
@@ -138,7 +138,7 @@ class Control implements ProtocolElementInterface
     }
 
     /**
-     * @return mixed|null
+     * @return AbstractType|ProtocolElementInterface|string|null
      */
     public function getValue()
     {

@@ -106,7 +106,7 @@ class PagingControl extends Control
     /**
      * {@inheritdoc}
      */
-    public function toAsn1() : AbstractType
+    public function toAsn1(): AbstractType
     {
         $this->controlValue = Asn1::sequence(
             Asn1::integer($this->size),
@@ -120,7 +120,7 @@ class PagingControl extends Control
      * @param AbstractType $type
      * @throws ProtocolException
      */
-    protected static function validate(AbstractType $type)
+    protected static function validate(AbstractType $type): void
     {
         if (!($type instanceof SequenceType && \count($type->getChildren()) === 2)) {
             throw new ProtocolException('A paged control value must be a sequence type with 2 children.');

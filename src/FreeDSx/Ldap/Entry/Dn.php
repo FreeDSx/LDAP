@@ -119,10 +119,13 @@ class Dn implements \IteratorAggregate, \Countable
     protected function parse() : void
     {
         $pieces = \preg_split('/(?<!\\\\),/', $this->dn);
-        $pieces = $pieces === false ? [] : $pieces;
+        $pieces = ($pieces === false) ? [] : $pieces;
 
-        if (empty($pieces)) {
-            throw new UnexpectedValueException(sprintf('The DN value "%s" is not valid.', $this->dn));
+        if (\count($pieces) === 0) {
+            throw new UnexpectedValueException(sprintf(
+                'The DN value "%s" is not valid.',
+                $this->dn
+            ));
         }
 
         foreach ($pieces as $i => $piece) {

@@ -73,7 +73,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
      */
     protected function filterEntryAttributes(SearchRequest $request, Entry $entry): void
     {
-        if (!empty($request->getAttributes())) {
+        if (\count($request->getAttributes()) !== 0) {
             foreach ($entry->getAttributes() as $dseAttr) {
                 $found = false;
                 foreach ($request->getAttributes() as $attribute) {

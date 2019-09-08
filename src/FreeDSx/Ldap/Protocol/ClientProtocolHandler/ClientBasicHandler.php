@@ -61,7 +61,7 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
 
         # The success code above should satisfy the majority of cases. This checks if the result code is really a non
         # error condition defined in RFC 4511, A.1
-        if (\in_array($result->getResultCode(), self::NON_ERROR_CODES)) {
+        if (\in_array($result->getResultCode(), self::NON_ERROR_CODES, true)) {
             return $messageFrom;
         }
 

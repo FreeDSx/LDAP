@@ -112,7 +112,7 @@ class SortingControl extends Control
                     throw new ProtocolException('The sorting control contains unexpected data.');
                 }
             }
-            if (empty($attrName) && $attrName !== '0') {
+            if ((string) $attrName === '') {
                 throw new ProtocolException('The sort key is missing an attribute description.');
             }
 

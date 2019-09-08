@@ -75,7 +75,7 @@ class Entry implements \IteratorAggregate, \Countable
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
 
-        if (!empty($attribute->getValues())) {
+        if (\count($attribute->getValues()) !== 0) {
             if (($exists = $this->get($attribute, true)) !== null) {
                 $exists->remove(...$attribute->getValues());
             }
@@ -141,7 +141,7 @@ class Entry implements \IteratorAggregate, \Countable
      * @param bool $strict If set to true, then options on the attribute must also match.
      * @return null|Attribute
      */
-    public function get($attribute, bool $strict = false) : ?Attribute
+    public function get($attribute, bool $strict = false): ?Attribute
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute);
 
@@ -161,7 +161,7 @@ class Entry implements \IteratorAggregate, \Countable
      * @param bool $strict
      * @return bool
      */
-    public function has($attribute, bool $strict = false) : bool
+    public function has($attribute, bool $strict = false): bool
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute);
 
@@ -171,7 +171,7 @@ class Entry implements \IteratorAggregate, \Countable
     /**
      * @return Attribute[]
      */
-    public function getAttributes() : array
+    public function getAttributes(): array
     {
         return $this->attributes;
     }
@@ -179,7 +179,7 @@ class Entry implements \IteratorAggregate, \Countable
     /**
      * @return Dn
      */
-    public function getDn() : Dn
+    public function getDn(): Dn
     {
         return $this->dn;
     }
@@ -189,7 +189,7 @@ class Entry implements \IteratorAggregate, \Countable
      *
      * @return Changes
      */
-    public function changes() : Changes
+    public function changes(): Changes
     {
         return $this->changes;
     }
@@ -199,7 +199,7 @@ class Entry implements \IteratorAggregate, \Countable
      *
      * @return array
      */
-    public function toArray() : array
+    public function toArray(): array
     {
         $attributes = [];
 
@@ -213,7 +213,7 @@ class Entry implements \IteratorAggregate, \Countable
     /**
      * @return \ArrayIterator
      */
-    public function getIterator()
+    public function getIterator(): \ArrayIterator
     {
         return new \ArrayIterator($this->attributes);
     }
@@ -221,50 +221,35 @@ class Entry implements \IteratorAggregate, \Countable
     /**
      * @return int
      */
-    public function count()
+    public function count(): int
     {
         return \count($this->attributes);
     }
 
-    /**
-     * @return string
-     */
-    public function __toString()
+    public function __toString(): string
     {
         return $this->dn->toString();
     }
 
-    /**
-     * @param $name
-     * @return Attribute|null
-     */
-    public function __get($name)
+    public function __get(string $name): ?Attribute
     {
         return $this->get($name);
     }
 
     /**
-     * @param $name
-     * @param $value
+     * @param Attribute|string $value
      */
-    public function __set($name, $value)
+    public function __set(string $name, $value): void
     {
         $this->set($name, ...(\is_array($value) ? $value : [$value]));
     }
 
-    /**
-     * @param $name
-     * @return bool
-     */
-    public function __isset($name)
+    public function __isset(string $name): bool
     {
         return $this->has($name);
     }
 
-    /**
-     * @param $name
-     */
-    public function __unset($name)
+    public function __unset(string $name): void
     {
         $this->reset($name);
     }

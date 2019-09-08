@@ -37,6 +37,9 @@ use FreeDSx\Ldap\Search\Filters;
  */
 class ClientReferralHandler implements ResponseHandlerInterface
 {
+    /**
+     * @var array
+     */
     protected $options = [];
 
     /**
@@ -73,7 +76,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
                 ReferralChaserInterface::class
             ));
         }
-        if (!$messageFrom->getResponse() instanceof LdapResult || empty($messageFrom->getResponse()->getReferrals())) {
+        if (!$messageFrom->getResponse() instanceof LdapResult || \count($messageFrom->getResponse()->getReferrals()) === 0) {
             throw new OperationException(
                 'Encountered a referral request, but no referrals were supplied.',
                 ResultCode::REFERRAL

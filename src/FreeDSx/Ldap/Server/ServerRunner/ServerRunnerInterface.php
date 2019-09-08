@@ -24,5 +24,5 @@ interface ServerRunnerInterface
      *
      * @param SocketServer $server
      */
-    public function run(SocketServer $server);
+    public function run(SocketServer $server): void;
 }

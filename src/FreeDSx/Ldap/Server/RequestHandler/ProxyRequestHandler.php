@@ -57,7 +57,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     /**
      * {@inheritdoc}
      */
-    public function modify(RequestContext $context, ModifyRequest $modify)
+    public function modify(RequestContext $context, ModifyRequest $modify): void
     {
         $this->ldap()->send($modify, ...$context->controls()->toArray());
     }
@@ -65,7 +65,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     /**
      * {@inheritdoc}
      */
-    public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn)
+    public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn): void
     {
         $this->ldap()->send($modifyDn, ...$context->controls()->toArray());
     }
@@ -73,7 +73,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     /**
      * {@inheritdoc}
      */
-    public function delete(RequestContext $context, DeleteRequest $delete)
+    public function delete(RequestContext $context, DeleteRequest $delete): void
     {
         $this->ldap()->send($delete, ...$context->controls()->toArray());
     }
@@ -81,7 +81,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     /**
      * {@inheritdoc}
      */
-    public function add(RequestContext $context, AddRequest $add)
+    public function add(RequestContext $context, AddRequest $add): void
     {
         $this->ldap()->send($add, ...$context->controls()->toArray());
     }
@@ -97,7 +97,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     /**
      * {@inheritdoc}
      */
-    public function compare(RequestContext $context, CompareRequest $compare) : bool
+    public function compare(RequestContext $context, CompareRequest $compare): bool
     {
         $response = $this->ldap()->send($compare, ...$context->controls()->toArray())->getResponse();
 
@@ -107,7 +107,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     /**
      * {@inheritdoc}
      */
-    public function extended(RequestContext $context, ExtendedRequest $extended)
+    public function extended(RequestContext $context, ExtendedRequest $extended): void
     {
         $this->ldap()->send($extended, ...$context->controls()->toArray());
     }
@@ -115,7 +115,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     /**
      * @param LdapClient $client
      */
-    public function setLdapClient(LdapClient $client)
+    public function setLdapClient(LdapClient $client): void
     {
         $this->ldap = $client;
     }
@@ -123,7 +123,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     /**
      * @return LdapClient
      */
-    protected function ldap() : LdapClient
+    protected function ldap(): LdapClient
     {
         if (!$this->ldap) {
             $this->ldap = new LdapClient($this->options);

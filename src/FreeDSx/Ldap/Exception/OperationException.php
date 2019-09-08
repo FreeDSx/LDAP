@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
  */
 class OperationException extends \Exception
 {
-    public function __construct($message = "", $code = ResultCode::OPERATIONS_ERROR, \Throwable $previous = null)
+    public function __construct(string $message = '', int $code = ResultCode::OPERATIONS_ERROR, \Throwable $previous = null)
     {
         parent::__construct($message, $code, $previous);
     }

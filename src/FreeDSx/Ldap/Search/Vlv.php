@@ -283,7 +283,7 @@ class Vlv
      * @param $contextId
      * @return VlvControl
      */
-    protected function createVlvControl($contextId) : VlvControl
+    protected function createVlvControl(?string $contextId) : VlvControl
     {
         if ($this->filter) {
             return Controls::vlvFilter($this->before, $this->after, $this->filter, $contextId);

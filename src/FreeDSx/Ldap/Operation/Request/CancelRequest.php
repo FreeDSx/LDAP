@@ -35,18 +35,18 @@ class CancelRequest extends ExtendedRequest
     protected $messageId;
 
     /**
-     * @param int|LdapMessage $messageId
+     * @param int $messageId
      */
-    public function __construct($messageId)
+    public function __construct(int $messageId)
     {
-        $this->setMessageId($messageId);
+        $this->messageId = $messageId;
         parent::__construct(self::OID_CANCEL);
     }
 
     /**
      * @return int
      */
-    public function getMessageId() : int
+    public function getMessageId(): int
     {
         return $this->messageId;
     }
@@ -55,9 +55,9 @@ class CancelRequest extends ExtendedRequest
      * @param int|LdapMessage $messageId
      * @return $this
      */
-    public function setMessageId($messageId)
+    public function setMessageId(int $messageId)
     {
-        $this->messageId = $messageId instanceof LdapMessage ? $messageId->getMessageId() : (int) $messageId;
+        $this->messageId = $messageId;
 
         return $this;
     }

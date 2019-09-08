@@ -46,33 +46,24 @@ class ResponseFactory
         $response = null;
         $request = $message->getRequest();
 
-        switch ($request) {
-            case $request instanceof BindRequest:
-                $response = new BindResponse(new LdapResult($resultCode, '', $diagnostic));
-                break;
-            case $request instanceof SearchRequest:
-                $response = new SearchResultDone($resultCode, '', $diagnostic);
-                break;
-            case $request instanceof AddRequest:
-                $response = new AddResponse($resultCode, $request->getEntry()->getDn()->toString(), $diagnostic);
-                break;
-            case $request instanceof CompareRequest:
-                $response = new CompareResponse($resultCode, $request->getDn()->toString(), $diagnostic);
-                break;
-            case $request instanceof DeleteRequest:
-                $response = new DeleteResponse($resultCode, $request->getDn()->toString(), $diagnostic);
-                break;
-            case $request instanceof ModifyDnRequest:
-                $response = new ModifyDnResponse($resultCode, $request->getDn()->toString(), $diagnostic);
-                break;
-            case $request instanceof ModifyRequest:
-                $response = new ModifyResponse($resultCode, $request->getDn()->toString(), $diagnostic);
-                break;
-            case $request instanceof ExtendedRequest:
-                $response = new ExtendedResponse(new LdapResult($resultCode, '', $diagnostic));
-                break;
-            default:
-                return $this->getExtendedError('Invalid request.', ResultCode::OPERATIONS_ERROR);
+        if ($request instanceof BindRequest) {
+            $response = new BindResponse(new LdapResult($resultCode, '', $diagnostic));
+        } elseif ($request instanceof SearchRequest) {
+            $response = new SearchResultDone($resultCode, '', $diagnostic);
+        } elseif ($request instanceof AddRequest) {
+            $response = new AddResponse($resultCode, $request->getEntry()->getDn()->toString(), $diagnostic);
+         } elseif ($request instanceof CompareRequest) {
+            $response = new CompareResponse($resultCode, $request->getDn()->toString(), $diagnostic);
+        } elseif ( $request instanceof DeleteRequest) {
+            $response = new DeleteResponse($resultCode, $request->getDn()->toString(), $diagnostic);
+         } elseif ($request instanceof ModifyDnRequest) {
+            $response = new ModifyDnResponse($resultCode, $request->getDn()->toString(), $diagnostic);
+         } elseif ($request instanceof ModifyRequest) {
+            $response = new ModifyResponse($resultCode, $request->getDn()->toString(), $diagnostic);
+         } elseif ($request instanceof ExtendedRequest) {
+            $response = new ExtendedResponse(new LdapResult($resultCode, '', $diagnostic));
+         } else {
+            return $this->getExtendedError('Invalid request.', ResultCode::OPERATIONS_ERROR);
         }
 
         return new LdapMessageResponse(

@@ -55,7 +55,7 @@ class FilterFactory
     {
         $filterClass = self::$map[$type->getTagNumber()] ?? null;
 
-        return $filterClass ? call_user_func($filterClass.'::fromAsn1', $type) : null;
+        return ($filterClass !== null) ? call_user_func($filterClass.'::fromAsn1', $type) : null;
     }
 
     /**

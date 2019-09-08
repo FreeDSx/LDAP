@@ -117,9 +117,9 @@ abstract class BindRequest implements RequestInterface
                 $auth->getTagNumber()
             ));
         }
-        $auth = $auth->getValue();
+        $auth = (string) $auth->getValue();
 
-        if (empty($auth) && $auth !== '0') {
+        if ($auth === '') {
             return new AnonBindRequest($name, $version);
         } else {
             return new SimpleBindRequest($name, $auth, $version);

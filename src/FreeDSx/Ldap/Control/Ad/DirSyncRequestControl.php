@@ -175,10 +175,9 @@ class DirSyncRequestControl extends Control
     }
 
     /**
-     * @param AbstractType $type
      * @throws ProtocolException
      */
-    protected static function validate(AbstractType $type)
+    protected static function validate(AbstractType $type): void
     {
         if (!($type instanceof SequenceType && \count($type) === 3)) {
             throw new ProtocolException('A DirSyncRequest control value must be a sequence type with 3 children.');

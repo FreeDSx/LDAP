@@ -123,7 +123,7 @@ class ExpectedEntryCountControl extends Control
      * @param AbstractType $type
      * @throws ProtocolException
      */
-    protected static function validate(AbstractType $type)
+    protected static function validate(AbstractType $type): void
     {
         if (!($type instanceof SequenceType && count($type) === 2)) {
             throw new ProtocolException('An ExpectedEntryCount control value must be a sequence type with 2 children.');

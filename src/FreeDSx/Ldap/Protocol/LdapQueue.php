@@ -94,7 +94,7 @@ class LdapQueue extends Asn1MessageQueue
     /**
      * Cleanly close the socket and clear buffer contents.
      */
-    public function close()
+    public function close(): void
     {
         if ($this->socket !== null) {
             $this->socket->close();
@@ -107,7 +107,7 @@ class LdapQueue extends Asn1MessageQueue
     /**
      * Generates a message ID to be sent out the queue.
      */
-    public function generateId() : int
+    public function generateId(): int
     {
         return ++$this->id;
     }
@@ -115,7 +115,7 @@ class LdapQueue extends Asn1MessageQueue
     /**
      * Get the current ID that the queue is on.
      */
-    public function currentId() : int
+    public function currentId(): int
     {
         return $this->id;
     }
@@ -126,7 +126,7 @@ class LdapQueue extends Asn1MessageQueue
      * The logic in the loop is to send the messages in chunks of 8192 bytes to lessen the amount of TCP writes we need
      * to perform if sending out many messages.
      */
-    public function sendMessage(LdapMessage ...$messages) : self
+    public function sendMessage(LdapMessage ...$messages): self
     {
         $this->initSocket();
 
@@ -152,7 +152,7 @@ class LdapQueue extends Asn1MessageQueue
      * @throws EncoderException
      * @return LdapMessageResponse|LdapMessageRequest
      */
-    public function getMessage(?int $id = null) : LdapMessage
+    public function getMessage(?int $id = null): LdapMessage
     {
         /** @var LdapMessage $message */
         $this->initSocket();

@@ -68,7 +68,7 @@ class Paging
      * @param SearchRequest $search
      * @param int|null $size
      */
-    public function start(SearchRequest $search, ?int $size = null)
+    public function start(SearchRequest $search, ?int $size = null): void
     {
         $this->size = $size ?? $this->size;
         $this->search = $search;
@@ -109,7 +109,7 @@ class Paging
             return false;
         }
 
-        return $this->control === null || !empty($this->control->getCookie());
+        return $this->control === null || !($this->control->getCookie() === '');
     }
 
     /**

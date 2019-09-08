@@ -90,7 +90,7 @@ class ExtendedRequest implements RequestInterface
     }
 
     /**
-     * @param $requestValue
+     * @param AbstractType|ProtocolElementInterface|string|null $requestValue
      * @return $this
      */
     public function setValue($requestValue)
@@ -101,7 +101,7 @@ class ExtendedRequest implements RequestInterface
     }
 
     /**
-     * @return mixed
+     * @return AbstractType|ProtocolElementInterface|string|null
      */
     public function getValue()
     {

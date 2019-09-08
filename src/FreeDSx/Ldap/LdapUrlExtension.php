@@ -136,7 +136,7 @@ class LdapUrlExtension
         }
         $pieces = \explode('=', $extension, 2);
 
-        $isCritical = !empty($pieces[0]) && $pieces[0][0] === '!';
+        $isCritical = isset($pieces[0][0]) && $pieces[0][0] === '!';
         if ($isCritical) {
             $pieces[0] = \substr($pieces[0], 1);
         }

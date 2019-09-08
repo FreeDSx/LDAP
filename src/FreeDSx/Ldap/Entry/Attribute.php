@@ -80,7 +80,7 @@ class Attribute implements \IteratorAggregate, \Countable
      */
     public function has(string $value) : bool
     {
-        return \array_search($value, $this->values) !== false;
+        return \array_search($value, $this->values, true) !== false;
     }
 
     /**
@@ -92,7 +92,7 @@ class Attribute implements \IteratorAggregate, \Countable
     public function remove(string ...$values)
     {
         foreach ($values as $value) {
-            if (($i = \array_search($value, $this->values)) !== false) {
+            if (($i = \array_search($value, $this->values, true)) !== false) {
                 unset($this->values[$i]);
             }
         }

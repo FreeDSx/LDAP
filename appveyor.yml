@@ -25,5 +25,5 @@ before_test:
 
 test_script:
   - cd C:\projects\freedsx-ldap
-  - bin\phpspec.bat run --no-interaction
-  - bin\phpunit.bat
+  - vendor\bin\phpspec.bat run --no-interaction
+  - vendor\bin\phpunit.bat

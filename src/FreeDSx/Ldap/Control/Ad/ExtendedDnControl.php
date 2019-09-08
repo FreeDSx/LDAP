@@ -94,7 +94,7 @@ class ExtendedDnControl extends Control
      * @param AbstractType $type
      * @throws ProtocolException
      */
-    protected static function validate(AbstractType $type)
+    protected static function validate(AbstractType $type): void
     {
         if (!($type instanceof SequenceType && \count($type) === 1)) {
             throw new ProtocolException('An ExtendedDn control value must be a sequence type with 1 child.');

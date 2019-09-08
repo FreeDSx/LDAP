@@ -19,18 +19,20 @@
   },
   "require-dev": {
     "phpspec/phpspec": "^5.0",
-    "phpunit/phpunit": "^7.0"
+    "phpunit/phpunit": "^7.0",
+    "phpstan/phpstan": "^0.11.15",
+    "phpstan/phpstan-strict-rules": "^0.11.1"
   },
   "suggest": {
     "ext-openssl": "For SSL/TLS support."
-  },
-  "config": {
-    "bin-dir": "bin"
   },
   "autoload": {
     "psr-4": {"FreeDSx\\Ldap\\": "src/FreeDSx/Ldap"}
   },
   "autoload-dev": {
-    "psr-4": {"unit\\FreeDSx\\Ldap\\": "tests/unit/FreeDSx/Ldap"}
+    "psr-4": {
+      "unit\\FreeDSx\\Ldap\\": "tests/unit/FreeDSx/Ldap",
+      "spec\\FreeDSx\\Ldap\\": "tests/spec/FreeDSx/Ldap"
+    }
   }
 }

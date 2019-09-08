@@ -297,27 +297,29 @@ class FilterParser
         if (!preg_match(self::MATCHING_RULE, $attribute, $matches)) {
             throw new FilterParseException(sprintf('The matching rule is not valid: %s', $attribute));
         }
-        $matchRule = new MatchingRuleFilter(null, null, $value);
+        $matchRuleObj = new MatchingRuleFilter(null, null, $value);
+
+        $matchingRule = $matches[4] ?? '';
+        $attrName = $matches[1] ?? '';
+        $useDnAttr = isset($matches[2]);
 
         # RFC 4511, 4.5.1.7.7: If the matchingRule field is absent, the type field MUST be present [..]
-        if (empty($matches[4]) && empty($matches[1])) {
+        if ($matchingRule === '' && $attrName === '') {
             throw new FilterParseException(sprintf(
                'If the matching rule is absent the attribute type must be present, but it is not: %s',
                $attribute
             ));
         }
 
-        if (!empty($matches[1])) {
-            $matchRule->setAttribute($matches[1]);
+        if ($attrName !== '') {
+            $matchRuleObj->setAttribute($attrName);
         }
-        if (!empty($matches[2])) {
-            $matchRule->setUseDnAttributes(true);
+        if ($matchingRule !== '') {
+            $matchRuleObj->setMatchingRule($matchingRule);
         }
-        if (!empty($matches[4])) {
-            $matchRule->setMatchingRule($matches[4]);
-        }
+        $matchRuleObj->setUseDnAttributes($useDnAttr);
 
-        return $matchRule;
+        return $matchRuleObj;
     }
 
     /**
@@ -401,7 +403,7 @@ class FilterParser
             # Detect an unescaped left parenthesis
             if ($this->filter[$i] === FilterInterface::PAREN_LEFT) {
                 # Is the parenthesis followed by an (ie. |, &, !) operator? If so it can contain children ...
-                if (isset($this->filter[$i + 1]) && in_array($this->filter[$i + 1], FilterInterface::OPERATORS)) {
+                if (isset($this->filter[$i + 1]) && in_array($this->filter[$i + 1], FilterInterface::OPERATORS, true)) {
                     $child = $child === null ? 0 : $child + 1;
                     $this->containers[$child] = ['startAt' => $i, 'endAt' => null];
 

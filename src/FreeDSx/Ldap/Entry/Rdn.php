@@ -77,7 +77,7 @@ class Rdn
      */
     public function isMultivalued() : bool
     {
-        return !empty($this->additional);
+        return \count($this->additional) !== 0;
     }
 
     /**
@@ -87,8 +87,8 @@ class Rdn
     {
         $rdn = $this->name.'='.$this->value;
 
-        foreach ($this->additional as $rdn) {
-            $rdn .= '+'.$rdn->getName().'='.$rdn->getValue();
+        foreach ($this->additional as $additional) {
+            $rdn .= '+'.$additional->getName().'='.$additional->getValue();
         }
 
         return $rdn;

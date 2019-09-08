@@ -34,27 +34,23 @@ class ServerDispatchHandler extends BaseServerHandler implements ServerProtocolH
         $context = new RequestContext($message->controls(), $token);
         $request = $message->getRequest();
 
-        switch ($request) {
-            case $request instanceof Request\AddRequest:
-                $dispatcher->add($context, $request);
-                break;
-            case $request instanceof Request\CompareRequest:
-                $dispatcher->compare($context, $request);
-                break;
-            case $request instanceof Request\DeleteRequest:
-                $dispatcher->delete($context, $request);
-                break;
-            case $request instanceof Request\ModifyDnRequest:
-                $dispatcher->modifyDn($context, $request);
-                break;
-            case $request instanceof Request\ModifyRequest:
-                $dispatcher->modify($context, $request);
-                break;
-            case $request instanceof Request\ExtendedRequest:
-                $dispatcher->extended($context, $request);
-                break;
-            default:
-                throw new OperationException('The request operation is not supported.', ResultCode::NO_SUCH_OPERATION);
+        if ($request instanceof Request\AddRequest) {
+            $dispatcher->add($context, $request);
+        } elseif ($request instanceof Request\CompareRequest) {
+            $dispatcher->compare($context, $request);
+        } elseif ($request instanceof Request\DeleteRequest) {
+            $dispatcher->delete($context, $request);
+        } elseif ($request instanceof Request\ModifyDnRequest) {
+            $dispatcher->modifyDn($context, $request);
+        } elseif ($request instanceof Request\ModifyRequest) {
+            $dispatcher->modify($context, $request);
+        } elseif ($request instanceof Request\ExtendedRequest) {
+            $dispatcher->extended($context, $request);
+        } else {
+            throw new OperationException(
+                'The requested operation is not supported.',
+                ResultCode::NO_SUCH_OPERATION
+            );
         }
 
         $queue->sendMessage($this->responseFactory->getStandardResponse($message));
