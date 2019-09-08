@@ -11,6 +11,7 @@
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Encoder\EncoderInterface;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
@@ -47,10 +48,10 @@ class LdapQueue extends Asn1MessageQueue
      */
     protected $socketPool;
 
-    public function __construct(Socket $socket, EncoderInterface $encoder, bool $serverMode = false)
+    public function __construct(Socket $socket, bool $serverMode = false, EncoderInterface $encoder = null)
     {
         $this->serverMode = $serverMode;
-        parent::__construct($socket, $encoder);
+        parent::__construct($socket,$encoder ?? new LdapEncoder());
     }
 
     /**
@@ -59,9 +60,9 @@ class LdapQueue extends Asn1MessageQueue
      *
      * @throws ConnectionException
      */
-    public static function usingSocketPool(SocketPool $socketPool, EncoderInterface $encoder, bool $serverMode = false) : self
+    public static function usingSocketPool(SocketPool $socketPool, bool $serverMode = false, EncoderInterface $encoder = null) : self
     {
-        $queue = new self($socketPool->connect(), $encoder, $serverMode);
+        $queue = new self($socketPool->connect(), $serverMode,  $encoder);
         $queue->socketPool = $socketPool;
 
         return $queue;
@@ -95,7 +96,9 @@ class LdapQueue extends Asn1MessageQueue
      */
     public function close()
     {
-        $this->socket->close();
+        if ($this->socket !== null) {
+            $this->socket->close();
+        }
         $this->socket = null;
         $this->buffer = false;
         $this->id = 0;
@@ -146,6 +149,7 @@ class LdapQueue extends Asn1MessageQueue
     /**
      * @throws UnsolicitedNotificationException
      * @throws ConnectionException
+     * @throws EncoderException
      * @return LdapMessageResponse|LdapMessageRequest
      */
     public function getMessage(?int $id = null) : LdapMessage
@@ -165,7 +169,7 @@ class LdapQueue extends Asn1MessageQueue
                 $response->getDiagnosticMessage(),
                 $response->getResultCode(),
                 null,
-                $response->getName()
+                (string) $response->getName()
             );
         }
         if ($id !== null && $message->getMessageId() !== $id) {
@@ -216,6 +220,9 @@ class LdapQueue extends Asn1MessageQueue
     {
         if ($this->socketPool && $this->socket === null) {
             $this->socket = $this->socketPool->connect();
+        }
+        if ($this->socketPool === null && $this->socket === null) {
+            throw new ConnectionException('Unable to re-initialize a closed socket.');
         }
     }
 }

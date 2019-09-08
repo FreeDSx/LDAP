@@ -10,6 +10,9 @@
 
 namespace FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
+use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Socket\SocketServer;
@@ -51,6 +54,7 @@ class LdapServer
     public function __construct(array $options = [], ServerRunnerInterface $serverRunner = null)
     {
         $this->options = array_merge($this->options, $options);
+        $this->validateRequestHandler();
         $this->runner = $serverRunner ?? new PcntlServerRunner($this->options);
     }
 
@@ -60,5 +64,36 @@ class LdapServer
     public function run()
     {
         $this->runner->run(SocketServer::bind($this->options['ip'], $this->options['port'], $this->options));
+    }
+
+    /**
+     * The request handler should be constructed from a string class name. This is to make sure that each client instance
+     * has its own version of the handler to avoid conflicts and potential security issues sharing a request handler.
+     */
+    protected function validateRequestHandler(): void
+    {
+        if (!isset($this->options['request_handler'])) {
+            $this->options['request_handler'] = GenericRequestHandler::class;
+
+            return;
+        }
+        if (!\is_string($this->options['request_handler'])) {
+            throw new RuntimeException(sprintf(
+                'The request handler must be a string class name, got %s.',
+                gettype($this->options['request_handler'])
+            ));
+        }
+        if (!\class_exists($this->options['request_handler'])) {
+            throw new RuntimeException(sprintf(
+                'The request handler class does not exist: %s',
+                $this->options['request_handler']
+            ));
+        }
+        if (!\is_subclass_of($this->options['request_handler'], RequestHandlerInterface::class)) {
+            throw new RuntimeException(sprintf(
+                'The request handler class must implement "%s"',
+                RequestHandlerInterface::class
+            ));
+        }
     }
 }

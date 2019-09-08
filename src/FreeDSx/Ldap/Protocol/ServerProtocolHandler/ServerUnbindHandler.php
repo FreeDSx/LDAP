@@ -8,27 +8,25 @@
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
+namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
-use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
- * Logic for handling an unbind operation.
+ * Handles an unbind. Which just closes the connection.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ClientUnbindHandler implements RequestHandlerInterface
+class ServerUnbindHandler implements ServerProtocolHandlerInterface
 {
     /**
      * {@inheritDoc}
      */
-    public function handleRequest(LdapMessageRequest $message, LdapQueue $queue, array $options): ?LdapMessageResponse
+    public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, LdapQueue $queue, array $options): void
     {
-        $queue->sendMessage($message);
         $queue->close();
-
-        return null;
     }
 }

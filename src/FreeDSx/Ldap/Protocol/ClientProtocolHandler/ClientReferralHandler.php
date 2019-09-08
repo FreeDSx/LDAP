@@ -27,7 +27,6 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\LdapQueue;
 use FreeDSx\Ldap\Protocol\ReferralContext;
-use FreeDSx\Ldap\Protocol\ResponseHandlerInterface;
 use FreeDSx\Ldap\ReferralChaserInterface;
 use FreeDSx\Ldap\Search\Filters;
 

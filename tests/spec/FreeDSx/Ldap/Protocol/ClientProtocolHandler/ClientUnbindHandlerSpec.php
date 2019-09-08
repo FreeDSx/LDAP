@@ -14,7 +14,7 @@ use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapQueue;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientUnbindHandler;
-use FreeDSx\Ldap\Protocol\RequestHandlerInterface;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
 use PhpSpec\ObjectBehavior;
 
 class ClientUnbindHandlerSpec extends ObjectBehavior

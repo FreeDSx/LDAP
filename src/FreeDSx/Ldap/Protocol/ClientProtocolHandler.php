@@ -33,7 +33,7 @@ class ClientProtocolHandler
     protected $pool;
 
     /**
-     * @var LdapQueue
+     * @var LdapQueue|null
      */
     protected $queue;
 
@@ -70,9 +70,8 @@ class ClientProtocolHandler
     }
 
     /**
-     * @param RequestInterface $request
-     * @param Control ...$controls
-     * @return LdapMessageResponse|null
+     * @throws ConnectionException
+     * @throws UnsolicitedNotificationException
      */
     public function send(RequestInterface $request, Control ...$controls) : ?LdapMessageResponse
     {
@@ -131,7 +130,7 @@ class ClientProtocolHandler
     protected function queue() : LdapQueue
     {
         if ($this->queue === null) {
-            $this->queue = LdapQueue::usingSocketPool($this->pool, new LdapEncoder());
+            $this->queue = LdapQueue::usingSocketPool($this->pool);
         }
 
         return $this->queue;

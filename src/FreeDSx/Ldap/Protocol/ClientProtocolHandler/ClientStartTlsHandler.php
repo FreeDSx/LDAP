@@ -16,7 +16,6 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\LdapQueue;
-use FreeDSx\Ldap\Protocol\ResponseHandlerInterface;
 
 /**
  * Logic for handling a StartTLS operation.

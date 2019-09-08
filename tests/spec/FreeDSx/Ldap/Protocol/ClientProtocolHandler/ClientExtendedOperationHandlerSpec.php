@@ -19,7 +19,7 @@ use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\LdapQueue;
-use FreeDSx\Ldap\Protocol\ResponseHandlerInterface;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 

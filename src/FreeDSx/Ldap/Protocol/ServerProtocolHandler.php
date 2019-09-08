@@ -11,39 +11,15 @@
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Entry\Entries;
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Operation\LdapResult;
-use FreeDSx\Ldap\Operation\Request\AddRequest;
-use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
-use FreeDSx\Ldap\Operation\Request\BindRequest;
-use FreeDSx\Ldap\Operation\Request\CompareRequest;
-use FreeDSx\Ldap\Operation\Request\DeleteRequest;
-use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
-use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
-use FreeDSx\Ldap\Operation\Request\ModifyRequest;
-use FreeDSx\Ldap\Operation\Request\RequestInterface;
-use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
-use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
-use FreeDSx\Ldap\Operation\Response\ResponseInterface;
-use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
-use FreeDSx\Ldap\Search\Filter\PresentFilter;
-use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
+use FreeDSx\Ldap\Protocol\Factory\ServerBindHandlerFactory;
+use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
-use FreeDSx\Ldap\Server\Token\AnonToken;
-use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\Server\RequestContext;
-use FreeDSx\Socket\Socket;
 
 /**
  * Handles server-client specific protocol interactions.
@@ -52,11 +28,6 @@ use FreeDSx\Socket\Socket;
  */
 class ServerProtocolHandler
 {
-    /**
-     * @var Socket
-     */
-    protected $socket;
-
     /**
      * @var array
      */
@@ -83,36 +54,72 @@ class ServerProtocolHandler
     /**
      * @var RequestHandlerInterface
      */
-    protected $handler;
+    protected $dispatcher;
 
     /**
-     * @var null|TokenInterface
+     * @var ServerAuthorization
      */
-    protected $token;
+    protected $authorizer;
 
     /**
-     * @var LdapEncoder
+     * @var ServerProtocolHandlerFactory
      */
-    protected $encoder;
+    protected $protocolHandlerFactory;
 
-    public function __construct(Socket $socket, array $options = [], LdapQueue $queue = null)
+    /**
+     * @var ResponseFactory
+     */
+    protected $responseFactory;
+
+    /**
+     * @var ServerBindHandlerFactory
+     */
+    protected $bindHandlerFactory;
+
+    public function __construct(
+        LdapQueue $queue,
+        RequestHandlerInterface $dispatcher,
+        array $options = [],
+        ServerProtocolHandlerFactory $protocolHandlerFactory = null,
+        ServerBindHandlerFactory $bindHandlerFactory = null,
+        ServerAuthorization $authorizer = null,
+        ResponseFactory $responseFactory = null
+    )
     {
-        $this->socket = $socket;
+        $this->queue = $queue;
+        $this->dispatcher = $dispatcher;
         $this->options = \array_merge($this->options, $options);
-        $this->validateAndSetRequestHandler();
-        $this->encoder = new LdapEncoder();
-        $this->queue = $queue ?? new LdapQueue($socket, $this->encoder, true);
+        $this->authorizer = $authorizer ?? new ServerAuthorization(null, $this->options);
+        $this->protocolHandlerFactory = $protocolHandlerFactory ?? new ServerProtocolHandlerFactory();
+        $this->bindHandlerFactory = $bindHandlerFactory ?? new ServerBindHandlerFactory();
+        $this->responseFactory = $responseFactory ?? new ResponseFactory();
     }
 
     /**
      * Listens for messages from the socket and handles the responses/actions needed.
      */
-    public function handle()
+    public function handle(): void
     {
         try {
-            $this->dispatchRequests();
-        // Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with a
-        // result code of protocol error.
+            while ($message = $this->queue->getMessage()) {
+                $this->dispatchRequest($message);
+                # If a protocol handler closed the TCP connection, then just break here...
+                if (!$this->queue->isConnected()) {
+                    break;
+                }
+            }
+        # OperationExceptions may be thrown by any handler and will be sent back to the client as the response
+        # specific error code and message associated with the exception.
+        } catch (OperationException $e) {
+            if (isset($message)) {
+                $this->queue->sendMessage($this->responseFactory->getStandardResponse(
+                    $message,
+                    $e->getCode(),
+                    $e->getMessage()
+                ));
+            }
+        # Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with a
+        # result code of protocol error.
         } catch (EncoderException|ProtocolException $e) {
             $this->sendNoticeOfDisconnect('The message encoding is malformed.');
         } catch (\Exception|\Throwable $e) {
@@ -120,115 +127,73 @@ class ServerProtocolHandler
                 $this->sendNoticeOfDisconnect();
             }
         } finally {
-            $this->queue->close();
-        }
-    }
-
-    /**
-     * @param RequestHandlerInterface $handler
-     */
-    public function setRequestHandler(RequestHandlerInterface $handler)
-    {
-        $this->handler = $handler;
-    }
-
-    /**
-     * Routes requests from the message queue based off some logic. Some basic protocol specific requests are handled
-     * directly:
-     *
-     *  - StartTLS request logic to encrypt a TCP session.
-     *  - WhoAmI requests to send back the user specified in the token, if it exists.
-     *  - Unbind requests to disconnect the session.
-     *  - RootDSE search requests.
-     *  - Check authentication requirements.
-     *  - Check anon bind requirements.
-     *
-     * Other requests are then dispatched to the specific request handler that has been defined.
-     */
-    protected function dispatchRequests() : void
-    {
-        /** @var LdapMessageRequest $message */
-        while ($message = $this->queue->getMessage()) {
-            if (!$this->validate($message)) {
-                continue;
-            }
-            $this->messageIds[] = $message->getMessageId();
-
-            $entries = null;
-            $result = null;
-            $context = $this->buildContext($message);
-            $request = $message->getRequest();
-            try {
-                if ($request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_WHOAMI) {
-                    $result = $this->handleWhoAmI();
-                } elseif ($request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_START_TLS) {
-                    $this->handleStartTls($message);
-                # The socket is closed in the finally block in handle(). Nothing to do, so just break the loop.
-                } elseif ($request instanceof UnbindRequest) {
-                    break;
-                } elseif ($this->isRootDseSearch($request)) {
-                    $result = $this->handleRootDse($message);
-                } elseif (!$this->options['allow_anonymous'] && $request instanceof AnonBindRequest) {
-                    $this->sendOpError($message, 'Anonymous binds are not allowed.', ResultCode::AUTH_METHOD_UNSUPPORTED);
-                } elseif ($this->options['require_authentication'] && !$this->token instanceof BindToken && !$request instanceof BindRequest) {
-                    $this->sendOpError($message, 'Authentication required.', ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
-                } else {
-                    $result = $this->sendToRequestHandler($message, $context);
-                }
-            } catch (OperationException $exception) {
-                $this->sendOpError($message, $exception->getMessage(), $exception->getCode());
-            }
-
-            if ($result) {
-                $this->queue->sendMessage(new LdapMessageResponse($message->getMessageId(), $result));
+            if ($this->queue->isConnected()) {
+                $this->queue->close();
             }
         }
     }
 
     /**
-     * This is to send the request back in chunks of 8192 bytes (or whatever the buffer size is) to lessen the amount of
-     * TCP writes we need to perform.
+     * Routes requests from the message queue based off the current authorization state and what protocol handler the
+     * request is mapped to.
      *
-     * @todo wrap this logic into the queue when sending out messages.
-     * @param LdapMessageRequest $message
-     * @param Entries $entries
+     * @throws OperationException
      */
-    protected function sendEntries(LdapMessageRequest $message, Entries $entries) : void
+    protected function dispatchRequest(LdapMessageRequest $message): void
     {
-        $messages = [];
+        if (!$this->isValidRequest($message)) {
+            return;
+        }
 
-        foreach ($entries->toArray() as $entry) {
-            $messages[] = new LdapMessageResponse(
-                $message->getMessageId(),
-                new SearchResultEntry($entry)
+        $this->messageIds[] = $message->getMessageId();
+
+        # Send auth requests to the specific handler for it...
+        if ($this->authorizer->isAuthenticationRequest($message->getRequest())) {
+            $this->authorizer->setToken($this->handleAuthRequest($message));
+
+            return;
+        }
+        $request = $message->getRequest();
+        $handler = $this->protocolHandlerFactory->get($request);
+
+        # They are authenticated or authentication is not required, so pass the request along...
+        if ($this->authorizer->isAuthenticated() || !$this->authorizer->isAuthenticationRequired($request)) {
+            $handler->handleRequest(
+                $message,
+                $this->authorizer->getToken(),
+                $this->dispatcher,
+                $this->queue,
+                $this->options
             );
-        }
+        # Authentication is required, but they have not authenticated...
+        } else {
+            $this->queue->sendMessage($this->responseFactory->getStandardResponse(
+                $message,
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+                'Authentication required.'
 
-        $this->queue->sendMessage(...$messages);
+            ));
+        }
     }
 
     /**
      * Checks that the message ID is valid. It cannot be zero or a message ID that was already used.
-     *
-     * @param LdapMessageRequest $message
-     * @return bool
      */
-    protected function validate(LdapMessageRequest $message) : bool
+    protected function isValidRequest(LdapMessageRequest $message): bool
     {
         if ($message->getMessageId() === 0) {
-            $this->queue->sendMessage(new LdapMessageResponse(0, new ExtendedResponse(new LdapResult(
-                ResultCode::PROTOCOL_ERROR,
-                '',
-                'The message ID 0 cannot be used in a client request.'
-            ))));
+            $this->queue->sendMessage($this->responseFactory->getExtendedError(
+                'The message ID 0 cannot be used in a client request.',
+                ResultCode::PROTOCOL_ERROR
+            ));
 
             return false;
         }
         if (\in_array($message->getMessageId(), $this->messageIds, true)) {
-            $this->sendExtendedError(
+            $this->queue->sendMessage($this->responseFactory->getExtendedError(
                 sprintf('The message ID %s is not valid.', $message->getMessageId()),
                 ResultCode::PROTOCOL_ERROR
-            );
+            ));
 
             return false;
         }
@@ -237,293 +202,33 @@ class ServerProtocolHandler
     }
 
     /**
-     * @param LdapMessageRequest $message
-     * @return RequestContext
-     */
-    protected function buildContext(LdapMessageRequest $message) : RequestContext
-    {
-        $token = $this->token ?? new AnonToken(null);
-
-        return new RequestContext($message->controls(), $token);
-    }
-
-    /**
-     * @param string $message
-     */
-    protected function sendNoticeOfDisconnect(string $message = '') : void
-    {
-        $this->queue->sendMessage(new LdapMessageResponse(0, new ExtendedResponse(
-            new LdapResult(ResultCode::PROTOCOL_ERROR, '', $message),
-            ExtendedResponse::OID_NOTICE_OF_DISCONNECTION
-        )));
-    }
-
-    /**
-     * @param string $message
-     * @param int $error
-     */
-    protected function sendExtendedError(string $message, int $error) : void
-    {
-        $this->queue->sendMessage(new LdapMessageResponse(0, new ExtendedResponse(new LdapResult($error, '', $message))));
-    }
-
-    /**
-     * @param LdapMessageRequest $message
-     * @param string $diagnostic
-     * @param int $resultCode
-     */
-    protected function sendOpError(LdapMessageRequest $message, string $diagnostic, int $resultCode) : void
-    {
-        $result = ResponseFactory::get($message->getRequest(), $resultCode, $diagnostic);
-
-        if ($result) {
-            $this->queue->sendMessage(new LdapMessageResponse($message->getMessageId(), $result));
-        } else {
-            $this->sendExtendedError($diagnostic, $resultCode);
-        }
-    }
-
-    /**
-     * @return ResponseInterface
+     * Sends a bind request to the bind handler and returns the token.
+     *
      * @throws OperationException
      */
-    protected function sendToRequestHandler(LdapMessageRequest $message, RequestContext $context): ResponseInterface
+    protected function handleAuthRequest(LdapMessageRequest $message): TokenInterface
     {
-        $entries = null;
-        $resultCode = ResultCode::SUCCESS;
-        $diagnostic = '';
-
-        $request = $message->getRequest();
-        switch ($request) {
-            case $request instanceof SimpleBindRequest:
-                [$resultCode, $diagnostic] = $this->handleBindRequest($request);
-                break;
-            case $request instanceof SearchRequest:
-                $entries = $this->handler->search($context, $request);
-                break;
-            case $request instanceof AddRequest:
-                $this->handler->add($context, $request);
-                break;
-            case $request instanceof CompareRequest:
-                $this->handler->compare($context, $request);
-                break;
-            case $request instanceof DeleteRequest:
-                $this->handler->delete($context, $request);
-                break;
-            case $request instanceof ModifyDnRequest:
-                $this->handler->modifyDn($context, $request);
-                break;
-            case $request instanceof ModifyRequest:
-                $this->handler->modify($context, $request);
-                break;
-            case $request instanceof ExtendedRequest:
-                $this->handler->extended($context, $request);
-                break;
-            default:
-                throw new OperationException('The request operation is not supported.', ResultCode::NO_SUCH_OPERATION);
-        }
-        $result = ResponseFactory::get($request, $resultCode, $diagnostic);
-
-        if ($entries) {
-            $this->sendEntries($message, $entries);
+        if (!$this->authorizer->isAuthenticationTypeSupported($message->getRequest())) {
+            throw new OperationException(
+                'The requested authentication type is not supported.',
+                ResultCode::AUTH_METHOD_UNSUPPORTED
+            );
         }
 
-        return $result;
+        return $this->bindHandlerFactory->get($message->getRequest())->handleBind(
+            $message,
+            $this->dispatcher,
+            $this->queue,
+            $this->options
+        );
     }
 
-    /**
-     * @param RequestInterface $request
-     * @return bool
-     */
-    protected function isRootDseSearch(RequestInterface $request) : bool
+    protected function sendNoticeOfDisconnect(string $message = ''): void
     {
-        if (!$request instanceof SearchRequest) {
-            return false;
-        }
-        $filter = $request->getFilter();
-
-        # @todo We need to truly match this.
-        return $request->getScope() === SearchRequest::SCOPE_BASE_OBJECT
-            && $request->getBaseDn()->toString() === ''
-            && $filter instanceof PresentFilter
-            && \strtolower($filter->getAttribute()) === 'objectclass';
-    }
-
-    /**
-     * Constructs and sends a very basic RootDSE back to the client.
-     *
-     * @param LdapMessageRequest $message
-     * @return ResponseInterface
-     */
-    protected function handleRootDse(LdapMessageRequest $message) : ResponseInterface
-    {
-        $entry = [
-            'namingContexts' => $this->options['dse_naming_contexts'],
-            'supportedExtension' => [
-                ExtendedRequest::OID_WHOAMI,
-            ],
-            'supportedLDAPVersion' => ['3'],
-            'vendorName' => $this->options['dse_vendor_name'],
-        ];
-        if (isset($this->options['ssl_cert'])) {
-            $entry['supportedExtension'][] = ExtendedRequest::OID_START_TLS;
-        }
-        if (isset($this->options['vendor_version'])) {
-            $entry['vendorVersion'] = $this->options['vendor_version'];
-        }
-        if (isset($this->options['alt_server'])) {
-            $entry['altServer'] = $this->options['alt_server'];
-        }
-
-        /** @var SearchRequest $request */
-        $request = $message->getRequest();
-        $entry = $this->filterEntryAttributes($request, $entry);
-        $this->sendEntries($message, new Entries(Entry::create('', $entry)));
-
-        return ResponseFactory::get($message->getRequest(), ResultCode::SUCCESS);
-    }
-
-    /**
-     * Filters attributes from an entry to return only what was requested.
-     *
-     * @param SearchRequest $request
-     * @param array $entry
-     * @return array
-     */
-    protected function filterEntryAttributes(SearchRequest $request, array $entry)
-    {
-        # Only return specific attributes if requested.
-        if (!empty($request->getAttributes())) {
-            $onlyThese = [];
-            foreach ($request->getAttributes() as $attribute) {
-                foreach (\array_keys($entry) as $dseAttr) {
-                    if ($attribute->equals(new Attribute($dseAttr))) {
-                        $onlyThese[$dseAttr] = $entry[$dseAttr];
-                    }
-                }
-            }
-            $entry = $onlyThese;
-        }
-
-        # Return attributes only if requested.
-        if ($request->getAttributesOnly()) {
-            foreach (\array_keys($entry) as $attr) {
-                $entry[$attr] = [];
-            }
-        }
-
-        return $entry;
-    }
-
-    /**
-     * @param SimpleBindRequest $request
-     * @return array
-     */
-    protected function handleBindRequest(SimpleBindRequest $request)
-    {
-        # Per RFC 4.2, a result code of protocol error must be sent back for unsupported versions.
-        if ($request->getVersion() !== 3) {
-            return [ResultCode::PROTOCOL_ERROR, 'Only LDAP version 3 is supported.'];
-        }
-
-        $diagnostic = '';
-        if ($this->handler->bind($request->getUsername(), $request->getPassword())) {
-            $this->token = new BindToken($request->getUsername(), $request->getPassword());
-            $resultCode = ResultCode::SUCCESS;
-        } else {
-            $resultCode = ResultCode::INVALID_CREDENTIALS;
-            $diagnostic = 'Invalid credentials.';
-        }
-
-        return [$resultCode, $diagnostic];
-    }
-
-    /**
-     * @param LdapMessageRequest $message
-     */
-    protected function handleStartTls(LdapMessageRequest $message) : void
-    {
-        # If we don't have a SSL cert or the OpenSSL extension is not available, then we can do nothing...
-        if (!isset($this->options['ssl_cert']) || !\extension_loaded('openssl')) {
-            $this->queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
-                new LdapResult(ResultCode::PROTOCOL_ERROR),
-                ExtendedRequest::OID_START_TLS
-            )));
-            return;
-        }
-        # If we are already encrypted, then consider this an operations error...
-        if ($this->queue->isEncrypted()) {
-            $this->queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
-                new LdapResult(ResultCode::OPERATIONS_ERROR, '', 'The current LDAP session is already encrypted.'),
-                ExtendedRequest::OID_START_TLS
-            )));
-            return;
-        }
-        $this->queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
-            new LdapResult(ResultCode::SUCCESS),
-            ExtendedRequest::OID_START_TLS
-        )));
-
-        $this->queue->encrypt();
-    }
-
-    /**
-     * @return ExtendedResponse
-     */
-    protected function handleWhoAmI() : ExtendedResponse
-    {
-        $userId = '';
-
-        if ($this->token) {
-            $userId = $this->token->getUsername();
-        }
-        if ($userId) {
-            try {
-                (new Dn($userId))->toArray();
-                $userId = 'dn:'.$userId;
-            } catch (\Exception $e) {
-                $userId = 'u:'.$userId;
-            }
-        }
-
-        return new ExtendedResponse(new LdapResult(ResultCode::SUCCESS), null, $userId);
-    }
-
-    /**
-     * The request handler should be constructed from a string class name. This is to make sure that each client instance
-     * has its own version of the handler to avoid conflicts and potential security issues sharing a request handler.
-     */
-    protected function validateAndSetRequestHandler() : void
-    {
-        if (!isset($this->options['request_handler'])) {
-            $this->handler = new GenericRequestHandler();
-            return;
-        }
-        if (!\is_string($this->options['request_handler'])) {
-            throw new RuntimeException(sprintf(
-                'The request handler must be a string class name, got %s.',
-                gettype($this->options['request_handler'])
-            ));
-        }
-        if (!\class_exists($this->options['request_handler'])) {
-            throw new RuntimeException(sprintf(
-                'The request handler class does not exist: %s',
-                $this->options['request_handler']
-            ));
-        }
-        if (!\is_subclass_of($this->options['request_handler'], RequestHandlerInterface::class)) {
-            throw new RuntimeException(sprintf(
-                'The request handler class must implement "%s"',
-                RequestHandlerInterface::class
-            ));
-        }
-        try {
-            $this->handler = new $this->options['request_handler'];
-        } catch (\Exception|\Throwable $e) {
-            throw new RuntimeException(sprintf(
-                'Unable to instantiate the request handler: "%s"',
-                $e->getMessage()
-            ), $e->getCode(), $e);
-        }
+        $this->queue->sendMessage($this->responseFactory->getExtendedError(
+            $message,
+            ResultCode::PROTOCOL_ERROR,
+            ExtendedResponse::OID_NOTICE_OF_DISCONNECTION
+        ));
     }
 }

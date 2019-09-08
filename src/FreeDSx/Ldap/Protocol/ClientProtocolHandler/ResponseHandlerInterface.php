@@ -8,7 +8,11 @@
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Protocol;
+namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
+
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\LdapQueue;
 
 /**
  * Handles response specific protocol communication details.
@@ -18,5 +22,8 @@ namespace FreeDSx\Ldap\Protocol;
  */
 interface ResponseHandlerInterface
 {
+    /**
+     * Pass the message response to the handler specific to it.
+     */
     public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, LdapQueue $queue, array $options) :?LdapMessageResponse;
 }

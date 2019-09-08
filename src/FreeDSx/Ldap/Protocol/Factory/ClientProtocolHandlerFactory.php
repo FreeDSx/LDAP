@@ -15,8 +15,8 @@ use FreeDSx\Ldap\Operation\Request as Request;
 use FreeDSx\Ldap\Operation\Response as Response;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
-use FreeDSx\Ldap\Protocol\RequestHandlerInterface;
-use FreeDSx\Ldap\Protocol\ResponseHandlerInterface;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
 
 /**
  * Retrieves the correct handler for a specific client protocol request / response.

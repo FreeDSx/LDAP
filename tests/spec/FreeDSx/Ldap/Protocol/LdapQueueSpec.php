@@ -36,7 +36,7 @@ class LdapQueueSpec extends ObjectBehavior
         $socket->read(Argument::any())->willReturn('foo', false);
         $encoder->getLastPosition()->willReturn(3);
 
-        $this->beConstructedThrough('usingSocketPool', [$socketPool, $encoder]);
+        $this->beConstructedThrough('usingSocketPool', [$socketPool, false, $encoder]);
     }
 
     function it_is_initializable()
@@ -44,9 +44,9 @@ class LdapQueueSpec extends ObjectBehavior
         $this->shouldHaveType(LdapQueue::class);
     }
 
-    function it_should_be_constructable_with_a_socket_only(Socket $socket, EncoderInterface $encoder)
+    function it_should_be_constructable_with_a_socket_only(Socket $socket)
     {
-        $this->beConstructedWith($socket, $encoder);
+        $this->beConstructedWith($socket);
 
         $this->shouldHaveType(LdapQueue::class);
     }
@@ -88,7 +88,7 @@ class LdapQueueSpec extends ObjectBehavior
 
     function it_should_get_a_requst_message($encoder, $socket)
     {
-        $this->beConstructedWith($socket, $encoder, true);
+        $this->beConstructedWith($socket, true, $encoder);
 
         $encoder->decode(Argument::any())->willReturn(Asn1::sequence(
             Asn1::integer(1),

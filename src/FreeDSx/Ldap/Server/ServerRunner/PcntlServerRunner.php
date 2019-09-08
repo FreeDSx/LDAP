@@ -11,7 +11,9 @@
 namespace FreeDSx\Ldap\Server\ServerRunner;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Protocol\LdapQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Socket\SocketServer;
 
 /**
@@ -54,10 +56,30 @@ class PcntlServerRunner implements ServerRunnerInterface
             if ($pid == -1) {
                 throw new RuntimeException('Unable to fork process.');
             } else if ($pid === 0) {
-                (new ServerProtocolHandler($socket, $this->options))->handle();
+                $serverProtocolHandler = new ServerProtocolHandler(
+                    new LdapQueue($socket, true),
+                    $this->constructRequestHandler(),
+                    $this->options
+                );
+                $serverProtocolHandler->handle();
                 $this->server->removeClient($socket);
                 exit;
             }
+        }
+    }
+
+    /**
+     * Try to instantiate the user supplied request handler.
+     */
+    protected function constructRequestHandler(): RequestHandlerInterface
+    {
+        try {
+            return new $this->options['request_handler'];
+        } catch (\Throwable $e) {
+            throw new RuntimeException(sprintf(
+                'Unable to instantiate the request handler: "%s"',
+                $e->getMessage()
+            ), $e->getCode(), $e);
         }
     }
 }

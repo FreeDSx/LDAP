@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
-use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\AddResponse;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
@@ -27,9 +26,10 @@ use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyDnResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyResponse;
-use FreeDSx\Ldap\Operation\Response\ResponseInterface;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
-
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 
 /**
  * For a specific request and result code/diagnostic, get the response object if possible.
@@ -39,14 +39,12 @@ use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 class ResponseFactory
 {
     /**
-     * @param RequestInterface $request
-     * @param int $resultCode
-     * @param string $diagnostic
-     * @return ResponseInterface|null
+     * Retrieve the expected response type for the request that was given.
      */
-    public static function get(RequestInterface $request, int $resultCode, string $diagnostic = '') : ?ResponseInterface
+    public function getStandardResponse(LdapMessageRequest $message, int $resultCode = ResultCode::SUCCESS, string $diagnostic = '') : LdapMessageResponse
     {
         $response = null;
+        $request = $message->getRequest();
 
         switch ($request) {
             case $request instanceof BindRequest:
@@ -73,8 +71,24 @@ class ResponseFactory
             case $request instanceof ExtendedRequest:
                 $response = new ExtendedResponse(new LdapResult($resultCode, '', $diagnostic));
                 break;
+            default:
+                return $this->getExtendedError('Invalid request.', ResultCode::OPERATIONS_ERROR);
         }
 
-        return $response;
+        return new LdapMessageResponse(
+            $message->getMessageId(),
+            $response
+        );
+    }
+
+    /**
+     * Retrieve an extended error, which has a message ID of zero.
+     */
+    public function getExtendedError(string $message, int $errorCode, ?string $responseName = null): LdapMessageResponse
+    {
+        return new LdapMessageResponse(
+            0,
+            new ExtendedResponse(new LdapResult($errorCode, '', $message), $responseName)
+        );
     }
 }

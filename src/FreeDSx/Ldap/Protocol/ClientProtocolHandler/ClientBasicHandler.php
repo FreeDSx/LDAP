@@ -18,8 +18,6 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\LdapQueue;
-use FreeDSx\Ldap\Protocol\RequestHandlerInterface;
-use FreeDSx\Ldap\Protocol\ResponseHandlerInterface;
 
 /**
  * Logic for handling basic operations.
@@ -56,8 +54,8 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
     {
         $result = $messageFrom->getResponse();
 
-        # No action to take if there was no result, we received something that isn't an LDAP Result, or on success.
-        if ($result === null || !$result instanceof LdapResult || $result->getResultCode() === ResultCode::SUCCESS) {
+        # No action to take if we received something that isn't an LDAP Result, or on success.
+        if (!$result instanceof LdapResult || $result->getResultCode() === ResultCode::SUCCESS) {
             return $messageFrom;
         }
 
