@@ -28,7 +28,6 @@ use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
-use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 
@@ -86,11 +85,8 @@ class Operations
 
     /**
      * Cancel a specific operation. Pass either the message ID or the LdapMessage object.
-     *
-     * @param int|LdapMessage $messageId
-     * @return CancelRequest
      */
-    public static function cancel($messageId)
+    public static function cancel(int $messageId): CancelRequest
     {
         return new CancelRequest($messageId);
     }
@@ -98,84 +94,59 @@ class Operations
     /**
      * A comparison operation to check if an entry has an attribute with a certain value.
      *
-     * @param string|Dn $dn
-     * @param string $attributeName
-     * @param string $value
      * @return CompareRequest
      */
-    public static function compare($dn, string $attributeName, string $value)
+    public static function compare(string $dn, string $attributeName, string $value): CompareRequest
     {
         return new CompareRequest($dn, Filters::equal($attributeName, $value));
     }
 
     /**
      * Delete an entry from LDAP by its DN.
-     *
-     * @param string|Dn $dn
-     * @return DeleteRequest
      */
-    public static function delete($dn)
+    public static function delete(string $dn): DeleteRequest
     {
         return new DeleteRequest($dn);
     }
 
     /**
      * Perform an extended operation.
-     *
-     * @param string $name
-     * @param null|string $value
-     * @return ExtendedRequest
      */
-    public static function extended(string $name, ?string $value = null)
+    public static function extended(string $name, ?string $value = null): ExtendedRequest
     {
         return new ExtendedRequest($name, $value);
     }
 
     /**
      * Perform modification(s) on an LDAP entry.
-     *
-     * @param string|Dn $dn
-     * @param Change[] ...$changes
-     * @return ModifyRequest
      */
-    public static function modify(string $dn, Change ...$changes)
+    public static function modify(string $dn, Change ...$changes): ModifyRequest
     {
         return new ModifyRequest($dn, ...$changes);
     }
 
     /**
      * Move an LDAP entry to a new parent DN location.
-     *
-     * @param string|Dn $dn
-     * @param string|Dn $newParentDn
-     * @return ModifyDnRequest
      */
-    public static function move($dn, $newParentDn)
+    public static function move(string $dn, string $newParentDn): ModifyDnRequest
     {
-        $dn = $dn instanceof Dn ? $dn : new Dn($dn);
+        $dnObj = new Dn($dn);
 
-        return new ModifyDnRequest($dn, $dn->getRdn(), true, $newParentDn);
+        return new ModifyDnRequest($dn, $dnObj->getRdn()->toString(), true, $newParentDn);
     }
 
     /**
      * Creates a password modify extended operation.
-     *
-     * @param string $username
-     * @param string $oldPassword
-     * @param string $newPassword
-     * @return PasswordModifyRequest
      */
-    public static function passwordModify(string $username, string $oldPassword, string $newPassword)
+    public static function passwordModify(string $username, string $oldPassword, string $newPassword): PasswordModifyRequest
     {
         return new PasswordModifyRequest($username, $oldPassword, $newPassword);
     }
 
     /**
      * Quit is an alias for unbind. This is more indicative of what an unbind actually does.
-     *
-     * @return UnbindRequest
      */
-    public static function quit()
+    public static function quit(): UnbindRequest
     {
         return self::unbind();
     }
@@ -183,12 +154,9 @@ class Operations
     /**
      * Rename an LDAP entry by modifying its RDN.
      *
-     * @param string|Dn $dn
      * @param string|Rdn $rdn
-     * @param bool $deleteOldRdn
-     * @return ModifyDnRequest
      */
-    public static function rename($dn, $rdn, bool $deleteOldRdn = true)
+    public static function rename(string $dn, $rdn, bool $deleteOldRdn = true): ModifyDnRequest
     {
         return new ModifyDnRequest($dn, $rdn, $deleteOldRdn);
     }
@@ -196,11 +164,9 @@ class Operations
     /**
      * Search LDAP with a given filter, scope, etc to retrieve a set of entries.
      *
-     * @param FilterInterface $filter
-     * @param array|Attribute $attributes
-     * @return SearchRequest
+     * @param string[]|Attribute[] ...$attributes
      */
-    public static function search(FilterInterface $filter, ...$attributes)
+    public static function search(FilterInterface $filter, ...$attributes): SearchRequest
     {
         return new SearchRequest($filter, ...$attributes);
     }
@@ -209,11 +175,9 @@ class Operations
      * Search for a specific base DN object to read. This sets a 'present' filter for the 'objectClass' attribute to help
      * simplify it.
      *
-     * @param string|Dn $baseDn
      * @param array ...$attributes
-     * @return SearchRequest
      */
-    public static function read($baseDn, ...$attributes)
+    public static function read(string $baseDn, ...$attributes): SearchRequest
     {
         return (new SearchRequest(Filters::present('objectClass'), ...$attributes))->base($baseDn)->useBaseScope();
     }
@@ -221,12 +185,9 @@ class Operations
     /**
      * Search a single level list from a base DN object.
      *
-     * @param FilterInterface $filter
-     * @param string|Dn $baseDn
      * @param array ...$attributes
-     * @return SearchRequest
      */
-    public static function list(FilterInterface $filter, $baseDn, ...$attributes)
+    public static function list(FilterInterface $filter, string $baseDn, ...$attributes): SearchRequest
     {
         return (new SearchRequest($filter, ...$attributes))->base($baseDn)->useSingleLevelScope();
     }
@@ -236,7 +197,7 @@ class Operations
      *
      * @return UnbindRequest
      */
-    public static function unbind()
+    public static function unbind(): UnbindRequest
     {
         return new UnbindRequest();
     }
@@ -246,7 +207,7 @@ class Operations
      *
      * @return ExtendedRequest
      */
-    public static function whoami()
+    public static function whoami(): ExtendedRequest
     {
         return new ExtendedRequest(ExtendedRequest::OID_WHOAMI);
     }

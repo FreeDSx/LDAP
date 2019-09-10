@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\Response\SearchResponse;
 
 /**
  * Provides a simple wrapper around paging a search operation.
@@ -120,7 +121,7 @@ class Paging
      */
     public function sizeEstimate() : ?int
     {
-        return $this->control ? $this->control->getSize() : null;
+        return ($this->control !== null) ? $this->control->getSize() : null;
     }
 
     /**
@@ -130,16 +131,24 @@ class Paging
      */
     protected function send(?int $size = null)
     {
-        $cookie = $this->control ? $this->control->getCookie() : '';
+        $cookie = ($this->control !== null) ? $this->control->getCookie() : '';
         $message = $this->client->send($this->search, Controls::paging($size ?? $this->size, $cookie));
-
-        $this->control = $message->controls()->get(Control::OID_PAGING);
+        $control = $message->controls()->get(Control::OID_PAGING);
+        if ($control !== null && !$control instanceof PagingControl) {
+            throw new ProtocolException(sprintf(
+                'Expected a paging control, but received: %s.',
+                get_class($control)
+            ));
+        }
         # OpenLDAP returns no paging control in response to an abandon request. However, other LDAP implementations do;
         # such as Active Directory. It's not clear from the paging RFC which is correct.
-        if (!$this->control && $size !== 0) {
+        if ($control === null && $size !== 0) {
             throw new ProtocolException('Expected a paging control, but received none.');
         }
+        $this->control = $control;
+        /** @var SearchResponse $response */
+        $response = $message->getResponse();
 
-        return $message->getResponse()->getEntries();
+        return $response->getEntries();
     }
 }

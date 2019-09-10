@@ -28,7 +28,7 @@ trait FilterContainerTrait
     /**
      * @var FilterInterface[]
      */
-    protected $filters;
+    protected $filters = [];
 
     /**
      * @param FilterInterface[] ...$filters

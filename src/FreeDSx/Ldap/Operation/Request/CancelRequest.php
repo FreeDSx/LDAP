@@ -52,7 +52,6 @@ class CancelRequest extends ExtendedRequest
     }
 
     /**
-     * @param int|LdapMessage $messageId
      * @return $this
      */
     public function setMessageId(int $messageId)

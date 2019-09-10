@@ -45,7 +45,7 @@ class Change
     /**
      * @param int $modType
      * @param string|Attribute $attribute
-     * @param array $values
+     * @param string[] ...$values
      */
     public function __construct(int $modType, $attribute, ...$values)
     {

@@ -14,6 +14,7 @@ use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
@@ -33,7 +34,7 @@ use FreeDSx\Ldap\Server\RequestContext;
 class ProxyRequestHandler implements RequestHandlerInterface
 {
     /**
-     * @var LdapClient
+     * @var LdapClient|null
      */
     protected $ldap;
 
@@ -100,6 +101,9 @@ class ProxyRequestHandler implements RequestHandlerInterface
     public function compare(RequestContext $context, CompareRequest $compare): bool
     {
         $response = $this->ldap()->send($compare, ...$context->controls()->toArray())->getResponse();
+        if (!$response instanceof LdapResult) {
+            throw new OperationException('The result was malformed.', ResultCode::PROTOCOL_ERROR);
+        }
 
         return $response->getResultCode() === ResultCode::COMPARE_TRUE;
     }
@@ -125,7 +129,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
      */
     protected function ldap(): LdapClient
     {
-        if (!$this->ldap) {
+        if ($this->ldap === null) {
             $this->ldap = new LdapClient($this->options);
         }
 

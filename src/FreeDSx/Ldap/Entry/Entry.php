@@ -46,8 +46,8 @@ class Entry implements \IteratorAggregate, \Countable
     /**
      * Add an attribute and its values.
      *
-     * @param string $attribute
-     * @param array ...$values
+     * @param string|Attribute $attribute
+     * @param string[] ...$values
      * @return $this
      */
     public function add($attribute, ...$values)
@@ -237,7 +237,7 @@ class Entry implements \IteratorAggregate, \Countable
     }
 
     /**
-     * @param Attribute|string $value
+     * @param string[]|string $value
      */
     public function __set(string $name, $value): void
     {

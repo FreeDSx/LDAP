@@ -41,7 +41,7 @@ class DeleteRequest implements RequestInterface, DnRequestInterface
     }
 
     /**
-     * @param string $dn
+     * @param string|Dn $dn
      * @return $this
      */
     public function setDn($dn)

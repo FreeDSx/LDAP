@@ -121,7 +121,7 @@ class FilterParser
      */
     protected function parseFilterContainer(int $startAt, bool $isRoot) : array
     {
-        if (!$this->containers) {
+        if ($this->containers === null) {
             $this->parseContainerDepths();
         }
         $this->depth += $isRoot ? 0 : 1;
@@ -171,11 +171,11 @@ class FilterParser
                 } elseif (($i + 1) < $endAt && $this->filter[$i].$this->filter[$i + 1] === $op) {
                     $filterType = $op;
                 }
-                if ($filterType) {
+                if ($filterType !== null) {
                     break;
                 }
             }
-            if ($filterType) {
+            if ($filterType !== null) {
                 $attributeEndsAfter = $i - $startAt;
                 $valueStartsAt = $i + strlen($filterType);
                 break;
@@ -335,9 +335,9 @@ class FilterParser
         $contains = [];
         foreach ($substrings as $substring) {
             $substring[0] = $this->unescapeValue($substring[0]);
-            if ($substring[1] === 0) {
+            if (isset($substring[1]) && ($substring[1] === 0)) {
                 $filter->setStartsWith($substring[0]);
-            } elseif (($substring[1] + strlen($substring[0])) === strlen($value)) {
+            } elseif (isset($substring[1]) && ($substring[1] + strlen($substring[0])) === strlen($value)) {
                 $filter->setEndsWith($substring[0]);
             } else {
                 $contains[] = $substring[0];

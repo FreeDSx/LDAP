@@ -113,7 +113,7 @@ class PwdPolicyResponseControl extends Control
             ));
         }
 
-        if ($warning) {
+        if ($warning !== null) {
             $response->addChild($warning);
         }
         if ($this->error !== null) {

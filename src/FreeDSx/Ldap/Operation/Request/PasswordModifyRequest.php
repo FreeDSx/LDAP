@@ -138,7 +138,7 @@ class PasswordModifyRequest extends ExtendedRequest
     public static function fromAsn1(AbstractType $type)
     {
         $request = self::decodeEncodedValue($type);
-        if (!$request) {
+        if ($request === null) {
             return new self();
         }
         if (!($request instanceof SequenceType)) {

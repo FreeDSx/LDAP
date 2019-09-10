@@ -11,6 +11,8 @@
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
@@ -56,9 +58,14 @@ class ClientSearchHandler extends ClientBasicHandler
             $messageFrom = $queue->getMessage($messageTo->getMessageId());
         }
 
+        $ldapResult = $messageFrom->getResponse();
+        if (!$ldapResult instanceof LdapResult) {
+            throw new OperationException('The final search result is malformed.');
+        }
+
         $finalResponse = new LdapMessageResponse(
             $messageFrom->getMessageId(),
-            new SearchResponse($messageFrom->getResponse(), new Entries(...$entries)),
+            new SearchResponse($ldapResult, new Entries(...$entries)),
             ...$messageFrom->controls()->toArray()
         );
 

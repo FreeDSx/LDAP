@@ -63,6 +63,9 @@ class ExtendedDnControl extends Control
      */
     public static function fromAsn1(AbstractType $type)
     {
+        if (!$type instanceof SequenceType) {
+            throw new ProtocolException('The extended DN control is malformed.');
+        }
         [0 => $oid, 1 => $criticality, 2 => $value] = self::parseAsn1ControlValues($type);
 
         $useHexFormat = false;

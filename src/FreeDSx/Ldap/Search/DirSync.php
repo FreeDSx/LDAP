@@ -30,7 +30,7 @@ use FreeDSx\Ldap\Search\Filter\FilterInterface;
 class DirSync
 {
     /**
-     * @var DirSyncResponseControl
+     * @var DirSyncResponseControl|null
      */
     protected $lastResponse;
 
@@ -129,7 +129,7 @@ class DirSync
      */
     public function hasChanges() : bool
     {
-        if (!$this->lastResponse) {
+        if ($this->lastResponse === null) {
             return false;
         }
 
@@ -147,10 +147,11 @@ class DirSync
     {
         /** @var LdapMessageResponse $response */
         $response = $this->client->send($this->getSearchRequest(), $this->getDirSyncControl());
-        $this->lastResponse = $response->controls()->get(Control::OID_DIR_SYNC);
-        if (!$this->lastResponse) {
+        $lastResponse = $response->controls()->get(Control::OID_DIR_SYNC);
+        if ($lastResponse === null || !$lastResponse instanceof DirSyncResponseControl) {
             throw new RuntimeException('Expected a DirSync control in the response, but none was received.');
         }
+        $this->lastResponse = $lastResponse;
         $this->dirSyncRequest->setCookie($this->lastResponse->getCookie());
         /** @var SearchResponse $searchResponse */
         $searchResponse = $response->getResponse();
@@ -297,7 +298,7 @@ class DirSync
      */
     protected function getDefaultRootNc()
     {
-        if (!$this->defaultRootNc) {
+        if ($this->defaultRootNc === null) {
             $this->defaultRootNc = (string) $this->client->read('', ['defaultNamingContext'])->get('defaultNamingContext');
         }
         if ($this->defaultRootNc === '') {

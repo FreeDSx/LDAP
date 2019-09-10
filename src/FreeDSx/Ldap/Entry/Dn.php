@@ -103,20 +103,20 @@ class Dn implements \IteratorAggregate, \Countable
     /**
      * @return Rdn[]
      */
-    public function toArray() : array
+    public function toArray(): array
     {
         if ($this->pieces !== null) {
             return $this->pieces;
         }
         $this->parse();
 
-        return $this->pieces;
+        return ($this->pieces === null) ? [] : $this->pieces;
     }
 
     /**
      * @todo This needs proper handling. But the regex would probably be rather crazy.
      */
-    protected function parse() : void
+    protected function parse(): void
     {
         $pieces = \preg_split('/(?<!\\\\),/', $this->dn);
         $pieces = ($pieces === false) ? [] : $pieces;

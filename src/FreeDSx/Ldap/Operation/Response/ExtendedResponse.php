@@ -43,7 +43,7 @@ class ExtendedResponse extends LdapResult
     protected $responseName;
 
     /**
-     * @var null|string
+     * @var null|string|AbstractType|ProtocolElementInterface
      */
     protected $responseValue;
 

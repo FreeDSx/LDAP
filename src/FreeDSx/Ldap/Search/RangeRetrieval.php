@@ -85,7 +85,7 @@ class RangeRetrieval
     /**
      * A simple check to determine if an entry contains any ranged attributes. Optionally pass an attribute
      *
-     * @param string|Entry $entry
+     * @param Entry $entry
      * @param Attribute|string|null $attribute
      * @return bool
      */
@@ -125,12 +125,12 @@ class RangeRetrieval
             return new Attribute($attribute->getName());
         }
         if ($amount !== '*') {
-            $amount += $range->getHighRange();
+            $amount = (int) $amount + (int) $range->getHighRange();
         }
         $attrReq = new Attribute($attribute->getName());
-        $attrReq->getOptions()->set(Option::fromRange($range->getHighRange() + 1, (string) $amount));
+        $attrReq->getOptions()->set(Option::fromRange((int) $range->getHighRange() + 1, (string) $amount));
         $result = $this->client->read($entry, [$attrReq]);
-        if (!$result) {
+        if ($result === null) {
             throw new RuntimeException(sprintf(
                 'No result for "%s" received from LDAP.',
                 (string) $entry
@@ -163,10 +163,10 @@ class RangeRetrieval
 
         $entry = $this->client->read($entry, [$attrResult]);
         $attribute = $this->getRanged($entry, $attrResult);
-        if (!$attribute) {
+        if ($attribute === null) {
             throw new RuntimeException(sprintf(
                 'No ranged result received for "%s" on entry "%s".',
-                $attribute->getName(),
+                $attrResult->getName(),
                 $entry->getDn()->toString()
             ));
         }

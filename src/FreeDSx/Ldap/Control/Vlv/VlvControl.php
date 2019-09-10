@@ -171,7 +171,7 @@ class VlvControl extends Control
         if ($this->filter === null && ($this->count === null || $this->offset === null)) {
             throw new RuntimeException('You must specify a filter or offset and count for a VLV request.');
         }
-        if ($this->filter) {
+        if ($this->filter !== null) {
             $this->controlValue->addChild(Asn1::context(1, $this->filter->toAsn1()));
         } else {
             $this->controlValue->addChild(Asn1::context(0, Asn1::sequence(

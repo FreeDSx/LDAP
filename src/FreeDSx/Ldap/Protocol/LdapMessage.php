@@ -149,7 +149,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                     $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
                     /** @var SequenceOfType $child */
                     foreach ($child->getChildren() as $control) {
-                        if (!($control instanceof SequenceType && $control->getChild(0) && $control->getChild(0) instanceof OctetStringType)) {
+                        if (!($control instanceof SequenceType && $control->getChild(0) !== null && $control->getChild(0) instanceof OctetStringType)) {
                             throw new ProtocolException('The control either is not a sequence or has no OID value attached.');
                         }
                         switch ($control->getChild(0)->getValue()) {
@@ -174,7 +174,8 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
             }
         }
 
-        if (!(($mesageId = $type->getChild(0)) && $mesageId instanceof IntegerType)) {
+        $messageId = $type->getChild(0);
+        if (!($messageId !== null && $messageId instanceof IntegerType)) {
             throw new ProtocolException('Expected an LDAP message ID as an ASN.1 integer type. None received.');
         }
 
@@ -248,7 +249,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
         }
 
         return new static(
-            $mesageId->getValue(),
+            $messageId->getValue(),
             $operation,
             ...$controls
         );

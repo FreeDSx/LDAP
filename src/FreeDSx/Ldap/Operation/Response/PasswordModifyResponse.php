@@ -69,7 +69,7 @@ class PasswordModifyResponse extends ExtendedResponse
         $generatedPassword = null;
 
         $pwdResponse = self::decodeEncodedValue($type);
-        if ($pwdResponse && $pwdResponse instanceof SequenceType) {
+        if ($pwdResponse !== null && $pwdResponse instanceof SequenceType) {
             foreach ($pwdResponse->getChildren() as $child) {
                 if ($child->getTagNumber() === 0) {
                     $generatedPassword = $child->getValue();

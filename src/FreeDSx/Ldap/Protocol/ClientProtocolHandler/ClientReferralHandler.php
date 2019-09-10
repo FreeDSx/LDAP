@@ -105,7 +105,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
             $bind = null;
             try {
                 # @todo Remove the bind parameter from the interface in a future release.
-                if ($referralChaser) {
+                if ($referralChaser !== null) {
                     $bind = $referralChaser->chase($messageTo, $referral, null);
                 }
             } catch (SkipReferralException $e) {

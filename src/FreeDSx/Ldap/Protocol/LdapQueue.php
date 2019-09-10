@@ -48,6 +48,11 @@ class LdapQueue extends Asn1MessageQueue
      */
     protected $socketPool;
 
+    /**
+     * @var Socket|null
+     */
+    protected $socket;
+
     public function __construct(Socket $socket, bool $serverMode = false, EncoderInterface $encoder = null)
     {
         $this->serverMode = $serverMode;
@@ -89,7 +94,7 @@ class LdapQueue extends Asn1MessageQueue
      */
     public function isEncrypted(): bool
     {
-        return $this->socket && $this->socket->isEncrypted();
+        return ($this->socket !== null && $this->socket->isEncrypted());
     }
     /**
      * Cleanly close the socket and clear buffer contents.
@@ -139,7 +144,7 @@ class LdapQueue extends Asn1MessageQueue
                 $buffer = $bufferLen > self::BUFFER_SIZE ? \substr($buffer, self::BUFFER_SIZE) : '';
             }
         }
-        if (\strlen($buffer)) {
+        if (\strlen($buffer) > 0) {
             $this->socket->write($buffer);
         }
 
@@ -218,7 +223,7 @@ class LdapQueue extends Asn1MessageQueue
      */
     protected function initSocket() : void
     {
-        if ($this->socketPool && $this->socket === null) {
+        if ($this->socketPool !== null && $this->socket === null) {
             $this->socket = $this->socketPool->connect();
         }
         if ($this->socketPool === null && $this->socket === null) {

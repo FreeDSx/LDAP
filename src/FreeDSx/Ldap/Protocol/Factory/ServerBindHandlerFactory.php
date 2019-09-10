@@ -12,7 +12,7 @@ namespace FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
-use FreeDSx\Ldap\Operation\Request\BindRequest;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\BindHandlerInterface;
@@ -31,7 +31,7 @@ class ServerBindHandlerFactory
      *
      * @throws OperationException
      */
-    public function get(BindRequest $request): BindHandlerInterface
+    public function get(RequestInterface $request): BindHandlerInterface
     {
         if ($request instanceof SimpleBindRequest) {
             return new ServerBindHandler();

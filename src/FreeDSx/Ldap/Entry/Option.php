@@ -57,12 +57,11 @@ class Option
      * A convenience method to get the high value of a range option.
      *
      * @see https://msdn.microsoft.com/en-us/library/cc223242.aspx
-     * @return string|null
      */
-    public function getHighRange() : ?string
+    public function getHighRange() : string
     {
         if (!$this->isRange()) {
-            return null;
+            return '';
         }
         \preg_match(self::MATCH_RANGE, $this->option, $match);
 

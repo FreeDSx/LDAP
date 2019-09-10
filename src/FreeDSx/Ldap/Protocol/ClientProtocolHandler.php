@@ -87,7 +87,7 @@ class ClientProtocolHandler
                 $this->queue(),
                 $this->options
             );
-            if ($messageFrom) {
+            if ($messageFrom !== null) {
                 $messageFrom = $this->protocolHandlerFactory->forResponse($messageTo->getRequest(), $messageFrom->getResponse())->handleResponse(
                     $messageTo,
                     $messageFrom,
@@ -121,7 +121,7 @@ class ClientProtocolHandler
      */
     public function isConnected() : bool
     {
-        return $this->queue && $this->queue->isConnected();
+        return ($this->queue !== null && $this->queue->isConnected());
     }
 
     /**

@@ -57,7 +57,7 @@ class LdapUrl
     protected $scope;
 
     /**
-     * @var string[]
+     * @var Attribute[]
      */
     protected $attributes = [];
 
@@ -71,9 +71,6 @@ class LdapUrl
      */
     protected $extensions = [];
 
-    /**
-     * @param null|string $host
-     */
     public function __construct(?string $host = null)
     {
         $this->host = $host;
@@ -90,24 +87,17 @@ class LdapUrl
         return $this;
     }
 
-    /**
-     * @return Dn
-     */
     public function getDn() : ?Dn
     {
         return $this->dn;
     }
 
-    /**
-     * @return mixed
-     */
     public function getHost() : ?string
     {
         return $this->host;
     }
 
     /**
-     * @param null|string $host
      * @return $this
      */
     public function setHost(?string $host)
@@ -206,7 +196,7 @@ class LdapUrl
     /**
      * @return Attribute[]
      */
-    public function getAttributes() : array
+    public function getAttributes(): array
     {
         return $this->attributes;
     }

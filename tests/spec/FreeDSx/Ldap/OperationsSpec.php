@@ -59,7 +59,9 @@ class OperationsSpec extends ObjectBehavior
         $dn = new Dn('cn=foo,dc=example,dc=local');
         $dn->getRdn();
 
-        $this::move(new Dn('cn=foo,dc=example,dc=local'), new Dn('ou=foo,dc=example,dc=local'))->shouldBeLike(new ModifyDnRequest($dn, 'cn=foo', true, 'ou=foo,dc=example,dc=local'));
+        $this::move(new Dn('cn=foo,dc=example,dc=local'), new Dn('ou=foo,dc=example,dc=local'))->shouldBeLike(
+            new ModifyDnRequest('cn=foo,dc=example,dc=local', 'cn=foo', true, 'ou=foo,dc=example,dc=local')
+        );
     }
 
     function it_should_create_a_delete_operation()

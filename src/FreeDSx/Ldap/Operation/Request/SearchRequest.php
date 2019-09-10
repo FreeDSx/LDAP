@@ -125,7 +125,7 @@ class SearchRequest implements RequestInterface
 
     /**
      * @param FilterInterface $filter
-     * @param string[]|Attribute[] $attributes
+     * @param string[]|Attribute[] ...$attributes
      */
     public function __construct(FilterInterface $filter, ...$attributes)
     {

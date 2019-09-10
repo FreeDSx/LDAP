@@ -213,8 +213,6 @@ class SubstringFilter implements FilterInterface
     }
 
     /**
-     * @param $substrings
-     * @return array
      * @throws ProtocolException
      */
     protected static function parseSubstrings(SequenceType $substrings) : array
@@ -230,7 +228,7 @@ class SubstringFilter implements FilterInterface
             }
             # Starts With and Ends With can occur only once each. Contains can occur multiple times.
             if ($substring->getTagNumber() === 0) {
-                if ($startsWith) {
+                if ($startsWith !== null) {
                     throw new ProtocolException('The substring filter is malformed.');
                 } else {
                     $startsWith = $substring;
@@ -238,7 +236,7 @@ class SubstringFilter implements FilterInterface
             } elseif ($substring->getTagNumber() === 1) {
                 $contains[] = $substring->getValue();
             } elseif ($substring->getTagNumber() === 2) {
-                if ($endsWith) {
+                if ($endsWith !== null) {
                     throw new ProtocolException('The substring filter is malformed.');
                 } else {
                     $endsWith = $substring;
@@ -248,6 +246,10 @@ class SubstringFilter implements FilterInterface
             }
         }
 
-        return [$startsWith ? $startsWith->getValue() : null, $endsWith ? $endsWith->getValue() : null, $contains];
+        return [
+            ($startsWith !== null) ? $startsWith->getValue() : null,
+            ($endsWith !== null)  ? $endsWith->getValue() : null,
+            $contains
+        ];
     }
 }

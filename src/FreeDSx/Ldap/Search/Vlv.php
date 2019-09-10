@@ -187,7 +187,7 @@ class Vlv
      */
     public function listOffset() : ?int
     {
-        return $this->control ? $this->control->getOffset() : null;
+        return ($this->control !== null) ? $this->control->getOffset() : null;
     }
 
     /**
@@ -197,7 +197,7 @@ class Vlv
      */
     public function listSize() : ?int
     {
-        return $this->control ? $this->control->getCount() : null;
+        return ($this->control !== null) ? $this->control->getCount() : null;
     }
 
     /**
@@ -208,7 +208,7 @@ class Vlv
      */
     public function position() : ?int
     {
-        $pos = $this->control ? $this->control->getOffset() : null;
+        $pos = ($this->control !== null) ? $this->control->getOffset() : null;
 
         if ($this->asPercentage && $pos !== null) {
             $pos = round($this->control->getOffset() / ($this->control->getCount() / 100));
@@ -266,13 +266,13 @@ class Vlv
      */
     protected function send()
     {
-        $contextId = $this->control ? $this->control->getContextId() : null;
+        $contextId = ($this->control !== null) ? $this->control->getContextId() : null;
         $message = $this->client->send($this->search, $this->createVlvControl($contextId), $this->sort);
-        $this->control = $message->controls()->get(Control::OID_VLV_RESPONSE);
-
-        if (!$this->control) {
+        $control = $message->controls()->get(Control::OID_VLV_RESPONSE);
+        if ($control === null || !$control instanceof VlvResponseControl) {
             throw new ProtocolException('Expected a VLV response control, but received none.');
         }
+        $this->control = $control;
         /** @var SearchResponse $response */
         $response = $message->getResponse();
 
@@ -280,20 +280,19 @@ class Vlv
     }
 
     /**
-     * @param $contextId
      * @return VlvControl
      */
     protected function createVlvControl(?string $contextId) : VlvControl
     {
-        if ($this->filter) {
+        if ($this->filter !== null) {
             return Controls::vlvFilter($this->before, $this->after, $this->filter, $contextId);
         }
         # An offset of 1 and a content size of zero starts from the beginning entry (server uses its assumed count).
-        $count = $this->control ? $this->control->getCount() : 0;
+        $count = ($this->control !== null) ? $this->control->getCount() : 0;
 
         # In percentage mode start off with an assumed count of 100, as the formula the server uses should give us the
         # expected result
-        if (!$this->control && $this->asPercentage) {
+        if ($this->control === null && $this->asPercentage) {
             $count = 100;
         }
 
@@ -305,7 +304,7 @@ class Vlv
             $offset = 0;
         }
 
-        if ($this->asPercentage && $this->control) {
+        if ($this->asPercentage && $this->control !== null) {
             $offset = round(($this->control->getCount() / 100) * $offset);
         }
 

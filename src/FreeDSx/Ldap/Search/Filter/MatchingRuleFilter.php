@@ -171,10 +171,10 @@ class MatchingRuleFilter implements FilterInterface
     public function toString(): string
     {
         $filter = '';
-        if ($this->attribute) {
+        if ($this->attribute !== null) {
             $filter = $this->attribute;
         }
-        if ($this->matchingRule) {
+        if ($this->matchingRule !== null) {
             $filter .= ':'.$this->matchingRule;
         }
         if ($this->useDnAttributes) {
@@ -223,19 +223,24 @@ class MatchingRuleFilter implements FilterInterface
         if (!$matchValue instanceof OctetStringType) {
             throw new ProtocolException('The matching rule filter is malformed.');
         }
-        if ($matchingRule && !$matchingRule instanceof OctetStringType) {
+        if ($matchingRule !== null && !$matchingRule instanceof OctetStringType) {
             throw new ProtocolException('The matching rule filter is malformed.');
         }
-        if ($matchingType && !$matchingType instanceof OctetStringType) {
+        if ($matchingType !== null && !$matchingType instanceof OctetStringType) {
             throw new ProtocolException('The matching rule filter is malformed.');
         }
-        if ($useDnAttr && !$useDnAttr instanceof BooleanType) {
+        if ($useDnAttr !== null && !$useDnAttr instanceof BooleanType) {
             throw new ProtocolException('The matching rule filter is malformed.');
         }
-        $matchingRule = $matchingRule ? $matchingRule->getValue() : null;
-        $matchingType = $matchingType ? $matchingType->getValue() : null;
-        $useDnAttr = $useDnAttr ? $useDnAttr->getValue() : false;
+        $matchingRule = ($matchingRule !== null) ? $matchingRule->getValue() : null;
+        $matchingType = ($matchingType !== null) ? $matchingType->getValue() : null;
+        $useDnAttr = ($useDnAttr !== null) ? $useDnAttr->getValue() : false;
 
-        return new self($matchingRule, $matchingType, $matchValue->getValue(), $useDnAttr);
+        return new self(
+            $matchingRule,
+            $matchingType,
+            $matchValue->getValue(),
+            $useDnAttr
+        );
     }
 }

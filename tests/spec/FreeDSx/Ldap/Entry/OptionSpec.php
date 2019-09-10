@@ -56,9 +56,9 @@ class OptionSpec extends ObjectBehavior
         $this->getHighRange()->shouldBeEqualTo('1500');
     }
     
-    function it_should_return_null_if_the_high_range_cannot_be_parsed()
+    function it_should_return_an_empty_string_if_the_high_range_cannot_be_parsed()
     {
-        $this->getHighRange()->shouldBeNull();
+        $this->getHighRange()->shouldBeEqualTo('');
     }
     
     function it_should_get_the_low_range_value_of_an_option()

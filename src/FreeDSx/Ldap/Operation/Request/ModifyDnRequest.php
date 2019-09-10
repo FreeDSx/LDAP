@@ -163,13 +163,13 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
         if (!($entry instanceof OctetStringType && $newRdn instanceof OctetStringType && $deleteOldRdn instanceof BooleanType)) {
             throw new ProtocolException('The modify dn request is malformed');
         }
-        if ($newSuperior && !($newSuperior->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $newSuperior->getTagNumber() === 0)) {
+        if ($newSuperior !== null && !($newSuperior->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $newSuperior->getTagNumber() === 0)) {
             throw new ProtocolException('The modify dn request is malformed');
         }
-        if ($newSuperior && !$newSuperior instanceof OctetStringType) {
+        if ($newSuperior !== null && !$newSuperior instanceof OctetStringType) {
             throw new ProtocolException('The modify dn request is malformed');
         }
-        $newSuperior = $newSuperior ? $newSuperior->getValue() : null;
+        $newSuperior = ($newSuperior !== null) ? $newSuperior->getValue() : null;
 
         return new self($entry->getValue(), $newRdn->getValue(), $deleteOldRdn->getValue(), $newSuperior);
     }

@@ -41,20 +41,17 @@ class ControlBag implements \IteratorAggregate, \Countable
      */
     public function has($control) : bool
     {
-        if ($control instanceof Control) {
-            return \array_search($control, $this->controls, true) !== false;
-        }
-        if (!\is_string($control)) {
-            throw new UnexpectedValueException('To check for a control you must use a string or Control object.');
-        }
-
-        foreach ($this->controls as $ctrl) {
-            if ($ctrl->getTypeOid() === $control) {
-                return true;
+        if (is_string($control)) {
+            foreach ($this->controls as $ctrl) {
+                if ($ctrl->getTypeOid() === $control) {
+                    return true;
+                }
             }
+
+            return false;
         }
 
-        return false;
+        return \array_search($control, $this->controls, true) !== false;
     }
 
     /**
@@ -111,18 +108,16 @@ class ControlBag implements \IteratorAggregate, \Countable
     public function remove(...$controls)
     {
         foreach ($controls as $control) {
-            if ($control instanceof Control) {
-                if (($i = \array_search($control, $this->controls, true)) !== false) {
-                    unset($this->controls[$i]);
-                }
-            } elseif (\is_string($control)) {
+            if (\is_string($control)) {
                 foreach ($this->controls as $i => $ctrl) {
                     if ($ctrl->getTypeOid() === $control) {
                         unset($this->controls[$i]);
                     }
                 }
             } else {
-                throw new UnexpectedValueException('To remove a control you must use a string or Control object.');
+                if (($i = \array_search($control, $this->controls, true)) !== false) {
+                    unset($this->controls[$i]);
+                }
             }
         }
 

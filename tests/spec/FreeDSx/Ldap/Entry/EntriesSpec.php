@@ -102,11 +102,6 @@ class EntriesSpec extends ObjectBehavior
         $this->has('cn=meh')->shouldBeEqualTo(false);
     }
 
-    function it_should_throw_an_exception_if_checking_for_an_entry_without_an_entry_or_string()
-    {
-        $this->shouldThrow(InvalidArgumentException::class)->during('has', [false]);
-    }
-
     function it_should_get_an_entry_by_dn()
     {
         $this->get('foo')->shouldBeLike(new Entry('foo'));
