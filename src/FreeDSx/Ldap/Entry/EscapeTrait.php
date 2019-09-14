@@ -34,23 +34,16 @@ trait EscapeTrait
 
     /**
      * Replace non-printable ASCII with escaped hex.
-     *
-     * @param string $value
-     * @return string
      */
-    protected static function escapeNonPrintable(string $value) : string
+    protected static function escapeNonPrintable(string $value): string
     {
         return \preg_replace_callback('/([\x00-\x1F\x7F])/', function($matches) {
             return '\\'.\bin2hex($matches[1]);
         }, $value);
     }
 
-    /**
-     * @param string $value
-     * @return bool
-     */
-    protected static function shouldNotEscape(string $value)
+    protected static function shouldNotEscape(string $value): bool
     {
-        return (\preg_match('/^(\\\\[0-9A-Fa-f]{2})+$/', $value)  || $value === '');
+        return (\preg_match('/^(\\\\[0-9A-Fa-f]{2})+$/', $value) === 1  || $value === '');
     }
 }

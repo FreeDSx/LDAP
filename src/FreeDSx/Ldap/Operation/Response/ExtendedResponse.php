@@ -52,7 +52,7 @@ class ExtendedResponse extends LdapResult
      * @param null|string $responseName
      * @param null|string $responseValue
      */
-    public function __construct(LdapResult $result, ?string $responseName = null, ?string $responseValue = null)
+    public function __construct(LdapResult $result, ?string $responseName = null, $responseValue = null)
     {
         $this->responseValue = $responseValue;
         $this->responseName = $responseName;
@@ -76,7 +76,7 @@ class ExtendedResponse extends LdapResult
      */
     public function getValue() : ?string
     {
-        return $this->responseValue;
+        return is_string($this->responseValue) ? $this->responseValue : null;
     }
 
     /**

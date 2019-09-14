@@ -12,6 +12,7 @@ namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceOfType;
@@ -144,7 +145,10 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
         if ($count > 2) {
             for ($i = 2; $i < $count; $i++) {
                 $child = $type->getChild($i);
-                if ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 0) {
+                if ($child !== null && $child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 0) {
+                    if (!$child instanceof IncompleteType) {
+                        throw new ProtocolException('The ASN1 structure for the controls is malformed.');
+                    }
                     /** @var \FreeDSx\Asn1\Type\IncompleteType $child */
                     $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
                     /** @var SequenceOfType $child */
@@ -178,8 +182,11 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
         if (!($messageId !== null && $messageId instanceof IntegerType)) {
             throw new ProtocolException('Expected an LDAP message ID as an ASN.1 integer type. None received.');
         }
-
         $opAsn1 = $type->getChild(1);
+        if ($opAsn1 === null) {
+            throw new ProtocolException('The LDAP message is malformed.');
+        }
+
         switch ($opAsn1->getTagNumber()) {
             case 0:
                 $operation = Request\BindRequest::fromAsn1($opAsn1);

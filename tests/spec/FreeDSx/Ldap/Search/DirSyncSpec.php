@@ -46,7 +46,7 @@ class DirSyncSpec extends ObjectBehavior
         $client->send(Argument::that(function ($search) {
             return $search->getFilter()->toString() == '(objectClass=*)';
         }), Argument::type(DirSyncRequestControl::class))->willReturn($this->initialResponse);
-        $client->read('', ['defaultNamingContext'])->willReturn(new Entry('', new Attribute('defaultNamingContext', 'dc=foo,dc=bar')));
+        $client->readOrFail('', ['defaultNamingContext'])->willReturn(new Entry('', new Attribute('defaultNamingContext', 'dc=foo,dc=bar')));
 
         $this->beConstructedWith($client);
     }
@@ -150,7 +150,7 @@ class DirSyncSpec extends ObjectBehavior
 
     function it_should_check_the_root_dse_for_the_default_naming_context($client)
     {
-        $client->read(Argument::any(), Argument::any())->shouldBeCalledOnce();
+        $client->readOrFail(Argument::any(), Argument::any())->shouldBeCalledOnce();
 
         $this->getChanges();
         $this->getChanges();
@@ -159,7 +159,7 @@ class DirSyncSpec extends ObjectBehavior
     function it_should_not_check_the_root_dse_for_the_default_naming_context_if_it_was_provided($client)
     {
         $this->useNamingContext('dc=foo');
-        $client->read(Argument::any(), Argument::any())->shouldNotBeCalled();
+        $client->readOrFail(Argument::any(), Argument::any())->shouldNotBeCalled();
 
         $this->getChanges();
     }

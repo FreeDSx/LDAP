@@ -16,7 +16,7 @@ use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -31,7 +31,7 @@ class ServerBindHandler extends BaseServerHandler implements BindHandlerInterfac
     /**
      * {@inheritDoc}
      */
-    public function handleBind(LdapMessageRequest $message, RequestHandlerInterface $dispatcher, LdapQueue $queue, array $options): TokenInterface
+    public function handleBind(LdapMessageRequest $message, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): TokenInterface
     {
         /** @var BindRequest $request */
         $request = $message->getRequest();

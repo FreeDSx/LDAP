@@ -12,7 +12,7 @@ namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 
 /**
  * Logic for handling an unbind operation.
@@ -24,7 +24,7 @@ class ClientUnbindHandler implements RequestHandlerInterface
     /**
      * {@inheritDoc}
      */
-    public function handleRequest(LdapMessageRequest $message, LdapQueue $queue, array $options): ?LdapMessageResponse
+    public function handleRequest(LdapMessageRequest $message, ClientQueue $queue, array $options): ?LdapMessageResponse
     {
         $queue->sendMessage($message);
         $queue->close();

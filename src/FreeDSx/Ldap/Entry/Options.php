@@ -23,7 +23,7 @@ class Options implements \Countable, \IteratorAggregate
     protected $options;
 
     /**
-     * @param mixed ...$options
+     * @param string|Option ...$options
      */
     public function __construct(...$options)
     {
@@ -49,12 +49,14 @@ class Options implements \Countable, \IteratorAggregate
      */
     public function set(...$options)
     {
+        $this->options = [];
         foreach ($options as $i => $option) {
-            if (!$option instanceof Option) {
-                $options[$i] = new Option($option);
+            if ($option instanceof Option) {
+                $this->options[] = $option;
+            } else {
+                $this->options[] = new Option($option);
             }
         }
-        $this->options = $options;
 
         return $this;
     }

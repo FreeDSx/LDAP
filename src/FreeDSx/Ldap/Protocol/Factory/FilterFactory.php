@@ -12,6 +12,7 @@ namespace FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
@@ -54,8 +55,18 @@ class FilterFactory
     public static function get(AbstractType $type) : ?FilterInterface
     {
         $filterClass = self::$map[$type->getTagNumber()] ?? null;
+        if ($filterClass === null) {
+            return null;
+        }
+        $filterConstruct = $filterClass.'::fromAsn1';
+        if (!is_callable($filterConstruct)) {
+            throw new RuntimeException(sprintf(
+                'The filter construct is not callable: %s',
+                $filterConstruct
+            ));
+        }
 
-        return ($filterClass !== null) ? call_user_func($filterClass.'::fromAsn1', $type) : null;
+        return ($filterClass !== null) ? call_user_func($filterConstruct, $type) : null;
     }
 
     /**

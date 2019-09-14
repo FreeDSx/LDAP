@@ -12,6 +12,7 @@ namespace FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
@@ -42,8 +43,15 @@ class ExtendedResponseFactory
         if (!self::has($oid)) {
             return null;
         }
+        $responseConstruct = self::$map[$oid].'::fromAsn1';
+        if (!is_callable($responseConstruct)) {
+            throw new RuntimeException(sprintf(
+                'The extended response construct is not callable: %s',
+                $responseConstruct
+            ));
+        }
 
-        return call_user_func(self::$map[$oid].'::fromAsn1', $asn1);
+        return call_user_func($responseConstruct, $asn1);
     }
 
     /**

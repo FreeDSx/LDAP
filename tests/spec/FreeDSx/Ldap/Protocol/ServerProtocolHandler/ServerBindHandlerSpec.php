@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerBindHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
@@ -31,7 +31,7 @@ class ServerBindHandlerSpec extends ObjectBehavior
         $this->shouldHaveType(ServerBindHandler::class);
     }
 
-    function it_should_return_a_token_on_success(LdapQueue $queue, RequestHandlerInterface $dispatcher)
+    function it_should_return_a_token_on_success(ServerQueue $queue, RequestHandlerInterface $dispatcher)
     {
         $bind = new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar'));
 
@@ -47,7 +47,7 @@ class ServerBindHandlerSpec extends ObjectBehavior
         );
     }
 
-    function it_should_throw_an_operations_exception_with_invalid_credentials_if_they_are_wrong(LdapQueue $queue, RequestHandlerInterface $dispatcher)
+    function it_should_throw_an_operations_exception_with_invalid_credentials_if_they_are_wrong(ServerQueue $queue, RequestHandlerInterface $dispatcher)
     {
         $bind = new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar'));
 
@@ -63,7 +63,7 @@ class ServerBindHandlerSpec extends ObjectBehavior
             );
     }
 
-    function it_should_validate_the_version(LdapQueue $queue, RequestHandlerInterface $dispatcher)
+    function it_should_validate_the_version(ServerQueue $queue, RequestHandlerInterface $dispatcher)
     {
         $bind = new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar', 5));
 

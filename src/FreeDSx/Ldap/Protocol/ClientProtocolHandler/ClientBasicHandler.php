@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 
 /**
  * Logic for handling basic operations.
@@ -40,7 +40,7 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
     /**
      * {@inheritDoc}
      */
-    public function handleRequest(LdapMessageRequest $message, LdapQueue $queue, array $options): ?LdapMessageResponse
+    public function handleRequest(LdapMessageRequest $message, ClientQueue $queue, array $options): ?LdapMessageResponse
     {
         $queue->sendMessage($message);
 
@@ -50,7 +50,7 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
     /**
      * {@inheritDoc}
      */
-    public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, LdapQueue $queue, array $options): ?LdapMessageResponse
+    public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse
     {
         $result = $messageFrom->getResponse();
 

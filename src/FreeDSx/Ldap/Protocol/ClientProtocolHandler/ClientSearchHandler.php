@@ -19,7 +19,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 
 /**
  * Logic for handling search operations.
@@ -31,7 +31,7 @@ class ClientSearchHandler extends ClientBasicHandler
     /**
      * {@inheritDoc}
      */
-    public function handleRequest(LdapMessageRequest $message, LdapQueue $queue, array $options) : ?LdapMessageResponse
+    public function handleRequest(LdapMessageRequest $message, ClientQueue $queue, array $options) : ?LdapMessageResponse
     {
         /** @var SearchRequest $request */
         $request = $message->getRequest();
@@ -45,7 +45,7 @@ class ClientSearchHandler extends ClientBasicHandler
     /**
      * {@inheritDoc}
      */
-    public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, LdapQueue $queue, array $options): ?LdapMessageResponse
+    public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse
     {
         $entries = [];
 

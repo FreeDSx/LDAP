@@ -26,9 +26,9 @@ use FreeDSx\Ldap\Operation\Response\ModifyResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ServerBindHandlerFactory;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
-use FreeDSx\Ldap\Protocol\LdapQueue;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
@@ -37,7 +37,7 @@ use Prophecy\Argument;
 
 class ServerProtocolHandlerSpec extends ObjectBehavior
 {
-    function let(LdapQueue $queue, ServerProtocolHandlerFactory $protocolHandlerFactory, ServerBindHandlerFactory $bindHandlerFactory, RequestHandlerInterface $dispatcher, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    function let(ServerQueue $queue, ServerProtocolHandlerFactory $protocolHandlerFactory, ServerBindHandlerFactory $bindHandlerFactory, RequestHandlerInterface $dispatcher, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
     {
         $queue->close()->hasReturnVoid();
         $queue->isConnected()->willReturn(true);
@@ -60,7 +60,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->shouldHaveType(ServerProtocolHandler::class);
     }
 
-    function it_should_enforce_anonymous_bind_requirements(LdapQueue $queue, ServerBindHandlerFactory $bindHandlerFactory)
+    function it_should_enforce_anonymous_bind_requirements(ServerQueue $queue, ServerBindHandlerFactory $bindHandlerFactory)
     {
         $queue->getMessage()->willReturn(
             new LdapMessageRequest(1, new AnonBindRequest('foo')),
@@ -80,7 +80,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    function it_should_not_allow_a_previous_message_ID_from_a_new_request(LdapQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    function it_should_not_allow_a_previous_message_ID_from_a_new_request(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
     {
         $queue->getMessage()->willReturn(
             new LdapMessageRequest(1, new SimpleBindRequest('foo', 'bar')),
@@ -106,7 +106,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    function it_should_enforce_authentication_requirements(LdapQueue $queue, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+function it_should_enforce_authentication_requirements(ServerQueue $queue, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
     {
         $queue->isConnected()->willReturn(true, false);
         $queue->getMessage()->willReturn(
@@ -131,7 +131,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    function it_should_send_a_notice_of_disconnect_on_a_protocol_exception_from_the_message_queue(LdapQueue $queue)
+    function it_should_send_a_notice_of_disconnect_on_a_protocol_exception_from_the_message_queue(ServerQueue $queue)
     {
         $queue->getMessage()->willThrow(new ProtocolException());
 
@@ -143,7 +143,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    function it_should_send_a_notice_of_disconnect_on_an_encoder_exception_from_the_message_queue(LdapQueue $queue)
+    function it_should_send_a_notice_of_disconnect_on_an_encoder_exception_from_the_message_queue(ServerQueue $queue)
     {
         $queue->getMessage()->willThrow(new EncoderException());
 
@@ -155,7 +155,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    function it_should_not_allow_a_message_with_an_ID_of_zero(LdapQueue $queue)
+    function it_should_not_allow_a_message_with_an_ID_of_zero(ServerQueue $queue)
     {
         $queue->getMessage()->willReturn(new LdapMessageRequest(0, new ExtendedRequest(ExtendedRequest::OID_START_TLS)), null);
 
@@ -168,7 +168,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    function it_should_send_a_bind_request_to_the_bind_request_handler(LdapQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    function it_should_send_a_bind_request_to_the_bind_request_handler(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
     {
         $queue->getMessage()->willReturn(
             new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar')),
@@ -184,7 +184,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    function it_should_handle_operation_errors_thrown_from_the_request_handlers(LdapQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    function it_should_handle_operation_errors_thrown_from_the_request_handlers(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
     {
         $queue->isConnected()->willReturn(true, false);
         $queue->getMessage()->willReturn(

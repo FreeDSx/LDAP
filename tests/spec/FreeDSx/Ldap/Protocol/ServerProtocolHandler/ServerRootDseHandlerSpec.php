@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerRootDseHandler;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
@@ -32,7 +32,7 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $this->shouldHaveType(ServerRootDseHandler::class);
     }
 
-    function it_should_send_back_a_RootDSE(LdapQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    function it_should_send_back_a_RootDSE(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $search = new LdapMessageRequest(
             1,
@@ -60,7 +60,7 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         );
     }
 
-    function it_should_only_return_attribute_names_from_the_RootDSE_if_requested(LdapQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    function it_should_only_return_attribute_names_from_the_RootDSE_if_requested(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $search = new LdapMessageRequest(
             1,
@@ -89,7 +89,7 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         );
     }
 
-    function it_should_only_return_specific_attributes_from_the_RootDSE_if_requested(LdapQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    function it_should_only_return_specific_attributes_from_the_RootDSE_if_requested(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $search = new LdapMessageRequest(
             1,

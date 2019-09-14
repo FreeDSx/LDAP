@@ -11,7 +11,7 @@
 namespace FreeDSx\Ldap\Server\ServerRunner;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Socket\SocketServer;
@@ -57,7 +57,7 @@ class PcntlServerRunner implements ServerRunnerInterface
                 throw new RuntimeException('Unable to fork process.');
             } else if ($pid === 0) {
                 $serverProtocolHandler = new ServerProtocolHandler(
-                    new LdapQueue($socket, true),
+                    new ServerQueue($socket),
                     $this->constructRequestHandler(),
                     $this->options
                 );

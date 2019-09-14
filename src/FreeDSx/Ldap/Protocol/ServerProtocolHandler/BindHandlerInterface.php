@@ -12,7 +12,7 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
@@ -28,5 +28,5 @@ interface BindHandlerInterface
      *
      * @throws OperationException
      */
-    public function handleBind(LdapMessageRequest $message, RequestHandlerInterface $dispatcher, LdapQueue $queue, array $options): TokenInterface;
+    public function handleBind(LdapMessageRequest $message, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): TokenInterface;
 }

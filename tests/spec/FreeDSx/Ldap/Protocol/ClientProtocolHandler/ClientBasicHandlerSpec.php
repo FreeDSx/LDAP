@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientBasicHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
@@ -46,7 +46,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $this->shouldBeAnInstanceOf(RequestHandlerInterface::class);
     }
 
-    function it_should_handle_a_request_and_return_a_response(LdapQueue $queue)
+    function it_should_handle_a_request_and_return_a_response(ClientQueue $queue)
     {
         $queue->sendMessage(Argument::type(LdapMessageRequest::class))->shouldBeCalledOnce();
         $queue->getMessage(1)->willReturn(
@@ -59,7 +59,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         );
     }
 
-    function it_should_handle_a_response(LdapQueue $queue)
+    function it_should_handle_a_response(ClientQueue $queue)
     {
         $messageRequest = new LdapMessageRequest(1, new SimpleBindRequest('foo', 'bar'));
         $messageFrom = new LdapMessageResponse(1, new BindResponse(new LdapResult(0)));
@@ -68,7 +68,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $this->handleResponse($messageRequest, $messageFrom, $queue, $options)->shouldBeEqualTo($messageFrom);
     }
 
-    function it_should_handle_a_response_with_non_error_codes(LdapQueue $queue)
+    function it_should_handle_a_response_with_non_error_codes(ClientQueue $queue)
     {
         $options = [];
         $messageRequest = new LdapMessageRequest(1, new CompareRequest('foo', new EqualityFilter('foo', 'bar') ));
@@ -85,7 +85,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $this->handleResponse($messageRequest, $messageFrom, $queue, $options)->shouldBeEqualTo($messageFrom);
     }
 
-    function it_should_throw_an_operation_exception_on_errors(LdapQueue $queue)
+    function it_should_throw_an_operation_exception_on_errors(ClientQueue $queue)
     {
         $messageRequest = new LdapMessageRequest(1, new CompareRequest('foo', new EqualityFilter('foo', 'bar') ));
         $messageFrom = new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_FALSE));
@@ -94,7 +94,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $this->handleResponse($messageRequest, $messageFrom, $queue, $options)->shouldBeEqualTo($messageFrom);
     }
 
-    function it_should_throw_a_specific_bind_exception_for_a_bind_response(LdapQueue $queue)
+    function it_should_throw_a_specific_bind_exception_for_a_bind_response(ClientQueue $queue)
     {
         $messageRequest = new LdapMessageRequest(1, new SimpleBindRequest('foo', 'bar'));
         $messageFrom = new LdapMessageResponse(1, new BindResponse(new LdapResult(ResultCode::INVALID_CREDENTIALS, 'foo', 'message')));

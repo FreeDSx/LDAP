@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Factory\ServerBindHandlerFactory;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
@@ -42,7 +43,7 @@ class ServerProtocolHandler
     ];
 
     /**
-     * @var LdapQueue
+     * @var ServerQueue
      */
     protected $queue;
 
@@ -77,7 +78,7 @@ class ServerProtocolHandler
     protected $bindHandlerFactory;
 
     public function __construct(
-        LdapQueue $queue,
+        ServerQueue $queue,
         RequestHandlerInterface $dispatcher,
         array $options = [],
         ServerProtocolHandlerFactory $protocolHandlerFactory = null,

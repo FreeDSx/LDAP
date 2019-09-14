@@ -10,6 +10,7 @@
 
 namespace FreeDSx\Ldap;
 
+use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
@@ -25,9 +26,11 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
+use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
+use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 
@@ -111,8 +114,10 @@ class Operations
 
     /**
      * Perform an extended operation.
+     *
+     * @param null|AbstractType|ProtocolElementInterface|string $value
      */
-    public static function extended(string $name, ?string $value = null): ExtendedRequest
+    public static function extended(string $name, $value = null): ExtendedRequest
     {
         return new ExtendedRequest($name, $value);
     }
@@ -123,6 +128,14 @@ class Operations
     public static function modify(string $dn, Change ...$changes): ModifyRequest
     {
         return new ModifyRequest($dn, ...$changes);
+    }
+
+    /**
+     * A SASL bind with the mechanism name, options, and challenge / response.
+     */
+    public static function bindSasl(string $mech, array $options = [], ?string $credentials = null): SaslBindRequest
+    {
+        return new SaslBindRequest($mech, $credentials, $options);
     }
 
     /**

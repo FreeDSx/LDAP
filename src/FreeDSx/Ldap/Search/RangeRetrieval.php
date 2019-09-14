@@ -128,15 +128,17 @@ class RangeRetrieval
             $amount = (int) $amount + (int) $range->getHighRange();
         }
         $attrReq = new Attribute($attribute->getName());
-        $attrReq->getOptions()->set(Option::fromRange((int) $range->getHighRange() + 1, (string) $amount));
-        $result = $this->client->read($entry, [$attrReq]);
-        if ($result === null) {
+        $startAt = (int) $range->getHighRange() + 1;
+        $attrReq->getOptions()->set(Option::fromRange((string) $startAt, (string) $amount));
+        $result = $this->client->readOrFail($entry, [$attrReq]);
+
+        $attrResult = $result->get($attribute->getName());
+        if ($attrResult === null) {
             throw new RuntimeException(sprintf(
-                'No result for "%s" received from LDAP.',
-                (string) $entry
+               'The attribute %s was not returned from LDAP',
+               $attribute->getName()
             ));
         }
-        $attrResult = $result->get($attribute->getName());
         if (($range = $this->getRangeOption($attrResult)) === null) {
             throw new RuntimeException(sprintf(
                 'No ranged option received for attribute "%s" on "%s".',
@@ -161,7 +163,7 @@ class RangeRetrieval
         $attrResult = $attribute instanceof Attribute ? new Attribute($attribute->getName()) : new Attribute($attribute);
         $attrResult->getOptions()->set(Option::fromRange('0'));
 
-        $entry = $this->client->read($entry, [$attrResult]);
+        $entry = $this->client->readOrFail($entry, [$attrResult]);
         $attribute = $this->getRanged($entry, $attrResult);
         if ($attribute === null) {
             throw new RuntimeException(sprintf(

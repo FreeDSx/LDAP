@@ -183,8 +183,16 @@ class FilterParser
         }
         $this->validateParsedFilter($filterType, $startAt, $valueStartsAt, $endAt);
 
-        $attribute = substr($this->filter,$startAt + ($parenthesis ? 1 : 0), $attributeEndsAfter - ($parenthesis ? 1 : 0));
-        $value = substr($this->filter, $valueStartsAt, $endAt - $valueStartsAt - ($parenthesis ? 1 : 0));
+        $attribute = substr(
+            $this->filter,
+            $startAt + ($parenthesis ? 1 : 0),
+            (int) $attributeEndsAfter - ($parenthesis ? 1 : 0)
+        );
+        $value = substr(
+            $this->filter,
+            (int) $valueStartsAt,
+            $endAt - (int) $valueStartsAt - ($parenthesis ? 1 : 0)
+        );
 
         if ($attribute === '') {
             throw new FilterParseException(sprintf(
@@ -279,7 +287,7 @@ class FilterParser
            return Filters::present($attribute);
        }
 
-       if (preg_match('/\*/', $value)) {
+       if (preg_match('/\*/', $value) !== 0) {
             return $this->getSubstringFilterObject($attribute, $value);
        } else {
             return Filters::equal($attribute, $this->unescapeValue($value));
@@ -294,7 +302,7 @@ class FilterParser
      */
     protected function getMatchingRuleFilterObject(string $attribute, string $value) : MatchingRuleFilter
     {
-        if (!preg_match(self::MATCHING_RULE, $attribute, $matches)) {
+        if (preg_match(self::MATCHING_RULE, $attribute, $matches) === 0) {
             throw new FilterParseException(sprintf('The matching rule is not valid: %s', $attribute));
         }
         $matchRuleObj = new MatchingRuleFilter(null, null, $value);
@@ -331,16 +339,24 @@ class FilterParser
     {
         $filter = new SubstringFilter($attribute);
         $substrings = preg_split('/\*/', $value, -1, PREG_SPLIT_OFFSET_CAPTURE | PREG_SPLIT_NO_EMPTY);
+        if (!is_array($substrings)) {
+            throw new FilterParseException(sprintf(
+                'Unable to parse the substring filter for attribute %s.',
+                $attribute
+            ));
+        }
 
         $contains = [];
         foreach ($substrings as $substring) {
-            $substring[0] = $this->unescapeValue($substring[0]);
-            if (isset($substring[1]) && ($substring[1] === 0)) {
+            $substringValue = $this->unescapeValue($substring[0]);
+            $substringType = (int) $substring[1];
+
+            if ($substringType === 0) {
                 $filter->setStartsWith($substring[0]);
-            } elseif (isset($substring[1]) && ($substring[1] + strlen($substring[0])) === strlen($value)) {
+            } elseif (($substringType + strlen($substringValue)) === strlen($value)) {
                 $filter->setEndsWith($substring[0]);
             } else {
-                $contains[] = $substring[0];
+                $contains[] = $substringValue;
             }
         }
         $filter->setContains(...$contains);
@@ -366,7 +382,7 @@ class FilterParser
         if (($info[0] + 1) !== $endAt) {
             throw new FilterParseException(sprintf(
                 'The value after the "not" filter value was unexpected: %s',
-                substr($this->filter, $info[0] + 1, $endAt - ($info[0] + 1))
+                substr($this->filter, $info[0] + 1, $endAt - ((int) $info[0] + 1))
             ));
         }
 
@@ -396,59 +412,16 @@ class FilterParser
      */
     protected function parseContainerDepths() : void
     {
-        $this->containers = [];
+        $this->containers = $this->containers ?? [];
 
         $child = null;
         for ($i = 0; $i < $this->length; $i++) {
             # Detect an unescaped left parenthesis
             if ($this->filter[$i] === FilterInterface::PAREN_LEFT) {
-                # Is the parenthesis followed by an (ie. |, &, !) operator? If so it can contain children ...
-                if (isset($this->filter[$i + 1]) && in_array($this->filter[$i + 1], FilterInterface::OPERATORS, true)) {
-                    $child = $child === null ? 0 : $child + 1;
-                    $this->containers[$child] = ['startAt' => $i, 'endAt' => null];
-
-                    $i += 2;
-                    # Container inside the container ...
-                    if ($this->isAtFilterContainer($i)) {
-                        $i--;
-                    # Comparison filter inside the container...
-                    } elseif (isset($this->filter[$i]) && $this->filter[$i] === FilterInterface::PAREN_LEFT) {
-                        $i = $this->nextClosingParenthesis($i);
-                    # An empty container is not allowed...
-                    } elseif (isset($this->filter[$i]) && $this->filter[$i] === FilterInterface::PAREN_RIGHT) {
-                        throw new FilterParseException(sprintf(
-                            'The filter container near position %s is empty.',
-                            $i
-                        ));
-                    # Any other conditions possible? This shouldn't happen unless the filter is malformed..
-                    } else {
-                        throw new FilterParseException(sprintf(
-                            'Unexpected value after "%s" at position %s: %s',
-                            $this->filter[$i - 1] ?? '',
-                            $i + 1,
-                            $this->filter[$i + 1] ?? ''
-                        ));
-                    }
-                # If there is no operator this is a standard comparison filter, just find the next closing parenthesis
-                } else {
-                    $i = $this->nextClosingParenthesis($i + 1);
-                }
-            # We have reached a closing parenthesis of a container, work backwards from those defined to set the ending.
+                [$i, $child] = $this->parseContainerStart($i, $child);
+                # We have reached a closing parenthesis of a container, work backwards from those defined to set the ending.
             } elseif ($this->filter[$i] === FilterInterface::PAREN_RIGHT) {
-                $matchFound = false;
-                foreach (array_reverse($this->containers, true) as $ci => $info) {
-                    if ($info['endAt'] === null) {
-                        $this->containers[$ci]['endAt'] = $i + 1;
-                        $matchFound = true;
-                        break;
-                    }
-                }
-                if (!$matchFound) {
-                    throw new FilterParseException(sprintf(
-                        'The closing ")" at position %s has no matching parenthesis',
-                        $i
-                    ));
-                }
+                $this->parseContainerEnd($i);
             }
         }
 
@@ -488,5 +461,66 @@ class FilterParser
         return preg_replace_callback('/\\\\([0-9A-Fa-f]{2})/', function ($matches) {
             return hex2bin($matches[1]);
         }, $value);
+    }
+
+    /**
+     * @throws FilterParseException
+     */
+    protected function parseContainerStart(int $i, ?int $child): array
+    {
+        # Is the parenthesis followed by an (ie. |, &, !) operator? If so it can contain children ...
+        if (isset($this->filter[$i + 1]) && in_array($this->filter[$i + 1], FilterInterface::OPERATORS, true)) {
+            $child = $child === null ? 0 : $child + 1;
+            $this->containers[$child] = ['startAt' => $i, 'endAt' => null];
+
+            $i += 2;
+            # Container inside the container ...
+            if ($this->isAtFilterContainer($i)) {
+                $i--;
+                # Comparison filter inside the container...
+            } elseif (isset($this->filter[$i]) && $this->filter[$i] === FilterInterface::PAREN_LEFT) {
+                $i = $this->nextClosingParenthesis($i);
+                # An empty container is not allowed...
+            } elseif (isset($this->filter[$i]) && $this->filter[$i] === FilterInterface::PAREN_RIGHT) {
+                throw new FilterParseException(sprintf(
+                    'The filter container near position %s is empty.',
+                    $i
+                ));
+                # Any other conditions possible? This shouldn't happen unless the filter is malformed..
+            } else {
+                throw new FilterParseException(sprintf(
+                    'Unexpected value after "%s" at position %s: %s',
+                    $this->filter[$i - 1] ?? '',
+                    $i + 1,
+                    $this->filter[$i + 1] ?? ''
+                ));
+            }
+            # If there is no operator this is a standard comparison filter, just find the next closing parenthesis
+        } else {
+            $i = $this->nextClosingParenthesis($i + 1);
+        }
+
+        return [$i, $child];
+    }
+
+    /**
+     * @throws FilterParseException
+     */
+    protected function parseContainerEnd(int $i): void
+    {
+        $matchFound = false;
+        foreach (array_reverse($this->containers, true) as $ci => $info) {
+            if ($info['endAt'] === null) {
+                $this->containers[$ci]['endAt'] = $i + 1;
+                $matchFound = true;
+                break;
+            }
+        }
+        if (!$matchFound) {
+            throw new FilterParseException(sprintf(
+                'The closing ")" at position %s has no matching parenthesis',
+                $i
+            ));
+        }
     }
 }

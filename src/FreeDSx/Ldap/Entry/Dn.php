@@ -128,10 +128,11 @@ class Dn implements \IteratorAggregate, \Countable
             ));
         }
 
+        $rdns = [];
         foreach ($pieces as $i => $piece) {
-            $pieces[$i] = Rdn::create(\ltrim($piece));
+            $rdns[$i] = Rdn::create(\ltrim($piece));
         }
 
-        $this->pieces = $pieces;
+        $this->pieces = $rdns;
     }
 }

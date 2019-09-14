@@ -204,6 +204,27 @@ class LdapClientSpec extends ObjectBehavior
         $this->read($entry)->shouldBeNull();
     }
 
+    function it_should_throw_an_exception_on_read_or_fail_if_the_entry_does_not_exist($handler)
+    {
+        $exception = new OperationException('', ResultCode::NO_SUCH_OBJECT);
+        $entry = new Entry('cn=foo,dc=local');
+        $handler->send(Operations::read('cn=foo,dc=local'))->shouldBeCalled()
+            ->willThrow($exception);
+
+        $this->shouldThrow($exception)->during('readOrFail', [$entry]);
+    }
+
+    function it_should_return_an_entry_on_a_readOrFail_if_it_exists($handler)
+    {
+        $entry = new Entry('cn=foo,dc=local');
+        $handler->send(Operations::read('cn=foo,dc=local'))->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(1, new SearchResponse(new LdapResult(ResultCode::SUCCESS), new Entries(
+                $entry
+            ))));
+
+        $this->readOrFail($entry)->shouldBeEqualTo($entry);
+    }
+
     function it_should_send_a_base_search_on_a_read_and_throw_an_unrelated_operation_exception($handler)
     {
         $entry = new Entry('cn=foo,dc=local');

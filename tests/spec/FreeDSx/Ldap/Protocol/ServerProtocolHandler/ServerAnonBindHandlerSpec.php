@@ -16,7 +16,7 @@ use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerAnonBindHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\AnonToken;
@@ -30,7 +30,7 @@ class ServerAnonBindHandlerSpec extends ObjectBehavior
         $this->shouldHaveType(ServerAnonBindHandler::class);
     }
 
-    function it_should_validate_the_version(LdapQueue $queue, RequestHandlerInterface $dispatcher)
+    function it_should_validate_the_version(ServerQueue $queue, RequestHandlerInterface $dispatcher)
     {
         $bind = new LdapMessageRequest(
             1,
@@ -45,7 +45,7 @@ class ServerAnonBindHandlerSpec extends ObjectBehavior
         );
     }
 
-    function it_should_return_an_anon_token_with_the_supplied_username(LdapQueue $queue, RequestHandlerInterface $dispatcher)
+    function it_should_return_an_anon_token_with_the_supplied_username(ServerQueue $queue, RequestHandlerInterface $dispatcher)
     {
         $bind = new LdapMessageRequest(
             1,

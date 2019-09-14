@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Socket\SocketPool;
 use FreeDSx\Socket\Exception\ConnectionException as SocketException;
 
@@ -33,7 +34,7 @@ class ClientProtocolHandler
     protected $pool;
 
     /**
-     * @var LdapQueue|null
+     * @var ClientQueue|null
      */
     protected $queue;
 
@@ -52,7 +53,7 @@ class ClientProtocolHandler
      */
     protected $protocolHandlerFactory;
 
-    public function __construct(array $options, LdapQueue $queue = null, SocketPool $pool = null, ClientProtocolHandlerFactory $clientProtocolHandlerFactory = null)
+    public function __construct(array $options, ClientQueue $queue = null, SocketPool $pool = null, ClientProtocolHandlerFactory $clientProtocolHandlerFactory = null)
     {
         $this->options = $options;
         $this->pool = $pool ?? new SocketPool($options);
@@ -127,10 +128,10 @@ class ClientProtocolHandler
     /**
      * @throws SocketException
      */
-    protected function queue() : LdapQueue
+    protected function queue(): ClientQueue
     {
         if ($this->queue === null) {
-            $this->queue = LdapQueue::usingSocketPool($this->pool);
+            $this->queue = new ClientQueue($this->pool);
         }
 
         return $this->queue;

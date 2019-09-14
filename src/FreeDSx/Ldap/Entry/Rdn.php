@@ -109,6 +109,9 @@ class Rdn
     public static function create(string $rdn) : Rdn
     {
         $pieces = \preg_split('/(?<!\\\\)\+/', $rdn);
+        if ($pieces === false) {
+            throw new InvalidArgumentException(sprintf('The RDN "%s" is invalid.', $rdn));
+        }
 
         // @todo Simplify this logic somehow?
         $obj = null;

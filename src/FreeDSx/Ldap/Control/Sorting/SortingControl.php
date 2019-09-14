@@ -106,6 +106,9 @@ class SortingControl extends Control
                 } elseif ($keyItem->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $keyItem->getTagNumber() === 0) {
                     $matchRule = $keyItem->getValue();
                 } elseif ($keyItem->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $keyItem->getTagNumber() === 1) {
+                    if (!$keyItem instanceof IncompleteType) {
+                        throw new ProtocolException('The sorting control is malformed.');
+                    }
                     /** @var IncompleteType $keyItem */
                     $useReverseOrder = $encoder->complete($keyItem, AbstractType::TAG_TYPE_BOOLEAN)->getValue();
                 } else {

@@ -14,7 +14,7 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 
 /**
  * Logic for handling extended operations.
@@ -36,7 +36,7 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
     /**
      * {@inheritDoc}
      */
-    public function handleRequest(LdapMessageRequest $message, LdapQueue $queue, array $options): ?LdapMessageResponse
+    public function handleRequest(LdapMessageRequest $message, ClientQueue $queue, array $options): ?LdapMessageResponse
     {
         $messageFrom = parent::handleRequest($message, $queue, $options);
 

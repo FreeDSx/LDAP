@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSearchHandler;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
@@ -32,7 +32,7 @@ class ServerSearchHandlerSpec extends ObjectBehavior
         $this->shouldHaveType(ServerSearchHandler::class);
     }
 
-    function it_should_send_a_search_request_to_the_request_handler(LdapQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    function it_should_send_a_search_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $search = new LdapMessageRequest(
             2,

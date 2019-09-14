@@ -138,8 +138,10 @@ class PwdPolicyResponseControl extends Control
 
         $encoder = new LdapEncoder();
         foreach ($response->getChildren() as $child) {
+            if (!$child instanceof IncompleteType) {
+                throw new ProtocolException('The ASN1 structure for the pwdPolicy control is malformed.');
+            }
             if ($child->getTagNumber() === 0) {
-                /** @var IncompleteType $child */
                 $warnings = $encoder->complete($child, AbstractType::TAG_TYPE_SEQUENCE, [
                     AbstractType::TAG_CLASS_CONTEXT_SPECIFIC => [
                         0 => AbstractType::TAG_TYPE_INTEGER,
@@ -157,7 +159,6 @@ class PwdPolicyResponseControl extends Control
                     }
                 }
             } elseif ($child->getTagNumber() === 1) {
-                /** @var IncompleteType $child */
                 $error = $encoder->complete($child, AbstractType::TAG_TYPE_ENUMERATED)->getValue();
             }
         }

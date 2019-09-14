@@ -12,6 +12,7 @@ namespace FreeDSx\Ldap\Operation;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Entry\Dn;
@@ -196,6 +197,9 @@ class LdapResult implements ResponseInterface
             for ($i = 3; $i < $count; $i++) {
                 $child = $type->getChild($i);
                 if ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 3) {
+                    if (!$child instanceof IncompleteType) {
+                        throw new ProtocolException('The ASN1 structure for the referrals is malformed.');
+                    }
                     /** @var \FreeDSx\Asn1\Type\SequenceType $child */
                     $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
                     foreach ($child->getChildren() as $ldapUrl) {

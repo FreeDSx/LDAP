@@ -55,7 +55,7 @@ class Vlv
     protected $after;
 
     /**
-     * @var int|null
+     * @var int
      */
     protected $offset = 1;
 
@@ -208,13 +208,17 @@ class Vlv
      */
     public function position() : ?int
     {
-        $pos = ($this->control !== null) ? $this->control->getOffset() : null;
-
-        if ($this->asPercentage && $pos !== null) {
-            $pos = round($this->control->getOffset() / ($this->control->getCount() / 100));
+        $control = $this->control;
+        $pos = $control === null ? null : $control->getOffset();
+        if ($control === null || $pos === null) {
+            return null;
         }
 
-        return $pos;
+        if ($this->asPercentage) {
+            return (int) round($pos / ((int) $control->getCount() / 100));
+        } else {
+            return $control->getOffset();
+        }
     }
 
     /**
@@ -227,11 +231,13 @@ class Vlv
         if ($this->control === null) {
             return false;
         }
-        if ((($this->control->getOffset() + $this->after) >= $this->control->getCount())) {
+
+        $control = $this->control;
+        if ((((int) $control->getOffset() + $this->after) >= (int) $control->getCount())) {
             return true;
         }
 
-        return $this->control->getOffset() === $this->control->getCount();
+        return $control->getOffset() === $control->getCount();
     }
 
     /**
@@ -244,11 +250,12 @@ class Vlv
         if ($this->control === null) {
             return false;
         }
-        if ($this->before !== 0 && ($this->control->getOffset() - $this->before) <= 1) {
+        $control = $this->control;
+        if ($this->before !== 0 && ((int) $control->getOffset() - $this->before) <= 1) {
             return true;
         }
 
-        return $this->control->getOffset() === 1;
+        return $control->getOffset() === 1;
     }
 
     /**
@@ -261,10 +268,9 @@ class Vlv
     }
 
     /**
-     * @return Entries
      * @throws ProtocolException
      */
-    protected function send()
+    protected function send(): Entries
     {
         $contextId = ($this->control !== null) ? $this->control->getContextId() : null;
         $message = $this->client->send($this->search, $this->createVlvControl($contextId), $this->sort);
@@ -288,7 +294,7 @@ class Vlv
             return Controls::vlvFilter($this->before, $this->after, $this->filter, $contextId);
         }
         # An offset of 1 and a content size of zero starts from the beginning entry (server uses its assumed count).
-        $count = ($this->control !== null) ? $this->control->getCount() : 0;
+        $count = ($this->control !== null) ? (int) $this->control->getCount() : 0;
 
         # In percentage mode start off with an assumed count of 100, as the formula the server uses should give us the
         # expected result
@@ -305,7 +311,7 @@ class Vlv
         }
 
         if ($this->asPercentage && $this->control !== null) {
-            $offset = round(($this->control->getCount() / 100) * $offset);
+            $offset = (int) round(((int) $this->control->getCount() / 100) * $offset);
         }
 
         return Controls::vlv($this->before, $this->after, $offset, $count, $contextId);

@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientExtendedOperationHandler;
 use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
@@ -40,7 +40,7 @@ class ClientExtendedOperationHandlerSpec extends ObjectBehavior
         $this->shouldBeAnInstanceOf(ResponseHandlerInterface::class);
     }
 
-    function it_should_handle_a_response(ExtendedResponseFactory $responseFactory, LdapQueue $queue)
+    function it_should_handle_a_response(ExtendedResponseFactory $responseFactory, ClientQueue $queue)
     {
         $responseFactory->has(Argument::any())->willReturn(false);
         $responseFactory->get(Argument::any(), Argument::any())->shouldNotBeCalled();
@@ -54,7 +54,7 @@ class ClientExtendedOperationHandlerSpec extends ObjectBehavior
         )->shouldBeEqualTo($response);
     }
 
-    function it_should_handle_an_extended_response_that_has_a_mapped_class(ExtendedResponseFactory $responseFactory, LdapQueue $queue)
+    function it_should_handle_an_extended_response_that_has_a_mapped_class(ExtendedResponseFactory $responseFactory, ClientQueue $queue)
     {
         $extendedResponse = new PasswordModifyResponse(new LdapResult(0));
         $responseFactory->has(Argument::any())->willReturn(true);

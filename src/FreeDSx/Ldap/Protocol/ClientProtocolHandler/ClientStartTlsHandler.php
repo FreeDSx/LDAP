@@ -15,7 +15,7 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 
 /**
  * Logic for handling a StartTLS operation.
@@ -27,7 +27,7 @@ class ClientStartTlsHandler implements ResponseHandlerInterface
     /**
      * {@inheritDoc}
      */
-    public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, LdapQueue $queue, array $options): ?LdapMessageResponse
+    public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse
     {
         /** @var ExtendedResponse $response */
         $response = $messageFrom->getResponse();

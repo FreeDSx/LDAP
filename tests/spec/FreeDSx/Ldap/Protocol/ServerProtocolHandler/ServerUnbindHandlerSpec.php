@@ -12,7 +12,7 @@ namespace spec\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnbindHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -26,7 +26,7 @@ class ServerUnbindHandlerSpec extends ObjectBehavior
         $this->shouldHaveType(ServerUnbindHandler::class);
     }
 
-    function it_should_handle_an_unbind_request(LdapQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher)
+    function it_should_handle_an_unbind_request(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher)
     {
         $queue->close()->shouldBeCalled();
         $queue->sendMessage(Argument::any())->shouldNotBeCalled();

@@ -67,7 +67,7 @@ class RangeRetrievalSpec extends ObjectBehavior
         $attrResult = new Attribute('member;range=1501-2000');
         $entry = new Entry('dc=foo', $attrResult);
         
-        $client->read('dc=foo', Argument::that(function ($attr) {
+        $client->readOrFail('dc=foo', Argument::that(function ($attr) {
             return $attr[0]->getOptions()->first()->getLowRange() == '1501' && $attr[0]->getOptions()->first()->getHighRange() == '*';
         }))->shouldBeCalled()->willReturn($entry);
         
@@ -79,7 +79,7 @@ class RangeRetrievalSpec extends ObjectBehavior
         $attrResult = new Attribute('member;range=1501-1600');
         $entry = new Entry('dc=foo', $attrResult);
 
-        $client->read('dc=foo', Argument::that(function ($attr) {
+        $client->readOrFail('dc=foo', Argument::that(function ($attr) {
             return $attr[0]->getOptions()->first()->getLowRange() == '1501' && $attr[0]->getOptions()->first()->getHighRange() == '1600';
         }))->shouldBeCalled()->willReturn($entry);
 
@@ -91,10 +91,10 @@ class RangeRetrievalSpec extends ObjectBehavior
         $entry1 = new Entry('dc=foo', new Attribute('member;range=0-1500', 'foo'));
         $entry2 = new Entry('dc=foo', new Attribute('member;range=1501-*', 'bar'));
 
-        $client->read('dc=foo', Argument::that(function ($attr) {
+        $client->readOrFail('dc=foo', Argument::that(function ($attr) {
             return $attr[0]->getOptions()->first()->getLowRange() == '0' && $attr[0]->getOptions()->first()->getHighRange() == '*';
         }))->shouldBeCalled()->willReturn($entry1);
-        $client->read('dc=foo', Argument::that(function ($attr) {
+        $client->readOrFail('dc=foo', Argument::that(function ($attr) {
             return $attr[0]->getOptions()->first()->getLowRange() == '1501' && $attr[0]->getOptions()->first()->getHighRange() == '*';
         }))->shouldBeCalled()->willReturn($entry2);
 

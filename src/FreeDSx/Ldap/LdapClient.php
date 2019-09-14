@@ -134,13 +134,35 @@ class LdapClient
     public function read(string $entry = '', $attributes = [], Control ...$controls) : ?Entry
     {
         try {
-            return $this->search(Operations::read($entry, ...$attributes), ...$controls)->first();
+            return $this->readOrFail($entry, $attributes, ...$controls);
         } catch (Exception\OperationException $e) {
             if ($e->getCode() === ResultCode::NO_SUCH_OBJECT) {
                 return null;
             }
             throw $e;
         }
+    }
+
+    /**
+     * Read an entry from LDAP. If the entry is not found an OperationException is thrown.
+     *
+     * @param string $entry
+     * @param array $attributes
+     * @param Control ...$controls
+     * @return Entry
+     * @throws OperationException
+     */
+    public function readOrFail(string $entry = '', $attributes = [], Control ...$controls): Entry
+    {
+        $entryObj = $this->search(Operations::read($entry, ...$attributes), ...$controls)->first();
+        if ($entryObj === null) {
+            throw new OperationException(sprintf(
+                'The entry "%s" was not found.',
+                $entry
+            ), ResultCode::NO_SUCH_OBJECT);
+        }
+
+        return $entryObj;
     }
 
     /**

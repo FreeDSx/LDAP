@@ -62,7 +62,7 @@ class ExtendedRequest implements RequestInterface
 
     /**
      * @param string $requestName
-     * @param null $requestValue
+     * @param null|AbstractType|ProtocolElementInterface|string $requestValue
      */
     public function __construct(string $requestName, $requestValue = null)
     {
@@ -118,10 +118,10 @@ class ExtendedRequest implements RequestInterface
         if ($this->requestValue !== null) {
             $value = $this->requestValue;
             $encoder = new LdapEncoder();
-            if ($this->requestValue instanceof AbstractType) {
-                $value = $encoder->encode($this->requestValue);
-            } elseif ($this->requestValue instanceof ProtocolElementInterface) {
-                $value = $encoder->encode($this->requestValue->toAsn1());
+            if ($value instanceof AbstractType) {
+                $value = $encoder->encode($value);
+            } elseif ($value instanceof ProtocolElementInterface) {
+                $value = $encoder->encode($value->toAsn1());
             }
             $asn1->addChild(Asn1::context(1, Asn1::octetString($value)));
         }

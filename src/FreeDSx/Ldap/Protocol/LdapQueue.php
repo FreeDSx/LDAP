@@ -11,15 +11,12 @@
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Encoder\EncoderInterface;
-use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Socket\Queue\Asn1MessageQueue;
-use FreeDSx\Socket\Queue\Message;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Socket;
-use FreeDSx\Socket\SocketPool;
 
 /**
  * The LDAP Queue class for sending and receiving messages.
@@ -39,38 +36,13 @@ class LdapQueue extends Asn1MessageQueue
     protected $id = 0;
 
     /**
-     * @var bool
-     */
-    protected $serverMode;
-
-    /**
-     * @var SocketPool
-     */
-    protected $socketPool;
-
-    /**
-     * @var Socket|null
+     * @var Socket
      */
     protected $socket;
 
-    public function __construct(Socket $socket, bool $serverMode = false, EncoderInterface $encoder = null)
+    public function __construct(Socket $socket, EncoderInterface $encoder = null)
     {
-        $this->serverMode = $serverMode;
         parent::__construct($socket,$encoder ?? new LdapEncoder());
-    }
-
-    /**
-     * Instantiate using a socket pool. This allows the queue to be reset / closed and then reconnect based on different
-     * operations that are happening.
-     *
-     * @throws ConnectionException
-     */
-    public static function usingSocketPool(SocketPool $socketPool, bool $serverMode = false, EncoderInterface $encoder = null) : self
-    {
-        $queue = new self($socketPool->connect(), $serverMode,  $encoder);
-        $queue->socketPool = $socketPool;
-
-        return $queue;
     }
 
     /**
@@ -81,7 +53,6 @@ class LdapQueue extends Asn1MessageQueue
      */
     public function encrypt()
     {
-        $this->initSocket();
         $this->socket->block(true);
         $this->socket->encrypt(true);
         $this->socket->block(false);
@@ -94,17 +65,15 @@ class LdapQueue extends Asn1MessageQueue
      */
     public function isEncrypted(): bool
     {
-        return ($this->socket !== null && $this->socket->isEncrypted());
+        return ($this->socket->isConnected() && $this->socket->isEncrypted());
     }
+
     /**
      * Cleanly close the socket and clear buffer contents.
      */
     public function close(): void
     {
-        if ($this->socket !== null) {
-            $this->socket->close();
-        }
-        $this->socket = null;
+        $this->socket->close();
         $this->buffer = false;
         $this->id = 0;
     }
@@ -131,11 +100,10 @@ class LdapQueue extends Asn1MessageQueue
      * The logic in the loop is to send the messages in chunks of 8192 bytes to lessen the amount of TCP writes we need
      * to perform if sending out many messages.
      */
-    public function sendMessage(LdapMessage ...$messages): self
+    protected function sendLdapMessage(LdapMessage ...$messages): self
     {
-        $this->initSocket();
-
         $buffer = '';
+
         foreach ($messages as $message) {
             $buffer .= $this->encoder->encode($message->toAsn1());
             $bufferLen = \strlen($buffer);
@@ -152,15 +120,20 @@ class LdapQueue extends Asn1MessageQueue
     }
 
     /**
-     * @throws UnsolicitedNotificationException
-     * @throws ConnectionException
-     * @throws EncoderException
-     * @return LdapMessageResponse|LdapMessageRequest
+     * @return bool
      */
-    public function getMessage(?int $id = null): LdapMessage
+    public function isConnected() : bool
     {
-        /** @var LdapMessage $message */
-        $this->initSocket();
+        return $this->socket->isConnected();
+    }
+
+    /**
+     * @throws ConnectionException
+     * @throws ProtocolException
+     * @throws UnsolicitedNotificationException
+     */
+    protected function getAndValidateMessage(?int $id): LdapMessage
+    {
         $message = parent::getMessage($id);
 
         /**
@@ -185,49 +158,6 @@ class LdapQueue extends Asn1MessageQueue
             ));
         }
 
-        return $message;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public function getMessages(?int $id = null)
-    {
-        $this->initSocket();
-
-        return parent::getMessages($id);
-    }
-
-    /**
-     * @return bool
-     */
-    public function isConnected() : bool
-    {
-        return $this->socket !== null && $this->socket->isConnected();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    protected function constructMessage(Message $message, ?int $id = null)
-    {
-        if ($this->serverMode) {
-            return LdapMessageRequest::fromAsn1($message->getMessage());
-        } else {
-            return LdapMessageResponse::fromAsn1($message->getMessage());
-        }
-    }
-
-    /**
-     * @throws ConnectionException
-     */
-    protected function initSocket() : void
-    {
-        if ($this->socketPool !== null && $this->socket === null) {
-            $this->socket = $this->socketPool->connect();
-        }
-        if ($this->socketPool === null && $this->socket === null) {
-            throw new ConnectionException('Unable to re-initialize a closed socket.');
-        }
+        return  $message;
     }
 }

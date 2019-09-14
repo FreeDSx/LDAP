@@ -131,7 +131,7 @@ class LdapUrlExtension
      */
     public static function parse(string $extension) : LdapUrlExtension
     {
-        if (!preg_match('/!?\w+(=.*)?/', $extension)) {
+        if (preg_match('/!?\w+(=.*)?/', $extension) !== 1) {
             throw new UrlParseException(sprintf('The LDAP URL extension is malformed: %s', $extension));
         }
         $pieces = \explode('=', $extension, 2);

@@ -16,7 +16,7 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerStartTlsHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -29,7 +29,7 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
         $this->shouldHaveType(ServerStartTlsHandler::class);
     }
 
-    function it_should_handle_a_start_tls_request(LdapQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher)
+    function it_should_handle_a_start_tls_request(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher)
     {
         $queue->isEncrypted()->willReturn(false);
 
@@ -46,7 +46,7 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
         $this->handleRequest($startTls, $token, $dispatcher, $queue, ['ssl_cert' => 'foo']);
     }
 
-    function it_should_send_back_an_error_if_the_queue_is_already_encrypted(LdapQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher)
+    function it_should_send_back_an_error_if_the_queue_is_already_encrypted(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher)
     {
         $queue->isEncrypted()->willReturn(true);
 
@@ -63,7 +63,7 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
         $this->handleRequest($startTls, $token, $dispatcher, $queue, ['ssl_cert' => 'foo']);
     }
 
-    function it_should_send_back_an_error_if_encryption_is_not_supported(LdapQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher)
+    function it_should_send_back_an_error_if_encryption_is_not_supported(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher)
     {
         $queue->isEncrypted()->willReturn(false);
 
