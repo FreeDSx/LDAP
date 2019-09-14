@@ -26,7 +26,6 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
-use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
@@ -128,14 +127,6 @@ class Operations
     public static function modify(string $dn, Change ...$changes): ModifyRequest
     {
         return new ModifyRequest($dn, ...$changes);
-    }
-
-    /**
-     * A SASL bind with the mechanism name, options, and challenge / response.
-     */
-    public static function bindSasl(string $mech, array $options = [], ?string $credentials = null): SaslBindRequest
-    {
-        return new SaslBindRequest($mech, $credentials, $options);
     }
 
     /**
