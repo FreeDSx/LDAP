@@ -96,7 +96,7 @@ class RangeRetrieval
 
     /**
      * Check if an attribute has more range values that can be queried.
-     * 
+     *
      * @param Attribute $attribute
      * @return bool
      */
@@ -112,7 +112,7 @@ class RangeRetrieval
     /**
      * Given a specific Entry/DN and an attribute, get the next set of ranged values available. Optionally pass a third
      * parameter to control how many values to grab next.
-     * 
+     *
      * @param Entry|Dn|string $entry
      * @param Attribute $attribute
      * @param string|int $amount
@@ -135,8 +135,8 @@ class RangeRetrieval
         $attrResult = $result->get($attribute->getName());
         if ($attrResult === null) {
             throw new RuntimeException(sprintf(
-               'The attribute %s was not returned from LDAP',
-               $attribute->getName()
+                'The attribute %s was not returned from LDAP',
+                $attribute->getName()
             ));
         }
         if (($range = $this->getRangeOption($attrResult)) === null) {

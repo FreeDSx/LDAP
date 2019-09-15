@@ -160,7 +160,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                             case Control\Control::OID_PAGING:
                                 $controls[] = Control\PagingControl::fromAsn1($control);
                                 break;
-                            case Control\Control::OID_SORTING_RESPONSE;
+                            case Control\Control::OID_SORTING_RESPONSE:
                                 $controls[] = Control\Sorting\SortingResponseControl::fromAsn1($control);
                                 break;
                             case Control\Control::OID_VLV_RESPONSE:

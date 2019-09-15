@@ -137,10 +137,10 @@ class ClientReferralHandler implements ResponseHandlerInterface
                 $response = $client->send($messageTo->getRequest(), ...$messageTo->controls());
 
                 return $response;
-            # Skip referrals that fail due to connection issues and not other issues
+                # Skip referrals that fail due to connection issues and not other issues
             } catch (ConnectionException $e) {
                 continue;
-            # If the referral encountered other referrals but exhausted them, continue to the next one.
+                # If the referral encountered other referrals but exhausted them, continue to the next one.
             } catch (OperationException $e) {
                 if ($e->getCode() === ResultCode::REFERRAL) {
                     continue;

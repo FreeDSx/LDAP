@@ -85,8 +85,7 @@ class ServerProtocolHandler
         ServerBindHandlerFactory $bindHandlerFactory = null,
         ServerAuthorization $authorizer = null,
         ResponseFactory $responseFactory = null
-    )
-    {
+    ) {
         $this->queue = $queue;
         $this->dispatcher = $dispatcher;
         $this->options = \array_merge($this->options, $options);
@@ -109,7 +108,7 @@ class ServerProtocolHandler
                     break;
                 }
             }
-        # OperationExceptions may be thrown by any handler and will be sent back to the client as the response
+            # OperationExceptions may be thrown by any handler and will be sent back to the client as the response
         # specific error code and message associated with the exception.
         } catch (OperationException $e) {
             if (isset($message)) {
@@ -119,7 +118,7 @@ class ServerProtocolHandler
                     $e->getMessage()
                 ));
             }
-        # Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with a
+            # Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with a
         # result code of protocol error.
         } catch (EncoderException|ProtocolException $e) {
             $this->sendNoticeOfDisconnect('The message encoding is malformed.');
@@ -172,7 +171,6 @@ class ServerProtocolHandler
                 $message,
                 ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
                 'Authentication required.'
-
             ));
         }
     }

@@ -59,7 +59,7 @@ class Attribute implements \IteratorAggregate, \Countable
 
     /**
      * Add a value, or values, to the attribute.
-     * 
+     *
      * @param string ...$values
      * @return $this
      */
@@ -74,7 +74,7 @@ class Attribute implements \IteratorAggregate, \Countable
 
     /**
      * Check if the attribute has a specific value.
-     * 
+     *
      * @param string $value
      * @return bool
      */
@@ -85,7 +85,7 @@ class Attribute implements \IteratorAggregate, \Countable
 
     /**
      * Remove a specific value, or values, from an attribute.
-     * 
+     *
      * @param string ...$values
      * @return $this
      */
@@ -127,7 +127,7 @@ class Attribute implements \IteratorAggregate, \Countable
 
     /**
      * Gets the name (AttributeType) portion of the AttributeDescription, which excludes the options.
-     * 
+     *
      * @return string
      */
     public function getName() : string
@@ -139,7 +139,7 @@ class Attribute implements \IteratorAggregate, \Countable
 
     /**
      * Gets the full AttributeDescription (RFC 4512, 2.5), which contains the attribute type (name) and options.
-     * 
+     *
      * @return string
      */
     public function getDescription() : string
@@ -149,7 +149,7 @@ class Attribute implements \IteratorAggregate, \Countable
 
     /**
      * Gets any values associated with the attribute.
-     * 
+     *
      * @return array
      */
     public function getValues() : array
@@ -159,10 +159,10 @@ class Attribute implements \IteratorAggregate, \Countable
 
     /**
      * Gets the options within the AttributeDescription (semi-colon separated list of options).
-     * 
+     *
      * @return Options
      */
-    public function getOptions() : Options 
+    public function getOptions() : Options
     {
         return $this->options();
     }
@@ -170,7 +170,7 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * @return bool
      */
-    public function hasOptions() : bool 
+    public function hasOptions() : bool
     {
         return ($this->options()->count() > 0);
     }

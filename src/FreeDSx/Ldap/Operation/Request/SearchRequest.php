@@ -444,6 +444,6 @@ class SearchRequest implements RequestInterface
                 /** @var Attribute $attr */
                 return Asn1::octetString($attr instanceof Attribute ? $attr->getDescription() : $attr);
             }, $this->attributes))
-         ));
+        ));
     }
 }

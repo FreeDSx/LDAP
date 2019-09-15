@@ -49,7 +49,7 @@ class ClientSearchHandler extends ClientBasicHandler
     {
         $entries = [];
 
-        while(!($messageFrom->getResponse() instanceof SearchResultDone)) {
+        while (!($messageFrom->getResponse() instanceof SearchResultDone)) {
             $response = $messageFrom->getResponse();
             if ($response instanceof SearchResultEntry) {
                 $entry = $response->getEntry();

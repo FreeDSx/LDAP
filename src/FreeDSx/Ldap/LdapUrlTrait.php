@@ -66,5 +66,4 @@ trait LdapUrlTrait
             $value
         );
     }
-
 }

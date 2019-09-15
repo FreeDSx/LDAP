@@ -98,7 +98,7 @@ class Options implements \Countable, \IteratorAggregate
 
     /**
      * Retrieve the first option, if it exists.
-     * 
+     *
      * @return Option|null
      */
     public function first() : ?Option
@@ -110,7 +110,7 @@ class Options implements \Countable, \IteratorAggregate
 
     /**
      * Retrieve the last option, if it exists.
-     * 
+     *
      * @return Option|null
      */
     public function last() : ?Option
@@ -129,7 +129,7 @@ class Options implements \Countable, \IteratorAggregate
     {
         $opts = $this->options;
         if ($sortedlc) {
-            \sort($opts);    
+            \sort($opts);
         }
 
         $options = '';
@@ -143,9 +143,9 @@ class Options implements \Countable, \IteratorAggregate
     /**
      * @return array
      */
-    public function toArray() : array 
+    public function toArray() : array
     {
-        return $this->options;    
+        return $this->options;
     }
     
     /**

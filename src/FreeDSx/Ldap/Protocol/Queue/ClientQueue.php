@@ -55,8 +55,8 @@ class ClientQueue extends LdapQueue
         $message = $this->getAndValidateMessage($id);
         if (!$message instanceof LdapMessageResponse) {
             throw new ProtocolException(sprintf(
-               'Expected an instance of LdapMessageResponse but got: %s',
-               get_class($message)
+                'Expected an instance of LdapMessageResponse but got: %s',
+                get_class($message)
             ));
         }
 

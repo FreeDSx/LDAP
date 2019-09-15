@@ -41,17 +41,17 @@ class ServerProtocolHandlerFactory
         }
     }
 
-        /**
-         * @param RequestInterface $request
-         * @return bool
-         */
-        protected function isRootDseSearch(RequestInterface $request) : bool
-        {
-            if (!$request instanceof SearchRequest) {
-                return false;
-            }
-
-            return $request->getScope() === SearchRequest::SCOPE_BASE_OBJECT
-                && ((string)$request->getBaseDn() === '');
+    /**
+     * @param RequestInterface $request
+     * @return bool
+     */
+    protected function isRootDseSearch(RequestInterface $request) : bool
+    {
+        if (!$request instanceof SearchRequest) {
+            return false;
         }
+
+        return $request->getScope() === SearchRequest::SCOPE_BASE_OBJECT
+                && ((string)$request->getBaseDn() === '');
+    }
 }

@@ -222,11 +222,12 @@ class FilterParser
             $pos = false;
             try {
                 $pos = $this->nextClosingParenthesis($startAt);
-            } catch (FilterParseException $e) {}
+            } catch (FilterParseException $e) {
+            }
             if ($pos !== false) {
                 throw new FilterParseException(sprintf('The ")" at char %s has no matching parenthesis', $pos));
             }
-        # If this is not a root filter, it must start with an opening parenthesis.
+            # If this is not a root filter, it must start with an opening parenthesis.
         } elseif (!$isRoot && !$this->startsWith(FilterInterface::PAREN_LEFT, $startAt)) {
             throw new FilterParseException(sprintf(
                 'The character "%s" at position %s was unexpected. Expected "(".',
@@ -283,15 +284,15 @@ class FilterParser
             return $this->getMatchingRuleFilterObject($attribute, $this->unescapeValue($value));
         }
 
-       if ($value === '*') {
-           return Filters::present($attribute);
-       }
+        if ($value === '*') {
+            return Filters::present($attribute);
+        }
 
-       if (preg_match('/\*/', $value) !== 0) {
+        if (preg_match('/\*/', $value) !== 0) {
             return $this->getSubstringFilterObject($attribute, $value);
-       } else {
+        } else {
             return Filters::equal($attribute, $this->unescapeValue($value));
-       }
+        }
     }
 
     /**
@@ -314,8 +315,8 @@ class FilterParser
         # RFC 4511, 4.5.1.7.7: If the matchingRule field is absent, the type field MUST be present [..]
         if ($matchingRule === '' && $attrName === '') {
             throw new FilterParseException(sprintf(
-               'If the matching rule is absent the attribute type must be present, but it is not: %s',
-               $attribute
+                'If the matching rule is absent the attribute type must be present, but it is not: %s',
+                $attribute
             ));
         }
 
@@ -419,7 +420,7 @@ class FilterParser
             # Detect an unescaped left parenthesis
             if ($this->filter[$i] === FilterInterface::PAREN_LEFT) {
                 [$i, $child] = $this->parseContainerStart($i, $child);
-                # We have reached a closing parenthesis of a container, work backwards from those defined to set the ending.
+            # We have reached a closing parenthesis of a container, work backwards from those defined to set the ending.
             } elseif ($this->filter[$i] === FilterInterface::PAREN_RIGHT) {
                 $this->parseContainerEnd($i);
             }
@@ -477,16 +478,16 @@ class FilterParser
             # Container inside the container ...
             if ($this->isAtFilterContainer($i)) {
                 $i--;
-                # Comparison filter inside the container...
+            # Comparison filter inside the container...
             } elseif (isset($this->filter[$i]) && $this->filter[$i] === FilterInterface::PAREN_LEFT) {
                 $i = $this->nextClosingParenthesis($i);
-                # An empty container is not allowed...
+            # An empty container is not allowed...
             } elseif (isset($this->filter[$i]) && $this->filter[$i] === FilterInterface::PAREN_RIGHT) {
                 throw new FilterParseException(sprintf(
                     'The filter container near position %s is empty.',
                     $i
                 ));
-                # Any other conditions possible? This shouldn't happen unless the filter is malformed..
+            # Any other conditions possible? This shouldn't happen unless the filter is malformed..
             } else {
                 throw new FilterParseException(sprintf(
                     'Unexpected value after "%s" at position %s: %s',

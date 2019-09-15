@@ -152,7 +152,7 @@ class Rdn
             $value = ($value[0] === '#' ? '\23' : '\20').\substr($value, 1);
         }
         if ($value[-1] === ' ') {
-            $value = \substr_replace($value, '\20',-1, 1);
+            $value = \substr_replace($value, '\20', -1, 1);
         }
 
         return self::escapeNonPrintable($value);

@@ -55,7 +55,7 @@ class PcntlServerRunner implements ServerRunnerInterface
             $pid = pcntl_fork();
             if ($pid == -1) {
                 throw new RuntimeException('Unable to fork process.');
-            } else if ($pid === 0) {
+            } elseif ($pid === 0) {
                 $serverProtocolHandler = new ServerProtocolHandler(
                     new ServerQueue($socket),
                     $this->constructRequestHandler(),

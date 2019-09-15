@@ -100,11 +100,11 @@ class Option
 
     /**
      * Options are case insensitive, so use this to optimize case-insensitive checks.
-     * 
+     *
      * @param Option $option
      * @return bool
      */
-    public function equals(Option $option) : bool 
+    public function equals(Option $option) : bool
     {
         if ($this->lcOption === null) {
             $this->lcOption = \strtolower($this->option);
@@ -143,7 +143,7 @@ class Option
 
     /**
      * Convenience factory method for creating a range option.
-     * 
+     *
      * @see https://msdn.microsoft.com/en-us/library/cc223242.aspx
      * @param string $startAt
      * @param string $endAt

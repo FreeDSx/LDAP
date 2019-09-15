@@ -160,8 +160,8 @@ class SubstringFilter implements FilterInterface
         }
 
         return Asn1::context(self::CHOICE_TAG, Asn1::sequence(
-           Asn1::octetString($this->attribute),
-           $substrings
+            Asn1::octetString($this->attribute),
+            $substrings
         ));
     }
 
@@ -174,7 +174,7 @@ class SubstringFilter implements FilterInterface
 
         $value = '';
         if (count($this->contains) !== 0) {
-            $value = array_map(function($value) {
+            $value = array_map(function ($value) {
                 return Attribute::escape($value);
             }, $this->contains);
             $value = '*'.implode('*', $value).'*';

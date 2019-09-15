@@ -52,17 +52,17 @@ class ResponseFactory
             $response = new SearchResultDone($resultCode, '', $diagnostic);
         } elseif ($request instanceof AddRequest) {
             $response = new AddResponse($resultCode, $request->getEntry()->getDn()->toString(), $diagnostic);
-         } elseif ($request instanceof CompareRequest) {
+        } elseif ($request instanceof CompareRequest) {
             $response = new CompareResponse($resultCode, $request->getDn()->toString(), $diagnostic);
-        } elseif ( $request instanceof DeleteRequest) {
+        } elseif ($request instanceof DeleteRequest) {
             $response = new DeleteResponse($resultCode, $request->getDn()->toString(), $diagnostic);
-         } elseif ($request instanceof ModifyDnRequest) {
+        } elseif ($request instanceof ModifyDnRequest) {
             $response = new ModifyDnResponse($resultCode, $request->getDn()->toString(), $diagnostic);
-         } elseif ($request instanceof ModifyRequest) {
+        } elseif ($request instanceof ModifyRequest) {
             $response = new ModifyResponse($resultCode, $request->getDn()->toString(), $diagnostic);
-         } elseif ($request instanceof ExtendedRequest) {
+        } elseif ($request instanceof ExtendedRequest) {
             $response = new ExtendedResponse(new LdapResult($resultCode, '', $diagnostic));
-         } else {
+        } else {
             return $this->getExtendedError('Invalid request.', ResultCode::OPERATIONS_ERROR);
         }
 

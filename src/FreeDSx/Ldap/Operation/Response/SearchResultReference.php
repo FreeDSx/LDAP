@@ -63,7 +63,6 @@ class SearchResultReference implements ResponseInterface
             } catch (UrlParseException $e) {
                 throw new ProtocolException($e->getMessage());
             }
-
         }
 
         return new self(...$referrals);

@@ -37,7 +37,7 @@ trait EscapeTrait
      */
     protected static function escapeNonPrintable(string $value): string
     {
-        return (string) \preg_replace_callback('/([\x00-\x1F\x7F])/', function($matches) {
+        return (string) \preg_replace_callback('/([\x00-\x1F\x7F])/', function ($matches) {
             return '\\'.\bin2hex($matches[1]);
         }, $value);
     }

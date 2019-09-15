@@ -342,12 +342,12 @@ class LdapClient
 
     /**
      * Get a helper class for handling ranged attributes.
-     * 
+     *
      * @return RangeRetrieval
      */
     public function range() : RangeRetrieval
     {
-        return new RangeRetrieval($this);    
+        return new RangeRetrieval($this);
     }
     
     /**
