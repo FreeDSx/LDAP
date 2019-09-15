@@ -95,7 +95,11 @@ class NotFilter implements FilterInterface
         if (!($type instanceof SequenceType && count($type) === 1)) {
             throw new ProtocolException('The not filter is malformed');
         }
+        $child = $type->getChild(0);
+        if ($child === null) {
+            throw new ProtocolException('The "not" filter is malformed.');
+        }
 
-        return new self(FilterFactory::get($type->getChild(0)));
+        return new self(FilterFactory::get($child));
     }
 }

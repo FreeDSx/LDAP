@@ -12,10 +12,12 @@ namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
  * A search result entry. RFC 4511, 4.5.2.
@@ -60,21 +62,32 @@ class SearchResultEntry implements ResponseInterface
     public static function fromAsn1(AbstractType $type)
     {
         $attributes = [];
-
-        /** @var \FreeDSx\Asn1\Type\SequenceType $type */
-        foreach ($type->getChild(1)->getChildren() as $partialAttribute) {
-            $values = [];
-
-            /** @var \FreeDSx\Asn1\Type\SequenceType $partialAttribute */
-            foreach ($partialAttribute->getChild(1)->getChildren() as $attrValue) {
-                /** @var \FreeDSx\Asn1\Type\OctetStringType $attrValue */
-                $values[] = $attrValue->getValue();
-            }
-
-            $attributes[] = new Attribute($partialAttribute->getChild(0)->getValue(), ...$values);
+        $dn = $type->getChild(0);
+        if ($dn === null) {
+            throw new ProtocolException('The search result entry is malformed.');
         }
 
-        return new self(new Entry(new Dn($type->getChild(0)->getValue()), ...$attributes));
+        $partialAttributes = $type->getChild(1);
+        if ($partialAttributes !== null) {
+            foreach ($partialAttributes as $partialAttribute) {
+                $values = [];
+                $attrValues = $partialAttribute->getChild(1);
+                if ($attrValues !== null) {
+                    /** @var SequenceType $attrValues */
+                    foreach ($attrValues->getChildren() as $attrValue) {
+                        /** @var OctetStringType $attrValue */
+                        $values[] = $attrValue->getValue();
+                    }
+                }
+
+                $attributes[] = new Attribute($partialAttribute->getChild(0)->getValue(), ...$values);
+            }
+        }
+
+        return new self(new Entry(
+            new Dn($dn->getValue()),
+            ...$attributes
+        ));
     }
 
     /**

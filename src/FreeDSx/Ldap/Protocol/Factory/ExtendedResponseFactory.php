@@ -12,6 +12,7 @@ namespace FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
@@ -36,12 +37,16 @@ class ExtendedResponseFactory
      *
      * @param AbstractType $asn1
      * @param string $oid
-     * @return null|ExtendedResponse
+     * @return ExtendedResponse
+     * @throws ProtocolException
      */
-    public function get(AbstractType $asn1, string $oid) : ?ExtendedResponse
+    public function get(AbstractType $asn1, string $oid): ExtendedResponse
     {
         if (!self::has($oid)) {
-            return null;
+            throw new ProtocolException(sprintf(
+                'There is no extended response mapped for %s.',
+                $oid
+            ));
         }
         $responseConstruct = self::$map[$oid].'::fromAsn1';
         if (!is_callable($responseConstruct)) {

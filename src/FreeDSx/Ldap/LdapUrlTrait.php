@@ -48,7 +48,7 @@ trait LdapUrlTrait
         return \str_replace(
             \array_keys(self::$escapeMap),
             \array_values(self::$escapeMap),
-            $value
+            (string) $value
         );
     }
 

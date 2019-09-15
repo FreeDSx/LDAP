@@ -95,10 +95,18 @@ class PagingControl extends Control
     public static function fromAsn1(AbstractType $type)
     {
         $paging = self::decodeEncodedValue($type);
-        self::validate($paging);
-
-        /** @var SequenceType $paging */
-        $control = new self($paging->getChild(0)->getValue(), $paging->getChild(1)->getValue());
+        if (!$paging instanceof SequenceType) {
+            throw new ProtocolException('A paged control value must be a sequence type with 2 children.');
+        }
+        $count = $paging->getChild(0);
+        $cookie = $paging->getChild(1);
+        if (!$count instanceof IntegerType) {
+            throw new ProtocolException('A paged control value sequence 0 must be an integer type.');
+        }
+        if (!$cookie instanceof OctetStringType) {
+            throw new ProtocolException('A paged control value sequence 1 must be an octet string type.');
+        }
+        $control = new self($count->getValue(), $cookie->getValue());
 
         return self::mergeControlData($control, $type);
     }
@@ -114,22 +122,5 @@ class PagingControl extends Control
         );
 
         return parent::toAsn1();
-    }
-
-    /**
-     * @param AbstractType $type
-     * @throws ProtocolException
-     */
-    protected static function validate(AbstractType $type): void
-    {
-        if (!($type instanceof SequenceType && \count($type->getChildren()) === 2)) {
-            throw new ProtocolException('A paged control value must be a sequence type with 2 children.');
-        }
-        if (!$type->getChild(0) instanceof IntegerType) {
-            throw new ProtocolException('A paged control value sequence 0 must be an integer type.');
-        }
-        if (!$type->getChild(1) instanceof OctetStringType) {
-            throw new ProtocolException('A paged control value sequence 1 must be an octet string type.');
-        }
     }
 }

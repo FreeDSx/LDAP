@@ -132,7 +132,7 @@ class Attribute implements \IteratorAggregate, \Countable
      */
     public function getName() : string
     {
-        $this->initOptions();
+        $this->options();
 
         return $this->attribute;
     }
@@ -144,7 +144,7 @@ class Attribute implements \IteratorAggregate, \Countable
      */
     public function getDescription() : string
     {
-        return $this->getName().($this->hasOptions() ? ';'.$this->options->toString() : '');
+        return $this->getName().($this->options()->count() > 0 ? ';'.$this->options()->toString() : '');
     }
 
     /**
@@ -164,9 +164,7 @@ class Attribute implements \IteratorAggregate, \Countable
      */
     public function getOptions() : Options 
     {
-        $this->initOptions();
-        
-        return $this->options;
+        return $this->options();
     }
 
     /**
@@ -174,9 +172,7 @@ class Attribute implements \IteratorAggregate, \Countable
      */
     public function hasOptions() : bool 
     {
-        $this->initOptions();
-        
-        return (bool) $this->options->toArray();
+        return ($this->options()->count() > 0);
     }
 
     /**
@@ -202,8 +198,8 @@ class Attribute implements \IteratorAggregate, \Countable
      */
     public function equals(Attribute $attribute, bool $strict = false) : bool
     {
-        $this->initOptions();
-        $attribute->initOptions();
+        $this->options();
+        $attribute->options();
         if ($this->lcAttribute === null) {
             $this->lcAttribute = \strtolower($this->attribute);
         }
@@ -248,18 +244,20 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * A one time check and load of any attribute options.
      */
-    protected function initOptions() : void
+    protected function options() : Options
     {
         if ($this->options !== null) {
-            return;
+            return $this->options;
         }
         if (\strpos($this->attribute, ';') === false) {
             $this->options = new Options();
             
-            return;
+            return $this->options;
         }
         $options = \explode(';', $this->attribute);
-        $this->attribute = \array_shift($options);
+        $this->attribute = (string) \array_shift($options);
         $this->options = new Options(...$options);
+
+        return $this->options;
     }
 }

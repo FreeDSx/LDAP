@@ -53,7 +53,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
     {
         $add = Operations::add(Entry::create('cn=foo,dc=freedsx,dc=local'));
 
-        $client->send($add, ...[])->shouldBeCalled();
+        $client->sendAndReceive($add, ...[])->shouldBeCalled();
         $this->add($context, $add);
     }
 
@@ -61,7 +61,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
     {
         $delete = Operations::delete('cn=foo,dc=freedsx,dc=local');
 
-        $client->send($delete, ...[])->shouldBeCalled();
+        $client->sendAndReceive($delete, ...[])->shouldBeCalled();
         $this->delete($context, $delete);
     }
 
@@ -69,7 +69,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
     {
         $modify = Operations::modify('cn=foo,dc=freedsx,dc=local', Change::add('foo', 'bar'));
 
-        $client->send($modify, ...[])->shouldBeCalled();
+        $client->sendAndReceive($modify, ...[])->shouldBeCalled();
         $this->modify($context, $modify);
     }
 
@@ -77,7 +77,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
     {
         $modifyDn = Operations::rename('cn=foo,dc=freedsx,dc=local', 'cn=bar');
 
-        $client->send($modifyDn, ...[])->shouldBeCalled();
+        $client->sendAndReceive($modifyDn, ...[])->shouldBeCalled();
         $this->modifyDn($context, $modifyDn);
     }
 
@@ -94,7 +94,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
     {
         $compare = Operations::compare('foo', 'foo', 'bar');
 
-        $client->send($compare)->shouldBeCalled()->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_FALSE)));
+        $client->sendAndReceive($compare)->shouldBeCalled()->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_FALSE)));
 
         $this->compare($context, $compare)->shouldBeEqualTo(false);
     }
@@ -103,7 +103,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
     {
         $compare = Operations::compare('foo', 'foo', 'bar');
 
-        $client->send($compare)->shouldBeCalled()->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_TRUE)));
+        $client->sendAndReceive($compare)->shouldBeCalled()->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_TRUE)));
 
         $this->compare($context, $compare)->shouldBeEqualTo(true);
     }

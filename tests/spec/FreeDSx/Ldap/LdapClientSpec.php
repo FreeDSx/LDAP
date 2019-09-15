@@ -36,6 +36,7 @@ use FreeDSx\Ldap\Search\Paging;
 use FreeDSx\Ldap\Search\RangeRetrieval;
 use FreeDSx\Ldap\Search\Vlv;
 use PhpSpec\ObjectBehavior;
+use Prophecy\Argument;
 
 class LdapClientSpec extends ObjectBehavior
 {
@@ -49,6 +50,20 @@ class LdapClientSpec extends ObjectBehavior
     function it_is_initializable()
     {
         $this->shouldHaveType(LdapClient::class);
+    }
+
+    function it_should_send_a_message_and_throw_an_exception_if_no_response_is_received_on_sendAndReceive($handler)
+    {
+        $handler->send(Argument::any())->shouldBeCalled()->willReturn(null);
+
+        $this->shouldThrow(OperationException::class)->during('sendAndReceive', [Operations::read('')]);
+    }
+
+    function it_should_send_a_message_and_return_the_response_on_sendAndReceive($handler, LdapMessageResponse $response)
+    {
+        $handler->send(Argument::any())->shouldBeCalled()->willReturn($response);
+
+        $this->sendAndReceive(Operations::read(''))->shouldBeEqualTo($response);
     }
 
     function it_should_send_a_search_and_get_entries_back($handler)

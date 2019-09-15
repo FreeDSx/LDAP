@@ -95,12 +95,20 @@ class ExpectedEntryCountControl extends Control
     public static function fromAsn1(AbstractType $type)
     {
         $request = self::decodeEncodedValue($type);
-        self::validate($request);
-
-        /** @var SequenceType $request */
+        if (!$request instanceof SequenceType) {
+            throw new ProtocolException('An ExpectedEntryCount control value must be a sequence type.');
+        }
+        $min = $request->getChild(0);
+        $max = $request->getChild(1);
+        if (!$min instanceof IntegerType) {
+            throw new ProtocolException('An ExpectedEntryCount control value sequence 0 must be an integer type.');
+        }
+        if (!$max instanceof IntegerType) {
+            throw new ProtocolException('An ExpectedEntryCount control value sequence 1 must be an integer type.');
+        }
         $control = new self(
-            $request->getChild(0)->getValue(),
-            $request->getChild(1)->getValue()
+            $min->getValue(),
+            $max->getValue()
         );
 
         return self::mergeControlData($control, $type);

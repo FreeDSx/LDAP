@@ -87,7 +87,7 @@ class LdapClient
      */
     public function bind(string $username, string $password) : LdapMessageResponse
     {
-        return $this->handler->send(Operations::bind($username, $password)->setVersion($this->options['version']));
+        return $this->sendAndReceive(Operations::bind($username, $password)->setVersion($this->options['version']));
     }
 
     /**
@@ -102,7 +102,7 @@ class LdapClient
     public function compare($dn, string $attributeName, string $value, Control ...$controls) : bool
     {
         /** @var \FreeDSx\Ldap\Operation\Response\CompareResponse $response */
-        $response = $this->send(Operations::compare($dn, $attributeName, $value), ...$controls)->getResponse();
+        $response = $this->sendAndReceive(Operations::compare($dn, $attributeName, $value), ...$controls)->getResponse();
 
         return $response->getResultCode() === ResultCode::COMPARE_TRUE;
     }
@@ -116,7 +116,7 @@ class LdapClient
      */
     public function create(Entry $entry, Control ...$controls) : LdapMessageResponse
     {
-        $response = $this->send(Operations::add($entry), ...$controls);
+        $response = $this->sendAndReceive(Operations::add($entry), ...$controls);
         $entry->changes()->reset();
 
         return $response;
@@ -174,7 +174,7 @@ class LdapClient
      */
     public function delete(string $entry, Control ...$controls) : LdapMessageResponse
     {
-        return $this->send(Operations::delete($entry), ...$controls);
+        return $this->sendAndReceive(Operations::delete($entry), ...$controls);
     }
 
     /**
@@ -186,7 +186,7 @@ class LdapClient
      */
     public function update(Entry $entry, Control ...$controls) : LdapMessageResponse
     {
-        $response = $this->send(Operations::modify($entry->getDn(), ...$entry->changes()), ...$controls);
+        $response = $this->sendAndReceive(Operations::modify($entry->getDn(), ...$entry->changes()), ...$controls);
         $entry->changes()->reset();
 
         return $response;
@@ -202,7 +202,7 @@ class LdapClient
      */
     public function move($dn, $newParentDn) : LdapMessageResponse
     {
-        return $this->send(Operations::move($dn, $newParentDn));
+        return $this->sendAndReceive(Operations::move($dn, $newParentDn));
     }
 
     /**
@@ -216,7 +216,7 @@ class LdapClient
      */
     public function rename($dn, $newRdn, bool $deleteOldRdn = true) : LdapMessageResponse
     {
-        return $this->send(Operations::rename($dn, $newRdn, $deleteOldRdn));
+        return $this->sendAndReceive(Operations::rename($dn, $newRdn, $deleteOldRdn));
     }
 
     /**
@@ -229,7 +229,7 @@ class LdapClient
     public function search(SearchRequest $request, Control ...$controls) : Entries
     {
         /** @var \FreeDSx\Ldap\Operation\Response\SearchResponse $response */
-        $response = $this->send($request, ...$controls)->getResponse();
+        $response = $this->sendAndReceive($request, ...$controls)->getResponse();
 
         return $response->getEntries();
     }
@@ -273,16 +273,34 @@ class LdapClient
     }
 
     /**
-     * Send a request operation to LDAP.
+     * Send a request operation to LDAP. This may return null if the request expects no response.
      *
      * @param RequestInterface $request
      * @param Control ...$controls
      * @return LdapMessageResponse|null
      * @throws OperationException
      */
-    public function send(RequestInterface $request, Control ...$controls) : ?LdapMessageResponse
+    public function send(RequestInterface $request, Control ...$controls): ?LdapMessageResponse
     {
         return $this->handler->send($request, ...$controls);
+    }
+
+    /**
+     * Send a request to LDAP that expects a response. If none is received an OperationException is thrown.
+     *
+     * @param RequestInterface $request
+     * @param Control ...$controls
+     * @return LdapMessageResponse
+     * @throws OperationException
+     */
+    public function sendAndReceive(RequestInterface $request, Control ...$controls): LdapMessageResponse
+    {
+        $response = $this->send($request, ...$controls);
+        if ($response === null) {
+            throw new OperationException('Expected an LDAP message response, but none was received.');
+        }
+
+        return $response;
     }
 
     /**
@@ -292,7 +310,7 @@ class LdapClient
      */
     public function startTls()
     {
-        $this->handler->send(Operations::extended(ExtendedRequest::OID_START_TLS));
+        $this->send(Operations::extended(ExtendedRequest::OID_START_TLS));
 
         return $this;
     }
@@ -304,7 +322,7 @@ class LdapClient
      */
     public function unbind()
     {
-        $this->handler->send(Operations::unbind());
+        $this->send(Operations::unbind());
 
         return $this;
     }
@@ -317,7 +335,7 @@ class LdapClient
     public function whoami() : ?string
     {
         /** @var \FreeDSx\Ldap\Operation\Response\ExtendedResponse $response */
-        $response = $this->send(Operations::whoami())->getResponse();
+        $response = $this->sendAndReceive(Operations::whoami())->getResponse();
 
         return $response->getValue();
     }

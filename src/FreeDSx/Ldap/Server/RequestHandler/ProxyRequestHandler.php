@@ -60,7 +60,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
      */
     public function modify(RequestContext $context, ModifyRequest $modify): void
     {
-        $this->ldap()->send($modify, ...$context->controls()->toArray());
+        $this->ldap()->sendAndReceive($modify, ...$context->controls()->toArray());
     }
 
     /**
@@ -68,7 +68,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
      */
     public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn): void
     {
-        $this->ldap()->send($modifyDn, ...$context->controls()->toArray());
+        $this->ldap()->sendAndReceive($modifyDn, ...$context->controls()->toArray());
     }
 
     /**
@@ -76,7 +76,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
      */
     public function delete(RequestContext $context, DeleteRequest $delete): void
     {
-        $this->ldap()->send($delete, ...$context->controls()->toArray());
+        $this->ldap()->sendAndReceive($delete, ...$context->controls()->toArray());
     }
 
     /**
@@ -84,7 +84,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
      */
     public function add(RequestContext $context, AddRequest $add): void
     {
-        $this->ldap()->send($add, ...$context->controls()->toArray());
+        $this->ldap()->sendAndReceive($add, ...$context->controls()->toArray());
     }
 
     /**
@@ -100,7 +100,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
      */
     public function compare(RequestContext $context, CompareRequest $compare): bool
     {
-        $response = $this->ldap()->send($compare, ...$context->controls()->toArray())->getResponse();
+        $response = $this->ldap()->sendAndReceive($compare, ...$context->controls()->toArray())->getResponse();
         if (!$response instanceof LdapResult) {
             throw new OperationException('The result was malformed.', ResultCode::PROTOCOL_ERROR);
         }

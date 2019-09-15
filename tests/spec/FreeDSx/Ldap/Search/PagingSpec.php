@@ -25,7 +25,7 @@ class PagingSpec extends ObjectBehavior
 {
     function let(LdapClient $client, SearchRequest $search)
     {
-        $client->send($search, new PagingControl(1000, ''))->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive($search, new PagingControl(1000, ''))->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(0, '', ''), new Entries(Entry::create('foo'), Entry::create('bar'))),
             new PagingControl(100, 'foo')
@@ -52,7 +52,7 @@ class PagingSpec extends ObjectBehavior
 
     function it_should_return_false_for_entries_when_the_cookie_is_empty($client, $search)
     {
-        $client->send($search, new PagingControl(100, ''))->willReturn(
+        $client->sendAndReceive($search, new PagingControl(100, ''))->willReturn(
             new LdapMessageResponse(
                 1,
                 new SearchResponse(new LdapResult(0, '', ''), new Entries()),
@@ -66,7 +66,7 @@ class PagingSpec extends ObjectBehavior
 
     function it_should_abort_a_paging_operation_if_end_is_called($client, $search)
     {
-        $client->send($search, new PagingControl(0, 'foo'))->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive($search, new PagingControl(0, 'foo'))->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(0, '', ''), new Entries()),
             new PagingControl(0, 'foo')

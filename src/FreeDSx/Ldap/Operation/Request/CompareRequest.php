@@ -100,7 +100,7 @@ class CompareRequest implements RequestInterface, DnRequestInterface
         $dn = $type->getChild(0);
         $ava = $type->getChild(1);
 
-        if (!$dn instanceof OctetStringType) {
+        if (!$dn instanceof OctetStringType || $ava === null) {
             throw new ProtocolException('The compare request is malformed.');
         }
 

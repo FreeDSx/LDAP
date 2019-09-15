@@ -175,8 +175,8 @@ class VlvControl extends Control
             $this->controlValue->addChild(Asn1::context(1, $this->filter->toAsn1()));
         } else {
             $this->controlValue->addChild(Asn1::context(0, Asn1::sequence(
-                Asn1::integer($this->offset),
-                Asn1::integer($this->count)
+                Asn1::integer((int) $this->offset),
+                Asn1::integer((int) $this->count)
             )));
         }
 

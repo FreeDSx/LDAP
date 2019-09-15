@@ -78,27 +78,15 @@ class PolicyHintsControl extends Control
     public static function fromAsn1(AbstractType $type)
     {
         $request = self::decodeEncodedValue($type);
-        self::validate($request);
-
-        /** @var SequenceType $request */
-        $control = new self(
-            $request->getChild(0)->getValue()
-        );
-
-        return self::mergeControlData($control, $type);
-    }
-
-    /**
-     * @param AbstractType $type
-     * @throws ProtocolException
-     */
-    protected static function validate(AbstractType $type) : void
-    {
-        if (!($type instanceof SequenceType && \count($type) === 1)) {
-            throw new ProtocolException('A PolicyHints control value must be a sequence type with 1 child.');
+        if (!$request instanceof SequenceType) {
+            throw new ProtocolException('A PolicyHints control value must be a sequence type.');
         }
-        if (!$type->getChild(0) instanceof IntegerType) {
+        $isEnabled = $request->getChild(0);
+        if (!$isEnabled instanceof IntegerType) {
             throw new ProtocolException('A PolicyHints control value sequence 0 must be an integer type.');
         }
+        $control = new self($isEnabled->getValue());
+
+        return self::mergeControlData($control, $type);
     }
 }

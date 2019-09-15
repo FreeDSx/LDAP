@@ -12,6 +12,7 @@ namespace FreeDSx\Ldap\Control\Sorting;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\EnumeratedType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -93,10 +94,15 @@ class SortingResponseControl extends Control
         if (!$sorting instanceof SequenceType) {
             throw new ProtocolException('The server side sorting response is malformed.');
         }
+        $result = $sorting->getChild(0);
+        $attribute = $sorting->getChild(1);
+        if (!$result instanceof EnumeratedType) {
+            throw new ProtocolException('The server side sorting response is malformed.');
+        }
 
         $response = new self(
-            $sorting->getChild(0)->getValue(),
-            $sorting->hasChild(1) ? $sorting->getChild(1)->getValue() : null
+            $result->getValue(),
+            ($attribute !== null) ? $attribute->getValue() : null
         );
 
         return parent::mergeControlData($response, $type);

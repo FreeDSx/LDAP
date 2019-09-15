@@ -273,7 +273,7 @@ class Vlv
     protected function send(): Entries
     {
         $contextId = ($this->control !== null) ? $this->control->getContextId() : null;
-        $message = $this->client->send($this->search, $this->createVlvControl($contextId), $this->sort);
+        $message = $this->client->sendAndReceive($this->search, $this->createVlvControl($contextId), $this->sort);
         $control = $message->controls()->get(Control::OID_VLV_RESPONSE);
         if ($control === null || !$control instanceof VlvResponseControl) {
             throw new ProtocolException('Expected a VLV response control, but received none.');

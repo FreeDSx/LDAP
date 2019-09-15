@@ -40,7 +40,7 @@ class VlvSpec extends ObjectBehavior
     {
         $this->beConstructedWith($client, $search, new SortKey('foo'));
 
-        $client->send(Argument::any(), Argument::any(), new SortingControl(new SortKey('foo')))->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), Argument::any(), new SortingControl(new SortKey('foo')))->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(50, 150,0, 'foo')
@@ -53,7 +53,7 @@ class VlvSpec extends ObjectBehavior
     {
         $this->beConstructedWith($client, $search, new SortingControl(new SortKey('foo'), new SortKey('bar')));
 
-        $client->send(Argument::any(), Argument::any(), new SortingControl(new SortKey('foo'), new SortKey('bar')))->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), Argument::any(), new SortingControl(new SortKey('foo'), new SortKey('bar')))->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(50, 150,0, 'foo')
@@ -64,7 +64,7 @@ class VlvSpec extends ObjectBehavior
 
     function it_should_set_the_offset_using_startAt($client)
     {
-        $client->send(Argument::any(), new VlvControl(0, 100, 1000, 0, null, null), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), new VlvControl(0, 100, 1000, 0, null, null), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(50, 150,0, 'foo')
@@ -76,7 +76,7 @@ class VlvSpec extends ObjectBehavior
 
     function it_should_set_the_offset_using_moveTo($client)
     {
-        $client->send(Argument::any(), new VlvControl(0, 100, 1000, 0, null, null), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), new VlvControl(0, 100, 1000, 0, null, null), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(50, 150,0, 'foo')
@@ -93,7 +93,7 @@ class VlvSpec extends ObjectBehavior
 
     function it_should_return_the_offset_on_a_call_to_position($client)
     {
-        $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(250, 150,0, 'foo')
@@ -105,7 +105,7 @@ class VlvSpec extends ObjectBehavior
 
     function it_should_return_the_size_of_the_list_returned_from_the_server($client)
     {
-        $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(0, 200,0, 'foo')
@@ -117,7 +117,7 @@ class VlvSpec extends ObjectBehavior
 
     function it_should_get_the_offset_returned_by_the_server_when_calling_list_offset($client)
     {
-        $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(10, 200,0, 'foo')
@@ -129,7 +129,7 @@ class VlvSpec extends ObjectBehavior
 
     function it_should_check_if_we_are_at_the_start_of_the_list($client)
     {
-        $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(1, 200,0, 'foo')
@@ -142,7 +142,7 @@ class VlvSpec extends ObjectBehavior
 
     function it_should_check_if_we_are_at_the_start_of_the_list_based_on_the_offset_and_before_value($client)
     {
-        $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(101, 200,0, 'foo')
@@ -155,7 +155,7 @@ class VlvSpec extends ObjectBehavior
 
     function it_should_check_if_we_are_at_the_end_of_the_list($client)
     {
-        $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(200, 200,0, 'foo')
@@ -168,7 +168,7 @@ class VlvSpec extends ObjectBehavior
 
     function it_should_check_if_we_are_at_the_end_of_the_list_based_on_the_offset_and_after_value($client)
     {
-        $client->send(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(101, 200,0, 'foo')
@@ -181,7 +181,7 @@ class VlvSpec extends ObjectBehavior
 
     function it_should_set_the_before_and_after_positions($client)
     {
-        $client->send(Argument::any(), new VlvControl(25, 75, 1, 0), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), new VlvControl(25, 75, 1, 0), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(1, 200,0, 'foo')
@@ -194,7 +194,7 @@ class VlvSpec extends ObjectBehavior
 
     function it_should_indicate_the_position_as_a_percentage_if_specified($client)
     {
-        $client->send(Argument::any(), new VlvControl(0, 100, 1, 100), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), new VlvControl(0, 100, 1, 100), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(150, 200,0, 'foo')
@@ -207,13 +207,13 @@ class VlvSpec extends ObjectBehavior
 
     function it_should_move_forward_as_a_percentage_if_specified($client)
     {
-        $client->send(Argument::any(), new VlvControl(0, 100, 1, 100), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), new VlvControl(0, 100, 1, 100), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(1, 200,0, 'foo')
         ));
 
-        $client->send(Argument::any(), new VlvControl(0, 100, 20, 200, null, 'foo'), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), new VlvControl(0, 100, 20, 200, null, 'foo'), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(20, 200,0, 'foo')
@@ -230,13 +230,13 @@ class VlvSpec extends ObjectBehavior
 
     function it_should_move_backward_as_a_percentage_if_specified($client)
     {
-        $client->send(Argument::any(), new VlvControl(0, 100, 50, 100), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), new VlvControl(0, 100, 50, 100), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(100, 200,0, 'foo')
         ));
 
-        $client->send(Argument::any(), new VlvControl(0, 100, 80, 200, null, 'foo'), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
+        $client->sendAndReceive(Argument::any(), new VlvControl(0, 100, 80, 200, null, 'foo'), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
             new SearchResponse(new LdapResult(1, '',''), new Entries()),
             new VlvResponseControl(80, 200,0, 'foo')

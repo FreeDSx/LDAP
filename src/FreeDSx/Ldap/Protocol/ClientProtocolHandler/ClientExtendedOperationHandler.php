@@ -10,6 +10,7 @@
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -44,6 +45,9 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
         $request = $message->getRequest();
         if (!$this->extendedResponseFactory->has($request->getName())) {
             return $messageFrom;
+        }
+        if ($messageFrom === null) {
+            throw new OperationException('Expected an LDAP message response, but none was received.');
         }
 
         $response = $this->extendedResponseFactory->get(

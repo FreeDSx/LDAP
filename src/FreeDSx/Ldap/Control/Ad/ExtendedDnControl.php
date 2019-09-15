@@ -71,8 +71,14 @@ class ExtendedDnControl extends Control
         $useHexFormat = false;
         if ($value !== null) {
             $request = self::decodeEncodedValue($type);
-            self::validate($request);
-            $useHexFormat = ($request->getChild(0)->getValue() === 0);
+            if (!$request instanceof SequenceType) {
+                throw new ProtocolException('An ExtendedDn control value must be a sequence type.');
+            }
+            $useHexFormat = $request->getChild(0);
+            if (!$useHexFormat instanceof IntegerType) {
+                throw new ProtocolException('An ExtendedDn control value sequence 0 must be an integer type.');
+            }
+            $useHexFormat = ($useHexFormat->getValue() === 0);
         }
 
         $control = new self($useHexFormat);

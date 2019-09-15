@@ -67,7 +67,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
         }
     }
 
-    protected function followReferral(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom): LdapMessageResponse
+    protected function followReferral(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom): ?LdapMessageResponse
     {
         $referralChaser = $this->options['referral_chaser'];
         if (!($referralChaser === null || $referralChaser instanceof ReferralChaserInterface)) {

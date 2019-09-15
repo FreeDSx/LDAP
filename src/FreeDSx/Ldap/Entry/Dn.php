@@ -45,6 +45,9 @@ class Dn implements \IteratorAggregate, \Countable
         if ($this->pieces === null) {
             $this->parse();
         }
+        if (!isset($this->pieces[0])) {
+            throw new UnexpectedValueException('Unable to parse the RDN.');
+        }
 
         return $this->pieces[0];
     }
@@ -57,11 +60,11 @@ class Dn implements \IteratorAggregate, \Countable
         if ($this->pieces === null) {
             $this->parse();
         }
-        if (\count($this->pieces) < 2) {
+        if (\count((array) $this->pieces) < 2) {
             return null;
         }
 
-        return new Dn(\implode(',', \array_slice($this->pieces, 1)));
+        return new Dn(\implode(',', \array_slice((array) $this->pieces, 1)));
     }
 
     /**
@@ -89,7 +92,7 @@ class Dn implements \IteratorAggregate, \Countable
             $this->parse();
         }
 
-        return \count($this->pieces);
+        return \count((array) $this->pieces);
     }
 
     /**

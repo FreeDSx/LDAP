@@ -196,11 +196,10 @@ class LdapResult implements ResponseInterface
         if ($count > 3) {
             for ($i = 3; $i < $count; $i++) {
                 $child = $type->getChild($i);
-                if ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 3) {
+                if ($child !== null && $child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 3) {
                     if (!$child instanceof IncompleteType) {
                         throw new ProtocolException('The ASN1 structure for the referrals is malformed.');
                     }
-                    /** @var \FreeDSx\Asn1\Type\SequenceType $child */
                     $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
                     foreach ($child->getChildren() as $ldapUrl) {
                         try {
@@ -213,10 +212,17 @@ class LdapResult implements ResponseInterface
             }
         }
 
+        $result = $type->getChild(0);
+        $dn = $type->getChild(1);
+        $diagnostic = $type->getChild(2);
+        if ($result === null || $dn === null || $diagnostic === null) {
+            throw new ProtocolException('The LDAP result is malformed.');
+        }
+
         return [
-            $type->getChild(0)->getValue(),
-            $type->getChild(1)->getValue(),
-            $type->getChild(2)->getValue(),
+            $result->getValue(),
+            $dn->getValue(),
+            $diagnostic->getValue(),
             $referrals
         ];
     }

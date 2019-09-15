@@ -94,7 +94,7 @@ class SortingControl extends Control
                 throw new ProtocolException('The sort key is malformed.');
             }
 
-            $attrName = null;
+            $attrName = '';
             $matchRule = null;
             $useReverseOrder = false;
 
@@ -115,7 +115,7 @@ class SortingControl extends Control
                     throw new ProtocolException('The sorting control contains unexpected data.');
                 }
             }
-            if ((string) $attrName === '') {
+            if ($attrName === '') {
                 throw new ProtocolException('The sort key is missing an attribute description.');
             }
 

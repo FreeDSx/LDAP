@@ -12,6 +12,7 @@ namespace FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
@@ -49,14 +50,16 @@ class FilterFactory
     ];
 
     /**
-     * @param AbstractType $type
-     * @return FilterInterface|null
+     * @throws ProtocolException
      */
-    public static function get(AbstractType $type) : ?FilterInterface
+    public static function get(AbstractType $type) : FilterInterface
     {
         $filterClass = self::$map[$type->getTagNumber()] ?? null;
         if ($filterClass === null) {
-            return null;
+            throw new ProtocolException(sprintf(
+                'The received filter "%s" is not recognized.',
+                $type->getTagNumber()
+            ));
         }
         $filterConstruct = $filterClass.'::fromAsn1';
         if (!is_callable($filterConstruct)) {
@@ -66,7 +69,7 @@ class FilterFactory
             ));
         }
 
-        return ($filterClass !== null) ? call_user_func($filterConstruct, $type) : null;
+        return call_user_func($filterConstruct, $type);
     }
 
     /**

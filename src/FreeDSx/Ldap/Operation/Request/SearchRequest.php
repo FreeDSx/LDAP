@@ -386,8 +386,13 @@ class SearchRequest implements RequestInterface
         $sizeLimit = $type->getChild(3);
         $timeLimit = $type->getChild(4);
         $typesOnly = $type->getChild(5);
-        $filter = FilterFactory::get($type->getChild(6));
         $attributes = $type->getChild(7);
+
+        $filter = $type->getChild(6);
+        if ($filter === null) {
+            throw new ProtocolException('The search request is malformed.');
+        }
+        $filter = FilterFactory::get($filter);
 
         if (!($baseDn instanceof OctetStringType
             && $scope instanceof EnumeratedType

@@ -201,7 +201,7 @@ class FilterParser
             ));
         }
 
-        return [$endAt, $this->getComparisonFilterObject($filterType, $attribute, $value)];
+        return [$endAt, $this->getComparisonFilterObject((string) $filterType, $attribute, $value)];
     }
 
     /**
@@ -458,7 +458,7 @@ class FilterParser
      */
     protected function unescapeValue(string $value)
     {
-        return preg_replace_callback('/\\\\([0-9A-Fa-f]{2})/', function ($matches) {
+        return (string) preg_replace_callback('/\\\\([0-9A-Fa-f]{2})/', function ($matches) {
             return hex2bin($matches[1]);
         }, $value);
     }
@@ -509,7 +509,7 @@ class FilterParser
     protected function parseContainerEnd(int $i): void
     {
         $matchFound = false;
-        foreach (array_reverse($this->containers, true) as $ci => $info) {
+        foreach (array_reverse((array) $this->containers, true) as $ci => $info) {
             if ($info['endAt'] === null) {
                 $this->containers[$ci]['endAt'] = $i + 1;
                 $matchFound = true;

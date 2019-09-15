@@ -148,13 +148,27 @@ class DirSyncRequestControl extends Control
     public static function fromAsn1(AbstractType $type)
     {
         $request = self::decodeEncodedValue($type);
-        self::validate($request);
+        if (!$request instanceof SequenceType) {
+            throw new ProtocolException('A DirSyncRequest control value must be a sequence type with 3 children.');
+        }
+        $flags = $request->getChild(0);
+        $cookie = $request->getChild(2);
+        $maxBytes = $request->getChild(1);
+        if (!$flags instanceof IntegerType) {
+            throw new ProtocolException('A DirSyncRequest control value sequence 0 must be an integer type.');
+        }
+        if (!$maxBytes instanceof IntegerType) {
+            throw new ProtocolException('A DirSyncRequest control value sequence 1 must be an integer type.');
+        }
+        if (!$cookie instanceof OctetStringType) {
+            throw new ProtocolException('A DirSyncRequest control value sequence 2 must be an octet string type.');
+        }
 
         /** @var SequenceType $request */
         $control = new self(
-            $request->getChild(0)->getValue(),
-            $request->getChild(2)->getValue(),
-            $request->getChild(1)->getValue()
+            $flags->getValue(),
+            $cookie->getValue(),
+            $maxBytes->getValue()
         );
 
         return self::mergeControlData($control, $type);
@@ -172,24 +186,5 @@ class DirSyncRequestControl extends Control
         );
 
         return parent::toAsn1();
-    }
-
-    /**
-     * @throws ProtocolException
-     */
-    protected static function validate(AbstractType $type): void
-    {
-        if (!($type instanceof SequenceType && \count($type) === 3)) {
-            throw new ProtocolException('A DirSyncRequest control value must be a sequence type with 3 children.');
-        }
-        if (!$type->getChild(0) instanceof IntegerType) {
-            throw new ProtocolException('A DirSyncRequest control value sequence 0 must be an integer type.');
-        }
-        if (!$type->getChild(1) instanceof IntegerType) {
-            throw new ProtocolException('A DirSyncRequest control value sequence 1 must be an integer type.');
-        }
-        if (!$type->getChild(2) instanceof OctetStringType) {
-            throw new ProtocolException('A DirSyncRequest control value sequence 2 must be an octet string type.');
-        }
     }
 }

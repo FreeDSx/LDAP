@@ -101,6 +101,6 @@ trait AttributeValueAssertionTrait
             throw new ProtocolException('The attribute value assertion is malformed.');
         }
 
-        return new self($attribute->getValue(), $value->getValue());
+        return new static($attribute->getValue(), $value->getValue());
     }
 }

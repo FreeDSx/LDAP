@@ -84,26 +84,31 @@ class VlvResponseControl extends Control
         if (!$vlv instanceof SequenceType) {
             throw new ProtocolException('The VLV response value contains an unexpected ASN1 type.');
         }
-        if (!$vlv->getChild(0) instanceof IntegerType) {
+        $offset = $vlv->getChild(0);
+        $count = $vlv->getChild(1);
+        $result = $vlv->getChild(2);
+        $contextId = $vlv->getChild(3);
+
+        if (!$offset instanceof IntegerType) {
             throw new ProtocolException('The VLV response value contains an unexpected ASN1 type.');
         }
-        if (!$vlv->getChild(1) instanceof IntegerType) {
+        if (!$count instanceof IntegerType) {
             throw new ProtocolException('The VLV response value contains an unexpected ASN1 type.');
         }
-        if (!$vlv->getChild(2) instanceof EnumeratedType) {
+        if (!$result instanceof EnumeratedType) {
             throw new ProtocolException('The VLV response value contains an unexpected ASN1 type.');
         }
-        if ($vlv->hasChild(3) && !$vlv->getChild(3) instanceof OctetStringType) {
+        if ($contextId !== null && !$contextId instanceof OctetStringType) {
             throw new ProtocolException('The VLV response value contains an unexpected ASN1 type.');
         }
 
         $response = new self(
-            $vlv->getChild(0)->getValue(),
-            $vlv->getChild(1)->getValue(),
-            $vlv->getChild(2)->getValue()
+            $offset->getValue(),
+            $count->getValue(),
+            $result->getValue()
         );
-        if ($vlv->hasChild(3)) {
-            $response->contextId = $vlv->getChild(3)->getValue();
+        if ($contextId !== null) {
+            $response->contextId = $contextId->getValue();
         }
 
         return parent::mergeControlData($response, $type);
@@ -115,8 +120,8 @@ class VlvResponseControl extends Control
     public function toAsn1(): AbstractType
     {
         $this->controlValue = Asn1::sequence(
-            Asn1::integer($this->offset),
-            Asn1::integer($this->count),
+            Asn1::integer((int) $this->offset),
+            Asn1::integer((int) $this->count),
             Asn1::enumerated($this->result)
         );
         if ($this->contextId !== null) {

@@ -132,7 +132,7 @@ class Paging
     protected function send(?int $size = null)
     {
         $cookie = ($this->control !== null) ? $this->control->getCookie() : '';
-        $message = $this->client->send($this->search, Controls::paging($size ?? $this->size, $cookie));
+        $message = $this->client->sendAndReceive($this->search, Controls::paging($size ?? $this->size, $cookie));
         $control = $message->controls()->get(Control::OID_PAGING);
         if ($control !== null && !$control instanceof PagingControl) {
             throw new ProtocolException(sprintf(
