@@ -384,14 +384,24 @@ class LdapClient
     }
 
     /**
-     * @param ClientProtocolHandler $handler
+     * @param ClientProtocolHandler|null $handler
      * @return $this
      */
-    public function setProtocolHandler(ClientProtocolHandler $handler)
+    public function setProtocolHandler(ClientProtocolHandler $handler = null)
     {
         $this->handler = $handler;
 
         return $this;
+    }
+
+    /**
+     * A simple check to determine if this client has an established connection to a server.
+     *
+     * @return bool
+     */
+    public function isConnected(): bool
+    {
+        return ($this->handler !== null && $this->handler->isConnected());
     }
 
     /**
