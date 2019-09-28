@@ -64,7 +64,7 @@ class LdapClient
     ];
 
     /**
-     * @var ClientProtocolHandler
+     * @var ClientProtocolHandler|null
      */
     protected $handler;
 
