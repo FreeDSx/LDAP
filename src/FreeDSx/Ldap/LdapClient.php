@@ -71,10 +71,9 @@ class LdapClient
     /**
      * @param array $options
      */
-    public function __construct(array $options)
+    public function __construct(array $options = [])
     {
         $this->options = array_merge($this->options, $options);
-        $this->handler = new ClientProtocolHandler($this->options);
     }
 
     /**
@@ -282,7 +281,7 @@ class LdapClient
      */
     public function send(RequestInterface $request, Control ...$controls): ?LdapMessageResponse
     {
-        return $this->handler->send($request, ...$controls);
+        return $this->handler()->send($request, ...$controls);
     }
 
     /**
@@ -358,7 +357,7 @@ class LdapClient
      */
     public function controls() : ControlBag
     {
-        return $this->handler->controls();
+        return $this->handler()->controls();
     }
 
     /**
@@ -403,5 +402,14 @@ class LdapClient
         if ($this->handler !== null && $this->handler->isConnected()) {
             $this->unbind();
         }
+    }
+
+    protected function handler(): ClientProtocolHandler
+    {
+        if ($this->handler === null) {
+            $this->handler = new Protocol\ClientProtocolHandler($this->options);
+        }
+
+        return $this->handler;
     }
 }

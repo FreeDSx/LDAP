@@ -43,7 +43,6 @@ class LdapClientSpec extends ObjectBehavior
     function let(ClientProtocolHandler $handler)
     {
         $handler->isConnected()->willReturn(false);
-        $this->beConstructedWith(['servers' => ['foo']]);
         $this->setProtocolHandler($handler);
     }
 
@@ -253,7 +252,7 @@ class LdapClientSpec extends ObjectBehavior
     {
         $this->getOptions()->shouldBeEqualTo([
             'version' => 3,
-            'servers' => ['foo'],
+            'servers' => [],
             'port' => 389,
             'base_dn' => null,
             'page_size' => 1000,
