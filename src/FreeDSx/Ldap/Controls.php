@@ -10,6 +10,7 @@
 
 namespace FreeDSx\Ldap;
 
+use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Control\Ad\DirSyncRequestControl;
 use FreeDSx\Ldap\Control\Ad\ExpectedEntryCountControl;
 use FreeDSx\Ldap\Control\Ad\ExtendedDnControl;
@@ -21,6 +22,7 @@ use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Control\Vlv\VlvControl;
+use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
 
 /**
@@ -35,10 +37,10 @@ class Controls
      *
      * @param string $oid
      * @param bool $criticality
-     * @param null $value
+     * @param AbstractType|ProtocolElementInterface|null $value
      * @return Control
      */
-    public static function create(string $oid, $criticality = false, $value = null) : Control
+    public static function create(string $oid, bool $criticality = false, $value = null) : Control
     {
         return new Control($oid, $criticality, $value);
     }
@@ -86,7 +88,7 @@ class Controls
      * @param string $cookie
      * @return PagingControl
      */
-    public static function paging(int $size, $cookie = '') : PagingControl
+    public static function paging(int $size, string $cookie = '') : PagingControl
     {
         return new PagingControl($size, $cookie);
     }
