@@ -125,7 +125,7 @@ class LdapClient
      * Read an entry.
      *
      * @param string $entry
-     * @param array $attributes
+     * @param string[] $attributes
      * @param Control ...$controls
      * @return Entry|null
      * @throws Exception\OperationException
@@ -146,7 +146,7 @@ class LdapClient
      * Read an entry from LDAP. If the entry is not found an OperationException is thrown.
      *
      * @param string $entry
-     * @param array $attributes
+     * @param string[] $attributes
      * @param Control ...$controls
      * @return Entry
      * @throws OperationException
