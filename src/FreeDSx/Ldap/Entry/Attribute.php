@@ -158,6 +158,29 @@ class Attribute implements \IteratorAggregate, \Countable
     }
 
     /**
+     * Retrieve the first value of the attribute.
+     *
+     * @return string|null
+     */
+    public function firstValue(): ?string
+    {
+        return $this->values[0] ?? null;
+    }
+
+    /**
+     * Retrieve the last value of the attribute.
+     *
+     * @return string|null
+     */
+    public function lastValue(): ?string
+    {
+        $last = end($this->values);
+        reset($this->values);
+
+        return $last === false ? null : $last;
+    }
+
+    /**
      * Gets the options within the AttributeDescription (semi-colon separated list of options).
      *
      * @return Options

@@ -67,6 +67,30 @@ class AttributeSpec extends ObjectBehavior
         $this->getValues()->shouldBeEqualTo(['foo', 'bar']);
     }
 
+    function it_should_get_the_first_value_if_it_exists()
+    {
+        $this->firstValue()->shouldBeEqualTo('foo');
+    }
+
+    function it_should_get_the_last_value_if_it_exists()
+    {
+        $this->lastValue()->shouldBeEqualTo('bar');
+    }
+
+    function it_should_get_null_if_the_first_value_does_not_exist()
+    {
+        $this->beConstructedWith('foo');
+
+        $this->firstValue()->shouldBeNull();
+    }
+
+    function it_should_get_null_if_the_last_value_does_not_exist()
+    {
+        $this->beConstructedWith('foo');
+
+        $this->lastValue()->shouldBeNull();
+    }
+
     function it_should_have_a_string_representation()
     {
         $this->__toString()->shouldBeEqualTo('foo, bar');
