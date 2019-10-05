@@ -10,6 +10,7 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\UnexpectedValueException;
 
 /**
@@ -46,7 +47,7 @@ class Dn implements \IteratorAggregate, \Countable
             $this->parse();
         }
         if (!isset($this->pieces[0])) {
-            throw new UnexpectedValueException('Unable to parse the RDN.');
+            throw new UnexpectedValueException('The DN has no RDN.');
         }
 
         return $this->pieces[0];
@@ -117,10 +118,30 @@ class Dn implements \IteratorAggregate, \Countable
     }
 
     /**
+     * @param string $dn
+     * @return bool
+     */
+    public static function isValid(string $dn): bool
+    {
+        try {
+            (new self($dn))->toArray();
+
+            return true;
+        } catch (UnexpectedValueException|InvalidArgumentException $e) {
+            return false;
+        }
+    }
+
+    /**
      * @todo This needs proper handling. But the regex would probably be rather crazy.
      */
     protected function parse(): void
     {
+        if ($this->dn === '') {
+            $this->pieces = [];
+
+            return;;
+        }
         $pieces = \preg_split('/(?<!\\\\),/', $this->dn);
         $pieces = ($pieces === false) ? [] : $pieces;
 

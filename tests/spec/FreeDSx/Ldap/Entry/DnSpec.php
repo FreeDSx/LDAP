@@ -54,4 +54,21 @@ class DnSpec extends ObjectBehavior
     {
         $this->toString()->shouldBeEqualTo('cn=fo\,o, dc=local,dc=example');
     }
+
+    function it_should_check_if_it_is_a_valid_dn()
+    {
+        $this::isValid('cn=foo,dc=bar=dc=foo')->shouldBeEqualTo(true);
+        $this::isValid('')->shouldBeEqualTo(true);
+        $this::isValid('foo')->shouldBeEqualTo(false);
+    }
+
+    function it_should_handle_a_rootdse_as_a_dn()
+    {
+        $this->beConstructedWith('');
+
+        $this->toString()->shouldBeEqualTo('');
+        $this->toArray()->shouldBeEqualTo([]);
+        $this->count()->shouldBeEqualTo(0);
+        $this->getParent()->shouldBeNull();
+    }
 }
