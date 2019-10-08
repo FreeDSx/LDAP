@@ -16,6 +16,7 @@ use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
@@ -82,7 +83,8 @@ class LdapClient
      * @param string $username
      * @param string $password
      * @return LdapMessageResponse
-     * @throws Exception\BindException
+     * @throws BindException
+     * @throws OperationException
      */
     public function bind(string $username, string $password) : LdapMessageResponse
     {
@@ -97,6 +99,7 @@ class LdapClient
      * @param string $value
      * @param Control ...$controls
      * @return bool
+     * @throws OperationException
      */
     public function compare($dn, string $attributeName, string $value, Control ...$controls) : bool
     {
@@ -112,6 +115,7 @@ class LdapClient
      * @param Entry $entry
      * @param Control ...$controls
      * @return LdapMessageResponse
+     * @throws OperationException
      */
     public function create(Entry $entry, Control ...$controls) : LdapMessageResponse
     {
@@ -170,6 +174,7 @@ class LdapClient
      * @param string $entry
      * @param Control ...$controls
      * @return LdapMessageResponse
+     * @throws OperationException
      */
     public function delete(string $entry, Control ...$controls) : LdapMessageResponse
     {
@@ -182,6 +187,7 @@ class LdapClient
      * @param Entry $entry
      * @param Control ...$controls
      * @return LdapMessageResponse
+     * @throws OperationException
      */
     public function update(Entry $entry, Control ...$controls) : LdapMessageResponse
     {
@@ -224,6 +230,7 @@ class LdapClient
      * @param SearchRequest $request
      * @param Control ...$controls
      * @return \FreeDSx\Ldap\Entry\Entries
+     * @throws OperationException
      */
     public function search(SearchRequest $request, Control ...$controls) : Entries
     {
@@ -277,6 +284,8 @@ class LdapClient
      * @param RequestInterface $request
      * @param Control ...$controls
      * @return LdapMessageResponse|null
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
      */
     public function send(RequestInterface $request, Control ...$controls): ?LdapMessageResponse
@@ -306,6 +315,7 @@ class LdapClient
      * Issue a startTLS to encrypt the LDAP connection.
      *
      * @return $this
+     * @throws OperationException
      */
     public function startTls()
     {
@@ -318,6 +328,7 @@ class LdapClient
      * Unbind and close the LDAP TCP connection.
      *
      * @return $this
+     * @throws OperationException
      */
     public function unbind()
     {
@@ -330,6 +341,7 @@ class LdapClient
      * Perform a whoami request and get the returned value.
      *
      * @return string
+     * @throws OperationException
      */
     public function whoami() : ?string
     {

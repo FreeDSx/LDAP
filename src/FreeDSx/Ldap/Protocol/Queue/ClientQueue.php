@@ -37,6 +37,9 @@ class ClientQueue extends LdapQueue
      */
     protected $socketPool;
 
+    /**
+     * @throws ConnectionException
+     */
     public function __construct(SocketPool $socketPool, EncoderInterface $encoder = null)
     {
         $this->socketPool = $socketPool;

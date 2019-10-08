@@ -13,6 +13,7 @@ namespace FreeDSx\Ldap\Protocol;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
@@ -73,6 +74,7 @@ class ClientProtocolHandler
     /**
      * @throws ConnectionException
      * @throws UnsolicitedNotificationException
+     * @throws OperationException
      */
     public function send(RequestInterface $request, Control ...$controls) : ?LdapMessageResponse
     {
