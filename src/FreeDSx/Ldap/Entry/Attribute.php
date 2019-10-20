@@ -38,7 +38,7 @@ class Attribute implements \IteratorAggregate, \Countable
     protected $lcAttribute;
 
     /**
-     * @var string[]
+     * @var mixed[]|string[]
      */
     protected $values = [];
 
@@ -49,7 +49,7 @@ class Attribute implements \IteratorAggregate, \Countable
 
     /**
      * @param string $attribute
-     * @param string[] ...$values
+     * @param mixed[]|string[] ...$values
      */
     public function __construct(string $attribute, ...$values)
     {
@@ -60,10 +60,10 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * Add a value, or values, to the attribute.
      *
-     * @param string ...$values
+     * @param mixed[]|string[] ...$values
      * @return $this
      */
-    public function add(string ...$values)
+    public function add(...$values): self
     {
         foreach ($values as $value) {
             $this->values[] = $value;
@@ -75,10 +75,10 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * Check if the attribute has a specific value.
      *
-     * @param string $value
+     * @param mixed|string $value
      * @return bool
      */
-    public function has(string $value) : bool
+    public function has($value): bool
     {
         return \array_search($value, $this->values, true) !== false;
     }
@@ -86,10 +86,10 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * Remove a specific value, or values, from an attribute.
      *
-     * @param string ...$values
+     * @param mixed[]|string[] ...$values
      * @return $this
      */
-    public function remove(string ...$values)
+    public function remove(...$values): self
     {
         foreach ($values as $value) {
             if (($i = \array_search($value, $this->values, true)) !== false) {
@@ -105,7 +105,7 @@ class Attribute implements \IteratorAggregate, \Countable
      *
      * @return $this
      */
-    public function reset()
+    public function reset(): self
     {
         $this->values = [];
 
@@ -115,10 +115,10 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * Set the values for the attribute.
      *
-     * @param string ...$values
+     * @param mixed[]|string[] ...$values
      * @return $this
      */
-    public function set(string ...$values)
+    public function set(...$values): self
     {
         $this->values = $values;
 
@@ -130,7 +130,7 @@ class Attribute implements \IteratorAggregate, \Countable
      *
      * @return string
      */
-    public function getName() : string
+    public function getName(): string
     {
         $this->options();
 
@@ -142,7 +142,7 @@ class Attribute implements \IteratorAggregate, \Countable
      *
      * @return string
      */
-    public function getDescription() : string
+    public function getDescription(): string
     {
         return $this->getName().($this->options()->count() > 0 ? ';'.$this->options()->toString() : '');
     }
@@ -152,7 +152,7 @@ class Attribute implements \IteratorAggregate, \Countable
      *
      * @return array
      */
-    public function getValues() : array
+    public function getValues(): array
     {
         return $this->values;
     }
@@ -160,9 +160,9 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * Retrieve the first value of the attribute.
      *
-     * @return string|null
+     * @return string|mixed|null
      */
-    public function firstValue(): ?string
+    public function firstValue()
     {
         return $this->values[0] ?? null;
     }
@@ -170,9 +170,9 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * Retrieve the last value of the attribute.
      *
-     * @return string|null
+     * @return string|mixed|null
      */
-    public function lastValue(): ?string
+    public function lastValue()
     {
         $last = end($this->values);
         reset($this->values);
@@ -185,7 +185,7 @@ class Attribute implements \IteratorAggregate, \Countable
      *
      * @return Options
      */
-    public function getOptions() : Options
+    public function getOptions(): Options
     {
         return $this->options();
     }
@@ -193,23 +193,23 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * @return bool
      */
-    public function hasOptions() : bool
+    public function hasOptions(): bool
     {
         return ($this->options()->count() > 0);
     }
 
     /**
-     * @return \ArrayIterator
+     * {@inheritDoc}
      */
-    public function getIterator()
+    public function getIterator(): \ArrayIterator
     {
         return new \ArrayIterator($this->values);
     }
 
     /**
-     * @return int
+     * {@inheritDoc}
      */
-    public function count()
+    public function count(): int
     {
         return \count($this->values);
     }
@@ -219,7 +219,7 @@ class Attribute implements \IteratorAggregate, \Countable
      * @param bool $strict If set to true, then options must also match.
      * @return bool
      */
-    public function equals(Attribute $attribute, bool $strict = false) : bool
+    public function equals(Attribute $attribute, bool $strict = false): bool
     {
         $this->options();
         $attribute->options();
@@ -243,7 +243,7 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * @return string
      */
-    public function __toString()
+    public function __toString(): string
     {
         return \implode(', ', $this->values);
     }
@@ -254,7 +254,7 @@ class Attribute implements \IteratorAggregate, \Countable
      * @param string $value
      * @return string
      */
-    public static function escape(string $value) : string
+    public static function escape(string $value): string
     {
         if (self::shouldNotEscape($value)) {
             return $value;
@@ -267,7 +267,7 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * A one time check and load of any attribute options.
      */
-    protected function options() : Options
+    protected function options(): Options
     {
         if ($this->options !== null) {
             return $this->options;
