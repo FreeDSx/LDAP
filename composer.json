@@ -21,7 +21,8 @@
     "phpspec/phpspec": "^5.0",
     "phpunit/phpunit": "^7.0",
     "phpstan/phpstan": "^0.11.15",
-    "phpstan/phpstan-strict-rules": "^0.11.1"
+    "phpstan/phpstan-strict-rules": "^0.11.1",
+    "symplify/easy-coding-standard": "^6.1"
   },
   "suggest": {
     "ext-openssl": "For SSL/TLS support."
