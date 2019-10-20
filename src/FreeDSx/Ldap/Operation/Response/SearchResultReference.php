@@ -44,7 +44,7 @@ class SearchResultReference implements ResponseInterface
     /**
      * @return LdapUrl[]
      */
-    public function getReferrals() : array
+    public function getReferrals(): array
     {
         return $this->referrals;
     }

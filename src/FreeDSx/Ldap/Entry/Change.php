@@ -56,7 +56,7 @@ class Change
     /**
      * @return Attribute
      */
-    public function getAttribute() : Attribute
+    public function getAttribute(): Attribute
     {
         return $this->attribute;
     }
@@ -75,7 +75,7 @@ class Change
     /**
      * @return int
      */
-    public function getType() : int
+    public function getType(): int
     {
         return $this->modType;
     }
@@ -94,7 +94,7 @@ class Change
     /**
      * @return bool
      */
-    public function isAdd() : bool
+    public function isAdd(): bool
     {
         return $this->modType === self::TYPE_ADD;
     }
@@ -102,7 +102,7 @@ class Change
     /**
      * @return bool
      */
-    public function isDelete() : bool
+    public function isDelete(): bool
     {
         return $this->modType === self::TYPE_DELETE && \count($this->attribute->getValues()) !== 0;
     }
@@ -110,7 +110,7 @@ class Change
     /**
      * @return bool
      */
-    public function isReplace() : bool
+    public function isReplace(): bool
     {
         return $this->modType === self::TYPE_REPLACE;
     }
@@ -118,7 +118,7 @@ class Change
     /**
      * @return bool
      */
-    public function isReset() : bool
+    public function isReset(): bool
     {
         return $this->modType === self::TYPE_DELETE && \count($this->attribute->getValues()) === 0;
     }
@@ -130,7 +130,7 @@ class Change
      * @param string[] ...$values
      * @return Change
      */
-    public static function add($attribute, ...$values) : Change
+    public static function add($attribute, ...$values): Change
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
 
@@ -145,7 +145,7 @@ class Change
      * @param string[] ...$values
      * @return Change
      */
-    public static function delete($attribute, ...$values) : Change
+    public static function delete($attribute, ...$values): Change
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
 
@@ -160,7 +160,7 @@ class Change
      * @param string[] ...$values
      * @return Change
      */
-    public static function replace($attribute, ...$values)  : Change
+    public static function replace($attribute, ...$values): Change
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
 
@@ -174,7 +174,7 @@ class Change
      * @param string|Attribute $attribute
      * @return Change
      */
-    public static function reset($attribute) : Change
+    public static function reset($attribute): Change
     {
         $attribute = $attribute instanceof Attribute ? new Attribute($attribute->getDescription()) : new Attribute($attribute);
 

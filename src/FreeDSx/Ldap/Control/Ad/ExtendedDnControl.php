@@ -42,7 +42,7 @@ class ExtendedDnControl extends Control
     /**
      * @return bool
      */
-    public function getUseHexFormat() : bool
+    public function getUseHexFormat(): bool
     {
         return $this->useHexFormat;
     }
@@ -91,7 +91,7 @@ class ExtendedDnControl extends Control
     /**
      * {@inheritdoc}
      */
-    public function toAsn1() : AbstractType
+    public function toAsn1(): AbstractType
     {
         $useHexFormat = $this->useHexFormat ? 0 : 1;
         $this->controlValue = Asn1::sequence(Asn1::integer($useHexFormat));

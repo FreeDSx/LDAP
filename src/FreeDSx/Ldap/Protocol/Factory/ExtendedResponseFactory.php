@@ -48,7 +48,7 @@ class ExtendedResponseFactory
                 $oid
             ));
         }
-        $responseConstruct = self::$map[$oid].'::fromAsn1';
+        $responseConstruct = self::$map[$oid] . '::fromAsn1';
         if (!is_callable($responseConstruct)) {
             throw new RuntimeException(sprintf(
                 'The extended response construct is not callable: %s',
@@ -73,7 +73,7 @@ class ExtendedResponseFactory
     /**
      * Set a specific class for an operation. It must implement ProtocolElementInterface.
      */
-    public static function set(string $oid, string $className) : void
+    public static function set(string $oid, string $className): void
     {
         if (!class_exists($className)) {
             throw new InvalidArgumentException(sprintf(

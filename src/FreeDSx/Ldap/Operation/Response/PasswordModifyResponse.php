@@ -43,7 +43,7 @@ class PasswordModifyResponse extends ExtendedResponse
     /**
      * @return null|string
      */
-    public function getGeneratedPassword() : ?string
+    public function getGeneratedPassword(): ?string
     {
         return $this->generatedPassword;
     }

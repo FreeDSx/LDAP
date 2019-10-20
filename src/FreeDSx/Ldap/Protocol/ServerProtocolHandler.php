@@ -120,9 +120,9 @@ class ServerProtocolHandler
             }
             # Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with a
         # result code of protocol error.
-        } catch (EncoderException|ProtocolException $e) {
+        } catch (EncoderException | ProtocolException $e) {
             $this->sendNoticeOfDisconnect('The message encoding is malformed.');
-        } catch (\Exception|\Throwable $e) {
+        } catch (\Exception | \Throwable $e) {
             if ($this->queue->isConnected()) {
                 $this->sendNoticeOfDisconnect();
             }

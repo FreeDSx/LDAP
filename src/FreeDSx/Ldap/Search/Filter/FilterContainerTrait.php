@@ -15,8 +15,8 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SetType;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 /**
  * Methods needed to implement the filter container interface.
@@ -55,7 +55,7 @@ trait FilterContainerTrait
      * @param FilterInterface $filter
      * @return bool
      */
-    public function has(FilterInterface $filter) : bool
+    public function has(FilterInterface $filter): bool
     {
         return array_search($filter, $this->filters, true) !== false;
     }
@@ -89,7 +89,7 @@ trait FilterContainerTrait
     /**
      * @return FilterInterface[]
      */
-    public function get() : array
+    public function get(): array
     {
         return $this->filters;
     }
@@ -97,7 +97,7 @@ trait FilterContainerTrait
     /**
      * {@inheritdoc}
      */
-    public function toAsn1() : AbstractType
+    public function toAsn1(): AbstractType
     {
         return Asn1::context(self::CHOICE_TAG, Asn1::setOf(
             ...array_map(function ($filter) {
@@ -110,15 +110,15 @@ trait FilterContainerTrait
     /**
      * {@inheritdoc}
      */
-    public function toString() : string
+    public function toString(): string
     {
         return self::PAREN_LEFT
-            .self::FILTER_OPERATOR
-            .implode('', array_map(function ($filter) {
+            . self::FILTER_OPERATOR
+            . implode('', array_map(function ($filter) {
                 /** @var FilterInterface $filter */
                 return $filter->toString();
             }, $this->filters))
-            .self::PAREN_RIGHT;
+            . self::PAREN_RIGHT;
     }
 
     /**

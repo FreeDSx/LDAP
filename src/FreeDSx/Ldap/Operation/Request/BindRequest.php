@@ -55,7 +55,7 @@ abstract class BindRequest implements RequestInterface
     /**
      * @return int
      */
-    public function getVersion() : int
+    public function getVersion(): int
     {
         return $this->version;
     }
@@ -74,7 +74,7 @@ abstract class BindRequest implements RequestInterface
     /**
      * @return string
      */
-    public function getUsername() : string
+    public function getUsername(): string
     {
         return $this->username;
     }
@@ -134,11 +134,11 @@ abstract class BindRequest implements RequestInterface
      *
      * @return AbstractType
      */
-    abstract protected function getAsn1AuthChoice() : AbstractType;
+    abstract protected function getAsn1AuthChoice(): AbstractType;
 
     /**
      * This is called as the request is transformed to ASN1 to be encoded. If the request parameters are not valid
      * then the method should throw an exception.
      */
-    abstract protected function validate() : void;
+    abstract protected function validate(): void;
 }

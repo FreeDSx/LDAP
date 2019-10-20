@@ -88,7 +88,7 @@ class DirSyncRequestControl extends Control
     /**
      * @return int
      */
-    public function getFlags() : int
+    public function getFlags(): int
     {
         return $this->flags;
     }
@@ -107,7 +107,7 @@ class DirSyncRequestControl extends Control
     /**
      * @return int
      */
-    public function getMaxBytes() : int
+    public function getMaxBytes(): int
     {
         return $this->maxBytes;
     }
@@ -126,7 +126,7 @@ class DirSyncRequestControl extends Control
     /**
      * @return string
      */
-    public function getCookie() : string
+    public function getCookie(): string
     {
         return $this->cookie;
     }
@@ -177,7 +177,7 @@ class DirSyncRequestControl extends Control
     /**
      * {@inheritdoc}
      */
-    public function toAsn1() : AbstractType
+    public function toAsn1(): AbstractType
     {
         $this->controlValue = Asn1::sequence(
             Asn1::integer($this->flags),

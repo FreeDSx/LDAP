@@ -216,7 +216,7 @@ class SearchRequest implements RequestInterface
     /**
      * @return Attribute[]
      */
-    public function getAttributes() : array
+    public function getAttributes(): array
     {
         return $this->attributes;
     }
@@ -239,7 +239,7 @@ class SearchRequest implements RequestInterface
     /**
      * @return Dn|null
      */
-    public function getBaseDn() : ?Dn
+    public function getBaseDn(): ?Dn
     {
         return $this->baseDn;
     }
@@ -261,7 +261,7 @@ class SearchRequest implements RequestInterface
     /**
      * @return int
      */
-    public function getScope() : int
+    public function getScope(): int
     {
         return $this->scope;
     }
@@ -280,7 +280,7 @@ class SearchRequest implements RequestInterface
     /**
      * @return int
      */
-    public function getDereferenceAliases() : int
+    public function getDereferenceAliases(): int
     {
         return $this->derefAliases;
     }
@@ -299,7 +299,7 @@ class SearchRequest implements RequestInterface
     /**
      * @return int
      */
-    public function getSizeLimit() : int
+    public function getSizeLimit(): int
     {
         return $this->sizeLimit;
     }
@@ -318,7 +318,7 @@ class SearchRequest implements RequestInterface
     /**
      * @return int
      */
-    public function getTimeLimit() : int
+    public function getTimeLimit(): int
     {
         return $this->timeLimit;
     }
@@ -337,7 +337,7 @@ class SearchRequest implements RequestInterface
     /**
      * @return bool
      */
-    public function getAttributesOnly() : bool
+    public function getAttributesOnly(): bool
     {
         return $this->attributesOnly;
     }
@@ -356,7 +356,7 @@ class SearchRequest implements RequestInterface
     /**
      * @return FilterInterface
      */
-    public function getFilter() : FilterInterface
+    public function getFilter(): FilterInterface
     {
         return $this->filter;
     }

@@ -43,7 +43,7 @@ trait LdapUrlTrait
      * @param string $value
      * @return string
      */
-    protected static function encode(?string $value) : string
+    protected static function encode(?string $value): string
     {
         return \str_replace(
             \array_keys(self::$escapeMap),
@@ -58,7 +58,7 @@ trait LdapUrlTrait
      * @param string $value
      * @return string
      */
-    protected static function decode(string $value) : string
+    protected static function decode(string $value): string
     {
         return \str_ireplace(
             \array_values(self::$escapeMap),

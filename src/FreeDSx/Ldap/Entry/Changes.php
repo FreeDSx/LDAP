@@ -101,7 +101,7 @@ class Changes implements \Countable, \IteratorAggregate
     /**
      * @return Change[]
      */
-    public function toArray() : array
+    public function toArray(): array
     {
         return $this->changes;
     }

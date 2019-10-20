@@ -63,7 +63,7 @@ class DirSyncResponseControl extends Control
     /**
      * @return int
      */
-    public function getMoreResults() : int
+    public function getMoreResults(): int
     {
         return $this->moreResults;
     }
@@ -71,7 +71,7 @@ class DirSyncResponseControl extends Control
     /**
      * @return bool
      */
-    public function hasMoreResults() : bool
+    public function hasMoreResults(): bool
     {
         return $this->moreResults !== 0;
     }
@@ -79,7 +79,7 @@ class DirSyncResponseControl extends Control
     /**
      * @return int
      */
-    public function getUnused() : int
+    public function getUnused(): int
     {
         return $this->unused;
     }
@@ -87,7 +87,7 @@ class DirSyncResponseControl extends Control
     /**
      * @return string
      */
-    public function getCookie() : string
+    public function getCookie(): string
     {
         return $this->cookie;
     }
@@ -103,7 +103,7 @@ class DirSyncResponseControl extends Control
         }
         $more = $response->getChild(0);
         $unused = $response->getChild(1);
-        $cookie =  $response->getChild(2);
+        $cookie = $response->getChild(2);
         if (!$more instanceof IntegerType) {
             throw new ProtocolException('A DirSyncResponse control value sequence 0 must be an integer type.');
         }
@@ -127,7 +127,7 @@ class DirSyncResponseControl extends Control
     /**
      * {@inheritdoc}
      */
-    public function toAsn1() : AbstractType
+    public function toAsn1(): AbstractType
     {
         $this->controlValue = Asn1::sequence(
             Asn1::integer($this->moreResults),

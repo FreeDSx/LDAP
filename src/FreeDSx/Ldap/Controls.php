@@ -40,7 +40,7 @@ class Controls
      * @param AbstractType|ProtocolElementInterface|null $value
      * @return Control
      */
-    public static function create(string $oid, bool $criticality = false, $value = null) : Control
+    public static function create(string $oid, bool $criticality = false, $value = null): Control
     {
         return new Control($oid, $criticality, $value);
     }
@@ -65,7 +65,7 @@ class Controls
      * @param int $max
      * @return ExpectedEntryCountControl
      */
-    public static function expectedEntryCount(int $min, int $max) : ExpectedEntryCountControl
+    public static function expectedEntryCount(int $min, int $max): ExpectedEntryCountControl
     {
         return new ExpectedEntryCountControl($min, $max);
     }
@@ -76,7 +76,7 @@ class Controls
      * @param bool $useHexFormat
      * @return ExtendedDnControl
      */
-    public static function extendedDn(bool $useHexFormat = false) : ExtendedDnControl
+    public static function extendedDn(bool $useHexFormat = false): ExtendedDnControl
     {
         return new ExtendedDnControl($useHexFormat);
     }
@@ -88,7 +88,7 @@ class Controls
      * @param string $cookie
      * @return PagingControl
      */
-    public static function paging(int $size, string $cookie = '') : PagingControl
+    public static function paging(int $size, string $cookie = ''): PagingControl
     {
         return new PagingControl($size, $cookie);
     }
@@ -99,7 +99,7 @@ class Controls
      * @param bool $isEnabled
      * @return PolicyHintsControl
      */
-    public static function policyHints(bool $isEnabled = true) : PolicyHintsControl
+    public static function policyHints(bool $isEnabled = true): PolicyHintsControl
     {
         return new PolicyHintsControl($isEnabled);
     }
@@ -110,7 +110,7 @@ class Controls
      * @param bool $criticality
      * @return Control
      */
-    public static function pwdPolicy(bool $criticality = true) : Control
+    public static function pwdPolicy(bool $criticality = true): Control
     {
         return new Control(Control::OID_PWD_POLICY, $criticality);
     }
@@ -121,7 +121,7 @@ class Controls
      * @param string $sid
      * @return SetOwnerControl
      */
-    public static function setOwner(string $sid) : SetOwnerControl
+    public static function setOwner(string $sid): SetOwnerControl
     {
         return new SetOwnerControl($sid);
     }
@@ -131,7 +131,7 @@ class Controls
      *
      * @return Control
      */
-    public static function showDeleted() : Control
+    public static function showDeleted(): Control
     {
         return self::create(Control::OID_SHOW_DELETED, true);
     }
@@ -141,7 +141,7 @@ class Controls
      *
      * @return Control
      */
-    public static function showRecycled() : Control
+    public static function showRecycled(): Control
     {
         return self::create(Control::OID_SHOW_RECYCLED, true);
     }
@@ -152,7 +152,7 @@ class Controls
      * @param SortKey[]|string[] ...$sortKeys
      * @return SortingControl
      */
-    public static function sort(...$sortKeys) : SortingControl
+    public static function sort(...$sortKeys): SortingControl
     {
         $keys = [];
         foreach ($sortKeys as $sort) {
@@ -169,7 +169,7 @@ class Controls
      * @param bool $criticality
      * @return Control
      */
-    public static function subtreeDelete(bool $criticality = false) : Control
+    public static function subtreeDelete(bool $criticality = false): Control
     {
         return new Control(Control::OID_SUBTREE_DELETE, $criticality);
     }
@@ -184,7 +184,7 @@ class Controls
      * @param null|string $contextId
      * @return VlvControl
      */
-    public static function vlv(int $before, int $after, int $offset = 1, int $count = 0, ?string $contextId = null) : VlvControl
+    public static function vlv(int $before, int $after, int $offset = 1, int $count = 0, ?string $contextId = null): VlvControl
     {
         return new VlvControl($before, $after, $offset, $count, null, $contextId);
     }
@@ -198,7 +198,7 @@ class Controls
      * @param null|string $contextId
      * @return VlvControl
      */
-    public static function vlvFilter(int $before, int $after, GreaterThanOrEqualFilter $filter, ?string $contextId = null) : VlvControl
+    public static function vlvFilter(int $before, int $after, GreaterThanOrEqualFilter $filter, ?string $contextId = null): VlvControl
     {
         return new VlvControl($before, $after, null, null, $filter, $contextId);
     }
@@ -209,7 +209,7 @@ class Controls
      * @param int $flags
      * @return SdFlagsControl
      */
-    public static function sdFlags(int $flags) : SdFlagsControl
+    public static function sdFlags(int $flags): SdFlagsControl
     {
         return new SdFlagsControl($flags);
     }

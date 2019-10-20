@@ -54,7 +54,7 @@ class SetOwnerControl extends Control
     /**
      * @return string
      */
-    public function getSid() : string
+    public function getSid(): string
     {
         return $this->sid;
     }

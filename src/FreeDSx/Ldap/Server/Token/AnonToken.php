@@ -40,7 +40,7 @@ class AnonToken implements TokenInterface
     /**
      * {@inheritdoc}
      */
-    public function getUsername() : ?string
+    public function getUsername(): ?string
     {
         return $this->username;
     }
@@ -48,7 +48,7 @@ class AnonToken implements TokenInterface
     /**
      * {@inheritdoc}
      */
-    public function getPassword() : ?string
+    public function getPassword(): ?string
     {
         return null;
     }
@@ -56,7 +56,7 @@ class AnonToken implements TokenInterface
     /**
      * {@inheritdoc}
      */
-    public function getVersion() : int
+    public function getVersion(): int
     {
         return $this->version;
     }

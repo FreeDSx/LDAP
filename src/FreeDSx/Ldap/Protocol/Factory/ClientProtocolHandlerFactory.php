@@ -46,7 +46,7 @@ class ClientProtocolHandlerFactory
      * @param Response\ResponseInterface $response
      * @return ResponseHandlerInterface
      */
-    public function forResponse(Request\RequestInterface $request, Response\ResponseInterface $response) : ResponseHandlerInterface
+    public function forResponse(Request\RequestInterface $request, Response\ResponseInterface $response): ResponseHandlerInterface
     {
         if ($response instanceof Response\SearchResultDone || $response instanceof Response\SearchResultEntry || $response instanceof Response\SearchResultReference) {
             return new ClientProtocolHandler\ClientSearchHandler();

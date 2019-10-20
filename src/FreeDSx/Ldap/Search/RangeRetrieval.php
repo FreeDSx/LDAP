@@ -62,7 +62,7 @@ class RangeRetrieval
      * @param Entry $entry
      * @return Attribute[]
      */
-    public function getAllRanged(Entry $entry) : array
+    public function getAllRanged(Entry $entry): array
     {
         $ranged = [];
 
@@ -89,7 +89,7 @@ class RangeRetrieval
      * @param Attribute|string|null $attribute
      * @return bool
      */
-    public function hasRanged(Entry $entry, $attribute = null) : bool
+    public function hasRanged(Entry $entry, $attribute = null): bool
     {
         return (bool) ($attribute !== null ? $this->getRanged($entry, $attribute) : $this->getAllRanged($entry));
     }
@@ -100,7 +100,7 @@ class RangeRetrieval
      * @param Attribute $attribute
      * @return bool
      */
-    public function hasMoreValues(Attribute $attribute) : bool
+    public function hasMoreValues(Attribute $attribute): bool
     {
         if (($range = $this->getRangeOption($attribute)) === null) {
             return false;
@@ -119,7 +119,7 @@ class RangeRetrieval
      * @return Attribute
      * @throws \FreeDSx\Ldap\Exception\OperationException
      */
-    public function getMoreValues($entry, Attribute $attribute, $amount = '*') : Attribute
+    public function getMoreValues($entry, Attribute $attribute, $amount = '*'): Attribute
     {
         if (($range = $this->getRangeOption($attribute)) === null || !$this->hasMoreValues($attribute)) {
             return new Attribute($attribute->getName());
@@ -158,7 +158,7 @@ class RangeRetrieval
      * @return Attribute
      * @throws \FreeDSx\Ldap\Exception\OperationException
      */
-    public function getAllValues($entry, $attribute) : Attribute
+    public function getAllValues($entry, $attribute): Attribute
     {
         $attrResult = $attribute instanceof Attribute ? new Attribute($attribute->getName()) : new Attribute($attribute);
         $attrResult->getOptions()->set(Option::fromRange('0'));
@@ -186,7 +186,7 @@ class RangeRetrieval
      * @param Attribute $attribute
      * @return Option|null
      */
-    protected function getRangeOption(Attribute $attribute) : ?Option
+    protected function getRangeOption(Attribute $attribute): ?Option
     {
         /** @var Option $option */
         foreach ($attribute->getOptions() as $option) {

@@ -20,9 +20,9 @@ use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Socket\PduInterface;
 use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Operation\Response;
+use FreeDSx\Socket\PduInterface;
 
 /**
  * The LDAP Message envelope (PDU). RFC 4511, 4.1.1
@@ -85,7 +85,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
     /**
      * @return int
      */
-    public function getMessageId() : int
+    public function getMessageId(): int
     {
         return $this->messageId;
     }
@@ -95,7 +95,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
      *
      * @return ControlBag
      */
-    public function controls() : ControlBag
+    public function controls(): ControlBag
     {
         return $this->controls;
     }
@@ -103,7 +103,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
     /**
      * {@inheritdoc}
      */
-    public function toAsn1() : AbstractType
+    public function toAsn1(): AbstractType
     {
         $asn1 = Asn1::sequence(
             Asn1::integer($this->messageId),
@@ -265,5 +265,5 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
     /**
      * @return AbstractType
      */
-    abstract protected function getOperationAsn1() : AbstractType;
+    abstract protected function getOperationAsn1(): AbstractType;
 }

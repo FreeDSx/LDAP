@@ -11,12 +11,12 @@
 namespace FreeDSx\Ldap\Protocol\Queue;
 
 use FreeDSx\Asn1\Encoder\EncoderInterface;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\LdapQueue;
 use FreeDSx\Socket\Exception\ConnectionException;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Socket\Queue\Message;
 use FreeDSx\Socket\SocketPool;
 
@@ -96,7 +96,7 @@ class ClientQueue extends LdapQueue
     /**
      * @throws ConnectionException
      */
-    protected function initSocket() : void
+    protected function initSocket(): void
     {
         if ($this->shouldReconnect) {
             $this->socket = $this->socketPool->connect();

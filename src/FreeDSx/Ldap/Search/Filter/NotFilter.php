@@ -43,7 +43,7 @@ class NotFilter implements FilterInterface
     /**
      * @return FilterInterface
      */
-    public function get() : FilterInterface
+    public function get(): FilterInterface
     {
         return $this->filter;
     }
@@ -62,7 +62,7 @@ class NotFilter implements FilterInterface
     /**
      * {@inheritdoc}
      */
-    public function toAsn1() : AbstractType
+    public function toAsn1(): AbstractType
     {
         return Asn1::context(self::CHOICE_TAG, Asn1::sequence($this->filter->toAsn1()));
     }
@@ -73,9 +73,9 @@ class NotFilter implements FilterInterface
     public function toString(): string
     {
         return self::PAREN_LEFT
-            .self::OPERATOR_NOT
-            .$this->filter->toString()
-            .self::PAREN_RIGHT;
+            . self::OPERATOR_NOT
+            . $this->filter->toString()
+            . self::PAREN_RIGHT;
     }
 
     /**

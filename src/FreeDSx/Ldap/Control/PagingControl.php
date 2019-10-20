@@ -54,7 +54,7 @@ class PagingControl extends Control
     /**
      * @return string
      */
-    public function getCookie() : string
+    public function getCookie(): string
     {
         return $this->cookie;
     }
@@ -62,7 +62,7 @@ class PagingControl extends Control
     /**
      * @return int
      */
-    public function getSize() : int
+    public function getSize(): int
     {
         return $this->size;
     }

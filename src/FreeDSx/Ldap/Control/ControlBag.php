@@ -39,7 +39,7 @@ class ControlBag implements \IteratorAggregate, \Countable
      * @param string|Control $control
      * @return bool
      */
-    public function has($control) : bool
+    public function has($control): bool
     {
         if (is_string($control)) {
             foreach ($this->controls as $ctrl) {
@@ -60,7 +60,7 @@ class ControlBag implements \IteratorAggregate, \Countable
      * @param string $oid
      * @return null|Control
      */
-    public function get(string $oid) : ?Control
+    public function get(string $oid): ?Control
     {
         foreach ($this->controls as $control) {
             if ($oid === $control->getTypeOid()) {
@@ -141,7 +141,7 @@ class ControlBag implements \IteratorAggregate, \Countable
      *
      * @return Control[]
      */
-    public function toArray() : array
+    public function toArray(): array
     {
         return $this->controls;
     }

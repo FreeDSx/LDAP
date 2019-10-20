@@ -72,7 +72,7 @@ class SortingControl extends Control
     /**
      * @return SortKey[]
      */
-    public function getSortKeys() : array
+    public function getSortKeys(): array
     {
         return $this->sortKeys;
     }

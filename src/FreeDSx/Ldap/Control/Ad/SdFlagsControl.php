@@ -63,7 +63,7 @@ class SdFlagsControl extends Control
     /**
      * @return int
      */
-    public function getFlags() : int
+    public function getFlags(): int
     {
         return $this->flags;
     }

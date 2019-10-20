@@ -11,13 +11,13 @@
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 /**
  * Common methods for filters using attribute value assertions.
@@ -57,7 +57,7 @@ trait AttributeValueAssertionTrait
     /**
      * @return string
      */
-    public function getValue() : string
+    public function getValue(): string
     {
         return $this->value;
     }
@@ -65,7 +65,7 @@ trait AttributeValueAssertionTrait
     /**
      * {@inheritdoc}
      */
-    public function toAsn1() : AbstractType
+    public function toAsn1(): AbstractType
     {
         return Asn1::context(self::CHOICE_TAG, Asn1::sequence(
             Asn1::octetString($this->attribute),
@@ -76,13 +76,13 @@ trait AttributeValueAssertionTrait
     /**
      * {@inheritdoc}
      */
-    public function toString() : string
+    public function toString(): string
     {
         return self::PAREN_LEFT
-            .$this->attribute
-            .self::FILTER_TYPE
-            .Attribute::escape($this->value)
-            .self::PAREN_RIGHT;
+            . $this->attribute
+            . self::FILTER_TYPE
+            . Attribute::escape($this->value)
+            . self::PAREN_RIGHT;
     }
 
     /**

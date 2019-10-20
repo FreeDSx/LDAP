@@ -51,7 +51,7 @@ class SearchResultEntry implements ResponseInterface
     /**
      * @return Entry
      */
-    public function getEntry() : Entry
+    public function getEntry(): Entry
     {
         return $this->entry;
     }

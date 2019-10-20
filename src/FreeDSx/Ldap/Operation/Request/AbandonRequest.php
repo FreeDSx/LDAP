@@ -53,7 +53,7 @@ class AbandonRequest implements RequestInterface
     /**
      * @return int
      */
-    public function getMessageId() : int
+    public function getMessageId(): int
     {
         return $this->messageID;
     }

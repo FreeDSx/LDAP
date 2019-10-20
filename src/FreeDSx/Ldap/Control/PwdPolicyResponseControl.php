@@ -70,7 +70,7 @@ class PwdPolicyResponseControl extends Control
     /**
      * @return int|null
      */
-    public function getTimeBeforeExpiration() : ?int
+    public function getTimeBeforeExpiration(): ?int
     {
         return $this->timeBeforeExpiration;
     }
@@ -78,7 +78,7 @@ class PwdPolicyResponseControl extends Control
     /**
      * @return int|null
      */
-    public function getGraceAttemptsRemaining() : ?int
+    public function getGraceAttemptsRemaining(): ?int
     {
         return $this->graceAuthRemaining;
     }
@@ -86,7 +86,7 @@ class PwdPolicyResponseControl extends Control
     /**
      * @return int|null
      */
-    public function getError() : ?int
+    public function getError(): ?int
     {
         return $this->error;
     }

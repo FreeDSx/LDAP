@@ -71,7 +71,7 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
     /**
      * @return Dn
      */
-    public function getDn() : Dn
+    public function getDn(): Dn
     {
         return $this->dn;
     }
@@ -90,7 +90,7 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
     /**
      * @return Rdn
      */
-    public function getNewRdn() : Rdn
+    public function getNewRdn(): Rdn
     {
         return $this->newRdn;
     }
@@ -109,7 +109,7 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
     /**
      * @return bool
      */
-    public function getDeleteOldRdn() : bool
+    public function getDeleteOldRdn(): bool
     {
         return $this->deleteOldRdn;
     }
@@ -128,7 +128,7 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
     /**
      * @return null|Dn
      */
-    public function getNewParentDn() : ?Dn
+    public function getNewParentDn(): ?Dn
     {
         return $this->newParentDn;
     }

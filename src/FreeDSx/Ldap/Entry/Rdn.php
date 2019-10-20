@@ -59,7 +59,7 @@ class Rdn
     /**
      * @return string
      */
-    public function getName() : string
+    public function getName(): string
     {
         return $this->name;
     }
@@ -67,7 +67,7 @@ class Rdn
     /**
      * @return string
      */
-    public function getValue() : string
+    public function getValue(): string
     {
         return $this->value;
     }
@@ -75,7 +75,7 @@ class Rdn
     /**
      * @return bool
      */
-    public function isMultivalued() : bool
+    public function isMultivalued(): bool
     {
         return \count($this->additional) !== 0;
     }
@@ -83,12 +83,12 @@ class Rdn
     /**
      * @return string
      */
-    public function toString() : string
+    public function toString(): string
     {
-        $rdn = $this->name.'='.$this->value;
+        $rdn = $this->name . '=' . $this->value;
 
         foreach ($this->additional as $additional) {
-            $rdn .= '+'.$additional->getName().'='.$additional->getValue();
+            $rdn .= '+' . $additional->getName() . '=' . $additional->getValue();
         }
 
         return $rdn;
@@ -106,7 +106,7 @@ class Rdn
      * @param string $rdn
      * @return Rdn
      */
-    public static function create(string $rdn) : Rdn
+    public static function create(string $rdn): Rdn
     {
         $pieces = \preg_split('/(?<!\\\\)\+/', $rdn);
         if ($pieces === false) {
@@ -141,7 +141,7 @@ class Rdn
      * @param string $value
      * @return string
      */
-    public static function escape(string $value) : string
+    public static function escape(string $value): string
     {
         if (self::shouldNotEscape($value)) {
             return $value;
@@ -149,7 +149,7 @@ class Rdn
         $value = \str_replace(\array_keys(self::ESCAPE_MAP), \array_values(self::ESCAPE_MAP), $value);
 
         if ($value[0] === '#' || $value[0] === ' ') {
-            $value = ($value[0] === '#' ? '\23' : '\20').\substr($value, 1);
+            $value = ($value[0] === '#' ? '\23' : '\20') . \substr($value, 1);
         }
         if ($value[-1] === ' ') {
             $value = \substr_replace($value, '\20', -1, 1);

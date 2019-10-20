@@ -39,7 +39,7 @@ class PresentFilter implements FilterInterface
     /**
      * {@inheritdoc}
      */
-    public function toAsn1() : AbstractType
+    public function toAsn1(): AbstractType
     {
         return Asn1::context(self::APP_TAG, Asn1::octetString($this->attribute));
     }
@@ -47,9 +47,9 @@ class PresentFilter implements FilterInterface
     /**
      * {@inheritdoc}
      */
-    public function toString() : string
+    public function toString(): string
     {
-        return self::PAREN_LEFT.$this->attribute.self::FILTER_EQUAL.'*'.self::PAREN_RIGHT;
+        return self::PAREN_LEFT . $this->attribute . self::FILTER_EQUAL . '*' . self::PAREN_RIGHT;
     }
 
     /**

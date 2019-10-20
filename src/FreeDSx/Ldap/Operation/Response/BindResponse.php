@@ -46,7 +46,7 @@ class BindResponse extends LdapResult
     /**
      * @return null|string
      */
-    public function getSaslCredentials() : ?string
+    public function getSaslCredentials(): ?string
     {
         return $this->saslCreds;
     }

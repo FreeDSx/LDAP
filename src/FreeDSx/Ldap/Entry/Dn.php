@@ -41,7 +41,7 @@ class Dn implements \IteratorAggregate, \Countable
     /**
      * @return Rdn
      */
-    public function getRdn() : Rdn
+    public function getRdn(): Rdn
     {
         if ($this->pieces === null) {
             $this->parse();
@@ -56,7 +56,7 @@ class Dn implements \IteratorAggregate, \Countable
     /**
      * @return null|Dn
      */
-    public function getParent() : ?Dn
+    public function getParent(): ?Dn
     {
         if ($this->pieces === null) {
             $this->parse();
@@ -79,7 +79,7 @@ class Dn implements \IteratorAggregate, \Countable
     /**
      * @return string
      */
-    public function toString() : string
+    public function toString(): string
     {
         return $this->dn;
     }
@@ -127,7 +127,7 @@ class Dn implements \IteratorAggregate, \Countable
             (new self($dn))->toArray();
 
             return true;
-        } catch (UnexpectedValueException|InvalidArgumentException $e) {
+        } catch (UnexpectedValueException | InvalidArgumentException $e) {
             return false;
         }
     }
@@ -140,7 +140,7 @@ class Dn implements \IteratorAggregate, \Countable
         if ($this->dn === '') {
             $this->pieces = [];
 
-            return;;
+            return;
         }
         $pieces = \preg_split('/(?<!\\\\),/', $this->dn);
         $pieces = ($pieces === false) ? [] : $pieces;

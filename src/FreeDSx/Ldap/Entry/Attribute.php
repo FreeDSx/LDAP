@@ -144,7 +144,7 @@ class Attribute implements \IteratorAggregate, \Countable
      */
     public function getDescription(): string
     {
-        return $this->getName().($this->options()->count() > 0 ? ';'.$this->options()->toString() : '');
+        return $this->getName() . ($this->options()->count() > 0 ? ';' . $this->options()->toString() : '');
     }
 
     /**

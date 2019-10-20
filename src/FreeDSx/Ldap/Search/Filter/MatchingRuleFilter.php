@@ -11,7 +11,6 @@
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\BooleanType;
 use FreeDSx\Asn1\Type\IncompleteType;
@@ -19,6 +18,7 @@ use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 /**
  * Represents an extensible matching rule filter. RFC 4511, 4.5.1.7.7
@@ -72,7 +72,7 @@ class MatchingRuleFilter implements FilterInterface
     /**
      * @return null|string
      */
-    public function getAttribute() : ?string
+    public function getAttribute(): ?string
     {
         return $this->attribute;
     }
@@ -91,7 +91,7 @@ class MatchingRuleFilter implements FilterInterface
     /**
      * @return null|string
      */
-    public function getMatchingRule() : ?string
+    public function getMatchingRule(): ?string
     {
         return $this->matchingRule;
     }
@@ -110,7 +110,7 @@ class MatchingRuleFilter implements FilterInterface
     /**
      * @return string
      */
-    public function getValue() : string
+    public function getValue(): string
     {
         return $this->value;
     }
@@ -129,7 +129,7 @@ class MatchingRuleFilter implements FilterInterface
     /**
      * @return bool
      */
-    public function getUseDnAttributes() : bool
+    public function getUseDnAttributes(): bool
     {
         return $this->useDnAttributes;
     }
@@ -148,7 +148,7 @@ class MatchingRuleFilter implements FilterInterface
     /**
      * {@inheritdoc}
      */
-    public function toAsn1() : AbstractType
+    public function toAsn1(): AbstractType
     {
         /** @var \FreeDSx\Asn1\Type\SequenceType $matchingRule */
         $matchingRule = Asn1::context(self::CHOICE_TAG, Asn1::sequence());
@@ -175,13 +175,13 @@ class MatchingRuleFilter implements FilterInterface
             $filter = $this->attribute;
         }
         if ($this->matchingRule !== null) {
-            $filter .= ':'.$this->matchingRule;
+            $filter .= ':' . $this->matchingRule;
         }
         if ($this->useDnAttributes) {
             $filter .= ':dn';
         }
 
-        return self::PAREN_LEFT.$filter.self::FILTER_EXT.Attribute::escape($this->value).self::PAREN_RIGHT;
+        return self::PAREN_LEFT . $filter . self::FILTER_EXT . Attribute::escape($this->value) . self::PAREN_RIGHT;
     }
 
     /**

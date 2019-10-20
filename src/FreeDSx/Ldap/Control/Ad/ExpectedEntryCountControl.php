@@ -54,7 +54,7 @@ class ExpectedEntryCountControl extends Control
     /**
      * @return int
      */
-    public function getMaximum() : int
+    public function getMaximum(): int
     {
         return $this->maximum;
     }
@@ -73,7 +73,7 @@ class ExpectedEntryCountControl extends Control
     /**
      * @return int
      */
-    public function getMinimum() : int
+    public function getMinimum(): int
     {
         return $this->minimum;
     }
@@ -117,7 +117,7 @@ class ExpectedEntryCountControl extends Control
     /**
      * {@inheritdoc}
      */
-    public function toAsn1() : AbstractType
+    public function toAsn1(): AbstractType
     {
         $this->controlValue = Asn1::sequence(
             Asn1::integer($this->minimum),

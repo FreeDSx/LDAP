@@ -65,7 +65,7 @@ class Options implements \Countable, \IteratorAggregate
      * @param string|Option $option
      * @return bool
      */
-    public function has($option) : bool
+    public function has($option): bool
     {
         $option = $option instanceof Option ? $option : new Option($option);
 
@@ -101,7 +101,7 @@ class Options implements \Countable, \IteratorAggregate
      *
      * @return Option|null
      */
-    public function first() : ?Option
+    public function first(): ?Option
     {
         $option = reset($this->options);
 
@@ -113,7 +113,7 @@ class Options implements \Countable, \IteratorAggregate
      *
      * @return Option|null
      */
-    public function last() : ?Option
+    public function last(): ?Option
     {
         $option = end($this->options);
         reset($this->options);
@@ -125,7 +125,7 @@ class Options implements \Countable, \IteratorAggregate
      * @param bool $sortedlc Used for comparison, as both case and order of options are irrelevant for options equality.
      * @return string
      */
-    public function toString(bool $sortedlc = false) : string
+    public function toString(bool $sortedlc = false): string
     {
         $opts = $this->options;
         if ($sortedlc) {
@@ -134,7 +134,7 @@ class Options implements \Countable, \IteratorAggregate
 
         $options = '';
         foreach ($opts as $option) {
-            $options .= ($options === '') ? $option->toString($sortedlc) : ';'.$option->toString($sortedlc);
+            $options .= ($options === '') ? $option->toString($sortedlc) : ';' . $option->toString($sortedlc);
         }
 
         return $options;
@@ -143,7 +143,7 @@ class Options implements \Countable, \IteratorAggregate
     /**
      * @return array
      */
-    public function toArray() : array
+    public function toArray(): array
     {
         return $this->options;
     }

@@ -52,7 +52,7 @@ class FilterFactory
     /**
      * @throws ProtocolException
      */
-    public static function get(AbstractType $type) : FilterInterface
+    public static function get(AbstractType $type): FilterInterface
     {
         $filterClass = self::$map[$type->getTagNumber()] ?? null;
         if ($filterClass === null) {
@@ -61,7 +61,7 @@ class FilterFactory
                 $type->getTagNumber()
             ));
         }
-        $filterConstruct = $filterClass.'::fromAsn1';
+        $filterConstruct = $filterClass . '::fromAsn1';
         if (!is_callable($filterConstruct)) {
             throw new RuntimeException(sprintf(
                 'The filter construct is not callable: %s',
@@ -76,7 +76,7 @@ class FilterFactory
      * @param int $filterType
      * @return bool
      */
-    public static function has(int $filterType) : bool
+    public static function has(int $filterType): bool
     {
         return isset(self::$map[$filterType]);
     }
@@ -85,7 +85,7 @@ class FilterFactory
      * @param int $filterType
      * @param string $filterClass
      */
-    public static function set(int $filterType, string $filterClass) : void
+    public static function set(int $filterType, string $filterClass): void
     {
         if (!class_exists($filterClass)) {
             throw new InvalidArgumentException(sprintf('The filter class does not exist: %s', $filterClass));

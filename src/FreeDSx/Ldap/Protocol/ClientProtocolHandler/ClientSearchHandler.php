@@ -31,7 +31,7 @@ class ClientSearchHandler extends ClientBasicHandler
     /**
      * {@inheritDoc}
      */
-    public function handleRequest(LdapMessageRequest $message, ClientQueue $queue, array $options) : ?LdapMessageResponse
+    public function handleRequest(LdapMessageRequest $message, ClientQueue $queue, array $options): ?LdapMessageResponse
     {
         /** @var SearchRequest $request */
         $request = $message->getRequest();

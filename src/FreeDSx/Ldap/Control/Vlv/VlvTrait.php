@@ -35,7 +35,7 @@ trait VlvTrait
     /**
      * @return null|string
      */
-    public function getContextId() : ?string
+    public function getContextId(): ?string
     {
         return $this->contextId;
     }
@@ -43,7 +43,7 @@ trait VlvTrait
     /**
      * @return int
      */
-    public function getOffset() : ?int
+    public function getOffset(): ?int
     {
         return $this->offset;
     }
@@ -51,7 +51,7 @@ trait VlvTrait
     /**
      * @return int
      */
-    public function getCount() : ?int
+    public function getCount(): ?int
     {
         return $this->count;
     }

@@ -102,7 +102,7 @@ class DirSync
      * @param int $checkInterval How often to check for changes (in seconds).
      * @throws \FreeDSx\Ldap\Exception\OperationException
      */
-    public function watch(\Closure $handler, int $checkInterval = 10) : void
+    public function watch(\Closure $handler, int $checkInterval = 10): void
     {
         $handler($this->getChanges(), true);
         while ($this->hasChanges()) {
@@ -127,7 +127,7 @@ class DirSync
      *
      * @return bool
      */
-    public function hasChanges() : bool
+    public function hasChanges(): bool
     {
         if ($this->lastResponse === null) {
             return false;
@@ -143,7 +143,7 @@ class DirSync
      * @return Entries
      * @throws \FreeDSx\Ldap\Exception\OperationException
      */
-    public function getChanges() : Entries
+    public function getChanges(): Entries
     {
         /** @var LdapMessageResponse $response */
         $response = $this->client->send($this->getSearchRequest(), $this->getDirSyncControl());
@@ -256,7 +256,7 @@ class DirSync
      *
      * @return string
      */
-    public function getCookie() : string
+    public function getCookie(): string
     {
         return $this->dirSyncRequest->getCookie();
     }
@@ -265,7 +265,7 @@ class DirSync
      * @return SearchRequest
      * @throws \FreeDSx\Ldap\Exception\OperationException
      */
-    protected function getSearchRequest() : SearchRequest
+    protected function getSearchRequest(): SearchRequest
     {
         $this->search->base($this->namingContext ?? $this->getDefaultRootNc());
 
@@ -275,7 +275,7 @@ class DirSync
     /**
      * @return DirSyncRequestControl
      */
-    protected function getDirSyncControl() : DirSyncRequestControl
+    protected function getDirSyncControl(): DirSyncRequestControl
     {
         $flags = 0;
         if ($this->incrementalValues) {

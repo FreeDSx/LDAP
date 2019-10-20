@@ -30,7 +30,7 @@ interface FilterContainerInterface extends FilterInterface
      *
      * @return FilterInterface[]|FilterContainerInterface[]
      */
-    public function get() : array;
+    public function get(): array;
 
     /**
      * Check if a filter exists.
@@ -38,7 +38,7 @@ interface FilterContainerInterface extends FilterInterface
      * @param FilterInterface $filter
      * @return bool
      */
-    public function has(FilterInterface $filter) : bool;
+    public function has(FilterInterface $filter): bool;
 
     /**
      * Remove a specific filter.

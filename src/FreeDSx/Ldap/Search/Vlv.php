@@ -12,9 +12,9 @@ namespace FreeDSx\Ldap\Search;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
-use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Control\Vlv\VlvControl;
 use FreeDSx\Ldap\Control\Vlv\VlvResponseControl;
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
@@ -185,7 +185,7 @@ class Vlv
      *
      * @return int|null
      */
-    public function listOffset() : ?int
+    public function listOffset(): ?int
     {
         return ($this->control !== null) ? $this->control->getOffset() : null;
     }
@@ -195,7 +195,7 @@ class Vlv
      *
      * @return int|null
      */
-    public function listSize() : ?int
+    public function listSize(): ?int
     {
         return ($this->control !== null) ? $this->control->getCount() : null;
     }
@@ -206,7 +206,7 @@ class Vlv
      *
      * @return int|null
      */
-    public function position() : ?int
+    public function position(): ?int
     {
         $control = $this->control;
         $pos = $control === null ? null : $control->getOffset();
@@ -226,7 +226,7 @@ class Vlv
      *
      * @return bool
      */
-    public function isAtEndOfList() : bool
+    public function isAtEndOfList(): bool
     {
         if ($this->control === null) {
             return false;
@@ -245,7 +245,7 @@ class Vlv
      *
      * @return bool
      */
-    public function isAtStartOfList() : bool
+    public function isAtStartOfList(): bool
     {
         if ($this->control === null) {
             return false;
@@ -262,7 +262,7 @@ class Vlv
      * @return Entries
      * @throws ProtocolException
      */
-    public function getEntries() : Entries
+    public function getEntries(): Entries
     {
         return $this->send();
     }
@@ -288,7 +288,7 @@ class Vlv
     /**
      * @return VlvControl
      */
-    protected function createVlvControl(?string $contextId) : VlvControl
+    protected function createVlvControl(?string $contextId): VlvControl
     {
         if ($this->filter !== null) {
             return Controls::vlvFilter($this->before, $this->after, $this->filter, $contextId);

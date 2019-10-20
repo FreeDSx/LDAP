@@ -54,7 +54,7 @@ class DeleteRequest implements RequestInterface, DnRequestInterface
     /**
      * @return Dn
      */
-    public function getDn() : Dn
+    public function getDn(): Dn
     {
         return $this->dn;
     }
@@ -81,7 +81,7 @@ class DeleteRequest implements RequestInterface, DnRequestInterface
      * @param AbstractType $type
      * @throws ProtocolException
      */
-    protected static function validate(AbstractType $type) : void
+    protected static function validate(AbstractType $type): void
     {
         if (!$type instanceof OctetStringType || $type->getTagClass() !== AbstractType::TAG_CLASS_APPLICATION) {
             throw new ProtocolException('The delete request must be an octet string with an application tag class.');

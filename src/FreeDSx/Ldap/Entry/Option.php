@@ -40,7 +40,7 @@ class Option
     /**
      * @return bool
      */
-    public function isLanguageTag() : bool
+    public function isLanguageTag(): bool
     {
         return $this->startsWith('lang-');
     }
@@ -48,7 +48,7 @@ class Option
     /**
      * @return bool
      */
-    public function isRange() : bool
+    public function isRange(): bool
     {
         return $this->startsWith('range=');
     }
@@ -58,7 +58,7 @@ class Option
      *
      * @see https://msdn.microsoft.com/en-us/library/cc223242.aspx
      */
-    public function getHighRange() : string
+    public function getHighRange(): string
     {
         if (!$this->isRange()) {
             return '';
@@ -74,7 +74,7 @@ class Option
      * @see https://msdn.microsoft.com/en-us/library/cc223242.aspx
      * @return string|null
      */
-    public function getLowRange() : ?string
+    public function getLowRange(): ?string
     {
         if (!$this->isRange()) {
             return null;
@@ -88,7 +88,7 @@ class Option
      * @param string $option
      * @return bool
      */
-    public function startsWith(string $option) : bool
+    public function startsWith(string $option): bool
     {
         if ($this->lcOption === null) {
             $this->lcOption = \strtolower($this->option);
@@ -104,7 +104,7 @@ class Option
      * @param Option $option
      * @return bool
      */
-    public function equals(Option $option) : bool
+    public function equals(Option $option): bool
     {
         if ($this->lcOption === null) {
             $this->lcOption = \strtolower($this->option);
@@ -120,7 +120,7 @@ class Option
      * @param bool $lowercase forces the string representation to lowercase.
      * @return string
      */
-    public function toString(bool $lowercase = false) : string
+    public function toString(bool $lowercase = false): string
     {
         if ($lowercase) {
             if ($this->lcOption === null) {
@@ -151,6 +151,6 @@ class Option
      */
     public static function fromRange(string $startAt, string $endAt = '*')
     {
-        return new self('range='.$startAt.'-'.$endAt);
+        return new self('range=' . $startAt . '-' . $endAt);
     }
 }

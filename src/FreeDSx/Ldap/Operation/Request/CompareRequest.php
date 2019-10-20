@@ -54,7 +54,7 @@ class CompareRequest implements RequestInterface, DnRequestInterface
     /**
      * @return Dn
      */
-    public function getDn() : Dn
+    public function getDn(): Dn
     {
         return $this->dn;
     }
@@ -73,7 +73,7 @@ class CompareRequest implements RequestInterface, DnRequestInterface
     /**
      * @return EqualityFilter
      */
-    public function getFilter() : EqualityFilter
+    public function getFilter(): EqualityFilter
     {
         return $this->filter;
     }

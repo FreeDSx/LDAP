@@ -25,7 +25,7 @@ trait FilterAttributeTrait
     /**
      * @return string
      */
-    public function getAttribute() : string
+    public function getAttribute(): string
     {
         return $this->attribute;
     }

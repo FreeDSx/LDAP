@@ -63,7 +63,7 @@ class AddRequest implements RequestInterface
     /**
      * @return Entry
      */
-    public function getEntry() : Entry
+    public function getEntry(): Entry
     {
         return $this->entry;
     }

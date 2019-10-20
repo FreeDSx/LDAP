@@ -45,7 +45,7 @@ class ServerProtocolHandlerFactory
      * @param RequestInterface $request
      * @return bool
      */
-    protected function isRootDseSearch(RequestInterface $request) : bool
+    protected function isRootDseSearch(RequestInterface $request): bool
     {
         if (!$request instanceof SearchRequest) {
             return false;

@@ -15,12 +15,12 @@ use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
-use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
-use FreeDSx\Socket\SocketPool;
 use FreeDSx\Socket\Exception\ConnectionException as SocketException;
+use FreeDSx\Socket\SocketPool;
 
 /**
  * Handles client specific protocol communication details.
@@ -66,7 +66,7 @@ class ClientProtocolHandler
     /**
      * @return ControlBag
      */
-    public function controls() : ControlBag
+    public function controls(): ControlBag
     {
         return $this->controls;
     }
@@ -76,7 +76,7 @@ class ClientProtocolHandler
      * @throws UnsolicitedNotificationException
      * @throws OperationException
      */
-    public function send(RequestInterface $request, Control ...$controls) : ?LdapMessageResponse
+    public function send(RequestInterface $request, Control ...$controls): ?LdapMessageResponse
     {
         try {
             $messageTo = new LdapMessageRequest(
@@ -122,7 +122,7 @@ class ClientProtocolHandler
     /**
      * @return bool
      */
-    public function isConnected() : bool
+    public function isConnected(): bool
     {
         return ($this->queue !== null && $this->queue->isConnected());
     }

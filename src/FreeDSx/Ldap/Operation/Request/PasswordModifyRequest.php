@@ -58,7 +58,7 @@ class PasswordModifyRequest extends ExtendedRequest
     /**
      * @return null|string
      */
-    public function getUsername() : ?string
+    public function getUsername(): ?string
     {
         return $this->userIdentity;
     }
@@ -77,7 +77,7 @@ class PasswordModifyRequest extends ExtendedRequest
     /**
      * @return null|string
      */
-    public function getNewPassword() : ?string
+    public function getNewPassword(): ?string
     {
         return $this->newPassword;
     }
@@ -96,7 +96,7 @@ class PasswordModifyRequest extends ExtendedRequest
     /**
      * @return null|string
      */
-    public function getOldPassword() : ?string
+    public function getOldPassword(): ?string
     {
         return $this->oldPassword;
     }

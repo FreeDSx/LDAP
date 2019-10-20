@@ -12,9 +12,9 @@ namespace FreeDSx\Ldap;
 
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\AddRequest;

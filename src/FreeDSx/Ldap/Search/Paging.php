@@ -11,8 +11,8 @@
 namespace FreeDSx\Ldap\Search;
 
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Control\PagingControl;
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
@@ -96,7 +96,7 @@ class Paging
      * @param int|null $size
      * @return Entries
      */
-    public function getEntries(?int $size = null) : Entries
+    public function getEntries(?int $size = null): Entries
     {
         return $this->send($size);
     }
@@ -119,7 +119,7 @@ class Paging
      *
      * @return int|null
      */
-    public function sizeEstimate() : ?int
+    public function sizeEstimate(): ?int
     {
         return ($this->control !== null) ? $this->control->getSize() : null;
     }

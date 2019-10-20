@@ -72,7 +72,7 @@ class VlvControl extends Control
     /**
      * @return int
      */
-    public function getAfter() : int
+    public function getAfter(): int
     {
         return $this->after;
     }
@@ -91,7 +91,7 @@ class VlvControl extends Control
     /**
      * @return int
      */
-    public function getBefore() : int
+    public function getBefore(): int
     {
         return $this->before;
     }
@@ -143,7 +143,7 @@ class VlvControl extends Control
     /**
      * @return null|GreaterThanOrEqualFilter
      */
-    public function getFilter() : ?GreaterThanOrEqualFilter
+    public function getFilter(): ?GreaterThanOrEqualFilter
     {
         return $this->filter;
     }

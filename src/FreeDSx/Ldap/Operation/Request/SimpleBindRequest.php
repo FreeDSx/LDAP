@@ -47,7 +47,7 @@ class SimpleBindRequest extends BindRequest
     /**
      * @return string
      */
-    public function getPassword() : string
+    public function getPassword(): string
     {
         return $this->password;
     }

@@ -102,7 +102,7 @@ class Control implements ProtocolElementInterface
     /**
      * @return string
      */
-    public function getTypeOid() : string
+    public function getTypeOid(): string
     {
         return $this->controlType;
     }
@@ -121,7 +121,7 @@ class Control implements ProtocolElementInterface
     /**
      * @return bool
      */
-    public function getCriticality() : bool
+    public function getCriticality(): bool
     {
         return $this->criticality;
     }

@@ -73,7 +73,7 @@ class SubstringFilter implements FilterInterface
      *
      * @return null|string
      */
-    public function getStartsWith() : ?string
+    public function getStartsWith(): ?string
     {
         return $this->startsWith;
     }
@@ -96,7 +96,7 @@ class SubstringFilter implements FilterInterface
      *
      * @return null|string
      */
-    public function getEndsWith() : ?string
+    public function getEndsWith(): ?string
     {
         return $this->endsWith;
     }
@@ -119,7 +119,7 @@ class SubstringFilter implements FilterInterface
      *
      * @return string[]
      */
-    public function getContains() : array
+    public function getContains(): array
     {
         return $this->contains;
     }
@@ -140,7 +140,7 @@ class SubstringFilter implements FilterInterface
     /**
      * {@inheritdoc}
      */
-    public function toAsn1() : AbstractType
+    public function toAsn1(): AbstractType
     {
         if ($this->startsWith === null && $this->endsWith === null && count($this->contains) === 0) {
             throw new RuntimeException('You must provide a contains, starts with, or ends with value to the substring filter.');
@@ -170,25 +170,25 @@ class SubstringFilter implements FilterInterface
      */
     public function toString(): string
     {
-        $filter = self::PAREN_LEFT.$this->attribute.self::FILTER_EQUAL;
+        $filter = self::PAREN_LEFT . $this->attribute . self::FILTER_EQUAL;
 
         $value = '';
         if (count($this->contains) !== 0) {
             $value = array_map(function ($value) {
                 return Attribute::escape($value);
             }, $this->contains);
-            $value = '*'.implode('*', $value).'*';
+            $value = '*' . implode('*', $value) . '*';
         }
         if ($this->startsWith !== null) {
             $startsWith = Attribute::escape($this->startsWith);
-            $value = ($value === '' ? $startsWith.'*' : $startsWith).$value;
+            $value = ($value === '' ? $startsWith . '*' : $startsWith) . $value;
         }
         if ($this->endsWith !== null) {
             $endsWith = Attribute::escape($this->endsWith);
-            $value = $value.($value === '' ? '*'.$endsWith : $endsWith);
+            $value = $value . ($value === '' ? '*' . $endsWith : $endsWith);
         }
 
-        return $filter.$value.self::PAREN_RIGHT;
+        return $filter . $value . self::PAREN_RIGHT;
     }
 
     /**
@@ -215,7 +215,7 @@ class SubstringFilter implements FilterInterface
     /**
      * @throws ProtocolException
      */
-    protected static function parseSubstrings(SequenceType $substrings) : array
+    protected static function parseSubstrings(SequenceType $substrings): array
     {
         $startsWith = null;
         $endsWith = null;
@@ -248,7 +248,7 @@ class SubstringFilter implements FilterInterface
 
         return [
             ($startsWith !== null) ? $startsWith->getValue() : null,
-            ($endsWith !== null)  ? $endsWith->getValue() : null,
+            ($endsWith !== null) ? $endsWith->getValue() : null,
             $contains
         ];
     }

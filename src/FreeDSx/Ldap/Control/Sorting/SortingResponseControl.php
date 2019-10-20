@@ -72,7 +72,7 @@ class SortingResponseControl extends Control
     /**
      * @return int
      */
-    public function getResult() : int
+    public function getResult(): int
     {
         return $this->result;
     }
@@ -80,7 +80,7 @@ class SortingResponseControl extends Control
     /**
      * @return null|string
      */
-    public function getAttribute() : ?string
+    public function getAttribute(): ?string
     {
         return $this->attribute;
     }

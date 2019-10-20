@@ -42,7 +42,7 @@ class LdapMessageResponse extends LdapMessage
     /**
      * @return ResponseInterface|LdapResult
      */
-    public function getResponse() : ResponseInterface
+    public function getResponse(): ResponseInterface
     {
         return $this->response;
     }

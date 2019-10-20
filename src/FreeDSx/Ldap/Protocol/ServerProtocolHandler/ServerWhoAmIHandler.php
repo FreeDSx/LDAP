@@ -37,9 +37,9 @@ class ServerWhoAmIHandler implements ServerProtocolHandlerInterface
         if ($userId !== null) {
             try {
                 (new Dn($userId))->toArray();
-                $userId = 'dn:'.$userId;
+                $userId = 'dn:' . $userId;
             } catch (\Exception $e) {
-                $userId = 'u:'.$userId;
+                $userId = 'u:' . $userId;
             }
         }
 

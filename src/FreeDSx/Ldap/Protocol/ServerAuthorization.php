@@ -56,7 +56,7 @@ class ServerAuthorization
      * @param RequestInterface $request
      * @return bool
      */
-    public function isAuthenticationRequired(RequestInterface $request) : bool
+    public function isAuthenticationRequired(RequestInterface $request): bool
     {
         if ($this->isAuthRequired === false) {
             return  false;

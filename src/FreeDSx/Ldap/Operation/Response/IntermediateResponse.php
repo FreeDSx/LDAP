@@ -51,7 +51,7 @@ class IntermediateResponse implements ResponseInterface
     /**
      * @return null|string
      */
-    public function getName() : ?string
+    public function getName(): ?string
     {
         return $this->responseName;
     }
@@ -59,7 +59,7 @@ class IntermediateResponse implements ResponseInterface
     /**
      * @return null|string
      */
-    public function getValue() : ?string
+    public function getValue(): ?string
     {
         return $this->responseValue;
     }

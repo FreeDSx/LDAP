@@ -261,7 +261,7 @@ class Entry implements \IteratorAggregate, \Countable
      * @param array $attributes
      * @return Entry
      */
-    public static function create(string $dn, array $attributes = []) : Entry
+    public static function create(string $dn, array $attributes = []): Entry
     {
         return self::fromArray($dn, $attributes);
     }
@@ -273,7 +273,7 @@ class Entry implements \IteratorAggregate, \Countable
      * @param array $attributes
      * @return Entry
      */
-    public static function fromArray(string $dn, array $attributes = []) : Entry
+    public static function fromArray(string $dn, array $attributes = []): Entry
     {
         /** @var Attribute[] $entryAttr */
         $entryAttr = [];

@@ -41,7 +41,7 @@ class ResponseFactory
     /**
      * Retrieve the expected response type for the request that was given.
      */
-    public function getStandardResponse(LdapMessageRequest $message, int $resultCode = ResultCode::SUCCESS, string $diagnostic = '') : LdapMessageResponse
+    public function getStandardResponse(LdapMessageRequest $message, int $resultCode = ResultCode::SUCCESS, string $diagnostic = ''): LdapMessageResponse
     {
         $response = null;
         $request = $message->getRequest();

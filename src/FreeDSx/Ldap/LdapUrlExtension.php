@@ -51,7 +51,7 @@ class LdapUrlExtension
     /**
      * @return string
      */
-    public function getName() : string
+    public function getName(): string
     {
         return $this->name;
     }
@@ -70,7 +70,7 @@ class LdapUrlExtension
     /**
      * @return null|string
      */
-    public function getValue() : ?string
+    public function getValue(): ?string
     {
         return $this->value;
     }
@@ -86,7 +86,7 @@ class LdapUrlExtension
         return $this;
     }
 
-    public function getIsCritical() : bool
+    public function getIsCritical(): bool
     {
         return $this->isCritical;
     }
@@ -105,12 +105,12 @@ class LdapUrlExtension
     /**
      * @return string
      */
-    public function toString() : string
+    public function toString(): string
     {
-        $ext = ($this->isCritical ? '!' : '').\str_replace(',', '%2c', self::encode($this->name));
+        $ext = ($this->isCritical ? '!' : '') . \str_replace(',', '%2c', self::encode($this->name));
 
         if ($this->value !== null) {
-            $ext .= '='.\str_replace(',', '%2c', self::encode($this->value));
+            $ext .= '=' . \str_replace(',', '%2c', self::encode($this->value));
         }
 
         return $ext;
@@ -129,7 +129,7 @@ class LdapUrlExtension
      * @return LdapUrlExtension
      * @throws UrlParseException
      */
-    public static function parse(string $extension) : LdapUrlExtension
+    public static function parse(string $extension): LdapUrlExtension
     {
         if (preg_match('/!?\w+(=.*)?/', $extension) !== 1) {
             throw new UrlParseException(sprintf('The LDAP URL extension is malformed: %s', $extension));

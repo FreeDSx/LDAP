@@ -41,7 +41,7 @@ class LdapMessageRequest extends LdapMessage
     /**
      * @return RequestInterface
      */
-    public function getRequest() : RequestInterface
+    public function getRequest(): RequestInterface
     {
         return $this->request;
     }

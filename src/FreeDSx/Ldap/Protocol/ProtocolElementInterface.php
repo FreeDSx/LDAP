@@ -24,7 +24,7 @@ interface ProtocolElementInterface
      *
      * @return AbstractType
      */
-    public function toAsn1() : AbstractType;
+    public function toAsn1(): AbstractType;
 
     /**
      * @param AbstractType $type

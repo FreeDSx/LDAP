@@ -14,8 +14,8 @@ use FreeDSx\Asn1\Encoder\EncoderInterface;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
-use FreeDSx\Socket\Queue\Asn1MessageQueue;
 use FreeDSx\Socket\Exception\ConnectionException;
+use FreeDSx\Socket\Queue\Asn1MessageQueue;
 use FreeDSx\Socket\Socket;
 
 /**
@@ -122,7 +122,7 @@ class LdapQueue extends Asn1MessageQueue
     /**
      * @return bool
      */
-    public function isConnected() : bool
+    public function isConnected(): bool
     {
         return $this->socket->isConnected();
     }

@@ -87,12 +87,12 @@ class LdapUrl
         return $this;
     }
 
-    public function getDn() : ?Dn
+    public function getDn(): ?Dn
     {
         return $this->dn;
     }
 
-    public function getHost() : ?string
+    public function getHost(): ?string
     {
         return $this->host;
     }
@@ -121,7 +121,7 @@ class LdapUrl
     /**
      * @return int|null
      */
-    public function getPort() : ?int
+    public function getPort(): ?int
     {
         return $this->port;
     }
@@ -129,7 +129,7 @@ class LdapUrl
     /**
      * @return null|string
      */
-    public function getScope() : ?string
+    public function getScope(): ?string
     {
         return $this->scope;
     }
@@ -158,7 +158,7 @@ class LdapUrl
     /**
      * @return null|string
      */
-    public function getFilter() : ?string
+    public function getFilter(): ?string
     {
         return $this->filter;
     }
@@ -177,7 +177,7 @@ class LdapUrl
     /**
      * @return LdapUrlExtension[]
      */
-    public function getExtensions() : array
+    public function getExtensions(): array
     {
         return $this->extensions;
     }
@@ -231,7 +231,7 @@ class LdapUrl
     /**
      * @return bool
      */
-    public function getUseSsl() : bool
+    public function getUseSsl(): bool
     {
         return $this->useSsl;
     }
@@ -241,15 +241,15 @@ class LdapUrl
      *
      * @return string
      */
-    public function toString() : string
+    public function toString(): string
     {
-        $url = ($this->useSsl ? 'ldaps' : 'ldap').'://'.$this->host;
+        $url = ($this->useSsl ? 'ldaps' : 'ldap') . '://' . $this->host;
 
         if ($this->host !== null && $this->port !== null) {
-            $url .= ':'.$this->port;
+            $url .= ':' . $this->port;
         }
 
-        return $url.'/'.self::encode($this->dn).$this->getQueryString();
+        return $url . '/' . self::encode($this->dn) . $this->getQueryString();
     }
 
     /**
@@ -267,7 +267,7 @@ class LdapUrl
      * @return LdapUrl
      * @throws UrlParseException
      */
-    public static function parse(string $ldapUrl) : LdapUrl
+    public static function parse(string $ldapUrl): LdapUrl
     {
         $pieces = self::explodeUrl($ldapUrl);
 
@@ -299,7 +299,7 @@ class LdapUrl
      * @return array
      * @throws UrlParseException
      */
-    protected static function explodeUrl(string $url) : array
+    protected static function explodeUrl(string $url): array
     {
         $pieces = \parse_url($url);
 

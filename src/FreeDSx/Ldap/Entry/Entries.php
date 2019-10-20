@@ -64,7 +64,7 @@ class Entries implements \Countable, \IteratorAggregate
      * @param Entry|Dn|string $entry
      * @return bool
      */
-    public function has($entry) : bool
+    public function has($entry): bool
     {
         if ($entry instanceof Entry) {
             return (\array_search($entry, $this->entries, true) !== false);
@@ -85,7 +85,7 @@ class Entries implements \Countable, \IteratorAggregate
      * @param string $dn
      * @return Entry|null
      */
-    public function get(string $dn) : ?Entry
+    public function get(string $dn): ?Entry
     {
         foreach ($this->entries as $entry) {
             if ($entry->getDn()->toString() === $dn) {
@@ -101,7 +101,7 @@ class Entries implements \Countable, \IteratorAggregate
      *
      * @return Entry|null
      */
-    public function first() : ?Entry
+    public function first(): ?Entry
     {
         $entry = \reset($this->entries);
 
@@ -113,7 +113,7 @@ class Entries implements \Countable, \IteratorAggregate
      *
      * @return Entry|null
      */
-    public function last() : ?Entry
+    public function last(): ?Entry
     {
         $entry = \end($this->entries);
         \reset($this->entries);
@@ -124,7 +124,7 @@ class Entries implements \Countable, \IteratorAggregate
     /**
      * @return Entry[]
      */
-    public function toArray() : array
+    public function toArray(): array
     {
         return $this->entries;
     }

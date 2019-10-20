@@ -86,7 +86,7 @@ class LdapClient
      * @throws BindException
      * @throws OperationException
      */
-    public function bind(string $username, string $password) : LdapMessageResponse
+    public function bind(string $username, string $password): LdapMessageResponse
     {
         return $this->sendAndReceive(Operations::bind($username, $password)->setVersion($this->options['version']));
     }
@@ -101,7 +101,7 @@ class LdapClient
      * @return bool
      * @throws OperationException
      */
-    public function compare($dn, string $attributeName, string $value, Control ...$controls) : bool
+    public function compare($dn, string $attributeName, string $value, Control ...$controls): bool
     {
         /** @var \FreeDSx\Ldap\Operation\Response\CompareResponse $response */
         $response = $this->sendAndReceive(Operations::compare($dn, $attributeName, $value), ...$controls)->getResponse();
@@ -117,7 +117,7 @@ class LdapClient
      * @return LdapMessageResponse
      * @throws OperationException
      */
-    public function create(Entry $entry, Control ...$controls) : LdapMessageResponse
+    public function create(Entry $entry, Control ...$controls): LdapMessageResponse
     {
         $response = $this->sendAndReceive(Operations::add($entry), ...$controls);
         $entry->changes()->reset();
@@ -134,7 +134,7 @@ class LdapClient
      * @return Entry|null
      * @throws Exception\OperationException
      */
-    public function read(string $entry = '', $attributes = [], Control ...$controls) : ?Entry
+    public function read(string $entry = '', $attributes = [], Control ...$controls): ?Entry
     {
         try {
             return $this->readOrFail($entry, $attributes, ...$controls);
@@ -176,7 +176,7 @@ class LdapClient
      * @return LdapMessageResponse
      * @throws OperationException
      */
-    public function delete(string $entry, Control ...$controls) : LdapMessageResponse
+    public function delete(string $entry, Control ...$controls): LdapMessageResponse
     {
         return $this->sendAndReceive(Operations::delete($entry), ...$controls);
     }
@@ -189,7 +189,7 @@ class LdapClient
      * @return LdapMessageResponse
      * @throws OperationException
      */
-    public function update(Entry $entry, Control ...$controls) : LdapMessageResponse
+    public function update(Entry $entry, Control ...$controls): LdapMessageResponse
     {
         $response = $this->sendAndReceive(Operations::modify($entry->getDn(), ...$entry->changes()), ...$controls);
         $entry->changes()->reset();
@@ -205,7 +205,7 @@ class LdapClient
      * @return LdapMessageResponse
      * @throws OperationException
      */
-    public function move($dn, $newParentDn) : LdapMessageResponse
+    public function move($dn, $newParentDn): LdapMessageResponse
     {
         return $this->sendAndReceive(Operations::move($dn, $newParentDn));
     }
@@ -219,7 +219,7 @@ class LdapClient
      * @return LdapMessageResponse
      * @throws OperationException
      */
-    public function rename($dn, $newRdn, bool $deleteOldRdn = true) : LdapMessageResponse
+    public function rename($dn, $newRdn, bool $deleteOldRdn = true): LdapMessageResponse
     {
         return $this->sendAndReceive(Operations::rename($dn, $newRdn, $deleteOldRdn));
     }
@@ -232,7 +232,7 @@ class LdapClient
      * @return \FreeDSx\Ldap\Entry\Entries
      * @throws OperationException
      */
-    public function search(SearchRequest $request, Control ...$controls) : Entries
+    public function search(SearchRequest $request, Control ...$controls): Entries
     {
         /** @var \FreeDSx\Ldap\Operation\Response\SearchResponse $response */
         $response = $this->sendAndReceive($request, ...$controls)->getResponse();
@@ -247,7 +247,7 @@ class LdapClient
      * @param int $size
      * @return Paging
      */
-    public function paging(SearchRequest $search, ?int $size = null) : Paging
+    public function paging(SearchRequest $search, ?int $size = null): Paging
     {
         return new Paging($this, $search, $size ?? $this->options['page_size']);
     }
@@ -260,7 +260,7 @@ class LdapClient
      * @param int $afterCount
      * @return Vlv
      */
-    public function vlv(SearchRequest $search, $sort, int $afterCount) : Vlv
+    public function vlv(SearchRequest $search, $sort, int $afterCount): Vlv
     {
         return new Vlv($this, $search, $sort, $afterCount);
     }
@@ -273,7 +273,7 @@ class LdapClient
      * @param mixed ...$attributes
      * @return DirSync
      */
-    public function dirSync(?string $rootNc = null, FilterInterface $filter = null, ...$attributes) : DirSync
+    public function dirSync(?string $rootNc = null, FilterInterface $filter = null, ...$attributes): DirSync
     {
         return new DirSync($this, $rootNc, $filter, ...$attributes);
     }
@@ -343,7 +343,7 @@ class LdapClient
      * @return string
      * @throws OperationException
      */
-    public function whoami() : ?string
+    public function whoami(): ?string
     {
         /** @var \FreeDSx\Ldap\Operation\Response\ExtendedResponse $response */
         $response = $this->sendAndReceive(Operations::whoami())->getResponse();
@@ -356,7 +356,7 @@ class LdapClient
      *
      * @return RangeRetrieval
      */
-    public function range() : RangeRetrieval
+    public function range(): RangeRetrieval
     {
         return new RangeRetrieval($this);
     }
@@ -367,7 +367,7 @@ class LdapClient
      *
      * @return ControlBag
      */
-    public function controls() : ControlBag
+    public function controls(): ControlBag
     {
         return $this->handler()->controls();
     }
@@ -377,7 +377,7 @@ class LdapClient
      *
      * @return array
      */
-    public function getOptions() : array
+    public function getOptions(): array
     {
         return $this->options;
     }

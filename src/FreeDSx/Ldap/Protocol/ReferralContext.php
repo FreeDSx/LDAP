@@ -35,7 +35,7 @@ class ReferralContext
     /**
      * @return LdapUrl[]
      */
-    public function getReferrals() : array
+    public function getReferrals(): array
     {
         return $this->referrals;
     }
@@ -55,7 +55,7 @@ class ReferralContext
      * @param LdapUrl $url
      * @return bool
      */
-    public function hasReferral(LdapUrl $url) : bool
+    public function hasReferral(LdapUrl $url): bool
     {
         foreach ($this->referrals as $referral) {
             if (\strtolower($referral->toString()) === \strtolower($url->toString())) {

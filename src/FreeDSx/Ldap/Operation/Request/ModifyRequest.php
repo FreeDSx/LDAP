@@ -63,7 +63,7 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
     /**
      * @return Change[]
      */
-    public function getChanges() : array
+    public function getChanges(): array
     {
         return $this->changes;
     }
@@ -93,7 +93,7 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
     /**
      * @return Dn
      */
-    public function getDn() : Dn
+    public function getDn(): Dn
     {
         return $this->dn;
     }
@@ -152,7 +152,7 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
      * @return Change
      * @throws ProtocolException
      */
-    protected static function parseChange(AbstractType $type) : Change
+    protected static function parseChange(AbstractType $type): Change
     {
         if (!($type instanceof SequenceType && \count($type->getChildren()) === 2)) {
             throw new ProtocolException('The change for the modify request is malformed.');
@@ -172,7 +172,7 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
      * @return Attribute
      * @throws ProtocolException
      */
-    protected static function parsePartialAttribute(SequenceType $type) : Attribute
+    protected static function parsePartialAttribute(SequenceType $type): Attribute
     {
         if (\count($type->getChildren()) !== 2) {
             throw new ProtocolException('The partial attribute for the modify request is malformed.');

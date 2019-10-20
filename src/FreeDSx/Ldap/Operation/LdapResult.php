@@ -14,12 +14,12 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SequenceType;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UrlParseException;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\Response\ResponseInterface;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 /**
  * Represents the result of an operation request. RFC 4511, 4.1.9
@@ -117,7 +117,7 @@ class LdapResult implements ResponseInterface
     /**
      * @return string
      */
-    public function getDiagnosticMessage() : string
+    public function getDiagnosticMessage(): string
     {
         return $this->diagnosticMessage;
     }
@@ -125,7 +125,7 @@ class LdapResult implements ResponseInterface
     /**
      * @return Dn
      */
-    public function getDn() : Dn
+    public function getDn(): Dn
     {
         return $this->dn;
     }
@@ -133,7 +133,7 @@ class LdapResult implements ResponseInterface
     /**
      * @return LdapUrl[]
      */
-    public function getReferrals() : array
+    public function getReferrals(): array
     {
         return $this->referrals;
     }
@@ -141,7 +141,7 @@ class LdapResult implements ResponseInterface
     /**
      * {@inheritdoc}
      */
-    public function getResultCode() : int
+    public function getResultCode(): int
     {
         return $this->resultCode;
     }
@@ -149,7 +149,7 @@ class LdapResult implements ResponseInterface
     /**
      * {@inheritdoc}
      */
-    public function toAsn1() : AbstractType
+    public function toAsn1(): AbstractType
     {
         $result = Asn1::sequence(
             Asn1::enumerated($this->resultCode),

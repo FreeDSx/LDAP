@@ -74,7 +74,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     protected function constructRequestHandler(): RequestHandlerInterface
     {
         try {
-            return new $this->options['request_handler'];
+            return new $this->options['request_handler']();
         } catch (\Throwable $e) {
             throw new RuntimeException(sprintf(
                 'Unable to instantiate the request handler: "%s"',

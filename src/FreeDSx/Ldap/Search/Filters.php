@@ -35,7 +35,7 @@ class Filters
      * @param FilterInterface[] ...$filters
      * @return AndFilter
      */
-    public static function and(FilterInterface ...$filters) : AndFilter
+    public static function and(FilterInterface ...$filters): AndFilter
     {
         return new AndFilter(...$filters);
     }
@@ -46,7 +46,7 @@ class Filters
      * @param FilterInterface[] ...$filters
      * @return OrFilter
      */
-    public static function or(FilterInterface ...$filters) : OrFilter
+    public static function or(FilterInterface ...$filters): OrFilter
     {
         return new OrFilter(...$filters);
     }
@@ -58,7 +58,7 @@ class Filters
      * @param string $value
      * @return EqualityFilter
      */
-    public static function equal(string $attribute, string $value) : EqualityFilter
+    public static function equal(string $attribute, string $value): EqualityFilter
     {
         return new EqualityFilter($attribute, $value);
     }
@@ -69,7 +69,7 @@ class Filters
      * @param FilterInterface $filter
      * @return NotFilter
      */
-    public static function not(FilterInterface $filter) : NotFilter
+    public static function not(FilterInterface $filter): NotFilter
     {
         return new NotFilter($filter);
     }
@@ -81,7 +81,7 @@ class Filters
      * @param string $value
      * @return GreaterThanOrEqualFilter
      */
-    public static function greaterThanOrEqual(string $attribute, string $value) : GreaterThanOrEqualFilter
+    public static function greaterThanOrEqual(string $attribute, string $value): GreaterThanOrEqualFilter
     {
         return new GreaterThanOrEqualFilter($attribute, $value);
     }
@@ -93,7 +93,7 @@ class Filters
      * @param string $value
      * @return GreaterThanOrEqualFilter
      */
-    public static function gte(string $attribute, string $value) : GreaterThanOrEqualFilter
+    public static function gte(string $attribute, string $value): GreaterThanOrEqualFilter
     {
         return self::greaterThanOrEqual($attribute, $value);
     }
@@ -105,7 +105,7 @@ class Filters
      * @param string $value
      * @return LessThanOrEqualFilter
      */
-    public static function lessThanOrEqual(string $attribute, string $value) : LessThanOrEqualFilter
+    public static function lessThanOrEqual(string $attribute, string $value): LessThanOrEqualFilter
     {
         return new LessThanOrEqualFilter($attribute, $value);
     }
@@ -117,7 +117,7 @@ class Filters
      * @param string $value
      * @return LessThanOrEqualFilter
      */
-    public static function lte(string $attribute, string $value) : LessThanOrEqualFilter
+    public static function lte(string $attribute, string $value): LessThanOrEqualFilter
     {
         return self::lessThanOrEqual($attribute, $value);
     }
@@ -128,7 +128,7 @@ class Filters
      * @param string $attribute
      * @return PresentFilter
      */
-    public static function present(string $attribute) : PresentFilter
+    public static function present(string $attribute): PresentFilter
     {
         return new PresentFilter($attribute);
     }
@@ -142,7 +142,7 @@ class Filters
      * @param string[] ...$contains
      * @return SubstringFilter
      */
-    public static function substring(string $attribute, ?string $startsWith, ?string $endsWith, string ...$contains) : SubstringFilter
+    public static function substring(string $attribute, ?string $startsWith, ?string $endsWith, string ...$contains): SubstringFilter
     {
         return new SubstringFilter($attribute, $startsWith, $endsWith, ...$contains);
     }
@@ -154,7 +154,7 @@ class Filters
      * @param string[] ...$values
      * @return SubstringFilter
      */
-    public static function contains(string $attribute, string ...$values) : SubstringFilter
+    public static function contains(string $attribute, string ...$values): SubstringFilter
     {
         return new SubstringFilter($attribute, null, null, ...$values);
     }
@@ -166,7 +166,7 @@ class Filters
      * @param string $value
      * @return SubstringFilter
      */
-    public static function endsWith(string $attribute, string $value) : SubstringFilter
+    public static function endsWith(string $attribute, string $value): SubstringFilter
     {
         return new SubstringFilter($attribute, null, $value);
     }
@@ -178,7 +178,7 @@ class Filters
      * @param string $value
      * @return SubstringFilter
      */
-    public static function startsWith(string $attribute, string $value) : SubstringFilter
+    public static function startsWith(string $attribute, string $value): SubstringFilter
     {
         return new SubstringFilter($attribute, $value);
     }
@@ -192,7 +192,7 @@ class Filters
      * @param bool $matchDn
      * @return MatchingRuleFilter
      */
-    public static function extensible(?string $attribute, string $value, ?string $rule, bool $matchDn = false) : MatchingRuleFilter
+    public static function extensible(?string $attribute, string $value, ?string $rule, bool $matchDn = false): MatchingRuleFilter
     {
         return new MatchingRuleFilter($rule, $attribute, $value, $matchDn);
     }
@@ -204,7 +204,7 @@ class Filters
      * @param string $value
      * @return ApproximateFilter
      */
-    public static function approximate(string $attribute, string $value) : ApproximateFilter
+    public static function approximate(string $attribute, string $value): ApproximateFilter
     {
         return new ApproximateFilter($attribute, $value);
     }
@@ -216,7 +216,7 @@ class Filters
      * @param string $filter
      * @return FilterInterface
      */
-    public static function raw(string $filter) : FilterInterface
+    public static function raw(string $filter): FilterInterface
     {
         return FilterParser::parse($filter);
     }

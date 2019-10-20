@@ -64,7 +64,7 @@ class ExtendedResponse extends LdapResult
      *
      * @return null|string
      */
-    public function getName() : ?string
+    public function getName(): ?string
     {
         return $this->responseName;
     }
@@ -74,7 +74,7 @@ class ExtendedResponse extends LdapResult
      *
      * @return null|string
      */
-    public function getValue() : ?string
+    public function getValue(): ?string
     {
         return is_string($this->responseValue) ? $this->responseValue : null;
     }

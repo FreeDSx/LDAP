@@ -38,7 +38,7 @@ class SearchResponse extends LdapResult
     /**
      * @return Entries
      */
-    public function getEntries() : Entries
+    public function getEntries(): Entries
     {
         return $this->entries;
     }

@@ -30,5 +30,5 @@ interface RequestHandlerInterface
      * @throws UnsolicitedNotificationException
      * @throws OperationException
      */
-    public function handleRequest(LdapMessageRequest $message, ClientQueue $queue, array $options) : ?LdapMessageResponse;
+    public function handleRequest(LdapMessageRequest $message, ClientQueue $queue, array $options): ?LdapMessageResponse;
 }

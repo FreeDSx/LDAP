@@ -60,7 +60,7 @@ class FilterParser
      * @return FilterInterface
      * @throws FilterParseException
      */
-    public static function parse(string $filter) : FilterInterface
+    public static function parse(string $filter): FilterInterface
     {
         if ($filter === '') {
             throw new FilterParseException('The filter cannot be empty.');
@@ -75,7 +75,7 @@ class FilterParser
      * @return array
      * @throws FilterParseException
      */
-    protected function parseFilterString(int $startAt, bool $isRoot = false) : array
+    protected function parseFilterString(int $startAt, bool $isRoot = false): array
     {
         if ($this->isAtFilterContainer($startAt)) {
             [$endsAt, $filter] = $this->parseFilterContainer($startAt, $isRoot);
@@ -96,7 +96,7 @@ class FilterParser
      * @param int $pos
      * @return bool
      */
-    protected function isAtFilterContainer(int $pos) : bool
+    protected function isAtFilterContainer(int $pos): bool
     {
         if (!$this->startsWith(FilterInterface::PAREN_LEFT, $pos)) {
             return false;
@@ -119,7 +119,7 @@ class FilterParser
      * @return array
      * @throws FilterParseException
      */
-    protected function parseFilterContainer(int $startAt, bool $isRoot) : array
+    protected function parseFilterContainer(int $startAt, bool $isRoot): array
     {
         if ($this->containers === null) {
             $this->parseContainerDepths();
@@ -127,7 +127,7 @@ class FilterParser
         $this->depth += $isRoot ? 0 : 1;
         if (!isset($this->containers[$this->depth])) {
             throw new FilterParseException(sprintf(
-                'The container at position %s is unrecognized. Perhaps there\'s an unmatched "(".'.
+                'The container at position %s is unrecognized. Perhaps there\'s an unmatched "(".' .
                 $startAt
             ));
         }
@@ -156,7 +156,7 @@ class FilterParser
      * @return array
      * @throws FilterParseException
      */
-    protected function parseComparisonFilter(int $startAt, bool $isRoot = false) : array
+    protected function parseComparisonFilter(int $startAt, bool $isRoot = false): array
     {
         $parenthesis = $this->validateComparisonFilter($startAt, $isRoot);
         $endAt = !$parenthesis && $isRoot ? $this->length : $this->nextClosingParenthesis($startAt) + 1;
@@ -168,7 +168,7 @@ class FilterParser
             foreach (FilterInterface::FILTERS as $op) {
                 if ($this->filter[$i] === $op) {
                     $filterType = $op;
-                } elseif (($i + 1) < $endAt && $this->filter[$i].$this->filter[$i + 1] === $op) {
+                } elseif (($i + 1) < $endAt && $this->filter[$i] . $this->filter[$i + 1] === $op) {
                     $filterType = $op;
                 }
                 if ($filterType !== null) {
@@ -257,7 +257,7 @@ class FilterParser
                 $startsAt
             ));
         }
-        if ($startValue === null || $startValue === $endAt -1) {
+        if ($startValue === null || $startValue === $endAt - 1) {
             throw new FilterParseException(sprintf(
                 'Expected a value after "%s" at position %s, but got none.',
                 $filterType,
@@ -272,7 +272,7 @@ class FilterParser
      * @param string $value
      * @return FilterInterface
      */
-    protected function getComparisonFilterObject(string $operator, string $attribute, string $value) : FilterInterface
+    protected function getComparisonFilterObject(string $operator, string $attribute, string $value): FilterInterface
     {
         if ($operator === FilterInterface::FILTER_LTE) {
             return Filters::lessThanOrEqual($attribute, $this->unescapeValue($value));
@@ -301,7 +301,7 @@ class FilterParser
      * @return MatchingRuleFilter
      * @throws FilterParseException
      */
-    protected function getMatchingRuleFilterObject(string $attribute, string $value) : MatchingRuleFilter
+    protected function getMatchingRuleFilterObject(string $attribute, string $value): MatchingRuleFilter
     {
         if (preg_match(self::MATCHING_RULE, $attribute, $matches) === 0) {
             throw new FilterParseException(sprintf('The matching rule is not valid: %s', $attribute));
@@ -336,7 +336,7 @@ class FilterParser
      * @param string $value
      * @return SubstringFilter
      */
-    protected function getSubstringFilterObject(string $attribute, string $value) : SubstringFilter
+    protected function getSubstringFilterObject(string $attribute, string $value): SubstringFilter
     {
         $filter = new SubstringFilter($attribute);
         $substrings = preg_split('/\*/', $value, -1, PREG_SPLIT_OFFSET_CAPTURE | PREG_SPLIT_NO_EMPTY);
@@ -395,7 +395,7 @@ class FilterParser
      * @param int $pos
      * @return bool
      */
-    protected function startsWith(string $char, int $pos) : bool
+    protected function startsWith(string $char, int $pos): bool
     {
         return isset($this->filter[$pos]) && $this->filter[$pos] === $char;
     }
@@ -411,7 +411,7 @@ class FilterParser
      *
      * @throws FilterParseException
      */
-    protected function parseContainerDepths() : void
+    protected function parseContainerDepths(): void
     {
         $this->containers = $this->containers ?? [];
 

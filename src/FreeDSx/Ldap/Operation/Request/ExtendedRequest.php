@@ -84,7 +84,7 @@ class ExtendedRequest implements RequestInterface
     /**
      * @return string
      */
-    public function getName() : string
+    public function getName(): string
     {
         return $this->requestName;
     }
@@ -113,7 +113,7 @@ class ExtendedRequest implements RequestInterface
      */
     public function toAsn1(): AbstractType
     {
-        $asn1 =  Asn1::sequence(Asn1::context(0, Asn1::octetString($this->requestName)));
+        $asn1 = Asn1::sequence(Asn1::context(0, Asn1::octetString($this->requestName)));
 
         if ($this->requestValue !== null) {
             $value = $this->requestValue;
@@ -142,7 +142,7 @@ class ExtendedRequest implements RequestInterface
      * @return AbstractType
      * @throws ProtocolException
      */
-    protected static function decodeEncodedValue(AbstractType $type) : ?AbstractType
+    protected static function decodeEncodedValue(AbstractType $type): ?AbstractType
     {
         [1 => $value] = self::parseAsn1ExtendedRequest($type);
 

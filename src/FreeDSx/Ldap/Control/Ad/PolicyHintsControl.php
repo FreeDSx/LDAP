@@ -57,7 +57,7 @@ class PolicyHintsControl extends Control
     /**
      * @return bool
      */
-    public function getIsEnabled() : bool
+    public function getIsEnabled(): bool
     {
         return $this->isEnabled;
     }

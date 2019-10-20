@@ -163,7 +163,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
      * @param RequestInterface $request
      * @param LdapUrl $referral
      */
-    protected function mergeReferralOptions(RequestInterface $request, LdapUrl $referral) : void
+    protected function mergeReferralOptions(RequestInterface $request, LdapUrl $referral): void
     {
         if ($referral->getDn() !== null && $request instanceof SearchRequest) {
             $request->setBaseDn($referral->getDn());

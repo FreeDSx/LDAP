@@ -47,7 +47,7 @@ class SortKey
     /**
      * @return string
      */
-    public function getAttribute() : string
+    public function getAttribute(): string
     {
         return $this->attribute;
     }
@@ -66,7 +66,7 @@ class SortKey
     /**
      * @return string
      */
-    public function getOrderingRule() : ?string
+    public function getOrderingRule(): ?string
     {
         return $this->orderingRule;
     }
@@ -85,7 +85,7 @@ class SortKey
     /**
      * @return bool
      */
-    public function getUseReverseOrder() : bool
+    public function getUseReverseOrder(): bool
     {
         return $this->useReverseOrder;
     }

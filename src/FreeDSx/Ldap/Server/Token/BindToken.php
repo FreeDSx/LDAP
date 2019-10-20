@@ -47,7 +47,7 @@ class BindToken implements TokenInterface
     /**
      * {@inheritdoc}
      */
-    public function getUsername() : ?string
+    public function getUsername(): ?string
     {
         return $this->username;
     }
@@ -55,7 +55,7 @@ class BindToken implements TokenInterface
     /**
      * {@inheritdoc}
      */
-    public function getPassword() : ?string
+    public function getPassword(): ?string
     {
         return $this->password;
     }
@@ -63,7 +63,7 @@ class BindToken implements TokenInterface
     /**
      * {@inheritdoc}
      */
-    public function getVersion() : int
+    public function getVersion(): int
     {
         return $this->version;
     }

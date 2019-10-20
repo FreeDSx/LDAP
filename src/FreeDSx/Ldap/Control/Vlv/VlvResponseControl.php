@@ -69,7 +69,7 @@ class VlvResponseControl extends Control
     /**
      * @return int
      */
-    public function getResult() : int
+    public function getResult(): int
     {
         return $this->result;
     }
