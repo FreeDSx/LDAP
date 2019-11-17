@@ -5,6 +5,7 @@ General LDAP Server Usage
 * [Handling Client Requests](#handling-client-requests)
   * [Proxy Request Handler](#proxy-request-handler)
   * [Generic Request Handler](#generic-request-handler)
+  * [Handling the RootDSE](#handling-the-rootdse)
 * [StartTLS SSL Certificate Support](#starttls-ssl-certificate-support)
 
 The LdapServer class is used to run a LDAP server process that accepts client requests and sends back a response. It
@@ -165,6 +166,42 @@ use Foo\LdapRequestHandler;
 $server = new LdapServer([ 'request_handler' => LdapRequestHandler::class ]);
 $server->run();
 ```
+
+### Handling the RootDSE
+
+If you need more control over the RootDSE that gets returned, you can implement the `RootDseAwareHandlerInterface`. This
+allows you modify / return your own RootDSE in response to a client request for one.
+
+It can be used like so:
+
+```php
+namespace Foo;
+
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
+use FreeDSx\Ldap\Server\RequestHandler\RootDseAwareHandlerInterface;
+
+class LdapProxyHandler extends ProxyRequestHandler implements RootDseAwareHandlerInterface
+{
+    /**
+     * Set the options for the LdapClient in the constructor.
+     */
+    public function __construct()
+    {
+        $this->options = [
+            'servers' => ['dc1.domain.local', 'dc2.domain.local'],
+            'base_dn' => 'dc=domain,dc=local',
+        ];
+    }
+    
+    public function rootDse(RequestContext $context, SearchRequest $request, Entry $rootDse): Entry
+    {
+        return $this->ldap()->search($search, ...$context->controls()->toArray())->first();
+    }
+}
+```
+
+The above would pass on a RootDSE request as a proxy and send it back to the client.
 
 ## StartTLS SSL Certificate Support
 
