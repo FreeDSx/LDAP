@@ -11,6 +11,7 @@
 namespace FreeDSx\Ldap\Server\RequestHandler;
 
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Server\RequestContext;
 
 /**
@@ -24,8 +25,9 @@ interface RootDseAwareHandlerInterface
      * Either return your own RootDse, or just pass back / modify the entry already generated.
      *
      * @param RequestContext $context
+     * @param SearchRequest $request
      * @param Entry $rootDse
      * @return Entry
      */
-    public function rootDse(RequestContext $context, Entry $rootDse): Entry;
+    public function rootDse(RequestContext $context, SearchRequest $request, Entry $rootDse): Entry;
 }

@@ -65,9 +65,10 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
 
     function it_should_send_a_request_to_the_dispatcher_if_it_implements_a_rootdse_aware_interface(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
+        $searchReqeust = (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope();
         $search = new LdapMessageRequest(
             1,
-            (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope()
+            $searchReqeust
         );
         $rootDse = Entry::create('', [
             'namingContexts' => 'dc=Foo,dc=Bar',
@@ -80,7 +81,7 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
 
         $handlerRootDse = Entry::fromArray('', ['foo' => 'bar']);
         $handler->implement(RootDseAwareHandlerInterface::class);
-        $handler->rootDse(Argument::type(RequestContext::class), $rootDse)
+        $handler->rootDse(Argument::type(RequestContext::class), $searchReqeust, $rootDse)
             ->shouldBeCalled()
             ->willReturn($handlerRootDse);
 

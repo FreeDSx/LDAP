@@ -59,7 +59,11 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
         $this->filterEntryAttributes($request, $entry);
 
         if ($dispatcher instanceof RootDseAwareHandlerInterface) {
-            $entry = $dispatcher->rootDse(new RequestContext($message->controls(), $token), $entry);
+            $entry = $dispatcher->rootDse(
+                new RequestContext($message->controls(), $token),
+                $request,
+                $entry
+            );
         }
 
         $queue->sendMessage(
