@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerRootDseHandler;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
-use FreeDSx\Ldap\Server\RequestHandler\RootDseAwareHandlerInterface;
+use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
@@ -80,7 +80,7 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         ]);
 
         $handlerRootDse = Entry::fromArray('', ['foo' => 'bar']);
-        $handler->implement(RootDseAwareHandlerInterface::class);
+        $handler->implement(RootDseHandlerInterface::class);
         $handler->rootDse(Argument::type(RequestContext::class), $searchReqeust, $rootDse)
             ->shouldBeCalled()
             ->willReturn($handlerRootDse);

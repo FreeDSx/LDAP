@@ -19,7 +19,7 @@ use FreeDSx\Ldap\Server\RequestContext;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-interface RootDseAwareHandlerInterface
+interface RootDseHandlerInterface
 {
     /**
      * Either return your own RootDse, or just pass back / modify the entry already generated.

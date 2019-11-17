@@ -169,7 +169,7 @@ $server->run();
 
 ### Handling the RootDSE
 
-If you need more control over the RootDSE that gets returned, you can implement the `RootDseAwareHandlerInterface`. This
+If you need more control over the RootDSE that gets returned, you can implement the `RootDseHandlerInterface`. This
 allows you modify / return your own RootDSE in response to a client request for one.
 
 It can be used like so:
@@ -179,9 +179,9 @@ namespace Foo;
 
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
-use FreeDSx\Ldap\Server\RequestHandler\RootDseAwareHandlerInterface;
+use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 
-class LdapProxyHandler extends ProxyRequestHandler implements RootDseAwareHandlerInterface
+class LdapProxyHandler extends ProxyRequestHandler implements RootDseHandlerInterface
 {
     /**
      * Set the options for the LdapClient in the constructor.

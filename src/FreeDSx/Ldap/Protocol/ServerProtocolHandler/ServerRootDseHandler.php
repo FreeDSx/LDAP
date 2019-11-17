@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
-use FreeDSx\Ldap\Server\RequestHandler\RootDseAwareHandlerInterface;
+use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
@@ -58,7 +58,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
         $request = $message->getRequest();
         $this->filterEntryAttributes($request, $entry);
 
-        if ($dispatcher instanceof RootDseAwareHandlerInterface) {
+        if ($dispatcher instanceof RootDseHandlerInterface) {
             $entry = $dispatcher->rootDse(
                 new RequestContext($message->controls(), $token),
                 $request,
