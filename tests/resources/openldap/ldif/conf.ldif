@@ -8,6 +8,8 @@ olcToolThreads: 1
 olcTLSCACertificateFile: /usr/local/share/ca-certificates/example.crt
 olcTLSCertificateFile: /etc/ssl/certs/slapd.crt
 olcTLSCertificateKeyFile: /etc/ssl/private/slapd.key
+olcAuthzRegexp: uid=([^,]*),cn=digest-md5,cn=auth
+  ldap:///dc=example,dc=com??sub?(uid=$1)
 
 dn: olcDatabase={-1}frontend,cn=config
 objectClass: olcDatabaseConfig

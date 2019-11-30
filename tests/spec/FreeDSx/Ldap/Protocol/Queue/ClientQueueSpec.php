@@ -94,4 +94,9 @@ class ClientQueueSpec extends ObjectBehavior
 
         $this->shouldThrow(ProtocolException::class)->during('getMessage', [2]);
     }
+
+    function it_should_set_a_message_wrapper()
+    {
+
+    }
 }

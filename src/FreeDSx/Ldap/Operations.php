@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
+use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
@@ -72,6 +73,19 @@ class Operations
     public static function bind(string $username, string $password)
     {
         return new SimpleBindRequest($username, $password);
+    }
+
+    /**
+     * A SASL bind request with a specific mechanism and their associated options.
+     *
+     * @param string $mechanism
+     * @param array $options
+     * @param string|null $credentials
+     * @return SaslBindRequest
+     */
+    public static function bindSasl(string $mechanism, array $options = [], ?string $credentials = null)
+    {
+        return new SaslBindRequest($mechanism, $credentials, $options);
     }
 
     /**

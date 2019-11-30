@@ -14,6 +14,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
+use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
@@ -23,6 +24,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientExtendedOperationHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientReferralHandler;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSaslBindHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientStartTlsHandler;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientBasicHandler;
@@ -84,6 +86,13 @@ class ClientProtocolHandlerFactorySpec extends ObjectBehavior
     {
         $this->forResponse($request, new BindResponse(new LdapResult(0)))->shouldBeAnInstanceOf(
             ClientBasicHandler::class
+        );
+    }
+
+    function it_should_get_a_sasl_bind_handler()
+    {
+        $this->forRequest(new SaslBindRequest('DIGEST-MD5'))->shouldBeAnInstanceOf(
+            ClientSaslBindHandler::class
         );
     }
 }

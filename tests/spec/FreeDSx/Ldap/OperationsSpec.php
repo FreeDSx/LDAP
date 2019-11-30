@@ -15,6 +15,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\CancelRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
+use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
@@ -36,6 +37,11 @@ class OperationsSpec extends ObjectBehavior
     function it_is_initializable()
     {
         $this->shouldHaveType(Operations::class);
+    }
+
+    function it_should_create_a_sasl_bind()
+    {
+        $this::bindSasl('DIGEST-MD5')->shouldBeLike(new SaslBindRequest('DIGEST-MD5'));
     }
 
     function it_should_create_an_add_operation()
