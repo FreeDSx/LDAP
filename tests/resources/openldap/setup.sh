@@ -20,7 +20,7 @@ CA_KEY="/etc/ssl/private/example.key"
 CA_CERT="/usr/local/share/ca-certificates/example.crt"
 
 apt update
-apt install -y slapd ldap-utils gnutls-bin
+DEBIAN_FRONTEND=noninteractive apt install -y slapd ldap-utils gnutls-bin
 
 service slapd stop
 
