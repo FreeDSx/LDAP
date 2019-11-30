@@ -24,13 +24,14 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo ./tests/resources/openldap/setup.sh
 
-      - name: Install Active Directory
-        if: runner.os == 'Windows'
-        run: powershell .\tests\resources\activedirectory\Install-AD-Step1.ps1
+    # Cannot get the reboot to work properly for this...
+    #- name: Install Active Directory
+    #  if: runner.os == 'Windows'
+    #  run: powershell .\tests\resources\activedirectory\Install-AD-Step1.ps1
 
-      - name: Finish Active Directory Configuration
-        if: runner.os == 'Windows'
-        run: powershell .\tests\resources\activedirectory\Install-AD-Step2.ps1
+    # - name: Finish Active Directory Configuration
+    #   if: runner.os == 'Windows'
+    #   run: powershell .\tests\resources\activedirectory\Install-AD-Step2.ps1
 
       - name: Get Composer Cache Directory
         id: composer-cache
@@ -48,3 +49,7 @@ jobs:
 
       - name: Run Specs
         run: composer run-script test-spec
+
+      - name: Run Integration Tests
+        if: runner.os == 'Linux'
+        run: composer run-script test-integration
