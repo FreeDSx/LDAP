@@ -23,7 +23,7 @@ class DirSyncRequestControlSpec extends ObjectBehavior
 
     function it_should_have_incremental_values_as_the_default_flags()
     {
-        $this->getFlags()->shouldBeEqualTo(DirSyncRequestControl::FLAG_INCREMENTAL_VALUES);
+        $this->getFlags()->shouldBeEqualTo((int) DirSyncRequestControl::FLAG_INCREMENTAL_VALUES);
     }
 
     function it_should_set_the_cookie()

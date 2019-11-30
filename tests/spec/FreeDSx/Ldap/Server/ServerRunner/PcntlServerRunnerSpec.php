@@ -27,11 +27,19 @@ class PcntlServerRunnerSpec extends ObjectBehavior
 
     function it_is_initializable()
     {
+        if (!extension_loaded('pcntl')) {
+            throw new SkippingException('The PCNTL extension is required for this spec.');
+        }
+
         $this->shouldHaveType(PcntlServerRunner::class);
     }
 
     function it_should_implement_server_runner_interface()
     {
+        if (!extension_loaded('pcntl')) {
+            throw new SkippingException('The PCNTL extension is required for this spec.');
+        }
+
         $this->shouldImplement(ServerRunnerInterface::class);
     }
 
@@ -40,6 +48,7 @@ class PcntlServerRunnerSpec extends ObjectBehavior
         if (!extension_loaded('pcntl')) {
             throw new SkippingException('The PCNTL extension is required for this spec.');
         }
+
         $server->accept()->willReturn($client, null);
         $client->read()->willReturn(false);
         $client->close()->willReturn(null);

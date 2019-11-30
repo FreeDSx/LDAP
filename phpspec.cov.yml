@@ -1,0 +1,13 @@
+suites:
+    default:
+        spec_path: tests/
+        src_path: src/
+formatter.name: progress
+extensions:
+    FriendsOfPhpSpec\PhpSpec\CodeCoverage\CodeCoverageExtension:
+        format:
+            - clover
+        output:
+            clover: coverage.xml
+        whitelist:
+            - src
