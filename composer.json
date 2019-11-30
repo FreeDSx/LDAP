@@ -22,7 +22,8 @@
     "phpunit/phpunit": "^7.0",
     "phpstan/phpstan": "^0.11.15",
     "phpstan/phpstan-strict-rules": "^0.11.1",
-    "symplify/easy-coding-standard": "^6.1"
+    "symplify/easy-coding-standard": "^6.1",
+    "friends-of-phpspec/phpspec-code-coverage": "^4.3"
   },
   "suggest": {
     "ext-openssl": "For SSL/TLS support."
@@ -35,5 +36,16 @@
       "unit\\FreeDSx\\Ldap\\": "tests/unit/FreeDSx/Ldap",
       "spec\\FreeDSx\\Ldap\\": "tests/spec/FreeDSx/Ldap"
     }
+  },
+  "scripts": {
+    "test-spec": [
+      "phpspec run --no-interaction"
+    ],
+    "test-integration": [
+      "phpunit"
+    ],
+    "analyse": [
+      "phpstan analyse"
+    ]
   }
 }
