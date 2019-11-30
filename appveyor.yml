@@ -5,9 +5,7 @@ clone_folder: c:\projects\freedsx-ldap
 
 environment:
   matrix:
-    - PHP_VERSION: "7.1"
-    - PHP_VERSION: "7.2"
-    - PHP_VERSION: "7.3"
+    - PHP_VERSION: "7.4"
 
 install:
   - ps: Invoke-WebRequest "https://raw.githubusercontent.com/ChadSikorra/ps-install-php/master/Install-PHP.ps1" -OutFile "Install-PHP.ps1"
@@ -25,5 +23,4 @@ before_test:
 
 test_script:
   - cd C:\projects\freedsx-ldap
-  - vendor\bin\phpspec.bat run --no-interaction
   - vendor\bin\phpunit.bat
