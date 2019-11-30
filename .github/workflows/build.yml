@@ -30,7 +30,7 @@ jobs:
 
       - name: Restart Windows
         if: runner.os == 'Windows'
-        run: Restart-Computer -Force
+        run: shutdown /r /f /t 00
 
       - name: Finish Active Directory Configuration
         if: runner.os == 'Windows'
