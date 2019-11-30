@@ -38,6 +38,9 @@
     }
   },
   "scripts": {
+    "test-coverage": [
+      "phpspec run --no-interaction -c phpspec.cov.yml"
+    ],
     "test-spec": [
       "phpspec run --no-interaction"
     ],

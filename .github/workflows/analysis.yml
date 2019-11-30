@@ -31,7 +31,7 @@ jobs:
           restore-keys: ${{ runner.os }}-composer-
 
       - name: Run Test Coverage
-        run: composer run-script test-spec
+        run: composer run-script test-coverage
 
       - name: Run Static Analysis
         run: composer run-script analyse
