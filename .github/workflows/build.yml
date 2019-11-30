@@ -20,6 +20,22 @@ jobs:
           coverage: xdebug
           pecl: false
 
+      - name: Install OpenLDAP
+        if: runner.os == 'Linux'
+        run: sudo ./tests/resources/openldap/setup.sh
+
+      - name: Install Active Directory
+        if: runner.os == 'Windows'
+        run: powershell .\tests\resources\activedirectory\Install-AD-Step1.ps1
+
+      - name: Restart Windows
+        if: runner.os == 'Windows'
+        run: Restart-Computer -Force
+
+      - name: Finish Active Directory Configuration
+        if: runner.os == 'Windows'
+        run: powershell .\tests\resources\activedirectory\Install-AD-Step2.ps1
+
       - name: Get Composer Cache Directory
         id: composer-cache
         run: echo "::set-output name=dir::$(composer config cache-files-dir)"
