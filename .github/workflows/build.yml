@@ -28,10 +28,6 @@ jobs:
         if: runner.os == 'Windows'
         run: powershell .\tests\resources\activedirectory\Install-AD-Step1.ps1
 
-      - name: Restart Windows
-        if: runner.os == 'Windows'
-        run: shutdown /r /f /t 00
-
       - name: Finish Active Directory Configuration
         if: runner.os == 'Windows'
         run: powershell .\tests\resources\activedirectory\Install-AD-Step2.ps1
