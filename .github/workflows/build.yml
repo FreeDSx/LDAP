@@ -1,0 +1,55 @@
+name: Build
+on: [push, pull_request]
+jobs:
+  run:
+    runs-on: ${{ matrix.operating-system }}
+    strategy:
+      matrix:
+        operating-system: [ubuntu-latest, windows-latest]
+        php-versions: ['7.1', '7.2', '7.3', '7.4']
+    name: PHP ${{ matrix.php-versions }} Test on ${{ matrix.operating-system }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v1
+        with:
+          php-version: ${{ matrix.php-versions }}
+          extension-csv: openssl,mbstring
+          coverage: xdebug
+          pecl: false
+
+      - name: Install OpenLDAP
+        if: runner.os == 'Linux'
+        run: sudo ./tests/resources/openldap/setup.sh
+
+    # Cannot get the reboot to work properly for this...
+    #- name: Install Active Directory
+    #  if: runner.os == 'Windows'
+    #  run: powershell .\tests\resources\activedirectory\Install-AD-Step1.ps1
+
+    # - name: Finish Active Directory Configuration
+    #   if: runner.os == 'Windows'
+    #   run: powershell .\tests\resources\activedirectory\Install-AD-Step2.ps1
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+
+      - name: Install Composer dependencies
+        run: composer install --no-progress --no-suggest --prefer-dist --optimize-autoloader
+
+      - name: Cache dependencies
+        uses: actions/cache@v1
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Run Specs
+        run: composer run-script test-spec
+
+      - name: Run Integration Tests
+        if: runner.os == 'Linux'
+        run: composer run-script test-integration

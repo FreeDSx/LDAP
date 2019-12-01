@@ -19,6 +19,9 @@ SLAPD_CONF="/etc/ldap/slapd.d"
 CA_KEY="/etc/ssl/private/example.key"
 CA_CERT="/usr/local/share/ca-certificates/example.crt"
 
+apt update
+DEBIAN_FRONTEND=noninteractive apt install -y slapd ldap-utils gnutls-bin ssl-cert
+
 service slapd stop
 
 # Remove existing data, reconfigure...
