@@ -16,7 +16,7 @@
     "php": ">=7.1",
     "freedsx/asn1": "^0.4.0",
     "freedsx/socket": "^0.3.0",
-    "freedsx/sasl": "dev-master"
+    "freedsx/sasl": "^0.1.0"
   },
   "require-dev": {
     "phpspec/phpspec": "^5.1|^6.1",
