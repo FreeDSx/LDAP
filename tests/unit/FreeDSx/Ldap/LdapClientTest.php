@@ -61,8 +61,9 @@ class LdapClientTest extends LdapTestCase
     public function testSaslBindWithAutoSelectingTheMechanism()
     {
         $response = self::$client->bindSasl(['username' => 'WillifoA', 'password' => 'Password1']);
+        $response = $response->getResponse();
 
-        $this->assertInstanceOf(BindResponse::class, $response->getResponse());
+        $this->assertInstanceOf(BindResponse::class, $response);
         $this->assertEquals(0, $response->getResultCode());
     }
 
@@ -72,8 +73,9 @@ class LdapClientTest extends LdapTestCase
             ['username' => 'WillifoA', 'password' => 'Password1'],
             'CRAM-MD5'
         );
+        $response = $response->getResponse();
 
-        $this->assertInstanceOf(BindResponse::class, $response->getResponse());
+        $this->assertInstanceOf(BindResponse::class, $response);
         $this->assertEquals(0, $response->getResultCode());
     }
 
@@ -83,8 +85,9 @@ class LdapClientTest extends LdapTestCase
             ['username' => 'WillifoA', 'password' => 'Password1'],
             'DIGEST-MD5'
         );
+        $response = $response->getResponse();
 
-        $this->assertInstanceOf(BindResponse::class, $response->getResponse());
+        $this->assertInstanceOf(BindResponse::class, $response);
         $this->assertEquals(0, $response->getResultCode());
     }
 
@@ -94,7 +97,7 @@ class LdapClientTest extends LdapTestCase
             ['username' => 'WillifoA', 'password' => 'Password1', 'use_integrity' => true],
             'DIGEST-MD5'
         );
-        $entry = self::$client->read('', 'supportedSaslMechanisms');
+        $entry = self::$client->read('', ['supportedSaslMechanisms']);
 
         $this->assertInstanceOf(Entry::class, $entry);
     }
