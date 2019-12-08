@@ -39,6 +39,16 @@ class ClientSaslBindHandler implements RequestHandlerInterface
     protected $controls;
 
     /**
+     * @var Sasl
+     */
+    protected $sasl;
+
+    public function __construct(?Sasl $sasl = null)
+    {
+        $this->sasl = $sasl ?? new Sasl();
+    }
+
+    /**
      * @{@inheritDoc}
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
@@ -81,9 +91,8 @@ class ClientSaslBindHandler implements RequestHandlerInterface
 
     protected function selectSaslMech(SaslBindRequest $request, ClientProtocolContext $context): MechanismInterface
     {
-        $sasl = new Sasl();
         if ($request->getMechanism() !== '') {
-            $mech = $sasl->get($request->getMechanism());
+            $mech = $this->sasl->get($request->getMechanism());
             $request->setMechanism($mech->getName());
 
             return $mech;
@@ -91,7 +100,7 @@ class ClientSaslBindHandler implements RequestHandlerInterface
         $rootDse = $context->getRootDse();
         $availableMechs = $rootDse->get('supportedSaslMechanisms');
         $availableMechs = $availableMechs === null ? [] : $availableMechs->getValues();
-        $mech = $sasl->select($availableMechs, $request->getOptions());
+        $mech = $this->sasl->select($availableMechs, $request->getOptions());
         $request->setMechanism($mech->getName());
 
         return $mech;
