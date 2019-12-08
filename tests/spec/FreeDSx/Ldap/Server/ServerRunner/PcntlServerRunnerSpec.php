@@ -50,6 +50,7 @@ class PcntlServerRunnerSpec extends ObjectBehavior
             throw new SkippingException('The PCNTL extension is required for this spec.');
         }
 
+        $server->removeClient(Argument::type(Socket::class))->hasReturnVoid();
         $server->accept()->willReturn($client, null);
         $client->read()->willReturn(false);
         $client->close()->willReturn(null);
