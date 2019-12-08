@@ -16,6 +16,9 @@ jobs:
           coverage: xdebug
           pecl: false
 
+      - name: Install OpenLDAP
+        run: sudo ./tests/resources/openldap/setup.sh
+
       - name: Get Composer Cache Directory
         id: composer-cache
         run: echo "::set-output name=dir::$(composer config cache-files-dir)"
