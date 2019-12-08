@@ -23,7 +23,7 @@ class PcntlServerRunnerSpec extends ObjectBehavior
 {
     function let()
     {
-        $this->beConstructedWith([GenericRequestHandler::class]);
+        $this->beConstructedWith(['request_handler' => GenericRequestHandler::class]);
     }
 
     function it_is_initializable()
