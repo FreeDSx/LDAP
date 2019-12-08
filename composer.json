@@ -27,7 +27,7 @@
     "friends-of-phpspec/phpspec-code-coverage": "^4.3"
   },
   "suggest": {
-    "ext-openssl": "For SSL/TLS support."
+    "ext-openssl": "For SSL/TLS support and some SASL mechanisms."
   },
   "autoload": {
     "psr-4": {"FreeDSx\\Ldap\\": "src/FreeDSx/Ldap"}
@@ -40,7 +40,8 @@
   },
   "scripts": {
     "test-coverage": [
-      "phpspec run --no-interaction -c phpspec.cov.yml"
+      "phpspec run --no-interaction -c phpspec.cov.yml",
+      "phpunit --coverage-clover=coverage-integration.xml"
     ],
     "test-spec": [
       "phpspec run --no-interaction"
