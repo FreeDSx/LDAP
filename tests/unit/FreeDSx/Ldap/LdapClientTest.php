@@ -58,6 +58,47 @@ class LdapClientTest extends LdapTestCase
         $this->assertEquals(0, $response->getResultCode());
     }
 
+    public function testSaslBindWithAutoSelectingTheMechanism()
+    {
+        $response = self::$client->bindSasl(['username' => 'WillifoA', 'password' => 'Password1']);
+
+        $this->assertInstanceOf(BindResponse::class, $response);
+        $this->assertEquals(0, $response->getResultCode());
+    }
+
+    public function testSaslBindWithCramMD5()
+    {
+        $response = self::$client->bindSasl(
+            ['username' => 'WillifoA', 'password' => 'Password1'],
+            'CRAM-MD5'
+        );
+
+        $this->assertInstanceOf(BindResponse::class, $response);
+        $this->assertEquals(0, $response->getResultCode());
+    }
+
+    public function testSaslBindWithDigestMD5()
+    {
+        $response = self::$client->bindSasl(
+            ['username' => 'WillifoA', 'password' => 'Password1'],
+            'DIGEST-MD5'
+        );
+
+        $this->assertInstanceOf(BindResponse::class, $response);
+        $this->assertEquals(0, $response->getResultCode());
+    }
+
+    public function testSaslBindWithAnIntegritySecurityLayerIsFunctional()
+    {
+        self::$client->bindSasl(
+            ['username' => 'WillifoA', 'password' => 'Password1', 'use_integrity' => true],
+            'DIGEST-MD5'
+        );
+        $entry = self::$client->read('', 'supportedSaslMechanisms');
+
+        $this->assertInstanceOf(Entry::class, $entry);
+    }
+
     public function testCompareOperation()
     {
         self::bindClient(self::$client);
