@@ -10,9 +10,18 @@
 
 namespace spec\FreeDSx\Ldap\Protocol;
 
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Encoder\EncoderInterface;
+use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Ldap\Protocol\Queue\MessageWrapperInterface;
 use FreeDSx\Socket\Queue\Asn1MessageQueue;
+use FreeDSx\Socket\Queue\Message;
 use FreeDSx\Socket\Socket;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
