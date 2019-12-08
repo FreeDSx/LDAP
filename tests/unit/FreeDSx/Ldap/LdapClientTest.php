@@ -62,7 +62,7 @@ class LdapClientTest extends LdapTestCase
     {
         $response = self::$client->bindSasl(['username' => 'WillifoA', 'password' => 'Password1']);
 
-        $this->assertInstanceOf(BindResponse::class, $response);
+        $this->assertInstanceOf(BindResponse::class, $response->getResponse());
         $this->assertEquals(0, $response->getResultCode());
     }
 
@@ -73,7 +73,7 @@ class LdapClientTest extends LdapTestCase
             'CRAM-MD5'
         );
 
-        $this->assertInstanceOf(BindResponse::class, $response);
+        $this->assertInstanceOf(BindResponse::class, $response->getResponse());
         $this->assertEquals(0, $response->getResultCode());
     }
 
@@ -84,7 +84,7 @@ class LdapClientTest extends LdapTestCase
             'DIGEST-MD5'
         );
 
-        $this->assertInstanceOf(BindResponse::class, $response);
+        $this->assertInstanceOf(BindResponse::class, $response->getResponse());
         $this->assertEquals(0, $response->getResultCode());
     }
 
