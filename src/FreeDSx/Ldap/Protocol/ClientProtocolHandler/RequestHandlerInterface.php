@@ -12,9 +12,7 @@ namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
-use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 
 /**
  * Handles request specific protocol communication details.
@@ -30,5 +28,5 @@ interface RequestHandlerInterface
      * @throws UnsolicitedNotificationException
      * @throws OperationException
      */
-    public function handleRequest(LdapMessageRequest $message, ClientQueue $queue, array $options): ?LdapMessageResponse;
+    public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse;
 }

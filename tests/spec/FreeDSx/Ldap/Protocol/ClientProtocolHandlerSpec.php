@@ -10,12 +10,19 @@
 
 namespace spec\FreeDSx\Ldap\Protocol;
 
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
+use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Operation\Response\SearchResponse;
+use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -64,7 +71,9 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         $messageResponse = new LdapMessageResponse(1, new DeleteResponse(0));
         $messageRequest = new LdapMessageRequest(1, $request);
 
-        $requestHandler->handleRequest($messageRequest,  $queue, [])->shouldBeCalledOnce()
+        $requestHandler->handleRequest(Argument::that(function (ClientProtocolHandler\ClientProtocolContext $context) use ($request) {
+            return $context->getRequest() === $request && $context->getOptions() === [];
+        }))->shouldBeCalledOnce()
             ->willReturn($messageResponse);
         $responseHandler->handleResponse($messageRequest, $messageResponse, $queue, [])->shouldBeCalledOnce()
             ->willReturn($messageResponse);
@@ -77,7 +86,9 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         $request = new UnbindRequest();
         $messageRequest = new LdapMessageRequest(1, $request);
 
-        $requestHandler->handleRequest($messageRequest,  $queue, [])->shouldBeCalledOnce()
+        $requestHandler->handleRequest(Argument::that(function (ClientProtocolHandler\ClientProtocolContext $context) use ($request) {
+            return $context->getRequest() === $request;
+        }))->shouldBeCalledOnce()
             ->willReturn(null);
         $responseHandler->handleResponse(Argument::any(), Argument::any(), Argument::any(), [])->shouldNotBeCalled();
 
@@ -90,11 +101,30 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         $messageResponse = new LdapMessageResponse(1, new DeleteResponse(0));
         $messageRequest = new LdapMessageRequest(1, $request);
 
-        $requestHandler->handleRequest($messageRequest,  $queue, [])->shouldBeCalledOnce()
+        $requestHandler->handleRequest(Argument::that(function (ClientProtocolHandler\ClientProtocolContext $context) use ($request) {
+            return $request === $context->getRequest();
+        })
+        )->shouldBeCalledOnce()
             ->willReturn($messageResponse);
         $responseHandler->handleResponse($messageRequest, $messageResponse, $queue, [])->shouldBeCalledOnce()
             ->willThrow(new \FreeDSx\Socket\Exception\ConnectionException('foo'));
 
         $this->shouldThrow(ConnectionException::class)->during('send', [$request]);
+    }
+
+    function it_should_fetch_the_root_dse(RequestHandlerInterface $requestHandler, ResponseHandlerInterface $responseHandler, ClientQueue $queue)
+    {
+        $request = Operations::read('', 'supportedSaslMechanisms', 'supportedControl', 'supportedLDAPVersion');
+        $messageResponse = new LdapMessageResponse(1, new SearchResponse(new LdapResult(0), new Entries(new Entry(new Dn('')))));
+        $messageRequest = new LdapMessageRequest(1, $request);
+
+        $requestHandler->handleRequest(Argument::that(function (ClientProtocolHandler\ClientProtocolContext $context) use ($request) {
+            return $context->getRequest() instanceof SearchRequest && $request->getFilter()->toString() === '(objectClass=*)';
+        }))->shouldBeCalledOnce()
+            ->willReturn($messageResponse);
+        $responseHandler->handleResponse($messageRequest, $messageResponse, $queue, [])->shouldBeCalledOnce()
+            ->willReturn($messageResponse);
+
+        $this->fetchRootDse()->shouldBeLike(new Entry(new Dn('')));
     }
 }

@@ -78,7 +78,7 @@ class LdapClient
     }
 
     /**
-     * Bind to LDAP with a username and password.
+     * A Simple Bind to LDAP with a username and password.
      *
      * @param string $username
      * @param string $password
@@ -89,6 +89,20 @@ class LdapClient
     public function bind(string $username, string $password): LdapMessageResponse
     {
         return $this->sendAndReceive(Operations::bind($username, $password)->setVersion($this->options['version']));
+    }
+
+    /**
+     * A SASL Bind to LDAP with SASL options and an optional specific mechanism type.
+     *
+     * @param array $options The SASL options (ie. ['username' => '...', 'password' => '...'])
+     * @param string $mechanism A specific mechanism to use. If none is supplied, one will be selected.
+     * @return LdapMessageResponse
+     * @throws BindException
+     * @throws OperationException
+     */
+    public function bindSasl(array $options = [], string $mechanism = ''): LdapMessageResponse
+    {
+        return $this->sendAndReceive(Operations::bindSasl($options, $mechanism)->setVersion($this->options['version']));
     }
 
     /**

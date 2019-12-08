@@ -59,6 +59,13 @@ class SaslBindRequest extends BindRequest
         return $this->mechanism;
     }
 
+    public function setMechanism(string $mech): self
+    {
+        $this->mechanism = $mech;
+
+        return $this;
+    }
+
     public function getCredentials(): ?string
     {
         return $this->credentials;

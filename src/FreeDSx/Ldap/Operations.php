@@ -78,12 +78,12 @@ class Operations
     /**
      * A SASL bind request with a specific mechanism and their associated options.
      *
-     * @param string $mechanism
      * @param array $options
+     * @param string $mechanism
      * @param string|null $credentials
      * @return SaslBindRequest
      */
-    public static function bindSasl(string $mechanism, array $options = [], ?string $credentials = null)
+    public static function bindSasl(array $options = [], string $mechanism = '', ?string $credentials = null)
     {
         return new SaslBindRequest($mechanism, $credentials, $options);
     }

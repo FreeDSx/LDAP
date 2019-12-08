@@ -41,7 +41,12 @@ class OperationsSpec extends ObjectBehavior
 
     function it_should_create_a_sasl_bind()
     {
-        $this::bindSasl('DIGEST-MD5')->shouldBeLike(new SaslBindRequest('DIGEST-MD5'));
+        $this::bindSasl(['username' => 'foo', 'password' => 'bar'])->shouldBeLike(
+            new SaslBindRequest('', null, ['username' => 'foo', 'password' => 'bar'])
+        );
+        $this::bindSasl(['username' => 'foo', 'password' => 'bar'], 'DIGEST-MD5')->shouldBeLike(
+            new SaslBindRequest('DIGEST-MD5', null, ['username' => 'foo', 'password' => 'bar'])
+        );
     }
 
     function it_should_create_an_add_operation()

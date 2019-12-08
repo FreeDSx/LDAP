@@ -40,8 +40,10 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
     /**
      * {@inheritDoc}
      */
-    public function handleRequest(LdapMessageRequest $message, ClientQueue $queue, array $options): ?LdapMessageResponse
+    public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
+        $queue = $context->getQueue();
+        $message = $context->messageToSend();
         $queue->sendMessage($message);
 
         return $queue->getMessage($message->getMessageId());

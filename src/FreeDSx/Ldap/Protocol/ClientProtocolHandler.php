@@ -12,11 +12,15 @@ namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Operation\Response\SearchResponse;
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientProtocolContext;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Socket\Exception\ConnectionException as SocketException;
@@ -29,6 +33,12 @@ use FreeDSx\Socket\SocketPool;
  */
 class ClientProtocolHandler
 {
+    const ROOTDSE_ATTRIBUTES = [
+        'supportedSaslMechanisms',
+        'supportedControl',
+        'supportedLDAPVersion',
+    ];
+
     /**
      * @var SocketPool
      */
@@ -54,6 +64,11 @@ class ClientProtocolHandler
      */
     protected $protocolHandlerFactory;
 
+    /**
+     * @var null|Entry
+     */
+    protected $rootDse;
+
     public function __construct(array $options, ClientQueue $queue = null, SocketPool $pool = null, ClientProtocolHandlerFactory $clientProtocolHandlerFactory = null)
     {
         $this->options = $options;
@@ -72,24 +87,54 @@ class ClientProtocolHandler
     }
 
     /**
+     * Make a single search request to fetch the RootDSE. Handle the various errors that could occur.
+     *
      * @throws ConnectionException
-     * @throws UnsolicitedNotificationException
      * @throws OperationException
+     * @throws UnsolicitedNotificationException
+     */
+    public function fetchRootDse(bool $reload = false): Entry
+    {
+        if ($reload === false && $this->rootDse !== null) {
+            return $this->rootDse;
+        }
+        $message = $this->send(Operations::read('', ...self::ROOTDSE_ATTRIBUTES));
+        if ($message === null) {
+            throw new OperationException('Expected a search response for the RootDSE. None received.');
+        }
+
+        $searchResponse = $message->getResponse();
+        if (!$searchResponse instanceof SearchResponse) {
+            throw new OperationException('Expected a search response for the RootDSE. None received.');
+        }
+
+        $entry = $searchResponse->getEntries()->first();
+        if ($entry === null) {
+            throw new OperationException('Expected a single entry for the RootDSE. None received.');
+        }
+        $this->rootDse = $entry;
+
+        return $entry;
+    }
+
+    /**
+     * @throws ConnectionException
+     * @throws OperationException
+     * @throws UnsolicitedNotificationException
      */
     public function send(RequestInterface $request, Control ...$controls): ?LdapMessageResponse
     {
         try {
-            $messageTo = new LdapMessageRequest(
-                $this->queue()->generateId(),
+            $context = new ClientProtocolContext(
                 $request,
-                ...\array_merge($this->controls->toArray(), $controls)
-            );
-
-            $messageFrom = $this->protocolHandlerFactory->forRequest($messageTo->getRequest())->handleRequest(
-                $messageTo,
+                $controls,
+                $this,
                 $this->queue(),
                 $this->options
             );
+
+            $messageFrom = $this->protocolHandlerFactory->forRequest($request)->handleRequest($context);
+            $messageTo = $context->messageToSend();
             if ($messageFrom !== null) {
                 $messageFrom = $this->protocolHandlerFactory->forResponse($messageTo->getRequest(), $messageFrom->getResponse())->handleResponse(
                     $messageTo,

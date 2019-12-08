@@ -10,17 +10,17 @@
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
-use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapper\SaslMessageWrapper;
+use FreeDSx\Sasl\Mechanism\MechanismInterface;
 use FreeDSx\Sasl\Sasl;
 use FreeDSx\Sasl\SaslContext;
 
@@ -31,17 +31,28 @@ use FreeDSx\Sasl\SaslContext;
  */
 class ClientSaslBindHandler implements RequestHandlerInterface
 {
+    use MessageCreationTrait;
+
     /**
-     * @var ControlBag
+     * @var Control[]
      */
     protected $controls;
 
     /**
      * @{@inheritDoc}
      */
-    public function handleRequest(LdapMessageRequest $message, ClientQueue $queue, array $options): ?LdapMessageResponse
+    public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
-        $this->controls = $message->controls();
+        /** @var SaslBindRequest $request */
+        $request = $context->getRequest();
+        $this->controls = $context->getControls();
+
+        # If we are selecting a mechanism from the RootDSE, we must check for a downgrade afterwards.
+        $detectDowngrade = ($request->getMechanism() === '');
+        $mech = $this->selectSaslMech($request, $context);
+
+        $queue = $context->getQueue();
+        $message = $context->messageToSend();
         $queue->sendMessage($message);
 
         /** @var LdapMessageResponse $response */
@@ -56,25 +67,48 @@ class ClientSaslBindHandler implements RequestHandlerInterface
         if ($saslResponse->getResultCode() !== ResultCode::SASL_BIND_IN_PROGRESS) {
             return $response;
         }
-        $response = $this->processSaslChallenge($message, $queue, $saslResponse);
+        $response = $this->processSaslChallenge($request, $queue, $saslResponse, $mech);
+        if ($detectDowngrade
+            && $response !== null
+            && $response->getResponse() instanceof BindResponse
+            && $response->getResponse()->getResultCode() === ResultCode::SUCCESS
+        ) {
+            $this->checkDowngradeAttempt($context);
+        }
 
         return $response;
     }
 
+    protected function selectSaslMech(SaslBindRequest $request, ClientProtocolContext $context): MechanismInterface
+    {
+        $sasl = new Sasl();
+        if ($request->getMechanism() !== '') {
+            $mech = $sasl->get($request->getMechanism());
+            $request->setMechanism($mech->getName());
+
+            return $mech;
+        }
+        $rootDse = $context->getRootDse();
+        $availableMechs = $rootDse->get('supportedSaslMechanisms');
+        $availableMechs = $availableMechs === null ? [] : $availableMechs->getValues();
+        $mech = $sasl->select($availableMechs, $request->getOptions());
+        $request->setMechanism($mech->getName());
+
+        return $mech;
+    }
+
     protected function processSaslChallenge(
-        LdapMessageRequest $message,
+        SaslBindRequest $request,
         ClientQueue $queue,
-        BindResponse $saslResponse
+        BindResponse $saslResponse,
+        MechanismInterface $mech
     ): ?LdapMessageResponse {
-        /** @var SaslBindRequest $request */
-        $request = $message->getRequest();
-        $mech = (new Sasl())->get($request->getMechanism());
         $challenge = $mech->challenge();
         $response = null;
 
         do {
             $context = $challenge->challenge($saslResponse->getSaslCredentials(), $request->getOptions());
-            $saslBind = Operations::bindSasl($request->getMechanism(), [], $context->getResponse());
+            $saslBind = Operations::bindSasl($request->getOptions(), $request->getMechanism(), $context->getResponse());
             $response = $this->sendRequestGetResponse($saslBind, $queue);
             $saslResponse = $response->getResponse();
             if (!$saslResponse instanceof BindResponse) {
@@ -90,7 +124,7 @@ class ClientSaslBindHandler implements RequestHandlerInterface
         }
 
         if ($saslResponse->getResultCode() === ResultCode::SUCCESS && $context->hasSecurityLayer()) {
-            $queue->setMessageWrapper(new SaslMessageWrapper($mech->security(), $context));
+            $queue->setMessageWrapper(new SaslMessageWrapper($mech->securityLayer(), $context));
         }
 
         return $response;
@@ -98,11 +132,7 @@ class ClientSaslBindHandler implements RequestHandlerInterface
 
     protected function sendRequestGetResponse(SaslBindRequest $request, ClientQueue $queue): LdapMessageResponse
     {
-        $messageTo = new LdapMessageRequest(
-            $queue->generateId(),
-            $request,
-            ...$this->controls
-        );
+        $messageTo = $this->makeRequest($queue, $request, $this->controls);
         $queue->sendMessage($messageTo);
 
         /** @var LdapMessageResponse $messageFrom */
@@ -122,5 +152,22 @@ class ClientSaslBindHandler implements RequestHandlerInterface
         }
 
         return $response->getResultCode() !== ResultCode::SASL_BIND_IN_PROGRESS;
+    }
+
+    protected function checkDowngradeAttempt(ClientProtocolContext $context): void
+    {
+        $priorRootDse = $context->getRootDse();
+        $rootDse = $context->getRootDse(true);
+
+        $mechs = $rootDse->get('supportedSaslMechanisms');
+        $priorMechs = $priorRootDse->get('supportedSaslMechanisms');
+        $priorMechs = $priorMechs !== null ? $priorMechs->getValues() : [];
+        $mechs = $mechs !== null ? $mechs->getValues() : [];
+
+        if (count(array_diff($mechs, $priorMechs)) !== 0) {
+            throw new BindException(
+                'Possible SASL downgrade attack detected. The advertised SASL mechanisms have changed.'
+            );
+        }
     }
 }
