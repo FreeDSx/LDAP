@@ -10,6 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Server\ServerRunner;
 
+use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Socket\Socket;
@@ -22,7 +23,7 @@ class PcntlServerRunnerSpec extends ObjectBehavior
 {
     function let()
     {
-        $this->beConstructedWith([]);
+        $this->beConstructedWith([GenericRequestHandler::class]);
     }
 
     function it_is_initializable()
