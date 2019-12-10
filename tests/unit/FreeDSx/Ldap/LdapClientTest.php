@@ -60,7 +60,7 @@ class LdapClientTest extends LdapTestCase
 
     public function testSaslBindWithAutoSelectingTheMechanism()
     {
-        $response = self::$client->bindSasl(['username' => 'WillifoA', 'password' => 'Password1']);
+        $response = self::$client->bindSasl($this->getSaslOptions());
         $response = $response->getResponse();
 
         $this->assertInstanceOf(BindResponse::class, $response);
@@ -69,8 +69,11 @@ class LdapClientTest extends LdapTestCase
 
     public function testSaslBindWithCramMD5()
     {
+        if ($this->isActiveDirectory()) {
+            $this->markTestSkipped('CRAM-MD5 not supported on AD.');
+        }
         $response = self::$client->bindSasl(
-            ['username' => 'WillifoA', 'password' => 'Password1'],
+            $this->getSaslOptions(),
             'CRAM-MD5'
         );
         $response = $response->getResponse();
@@ -82,7 +85,7 @@ class LdapClientTest extends LdapTestCase
     public function testSaslBindWithDigestMD5()
     {
         $response = self::$client->bindSasl(
-            ['username' => 'WillifoA', 'password' => 'Password1'],
+            $this->getSaslOptions(),
             'DIGEST-MD5'
         );
         $response = $response->getResponse();
@@ -94,7 +97,7 @@ class LdapClientTest extends LdapTestCase
     public function testSaslBindWithAnIntegritySecurityLayerIsFunctional()
     {
         self::$client->bindSasl(
-            ['username' => 'WillifoA', 'password' => 'Password1', 'use_integrity' => true],
+            array_merge($this->getSaslOptions(),['use_integrity' => true]),
             'DIGEST-MD5'
         );
         $entry = self::$client->read('', ['supportedSaslMechanisms']);
@@ -305,5 +308,21 @@ class LdapClientTest extends LdapTestCase
 
         self::$client->read('');
         $this->assertTrue(true);
+    }
+
+    protected function getSaslOptions(): array
+    {
+        if ($this->isActiveDirectory()) {
+            return [
+                'username' => 'admin',
+                'password' =>  $_ENV['LDAP_PASSWORD'],
+                'host' => gethostname()
+            ];
+        } else {
+            return [
+                'username' => 'WillifoA',
+                'password' => 'Password1',
+            ];
+        }
     }
 }
