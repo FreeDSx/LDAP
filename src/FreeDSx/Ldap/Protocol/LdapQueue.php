@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapperInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Queue\Asn1MessageQueue;
-use FreeDSx\Socket\Queue\Message;
+use FreeDSx\Socket\Queue\Buffer;
 use FreeDSx\Socket\Socket;
 
 /**
@@ -115,14 +115,13 @@ class LdapQueue extends Asn1MessageQueue
     /**
      * {@inheritDoc}
      */
-    protected function decode($bytes): Message
+    protected function unwrap($bytes): Buffer
     {
         if ($this->messageWrapper === null) {
-            return parent::decode($bytes);
+            return parent::unwrap($bytes);
         }
-        $message = parent::decode($this->messageWrapper->unwrap($bytes));
 
-        return $this->messageWrapper->postUnwrap($message);
+        return $this->messageWrapper->unwrap($bytes);
     }
 
     /**

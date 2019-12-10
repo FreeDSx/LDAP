@@ -15,13 +15,12 @@ use FreeDSx\Asn1\Encoder\EncoderInterface;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
-use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapperInterface;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Socket\Queue\Message;
+use FreeDSx\Socket\Queue\Buffer;
 use FreeDSx\Socket\Socket;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
@@ -90,10 +89,7 @@ class ServerQueueSpec extends ObjectBehavior
         );
         $encoder->decode(Argument::any())->willReturn($asn1);
 
-        $messageWrapper->unwrap('foo')->shouldBeCalled()->willReturn('bar');
-        $messageWrapper->postUnwrap(Argument::type(Message::class))
-            ->shouldBeCalled()
-            ->willReturn(new Message($asn1, 3));
+        $messageWrapper->unwrap('foo')->shouldBeCalled()->willReturn(new Buffer('bar', 3));
 
         $this->setMessageWrapper($messageWrapper);
         $this->getMessage()->shouldBeAnInstanceOf(LdapMessageRequest::class);

@@ -16,7 +16,7 @@ use FreeDSx\Sasl\SaslBuffer;
 use FreeDSx\Sasl\SaslContext;
 use FreeDSx\Sasl\Security\SecurityLayerInterface;
 use FreeDSx\Socket\Exception\PartialMessageException;
-use FreeDSx\Socket\Queue\Message;
+use FreeDSx\Socket\Queue\Buffer;
 use function strlen;
 
 /**
@@ -30,11 +30,6 @@ class SaslMessageWrapper implements MessageWrapperInterface
      * @var SaslContext
      */
     protected $context;
-
-    /**
-     * @var int
-     */
-    protected $lastBufferSize;
 
     /**
      * @var SecurityLayerInterface
@@ -60,23 +55,17 @@ class SaslMessageWrapper implements MessageWrapperInterface
     /**
      * {@inheritDoc}
      */
-    public function unwrap(string $message): string
+    public function unwrap(string $message): Buffer
     {
         try {
             $data = SaslBuffer::unwrap($message);
-            $this->lastBufferSize = strlen($data) + 4;
+
+            return new Buffer(
+                $this->securityLayer->unwrap($data, $this->context),
+                strlen($data) + 4
+            );
         } catch (SaslBufferException $exception) {
             throw new PartialMessageException($exception->getMessage(), $exception->getCode(), $exception);
         }
-
-        return $this->securityLayer->unwrap($data, $this->context);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public function postUnwrap(Message $message): Message
-    {
-        return new Message($message->getMessage(), $this->lastBufferSize);
     }
 }

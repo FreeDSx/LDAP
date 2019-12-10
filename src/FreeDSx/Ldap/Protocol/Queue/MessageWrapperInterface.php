@@ -1,8 +1,16 @@
 <?php
+/**
+ * This file is part of the FreeDSx LDAP package.
+ *
+ * (c) Chad Sikorra <Chad.Sikorra@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
 
 namespace FreeDSx\Ldap\Protocol\Queue;
 
-use FreeDSx\Socket\Queue\Message;
+use FreeDSx\Socket\Queue\Buffer;
 
 /**
  * Used to wrap / unwrap messages after ASN.1 encoding, or prior to ASN.1 decoding.
@@ -23,15 +31,7 @@ interface MessageWrapperInterface
      * Unwrap the message before it is decoded to ASN.1.
      *
      * @param string $message
-     * @return string
+     * @return Buffer
      */
-    public function unwrap(string $message): string;
-
-    /**
-     * Any final adjustments needed after the unwrap process decoding ASN.1 (moving the last position...).
-     *
-     * @param Message $message
-     * @return Message
-     */
-    public function postUnwrap(Message $message): Message;
+    public function unwrap(string $message): Buffer;
 }

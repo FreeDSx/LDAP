@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapperInterface;
-use FreeDSx\Socket\Queue\Message;
+use FreeDSx\Socket\Queue\Buffer;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketPool;
 use PhpSpec\ObjectBehavior;
@@ -120,11 +120,7 @@ class ClientQueueSpec extends ObjectBehavior
             Asn1::context(0, (new IncompleteType((new LdapEncoder())->encode((new Control('foo'))->toAsn1())))->setIsConstructed(true))
         );
         $encoder->decode('bar')->willReturn($asn1);
-
-        $messageWrapper->unwrap('foo')->shouldBeCalled()->willReturn('bar');
-        $messageWrapper->postUnwrap(Argument::type(Message::class))
-            ->shouldBeCalled()
-            ->willReturn(new Message($asn1, 3));
+        $messageWrapper->unwrap('foo')->shouldBeCalled()->willReturn(new Buffer('bar', 3));
 
         $this->setMessageWrapper($messageWrapper);
         $this->getMessage()->shouldBeAnInstanceOf(LdapMessageResponse::class);

@@ -14,6 +14,7 @@ use FreeDSx\Ldap\Protocol\Queue\MessageWrapper\SaslMessageWrapper;
 use FreeDSx\Sasl\SaslContext;
 use FreeDSx\Sasl\Security\SecurityLayerInterface;
 use FreeDSx\Socket\Exception\PartialMessageException;
+use FreeDSx\Socket\Queue\Buffer;
 use FreeDSx\Socket\Queue\Message;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
@@ -47,17 +48,7 @@ class SaslMessageWrapperSpec extends ObjectBehavior
             ->shouldBeCalled()
             ->willReturn('foobar');
 
-        $this->unwrap("\x00\x00\x00\x06foobar")->shouldBeEqualTo("foobar");
-    }
-
-    function it_should_post_unwrap_the_message_to_increment_the_buffer_size(SecurityLayerInterface $securityLayer)
-    {
-        $securityLayer->unwrap('foobar', Argument::type(SaslContext::class))
-            ->shouldBeCalled()
-            ->willReturn('foobar');
-        $this->unwrap("\x00\x00\x00\x06foobar")->shouldBeEqualTo("foobar");
-
-        $this->postUnwrap(new Message('foobar', 6))->getLastPosition()->shouldBeEqualTo(10);
+        $this->unwrap("\x00\x00\x00\x06foobar")->shouldBeLike(new Buffer("foobar", 10));
     }
 
     function it_should_throw_a_partial_message_exception_when_there_is_not_enough_data_to_unwrap(SecurityLayerInterface $securityLayer)
