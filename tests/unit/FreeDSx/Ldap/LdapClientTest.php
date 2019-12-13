@@ -304,7 +304,12 @@ class LdapClientTest extends LdapTestCase
 
     public function testUseSslIgnoreCertValidation()
     {
-        self::$client = self::getClient(['servers' => 'foo.com', 'ssl_validate_cert' => false, 'use_ssl' => true, 'port' => 636]);
+        self::$client = self::getClient([
+            'servers' => 'foo.com',
+            'ssl_validate_cert' => false,
+            'use_ssl' => true,
+            'port' => 636,
+        ]);
 
         self::$client->read('');
         $this->assertTrue(true);
