@@ -19,7 +19,7 @@ install:
 
 before_test:
   - cd C:\projects\freedsx-ldap
-  - pmp composer.phar clear-cache
+  - php composer.phar clear-cache
   - php composer.phar install --no-interaction --no-progress --optimize-autoloader --prefer-source --no-ansi
 
 test_script:
