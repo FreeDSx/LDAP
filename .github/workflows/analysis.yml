@@ -19,7 +19,7 @@ jobs:
         run: |
           wget https://xdebug.org/files/xdebug-2.9.0.tgz
           tar -xvzf xdebug-2.9.0.tgz
-          cd xdebug-2.4.0
+          cd xdebug-2.9.0
           phpize && ./configure && make
           sudo cp ./xdebug.so /usr/local/php/modules/xdebug.so
           sudo echo '[xdebug]' >> /etc/php/php.ini
