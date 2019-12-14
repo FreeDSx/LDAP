@@ -39,8 +39,6 @@ class LdapClientTest extends LdapTestCase
         try {
             @$this->client->unbind();
         } catch (\Exception|\Throwable $exception) {
-            dump($exception->getMessage());
-            dump($exception->getTrace());
         }
     }
 
