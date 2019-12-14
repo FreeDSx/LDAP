@@ -1,6 +1,19 @@
 CHANGELOG
 =========
 
+0.6.0 (2019-12-14)
+------------------
+* Add initial SASL support with a limited set of mechanisms (DIGEST-MD5, CRAM-MD5, PLAIN, ANONYMOUS).
+* The Server RequestHandler interface now requires type-hints for all methods.
+* Server request handlers can now return their own RootDSE if they choose to.
+* Added an isValid() method to the Dn class.
+* Added a firstValue() and lastValue() method for attributes.
+* The client and server protocol handlers have been completely refactored.
+* Implemented PHPStan and made fixes necessary to bump it to the max level.
+* Introduced code coverage to CI runs.
+* Moved CI runs into Github Actions.
+* Use PSR-12 coding standards via ECS.
+
 0.5.0 (2019-03-11)
 ------------------
 * Vastly improved memory efficiency and performance in general (especially on large search results).
