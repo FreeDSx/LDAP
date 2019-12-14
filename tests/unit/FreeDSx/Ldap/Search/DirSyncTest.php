@@ -33,7 +33,7 @@ class DirSyncTest extends LdapTestCase
      */
     protected $filter;
 
-    public function setUp()
+    public function setUp(): void
     {
         if (!$this->isActiveDirectory()) {
             $this->markTestSkipped('Range retrieval is only testable against Active Directory.');

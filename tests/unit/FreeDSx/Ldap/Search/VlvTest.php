@@ -34,7 +34,7 @@ class VlvTest extends LdapTestCase
      */
     protected $client;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         $this->client = $this->getClient();
         $this->bindClient($this->client);
@@ -46,7 +46,7 @@ class VlvTest extends LdapTestCase
         $this->vlv = new Vlv($this->client, $this->search, 'sn');
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
         try {
             $this->client->unbind();

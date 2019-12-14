@@ -29,12 +29,12 @@ class LdapClientTest extends LdapTestCase
      */
     protected $client;
 
-    public function setUp()
+    public function setUp(): void
     {
         $this->client = $this->getClient();
     }
 
-    public function tearDown()
+    public function tearDown(): void
     {
         try {
             @$this->client->unbind();
