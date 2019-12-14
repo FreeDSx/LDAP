@@ -49,7 +49,7 @@ $ldap->bindSasl([
 The following table details mechanisms / options that are recognized when doing a SASL bind:
 
 |                  | `DIGEST-MD5`  | `CRAM-MD5` | `PLAIN` | `ANONYMOUS` |
-| ---------------- | ------------- | ---------- | ------- | ----------- |
+| ---------------- | :-----------: | :--------: | :-----: | :---------: |
 | `username`       | X             | X          | X       | X           |
 | `password`       | X             | X          | X       |             |
 | `use_integrity`  | X             |            |         |             |
