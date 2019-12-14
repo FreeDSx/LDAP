@@ -13,18 +13,7 @@ jobs:
         with:
           php-version: '7.4'
           extension-csv: openssl,mbstring
-          pecl: true
-
-      - name: Install Latest XDebug
-        run: |
-          wget --retry-connrefused --waitretry=1 --read-timeout=20 --timeout=15 -t 0 https://xdebug.org/files/xdebug-2.9.0.tgz
-          tar -xvzf xdebug-2.9.0.tgz
-          cd xdebug-2.9.0
-          phpize && ./configure && make
-          sudo mkdir -p /usr/local/php/modules
-          sudo cp ./modules/xdebug.so /usr/local/php/modules/xdebug.so
-          echo '[xdebug]' | sudo tee -a /etc/php/php.ini
-          echo 'zend_extension="/usr/local/php/modules/xdebug.so"' | sudo tee -a /etc/php/php.ini
+          coverage: pcov
 
       - name: Install OpenLDAP
         run: sudo ./tests/resources/openldap/setup.sh
