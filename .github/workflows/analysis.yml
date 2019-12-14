@@ -16,10 +16,14 @@ jobs:
           pecl: true
 
       - name: Install Latest XDebug
-        run: sudo pecl install xdebug
-
-      - name: Enable XDebug
-        run: sudo echo 'zend_extension="/usr/local/php/modules/xdebug.so"' >> /etc/php/php.ini
+        run: |
+          wget https://xdebug.org/files/xdebug-2.9.0.tgz
+          tar -xvzf xdebug-2.9.0.tgz
+          cd xdebug-2.4.0
+          phpize && ./configure && make
+          sudo cp ./xdebug.so /usr/local/php/modules/xdebug.so
+          sudo echo '[xdebug]' >> /etc/php/php.ini
+          sudo echo 'zend_extension="/usr/local/php/modules/xdebug.so"' >> /etc/php/php.ini
 
       - name: Install OpenLDAP
         run: sudo ./tests/resources/openldap/setup.sh
