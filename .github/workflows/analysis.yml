@@ -21,6 +21,7 @@ jobs:
           tar -xvzf xdebug-2.9.0.tgz
           cd xdebug-2.9.0
           phpize && ./configure && make
+          sudo mkdir -p /usr/local/php/modules
           sudo cp ./modules/xdebug.so /usr/local/php/modules/xdebug.so
           sudo echo '[xdebug]' >> /etc/php/php.ini
           sudo echo 'zend_extension="/usr/local/php/modules/xdebug.so"' >> /etc/php/php.ini
