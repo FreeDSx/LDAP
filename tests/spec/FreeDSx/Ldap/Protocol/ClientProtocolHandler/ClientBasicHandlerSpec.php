@@ -19,6 +19,8 @@ use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\CompareResponse;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientProtocolContext;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
@@ -46,15 +48,17 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $this->shouldBeAnInstanceOf(RequestHandlerInterface::class);
     }
 
-    function it_should_handle_a_request_and_return_a_response(ClientQueue $queue)
+    function it_should_handle_a_request_and_return_a_response(ClientProtocolContext $context, ClientQueue $queue, ClientProtocolHandler $protocolHandler)
     {
+        $context->messageToSend()->willReturn(new LdapMessageRequest(1, new DeleteRequest('cn=foo')));
+        $context->getQueue()->willReturn($queue);
+
         $queue->sendMessage(Argument::type(LdapMessageRequest::class))->shouldBeCalledOnce();
         $queue->getMessage(1)->willReturn(
             new LdapMessageResponse(1, new DeleteResponse(0))
         );
 
-        $options = [];
-        $this->handleRequest(new LdapMessageRequest(1, new DeleteRequest('cn=foo')), $queue, $options)->shouldBeAnInstanceOf(
+        $this->handleRequest($context)->shouldBeAnInstanceOf(
             LdapMessageResponse::class
         );
     }

@@ -31,15 +31,15 @@ class ClientSearchHandler extends ClientBasicHandler
     /**
      * {@inheritDoc}
      */
-    public function handleRequest(LdapMessageRequest $message, ClientQueue $queue, array $options): ?LdapMessageResponse
+    public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
         /** @var SearchRequest $request */
-        $request = $message->getRequest();
+        $request = $context->getRequest();
         if ($request->getBaseDn() === null) {
-            $request->setBaseDn($options['base_dn'] ?? null);
+            $request->setBaseDn($context->getOptions()['base_dn'] ?? null);
         }
 
-        return parent::handleRequest($message, $queue, $options);
+        return parent::handleRequest($context);
     }
 
     /**

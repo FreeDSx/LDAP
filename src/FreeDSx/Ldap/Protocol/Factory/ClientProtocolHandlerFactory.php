@@ -35,6 +35,8 @@ class ClientProtocolHandlerFactory
             return new ClientProtocolHandler\ClientSearchHandler();
         } elseif ($request instanceof Request\UnbindRequest) {
             return new ClientProtocolHandler\ClientUnbindHandler();
+        } elseif ($request instanceof Request\SaslBindRequest) {
+            return new ClientProtocolHandler\ClientSaslBindHandler();
         } else {
             return new ClientProtocolHandler\ClientBasicHandler();
         }

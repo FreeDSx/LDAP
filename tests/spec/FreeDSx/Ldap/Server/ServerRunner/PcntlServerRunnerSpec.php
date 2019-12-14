@@ -10,6 +10,7 @@
 
 namespace spec\FreeDSx\Ldap\Server\ServerRunner;
 
+use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Socket\Socket;
@@ -22,7 +23,7 @@ class PcntlServerRunnerSpec extends ObjectBehavior
 {
     function let()
     {
-        $this->beConstructedWith([]);
+        $this->beConstructedWith(['request_handler' => GenericRequestHandler::class]);
     }
 
     function it_is_initializable()
@@ -49,6 +50,7 @@ class PcntlServerRunnerSpec extends ObjectBehavior
             throw new SkippingException('The PCNTL extension is required for this spec.');
         }
 
+        $server->removeClient(Argument::type(Socket::class))->hasReturnVoid();
         $server->accept()->willReturn($client, null);
         $client->read()->willReturn(false);
         $client->close()->willReturn(null);

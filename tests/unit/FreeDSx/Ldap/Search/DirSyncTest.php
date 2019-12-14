@@ -21,47 +21,46 @@ class DirSyncTest extends LdapTestCase
     /**
      * @var LdapClient
      */
-    protected static $client;
+    protected $client;
 
     /**
      * @var DirSync
      */
-    protected static $dirSync;
+    protected $dirSync;
 
     /**
      * @var FilterInterface
      */
-    protected static $filter;
+    protected $filter;
 
-    public static function setUpBeforeClass()
+    public function setUp(): void
     {
-        if (!self::isActiveDirectory()) {
-            self::markTestSkipped('Range retrieval is only testable against Active Directory.');
-        } else {
-            self::$client = self::getClient();
-            self::bindClient(self::$client);
-
-            self::$filter = Filters::and(
-                Filters::equal('objectClass', 'inetOrgPerson'),
-                Filters::not(Filters::equal('isDeleted', 'TRUE'))
-            );
-            self::$dirSync = new DirSync(self::$client, null, self::$filter, 'description');
+        if (!$this->isActiveDirectory()) {
+            $this->markTestSkipped('Range retrieval is only testable against Active Directory.');
         }
+        $this->client = $this->getClient();
+        $this->bindClient($this->client);
+
+        $this->filter = Filters::and(
+            Filters::equal('objectClass', 'inetOrgPerson'),
+            Filters::not(Filters::equal('isDeleted', 'TRUE'))
+        );
+        $this->dirSync = new DirSync($this->client, null, $this->filter, 'description');
     }
 
     public function testPagingSync()
     {
-        $all = self::$dirSync->getChanges();
+        $all = $this->dirSync->getChanges();
 
-        while (self::$dirSync->hasChanges()) {
-            $all->add(...self::$dirSync->getChanges());
+        while ($this->dirSync->hasChanges()) {
+            $all->add(...$this->dirSync->getChanges());
         }
         $this->assertCount(10001, $all);
 
-        $entry = self::$client->read('cn=Vivie Niebudek,ou=Administrative,ou=FreeDSx-Test,dc=example,dc=com');
+        $entry = $this->client->read('cn=Vivie Niebudek,ou=Administrative,ou=FreeDSx-Test,dc=example,dc=com');
         $entry->set('description', 'foobar '.rand());
-        self::$client->update($entry);
+        $this->client->update($entry);
 
-        $this->assertCount(1, self::$dirSync->getChanges());
+        $this->assertCount(1, $this->dirSync->getChanges());
     }
 }

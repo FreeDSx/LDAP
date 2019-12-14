@@ -34,7 +34,7 @@ class PagingTest extends LdapTestCase
      */
     protected $client;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         $this->client = $this->getClient();
         $this->bindClient($this->client);
@@ -43,7 +43,7 @@ class PagingTest extends LdapTestCase
         $this->paging = new Paging($this->client, $this->search);
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
         try {
             $this->client->unbind();

@@ -8,6 +8,7 @@ functionality. It also implements some other client features from various RFCs:
 * Server Side Sort Control ([RFC 2891](https://tools.ietf.org/html/rfc2891))
 * Password Modify Request ([RFC 3062](https://tools.ietf.org/html/rfc3062))
 * String Representation of Search Filters ([RFC 4515](https://tools.ietf.org/search/rfc4515))
+* SASL authentication / integrity layer support for certain mechanisms ([RFC 4513](https://tools.ietf.org/search/rfc4513))
 
 It supports encryption of the LDAP connection through TLS via the OpenSSL extension if available.
 
@@ -15,6 +16,7 @@ It supports encryption of the LDAP connection through TLS via the OpenSSL extens
 
 * [LDAP Client](/docs/Client)
   * [Configuration](/docs/Client/Configuration.md)
+  * [SASL Bind Authentication](/docs/Client/SASL-Bind-Authentication.md)
   * [General Usage](/docs/Client/General-Usage.md)
   * [Entries](/docs/Client/Entries.md)
   * [Operations](/docs/Client/Operations.md)

@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientProtocolContext;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSearchHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -48,17 +49,23 @@ class ClientSearchHandlerSpec extends ObjectBehavior
         $this->shouldBeAnInstanceOf(RequestHandlerInterface::class);
     }
 
-    function it_should_send_a_request_and_get_a_response(ClientQueue $queue, LdapMessageResponse $response)
+    function it_should_send_a_request_and_get_a_response(ClientProtocolContext $context, ClientQueue $queue, LdapMessageResponse $response)
     {
-        $message = new LdapMessageRequest(1, Operations::search(new EqualityFilter('foo', 'bar')));
+        $request = Operations::search(new EqualityFilter('foo', 'bar'));
+        $message = new LdapMessageRequest(1, $request);
 
         $queue->sendMessage($message)->shouldBeCalledOnce();
         $queue->getMessage(1)->shouldBeCalledOnce()->willReturn($response);
 
-        $this->handleRequest($message, $queue, [])->shouldBeEqualTo($response);
+        $context->getRequest()->willReturn($request);
+        $context->messageToSend()->willReturn($message);
+        $context->getQueue()->willReturn($queue);
+        $context->getOptions()->willReturn([]);
+
+        $this->handleRequest($context)->shouldBeEqualTo($response);
     }
 
-    function it_should_set_a_default_DN_for_a_request_that_has_none(LdapMessageResponse $response, ClientQueue $queue, LdapMessageRequest $message, SearchRequest $request)
+    function it_should_set_a_default_DN_for_a_request_that_has_none(ClientProtocolContext $context, LdapMessageResponse $response, ClientQueue $queue, LdapMessageRequest $message, SearchRequest $request)
     {
         $queue->getMessage(1)->shouldBeCalled()->willReturn($response);
         $queue->sendMessage($message)->shouldBeCalledOnce();
@@ -67,8 +74,13 @@ class ClientSearchHandlerSpec extends ObjectBehavior
         $message->getRequest()->willReturn($request);
         $request->getBaseDn()->willReturn(null);
 
+        $context->messageToSend()->willReturn($message);
+        $context->getRequest()->willReturn($request);
+        $context->getQueue()->willReturn($queue);
+        $context->getOptions()->willReturn(['base_dn' => 'cn=foo']);
+
         $request->setBaseDn('cn=foo')->shouldBeCalledOnce();
-        $this->handleRequest($message, $queue, ['base_dn' => 'cn=foo']);
+        $this->handleRequest($context);
     }
 
     function it_should_not_keep_getting_messages_when_the_first_result_is_search_done(ClientQueue $queue)

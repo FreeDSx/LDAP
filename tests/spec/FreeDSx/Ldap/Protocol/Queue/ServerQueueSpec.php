@@ -18,7 +18,9 @@ use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\Queue\MessageWrapperInterface;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Socket\Queue\Buffer;
 use FreeDSx\Socket\Socket;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
@@ -65,5 +67,31 @@ class ServerQueueSpec extends ObjectBehavior
             new LdapMessageResponse(1, new DeleteResponse(0)),
             new LdapMessageResponse(2, new DeleteResponse(0))
         );
+    }
+
+
+    function it_should_set_a_message_wrapper_and_use_it_when_sending_messages(Socket $socket, EncoderInterface $encoder, MessageWrapperInterface $messageWrapper)
+    {
+        $encoder->encode(Argument::any())->shouldBeCalledTimes(1)->willReturn('foo');
+        $socket->write(Argument::any())->shouldBeCalledTimes(1);
+
+        $messageWrapper->wrap('foo')->shouldBeCalled()->willReturn('bar');
+        $this->setMessageWrapper($messageWrapper);
+        $this->sendMessage(new LdapMessageResponse(1, new DeleteResponse(0)));
+    }
+
+    function it_should_set_a_message_wrapper_and_use_it_when_receiving_messages(Socket $socket, EncoderInterface $encoder, MessageWrapperInterface $messageWrapper)
+    {
+        $asn1 = Asn1::sequence(
+            Asn1::integer(1),
+            Asn1::application(10, Asn1::octetString('dc=foo,dc=bar')),
+            new IncompleteType((new LdapEncoder())->encode(Asn1::context(0, Asn1::sequenceOf((new Control('foo'))->toAsn1()))))
+        );
+        $encoder->decode(Argument::any())->willReturn($asn1);
+
+        $messageWrapper->unwrap('foo')->shouldBeCalled()->willReturn(new Buffer('bar', 3));
+
+        $this->setMessageWrapper($messageWrapper);
+        $this->getMessage()->shouldBeAnInstanceOf(LdapMessageRequest::class);
     }
 }

@@ -11,6 +11,7 @@
 namespace spec\FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientProtocolContext;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientUnbindHandler;
@@ -29,12 +30,15 @@ class ClientUnbindHandlerSpec extends ObjectBehavior
         $this->shouldBeAnInstanceOf(RequestHandlerInterface::class);
     }
 
-    function it_should_send_the_message_and_close_the_queue(ClientQueue $queue)
+    function it_should_send_the_message_and_close_the_queue(ClientProtocolContext $context, ClientQueue $queue)
     {
         $unbind = new LdapMessageRequest(1, new UnbindRequest());
         $queue->sendMessage($unbind)->shouldBeCalledOnce();
         $queue->close()->shouldBeCalledOnce();
 
-        $this->handleRequest($unbind, $queue, [])->shouldBeNull();
+        $context->messageToSend()->willReturn($unbind);
+        $context->getQueue()->willReturn($queue);
+
+        $this->handleRequest($context)->shouldBeNull();
     }
 }

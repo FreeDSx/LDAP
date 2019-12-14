@@ -14,8 +14,10 @@ use FreeDSx\Asn1\Encoder\EncoderInterface;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Protocol\Queue\MessageWrapperInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Queue\Asn1MessageQueue;
+use FreeDSx\Socket\Queue\Buffer;
 use FreeDSx\Socket\Socket;
 
 /**
@@ -39,6 +41,11 @@ class LdapQueue extends Asn1MessageQueue
      * @var Socket
      */
     protected $socket;
+
+    /**
+     * @var MessageWrapperInterface|null
+     */
+    protected $messageWrapper;
 
     public function __construct(Socket $socket, EncoderInterface $encoder = null)
     {
@@ -95,6 +102,29 @@ class LdapQueue extends Asn1MessageQueue
     }
 
     /**
+     * @param MessageWrapperInterface|null $messageWrapper
+     * @return $this
+     */
+    public function setMessageWrapper(?MessageWrapperInterface $messageWrapper)
+    {
+        $this->messageWrapper = $messageWrapper;
+
+        return $this;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected function unwrap($bytes): Buffer
+    {
+        if ($this->messageWrapper === null) {
+            return parent::unwrap($bytes);
+        }
+
+        return $this->messageWrapper->unwrap($bytes);
+    }
+
+    /**
      * Send LDAP messages out the socket.
      *
      * The logic in the loop is to send the messages in chunks of 8192 bytes to lessen the amount of TCP writes we need
@@ -105,7 +135,8 @@ class LdapQueue extends Asn1MessageQueue
         $buffer = '';
 
         foreach ($messages as $message) {
-            $buffer .= $this->encoder->encode($message->toAsn1());
+            $encoded = $this->encoder->encode($message->toAsn1());
+            $buffer .= $this->messageWrapper !== null ? $this->messageWrapper->wrap($encoded) : $encoded;
             $bufferLen = \strlen($buffer);
             if ($bufferLen >= self::BUFFER_SIZE) {
                 $this->socket->write(\substr($buffer, 0, self::BUFFER_SIZE));

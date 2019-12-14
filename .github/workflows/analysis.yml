@@ -13,8 +13,10 @@ jobs:
         with:
           php-version: '7.4'
           extension-csv: openssl,mbstring
-          coverage: xdebug
-          pecl: false
+          coverage: pcov
+
+      - name: Install OpenLDAP
+        run: sudo ./tests/resources/openldap/setup.sh
 
       - name: Get Composer Cache Directory
         id: composer-cache
@@ -36,9 +38,16 @@ jobs:
       - name: Run Test Coverage
         run: composer run-script --timeout=0 test-coverage
 
-      - name: Upload Coverage to Codecov
+      - name: Upload Spec Coverage to Codecov
         uses: codecov/codecov-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage.xml
-          name: FreeDSx-LDAP
+          name: FreeDSx-LDAP-Unit
+
+      - name: Upload Integration Coverage to Codecov
+        uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage-integration.xml
+          name: FreeDSx-LDAP-Integration
