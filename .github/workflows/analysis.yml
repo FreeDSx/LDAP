@@ -23,8 +23,8 @@ jobs:
           phpize && ./configure && make
           sudo mkdir -p /usr/local/php/modules
           sudo cp ./modules/xdebug.so /usr/local/php/modules/xdebug.so
-          sudo echo '[xdebug]' >> /etc/php/php.ini
-          sudo echo 'zend_extension="/usr/local/php/modules/xdebug.so"' >> /etc/php/php.ini
+          echo '[xdebug]' | sudo tee -a /etc/php/php.ini
+          echo 'zend_extension="/usr/local/php/modules/xdebug.so"' | sudo tee -a /etc/php/php.ini
 
       - name: Install OpenLDAP
         run: sudo ./tests/resources/openldap/setup.sh
