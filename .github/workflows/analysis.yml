@@ -17,11 +17,11 @@ jobs:
 
       - name: Install Latest XDebug
         run: |
-          wget https://xdebug.org/files/xdebug-2.9.0.tgz
+          wget --retry-connrefused --waitretry=1 --read-timeout=20 --timeout=15 -t 0 https://xdebug.org/files/xdebug-2.9.0.tgz
           tar -xvzf xdebug-2.9.0.tgz
           cd xdebug-2.9.0
           phpize && ./configure && make
-          sudo cp ./xdebug.so /usr/local/php/modules/xdebug.so
+          sudo cp ./modules/xdebug.so /usr/local/php/modules/xdebug.so
           sudo echo '[xdebug]' >> /etc/php/php.ini
           sudo echo 'zend_extension="/usr/local/php/modules/xdebug.so"' >> /etc/php/php.ini
 
