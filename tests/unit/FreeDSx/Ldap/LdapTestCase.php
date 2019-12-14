@@ -24,7 +24,7 @@ class LdapTestCase extends TestCase
      * @param array $options
      * @return LdapClient
      */
-    protected static function getClient(array $options = []) : LdapClient
+    protected function getClient(array $options = []) : LdapClient
     {
         $default = [
             'servers' => $_ENV['LDAP_SERVER'],
@@ -39,22 +39,27 @@ class LdapTestCase extends TestCase
     /**
      * @param LdapClient $client
      * @throws \FreeDSx\Ldap\Exception\BindException
+     * @throws \FreeDSx\Ldap\Exception\OperationException
      */
-    protected static function bindClient(LdapClient $client) : void
+    protected function bindClient(LdapClient $client) : void
     {
         $client->bind($_ENV['LDAP_USERNAME'], $_ENV['LDAP_PASSWORD']);
     }
 
     /**
      * @return bool
+     * @throws \FreeDSx\Ldap\Exception\OperationException
      */
-    protected static function isActiveDirectory() : bool
+    protected function isActiveDirectory() : bool
     {
         if (self::$isActiveDirectory === null) {
+            $client = $this->getClient();
             try {
-                self::$isActiveDirectory = self::getClient()->read('')->has('forestFunctionality');
+                self::$isActiveDirectory = $client->read('')->has('forestFunctionality');
             } catch (\Exception|\Throwable $e) {
                 self::$isActiveDirectory = false;
+            } finally {
+                $client->unbind();
             }
         }
 

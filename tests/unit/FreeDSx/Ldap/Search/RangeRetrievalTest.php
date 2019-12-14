@@ -20,72 +20,72 @@ class RangeRetrievalTest extends LdapTestCase
     /**
      * @var LdapClient
      */
-    protected static $client;
+    protected $client;
 
     /**
      * @var RangeRetrieval
      */
-    protected static $range;
+    protected $range;
 
-    public static function setUpBeforeClass()
+    public function setUp()
     {
-        if (!self::isActiveDirectory()) {
-            self::markTestSkipped('Range retrieval is only testable against Active Directory.');
+        if (!$this->isActiveDirectory()) {
+            $this->markTestSkipped('Range retrieval is only testable against Active Directory.');
         } else {
-            self::$client = self::getClient();
-            self::bindClient(self::$client);
-            self::$range = new RangeRetrieval(self::$client);
+            $this->client = $this->getClient();
+            $this->bindClient($this->client);
+            $this->range = new RangeRetrieval($this->client);
         }
     }
 
-    public static function tearDownAfterClass()
+    public function tearDown()
     {
         try {
-            self::$client->unbind();
+            $this->client->unbind();
         } catch (\Exception|\Throwable $e) {
         }
     }
     
     public function testRetrieveAll()
     {
-        $result = self::$range->getAllValues('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com', 'member');
+        $result = $this->range->getAllValues('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com', 'member');
 
         $this->assertEquals(10001, count($result->getValues()));
     }
 
     public function testHasRanged()
     {
-        $entry = self::$client->read('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com');
+        $entry = $this->client->read('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com');
 
-        $this->assertTrue(self::$range->hasRanged($entry, 'member'));
-        $this->assertFalse(self::$range->hasRanged($entry, 'description'));
+        $this->assertTrue($this->range->hasRanged($entry, 'member'));
+        $this->assertFalse($this->range->hasRanged($entry, 'description'));
     }
 
     public function testGetRanged()
     {
-        $entry = self::$client->read('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com');
+        $entry = $this->client->read('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com');
 
-        $this->assertInstanceOf(Attribute::class, self::$range->getRanged($entry, 'member'));
-        $this->assertNull(self::$range->getRanged($entry, 'description'));
+        $this->assertInstanceOf(Attribute::class, $this->range->getRanged($entry, 'member'));
+        $this->assertNull($this->range->getRanged($entry, 'description'));
     }
 
     public function testGetAllRanged()
     {
-        $allUsers = self::$client->read('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com');
-        $adminUsers = self::$client->read('cn=Administrative Users,ou=FreeDSx-Test,dc=example,dc=com');
+        $allUsers = $this->client->read('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com');
+        $adminUsers = $this->client->read('cn=Administrative Users,ou=FreeDSx-Test,dc=example,dc=com');
 
-        $this->assertCount(1, self::$range->getAllRanged($allUsers));
-        $this->assertCount(0, self::$range->getAllRanged($adminUsers));
+        $this->assertCount(1, $this->range->getAllRanged($allUsers));
+        $this->assertCount(0, $this->range->getAllRanged($adminUsers));
     }
 
     public function testPagingRangedValues()
     {
-        $members = self::$client->read('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com', ['member;range=0-*'])->get('member');
-        $this->assertTrue(self::$range->hasMoreValues($members));
+        $members = $this->client->read('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com', ['member;range=0-*'])->get('member');
+        $this->assertTrue($this->range->hasMoreValues($members));
 
         $all = $members->getValues();
-        while (self::$range->hasMoreValues($members)) {
-            $members = self::$range->getMoreValues('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com', $members);
+        while ($this->range->hasMoreValues($members)) {
+            $members = $this->range->getMoreValues('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com', $members);
             $all = array_merge($all, $members->getValues());
         }
 
