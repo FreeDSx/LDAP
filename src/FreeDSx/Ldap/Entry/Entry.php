@@ -88,7 +88,7 @@ class Entry implements \IteratorAggregate, \Countable
     /**
      * Reset an attribute, which removes any values it may have.
      *
-     * @param string[]|Attribute[] ...$attributes
+     * @param string|Attribute ...$attributes
      * @return $this
      */
     public function reset(...$attributes)

@@ -419,16 +419,18 @@ class FilterParser
         for ($i = 0; $i < $this->length; $i++) {
             # Detect an unescaped left parenthesis
             if ($this->filter[$i] === FilterInterface::PAREN_LEFT) {
-                [$i, $child] = $this->parseContainerStart($i, $child);
+                [$i, $child] = $this->parseContainerStart((int)$i, $child);
             # We have reached a closing parenthesis of a container, work backwards from those defined to set the ending.
             } elseif ($this->filter[$i] === FilterInterface::PAREN_RIGHT) {
-                $this->parseContainerEnd($i);
+                $this->parseContainerEnd((int)$i);
             }
         }
 
-        foreach ($this->containers as $info) {
-            if ($info['endAt'] === null) {
-                throw new FilterParseException('The filter has an unmatched "(".');
+        if ($this->containers !== null) {
+            foreach ($this->containers as $info) {
+                if ($info['endAt'] === null) {
+                    throw new FilterParseException('The filter has an unmatched "(".');
+                }
             }
         }
     }

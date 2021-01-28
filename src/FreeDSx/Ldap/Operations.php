@@ -182,7 +182,7 @@ class Operations
     /**
      * Search LDAP with a given filter, scope, etc to retrieve a set of entries.
      *
-     * @param string[]|Attribute[] ...$attributes
+     * @param string|Attribute ...$attributes
      */
     public static function search(FilterInterface $filter, ...$attributes): SearchRequest
     {
@@ -193,7 +193,7 @@ class Operations
      * Search for a specific base DN object to read. This sets a 'present' filter for the 'objectClass' attribute to help
      * simplify it.
      *
-     * @param array ...$attributes
+     * @param string|Attribute ...$attributes
      */
     public static function read(string $baseDn, ...$attributes): SearchRequest
     {
@@ -203,7 +203,7 @@ class Operations
     /**
      * Search a single level list from a base DN object.
      *
-     * @param array ...$attributes
+     * @param string|Attribute ...$attributes
      */
     public static function list(FilterInterface $filter, string $baseDn, ...$attributes): SearchRequest
     {

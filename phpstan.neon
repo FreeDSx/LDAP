@@ -1,0 +1,9 @@
+parameters:
+    level: max
+    paths:
+        - %currentWorkingDirectory%/src
+    checkMissingIterableValueType: false
+    checkGenericClassInNonGenericObjectType: false
+    treatPhpDocTypesAsCertain: false
+    ignoreErrors:
+        - '#Unsafe usage of new static\(\).#'

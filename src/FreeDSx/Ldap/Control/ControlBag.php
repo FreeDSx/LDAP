@@ -102,11 +102,12 @@ class ControlBag implements \IteratorAggregate, \Countable
     /**
      * Remove controls by OID or Control object (strict check).
      *
-     * @param Control[]|string[] ...$controls
+     * @param Control|string ...$controls
      * @return $this
      */
     public function remove(...$controls)
     {
+        /** @var Control|string $control */
         foreach ($controls as $control) {
             if (\is_string($control)) {
                 foreach ($this->controls as $i => $ctrl) {

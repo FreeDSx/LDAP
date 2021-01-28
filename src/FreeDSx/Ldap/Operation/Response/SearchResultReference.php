@@ -56,7 +56,6 @@ class SearchResultReference implements ResponseInterface
     {
         $referrals = [];
 
-        /** @var \FreeDSx\Asn1\Type\SequenceType $type */
         foreach ($type->getChildren() as $referral) {
             try {
                 $referrals[] = LdapUrl::parse($referral->getValue());

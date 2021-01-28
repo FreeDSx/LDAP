@@ -125,7 +125,7 @@ class SearchRequest implements RequestInterface
 
     /**
      * @param FilterInterface $filter
-     * @param string[]|Attribute[] ...$attributes
+     * @param string|Attribute ...$attributes
      */
     public function __construct(FilterInterface $filter, ...$attributes)
     {
@@ -136,7 +136,7 @@ class SearchRequest implements RequestInterface
     /**
      * Alias to setAttributes. Convenience for a more fluent method call.
      *
-     * @param array ...$attributes
+     * @param string|Attribute ...$attributes
      * @return SearchRequest
      */
     public function select(...$attributes)
@@ -222,7 +222,7 @@ class SearchRequest implements RequestInterface
     }
 
     /**
-     * @param string[]|Attribute[] ...$attributes
+     * @param string|Attribute ...$attributes
      * @return $this
      */
     public function setAttributes(...$attributes)
@@ -441,7 +441,7 @@ class SearchRequest implements RequestInterface
             Asn1::boolean($this->attributesOnly),
             $this->filter->toAsn1(),
             Asn1::sequenceOf(...\array_map(function ($attr) {
-                /** @var Attribute $attr */
+                /** @var Attribute|string $attr */
                 return Asn1::octetString($attr instanceof Attribute ? $attr->getDescription() : $attr);
             }, $this->attributes))
         ));

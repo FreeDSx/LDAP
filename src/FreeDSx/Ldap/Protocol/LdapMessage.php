@@ -149,9 +149,9 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                     if (!$child instanceof IncompleteType) {
                         throw new ProtocolException('The ASN1 structure for the controls is malformed.');
                     }
-                    /** @var \FreeDSx\Asn1\Type\IncompleteType $child */
-                    $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
                     /** @var SequenceOfType $child */
+                    $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
+
                     foreach ($child->getChildren() as $control) {
                         if (!($control instanceof SequenceType && $control->getChild(0) !== null && $control->getChild(0) instanceof OctetStringType)) {
                             throw new ProtocolException('The control either is not a sequence or has no OID value attached.');
@@ -182,6 +182,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
         if (!($messageId !== null && $messageId instanceof IntegerType)) {
             throw new ProtocolException('Expected an LDAP message ID as an ASN.1 integer type. None received.');
         }
+        /** @var SequenceType|null $opAsn1 */
         $opAsn1 = $type->getChild(1);
         if ($opAsn1 === null) {
             throw new ProtocolException('The LDAP message is malformed.');

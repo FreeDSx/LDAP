@@ -55,10 +55,8 @@ class ClientReferralHandler implements ResponseHandlerInterface
                 $referrals = $result instanceof LdapResult ? $result->getReferrals() : [];
 
                 throw new ReferralException($message, ...$referrals);
-                break;
             case 'follow':
                 return $this->followReferral($messageTo, $messageFrom);
-                break;
             default:
                 throw new RuntimeException(sprintf(
                     'The referral option "%s" is invalid.',

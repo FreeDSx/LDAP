@@ -114,7 +114,6 @@ class DirSyncResponseControl extends Control
             throw new ProtocolException('A DirSyncResponse control value sequence 2 must be an octet string type.');
         }
 
-        /** @var SequenceType $request */
         $control = new self(
             $more->getValue(),
             $unused->getValue(),

@@ -123,7 +123,6 @@ class ExtendedResponse extends LdapResult
     {
         $info = [0 => null, 1 => null];
 
-        /** @var \FreeDSx\Asn1\Type\SequenceType $type */
         foreach ($type->getChildren() as $child) {
             if ($child->getTagNumber() === 10) {
                 $info[0] = $child->getValue();

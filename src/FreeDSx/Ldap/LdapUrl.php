@@ -202,7 +202,7 @@ class LdapUrl
     }
 
     /**
-     * @param string[]|Attribute[] ...$attributes
+     * @param string|Attribute ...$attributes
      * @return $this
      */
     public function setAttributes(...$attributes)
@@ -379,6 +379,7 @@ class LdapUrl
         for ($i = 0; $i <= $last; $i++) {
             $url .= '?';
             if (isset($query[$i])) {
+                /* @phpstan-ignore-next-line */
                 $url .= $query[$i];
             }
         }

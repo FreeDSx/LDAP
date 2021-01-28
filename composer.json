@@ -21,10 +21,9 @@
   "require-dev": {
     "phpspec/phpspec": "^5.1|^6.1",
     "phpunit/phpunit": "^8.0|^7.0",
-    "phpstan/phpstan": "^0.11.15",
-    "phpstan/phpstan-strict-rules": "^0.11.1",
     "symplify/easy-coding-standard": "^6.1",
-    "friends-of-phpspec/phpspec-code-coverage": "^4.3"
+    "friends-of-phpspec/phpspec-code-coverage": "^4.3",
+    "phpstan/phpstan": "^0.12.70"
   },
   "suggest": {
     "ext-openssl": "For SSL/TLS support and some SASL mechanisms."

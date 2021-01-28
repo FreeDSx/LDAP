@@ -68,13 +68,13 @@ class BindResponse extends LdapResult
 
     /**
      * {@inheritdoc}
+     * @param SequenceType $type
      */
     public static function fromAsn1(AbstractType $type)
     {
         [$resultCode, $dn, $diag, $ref] = self::parseResultData($type);
         $saslCreds = null;
 
-        /** @var SequenceType $type */
         foreach ($type->getChildren() as $child) {
             if ($child->getTagNumber() === 7 && $child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
                 $saslCreds = $child->getValue();

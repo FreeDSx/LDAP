@@ -88,7 +88,6 @@ class SortingControl extends Control
         }
 
         $sortKeys = [];
-        /** @var SequenceType $response */
         foreach ($response->getChildren() as $sequence) {
             if (!$sequence instanceof SequenceType) {
                 throw new ProtocolException('The sort key is malformed.');
