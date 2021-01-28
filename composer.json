@@ -20,8 +20,8 @@
   },
   "require-dev": {
     "phpspec/phpspec": "^5.1|^6.1",
-    "phpunit/phpunit": "^8.0|^7.0",
-    "symplify/easy-coding-standard": "^6.1",
+    "phpunit/phpunit": "^9.3|^8.0|^7.0",
+    "symplify/easy-coding-standard": "^6.1|^7.3|^9.0",
     "friends-of-phpspec/phpspec-code-coverage": "^4.3",
     "phpstan/phpstan": "^0.12.70"
   },
