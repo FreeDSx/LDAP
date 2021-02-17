@@ -238,8 +238,8 @@ $filter = Filters::or(
     # Get user objects
     Filters::equal('objectClass', 'user'),
     # Get group objects
-    Filters::equal('objectClass', 'group'),
-};
+    Filters::equal('objectClass', 'group')
+);
 ```
 
 ------------------
