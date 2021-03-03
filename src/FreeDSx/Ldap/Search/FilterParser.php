@@ -127,7 +127,7 @@ class FilterParser
         $this->depth += $isRoot ? 0 : 1;
         if (!isset($this->containers[$this->depth])) {
             throw new FilterParseException(sprintf(
-                'The container at position %s is unrecognized. Perhaps there\'s an unmatched "(".' .
+                'The container at position %s is unrecognized. Perhaps there\'s an unmatched "(".',
                 $startAt
             ));
         }
