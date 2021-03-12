@@ -79,6 +79,28 @@ class Entries implements \Countable, \IteratorAggregate
         return false;
     }
 
+    
+    /**
+     * Check whether or not an entry (either an Entry object or string DN) exists within the entries.
+     *
+     * @param Entry|Dn|string $entry
+     * @return bool
+     */
+    public function hasCaseInsensitive($entry): bool
+    {
+        if ($entry instanceof Entry) {
+            return (\array_search($entry, $this->entries, true) !== false);
+        }
+
+        foreach ($this->entries as $entryObj) {
+            if ((string) strtolower($entry) === strtolower($entryObj->getDn()->toString())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+    
     /**
      * Get an entry from the collection by its DN.
      *
@@ -89,6 +111,23 @@ class Entries implements \Countable, \IteratorAggregate
     {
         foreach ($this->entries as $entry) {
             if ($entry->getDn()->toString() === $dn) {
+                return $entry;
+            }
+        }
+
+        return null;
+    }
+    
+    /**
+     * Get an entry from the collection by its DN.
+     *
+     * @param string $dn
+     * @return Entry|null
+     */
+    public function getCaseInsensitive(string $dn): ?Entry
+    {
+        foreach ($this->entries as $entry) {
+            if (strtolower($entry->getDn()->toString()) === strtolower($dn)) {
                 return $entry;
             }
         }
