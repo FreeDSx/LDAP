@@ -60,7 +60,7 @@ class Option
      *
      * @return null|string
      */
-    public function getHighRange(): string
+    public function getHighRange(): ?string
     {
         if (!$this->isRange()) {
             return '';
