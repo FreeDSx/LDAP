@@ -123,6 +123,8 @@ trait FilterContainerTrait
 
     /**
      * @return \ArrayIterator
+     * @psalm-return \ArrayIterator<array-key, \FreeDSx\Ldap\Search\Filter\FilterInterface>
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     public function getIterator()
     {
@@ -146,7 +148,10 @@ trait FilterContainerTrait
     }
 
     /**
-     * {@inheritdoc}
+     * @param AbstractType $type
+     * @return self
+     * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {

@@ -90,7 +90,7 @@ class SaslBindRequest extends BindRequest
     }
 
     /**
-     * {@inheritDoc}
+     * @throws BindException
      */
     protected function validate(): void
     {

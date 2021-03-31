@@ -160,7 +160,8 @@ class VlvControl extends Control
     }
 
     /**
-     * {@inheritdoc}
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     public function toAsn1(): AbstractType
     {

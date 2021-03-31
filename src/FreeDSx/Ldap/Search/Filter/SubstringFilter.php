@@ -138,7 +138,7 @@ class SubstringFilter implements FilterInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @throws RuntimeException
      */
     public function toAsn1(): AbstractType
     {
@@ -192,7 +192,10 @@ class SubstringFilter implements FilterInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param AbstractType $type
+     * @return SubstringFilter
+     * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {

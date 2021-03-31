@@ -44,7 +44,13 @@ class ProxyRequestHandler implements RequestHandlerInterface
     protected $options = [];
 
     /**
-     * {@inheritdoc}
+     * @param string $username
+     * @param string $password
+     * @return bool
+     * @throws OperationException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function bind(string $username, string $password): bool
     {
@@ -56,7 +62,12 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param RequestContext $context
+     * @param ModifyRequest $modify
+     * @throws OperationException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function modify(RequestContext $context, ModifyRequest $modify): void
     {
@@ -64,7 +75,12 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param RequestContext $context
+     * @param ModifyDnRequest $modifyDn
+     * @throws OperationException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn): void
     {
@@ -72,7 +88,12 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param RequestContext $context
+     * @param DeleteRequest $delete
+     * @throws OperationException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function delete(RequestContext $context, DeleteRequest $delete): void
     {
@@ -80,7 +101,12 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param RequestContext $context
+     * @param AddRequest $add
+     * @throws OperationException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function add(RequestContext $context, AddRequest $add): void
     {
@@ -88,7 +114,13 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param RequestContext $context
+     * @param SearchRequest $search
+     * @return Entries
+     * @throws OperationException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function search(RequestContext $context, SearchRequest $search): Entries
     {
@@ -96,7 +128,13 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param RequestContext $context
+     * @param CompareRequest $compare
+     * @return bool
+     * @throws OperationException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function compare(RequestContext $context, CompareRequest $compare): bool
     {
@@ -109,7 +147,12 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param RequestContext $context
+     * @param ExtendedRequest $extended
+     * @throws OperationException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function extended(RequestContext $context, ExtendedRequest $extended): void
     {

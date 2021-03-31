@@ -83,8 +83,10 @@ class LdapClient
      * @param string $username
      * @param string $password
      * @return LdapMessageResponse
-     * @throws BindException
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function bind(string $username, string $password): LdapMessageResponse
     {
@@ -97,8 +99,10 @@ class LdapClient
      * @param array $options The SASL options (ie. ['username' => '...', 'password' => '...'])
      * @param string $mechanism A specific mechanism to use. If none is supplied, one will be selected.
      * @return LdapMessageResponse
-     * @throws BindException
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function bindSasl(array $options = [], string $mechanism = ''): LdapMessageResponse
     {
@@ -113,7 +117,10 @@ class LdapClient
      * @param string $value
      * @param Control ...$controls
      * @return bool
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function compare($dn, string $attributeName, string $value, Control ...$controls): bool
     {
@@ -129,7 +136,10 @@ class LdapClient
      * @param Entry $entry
      * @param Control ...$controls
      * @return LdapMessageResponse
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function create(Entry $entry, Control ...$controls): LdapMessageResponse
     {
@@ -146,7 +156,10 @@ class LdapClient
      * @param string[] $attributes
      * @param Control ...$controls
      * @return Entry|null
-     * @throws Exception\OperationException
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
+     * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function read(string $entry = '', $attributes = [], Control ...$controls): ?Entry
     {
@@ -167,7 +180,10 @@ class LdapClient
      * @param string[] $attributes
      * @param Control ...$controls
      * @return Entry
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function readOrFail(string $entry = '', $attributes = [], Control ...$controls): Entry
     {
@@ -188,7 +204,10 @@ class LdapClient
      * @param string $entry
      * @param Control ...$controls
      * @return LdapMessageResponse
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function delete(string $entry, Control ...$controls): LdapMessageResponse
     {
@@ -201,7 +220,10 @@ class LdapClient
      * @param Entry $entry
      * @param Control ...$controls
      * @return LdapMessageResponse
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function update(Entry $entry, Control ...$controls): LdapMessageResponse
     {
@@ -217,7 +239,11 @@ class LdapClient
      * @param string|Entry $dn
      * @param string|Entry $newParentDn
      * @return LdapMessageResponse
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\UnexpectedValueException
      */
     public function move($dn, $newParentDn): LdapMessageResponse
     {
@@ -231,7 +257,10 @@ class LdapClient
      * @param string $newRdn
      * @param bool $deleteOldRdn
      * @return LdapMessageResponse
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function rename($dn, $newRdn, bool $deleteOldRdn = true): LdapMessageResponse
     {
@@ -244,7 +273,10 @@ class LdapClient
      * @param SearchRequest $request
      * @param Control ...$controls
      * @return \FreeDSx\Ldap\Entry\Entries
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function search(SearchRequest $request, Control ...$controls): Entries
     {
@@ -301,6 +333,7 @@ class LdapClient
      * @throws Exception\ConnectionException
      * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function send(RequestInterface $request, Control ...$controls): ?LdapMessageResponse
     {
@@ -313,7 +346,10 @@ class LdapClient
      * @param RequestInterface $request
      * @param Control ...$controls
      * @return LdapMessageResponse
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function sendAndReceive(RequestInterface $request, Control ...$controls): LdapMessageResponse
     {
@@ -329,7 +365,10 @@ class LdapClient
      * Issue a startTLS to encrypt the LDAP connection.
      *
      * @return $this
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function startTls()
     {
@@ -342,7 +381,10 @@ class LdapClient
      * Unbind and close the LDAP TCP connection.
      *
      * @return $this
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function unbind()
     {
@@ -355,7 +397,10 @@ class LdapClient
      * Perform a whoami request and get the returned value.
      *
      * @return string
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function whoami(): ?string
     {
@@ -432,6 +477,10 @@ class LdapClient
 
     /**
      * Try to clean-up if needed.
+     * @throws Exception\ConnectionException
+     * @throws Exception\UnsolicitedNotificationException
+     * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function __destruct()
     {

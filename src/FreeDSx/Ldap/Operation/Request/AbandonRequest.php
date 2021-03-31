@@ -59,7 +59,9 @@ class AbandonRequest implements RequestInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param AbstractType $type
+     * @return AbandonRequest
+     * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {

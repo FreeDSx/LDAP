@@ -50,6 +50,15 @@ class ClientSaslBindHandler implements RequestHandlerInterface
 
     /**
      * @{@inheritDoc}
+     * @param ClientProtocolContext $context
+     * @return LdapMessageResponse|null
+     * @throws BindException
+     * @throws ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Sasl\Exception\SaslException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
@@ -89,6 +98,16 @@ class ClientSaslBindHandler implements RequestHandlerInterface
         return $response;
     }
 
+    /**
+     * @param SaslBindRequest $request
+     * @param ClientProtocolContext $context
+     * @return MechanismInterface
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Sasl\Exception\SaslException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     */
     protected function selectSaslMech(SaslBindRequest $request, ClientProtocolContext $context): MechanismInterface
     {
         if ($request->getMechanism() !== '') {
@@ -106,6 +125,19 @@ class ClientSaslBindHandler implements RequestHandlerInterface
         return $mech;
     }
 
+    /**
+     * @param SaslBindRequest $request
+     * @param ClientQueue $queue
+     * @param BindResponse $saslResponse
+     * @param MechanismInterface $mech
+     * @return LdapMessageResponse|null
+     * @throws BindException
+     * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Sasl\Exception\SaslException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     */
     protected function processSaslChallenge(
         SaslBindRequest $request,
         ClientQueue $queue,
@@ -139,6 +171,15 @@ class ClientSaslBindHandler implements RequestHandlerInterface
         return $response;
     }
 
+    /**
+     * @param SaslBindRequest $request
+     * @param ClientQueue $queue
+     * @return LdapMessageResponse
+     * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     */
     protected function sendRequestGetResponse(SaslBindRequest $request, ClientQueue $queue): LdapMessageResponse
     {
         $messageTo = $this->makeRequest($queue, $request, $this->controls);
@@ -163,6 +204,14 @@ class ClientSaslBindHandler implements RequestHandlerInterface
         return $response->getResultCode() !== ResultCode::SASL_BIND_IN_PROGRESS;
     }
 
+    /**
+     * @param ClientProtocolContext $context
+     * @throws BindException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     */
     protected function checkDowngradeAttempt(ClientProtocolContext $context): void
     {
         $priorRootDse = $context->getRootDse();

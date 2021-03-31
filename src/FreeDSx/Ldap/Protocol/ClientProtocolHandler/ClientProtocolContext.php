@@ -109,6 +109,11 @@ class ClientProtocolContext
 
     /**
      * @param bool $reload force reload the RootDSE
+     * @return Entry
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function getRootDse(bool $reload = false): Entry
     {

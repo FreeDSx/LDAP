@@ -29,7 +29,12 @@ use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 class ClientSearchHandler extends ClientBasicHandler
 {
     /**
-     * {@inheritDoc}
+     * @param ClientProtocolContext $context
+     * @return LdapMessageResponse|null
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
@@ -43,7 +48,16 @@ class ClientSearchHandler extends ClientBasicHandler
     }
 
     /**
-     * {@inheritDoc}
+     * @param LdapMessageRequest $messageTo
+     * @param LdapMessageResponse $messageFrom
+     * @param ClientQueue $queue
+     * @param array $options
+     * @return LdapMessageResponse|null
+     * @throws OperationException
+     * @throws \FreeDSx\Ldap\Exception\BindException
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse
     {

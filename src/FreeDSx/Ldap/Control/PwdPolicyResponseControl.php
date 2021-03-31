@@ -92,7 +92,9 @@ class PwdPolicyResponseControl extends Control
     }
 
     /**
-     * {@inheritdoc}
+     * @return AbstractType
+     * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public function toAsn1(): AbstractType
     {
@@ -125,7 +127,11 @@ class PwdPolicyResponseControl extends Control
     }
 
     /**
-     * {@inheritdoc}
+     * @param AbstractType $type
+     * @return Control
+     * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Asn1\Exception\PartialPduException
      */
     public static function fromAsn1(AbstractType $type)
     {

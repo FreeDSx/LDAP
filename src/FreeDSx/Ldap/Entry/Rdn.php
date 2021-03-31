@@ -105,6 +105,7 @@ class Rdn
     /**
      * @param string $rdn
      * @return Rdn
+     * @throws InvalidArgumentException
      */
     public static function create(string $rdn): Rdn
     {

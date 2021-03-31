@@ -52,7 +52,8 @@ class BindResponse extends LdapResult
     }
 
     /**
-     * {@inheritdoc}
+     * @return AbstractType
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
      */
     public function toAsn1(): AbstractType
     {
@@ -67,8 +68,10 @@ class BindResponse extends LdapResult
     }
 
     /**
-     * {@inheritdoc}
-     * @param SequenceType $type
+     * @param AbstractType $type
+     * @return self
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {

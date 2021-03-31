@@ -145,6 +145,8 @@ class Operations
 
     /**
      * Move an LDAP entry to a new parent DN location.
+     *
+     * @throws UnexpectedValueException
      */
     public static function move(string $dn, string $newParentDn): ModifyDnRequest
     {

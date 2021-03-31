@@ -87,7 +87,11 @@ class NotFilter implements FilterInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param AbstractType $type
+     * @return NotFilter
+     * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     public static function fromAsn1(AbstractType $type)
     {

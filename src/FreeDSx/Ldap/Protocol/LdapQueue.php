@@ -129,6 +129,9 @@ class LdapQueue extends Asn1MessageQueue
      *
      * The logic in the loop is to send the messages in chunks of 8192 bytes to lessen the amount of TCP writes we need
      * to perform if sending out many messages.
+     * @param LdapMessage ...$messages
+     * @return LdapQueue
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     protected function sendLdapMessage(LdapMessage ...$messages): self
     {

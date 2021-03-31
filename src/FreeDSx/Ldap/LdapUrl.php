@@ -137,6 +137,7 @@ class LdapUrl
     /**
      * @param null|string $scope
      * @return $this
+     * @throws InvalidArgumentException
      */
     public function setScope(?string $scope)
     {
@@ -266,6 +267,7 @@ class LdapUrl
      * @param string $ldapUrl
      * @return LdapUrl
      * @throws UrlParseException
+     * @throws \FreeDSx\Ldap\Exception\InvalidArgumentException
      */
     public static function parse(string $ldapUrl): LdapUrl
     {

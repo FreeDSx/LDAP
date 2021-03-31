@@ -94,7 +94,9 @@ abstract class BindRequest implements RequestInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param AbstractType $type
+     * @return AnonBindRequest|SimpleBindRequest
+     * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {

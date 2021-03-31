@@ -29,7 +29,14 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 class ServerBindHandler extends BaseServerHandler implements BindHandlerInterface
 {
     /**
-     * {@inheritDoc}
+     * @param LdapMessageRequest $message
+     * @param RequestHandlerInterface $dispatcher
+     * @param ServerQueue $queue
+     * @param array $options
+     * @return TokenInterface
+     * @throws OperationException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws RuntimeException
      */
     public function handleBind(LdapMessageRequest $message, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): TokenInterface
     {

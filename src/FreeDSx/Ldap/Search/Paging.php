@@ -81,6 +81,11 @@ class Paging
      * End the paging operation. This can be triggered at any time.
      *
      * @return $this
+     * @throws ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function end()
     {
@@ -95,6 +100,11 @@ class Paging
      *
      * @param int|null $size
      * @return Entries
+     * @throws ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function getEntries(?int $size = null): Entries
     {
@@ -128,6 +138,10 @@ class Paging
      * @param int|null $size
      * @return Entries
      * @throws ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function send(?int $size = null)
     {

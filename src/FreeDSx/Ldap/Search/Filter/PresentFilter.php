@@ -53,7 +53,10 @@ class PresentFilter implements FilterInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param AbstractType $type
+     * @return PresentFilter
+     * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {

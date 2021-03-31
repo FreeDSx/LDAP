@@ -215,6 +215,7 @@ class Filters
      *
      * @param string $filter
      * @return FilterInterface
+     * @throws \FreeDSx\Ldap\Exception\FilterParseException
      */
     public static function raw(string $filter): FilterInterface
     {

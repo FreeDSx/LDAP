@@ -39,6 +39,7 @@ class ExtendedResponseFactory
      * @param string $oid
      * @return ExtendedResponse
      * @throws ProtocolException
+     * @throws RuntimeException
      */
     public function get(AbstractType $asn1, string $oid): ExtendedResponse
     {
@@ -72,6 +73,8 @@ class ExtendedResponseFactory
 
     /**
      * Set a specific class for an operation. It must implement ProtocolElementInterface.
+     *
+     * @throws InvalidArgumentException
      */
     public static function set(string $oid, string $className): void
     {

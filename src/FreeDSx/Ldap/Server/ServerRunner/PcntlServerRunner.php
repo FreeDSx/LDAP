@@ -35,6 +35,8 @@ class PcntlServerRunner implements ServerRunnerInterface
 
     /**
      * @param array $options
+     * @psalm-param array{request_handler?: class-string<RequestHandlerInterface>} $options
+     * @throws RuntimeException
      */
     public function __construct(array $options = [])
     {
@@ -45,7 +47,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public function run(SocketServer $server): void
     {
@@ -70,6 +72,8 @@ class PcntlServerRunner implements ServerRunnerInterface
 
     /**
      * Try to instantiate the user supplied request handler.
+     *
+     * @throws RuntimeException
      */
     protected function constructRequestHandler(): RequestHandlerInterface
     {

@@ -40,6 +40,7 @@ class Dn implements \IteratorAggregate, \Countable
 
     /**
      * @return Rdn
+     * @throws UnexpectedValueException
      */
     public function getRdn(): Rdn
     {
@@ -55,6 +56,7 @@ class Dn implements \IteratorAggregate, \Countable
 
     /**
      * @return null|Dn
+     * @throws \FreeDSx\Ldap\Exception\UnexpectedValueException
      */
     public function getParent(): ?Dn
     {
@@ -70,6 +72,7 @@ class Dn implements \IteratorAggregate, \Countable
 
     /**
      * @return \ArrayIterator
+     * @throws \FreeDSx\Ldap\Exception\UnexpectedValueException
      */
     public function getIterator()
     {
@@ -86,6 +89,7 @@ class Dn implements \IteratorAggregate, \Countable
 
     /**
      * @return int
+     * @throws \FreeDSx\Ldap\Exception\UnexpectedValueException
      */
     public function count()
     {
@@ -106,6 +110,7 @@ class Dn implements \IteratorAggregate, \Countable
 
     /**
      * @return Rdn[]
+     * @throws \FreeDSx\Ldap\Exception\UnexpectedValueException
      */
     public function toArray(): array
     {
@@ -134,6 +139,8 @@ class Dn implements \IteratorAggregate, \Countable
 
     /**
      * @todo This needs proper handling. But the regex would probably be rather crazy.
+     *
+     * @throws UnexpectedValueException
      */
     protected function parse(): void
     {

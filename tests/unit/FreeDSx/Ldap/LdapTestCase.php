@@ -38,8 +38,10 @@ class LdapTestCase extends TestCase
 
     /**
      * @param LdapClient $client
-     * @throws \FreeDSx\Ldap\Exception\BindException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function bindClient(LdapClient $client) : void
     {
@@ -48,7 +50,10 @@ class LdapTestCase extends TestCase
 
     /**
      * @return bool
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function isActiveDirectory() : bool
     {

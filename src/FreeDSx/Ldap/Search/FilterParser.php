@@ -271,6 +271,7 @@ class FilterParser
      * @param string $attribute
      * @param string $value
      * @return FilterInterface
+     * @throws FilterParseException
      */
     protected function getComparisonFilterObject(string $operator, string $attribute, string $value): FilterInterface
     {
@@ -335,6 +336,7 @@ class FilterParser
      * @param string $attribute
      * @param string $value
      * @return SubstringFilter
+     * @throws FilterParseException
      */
     protected function getSubstringFilterObject(string $attribute, string $value): SubstringFilter
     {

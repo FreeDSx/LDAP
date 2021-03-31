@@ -117,7 +117,11 @@ class RangeRetrieval
      * @param Attribute $attribute
      * @param string|int $amount
      * @return Attribute
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws RuntimeException
      */
     public function getMoreValues($entry, Attribute $attribute, $amount = '*'): Attribute
     {
@@ -156,7 +160,11 @@ class RangeRetrieval
      * @param Entry|Dn|string $entry
      * @param string|Attribute $attribute
      * @return Attribute
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws RuntimeException
      */
     public function getAllValues($entry, $attribute): Attribute
     {

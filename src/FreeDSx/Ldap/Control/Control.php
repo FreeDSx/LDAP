@@ -146,7 +146,8 @@ class Control implements ProtocolElementInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return AbstractType
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public function toAsn1(): AbstractType
     {
@@ -179,7 +180,9 @@ class Control implements ProtocolElementInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param AbstractType $type
+     * @return mixed|static
+     * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -216,6 +219,8 @@ class Control implements ProtocolElementInterface
      * @param AbstractType $type
      * @return AbstractType
      * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Asn1\Exception\PartialPduException
      */
     protected static function decodeEncodedValue(AbstractType $type)
     {

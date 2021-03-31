@@ -97,6 +97,7 @@ class ServerProtocolHandler
 
     /**
      * Listens for messages from the socket and handles the responses/actions needed.
+     * @throws EncoderException
      */
     public function handle(): void
     {
@@ -138,6 +139,7 @@ class ServerProtocolHandler
      * request is mapped to.
      *
      * @throws OperationException
+     * @throws EncoderException
      */
     protected function dispatchRequest(LdapMessageRequest $message): void
     {
@@ -177,6 +179,8 @@ class ServerProtocolHandler
 
     /**
      * Checks that the message ID is valid. It cannot be zero or a message ID that was already used.
+     * @throws EncoderException
+     * @throws EncoderException
      */
     protected function isValidRequest(LdapMessageRequest $message): bool
     {
@@ -222,6 +226,10 @@ class ServerProtocolHandler
         );
     }
 
+    /**
+     * @param string $message
+     * @throws EncoderException
+     */
     protected function sendNoticeOfDisconnect(string $message = ''): void
     {
         $this->queue->sendMessage($this->responseFactory->getExtendedError(

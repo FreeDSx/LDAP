@@ -100,7 +100,11 @@ class DirSync
      *
      * @param \Closure $handler An anonymous function to pass results to.
      * @param int $checkInterval How often to check for changes (in seconds).
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     public function watch(\Closure $handler, int $checkInterval = 10): void
     {
@@ -141,7 +145,11 @@ class DirSync
      * followed with a hasChanges() call to determine if more changes are still available.
      *
      * @return Entries
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws RuntimeException
      */
     public function getChanges(): Entries
     {
@@ -263,7 +271,10 @@ class DirSync
 
     /**
      * @return SearchRequest
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function getSearchRequest(): SearchRequest
     {
@@ -294,7 +305,11 @@ class DirSync
 
     /**
      * @return string|null
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws RuntimeException
      */
     protected function getDefaultRootNc()
     {

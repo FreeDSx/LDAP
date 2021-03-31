@@ -261,6 +261,10 @@ class Vlv
     /**
      * @return Entries
      * @throws ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function getEntries(): Entries
     {
@@ -269,6 +273,10 @@ class Vlv
 
     /**
      * @throws ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function send(): Entries
     {

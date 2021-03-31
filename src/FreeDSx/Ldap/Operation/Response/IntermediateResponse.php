@@ -65,7 +65,9 @@ class IntermediateResponse implements ResponseInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @param AbstractType $type
+     * @return self
+     * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {

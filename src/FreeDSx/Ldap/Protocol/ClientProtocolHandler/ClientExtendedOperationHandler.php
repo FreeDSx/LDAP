@@ -33,7 +33,15 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
     }
 
     /**
-     * {@inheritDoc}
+     * @param ClientProtocolContext $context
+     * @return LdapMessageResponse|null
+     * @throws OperationException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws \ReflectionException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {

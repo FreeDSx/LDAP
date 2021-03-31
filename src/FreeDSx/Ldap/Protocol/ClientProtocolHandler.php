@@ -91,6 +91,7 @@ class ClientProtocolHandler
      *
      * @throws ConnectionException
      * @throws OperationException
+     * @throws SocketException
      * @throws UnsolicitedNotificationException
      */
     public function fetchRootDse(bool $reload = false): Entry
@@ -120,6 +121,7 @@ class ClientProtocolHandler
     /**
      * @throws ConnectionException
      * @throws OperationException
+     * @throws SocketException
      * @throws UnsolicitedNotificationException
      */
     public function send(RequestInterface $request, Control ...$controls): ?LdapMessageResponse
