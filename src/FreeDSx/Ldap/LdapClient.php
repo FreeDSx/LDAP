@@ -254,7 +254,7 @@ class LdapClient
      * Rename an entry (changing the RDN).
      *
      * @param string|Entry $dn
-     * @param string $newRdn
+     * @param string|Rdn $newRdn
      * @param bool $deleteOldRdn
      * @return LdapMessageResponse
      * @throws Exception\ConnectionException
@@ -290,7 +290,7 @@ class LdapClient
      * A helper for performing a paging based search.
      *
      * @param SearchRequest $search
-     * @param int $size
+     * @param null|int $size
      * @return Paging
      */
     public function paging(SearchRequest $search, ?int $size = null): Paging

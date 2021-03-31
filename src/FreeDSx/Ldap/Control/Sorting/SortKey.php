@@ -72,7 +72,7 @@ class SortKey
     }
 
     /**
-     * @param string $orderingRule
+     * @param null|string $orderingRule
      * @return $this
      */
     public function setOrderingRule(?string $orderingRule)

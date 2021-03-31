@@ -33,7 +33,7 @@ class DeleteRequest implements RequestInterface, DnRequestInterface
     protected $dn;
 
     /**
-     * @param string $dn
+     * @param string|Dn $dn
      */
     public function __construct($dn)
     {

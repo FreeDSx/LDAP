@@ -49,7 +49,7 @@ class Attribute implements \IteratorAggregate, \Countable
 
     /**
      * @param string $attribute
-     * @param mixed[]|string[] ...$values
+     * @param mixed|string ...$values
      */
     public function __construct(string $attribute, ...$values)
     {
@@ -60,7 +60,7 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * Add a value, or values, to the attribute.
      *
-     * @param mixed[]|string[] ...$values
+     * @param mixed|string ...$values
      * @return $this
      */
     public function add(...$values): self
@@ -86,7 +86,7 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * Remove a specific value, or values, from an attribute.
      *
-     * @param mixed[]|string[] ...$values
+     * @param mixed|string ...$values
      * @return $this
      */
     public function remove(...$values): self
@@ -115,7 +115,7 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * Set the values for the attribute.
      *
-     * @param mixed[]|string[] ...$values
+     * @param mixed|string ...$values
      * @return $this
      */
     public function set(...$values): self

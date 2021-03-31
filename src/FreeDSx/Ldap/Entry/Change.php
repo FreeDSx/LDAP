@@ -45,7 +45,7 @@ class Change
     /**
      * @param int $modType
      * @param string|Attribute $attribute
-     * @param string[] ...$values
+     * @param string ...$values
      */
     public function __construct(int $modType, $attribute, ...$values)
     {
@@ -127,7 +127,7 @@ class Change
      * Add the values contained in the attribute, creating the attribute if necessary.
      *
      * @param string|Attribute $attribute
-     * @param string[] ...$values
+     * @param string ...$values
      * @return Change
      */
     public static function add($attribute, ...$values): Change
@@ -142,7 +142,7 @@ class Change
      * the entire attribute is removed.
      *
      * @param Attribute|string $attribute
-     * @param string[] ...$values
+     * @param string ...$values
      * @return Change
      */
     public static function delete($attribute, ...$values): Change
@@ -157,7 +157,7 @@ class Change
      * with no value will delete the entire attribute if it exists, and it is ignored if the attribute does not exist.
      *
      * @param Attribute|string $attribute
-     * @param string[] ...$values
+     * @param string ...$values
      * @return Change
      */
     public static function replace($attribute, ...$values): Change

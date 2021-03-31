@@ -51,8 +51,8 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
     protected $dn;
 
     /**
-     * @param string $dn
-     * @param Change[] ...$changes
+     * @param string|Dn $dn
+     * @param Change ...$changes
      */
     public function __construct($dn, Change ...$changes)
     {

@@ -58,7 +58,7 @@ class SubstringFilter implements FilterInterface
      * @param string $attribute
      * @param null|string $startsWith
      * @param null|string $endsWith
-     * @param string[] ...$contains
+     * @param string ...$contains
      */
     public function __construct(string $attribute, ?string $startsWith = null, ?string $endsWith = null, string ...$contains)
     {
@@ -127,7 +127,7 @@ class SubstringFilter implements FilterInterface
     /**
      * Set the values it should contain.
      *
-     * @param string[] ...$values
+     * @param string ...$values
      * @return $this
      */
     public function setContains(string ...$values)

@@ -32,7 +32,7 @@ class Filters
     /**
      * Create a logical 'and' filter, containing other filters.
      *
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      * @return AndFilter
      */
     public static function and(FilterInterface ...$filters): AndFilter
@@ -43,7 +43,7 @@ class Filters
     /**
      * Create a logical 'or' filter, containing other filters.
      *
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      * @return OrFilter
      */
     public static function or(FilterInterface ...$filters): OrFilter
@@ -139,7 +139,7 @@ class Filters
      * @param string $attribute
      * @param null|string $startsWith
      * @param null|string $endsWith
-     * @param string[] ...$contains
+     * @param string ...$contains
      * @return SubstringFilter
      */
     public static function substring(string $attribute, ?string $startsWith, ?string $endsWith, string ...$contains): SubstringFilter
@@ -151,7 +151,7 @@ class Filters
      * Creates a substring filter to specifically check if an attribute value contains a value.
      *
      * @param string $attribute
-     * @param string[] ...$values
+     * @param string ...$values
      * @return SubstringFilter
      */
     public static function contains(string $attribute, string ...$values): SubstringFilter

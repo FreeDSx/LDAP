@@ -31,7 +31,7 @@ trait FilterContainerTrait
     protected $filters = [];
 
     /**
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      */
     public function __construct(FilterInterface ...$filters)
     {
@@ -39,7 +39,7 @@ trait FilterContainerTrait
     }
 
     /**
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      * @return $this
      */
     public function add(FilterInterface ...$filters)
@@ -61,7 +61,7 @@ trait FilterContainerTrait
     }
 
     /**
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      * @return $this
      */
     public function remove(FilterInterface ...$filters)
@@ -76,7 +76,7 @@ trait FilterContainerTrait
     }
 
     /**
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      * @return $this
      */
     public function set(FilterInterface ...$filters)

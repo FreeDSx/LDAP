@@ -89,6 +89,8 @@ class ClientProtocolHandler
     /**
      * Make a single search request to fetch the RootDSE. Handle the various errors that could occur.
      *
+     * @param bool $reload
+     * @return Entry
      * @throws ConnectionException
      * @throws OperationException
      * @throws SocketException
@@ -119,6 +121,9 @@ class ClientProtocolHandler
     }
 
     /**
+     * @param RequestInterface $request
+     * @param Control ...$controls
+     * @return LdapMessageResponse|null
      * @throws ConnectionException
      * @throws OperationException
      * @throws SocketException

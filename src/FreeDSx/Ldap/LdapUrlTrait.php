@@ -40,7 +40,7 @@ trait LdapUrlTrait
     /**
      * Percent-encode certain values in the URL.
      *
-     * @param string $value
+     * @param null|string $value
      * @return string
      */
     protected static function encode(?string $value): string
