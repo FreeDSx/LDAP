@@ -10,8 +10,6 @@
 
 namespace FreeDSx\Ldap\Control;
 
-use FreeDSx\Ldap\Exception\UnexpectedValueException;
-
 /**
  * Represents a set of controls.
  *

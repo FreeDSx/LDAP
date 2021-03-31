@@ -10,9 +10,9 @@
 
 namespace FreeDSx\Ldap\Protocol\Factory;
 
-use FreeDSx\Ldap\Operation as Operation;
-use FreeDSx\Ldap\Operation\Request as Request;
-use FreeDSx\Ldap\Operation\Response as Response;
+use FreeDSx\Ldap\Operation;
+use FreeDSx\Ldap\Operation\Request;
+use FreeDSx\Ldap\Operation\Response;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;

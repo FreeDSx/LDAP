@@ -10,8 +10,6 @@
 
 namespace FreeDSx\Ldap\Entry;
 
-use FreeDSx\Ldap\Exception\InvalidArgumentException;
-
 /**
  * Represents a collection of entry objects.
  *
