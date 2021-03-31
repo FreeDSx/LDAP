@@ -57,6 +57,8 @@ class Option
      * A convenience method to get the high value of a range option.
      *
      * @see https://msdn.microsoft.com/en-us/library/cc223242.aspx
+     *
+     * @return null|string
      */
     public function getHighRange(): string
     {

@@ -272,6 +272,7 @@ class Vlv
     }
 
     /**
+     * @return Entries
      * @throws ProtocolException
      * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException

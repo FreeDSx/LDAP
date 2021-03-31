@@ -199,7 +199,7 @@ class Control implements ProtocolElementInterface
     /**
      * @param Control $control
      * @param AbstractType $type
-     * @return Control
+     * @return self
      * @throws ProtocolException
      */
     protected static function mergeControlData(Control $control, AbstractType $type)
