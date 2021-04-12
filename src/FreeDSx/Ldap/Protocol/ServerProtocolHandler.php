@@ -140,6 +140,7 @@ class ServerProtocolHandler
      *
      * @throws OperationException
      * @throws EncoderException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     protected function dispatchRequest(LdapMessageRequest $message): void
     {
@@ -208,6 +209,8 @@ class ServerProtocolHandler
      * Sends a bind request to the bind handler and returns the token.
      *
      * @throws OperationException
+     * @throws EncoderException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     protected function handleAuthRequest(LdapMessageRequest $message): TokenInterface
     {
