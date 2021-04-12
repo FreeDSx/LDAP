@@ -155,6 +155,7 @@ class ControlBag implements \IteratorAggregate, \Countable
 
     /**
      * @return \ArrayIterator
+     * @psalm-return \ArrayIterator<array-key, Control>
      */
     public function getIterator()
     {

@@ -54,11 +54,14 @@ class ClientSaslBindHandler implements RequestHandlerInterface
      * @return LdapMessageResponse|null
      * @throws BindException
      * @throws ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
      * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
      * @throws \FreeDSx\Ldap\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\ReferralException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Sasl\Exception\SaslException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws \Throwable
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
@@ -102,11 +105,16 @@ class ClientSaslBindHandler implements RequestHandlerInterface
      * @param SaslBindRequest $request
      * @param ClientProtocolContext $context
      * @return MechanismInterface
+     * @throws BindException
+     * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\ReferralException
      * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
      * @throws \FreeDSx\Sasl\Exception\SaslException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws \Throwable
      */
     protected function selectSaslMech(SaslBindRequest $request, ClientProtocolContext $context): MechanismInterface
     {
@@ -207,10 +215,15 @@ class ClientSaslBindHandler implements RequestHandlerInterface
     /**
      * @param ClientProtocolContext $context
      * @throws BindException
+     * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\ReferralException
      * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Sasl\Exception\SaslException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws \Throwable
      */
     protected function checkDowngradeAttempt(ClientProtocolContext $context): void
     {

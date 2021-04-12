@@ -220,7 +220,7 @@ class LdapUrl
 
     /**
      * @param bool $useSsl
-     * @return LdapUrl
+     * @return static
      */
     public function setUseSsl(bool $useSsl)
     {

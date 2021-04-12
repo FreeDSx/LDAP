@@ -118,6 +118,12 @@ class ClientProtocolContext
      * @throws \FreeDSx\Ldap\Exception\OperationException
      * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\BindException
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\ReferralException
+     * @throws \FreeDSx\Sasl\Exception\SaslException
+     * @throws \Throwable
      */
     public function getRootDse(bool $reload = false): Entry
     {

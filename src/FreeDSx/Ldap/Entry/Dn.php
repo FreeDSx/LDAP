@@ -72,6 +72,7 @@ class Dn implements \IteratorAggregate, \Countable
 
     /**
      * @return \ArrayIterator
+     * @@psalm-return \ArrayIterator<array-key, Rdn>
      * @throws \FreeDSx\Ldap\Exception\UnexpectedValueException
      */
     public function getIterator()
@@ -89,6 +90,7 @@ class Dn implements \IteratorAggregate, \Countable
 
     /**
      * @return int
+     * @psalm-return 0|positive-int
      * @throws \FreeDSx\Ldap\Exception\UnexpectedValueException
      */
     public function count()

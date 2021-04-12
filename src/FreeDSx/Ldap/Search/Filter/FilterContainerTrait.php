@@ -133,6 +133,7 @@ trait FilterContainerTrait
 
     /**
      * @return int
+     * @psalm-return 0|positive-int
      */
     public function count()
     {

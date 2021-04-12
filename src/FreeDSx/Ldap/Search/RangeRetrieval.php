@@ -61,6 +61,7 @@ class RangeRetrieval
      *
      * @param Entry $entry
      * @return Attribute[]
+     * @psalm-return list<Attribute>
      */
     public function getAllRanged(Entry $entry): array
     {
@@ -117,11 +118,16 @@ class RangeRetrieval
      * @param Attribute $attribute
      * @param string|int $amount
      * @return Attribute
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\BindException
      * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\ReferralException
      * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Sasl\Exception\SaslException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws RuntimeException
+     * @throws \Throwable
      */
     public function getMoreValues($entry, Attribute $attribute, $amount = '*'): Attribute
     {
@@ -153,18 +159,23 @@ class RangeRetrieval
         
         return $attrResult;
     }
-    
+
     /**
      * Given a specific entry and attribute, range retrieve all values of the attribute.
      *
      * @param Entry|Dn|string $entry
      * @param string|Attribute $attribute
      * @return Attribute
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\BindException
      * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\ReferralException
      * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Sasl\Exception\SaslException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws RuntimeException
+     * @throws \Throwable
      */
     public function getAllValues($entry, $attribute): Attribute
     {

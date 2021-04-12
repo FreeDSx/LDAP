@@ -19,6 +19,7 @@ class Changes implements \Countable, \IteratorAggregate
 {
     /**
      * @var Change[]
+     * @psalm-var list<Change>
      */
     protected $changes = [];
 
@@ -108,6 +109,7 @@ class Changes implements \Countable, \IteratorAggregate
 
     /**
      * @return int
+     * @psalm-return 0|positive-int
      */
     public function count()
     {
@@ -115,7 +117,8 @@ class Changes implements \Countable, \IteratorAggregate
     }
 
     /**
-     * @return \ArrayIterator|\Traversable
+     * @return \ArrayIterator
+     * @psalm-return \ArrayIterator<int, Change>
      */
     public function getIterator()
     {

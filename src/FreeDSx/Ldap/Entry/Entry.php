@@ -212,6 +212,7 @@ class Entry implements \IteratorAggregate, \Countable
 
     /**
      * @return \ArrayIterator
+     * @psalm-return \ArrayIterator<array-key, Attribute>
      */
     public function getIterator(): \ArrayIterator
     {
@@ -220,6 +221,7 @@ class Entry implements \IteratorAggregate, \Countable
 
     /**
      * @return int
+     * @psalm-return 0|positive-int
      */
     public function count(): int
     {

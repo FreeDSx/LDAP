@@ -215,6 +215,7 @@ class SubstringFilter implements FilterInterface
     }
 
     /**
+     * @psalm-return array{0: mixed|null, 1: mixed|null, 2: list<mixed>}
      * @throws ProtocolException
      */
     protected static function parseSubstrings(SequenceType $substrings): array
