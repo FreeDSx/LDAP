@@ -112,13 +112,13 @@ class ServerProtocolHandler
         } catch (OperationException $e) {
             # OperationExceptions may be thrown by any handler and will be sent back to the client as the response
             # specific error code and message associated with the exception.
-            if (isset($message)) {
+            //if (isset($message)) {
                 $this->queue->sendMessage($this->responseFactory->getStandardResponse(
                     $message,
                     $e->getCode(),
                     $e->getMessage()
                 ));
-            }
+            //}
         } catch (EncoderException | ProtocolException $e) {
             # Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with a
             # result code of protocol error.
@@ -209,7 +209,6 @@ class ServerProtocolHandler
     /**
      * Sends a bind request to the bind handler and returns the token.
      *
-     * @psalm-return \FreeDSx\Ldap\Server\Token\BindToken
      * @throws OperationException
      * @throws EncoderException
      * @throws \FreeDSx\Ldap\Exception\RuntimeException

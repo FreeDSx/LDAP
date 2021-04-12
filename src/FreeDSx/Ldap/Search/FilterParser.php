@@ -38,7 +38,6 @@ class FilterParser
 
     /**
      * @var int
-     * @psalm-var 0|positive-int
      */
     protected $depth = 0;
 
@@ -121,7 +120,7 @@ class FilterParser
      * @param int $startAt
      * @param bool $isRoot
      * @return array
-     * @psalm-return array{0: int|null, 1: AndFilter|Filter\NotFilter|OrFilter}
+     * @psalm-return array{0: int, 1: AndFilter|Filter\NotFilter|OrFilter}
      * @throws FilterParseException
      */
     protected function parseFilterContainer(int $startAt, bool $isRoot): array
@@ -136,7 +135,7 @@ class FilterParser
                 $startAt
             ));
         }
-        $endAt = $this->containers[$this->depth]['endAt'];
+        $endAt = $this->containers[$this->depth]['endAt'] ?? 0;
         $operator = substr($this->filter, $startAt + 1, 1);
 
         if ($operator === FilterInterface::OPERATOR_NOT) {
@@ -146,7 +145,7 @@ class FilterParser
         $startAt += 2;
         $filter = $operator === FilterInterface::OPERATOR_AND ? new AndFilter() : new OrFilter();
         while ($endAt !== ($startAt + 1)) {
-            [$startAt, $childFilter] = $this->parseFilterString($startAt);
+            [$startAt, $childFilter] = $this->parseFilterString($startAt ?? 0);
             $filter->add($childFilter);
         }
 
@@ -478,7 +477,6 @@ class FilterParser
 
     /**
      * @psalm-param 0|positive-int $child
-     * @psalm-return array{0: int, 1: 0|null|positive-int}
      * @throws FilterParseException
      */
     protected function parseContainerStart(int $i, ?int $child): array
