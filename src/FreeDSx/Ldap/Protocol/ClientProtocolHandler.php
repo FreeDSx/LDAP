@@ -128,6 +128,12 @@ class ClientProtocolHandler
      * @throws OperationException
      * @throws SocketException
      * @throws UnsolicitedNotificationException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\BindException
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\ReferralException
+     * @throws \FreeDSx\Sasl\Exception\SaslException
+     * @throws \Throwable
      */
     public function send(RequestInterface $request, Control ...$controls): ?LdapMessageResponse
     {

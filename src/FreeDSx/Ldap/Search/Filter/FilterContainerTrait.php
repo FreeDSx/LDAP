@@ -152,6 +152,7 @@ trait FilterContainerTrait
      * @param AbstractType $type
      * @return self
      * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {

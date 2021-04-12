@@ -92,6 +92,7 @@ class NotFilter implements FilterInterface
      * @return NotFilter
      * @throws ProtocolException
      * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     public static function fromAsn1(AbstractType $type)
     {

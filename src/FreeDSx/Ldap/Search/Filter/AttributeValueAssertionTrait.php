@@ -86,7 +86,6 @@ trait AttributeValueAssertionTrait
     }
 
     /**
-
      * {@inheritDoc}
      * @param AbstractType $type
      * @return self
