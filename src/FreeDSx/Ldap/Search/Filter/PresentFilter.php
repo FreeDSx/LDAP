@@ -45,7 +45,7 @@ class PresentFilter implements FilterInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return string
      */
     public function toString(): string
     {
@@ -53,6 +53,7 @@ class PresentFilter implements FilterInterface
     }
 
     /**
+     * {@inheritDoc}
      * @param AbstractType $type
      * @return PresentFilter
      * @throws ProtocolException

@@ -39,7 +39,7 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
 
     /**
      * @param ClientProtocolContext $context
-     * @return LdapMessageResponse|null
+     * @return LdapMessageResponse
      * @throws \FreeDSx\Ldap\Exception\ProtocolException
      * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
@@ -59,7 +59,7 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
      * @param LdapMessageResponse $messageFrom
      * @param ClientQueue $queue
      * @param array $options
-     * @return LdapMessageResponse|null
+     * @return LdapMessageResponse
      * @throws BindException
      * @throws OperationException
      */

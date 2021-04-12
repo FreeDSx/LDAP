@@ -373,9 +373,8 @@ class SearchRequest implements RequestInterface
     }
 
     /**
-     * @param AbstractType $type
+     * {@inheritDoc}
      * @return self
-     * @throws ProtocolException
      * @throws RuntimeException
      */
     public static function fromAsn1(AbstractType $type)

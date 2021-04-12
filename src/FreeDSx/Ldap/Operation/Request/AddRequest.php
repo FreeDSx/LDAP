@@ -80,9 +80,8 @@ class AddRequest implements RequestInterface
     }
 
     /**
-     * @param AbstractType $type
+     * {@inheritDoc}
      * @return self
-     * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {

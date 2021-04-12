@@ -148,9 +148,8 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
     }
 
     /**
-     * @param AbstractType $type
+     * {@inheritDoc}
      * @return self
-     * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -177,7 +176,7 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return SequenceType
      */
     public function toAsn1(): AbstractType
     {

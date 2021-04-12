@@ -73,6 +73,10 @@ class ClientProtocolContext
         return $this->request;
     }
 
+    /**
+     * @return Control[]
+     * @psalm-return array<array-key, Control>
+     */
     public function getControls(): array
     {
         return $this->controls;

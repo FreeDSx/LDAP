@@ -124,12 +124,10 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
     }
 
     /**
-     * @param AbstractType $type
+     * {@inheritDoc}
      * @return self
-     * @throws ProtocolException
      * @throws \FreeDSx\Asn1\Exception\EncoderException
      * @throws \FreeDSx\Asn1\Exception\PartialPduException
-     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     public static function fromAsn1(AbstractType $type)
     {

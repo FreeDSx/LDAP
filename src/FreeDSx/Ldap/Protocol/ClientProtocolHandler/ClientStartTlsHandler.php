@@ -29,7 +29,7 @@ class ClientStartTlsHandler implements ResponseHandlerInterface
      * @param LdapMessageResponse $messageFrom
      * @param ClientQueue $queue
      * @param array $options
-     * @return LdapMessageResponse|null
+     * @return LdapMessageResponse
      * @throws ConnectionException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
      */

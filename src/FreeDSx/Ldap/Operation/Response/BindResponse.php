@@ -26,6 +26,9 @@ use FreeDSx\Ldap\Operation\LdapResult;
  */
 class BindResponse extends LdapResult
 {
+    /**
+     * @var int
+     */
     protected $tagNumber = 1;
 
     /**
@@ -52,7 +55,7 @@ class BindResponse extends LdapResult
     }
 
     /**
-     * @return AbstractType
+     * @return SequenceType
      * @throws \FreeDSx\Ldap\Exception\ProtocolException
      */
     public function toAsn1(): AbstractType
@@ -68,10 +71,9 @@ class BindResponse extends LdapResult
     }
 
     /**
-     * @param AbstractType $type
+     * {@inheritDoc}
      * @return self
      * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {

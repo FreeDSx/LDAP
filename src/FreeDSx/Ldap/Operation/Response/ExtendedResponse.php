@@ -30,6 +30,9 @@ use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
  */
 class ExtendedResponse extends LdapResult
 {
+    /**
+     * @var int
+     */
     protected $tagNumber = 24;
 
     /**
@@ -80,9 +83,8 @@ class ExtendedResponse extends LdapResult
     }
 
     /**
-     * @param AbstractType $type
+     * {@inheritDoc}
      * @return self
-     * @throws ProtocolException
      * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public static function fromAsn1(AbstractType $type)

@@ -141,7 +141,8 @@ class Options implements \Countable, \IteratorAggregate
     }
 
     /**
-     * @return array
+     * @return Option[]
+     * @psalm-return array<array-key, Option>
      */
     public function toArray(): array
     {
@@ -157,7 +158,8 @@ class Options implements \Countable, \IteratorAggregate
     }
 
     /**
-     * @return \Traversable
+     * @return \ArrayIterator
+     * @psalm-return \ArrayIterator<array-key, Option>
      */
     public function getIterator()
     {
@@ -166,6 +168,7 @@ class Options implements \Countable, \IteratorAggregate
 
     /**
      * @return int
+     * @psalm-return 0|positive-int
      */
     public function count()
     {

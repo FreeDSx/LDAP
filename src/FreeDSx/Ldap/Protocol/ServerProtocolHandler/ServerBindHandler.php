@@ -57,6 +57,7 @@ class ServerBindHandler extends BaseServerHandler implements BindHandlerInterfac
     }
 
     /**
+     * @return BindToken
      * @throws OperationException
      */
     protected function simpleBind(RequestHandlerInterface $dispatcher, SimpleBindRequest $request): TokenInterface

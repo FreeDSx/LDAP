@@ -30,7 +30,7 @@ class ServerAnonBindHandler extends ServerBindHandler
      * @param RequestHandlerInterface $dispatcher
      * @param ServerQueue $queue
      * @param array $options
-     * @return TokenInterface
+     * @return AnonToken
      * @throws \FreeDSx\Asn1\Exception\EncoderException
      * @throws \FreeDSx\Ldap\Exception\OperationException
      * @throws RuntimeException

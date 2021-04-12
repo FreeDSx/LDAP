@@ -131,9 +131,8 @@ class ExtendedRequest implements RequestInterface
     }
 
     /**
-     * @param AbstractType $type
+     * {@inheritDoc}
      * @return self
-     * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -158,6 +157,7 @@ class ExtendedRequest implements RequestInterface
      * @param AbstractType $type
      * @return array
      * @throws ProtocolException
+     * @psalm-return array{0: mixed, 1: mixed|null}
      */
     protected static function parseAsn1ExtendedRequest(AbstractType $type)
     {

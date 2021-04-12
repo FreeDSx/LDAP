@@ -185,7 +185,7 @@ class VlvControl extends Control
     }
 
     /**
-     *
+     * {@inheritDoc}
      * @return void
      */
     public static function fromAsn1(AbstractType $type)

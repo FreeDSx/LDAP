@@ -38,11 +38,13 @@ class FilterParser
 
     /**
      * @var int
+     * @psalm-var 0|positive-int
      */
     protected $depth = 0;
 
     /**
      * @var null|array
+     * @psalm-var null|array<0|positive-int, array{startAt?: int, endAt: null|int}>
      */
     protected $containers;
 

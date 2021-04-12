@@ -180,9 +180,8 @@ class Control implements ProtocolElementInterface
     }
 
     /**
-     * @param AbstractType $type
-     * @return mixed|static
-     * @throws ProtocolException
+     * {@inheritDoc}
+     * @return static|ProtocolElementInterface
      */
     public static function fromAsn1(AbstractType $type)
     {

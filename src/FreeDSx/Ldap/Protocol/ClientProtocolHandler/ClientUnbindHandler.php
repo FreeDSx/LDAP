@@ -23,7 +23,7 @@ class ClientUnbindHandler implements RequestHandlerInterface
 
     /**
      * @param ClientProtocolContext $context
-     * @return LdapMessageResponse|null
+     * @return null
      * @throws \FreeDSx\Asn1\Exception\EncoderException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
      */

@@ -78,9 +78,8 @@ class SortingControl extends Control
     }
 
     /**
-     * @param AbstractType $type
+     * {@inheritDoc}
      * @return Control
-     * @throws ProtocolException
      * @throws \FreeDSx\Asn1\Exception\EncoderException
      * @throws \FreeDSx\Asn1\Exception\PartialPduException
      */

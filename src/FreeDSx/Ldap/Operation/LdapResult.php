@@ -170,9 +170,8 @@ class LdapResult implements ResponseInterface
     }
 
     /**
-     * @param AbstractType $type
+     * {@inheritDoc}
      * @return self
-     * @throws ProtocolException
      * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public static function fromAsn1(AbstractType $type)

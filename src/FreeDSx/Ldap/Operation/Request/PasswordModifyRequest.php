@@ -133,9 +133,8 @@ class PasswordModifyRequest extends ExtendedRequest
     }
 
     /**
-     * @param AbstractType $type
+     * {@inheritDoc}
      * @return PasswordModifyRequest
-     * @throws ProtocolException
      * @throws \FreeDSx\Asn1\Exception\EncoderException
      * @throws \FreeDSx\Asn1\Exception\PartialPduException
      */

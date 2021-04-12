@@ -49,7 +49,7 @@ class ClientSaslBindHandler implements RequestHandlerInterface
     }
 
     /**
-     * @{@inheritDoc}
+     * {@@inheritDoc}
      * @param ClientProtocolContext $context
      * @return LdapMessageResponse|null
      * @throws BindException
@@ -130,7 +130,7 @@ class ClientSaslBindHandler implements RequestHandlerInterface
      * @param ClientQueue $queue
      * @param BindResponse $saslResponse
      * @param MechanismInterface $mech
-     * @return LdapMessageResponse|null
+     * @return LdapMessageResponse
      * @throws BindException
      * @throws ProtocolException
      * @throws \FreeDSx\Asn1\Exception\EncoderException
