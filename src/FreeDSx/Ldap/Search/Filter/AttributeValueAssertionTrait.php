@@ -90,6 +90,8 @@ trait AttributeValueAssertionTrait
      * @param AbstractType $type
      * @return self
      * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
+     * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {
