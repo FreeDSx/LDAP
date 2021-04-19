@@ -47,7 +47,7 @@ class Entry implements \IteratorAggregate, \Countable
      * Add an attribute and its values.
      *
      * @param string|Attribute $attribute
-     * @param string[] ...$values
+     * @param string ...$values
      * @return $this
      */
     public function add($attribute, ...$values)
@@ -68,7 +68,7 @@ class Entry implements \IteratorAggregate, \Countable
      * Remove an attribute's value(s).
      *
      * @param string|Attribute $attribute
-     * @param array ...$values
+     * @param mixed|string ...$values
      * @return $this
      */
     public function remove($attribute, ...$values)
@@ -111,7 +111,7 @@ class Entry implements \IteratorAggregate, \Countable
      * Set an attribute on the entry, replacing any value(s) that may exist on it.
      *
      * @param string|Attribute $attribute
-     * @param array ...$values
+     * @param mixed ...$values
      * @return $this
      */
     public function set($attribute, ...$values)
@@ -212,6 +212,7 @@ class Entry implements \IteratorAggregate, \Countable
 
     /**
      * @return \ArrayIterator
+     * @psalm-return \ArrayIterator<array-key, Attribute>
      */
     public function getIterator(): \ArrayIterator
     {
@@ -220,6 +221,7 @@ class Entry implements \IteratorAggregate, \Countable
 
     /**
      * @return int
+     * @psalm-return 0|positive-int
      */
     public function count(): int
     {

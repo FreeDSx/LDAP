@@ -29,6 +29,7 @@ class ServerBindHandlerFactory
     /**
      * Get the bind handler specific to the request.
      *
+     * @return ServerBindHandler
      * @throws OperationException
      */
     public function get(RequestInterface $request): BindHandlerInterface

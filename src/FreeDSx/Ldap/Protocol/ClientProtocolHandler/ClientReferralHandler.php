@@ -43,7 +43,14 @@ class ClientReferralHandler implements ResponseHandlerInterface
     protected $options = [];
 
     /**
-     * {@inheritDoc}
+     * @param LdapMessageRequest $messageTo
+     * @param LdapMessageResponse $messageFrom
+     * @param ClientQueue $queue
+     * @param array $options
+     * @return LdapMessageResponse|null
+     * @throws OperationException
+     * @throws ReferralException
+     * @throws \Throwable
      */
     public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse
     {
@@ -65,6 +72,15 @@ class ClientReferralHandler implements ResponseHandlerInterface
         }
     }
 
+    /**
+     * @param LdapMessageRequest $messageTo
+     * @param LdapMessageResponse $messageFrom
+     * @return LdapMessageResponse|null
+     * @throws OperationException
+     * @throws SkipReferralException
+     * @throws \FreeDSx\Ldap\Exception\FilterParseException
+     * @throws \Throwable
+     */
     protected function followReferral(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom): ?LdapMessageResponse
     {
         $referralChaser = $this->options['referral_chaser'];
@@ -160,6 +176,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
     /**
      * @param RequestInterface $request
      * @param LdapUrl $referral
+     * @throws \FreeDSx\Ldap\Exception\FilterParseException
      */
     protected function mergeReferralOptions(RequestInterface $request, LdapUrl $referral): void
     {

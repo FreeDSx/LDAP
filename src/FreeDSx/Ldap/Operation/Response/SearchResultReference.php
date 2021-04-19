@@ -50,7 +50,8 @@ class SearchResultReference implements ResponseInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
      */
     public static function fromAsn1(AbstractType $type)
     {

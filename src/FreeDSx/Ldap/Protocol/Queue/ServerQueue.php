@@ -23,6 +23,13 @@ use FreeDSx\Socket\Queue\Message;
  */
 class ServerQueue extends LdapQueue
 {
+    /**
+     * @param int|null $id
+     * @return LdapMessageRequest
+     * @throws ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     */
     public function getMessage(?int $id = null): LdapMessageRequest
     {
         $message = $this->getAndValidateMessage($id);
@@ -37,7 +44,12 @@ class ServerQueue extends LdapQueue
         return $message;
     }
 
-    public function sendMessage(LdapMessageResponse ...$response): ServerQueue
+    /**
+     * @param LdapMessageResponse ...$response
+     * @return $this
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     */
+    public function sendMessage(LdapMessageResponse ...$response): self
     {
         $this->sendLdapMessage(...$response);
 
@@ -45,7 +57,13 @@ class ServerQueue extends LdapQueue
     }
 
     /**
-     * {@inheritDoc}
+     * @param Message $message
+     * @param int|null $id
+     * @return LdapMessageRequest|mixed
+     * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Asn1\Exception\PartialPduException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     protected function constructMessage(Message $message, ?int $id = null)
     {

@@ -31,7 +31,7 @@ trait FilterContainerTrait
     protected $filters = [];
 
     /**
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      */
     public function __construct(FilterInterface ...$filters)
     {
@@ -39,7 +39,7 @@ trait FilterContainerTrait
     }
 
     /**
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      * @return $this
      */
     public function add(FilterInterface ...$filters)
@@ -61,7 +61,7 @@ trait FilterContainerTrait
     }
 
     /**
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      * @return $this
      */
     public function remove(FilterInterface ...$filters)
@@ -76,7 +76,7 @@ trait FilterContainerTrait
     }
 
     /**
-     * @param FilterInterface[] ...$filters
+     * @param FilterInterface ...$filters
      * @return $this
      */
     public function set(FilterInterface ...$filters)
@@ -123,6 +123,8 @@ trait FilterContainerTrait
 
     /**
      * @return \ArrayIterator
+     * @psalm-return \ArrayIterator<array-key, \FreeDSx\Ldap\Search\Filter\FilterInterface>
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     public function getIterator()
     {
@@ -131,6 +133,7 @@ trait FilterContainerTrait
 
     /**
      * @return int
+     * @psalm-return 0|positive-int
      */
     public function count()
     {
@@ -146,7 +149,11 @@ trait FilterContainerTrait
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @param AbstractType $type
+     * @return self
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {

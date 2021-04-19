@@ -59,6 +59,9 @@ class SaslBindRequest extends BindRequest
         return $this->mechanism;
     }
 
+    /**
+     * @return static
+     */
     public function setMechanism(string $mech): self
     {
         $this->mechanism = $mech;
@@ -90,7 +93,7 @@ class SaslBindRequest extends BindRequest
     }
 
     /**
-     * {@inheritDoc}
+     * @throws BindException
      */
     protected function validate(): void
     {

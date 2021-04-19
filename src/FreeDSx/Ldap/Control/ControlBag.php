@@ -10,8 +10,6 @@
 
 namespace FreeDSx\Ldap\Control;
 
-use FreeDSx\Ldap\Exception\UnexpectedValueException;
-
 /**
  * Represents a set of controls.
  *
@@ -157,6 +155,7 @@ class ControlBag implements \IteratorAggregate, \Countable
 
     /**
      * @return \ArrayIterator
+     * @psalm-return \ArrayIterator<array-key, Control>
      */
     public function getIterator()
     {

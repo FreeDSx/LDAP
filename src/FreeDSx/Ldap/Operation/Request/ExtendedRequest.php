@@ -109,7 +109,8 @@ class ExtendedRequest implements RequestInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return AbstractType
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public function toAsn1(): AbstractType
     {
@@ -130,7 +131,8 @@ class ExtendedRequest implements RequestInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -141,6 +143,8 @@ class ExtendedRequest implements RequestInterface
      * @param AbstractType $type
      * @return AbstractType
      * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Asn1\Exception\PartialPduException
      */
     protected static function decodeEncodedValue(AbstractType $type): ?AbstractType
     {
@@ -153,6 +157,7 @@ class ExtendedRequest implements RequestInterface
      * @param AbstractType $type
      * @return array
      * @throws ProtocolException
+     * @psalm-return array{0: mixed, 1: mixed|null}
      */
     protected static function parseAsn1ExtendedRequest(AbstractType $type)
     {

@@ -22,7 +22,10 @@ class ClientUnbindHandler implements RequestHandlerInterface
     use MessageCreationTrait;
 
     /**
-     * {@inheritDoc}
+     * @param ClientProtocolContext $context
+     * @return null
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {

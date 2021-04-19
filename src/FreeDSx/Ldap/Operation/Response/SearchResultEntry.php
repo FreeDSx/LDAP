@@ -57,7 +57,8 @@ class SearchResultEntry implements ResponseInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -91,7 +92,7 @@ class SearchResultEntry implements ResponseInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return SequenceType
      */
     public function toAsn1(): AbstractType
     {

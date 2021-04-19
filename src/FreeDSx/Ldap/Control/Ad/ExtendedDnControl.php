@@ -59,7 +59,10 @@ class ExtendedDnControl extends Control
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return ExtendedDnControl
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Asn1\Exception\PartialPduException
      */
     public static function fromAsn1(AbstractType $type)
     {

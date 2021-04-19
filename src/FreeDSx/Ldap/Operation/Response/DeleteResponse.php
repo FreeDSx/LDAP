@@ -21,5 +21,8 @@ use FreeDSx\Ldap\Operation\LdapResult;
  */
 class DeleteResponse extends LdapResult
 {
+    /**
+     * @var int
+     */
     protected $tagNumber = 11;
 }

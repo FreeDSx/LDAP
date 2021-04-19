@@ -373,7 +373,9 @@ class SearchRequest implements RequestInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
+     * @throws RuntimeException
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -424,7 +426,7 @@ class SearchRequest implements RequestInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @throws RuntimeException
      */
     public function toAsn1(): AbstractType
     {

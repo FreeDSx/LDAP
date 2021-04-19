@@ -67,7 +67,9 @@ class ClientQueue extends LdapQueue
     }
 
     /**
-     * {@inheritDoc}
+     * @param int|null $id
+     * @return \Generator
+     * @throws ConnectionException
      */
     public function getMessages(?int $id = null)
     {
@@ -76,7 +78,13 @@ class ClientQueue extends LdapQueue
         return parent::getMessages($id);
     }
 
-    public function sendMessage(LdapMessageRequest ...$messages): ClientQueue
+    /**
+     * @param LdapMessageRequest ...$messages
+     * @return $this
+     * @throws ConnectionException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     */
+    public function sendMessage(LdapMessageRequest ...$messages): self
     {
         $this->initSocket();
         $this->sendLdapMessage(...$messages);
@@ -105,7 +113,13 @@ class ClientQueue extends LdapQueue
     }
 
     /**
-     * {@inheritDoc}
+     * @param Message $message
+     * @param int|null $id
+     * @return false|\FreeDSx\Ldap\Protocol\LdapMessage|mixed
+     * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Asn1\Exception\PartialPduException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     protected function constructMessage(Message $message, ?int $id = null)
     {

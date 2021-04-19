@@ -100,7 +100,17 @@ class DirSync
      *
      * @param \Closure $handler An anonymous function to pass results to.
      * @param int $checkInterval How often to check for changes (in seconds).
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\BindException
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\ReferralException
+     * @throws \FreeDSx\Sasl\Exception\SaslException
+     * @throws \Throwable
      */
     public function watch(\Closure $handler, int $checkInterval = 10): void
     {
@@ -141,7 +151,16 @@ class DirSync
      * followed with a hasChanges() call to determine if more changes are still available.
      *
      * @return Entries
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\BindException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\ReferralException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Sasl\Exception\SaslException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws \Throwable
      */
     public function getChanges(): Entries
     {
@@ -263,7 +282,16 @@ class DirSync
 
     /**
      * @return SearchRequest
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\BindException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\ReferralException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Sasl\Exception\SaslException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws \Throwable
      */
     protected function getSearchRequest(): SearchRequest
     {
@@ -293,8 +321,17 @@ class DirSync
     }
 
     /**
-     * @return string|null
+     * @return string
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\BindException
+     * @throws \FreeDSx\Ldap\Exception\ConnectionException
      * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\ReferralException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Sasl\Exception\SaslException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws \Throwable
      */
     protected function getDefaultRootNc()
     {

@@ -193,7 +193,9 @@ class MatchingRuleFilter implements FilterInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return MatchingRuleFilter
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {

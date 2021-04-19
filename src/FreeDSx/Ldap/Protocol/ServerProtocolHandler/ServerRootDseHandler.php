@@ -32,7 +32,7 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 class ServerRootDseHandler implements ServerProtocolHandlerInterface
 {
     /**
-     * {@inheritDoc}
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): void
     {

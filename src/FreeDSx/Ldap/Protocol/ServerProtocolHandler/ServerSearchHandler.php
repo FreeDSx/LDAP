@@ -30,7 +30,14 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 class ServerSearchHandler implements ServerProtocolHandlerInterface
 {
     /**
-     * {@inheritDoc}
+     * @param LdapMessageRequest $message
+     * @param TokenInterface $token
+     * @param RequestHandlerInterface $dispatcher
+     * @param ServerQueue $queue
+     * @param array $options
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws RuntimeException
      */
     public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): void
     {

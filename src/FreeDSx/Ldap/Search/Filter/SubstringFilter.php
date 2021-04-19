@@ -58,7 +58,7 @@ class SubstringFilter implements FilterInterface
      * @param string $attribute
      * @param null|string $startsWith
      * @param null|string $endsWith
-     * @param string[] ...$contains
+     * @param string ...$contains
      */
     public function __construct(string $attribute, ?string $startsWith = null, ?string $endsWith = null, string ...$contains)
     {
@@ -127,7 +127,7 @@ class SubstringFilter implements FilterInterface
     /**
      * Set the values it should contain.
      *
-     * @param string[] ...$values
+     * @param string ...$values
      * @return $this
      */
     public function setContains(string ...$values)
@@ -138,7 +138,7 @@ class SubstringFilter implements FilterInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @throws RuntimeException
      */
     public function toAsn1(): AbstractType
     {
@@ -192,7 +192,9 @@ class SubstringFilter implements FilterInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return SubstringFilter
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -213,6 +215,7 @@ class SubstringFilter implements FilterInterface
     }
 
     /**
+     * @psalm-return array{0: mixed|null, 1: mixed|null, 2: list<mixed>}
      * @throws ProtocolException
      */
     protected static function parseSubstrings(SequenceType $substrings): array

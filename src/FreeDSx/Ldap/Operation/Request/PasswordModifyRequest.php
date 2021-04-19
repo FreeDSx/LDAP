@@ -133,7 +133,10 @@ class PasswordModifyRequest extends ExtendedRequest
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return PasswordModifyRequest
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Asn1\Exception\PartialPduException
      */
     public static function fromAsn1(AbstractType $type)
     {

@@ -43,7 +43,9 @@ class SaslMessageWrapper implements MessageWrapperInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @param string $message
+     * @return string
+     * @throws \FreeDSx\Sasl\Exception\SaslException
      */
     public function wrap(string $message): string
     {
@@ -53,7 +55,10 @@ class SaslMessageWrapper implements MessageWrapperInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @param string $message
+     * @return Buffer
+     * @throws PartialMessageException
+     * @throws \FreeDSx\Sasl\Exception\SaslException
      */
     public function unwrap(string $message): Buffer
     {

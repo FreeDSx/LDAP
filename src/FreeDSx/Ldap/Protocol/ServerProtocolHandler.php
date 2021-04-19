@@ -97,6 +97,7 @@ class ServerProtocolHandler
 
     /**
      * Listens for messages from the socket and handles the responses/actions needed.
+     * @throws EncoderException
      */
     public function handle(): void
     {
@@ -111,13 +112,13 @@ class ServerProtocolHandler
         } catch (OperationException $e) {
             # OperationExceptions may be thrown by any handler and will be sent back to the client as the response
             # specific error code and message associated with the exception.
-            if (isset($message)) {
+            //if (isset($message)) {
                 $this->queue->sendMessage($this->responseFactory->getStandardResponse(
                     $message,
                     $e->getCode(),
                     $e->getMessage()
                 ));
-            }
+            //}
         } catch (EncoderException | ProtocolException $e) {
             # Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with a
             # result code of protocol error.
@@ -138,6 +139,9 @@ class ServerProtocolHandler
      * request is mapped to.
      *
      * @throws OperationException
+     * @throws EncoderException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function dispatchRequest(LdapMessageRequest $message): void
     {
@@ -177,6 +181,8 @@ class ServerProtocolHandler
 
     /**
      * Checks that the message ID is valid. It cannot be zero or a message ID that was already used.
+     * @throws EncoderException
+     * @throws EncoderException
      */
     protected function isValidRequest(LdapMessageRequest $message): bool
     {
@@ -204,6 +210,8 @@ class ServerProtocolHandler
      * Sends a bind request to the bind handler and returns the token.
      *
      * @throws OperationException
+     * @throws EncoderException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     protected function handleAuthRequest(LdapMessageRequest $message): TokenInterface
     {
@@ -222,6 +230,10 @@ class ServerProtocolHandler
         );
     }
 
+    /**
+     * @param string $message
+     * @throws EncoderException
+     */
     protected function sendNoticeOfDisconnect(string $message = ''): void
     {
         $this->queue->sendMessage($this->responseFactory->getExtendedError(

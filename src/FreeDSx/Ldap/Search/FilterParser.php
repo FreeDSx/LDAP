@@ -43,6 +43,7 @@ class FilterParser
 
     /**
      * @var null|array
+     * @psalm-var null|array<0|positive-int, array{startAt?: int, endAt: null|int}>
      */
     protected $containers;
 
@@ -58,6 +59,7 @@ class FilterParser
     /**
      * @param string $filter
      * @return FilterInterface
+     * @psalm-return AndFilter|Filter\ApproximateFilter|Filter\EqualityFilter|Filter\GreaterThanOrEqualFilter|Filter\LessThanOrEqualFilter|Filter\NotFilter|Filter\PresentFilter|MatchingRuleFilter|OrFilter|SubstringFilter
      * @throws FilterParseException
      */
     public static function parse(string $filter): FilterInterface
@@ -73,6 +75,7 @@ class FilterParser
      * @param int $startAt
      * @param bool $isRoot
      * @return array
+     * @psalm-return array{0: int|null, 1: AndFilter|Filter\ApproximateFilter|Filter\EqualityFilter|Filter\GreaterThanOrEqualFilter|Filter\LessThanOrEqualFilter|Filter\NotFilter|Filter\PresentFilter|MatchingRuleFilter|OrFilter|SubstringFilter}
      * @throws FilterParseException
      */
     protected function parseFilterString(int $startAt, bool $isRoot = false): array
@@ -117,6 +120,7 @@ class FilterParser
      * @param int $startAt
      * @param bool $isRoot
      * @return array
+     * @psalm-return array{0: int, 1: AndFilter|Filter\NotFilter|OrFilter}
      * @throws FilterParseException
      */
     protected function parseFilterContainer(int $startAt, bool $isRoot): array
@@ -131,7 +135,7 @@ class FilterParser
                 $startAt
             ));
         }
-        $endAt = $this->containers[$this->depth]['endAt'];
+        $endAt = $this->containers[$this->depth]['endAt'] ?? 0;
         $operator = substr($this->filter, $startAt + 1, 1);
 
         if ($operator === FilterInterface::OPERATOR_NOT) {
@@ -141,7 +145,7 @@ class FilterParser
         $startAt += 2;
         $filter = $operator === FilterInterface::OPERATOR_AND ? new AndFilter() : new OrFilter();
         while ($endAt !== ($startAt + 1)) {
-            [$startAt, $childFilter] = $this->parseFilterString($startAt);
+            [$startAt, $childFilter] = $this->parseFilterString($startAt ?? 0);
             $filter->add($childFilter);
         }
 
@@ -154,6 +158,7 @@ class FilterParser
      * @param int $startAt
      * @param bool $isRoot
      * @return array
+     * @psalm-return array{0: int, 1: Filter\ApproximateFilter|Filter\EqualityFilter|Filter\GreaterThanOrEqualFilter|Filter\LessThanOrEqualFilter|Filter\PresentFilter|MatchingRuleFilter|SubstringFilter}
      * @throws FilterParseException
      */
     protected function parseComparisonFilter(int $startAt, bool $isRoot = false): array
@@ -271,6 +276,8 @@ class FilterParser
      * @param string $attribute
      * @param string $value
      * @return FilterInterface
+     * @psalm-return Filter\ApproximateFilter|Filter\EqualityFilter|Filter\GreaterThanOrEqualFilter|Filter\LessThanOrEqualFilter|Filter\PresentFilter|MatchingRuleFilter|SubstringFilter
+     * @throws FilterParseException
      */
     protected function getComparisonFilterObject(string $operator, string $attribute, string $value): FilterInterface
     {
@@ -335,6 +342,7 @@ class FilterParser
      * @param string $attribute
      * @param string $value
      * @return SubstringFilter
+     * @throws FilterParseException
      */
     protected function getSubstringFilterObject(string $attribute, string $value): SubstringFilter
     {
@@ -369,6 +377,7 @@ class FilterParser
      * @param int $startAt
      * @param int $endAt
      * @return FilterInterface
+     * @psalm-return Filter\NotFilter
      * @throws FilterParseException
      */
     protected function getNotFilterObject(int $startAt, int $endAt): FilterInterface
@@ -467,6 +476,7 @@ class FilterParser
     }
 
     /**
+     * @psalm-param 0|positive-int $child
      * @throws FilterParseException
      */
     protected function parseContainerStart(int $i, ?int $child): array

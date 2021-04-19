@@ -27,7 +27,7 @@ class ReferralException extends \Exception
 
     /**
      * @param string $diagnostic
-     * @param LdapUrl[] ...$referrals
+     * @param LdapUrl ...$referrals
      */
     public function __construct(string $diagnostic, LdapUrl ...$referrals)
     {

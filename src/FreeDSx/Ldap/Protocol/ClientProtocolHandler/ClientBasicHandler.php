@@ -38,7 +38,12 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
     ];
 
     /**
-     * {@inheritDoc}
+     * @param ClientProtocolContext $context
+     * @return LdapMessageResponse
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
+     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
@@ -50,7 +55,13 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
     }
 
     /**
-     * {@inheritDoc}
+     * @param LdapMessageRequest $messageTo
+     * @param LdapMessageResponse $messageFrom
+     * @param ClientQueue $queue
+     * @param array $options
+     * @return LdapMessageResponse
+     * @throws BindException
+     * @throws OperationException
      */
     public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse
     {

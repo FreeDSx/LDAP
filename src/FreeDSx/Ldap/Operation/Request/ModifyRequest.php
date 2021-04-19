@@ -51,8 +51,8 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
     protected $dn;
 
     /**
-     * @param string $dn
-     * @param Change[] ...$changes
+     * @param string|Dn $dn
+     * @param Change ...$changes
      */
     public function __construct($dn, Change ...$changes)
     {
@@ -99,7 +99,8 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
      */
     public static function fromAsn1(AbstractType $type)
     {

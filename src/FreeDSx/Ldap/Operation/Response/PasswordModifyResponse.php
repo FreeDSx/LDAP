@@ -61,7 +61,11 @@ class PasswordModifyResponse extends ExtendedResponse
     }
 
     /**
-     * {@inheritdoc}
+     * @param AbstractType $type
+     * @return PasswordModifyResponse
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Asn1\Exception\PartialPduException
+     * @throws \FreeDSx\Ldap\Exception\ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {

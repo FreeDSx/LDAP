@@ -72,7 +72,7 @@ class SimpleBindRequest extends BindRequest
     }
 
     /**
-     * {@inheritdoc}
+     * @throws BindException
      */
     protected function validate(): void
     {

@@ -53,8 +53,8 @@ class VlvControl extends Control
     /**
      * @param int $before
      * @param int $after
-     * @param int $offset
-     * @param int $count
+     * @param null|int $offset
+     * @param null|int $count
      * @param GreaterThanOrEqualFilter|null $filter
      * @param null|string $contextId
      */
@@ -108,7 +108,7 @@ class VlvControl extends Control
     }
 
     /**
-     * @param int $count
+     * @param null|int $count
      * @return $this
      */
     public function setCount(?int $count)
@@ -130,7 +130,7 @@ class VlvControl extends Control
     }
 
     /**
-     * @param int $offset
+     * @param null|int $offset
      * @return $this
      */
     public function setOffset(?int $offset)
@@ -160,7 +160,8 @@ class VlvControl extends Control
     }
 
     /**
-     * {@inheritdoc}
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     public function toAsn1(): AbstractType
     {
@@ -184,7 +185,8 @@ class VlvControl extends Control
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return void
      */
     public static function fromAsn1(AbstractType $type)
     {

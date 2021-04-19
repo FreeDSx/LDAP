@@ -147,7 +147,8 @@ class LdapResult implements ResponseInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @return AbstractType
+     * @throws ProtocolException
      */
     public function toAsn1(): AbstractType
     {
@@ -169,7 +170,9 @@ class LdapResult implements ResponseInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -181,7 +184,9 @@ class LdapResult implements ResponseInterface
     /**
      * @param AbstractType $type
      * @return array
+     * @psalm-return array{0: mixed, 1: mixed, 2: mixed, 3: list<LdapUrl>}
      * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     protected static function parseResultData(AbstractType $type)
     {

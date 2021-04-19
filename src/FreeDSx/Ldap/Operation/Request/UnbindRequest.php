@@ -27,7 +27,8 @@ class UnbindRequest implements RequestInterface
     protected const APP_TAG = 2;
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
      */
     public static function fromAsn1(AbstractType $type)
     {

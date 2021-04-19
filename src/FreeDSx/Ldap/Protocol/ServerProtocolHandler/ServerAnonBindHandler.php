@@ -26,7 +26,14 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 class ServerAnonBindHandler extends ServerBindHandler
 {
     /**
-     * {@inheritDoc}
+     * @param LdapMessageRequest $message
+     * @param RequestHandlerInterface $dispatcher
+     * @param ServerQueue $queue
+     * @param array $options
+     * @return AnonToken
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws RuntimeException
      */
     public function handleBind(LdapMessageRequest $message, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): TokenInterface
     {

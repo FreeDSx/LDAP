@@ -90,7 +90,10 @@ class CompareRequest implements RequestInterface, DnRequestInterface
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Ldap\Exception\RuntimeException
      */
     public static function fromAsn1(AbstractType $type)
     {

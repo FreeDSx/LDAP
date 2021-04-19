@@ -16,6 +16,7 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
+use FreeDSx\Ldap\Exception\UnexpectedValueException;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
@@ -145,6 +146,8 @@ class Operations
 
     /**
      * Move an LDAP entry to a new parent DN location.
+     *
+     * @throws UnexpectedValueException
      */
     public static function move(string $dn, string $newParentDn): ModifyDnRequest
     {

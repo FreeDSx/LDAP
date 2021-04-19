@@ -27,7 +27,13 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 class ServerDispatchHandler extends BaseServerHandler implements ServerProtocolHandlerInterface
 {
     /**
-     * {@inheritDoc}
+     * @param LdapMessageRequest $message
+     * @param TokenInterface $token
+     * @param RequestHandlerInterface $dispatcher
+     * @param ServerQueue $queue
+     * @param array $options
+     * @throws OperationException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): void
     {

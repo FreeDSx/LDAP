@@ -30,6 +30,9 @@ use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
  */
 class ExtendedResponse extends LdapResult
 {
+    /**
+     * @var int
+     */
     protected $tagNumber = 24;
 
     /**
@@ -80,7 +83,9 @@ class ExtendedResponse extends LdapResult
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @return self
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -91,7 +96,9 @@ class ExtendedResponse extends LdapResult
     }
 
     /**
-     * {@inheritdoc}
+     * @return AbstractType
+     * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     public function toAsn1(): AbstractType
     {
@@ -137,6 +144,8 @@ class ExtendedResponse extends LdapResult
     /**
      * @param AbstractType $type
      * @return LdapResult
+     * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
     protected static function createLdapResult(AbstractType $type)
     {
@@ -149,6 +158,8 @@ class ExtendedResponse extends LdapResult
      * @param AbstractType $type
      * @return AbstractType|null
      * @throws ProtocolException
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Asn1\Exception\PartialPduException
      */
     protected static function decodeEncodedValue(AbstractType $type)
     {

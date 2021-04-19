@@ -15,7 +15,6 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Protocol\LdapMessage;
 
 /**
  * RFC 3909. A request to cancel an operation.
@@ -72,7 +71,11 @@ class CancelRequest extends ExtendedRequest
     }
 
     /**
-     * {@inheritdoc}
+     * {@inheritDoc}
+     * @param AbstractType $type
+     * @return self
+     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws \FreeDSx\Asn1\Exception\PartialPduException
      */
     public static function fromAsn1(AbstractType $type)
     {

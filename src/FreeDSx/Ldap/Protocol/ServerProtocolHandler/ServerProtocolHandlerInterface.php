@@ -28,6 +28,7 @@ interface ServerProtocolHandlerInterface
      * Handle protocol actions specific to the request received.
      *
      * @throws OperationException
+     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): void;
 }

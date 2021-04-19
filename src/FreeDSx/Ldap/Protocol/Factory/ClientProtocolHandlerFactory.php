@@ -10,9 +10,9 @@
 
 namespace FreeDSx\Ldap\Protocol\Factory;
 
-use FreeDSx\Ldap\Operation as Operation;
-use FreeDSx\Ldap\Operation\Request as Request;
-use FreeDSx\Ldap\Operation\Response as Response;
+use FreeDSx\Ldap\Operation;
+use FreeDSx\Ldap\Operation\Request;
+use FreeDSx\Ldap\Operation\Response;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
@@ -27,7 +27,7 @@ class ClientProtocolHandlerFactory
 {
     /**
      * @param Request\RequestInterface $request
-     * @return RequestHandlerInterface
+     * @return ClientProtocolHandler\ClientBasicHandler|ClientProtocolHandler\ClientSaslBindHandler|ClientProtocolHandler\ClientUnbindHandler
      */
     public function forRequest(Request\RequestInterface $request): RequestHandlerInterface
     {
@@ -46,7 +46,7 @@ class ClientProtocolHandlerFactory
     /**
      * @param Request\RequestInterface $request
      * @param Response\ResponseInterface $response
-     * @return ResponseHandlerInterface
+     * @return ClientProtocolHandler\ClientBasicHandler|ClientProtocolHandler\ClientReferralHandler|ClientProtocolHandler\ClientStartTlsHandler
      */
     public function forResponse(Request\RequestInterface $request, Response\ResponseInterface $response): ResponseHandlerInterface
     {
