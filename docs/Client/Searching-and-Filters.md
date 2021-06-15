@@ -63,7 +63,7 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 
 # Only look for OUs
-$filter = Filters::equal('objectClass', 'organizationalUnit')
+$filter = Filters::equal('objectClass', 'organizationalUnit');
 
 # Grab all entries at the root, select only the 'ou' attribute
 $entries = $ldap->search(Operations::list($filter, 'dc=domain,dc=local', 'ou'));
