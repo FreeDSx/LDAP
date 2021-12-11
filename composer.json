@@ -19,10 +19,10 @@
     "freedsx/sasl": "^0.1.0"
   },
   "require-dev": {
-    "phpspec/phpspec": "^5.1|^6.1",
+    "phpspec/phpspec": "^5.1|^6.1|^7.1",
     "phpunit/phpunit": "^9.3|^8.0|^7.0",
     "symplify/easy-coding-standard": "^6.1|^7.3|^9.0",
-    "friends-of-phpspec/phpspec-code-coverage": "^4.3",
+    "friends-of-phpspec/phpspec-code-coverage": "^4.3|^6.1",
     "phpstan/phpstan": "^0.12.70"
   },
   "suggest": {
