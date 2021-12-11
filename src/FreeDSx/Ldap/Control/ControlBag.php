@@ -10,12 +10,16 @@
 
 namespace FreeDSx\Ldap\Control;
 
+use Countable;
+use IteratorAggregate;
+use Traversable;
+
 /**
  * Represents a set of controls.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ControlBag implements \IteratorAggregate, \Countable
+class ControlBag implements IteratorAggregate, Countable
 {
     /**
      * @var Control[]
@@ -146,18 +150,18 @@ class ControlBag implements \IteratorAggregate, \Countable
     }
 
     /**
-     * @return int
+     * @inheritDoc
      */
-    public function count()
+    public function count(): int
     {
         return \count($this->controls);
     }
 
     /**
-     * @return \ArrayIterator
+     * @inheritDoc
      * @psalm-return \ArrayIterator<array-key, Control>
      */
-    public function getIterator()
+    public function getIterator(): Traversable
     {
         return new \ArrayIterator($this->controls);
     }

@@ -10,12 +10,16 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use Countable;
+use IteratorAggregate;
+use Traversable;
+
 /**
  * Represents an entry attribute and any values.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Attribute implements \IteratorAggregate, \Countable
+class Attribute implements IteratorAggregate, Countable
 {
     use EscapeTrait;
 
@@ -201,7 +205,7 @@ class Attribute implements \IteratorAggregate, \Countable
     /**
      * {@inheritDoc}
      */
-    public function getIterator(): \ArrayIterator
+    public function getIterator(): Traversable
     {
         return new \ArrayIterator($this->values);
     }

@@ -10,6 +10,7 @@
 
 namespace FreeDSx\Ldap\Protocol;
 
+use Countable;
 use FreeDSx\Ldap\LdapUrl;
 
 /**
@@ -17,7 +18,7 @@ use FreeDSx\Ldap\LdapUrl;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ReferralContext
+class ReferralContext implements Countable
 {
     /**
      * @var LdapUrl[]
@@ -67,10 +68,10 @@ class ReferralContext
     }
 
     /**
-     * @return int
+     * @inheritDoc
      * @psalm-return 0|positive-int
      */
-    public function count()
+    public function count(): int
     {
         return \count($this->referrals);
     }

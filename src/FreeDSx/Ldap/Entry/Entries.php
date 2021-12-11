@@ -10,12 +10,16 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use Countable;
+use IteratorAggregate;
+use Traversable;
+
 /**
  * Represents a collection of entry objects.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Entries implements \Countable, \IteratorAggregate
+class Entries implements Countable, IteratorAggregate
 {
     /**
      * @var Entry[]
@@ -128,17 +132,17 @@ class Entries implements \Countable, \IteratorAggregate
     }
 
     /**
-     * @return \ArrayIterator
+     * @inheritDoc
      */
-    public function getIterator()
+    public function getIterator(): Traversable
     {
         return new \ArrayIterator($this->entries);
     }
 
     /**
-     * @return int
+     * @inheritDoc
      */
-    public function count()
+    public function count(): int
     {
         return \count($this->entries);
     }

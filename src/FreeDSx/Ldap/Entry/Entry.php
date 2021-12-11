@@ -10,12 +10,16 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use Countable;
+use IteratorAggregate;
+use Traversable;
+
 /**
  * Represents an Entry in LDAP.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Entry implements \IteratorAggregate, \Countable
+class Entry implements IteratorAggregate, Countable
 {
     /**
      * @var Attribute[]
@@ -211,10 +215,10 @@ class Entry implements \IteratorAggregate, \Countable
     }
 
     /**
-     * @return \ArrayIterator
+     * @inheritDoc
      * @psalm-return \ArrayIterator<array-key, Attribute>
      */
-    public function getIterator(): \ArrayIterator
+    public function getIterator(): Traversable
     {
         return new \ArrayIterator($this->attributes);
     }

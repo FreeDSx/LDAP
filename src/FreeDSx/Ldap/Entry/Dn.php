@@ -10,15 +10,17 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use Countable;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\UnexpectedValueException;
+use IteratorAggregate;
 
 /**
  * Represents a Distinguished Name.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Dn implements \IteratorAggregate, \Countable
+class Dn implements IteratorAggregate, Countable
 {
     /**
      * @var string
@@ -56,7 +58,7 @@ class Dn implements \IteratorAggregate, \Countable
 
     /**
      * @return null|Dn
-     * @throws \FreeDSx\Ldap\Exception\UnexpectedValueException
+     * @throws UnexpectedValueException
      */
     public function getParent(): ?Dn
     {
@@ -71,11 +73,11 @@ class Dn implements \IteratorAggregate, \Countable
     }
 
     /**
-     * @return \ArrayIterator
+     * @inheritDoc
      * @@psalm-return \ArrayIterator<array-key, Rdn>
-     * @throws \FreeDSx\Ldap\Exception\UnexpectedValueException
+     * @throws UnexpectedValueException
      */
-    public function getIterator()
+    public function getIterator(): \Traversable
     {
         return new \ArrayIterator($this->toArray());
     }
@@ -89,11 +91,11 @@ class Dn implements \IteratorAggregate, \Countable
     }
 
     /**
-     * @return int
+     * @inheritDoc
      * @psalm-return 0|positive-int
-     * @throws \FreeDSx\Ldap\Exception\UnexpectedValueException
+     * @throws UnexpectedValueException
      */
-    public function count()
+    public function count(): int
     {
         if ($this->pieces === null) {
             $this->parse();
@@ -112,7 +114,7 @@ class Dn implements \IteratorAggregate, \Countable
 
     /**
      * @return Rdn[]
-     * @throws \FreeDSx\Ldap\Exception\UnexpectedValueException
+     * @throws UnexpectedValueException
      */
     public function toArray(): array
     {

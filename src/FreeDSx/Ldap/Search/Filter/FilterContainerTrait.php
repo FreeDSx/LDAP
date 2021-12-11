@@ -10,13 +10,16 @@
 
 namespace FreeDSx\Ldap\Search\Filter;
 
+use ArrayIterator;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SetType;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use Traversable;
 
 /**
  * Methods needed to implement the filter container interface.
@@ -122,20 +125,20 @@ trait FilterContainerTrait
     }
 
     /**
-     * @return \ArrayIterator
-     * @psalm-return \ArrayIterator<array-key, \FreeDSx\Ldap\Search\Filter\FilterInterface>
-     * @throws \FreeDSx\Ldap\Exception\RuntimeException
+     * @inheritDoc
+     * @psalm-return ArrayIterator<array-key, FilterInterface>
+     * @throws RuntimeException
      */
-    public function getIterator()
+    public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->filters);
+        return new ArrayIterator($this->filters);
     }
 
     /**
-     * @return int
+     * @inheritDoc
      * @psalm-return 0|positive-int
      */
-    public function count()
+    public function count(): int
     {
         return count($this->filters);
     }

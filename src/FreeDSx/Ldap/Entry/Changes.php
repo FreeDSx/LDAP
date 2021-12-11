@@ -10,12 +10,16 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use Countable;
+use IteratorAggregate;
+use Traversable;
+
 /**
  * Represents a set of change objects.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Changes implements \Countable, \IteratorAggregate
+class Changes implements Countable, IteratorAggregate
 {
     /**
      * @var Change[]
@@ -108,19 +112,19 @@ class Changes implements \Countable, \IteratorAggregate
     }
 
     /**
-     * @return int
+     * @inheritDoc
      * @psalm-return 0|positive-int
      */
-    public function count()
+    public function count(): int
     {
         return \count($this->changes);
     }
 
     /**
-     * @return \ArrayIterator
+     * @inheritDoc
      * @psalm-return \ArrayIterator<int, Change>
      */
-    public function getIterator()
+    public function getIterator(): Traversable
     {
         return new \ArrayIterator($this->changes);
     }

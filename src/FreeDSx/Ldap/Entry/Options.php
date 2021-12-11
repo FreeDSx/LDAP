@@ -10,12 +10,17 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use ArrayIterator;
+use Countable;
+use IteratorAggregate;
+use Traversable;
+
 /**
  * Represents a collection of attribute options.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Options implements \Countable, \IteratorAggregate
+class Options implements Countable, IteratorAggregate
 {
     /**
      * @var Option[]
@@ -158,19 +163,19 @@ class Options implements \Countable, \IteratorAggregate
     }
 
     /**
-     * @return \ArrayIterator
-     * @psalm-return \ArrayIterator<array-key, Option>
+     * @inheritDoc
+     * @psalm-return ArrayIterator<array-key, Option>
      */
-    public function getIterator()
+    public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->options);
+        return new ArrayIterator($this->options);
     }
 
     /**
-     * @return int
+     * @inheritDoc
      * @psalm-return 0|positive-int
      */
-    public function count()
+    public function count(): int
     {
         return \count($this->options);
     }
