@@ -17,7 +17,6 @@ jobs:
         with:
           php-version: ${{ matrix.php-versions }}
           coverage: xdebug
-          pecl: false
 
       - name: Install OpenLDAP
         if: runner.os == 'Linux'
