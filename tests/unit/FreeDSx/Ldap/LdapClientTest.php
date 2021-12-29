@@ -295,6 +295,20 @@ class LdapClientTest extends LdapTestCase
         $this->assertTrue(true);
     }
 
+    public function testItCanWorkOverUnixSocket()
+    {
+        if ($this->isActiveDirectory()) {
+            $this->markTestSkipped('Connecting via a unix socket only tested on OpenLDAP.');
+        }
+        $this->client = $this->getClient([
+            'transport' => 'unix',
+            'servers' => '/var/run/slapd/ldapi',
+        ]);
+        $entry = $this->client->read('');
+
+        $this->assertNotNull($entry);
+    }
+
     public function testUseSslFailure()
     {
         $this->client = $this->getClient(['servers' => 'foo.com', 'use_ssl' => true, 'port' => 636]);

@@ -4,6 +4,7 @@ LDAP Client Configuration
 * [General Options](#general-options)
     * [base_dn](#base_dn)
     * [page_size](#page_size)
+    * [transport] (#transport)
     * [port](#port)
     * [servers](#servers)
     * [timeout_connect](#timeout_connect)
@@ -48,6 +49,18 @@ A default page size to use for paging operations. This will be used if a page si
 client's paging method.
 
 **Default**: `1000`
+
+------------------
+#### transport
+
+The transport mechanism to connect to LDAP with. Use either:
+
+* `tcp`
+* `unix`
+
+If using `unix` for the transport you should set the `servers` to a file representing the unix socket to connect to. ie: `/var/run/slapd/ldapi` (for OpenLDAP)
+
+**Default**: `tcp`
 
 ------------------
 #### port
