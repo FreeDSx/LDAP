@@ -254,6 +254,7 @@ class LdapClientSpec extends ObjectBehavior
             'version' => 3,
             'servers' => [],
             'port' => 389,
+            'transport' => 'tcp',
             'base_dn' => null,
             'page_size' => 1000,
             'use_ssl' => false,
