@@ -150,7 +150,7 @@ needed logic beforehand, such as a StartTLS command.
 If set to true, the client will use an SSL stream to connect to the server. This would mostly be used for servers running
 over port 636 using SSL only. You still must change the port number if you choose this option.
 
-**Note**: LDAP over SSL (port 636), commonly referred to as LDAPS, has been deprecated. You should use StartTLS instead. 
+**Note**: LDAP over SSL (port 636), commonly referred to as LDAPS, is not an official LDAP standard. You should use the StartTLS method on the client instead.
 
 **Default**: `false`
 
