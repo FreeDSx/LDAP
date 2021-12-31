@@ -36,7 +36,7 @@ jobs:
         run: composer run-script analyse
 
       - name: Run Test Coverage
-        run: composer run-script --timeout=0 test-coverage
+        run: sudo composer run-script --timeout=0 test-coverage
 
       - name: Upload Spec Coverage to Codecov
         uses: codecov/codecov-action@v1
