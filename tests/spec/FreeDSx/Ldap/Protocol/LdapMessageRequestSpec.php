@@ -19,37 +19,37 @@ use PhpSpec\ObjectBehavior;
 
 class LdapMessageRequestSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(1, new DeleteRequest('dc=foo,dc=bar'), new Control('foo'));
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(LdapMessageRequest::class);
     }
 
-    function it_should_extend_ldap_message()
+    public function it_should_extend_ldap_message()
     {
         $this->shouldBeAnInstanceOf(LdapMessage::class);
     }
 
-    function it_should_get_the_response()
+    public function it_should_get_the_response()
     {
         $this->getRequest()->shouldBeAnInstanceOf(DeleteRequest::class);
     }
 
-    function it_should_get_the_controls()
+    public function it_should_get_the_controls()
     {
         $this->controls()->has('foo')->shouldBeEqualTo(true);
     }
 
-    function it_should_get_the_message_id()
+    public function it_should_get_the_message_id()
     {
         $this->getMessageId()->shouldBeEqualTo(1);
     }
 
-    function it_should_generate_correct_ASN1()
+    public function it_should_generate_correct_ASN1()
     {
         $this->toAsn1()->shouldBeLike(Asn1::sequence(
             Asn1::integer(1),

@@ -21,17 +21,17 @@ class UnsolicitedNotificationExceptionSpec extends ObjectBehavior
         $this->beConstructedWith('foo', 0, null, 'bar');
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(UnsolicitedNotificationException::class);
     }
 
-    function it_should_extend_protocol_exception()
+    public function it_should_extend_protocol_exception()
     {
         $this->shouldBeAnInstanceOf(ProtocolException::class);
     }
 
-    function it_should_get_the_name_oid()
+    public function it_should_get_the_name_oid()
     {
         $this->getOid()->shouldBeEqualTo('bar');
     }

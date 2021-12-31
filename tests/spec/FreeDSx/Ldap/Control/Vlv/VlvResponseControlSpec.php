@@ -11,44 +11,44 @@
 namespace spec\FreeDSx\Ldap\Control\Vlv;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Vlv\VlvResponseControl;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PhpSpec\ObjectBehavior;
 
 class VlvResponseControlSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(10, 9, 0);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(VlvResponseControl::class);
     }
 
-    function it_should_get_the_offset()
+    public function it_should_get_the_offset()
     {
         $this->getOffset()->shouldBeEqualTo(10);
     }
 
-    function it_should_get_the_count()
+    public function it_should_get_the_count()
     {
         $this->getCount()->shouldBeEqualTo(9);
     }
 
-    function it_should_get_the_context_id()
+    public function it_should_get_the_context_id()
     {
         $this->getContextId()->shouldBeNull();
     }
 
-    function it_should_get_the_result()
+    public function it_should_get_the_result()
     {
         $this->getResult()->shouldBeEqualTo(0);
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $encoder = new LdapEncoder();
 

@@ -23,12 +23,12 @@ use Prophecy\Argument;
 
 class LdapServerSpec extends ObjectBehavior
 {
-    function let(ServerRunnerInterface $serverRunner)
+    public function let(ServerRunnerInterface $serverRunner)
     {
         $this->beConstructedWith(['port' => 33389], $serverRunner);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         if (!extension_loaded('pcntl')) {
             throw new SkippingException('The PCNTL extension is required for this spec.');
@@ -37,7 +37,7 @@ class LdapServerSpec extends ObjectBehavior
         $this->shouldHaveType(LdapServer::class);
     }
 
-    function it_should_run_the_server($serverRunner)
+    public function it_should_run_the_server($serverRunner)
     {
         if (!extension_loaded('pcntl')) {
             throw new SkippingException('The PCNTL extension is required for this spec.');
@@ -48,16 +48,16 @@ class LdapServerSpec extends ObjectBehavior
         $this->run();
     }
 
-    function it_should_not_allow_a_request_handler_as_an_object()
+    public function it_should_not_allow_a_request_handler_as_an_object()
     {
         if (!extension_loaded('pcntl')) {
             throw new SkippingException('The PCNTL extension is required for this spec.');
         }
 
-        $this->shouldThrow(RuntimeException::class)->during('__construct', [['request_handler' => new GenericRequestHandler()],]);
+        $this->shouldThrow(RuntimeException::class)->during('__construct', [['request_handler' => new GenericRequestHandler()], ]);
     }
 
-    function it_should_only_allow_a_request_handler_implementing_request_handler_interface()
+    public function it_should_only_allow_a_request_handler_implementing_request_handler_interface()
     {
         if (!extension_loaded('pcntl')) {
             throw new SkippingException('The PCNTL extension is required for this spec.');
@@ -66,12 +66,12 @@ class LdapServerSpec extends ObjectBehavior
         $this->shouldThrow(RuntimeException::class)->during('__construct', [['request_handler' => new Entry('foo')]]);
     }
 
-    function it_should_allow_a_request_handler_as_a_string_implementing_request_handler_interface()
+    public function it_should_allow_a_request_handler_as_a_string_implementing_request_handler_interface()
     {
         if (!extension_loaded('pcntl')) {
             throw new SkippingException('The PCNTL extension is required for this spec.');
         }
 
-        $this->shouldNotThrow(RuntimeException::class)->during('__construct', [['request_handler' => ProxyRequestHandler::class],]);
+        $this->shouldNotThrow(RuntimeException::class)->during('__construct', [['request_handler' => ProxyRequestHandler::class], ]);
     }
 }

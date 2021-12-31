@@ -11,47 +11,47 @@
 namespace spec\FreeDSx\Ldap\Control\Vlv;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Vlv\VlvControl;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PhpSpec\ObjectBehavior;
 
 class VlvControlSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(10, 9, 8, 0);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(VlvControl::class);
     }
 
-    function it_should_have_a_count_of_zero_by_default()
+    public function it_should_have_a_count_of_zero_by_default()
     {
         $this->getCount()->shouldBeEqualTo(0);
     }
 
-    function it_should_get_and_set_the_value_for_after()
+    public function it_should_get_and_set_the_value_for_after()
     {
         $this->getAfter()->shouldBeEqualTo(9);
         $this->setBefore(10)->getBefore()->shouldBeEqualTo(10);
     }
 
-    function it_should_get_and_set_the_value_for_before()
+    public function it_should_get_and_set_the_value_for_before()
     {
         $this->getBefore()->shouldBeEqualTo(10);
         $this->setBefore(20)->getBefore()->shouldBeEqualTo(20);
     }
 
-    function it_should_get_and_set_the_value_for_the_offset()
+    public function it_should_get_and_set_the_value_for_the_offset()
     {
         $this->getOffset()->shouldBeEqualTo(8);
         $this->setOffset(16)->getOffset()->shouldBeEqualTo(16);
     }
 
-    function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1()
     {
         $encoder = new LdapEncoder();
         $this->toAsn1()->shouldBeLike(Asn1::sequence(

@@ -11,41 +11,41 @@
 namespace spec\FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PhpSpec\ObjectBehavior;
 
 class PasswordModifyResponseSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(new LdapResult(0, 'foo'), '12345');
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(PasswordModifyResponse::class);
     }
 
-    function it_should_get_the_result_code()
+    public function it_should_get_the_result_code()
     {
         $this->getResultCode()->shouldBeEqualTo(0);
     }
 
-    function it_should_get_the_dn()
+    public function it_should_get_the_dn()
     {
         $this->getDn()->shouldBeLike(new Dn('foo'));
     }
 
-    function it_should_get_the_generated_password()
+    public function it_should_get_the_generated_password()
     {
         $this->getGeneratedPassword()->shouldBeEqualTo('12345');
     }
 
-    function it_should_be_constructed_from_asn1_with_a_generated_password()
+    public function it_should_be_constructed_from_asn1_with_a_generated_password()
     {
         $encoder = new LdapEncoder();
 
@@ -55,7 +55,7 @@ class PasswordModifyResponseSpec extends ObjectBehavior
             Asn1::octetString('foo'),
             Asn1::context(3, (new IncompleteType(
                 $encoder->encode(Asn1::octetString('ldap://foo'))
-                .$encoder->encode(Asn1::octetString('ldap://bar'))
+                . $encoder->encode(Asn1::octetString('ldap://bar'))
             ))->setIsConstructed(true)),
             Asn1::context(11, Asn1::octetString($encoder->encode(Asn1::sequence(
                 Asn1::context(0, Asn1::octetString('bleep-blorp'))
@@ -67,7 +67,7 @@ class PasswordModifyResponseSpec extends ObjectBehavior
         $this->getDn()->shouldBeLike(new Dn('dc=foo,dc=bar'));
     }
 
-    function it_should_be_constructed_from_asn1_without_a_generated_password()
+    public function it_should_be_constructed_from_asn1_without_a_generated_password()
     {
         $encoder = new LdapEncoder();
 
@@ -77,7 +77,7 @@ class PasswordModifyResponseSpec extends ObjectBehavior
             Asn1::octetString('foo'),
             Asn1::context(3, (new IncompleteType(
                 $encoder->encode(Asn1::octetString('ldap://foo'))
-                .$encoder->encode(Asn1::octetString('ldap://bar'))
+                . $encoder->encode(Asn1::octetString('ldap://bar'))
             ))->setIsConstructed(true)),
             Asn1::context(11, Asn1::octetString($encoder->encode(Asn1::sequence())))
         ))]);

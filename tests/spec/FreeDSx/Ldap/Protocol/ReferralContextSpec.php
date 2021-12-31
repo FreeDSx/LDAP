@@ -17,28 +17,28 @@ use PhpSpec\ObjectBehavior;
 
 class ReferralContextSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(new LdapUrl('foo'));
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ReferralContext::class);
     }
 
-    function it_should_get_the_referrals()
+    public function it_should_get_the_referrals()
     {
         $this->getReferrals()->shouldBeLike([new LdapUrl('foo')]);
     }
 
-    function it_should_check_if_it_has_a_specific_referral()
+    public function it_should_check_if_it_has_a_specific_referral()
     {
         $this->hasReferral(new LdapUrl('Foo'))->shouldBeLike(true);
         $this->hasReferral(new LdapUrl('bar'))->shouldBeLike(false);
     }
 
-    function it_should_add_a_referral()
+    public function it_should_add_a_referral()
     {
         $this->addReferral(new LdapUrl('bar'));
 
@@ -48,7 +48,7 @@ class ReferralContextSpec extends ObjectBehavior
         ]);
     }
 
-    function it_should_get_the_referral_count()
+    public function it_should_get_the_referral_count()
     {
         $this->count()->shouldBeEqualTo(1);
     }

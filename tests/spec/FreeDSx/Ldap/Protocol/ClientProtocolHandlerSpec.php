@@ -24,11 +24,11 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
-use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Socket\SocketPool;
 use PhpSpec\ObjectBehavior;
@@ -36,7 +36,7 @@ use Prophecy\Argument;
 
 class ClientProtocolHandlerSpec extends ObjectBehavior
 {
-    function let(SocketPool $pool, ClientQueue $queue, ClientProtocolHandlerFactory $protocolHandlerFactory, ResponseHandlerInterface $responseHandler, RequestHandlerInterface $requestHandler)
+    public function let(SocketPool $pool, ClientQueue $queue, ClientProtocolHandlerFactory $protocolHandlerFactory, ResponseHandlerInterface $responseHandler, RequestHandlerInterface $requestHandler)
     {
         $protocolHandlerFactory->forResponse(Argument::any(), Argument::any())->willReturn($responseHandler);
         $protocolHandlerFactory->forRequest(Argument::any())->willReturn($requestHandler);
@@ -45,27 +45,27 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         $this->beConstructedWith([], $queue, $pool, $protocolHandlerFactory);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ClientProtocolHandler::class);
     }
 
-    function it_should_close_the_queue_on_a_disconnect_notice_and_throw_a_connection_exception(RequestHandlerInterface $requestHandler, ClientQueue $queue)
+    public function it_should_close_the_queue_on_a_disconnect_notice_and_throw_a_connection_exception(RequestHandlerInterface $requestHandler, ClientQueue $queue)
     {
-        $requestHandler->handleRequest(Argument::any(), Argument::any(), Argument::any())->willThrow(new UnsolicitedNotificationException('foo', 0, null, ExtendedResponse::OID_NOTICE_OF_DISCONNECTION ));
+        $requestHandler->handleRequest(Argument::any(), Argument::any(), Argument::any())->willThrow(new UnsolicitedNotificationException('foo', 0, null, ExtendedResponse::OID_NOTICE_OF_DISCONNECTION));
 
         $queue->close()->shouldBeCalledOnce();
         $this->shouldThrow(ConnectionException::class)->during('send', [new DeleteRequest('foo')]);
     }
 
-    function it_should_throw_a_ldap_specific_connection_exception_on_socket_issues(RequestHandlerInterface $requestHandler, ClientQueue $queue)
+    public function it_should_throw_a_ldap_specific_connection_exception_on_socket_issues(RequestHandlerInterface $requestHandler, ClientQueue $queue)
     {
         $requestHandler->handleRequest(Argument::any(), Argument::any(), Argument::any())->willThrow(new \FreeDSx\Socket\Exception\ConnectionException('foo'));
 
         $this->shouldThrow(ConnectionException::class)->during('send', [new DeleteRequest('foo')]);
     }
 
-    function it_should_send_a_request_and_handle_a_response(RequestHandlerInterface $requestHandler, ResponseHandlerInterface $responseHandler, ClientQueue $queue)
+    public function it_should_send_a_request_and_handle_a_response(RequestHandlerInterface $requestHandler, ResponseHandlerInterface $responseHandler, ClientQueue $queue)
     {
         $request = new DeleteRequest('cn=foo');
         $messageResponse = new LdapMessageResponse(1, new DeleteResponse(0));
@@ -81,7 +81,7 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         $this->send($request)->shouldBeLike($messageResponse);
     }
 
-    function it_should_return_null_if_no_response_was_returned(ResponseHandlerInterface $responseHandler, RequestHandlerInterface $requestHandler, ClientQueue $queue)
+    public function it_should_return_null_if_no_response_was_returned(ResponseHandlerInterface $responseHandler, RequestHandlerInterface $requestHandler, ClientQueue $queue)
     {
         $request = new UnbindRequest();
         $messageRequest = new LdapMessageRequest(1, $request);
@@ -95,15 +95,16 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         $this->send($request)->shouldBeEqualTo(null);
     }
 
-    function it_should_throw_a_LDAP_specific_connection_exception_if_the_response_handler_throws_a_socket_exception(ResponseHandlerInterface $responseHandler, RequestHandlerInterface $requestHandler, ClientQueue $queue)
+    public function it_should_throw_a_LDAP_specific_connection_exception_if_the_response_handler_throws_a_socket_exception(ResponseHandlerInterface $responseHandler, RequestHandlerInterface $requestHandler, ClientQueue $queue)
     {
         $request = new DeleteRequest('cn=foo');
         $messageResponse = new LdapMessageResponse(1, new DeleteResponse(0));
         $messageRequest = new LdapMessageRequest(1, $request);
 
-        $requestHandler->handleRequest(Argument::that(function (ClientProtocolHandler\ClientProtocolContext $context) use ($request) {
-            return $request === $context->getRequest();
-        })
+        $requestHandler->handleRequest(
+            Argument::that(function (ClientProtocolHandler\ClientProtocolContext $context) use ($request) {
+                return $request === $context->getRequest();
+            })
         )->shouldBeCalledOnce()
             ->willReturn($messageResponse);
         $responseHandler->handleResponse($messageRequest, $messageResponse, $queue, [])->shouldBeCalledOnce()
@@ -112,7 +113,7 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         $this->shouldThrow(ConnectionException::class)->during('send', [$request]);
     }
 
-    function it_should_fetch_the_root_dse(RequestHandlerInterface $requestHandler, ResponseHandlerInterface $responseHandler, ClientQueue $queue)
+    public function it_should_fetch_the_root_dse(RequestHandlerInterface $requestHandler, ResponseHandlerInterface $responseHandler, ClientQueue $queue)
     {
         $request = Operations::read('', 'supportedSaslMechanisms', 'supportedControl', 'supportedLDAPVersion');
         $messageResponse = new LdapMessageResponse(1, new SearchResponse(new LdapResult(0), new Entries(new Entry(new Dn('')))));

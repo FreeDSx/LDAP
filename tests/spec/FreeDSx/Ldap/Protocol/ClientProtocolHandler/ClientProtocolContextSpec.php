@@ -21,12 +21,12 @@ use PhpSpec\ObjectBehavior;
 
 class ClientProtocolContextSpec extends ObjectBehavior
 {
-    function let(ClientQueue $queue, ClientProtocolHandler $protocolHandler)
+    public function let(ClientQueue $queue, ClientProtocolHandler $protocolHandler)
     {
         $this->beConstructedWith(new DeleteRequest('foo'), [], $protocolHandler, $queue, ['foo']);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ClientProtocolContext::class);
     }

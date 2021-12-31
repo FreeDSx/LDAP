@@ -23,33 +23,33 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientProtocolContext;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSearchHandler;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
-use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
-use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
 class ClientSearchHandlerSpec extends ObjectBehavior
 {
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ClientSearchHandler::class);
     }
 
-    function it_should_implement_ResponseHandlerInterface()
+    public function it_should_implement_ResponseHandlerInterface()
     {
         $this->shouldBeAnInstanceOf(ResponseHandlerInterface::class);
     }
 
-    function it_should_implement_RequestHandlerInterface()
+    public function it_should_implement_RequestHandlerInterface()
     {
         $this->shouldBeAnInstanceOf(RequestHandlerInterface::class);
     }
 
-    function it_should_send_a_request_and_get_a_response(ClientProtocolContext $context, ClientQueue $queue, LdapMessageResponse $response)
+    public function it_should_send_a_request_and_get_a_response(ClientProtocolContext $context, ClientQueue $queue, LdapMessageResponse $response)
     {
         $request = Operations::search(new EqualityFilter('foo', 'bar'));
         $message = new LdapMessageRequest(1, $request);
@@ -65,7 +65,7 @@ class ClientSearchHandlerSpec extends ObjectBehavior
         $this->handleRequest($context)->shouldBeEqualTo($response);
     }
 
-    function it_should_set_a_default_DN_for_a_request_that_has_none(ClientProtocolContext $context, LdapMessageResponse $response, ClientQueue $queue, LdapMessageRequest $message, SearchRequest $request)
+    public function it_should_set_a_default_DN_for_a_request_that_has_none(ClientProtocolContext $context, LdapMessageResponse $response, ClientQueue $queue, LdapMessageRequest $message, SearchRequest $request)
     {
         $queue->getMessage(1)->shouldBeCalled()->willReturn($response);
         $queue->sendMessage($message)->shouldBeCalledOnce();
@@ -83,7 +83,7 @@ class ClientSearchHandlerSpec extends ObjectBehavior
         $this->handleRequest($context);
     }
 
-    function it_should_not_keep_getting_messages_when_the_first_result_is_search_done(ClientQueue $queue)
+    public function it_should_not_keep_getting_messages_when_the_first_result_is_search_done(ClientQueue $queue)
     {
         $messageTo = new LdapMessageRequest(1, new SearchRequest(new EqualityFilter('foo', 'bar')));
         $response = new LdapMessageResponse(1, new SearchResultDone(0));
@@ -92,7 +92,7 @@ class ClientSearchHandlerSpec extends ObjectBehavior
         $this->handleResponse($messageTo, $response, $queue, [])->getResponse()->shouldBeAnInstanceOf(SearchResponse::class);
     }
 
-    function it_should_retrieve_results_until_it_receives_a_search_done_and_return_all_results(ClientQueue $queue)
+    public function it_should_retrieve_results_until_it_receives_a_search_done_and_return_all_results(ClientQueue $queue)
     {
         $messageTo = new LdapMessageRequest(1, new SearchRequest(new EqualityFilter('foo', 'bar')));
         $response = new LdapMessageResponse(1, new SearchResultEntry(new Entry('bar')));
@@ -103,7 +103,7 @@ class ClientSearchHandlerSpec extends ObjectBehavior
             new LdapMessageResponse(1, new SearchResultReference()),
             new LdapMessageResponse(1, new SearchResultEntry(new Entry('foo'))),
             new LdapMessageResponse(1, new SearchResultDone(0, 'cn=foo', 'bar'))
-         );
+        );
 
         $queue->getMessage(1)->shouldBeCalledTimes(5);
         $this->handleResponse($messageTo, $response, $queue, [])->shouldBeLike(
@@ -112,10 +112,11 @@ class ClientSearchHandlerSpec extends ObjectBehavior
                 new Entry('foo'),
                 new Entry('foo'),
                 new Entry('foo')
-            ))));
+            )))
+        );
     }
 
-    function it_should_throw_an_exception_if_the_result_code_is_not_success(ClientQueue $queue)
+    public function it_should_throw_an_exception_if_the_result_code_is_not_success(ClientQueue $queue)
     {
         $messageTo = new LdapMessageRequest(1, new SearchRequest(new EqualityFilter('foo', 'bar')));
         $response = new LdapMessageResponse(1, new SearchResultDone(ResultCode::SIZE_LIMIT_EXCEEDED));

@@ -18,17 +18,17 @@ use PhpSpec\ObjectBehavior;
 
 class SearchResultReferenceSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(new LdapUrl('foo'), new LdapUrl('bar'));
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(SearchResultReference::class);
     }
 
-    function it_should_get_the_referrals()
+    public function it_should_get_the_referrals()
     {
         $this->getReferrals()->shouldBeLike([
             new LdapUrl('foo'),
@@ -36,7 +36,7 @@ class SearchResultReferenceSpec extends ObjectBehavior
         ]);
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $this->beConstructedThrough('fromAsn1', [Asn1::application(19, Asn1::sequence(
             Asn1::octetString('ldap://foo'),
@@ -49,7 +49,7 @@ class SearchResultReferenceSpec extends ObjectBehavior
         ]);
     }
 
-    function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1()
     {
         $this::toAsn1()->shouldBeLike(Asn1::application(19, Asn1::sequence(
             Asn1::octetString('ldap://foo/'),
@@ -57,7 +57,7 @@ class SearchResultReferenceSpec extends ObjectBehavior
         )));
     }
 
-    function it_should_throw_a_protocol_exception_if_the_referral_cannot_be_parsed()
+    public function it_should_throw_a_protocol_exception_if_the_referral_cannot_be_parsed()
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::application(19, Asn1::sequence(
             Asn1::octetString('ldap://foo/'),

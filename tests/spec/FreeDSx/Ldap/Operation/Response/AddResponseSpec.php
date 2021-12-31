@@ -16,17 +16,17 @@ use PhpSpec\ObjectBehavior;
 
 class AddResponseSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(0, 'foo', 'bar');
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(AddResponse::class);
     }
 
-    function it_should_extend_ldap_result()
+    public function it_should_extend_ldap_result()
     {
         $this->shouldBeAnInstanceOf(LdapResult::class);
     }

@@ -11,31 +11,31 @@
 namespace spec\FreeDSx\Ldap\Control\Sorting;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PhpSpec\ObjectBehavior;
 
 class SortingControlSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(new SortKey('foo'), new SortKey('bar'));
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(SortingControl::class);
     }
 
-    function it_should_have_the_sorting_oid()
+    public function it_should_have_the_sorting_oid()
     {
         $this->getTypeOid()->shouldBeEqualTo(Control::OID_SORTING);
     }
 
-    function it_should_get_the_sort_keys()
+    public function it_should_get_the_sort_keys()
     {
         $this->getSortKeys()->shouldBeLike([
            new SortKey('foo'),
@@ -43,14 +43,14 @@ class SortingControlSpec extends ObjectBehavior
         ]);
     }
 
-    function it_should_set_sort_keys()
+    public function it_should_set_sort_keys()
     {
         $this->setSortKeys(new SortKey('foobar'));
 
         $this->getSortKeys()->shouldBeLike([new SortKey('foobar')]);
     }
 
-    function it_should_add_sort_keys()
+    public function it_should_add_sort_keys()
     {
         $key = new SortKey('foobar');
         $this->addSortKeys($key);
@@ -58,7 +58,7 @@ class SortingControlSpec extends ObjectBehavior
         $this->getSortKeys()->shouldContain($key);
     }
 
-    function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1()
     {
         $this->addSortKeys(new SortKey('foobar', true, 'bleh'));
 
@@ -78,7 +78,7 @@ class SortingControlSpec extends ObjectBehavior
         ));
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $encoder = new LdapEncoder();
         $this::fromAsn1(Asn1::sequence(
@@ -100,7 +100,7 @@ class SortingControlSpec extends ObjectBehavior
         ));
     }
 
-    function it_should_throw_an_error_parsing_sorting_keys_with_no_attribute()
+    public function it_should_throw_an_error_parsing_sorting_keys_with_no_attribute()
     {
         $encoder = new LdapEncoder();
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
@@ -112,7 +112,7 @@ class SortingControlSpec extends ObjectBehavior
         )]);
     }
 
-    function it_should_throw_an_error_parsing_sorting_keys_with_unexpected_values()
+    public function it_should_throw_an_error_parsing_sorting_keys_with_unexpected_values()
     {
         $encoder = new LdapEncoder();
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(

@@ -41,7 +41,7 @@ class VlvTest extends LdapTestCase
 
         $this->search = Operations::search(Filters::and(
             Filters::equal('objectClass', 'inetOrgPerson'),
-            Filters::startsWith('cn','B')
+            Filters::startsWith('cn', 'B')
         ), 'sn', 'givenName');
         $this->vlv = new Vlv($this->client, $this->search, 'sn');
     }
@@ -82,7 +82,7 @@ class VlvTest extends LdapTestCase
     {
         $this->search = Operations::search(Filters::and(
             Filters::equal('objectClass', 'inetOrgPerson'),
-            Filters::startsWith('cn','E')
+            Filters::startsWith('cn', 'E')
         ), 'sn', 'givenName');
         $this->vlv = new Vlv($this->client, $this->search, 'sn');
 

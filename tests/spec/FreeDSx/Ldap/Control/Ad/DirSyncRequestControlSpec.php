@@ -10,45 +10,45 @@ use PhpSpec\ObjectBehavior;
 
 class DirSyncRequestControlSpec extends ObjectBehavior
 {
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(DirSyncRequestControl::class);
     }
 
-    function it_should_set_the_flags()
+    public function it_should_set_the_flags()
     {
         $this->setFlags(DirSyncRequestControl::FLAG_PUBLIC_DATA_ONLY);
         $this->getFlags()->shouldBeEqualTo(DirSyncRequestControl::FLAG_PUBLIC_DATA_ONLY);
     }
 
-    function it_should_have_incremental_values_as_the_default_flags()
+    public function it_should_have_incremental_values_as_the_default_flags()
     {
         $this->getFlags()->shouldBeEqualTo((int) DirSyncRequestControl::FLAG_INCREMENTAL_VALUES);
     }
 
-    function it_should_set_the_cookie()
+    public function it_should_set_the_cookie()
     {
         $this->setCookie('foo');
         $this->getCookie()->shouldBeEqualTo('foo');
     }
 
-    function it_should_have_an_empty_cookie_by_default()
+    public function it_should_have_an_empty_cookie_by_default()
     {
         $this->getCookie()->shouldBeEqualTo('');
     }
 
-    function it_should_set_the_max_bytes()
+    public function it_should_set_the_max_bytes()
     {
         $this->setMaxBytes(2000);
         $this->getMaxBytes()->shouldBeEqualTo(2000);
     }
 
-    function it_should_have_the_max_value_for_max_bytes_by_default()
+    public function it_should_have_the_max_value_for_max_bytes_by_default()
     {
         $this->getMaxBytes()->shouldBeEqualTo(2147483647);
     }
 
-    function it_should_generate_correct_ASN1()
+    public function it_should_generate_correct_ASN1()
     {
         $encoder = new LdapEncoder();
 
@@ -63,7 +63,7 @@ class DirSyncRequestControlSpec extends ObjectBehavior
         ));
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $encoder = new LdapEncoder();
 

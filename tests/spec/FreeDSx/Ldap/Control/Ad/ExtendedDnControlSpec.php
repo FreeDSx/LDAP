@@ -18,22 +18,22 @@ use PhpSpec\ObjectBehavior;
 
 class ExtendedDnControlSpec extends ObjectBehavior
 {
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ExtendedDnControl::class);
     }
 
-    function it_should_set_whether_or_not_to_use_hex_format()
+    public function it_should_set_whether_or_not_to_use_hex_format()
     {
         $this->setUseHexFormat(true)->getUseHexFormat()->shouldBeEqualTo(true);
     }
 
-    function it_should_not_use_hex_format_by_default()
+    public function it_should_not_use_hex_format_by_default()
     {
         $this->getUseHexFormat()->shouldBeEqualTo(false);
     }
 
-    function it_should_generate_correct_ASN1()
+    public function it_should_generate_correct_ASN1()
     {
         $encoder = new LdapEncoder();
 
@@ -46,7 +46,7 @@ class ExtendedDnControlSpec extends ObjectBehavior
         ));
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $encoder = new LdapEncoder();
 
@@ -59,7 +59,7 @@ class ExtendedDnControlSpec extends ObjectBehavior
         ))->setValue(null)->shouldBeLike(new ExtendedDnControl());
     }
 
-    function it_should_be_constructed_from_asn1_when_the_empty_value_form_is_used()
+    public function it_should_be_constructed_from_asn1_when_the_empty_value_form_is_used()
     {
         $this::fromAsn1(Asn1::sequence(
             Asn1::octetString(Control::OID_EXTENDED_DN),

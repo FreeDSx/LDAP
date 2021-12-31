@@ -34,12 +34,12 @@ class ServerQueueSpec extends ObjectBehavior
         $this->beConstructedWith($socket, $encoder);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ServerQueue::class);
     }
 
-    function it_should_send_a_message(Socket $socket, EncoderInterface $encoder)
+    public function it_should_send_a_message(Socket $socket, EncoderInterface $encoder)
     {
         $encoder->encode(Argument::any())->shouldBeCalledTimes(1)->willReturn('foo');
         $socket->write(Argument::any())->shouldBeCalledTimes(1);
@@ -47,7 +47,7 @@ class ServerQueueSpec extends ObjectBehavior
         $this->sendMessage(new LdapMessageResponse(1, new DeleteResponse(0)));
     }
 
-    function it_should_get_a_request_message(EncoderInterface $encoder, Socket $socket)
+    public function it_should_get_a_request_message(EncoderInterface $encoder, Socket $socket)
     {
         $encoder->decode(Argument::any())->willReturn(Asn1::sequence(
             Asn1::integer(1),
@@ -58,7 +58,7 @@ class ServerQueueSpec extends ObjectBehavior
         $this->getMessage()->shouldBeAnInstanceOf(LdapMessageRequest::class);
     }
 
-    function it_should_send_multiple_messages_with_write_and_respect_the_buffer_size($socket, $encoder)
+    public function it_should_send_multiple_messages_with_write_and_respect_the_buffer_size($socket, $encoder)
     {
         $encoder->encode(Argument::any())->shouldBeCalledTimes(2)->willReturn(str_repeat('f', 8000));
         $socket->write(Argument::any())->shouldBeCalledTimes(2);
@@ -70,7 +70,7 @@ class ServerQueueSpec extends ObjectBehavior
     }
 
 
-    function it_should_set_a_message_wrapper_and_use_it_when_sending_messages(Socket $socket, EncoderInterface $encoder, MessageWrapperInterface $messageWrapper)
+    public function it_should_set_a_message_wrapper_and_use_it_when_sending_messages(Socket $socket, EncoderInterface $encoder, MessageWrapperInterface $messageWrapper)
     {
         $encoder->encode(Argument::any())->shouldBeCalledTimes(1)->willReturn('foo');
         $socket->write(Argument::any())->shouldBeCalledTimes(1);
@@ -80,7 +80,7 @@ class ServerQueueSpec extends ObjectBehavior
         $this->sendMessage(new LdapMessageResponse(1, new DeleteResponse(0)));
     }
 
-    function it_should_set_a_message_wrapper_and_use_it_when_receiving_messages(Socket $socket, EncoderInterface $encoder, MessageWrapperInterface $messageWrapper)
+    public function it_should_set_a_message_wrapper_and_use_it_when_receiving_messages(Socket $socket, EncoderInterface $encoder, MessageWrapperInterface $messageWrapper)
     {
         $asn1 = Asn1::sequence(
             Asn1::integer(1),

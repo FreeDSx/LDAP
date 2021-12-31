@@ -18,22 +18,22 @@ use PhpSpec\ObjectBehavior;
 
 class PolicyHintsControlSpec extends ObjectBehavior
 {
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(PolicyHintsControl::class);
     }
 
-    function it_should_be_enabled_by_default()
+    public function it_should_be_enabled_by_default()
     {
         $this->getIsEnabled()->shouldBeEqualTo(true);
     }
 
-    function it_should_set_whether_or_not_it_is_enabled()
+    public function it_should_set_whether_or_not_it_is_enabled()
     {
         $this->setIsEnabled(false)->getIsEnabled()->shouldBeEqualTo(false);
     }
 
-    function it_should_generate_correct_ASN1()
+    public function it_should_generate_correct_ASN1()
     {
         $encoder = new LdapEncoder();
 
@@ -46,7 +46,7 @@ class PolicyHintsControlSpec extends ObjectBehavior
         ));
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $encoder = new LdapEncoder();
 

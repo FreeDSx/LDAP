@@ -17,32 +17,32 @@ use PhpSpec\ObjectBehavior;
 
 class LessThanOrEqualFilterSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith('foo', 'bar');
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(LessThanOrEqualFilter::class);
     }
 
-    function it_should_implement_fiter_interface()
+    public function it_should_implement_fiter_interface()
     {
         $this->shouldImplement(FilterInterface::class);
     }
 
-    function it_should_get_the_attribute_name()
+    public function it_should_get_the_attribute_name()
     {
         $this->getAttribute()->shouldBeEqualTo('foo');
     }
 
-    function it_should_get_the_value()
+    public function it_should_get_the_value()
     {
         $this->getValue()->shouldBeEqualTo('bar');
     }
 
-    function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1()
     {
         $this->toAsn1()->shouldBeLike(Asn1::context(6, Asn1::sequence(
             Asn1::octetString('foo'),
@@ -50,22 +50,22 @@ class LessThanOrEqualFilterSpec extends ObjectBehavior
         )));
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $this::fromAsn1((new LessThanOrEqualFilter('foo', 'bar'))->toAsn1())->shouldBeLike(new LessThanOrEqualFilter('foo', 'bar'));
     }
 
-    function it_should_get_the_string_filter_representation()
+    public function it_should_get_the_string_filter_representation()
     {
         $this->toString()->shouldBeEqualTo('(foo<=bar)');
     }
 
-    function it_should_have_a_filter_as_a_toString_representation()
+    public function it_should_have_a_filter_as_a_toString_representation()
     {
         $this->__toString()->shouldBeEqualTo('(foo<=bar)');
     }
 
-    function it_should_escape_values_on_the_string_representation()
+    public function it_should_escape_values_on_the_string_representation()
     {
         $this->beConstructedWith('foo', ')(bar=*5');
         $this->toString()->shouldBeEqualTo('(foo<=\29\28bar=\2a5)');

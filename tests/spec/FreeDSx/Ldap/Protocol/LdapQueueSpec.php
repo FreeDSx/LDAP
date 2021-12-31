@@ -28,7 +28,7 @@ use Prophecy\Argument;
 
 class LdapQueueSpec extends ObjectBehavior
 {
-    function let(Socket $socket, EncoderInterface $encoder)
+    public function let(Socket $socket, EncoderInterface $encoder)
     {
         $socket->read(Argument::any())->willReturn('foo', false);
         $encoder->getLastPosition()->willReturn(3);
@@ -36,22 +36,22 @@ class LdapQueueSpec extends ObjectBehavior
         $this->beConstructedWith($socket, $encoder);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(LdapQueue::class);
     }
 
-    function it_should_extend_the_Asn1MessageQueue()
+    public function it_should_extend_the_Asn1MessageQueue()
     {
         $this->shouldBeAnInstanceOf(Asn1MessageQueue::class);
     }
 
-    function it_should_get_the_current_id()
+    public function it_should_get_the_current_id()
     {
         $this->currentId()->shouldBeEqualTo(0);
     }
 
-    function it_should_generate_an_id()
+    public function it_should_generate_an_id()
     {
         $this->generateId()->shouldBeEqualTo(1);
         $this->generateId()->shouldBeEqualTo(2);

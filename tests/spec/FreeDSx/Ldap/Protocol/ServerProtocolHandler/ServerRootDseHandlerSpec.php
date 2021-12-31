@@ -30,12 +30,12 @@ use Prophecy\Argument;
 
 class ServerRootDseHandlerSpec extends ObjectBehavior
 {
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ServerRootDseHandler::class);
     }
 
-    function it_should_send_back_a_RootDSE(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_back_a_RootDSE(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $search = new LdapMessageRequest(
             1,
@@ -63,7 +63,7 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         );
     }
 
-    function it_should_send_a_request_to_the_dispatcher_if_it_implements_a_rootdse_aware_interface(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_a_request_to_the_dispatcher_if_it_implements_a_rootdse_aware_interface(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $searchReqeust = (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope();
         $search = new LdapMessageRequest(
@@ -99,7 +99,7 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         );
     }
 
-    function it_should_only_return_attribute_names_from_the_RootDSE_if_requested(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_only_return_attribute_names_from_the_RootDSE_if_requested(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $search = new LdapMessageRequest(
             1,
@@ -128,7 +128,7 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         );
     }
 
-    function it_should_only_return_specific_attributes_from_the_RootDSE_if_requested(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_only_return_specific_attributes_from_the_RootDSE_if_requested(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $search = new LdapMessageRequest(
             1,
@@ -139,7 +139,7 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         );
 
         # The reset below is needed, unfortunately, to properly spec due to how the objects change...
-        $entry = Entry::create('', ['namingContexts' => 'dc=Foo,dc=Bar',]);
+        $entry = Entry::create('', ['namingContexts' => 'dc=Foo,dc=Bar', ]);
         $entry->changes()->reset();
         $entry->get('namingContexts')->equals(new Attribute('foo'));
 

@@ -21,12 +21,12 @@ use Prophecy\Argument;
 
 class ServerUnbindHandlerSpec extends ObjectBehavior
 {
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ServerUnbindHandler::class);
     }
 
-    function it_should_handle_an_unbind_request(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher)
+    public function it_should_handle_an_unbind_request(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher)
     {
         $queue->close()->shouldBeCalled();
         $queue->sendMessage(Argument::any())->shouldNotBeCalled();

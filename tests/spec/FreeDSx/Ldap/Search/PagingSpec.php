@@ -23,7 +23,7 @@ use PhpSpec\ObjectBehavior;
 
 class PagingSpec extends ObjectBehavior
 {
-    function let(LdapClient $client, SearchRequest $search)
+    public function let(LdapClient $client, SearchRequest $search)
     {
         $client->sendAndReceive($search, new PagingControl(1000, ''))->willReturn(new LdapMessageResponse(
             1,
@@ -34,23 +34,23 @@ class PagingSpec extends ObjectBehavior
         $this->beConstructedWith($client, $search, 1000);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(Paging::class);
     }
 
-    function it_should_check_whether_paging_has_entries_left_and_return_true_on_start()
+    public function it_should_check_whether_paging_has_entries_left_and_return_true_on_start()
     {
         $this->hasEntries()->shouldBeEqualTo(true);
     }
 
-    function it_should_return_true_for_entries_when_the_cookie_is_not_empty()
+    public function it_should_return_true_for_entries_when_the_cookie_is_not_empty()
     {
         $this->getEntries();
         $this->hasEntries()->shouldBeEqualTo(true);
     }
 
-    function it_should_return_false_for_entries_when_the_cookie_is_empty($client, $search)
+    public function it_should_return_false_for_entries_when_the_cookie_is_empty($client, $search)
     {
         $client->sendAndReceive($search, new PagingControl(100, ''))->willReturn(
             new LdapMessageResponse(
@@ -64,7 +64,7 @@ class PagingSpec extends ObjectBehavior
         $this->hasEntries()->shouldBeEqualTo(false);
     }
 
-    function it_should_abort_a_paging_operation_if_end_is_called($client, $search)
+    public function it_should_abort_a_paging_operation_if_end_is_called($client, $search)
     {
         $client->sendAndReceive($search, new PagingControl(0, 'foo'))->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
@@ -76,14 +76,14 @@ class PagingSpec extends ObjectBehavior
         $this->end();
     }
 
-    function it_should_get_the_size_estimate_from_the_server_response()
+    public function it_should_get_the_size_estimate_from_the_server_response()
     {
         $this->sizeEstimate()->shouldBe(null);
         $this->getEntries();
         $this->sizeEstimate()->shouldBeEqualTo(100);
     }
 
-    function it_should_get_the_entries_from_the_response()
+    public function it_should_get_the_entries_from_the_response()
     {
         $this->getEntries()->shouldBeLike(new Entries(Entry::create('foo'), Entry::create('bar')));
     }

@@ -11,31 +11,31 @@
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\CancelRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PhpSpec\ObjectBehavior;
 
 class CancelRequestSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(1);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(CancelRequest::class);
     }
 
-    function it_should_set_the_message_id()
+    public function it_should_set_the_message_id()
     {
         $this->getMessageId()->shouldBeEqualTo(1);
         $this->setMessageId(2)->getMessageId()->shouldBeEqualTo(2);
     }
 
-    function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1()
     {
         $encoder = new LdapEncoder();
 
@@ -47,12 +47,12 @@ class CancelRequestSpec extends ObjectBehavior
         )));
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $this::fromAsn1((new CancelRequest(2))->toAsn1())->shouldBeLike(new CancelRequest(2));
     }
 
-    function it_should_detect_invalid_asn1_from_asn1()
+    public function it_should_detect_invalid_asn1_from_asn1()
     {
         $req = new ExtendedRequest('foo', Asn1::octetString('foo'));
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [$req->toAsn1()]);

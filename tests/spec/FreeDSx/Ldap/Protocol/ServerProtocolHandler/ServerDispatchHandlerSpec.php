@@ -36,12 +36,12 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $queue->sendMessage(Argument::any())->willReturn($queue);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ServerDispatchHandler::class);
     }
 
-    function it_should_send_an_add_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_an_add_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $add = new LdapMessageRequest(1, new AddRequest(Entry::create('cn=foo,dc=bar')));
 
@@ -49,7 +49,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $this->handleRequest($add, $token, $handler, $queue, []);
     }
 
-    function it_should_send_a_delete_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_a_delete_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $delete = new LdapMessageRequest(1, new DeleteRequest('cn=foo,dc=bar'));
 
@@ -57,7 +57,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $this->handleRequest($delete, $token, $handler, $queue, []);
     }
 
-    function it_should_send_a_modify_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_a_modify_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $modify = new LdapMessageRequest(1, new ModifyRequest('cn=foo,dc=bar', Change::add('foo', 'bar')));
 
@@ -65,7 +65,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $this->handleRequest($modify, $token, $handler, $queue, []);
     }
 
-    function it_should_send_a_modify_dn_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_a_modify_dn_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $modifyDn = new LdapMessageRequest(1, new ModifyDnRequest('cn=foo,dc=bar', 'cn=bar', true));
 
@@ -73,7 +73,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $this->handleRequest($modifyDn, $token, $handler, $queue, []);
     }
 
-    function it_should_send_an_extended_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_an_extended_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $ext = new LdapMessageRequest(1, new ExtendedRequest('foo', 'bar'));
 
@@ -81,7 +81,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $this->handleRequest($ext, $token, $handler, $queue, []);
     }
 
-    function it_should_send_a_compare_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_a_compare_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $compare = new LdapMessageRequest(1, new CompareRequest('cn=foo,dc=bar', Filters::equal('foo', 'bar')));
 
@@ -89,9 +89,9 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $this->handleRequest($compare, $token, $handler, $queue, []);
     }
 
-    function it_should_throw_an_operation_exception_if_the_request_is_unsupported(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_throw_an_operation_exception_if_the_request_is_unsupported(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
-        $request  = new LdapMessageRequest(2, new AbandonRequest(1));
+        $request = new LdapMessageRequest(2, new AbandonRequest(1));
 
         $this->shouldThrow(OperationException::class)->during(
             'handleRequest',

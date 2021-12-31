@@ -22,17 +22,17 @@ class RequestContextSpec extends ObjectBehavior
         $this->beConstructedWith(new ControlBag(), new AnonToken(null));
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(RequestContext::class);
     }
 
-    function it_should_get_the_token()
+    public function it_should_get_the_token()
     {
         $this->token()->shouldBeAnInstanceOf(new AnonToken(null));
     }
 
-    function it_should_get_the_controls()
+    public function it_should_get_the_controls()
     {
         $this->controls()->shouldBeAnInstanceOf(new ControlBag());
     }

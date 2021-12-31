@@ -15,12 +15,12 @@ use PhpSpec\ObjectBehavior;
 
 class FilterParseExceptionSpec extends ObjectBehavior
 {
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(FilterParseException::class);
     }
 
-    function it_should_extend_exception()
+    public function it_should_extend_exception()
     {
         $this->shouldBeAnInstanceOf('\Exception');
     }

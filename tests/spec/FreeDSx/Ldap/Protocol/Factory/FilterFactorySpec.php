@@ -16,25 +16,25 @@ use PhpSpec\ObjectBehavior;
 
 class FilterFactorySpec extends ObjectBehavior
 {
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(FilterFactory::class);
     }
 
-    function it_should_check_if_a_mapping_exists()
+    public function it_should_check_if_a_mapping_exists()
     {
         $this::has(0)->shouldBeEqualTo(true);
         $this::has(99)->shouldBeEqualTo(false);
     }
 
-    function it_should_set_a_mapping()
+    public function it_should_set_a_mapping()
     {
         $this::set(99, EqualityFilter::class);
 
         $this::has(99)->shouldBeEqualTo(true);
     }
 
-    function it_should_get_a_mapping()
+    public function it_should_get_a_mapping()
     {
         $this::get((new EqualityFilter('foo', 'bar'))->toAsn1())->shouldBeLike(new EqualityFilter('foo', 'bar'));
     }

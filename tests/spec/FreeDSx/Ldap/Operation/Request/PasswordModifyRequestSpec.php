@@ -11,43 +11,43 @@
 namespace spec\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PhpSpec\ObjectBehavior;
 
 class PasswordModifyRequestSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith('foo', 'bar', '12345');
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(PasswordModifyRequest::class);
     }
 
-    function it_should_get_the_new_password()
+    public function it_should_get_the_new_password()
     {
         $this->getNewPassword()->shouldBeEqualTo('12345');
         $this->setNewPassword('foo')->getNewPassword()->shouldBeEqualTo('foo');
     }
 
-    function it_should_get_the_old_password()
+    public function it_should_get_the_old_password()
     {
         $this->getOldPassword()->shouldBeEqualTo('bar');
         $this->setOldPassword('foo')->getOldPassword()->shouldBeEqualTo('foo');
     }
 
-    function it_should_get_the_username()
+    public function it_should_get_the_username()
     {
         $this->getUsername()->shouldBeEqualTo('foo');
         $this->setUsername('bar')->getUsername()->shouldBeEqualTo('bar');
     }
 
-    function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1()
     {
         $encoder = new LdapEncoder();
 
@@ -84,7 +84,7 @@ class PasswordModifyRequestSpec extends ObjectBehavior
         )));
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $passwdMod = new PasswordModifyRequest('foo', 'bar', '12345');
         $this::fromAsn1($passwdMod->toAsn1())->shouldBeLike($passwdMod->setValue(null));
@@ -96,7 +96,7 @@ class PasswordModifyRequestSpec extends ObjectBehavior
         $this::fromAsn1($passwdMod->toAsn1())->shouldBeLike($passwdMod->setValue(null));
     }
 
-    function it_should_not_be_constructed_from_invalid_asn1()
+    public function it_should_not_be_constructed_from_invalid_asn1()
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [
             (new ExtendedRequest('foo'))->setValue(Asn1::set())->toAsn1()

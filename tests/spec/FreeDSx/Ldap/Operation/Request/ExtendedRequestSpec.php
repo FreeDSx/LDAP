@@ -22,23 +22,23 @@ class ExtendedRequestSpec extends ObjectBehavior
         $this->beConstructedWith(ExtendedRequest::OID_START_TLS);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ExtendedRequest::class);
     }
 
-    function it_should_get_the_extended_request_name()
+    public function it_should_get_the_extended_request_name()
     {
         $this->getName()->shouldBeEqualTo('1.3.6.1.4.1.1466.20037');
         $this->setName('foo')->getName()->shouldBeEqualTo('foo');
     }
 
-    function it_should_get_the_extended_request_value()
+    public function it_should_get_the_extended_request_value()
     {
         $this->setValue('foo')->getValue()->shouldBeEqualTo('foo');
     }
 
-    function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1()
     {
         $this->toAsn1()->shouldBeLike(Asn1::application(23, Asn1::sequence(
             Asn1::context(0, Asn1::octetString(ExtendedRequest::OID_START_TLS))
@@ -52,21 +52,21 @@ class ExtendedRequestSpec extends ObjectBehavior
         )));
     }
 
-    function it_should_be_constructed_from_asn1_with_no_value()
+    public function it_should_be_constructed_from_asn1_with_no_value()
     {
         $request = new ExtendedRequest('foo');
 
         $this::fromAsn1($request->toAsn1())->shouldBeLike($request);
     }
 
-    function it_should_be_constructed_from_asn1_with_a_value()
+    public function it_should_be_constructed_from_asn1_with_a_value()
     {
         $request = new ExtendedRequest('foo', 'bar');
 
         $this::fromAsn1($request->toAsn1())->shouldBeLike($request);
     }
 
-    function it_should_detect_invalid_asn1()
+    public function it_should_detect_invalid_asn1()
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::octetString('foo')]);
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence()]);

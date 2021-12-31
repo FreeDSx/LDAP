@@ -26,12 +26,12 @@ use Prophecy\Argument;
 
 class ServerBindHandlerSpec extends ObjectBehavior
 {
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ServerBindHandler::class);
     }
 
-    function it_should_return_a_token_on_success(ServerQueue $queue, RequestHandlerInterface $dispatcher)
+    public function it_should_return_a_token_on_success(ServerQueue $queue, RequestHandlerInterface $dispatcher)
     {
         $bind = new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar'));
 
@@ -47,7 +47,7 @@ class ServerBindHandlerSpec extends ObjectBehavior
         );
     }
 
-    function it_should_throw_an_operations_exception_with_invalid_credentials_if_they_are_wrong(ServerQueue $queue, RequestHandlerInterface $dispatcher)
+    public function it_should_throw_an_operations_exception_with_invalid_credentials_if_they_are_wrong(ServerQueue $queue, RequestHandlerInterface $dispatcher)
     {
         $bind = new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar'));
 
@@ -63,7 +63,7 @@ class ServerBindHandlerSpec extends ObjectBehavior
             );
     }
 
-    function it_should_validate_the_version(ServerQueue $queue, RequestHandlerInterface $dispatcher)
+    public function it_should_validate_the_version(ServerQueue $queue, RequestHandlerInterface $dispatcher)
     {
         $bind = new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar', 5));
 

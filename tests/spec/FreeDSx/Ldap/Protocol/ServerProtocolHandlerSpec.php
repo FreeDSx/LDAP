@@ -37,7 +37,7 @@ use Prophecy\Argument;
 
 class ServerProtocolHandlerSpec extends ObjectBehavior
 {
-    function let(ServerQueue $queue, ServerProtocolHandlerFactory $protocolHandlerFactory, ServerBindHandlerFactory $bindHandlerFactory, RequestHandlerInterface $dispatcher, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    public function let(ServerQueue $queue, ServerProtocolHandlerFactory $protocolHandlerFactory, ServerBindHandlerFactory $bindHandlerFactory, RequestHandlerInterface $dispatcher, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
     {
         $queue->close()->hasReturnVoid();
         $queue->isConnected()->willReturn(true);
@@ -55,12 +55,12 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         );
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ServerProtocolHandler::class);
     }
 
-    function it_should_enforce_anonymous_bind_requirements(ServerQueue $queue, ServerBindHandlerFactory $bindHandlerFactory)
+    public function it_should_enforce_anonymous_bind_requirements(ServerQueue $queue, ServerBindHandlerFactory $bindHandlerFactory)
     {
         $queue->getMessage()->willReturn(
             new LdapMessageRequest(1, new AnonBindRequest('foo')),
@@ -80,7 +80,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    function it_should_not_allow_a_previous_message_ID_from_a_new_request(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    public function it_should_not_allow_a_previous_message_ID_from_a_new_request(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
     {
         $queue->getMessage()->willReturn(
             new LdapMessageRequest(1, new SimpleBindRequest('foo', 'bar')),
@@ -106,7 +106,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-function it_should_enforce_authentication_requirements(ServerQueue $queue, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    public function it_should_enforce_authentication_requirements(ServerQueue $queue, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
     {
         $queue->isConnected()->willReturn(true, false);
         $queue->getMessage()->willReturn(
@@ -122,7 +122,8 @@ function it_should_enforce_authentication_requirements(ServerQueue $queue, Serve
             new ModifyDnResponse(
                 ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
                 'cn=foo,dc=bar',
-                'Authentication required.')
+                'Authentication required.'
+            )
         ))->shouldBeCalled()->willReturn($queue);
 
         $protocolHandler->handleRequest(Argument::any(), Argument::any(), Argument::any(), Argument::any(), Argument::any())
@@ -131,7 +132,7 @@ function it_should_enforce_authentication_requirements(ServerQueue $queue, Serve
         $this->handle();
     }
 
-    function it_should_send_a_notice_of_disconnect_on_a_protocol_exception_from_the_message_queue(ServerQueue $queue)
+    public function it_should_send_a_notice_of_disconnect_on_a_protocol_exception_from_the_message_queue(ServerQueue $queue)
     {
         $queue->getMessage()->willThrow(new ProtocolException());
 
@@ -143,7 +144,7 @@ function it_should_enforce_authentication_requirements(ServerQueue $queue, Serve
         $this->handle();
     }
 
-    function it_should_send_a_notice_of_disconnect_on_an_encoder_exception_from_the_message_queue(ServerQueue $queue)
+    public function it_should_send_a_notice_of_disconnect_on_an_encoder_exception_from_the_message_queue(ServerQueue $queue)
     {
         $queue->getMessage()->willThrow(new EncoderException());
 
@@ -155,7 +156,7 @@ function it_should_enforce_authentication_requirements(ServerQueue $queue, Serve
         $this->handle();
     }
 
-    function it_should_not_allow_a_message_with_an_ID_of_zero(ServerQueue $queue)
+    public function it_should_not_allow_a_message_with_an_ID_of_zero(ServerQueue $queue)
     {
         $queue->getMessage()->willReturn(new LdapMessageRequest(0, new ExtendedRequest(ExtendedRequest::OID_START_TLS)), null);
 
@@ -168,7 +169,7 @@ function it_should_enforce_authentication_requirements(ServerQueue $queue, Serve
         $this->handle();
     }
 
-    function it_should_send_a_bind_request_to_the_bind_request_handler(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    public function it_should_send_a_bind_request_to_the_bind_request_handler(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
     {
         $queue->getMessage()->willReturn(
             new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar')),
@@ -184,7 +185,7 @@ function it_should_enforce_authentication_requirements(ServerQueue $queue, Serve
         $this->handle();
     }
 
-    function it_should_handle_operation_errors_thrown_from_the_request_handlers(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    public function it_should_handle_operation_errors_thrown_from_the_request_handlers(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
     {
         $queue->isConnected()->willReturn(true, false);
         $queue->getMessage()->willReturn(
@@ -206,7 +207,8 @@ function it_should_enforce_authentication_requirements(ServerQueue $queue, Serve
                 ResultCode::CONFIDENTIALITY_REQUIRED,
                 'cn=foo,dc=bar',
                 'Foo.'
-            )))->shouldBeCalled();
+            )
+        ))->shouldBeCalled();
 
         $this->handle();
     }

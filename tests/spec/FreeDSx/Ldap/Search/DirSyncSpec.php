@@ -30,7 +30,7 @@ class DirSyncSpec extends ObjectBehavior
 
     protected $secondResponse;
 
-    function let(LdapClient $client)
+    public function let(LdapClient $client)
     {
         $this->initialResponse = new LdapMessageResponse(
             0,
@@ -51,12 +51,12 @@ class DirSyncSpec extends ObjectBehavior
         $this->beConstructedWith($client);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(DirSync::class);
     }
 
-    function it_should_set_the_naming_context($client)
+    public function it_should_set_the_naming_context($client)
     {
         $client->send(Argument::that(function ($search) {
             return $search->getBaseDn()->toString() == 'dc=foo';
@@ -66,7 +66,7 @@ class DirSyncSpec extends ObjectBehavior
         $this->getChanges();
     }
 
-    function it_should_set_the_filter($client)
+    public function it_should_set_the_filter($client)
     {
         $client->send(Argument::that(function ($search) {
             return $search->getFilter()->toString() == '(foo=bar)';
@@ -76,7 +76,7 @@ class DirSyncSpec extends ObjectBehavior
         $this->getChanges();
     }
 
-    function it_should_set_the_attributes_to_select($client)
+    public function it_should_set_the_attributes_to_select($client)
     {
         $client->send(Argument::that(function ($search) {
             return $search->getAttributes()[0]->getName() === 'foo';
@@ -86,7 +86,7 @@ class DirSyncSpec extends ObjectBehavior
         $this->getChanges();
     }
 
-    function it_should_set_the_incremental_values_flag($client)
+    public function it_should_set_the_incremental_values_flag($client)
     {
         $client->send(Argument::any(), Argument::that(function ($control) {
             return $control->getFlags() !== DirSyncRequestControl::FLAG_INCREMENTAL_VALUES;
@@ -96,7 +96,7 @@ class DirSyncSpec extends ObjectBehavior
         $this->getChanges();
     }
 
-    function it_should_object_security_flag($client)
+    public function it_should_object_security_flag($client)
     {
         $client->send(Argument::any(), Argument::that(function ($control) {
             return ($control->getFlags() & DirSyncRequestControl::FLAG_OBJECT_SECURITY);
@@ -106,7 +106,7 @@ class DirSyncSpec extends ObjectBehavior
         $this->getChanges();
     }
 
-    function it_should_set_ancestor_first_order($client)
+    public function it_should_set_ancestor_first_order($client)
     {
         $client->send(Argument::any(), Argument::that(function ($control) {
             return ($control->getFlags() & DirSyncRequestControl::FLAG_ANCESTORS_FIRST_ORDER);
@@ -116,7 +116,7 @@ class DirSyncSpec extends ObjectBehavior
         $this->getChanges();
     }
 
-    function it_should_set_the_cookie($client)
+    public function it_should_set_the_cookie($client)
     {
         $client->send(Argument::any(), Argument::that(function ($control) {
             return ($control->getCookie() === 'foo');
@@ -126,14 +126,14 @@ class DirSyncSpec extends ObjectBehavior
         $this->getChanges();
     }
 
-    function it_should_get_the_cookie()
+    public function it_should_get_the_cookie()
     {
         $this->getCookie()->shouldBeEqualTo('');
         $this->getChanges();
         $this->getCookie()->shouldBeEqualTo('foo');
     }
 
-    function it_should_set_the_cookie_from_the_response_after_the_initial_query($client)
+    public function it_should_set_the_cookie_from_the_response_after_the_initial_query($client)
     {
         $client->send(Argument::any(), Argument::that(function ($control) {
             return ($control->getCookie() === '');
@@ -148,7 +148,7 @@ class DirSyncSpec extends ObjectBehavior
         $this->getChanges();
     }
 
-    function it_should_check_the_root_dse_for_the_default_naming_context($client)
+    public function it_should_check_the_root_dse_for_the_default_naming_context($client)
     {
         $client->readOrFail(Argument::any(), Argument::any())->shouldBeCalledOnce();
 
@@ -156,7 +156,7 @@ class DirSyncSpec extends ObjectBehavior
         $this->getChanges();
     }
 
-    function it_should_not_check_the_root_dse_for_the_default_naming_context_if_it_was_provided($client)
+    public function it_should_not_check_the_root_dse_for_the_default_naming_context_if_it_was_provided($client)
     {
         $this->useNamingContext('dc=foo');
         $client->readOrFail(Argument::any(), Argument::any())->shouldNotBeCalled();
@@ -164,18 +164,18 @@ class DirSyncSpec extends ObjectBehavior
         $this->getChanges();
     }
 
-    function it_should_return_false_for_changes_if_no_queries_have_been_made_yet()
+    public function it_should_return_false_for_changes_if_no_queries_have_been_made_yet()
     {
         $this->hasChanges()->shouldBeEqualTo(false);
     }
 
-    function it_should_return_true_for_changes_if_the_dir_sync_control_indicates_there_are()
+    public function it_should_return_true_for_changes_if_the_dir_sync_control_indicates_there_are()
     {
         $this->getChanges();
         $this->hasChanges()->shouldBeEqualTo(true);
     }
 
-    function it_should_return_false_for_changes_if_the_dir_sync_control_indicates_there_are_none_left($client)
+    public function it_should_return_false_for_changes_if_the_dir_sync_control_indicates_there_are_none_left($client)
     {
         $client->send(Argument::any(), Argument::that(function ($control) {
             return ($control->getCookie() === '');

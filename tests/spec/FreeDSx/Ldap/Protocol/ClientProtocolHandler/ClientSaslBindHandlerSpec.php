@@ -44,7 +44,7 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
      */
     protected $saslComplete;
 
-    function let(Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue, ClientProtocolHandler $protocolHandler)
+    public function let(Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue, ClientProtocolHandler $protocolHandler)
     {
         $queue->sendMessage(Argument::any())->willReturn($queue);
         $context->getControls()->willReturn([]);
@@ -66,17 +66,17 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
         $this->beConstructedWith($sasl);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ClientSaslBindHandler::class);
     }
 
-    function it_should_implement_RequestHandlerInterface()
+    public function it_should_implement_RequestHandlerInterface()
     {
         $this->shouldBeAnInstanceOf(RequestHandlerInterface::class);
     }
 
-    function it_should_handle_a_sasl_bind_request(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue)
+    public function it_should_handle_a_sasl_bind_request(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue)
     {
         $saslBind = Operations::bindSasl(['username' => 'foo', 'password' => 'bar']);
         $context->getRequest()->willReturn($saslBind);
@@ -108,7 +108,7 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
         $this->handleRequest($context)->shouldBeEqualTo($this->saslComplete);
     }
 
-    function it_should_detect_a_downgrade_attack(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue)
+    public function it_should_detect_a_downgrade_attack(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue)
     {
         $saslBind = Operations::bindSasl(['username' => 'foo', 'password' => 'bar']);
         $context->getRequest()->willReturn($saslBind);
@@ -146,7 +146,7 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
             ->during('handleRequest', [$context]);
     }
 
-    function it_should_not_query_the_rootdse_if_the_mechanism_was_explicitly_specified(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue)
+    public function it_should_not_query_the_rootdse_if_the_mechanism_was_explicitly_specified(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue)
     {
         $saslBind = Operations::bindSasl(['username' => 'foo', 'password' => 'bar'], 'DIGEST-MD5');
         $context->getRequest()->willReturn($saslBind);
@@ -172,7 +172,7 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
         $this->handleRequest($context)->shouldBeEqualTo($this->saslComplete);
     }
 
-    function it_should_set_the_set_the_security_layer_on_the_queue_if_one_was_negotiated(SecurityLayerInterface $securityLayer, ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue)
+    public function it_should_set_the_set_the_security_layer_on_the_queue_if_one_was_negotiated(SecurityLayerInterface $securityLayer, ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue)
     {
         $saslBind = Operations::bindSasl(['username' => 'foo', 'password' => 'bar'], 'DIGEST-MD5');
         $context->getRequest()->willReturn($saslBind);

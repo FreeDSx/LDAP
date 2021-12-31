@@ -17,22 +17,22 @@ use PhpSpec\ObjectBehavior;
 
 class SearchResultEntrySpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(Entry::create('cn=foo,dc=foo,dc=bar', ['cn' => 'foo']));
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(SearchResultEntry::class);
     }
 
-    function it_should_get_the_entry()
+    public function it_should_get_the_entry()
     {
         $this->getEntry()->shouldBeLike(Entry::create('cn=foo,dc=foo,dc=bar', ['cn' => 'foo']));
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $this->beConstructedThrough('fromAsn1', [Asn1::application(4, Asn1::sequence(
             Asn1::octetString('dc=foo,dc=bar'),
@@ -56,7 +56,7 @@ class SearchResultEntrySpec extends ObjectBehavior
         $this->getEntry()->shouldBeLike(Entry::create('dc=foo,dc=bar', ['cn' => ['foo'], 'sn' => ['foo', 'bar']]));
     }
 
-    function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1()
     {
         $this->toAsn1()->shouldBeLike(Asn1::application(4, Asn1::sequence(
             Asn1::octetString('cn=foo,dc=foo,dc=bar'),

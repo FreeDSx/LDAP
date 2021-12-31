@@ -24,12 +24,12 @@ class LdapTestCase extends TestCase
      * @param array $options
      * @return LdapClient
      */
-    protected function getClient(array $options = []) : LdapClient
+    protected function getClient(array $options = []): LdapClient
     {
         $default = [
             'servers' => $_ENV['LDAP_SERVER'],
             'port' => $_ENV['LDAP_PORT'],
-            'ssl_ca_cert' => $_ENV['LDAP_CA_CERT'] === '' ? __DIR__.'/../../../resources/cert/ca.crt' : $_ENV['LDAP_CA_CERT'],
+            'ssl_ca_cert' => $_ENV['LDAP_CA_CERT'] === '' ? __DIR__ . '/../../../resources/cert/ca.crt' : $_ENV['LDAP_CA_CERT'],
             'base_dn' => $_ENV['LDAP_BASE_DN'],
         ];
 
@@ -43,7 +43,7 @@ class LdapTestCase extends TestCase
      * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
-    protected function bindClient(LdapClient $client) : void
+    protected function bindClient(LdapClient $client): void
     {
         $client->bind($_ENV['LDAP_USERNAME'], $_ENV['LDAP_PASSWORD']);
     }
@@ -55,7 +55,7 @@ class LdapTestCase extends TestCase
      * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
-    protected function isActiveDirectory() : bool
+    protected function isActiveDirectory(): bool
     {
         if (self::$isActiveDirectory === null) {
             $client = $this->getClient();

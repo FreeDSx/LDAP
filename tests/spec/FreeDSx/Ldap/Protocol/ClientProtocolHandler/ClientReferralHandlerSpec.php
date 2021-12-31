@@ -32,12 +32,12 @@ use Prophecy\Argument;
 
 class ClientReferralHandlerSpec extends ObjectBehavior
 {
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ClientReferralHandler::class);
     }
 
-    function it_should_throw_an_exception_on_referrals(ClientQueue $queue)
+    public function it_should_throw_an_exception_on_referrals(ClientQueue $queue)
     {
         $response = new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', 'foo', new LdapUrl('foo')));
         $request = new LdapMessageRequest(1, new DeleteRequest('cn=foo'));
@@ -45,7 +45,7 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         $this->shouldThrow(ReferralException::class)->during('handleResponse', [$request, $response, $queue, ['referral' => 'throw']]);
     }
 
-    function it_should_follow_referrals_with_a_referral_chaser_if_specified(ReferralChaserInterface $chaser, ClientQueue $queue, LdapClient $ldapClient)
+    public function it_should_follow_referrals_with_a_referral_chaser_if_specified(ReferralChaserInterface $chaser, ClientQueue $queue, LdapClient $ldapClient)
     {
         $chaser->client(Argument::any())->willReturn($ldapClient);
         $bind = new SimpleBindRequest('foo', 'bar');
@@ -63,7 +63,7 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         )->shouldBeLike($message);
     }
 
-    function it_should_throw_an_exception_if_the_referral_limit_is_reached(ReferralChaserInterface $chaser, ClientQueue $queue)
+    public function it_should_throw_an_exception_if_the_referral_limit_is_reached(ReferralChaserInterface $chaser, ClientQueue $queue)
     {
         $this->shouldThrow(new OperationException('The referral limit of -1 has been reached.'))->during('handleResponse', [
             new LdapMessageRequest(2, new DeleteRequest('foo')),
@@ -73,7 +73,7 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         ]);
     }
 
-    function it_should_throw_an_exception_if_all_referrals_have_been_tried_and_follow_is_specified(ReferralChaserInterface $chaser, ClientQueue $queue)
+    public function it_should_throw_an_exception_if_all_referrals_have_been_tried_and_follow_is_specified(ReferralChaserInterface $chaser, ClientQueue $queue)
     {
         $chaser->chase(Argument::any(), Argument::any(), Argument::any())->willThrow(new SkipReferralException());
 
@@ -85,7 +85,7 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         ]);
     }
 
-    function it_should_continue_to_the_next_referral_if_a_connection_exception_is_thrown(ReferralChaserInterface $chaser, ClientQueue $queue, LdapClient $ldapClient)
+    public function it_should_continue_to_the_next_referral_if_a_connection_exception_is_thrown(ReferralChaserInterface $chaser, ClientQueue $queue, LdapClient $ldapClient)
     {
         $chaser->client(Argument::any())->willReturn($ldapClient);
         $bind = new SimpleBindRequest('foo', 'bar');
@@ -107,7 +107,7 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         )->shouldBeLike($message);
     }
 
-    function it_should_continue_to_the_next_referral_if_an_operation_exception_with_a_referral_result_code_is_thrown(ReferralChaserInterface $chaser, ClientQueue $queue, LdapClient $ldapClient)
+    public function it_should_continue_to_the_next_referral_if_an_operation_exception_with_a_referral_result_code_is_thrown(ReferralChaserInterface $chaser, ClientQueue $queue, LdapClient $ldapClient)
     {
         $chaser->client(Argument::any())->willReturn($ldapClient);
         $bind = new SimpleBindRequest('foo', 'bar');
@@ -127,7 +127,7 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         )->shouldBeLike($message);
     }
 
-    function it_should_not_bind_on_the_referral_client_initially_if_the_referral_is_for_a_bind_request(ReferralChaserInterface $chaser, ClientQueue $queue, LdapClient $ldapClient)
+    public function it_should_not_bind_on_the_referral_client_initially_if_the_referral_is_for_a_bind_request(ReferralChaserInterface $chaser, ClientQueue $queue, LdapClient $ldapClient)
     {
         $chaser->client(Argument::any())->willReturn($ldapClient);
         $chaser->chase(Argument::any(), Argument::any(), Argument::any())->willReturn(new SimpleBindRequest('foo', 'bar'));

@@ -32,24 +32,24 @@ use PhpSpec\ObjectBehavior;
 
 class ProxyRequestHandlerSpec extends ObjectBehavior
 {
-    function let(LdapClient $client, RequestContext $context)
+    public function let(LdapClient $client, RequestContext $context)
     {
         $context->controls()->willReturn(new ControlBag());
         $context->token()->willReturn(new BindToken('foo', 'bar'));
         $this->setLdapClient($client);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ProxyRequestHandler::class);
     }
 
-    function it_should_implement_request_handler_interface()
+    public function it_should_implement_request_handler_interface()
     {
         $this->shouldImplement(RequestHandlerInterface::class);
     }
 
-    function it_should_send_an_add_request($client, $context)
+    public function it_should_send_an_add_request($client, $context)
     {
         $add = Operations::add(Entry::create('cn=foo,dc=freedsx,dc=local'));
 
@@ -57,7 +57,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
         $this->add($context, $add);
     }
 
-    function it_should_send_a_delete_request($client, $context)
+    public function it_should_send_a_delete_request($client, $context)
     {
         $delete = Operations::delete('cn=foo,dc=freedsx,dc=local');
 
@@ -65,7 +65,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
         $this->delete($context, $delete);
     }
 
-    function it_should_send_a_modify_request($client, $context)
+    public function it_should_send_a_modify_request($client, $context)
     {
         $modify = Operations::modify('cn=foo,dc=freedsx,dc=local', Change::add('foo', 'bar'));
 
@@ -73,7 +73,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
         $this->modify($context, $modify);
     }
 
-    function it_should_send_a_modify_dn_request($client, $context)
+    public function it_should_send_a_modify_dn_request($client, $context)
     {
         $modifyDn = Operations::rename('cn=foo,dc=freedsx,dc=local', 'cn=bar');
 
@@ -81,7 +81,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
         $this->modifyDn($context, $modifyDn);
     }
 
-    function it_should_send_a_search_request($client, $context)
+    public function it_should_send_a_search_request($client, $context)
     {
         $search = Operations::search(Filters::present('objectClass'), 'cn')->base('dc=foo');
         $entries = new Entries(Entry::create('dc=foo'));
@@ -90,7 +90,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
         $this->search($context, $search)->shouldBeEqualTo($entries);
     }
 
-    function it_should_send_a_compare_request_and_return_false_on_no_match($client, $context)
+    public function it_should_send_a_compare_request_and_return_false_on_no_match($client, $context)
     {
         $compare = Operations::compare('foo', 'foo', 'bar');
 
@@ -99,7 +99,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
         $this->compare($context, $compare)->shouldBeEqualTo(false);
     }
 
-    function it_should_send_a_compare_request_and_return_true_on_match($client, $context)
+    public function it_should_send_a_compare_request_and_return_true_on_match($client, $context)
     {
         $compare = Operations::compare('foo', 'foo', 'bar');
 
@@ -108,7 +108,7 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
         $this->compare($context, $compare)->shouldBeEqualTo(true);
     }
 
-    function it_should_send_an_extended_request($client, $context)
+    public function it_should_send_an_extended_request($client, $context)
     {
         $extended = Operations::extended('foo', 'bar');
 
@@ -116,17 +116,17 @@ class ProxyRequestHandlerSpec extends ObjectBehavior
         $this->extended($context, $extended);
     }
 
-    function it_should_handle_a_bind_request($client)
+    public function it_should_handle_a_bind_request($client)
     {
         $client->bind('foo', 'bar')->shouldBeCalled()->willReturn(new LdapMessageResponse(1, new BindResponse(new LdapResult(0))));
 
         $this->bind('foo', 'bar')->shouldBeEqualTo(true);
     }
 
-    function it_should_handle_a_bind_request_failure($client)
+    public function it_should_handle_a_bind_request_failure($client)
     {
         $client->bind('foo', 'bar')->shouldBeCalled()->willThrow(new BindException('Foo!', 49));
 
-        $this->shouldThrow(new OperationException('Foo!', 49))->during('bind',['foo', 'bar']);
+        $this->shouldThrow(new OperationException('Foo!', 49))->during('bind', ['foo', 'bar']);
     }
 }

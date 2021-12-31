@@ -17,22 +17,22 @@ use PhpSpec\ObjectBehavior;
 
 class ReferralExceptionSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith('foo', new LdapUrl('foo'), new LdapUrl('bar'));
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ReferralException::class);
     }
 
-    function it_should_extend_exception()
+    public function it_should_extend_exception()
     {
         $this->shouldBeAnInstanceOf('\Exception');
     }
 
-    function it_should_get_the_referrals()
+    public function it_should_get_the_referrals()
     {
         $this->getReferrals()->shouldBeLike([
            new LdapUrl('foo'),
@@ -40,12 +40,12 @@ class ReferralExceptionSpec extends ObjectBehavior
         ]);
     }
 
-    function it_should_set_the_message()
+    public function it_should_set_the_message()
     {
         $this->getMessage()->shouldBeEqualTo('foo');
     }
 
-    function it_should_have_a_code_of_the_referral_result_code()
+    public function it_should_have_a_code_of_the_referral_result_code()
     {
         $this->getCode()->shouldBeEqualTo(ResultCode::REFERRAL);
     }

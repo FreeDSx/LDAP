@@ -97,7 +97,7 @@ class LdapClientTest extends LdapTestCase
     public function testSaslBindWithAnIntegritySecurityLayerIsFunctional()
     {
         $this->client->bindSasl(
-            array_merge($this->getSaslOptions(),['use_integrity' => true]),
+            array_merge($this->getSaslOptions(), ['use_integrity' => true]),
             'DIGEST-MD5'
         );
         $entry = $this->client->read('', ['supportedSaslMechanisms']);
@@ -147,7 +147,7 @@ class LdapClientTest extends LdapTestCase
         $attributes = [
             'cn' => ['Carmelina Esposito'],
             'sn' => ['Esposito'],
-            'description' =>  ["This is Carmelina Esposito's description"],
+            'description' => ["This is Carmelina Esposito's description"],
             'facsimileTelephoneNumber' => ['+1 415 116-9439'],
             'l' => ['San Jose'],
             'postalAddress' => ['Product Testing$San Jose'],
@@ -155,7 +155,7 @@ class LdapClientTest extends LdapTestCase
         $entry = $this->client->read('cn=Carmelina Esposito,ou=Product Testing,ou=FreeDSx-Test,dc=example,dc=com', array_keys($attributes));
 
         $this->assertInstanceOf(Entry::class, $entry);
-        $this->assertEquals(strtolower($entry->getDn()->toString()),strtolower('cn=Carmelina Esposito,ou=Product Testing,ou=FreeDSx-Test,dc=example,dc=com'));
+        $this->assertEquals(strtolower($entry->getDn()->toString()), strtolower('cn=Carmelina Esposito,ou=Product Testing,ou=FreeDSx-Test,dc=example,dc=com'));
         $this->assertEquals($entry->toArray(), $attributes);
     }
 
@@ -252,7 +252,7 @@ class LdapClientTest extends LdapTestCase
 
         /** @var Entry $entry */
         foreach ($entries as $entry) {
-            $this->assertEquals(strtolower('ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com'),strtolower($entry->getDn()->getParent()->toString()));
+            $this->assertEquals(strtolower('ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com'), strtolower($entry->getDn()->getParent()->toString()));
         }
     }
 
@@ -335,7 +335,7 @@ class LdapClientTest extends LdapTestCase
         if ($this->isActiveDirectory()) {
             return [
                 'username' => 'admin',
-                'password' =>  $_ENV['LDAP_PASSWORD'],
+                'password' => $_ENV['LDAP_PASSWORD'],
                 'host' => 'ADDC3.example.com'
             ];
         } else {

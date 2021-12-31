@@ -17,61 +17,61 @@ use PhpSpec\ObjectBehavior;
 
 class MatchingRuleFilterSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith('foo', 'bar', 'foobar');
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(MatchingRuleFilter::class);
     }
 
-    function it_should_implement_fiter_interface()
+    public function it_should_implement_fiter_interface()
     {
         $this->shouldImplement(FilterInterface::class);
     }
 
-    function it_should_get_the_attribute_name()
+    public function it_should_get_the_attribute_name()
     {
         $this->getAttribute()->shouldBeEqualTo('bar');
     }
 
-    function it_should_get_the_value()
+    public function it_should_get_the_value()
     {
         $this->getValue()->shouldBeEqualTo('foobar');
     }
 
-    function it_should_not_use_dn_attributes_by_default()
+    public function it_should_not_use_dn_attributes_by_default()
     {
         $this->getUseDnAttributes()->shouldBeEqualTo(false);
     }
 
-    function it_should_set_whether_to_use_dn_attributes_by_default()
+    public function it_should_set_whether_to_use_dn_attributes_by_default()
     {
         $this->setUseDnAttributes(true);
         $this->getUseDnAttributes()->shouldBeEqualTo(true);
     }
 
-    function it_should_set_the_matching_rule()
+    public function it_should_set_the_matching_rule()
     {
         $this->setMatchingRule('bleep');
         $this->getMatchingRule()->shouldBeEqualTo('bleep');
     }
 
-    function it_should_be_able_to_set_the_attribute_to_null()
+    public function it_should_be_able_to_set_the_attribute_to_null()
     {
         $this->setAttribute(null);
         $this->getAttribute()->shouldBeNull();
     }
 
-    function it_should_be_able_to_set_the_matching_rule_to_null()
+    public function it_should_be_able_to_set_the_matching_rule_to_null()
     {
         $this->setMatchingRule(null);
         $this->getMatchingRule()->shouldBeNull();
     }
 
-    function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1()
     {
         $this->toAsn1()->shouldBeLike(Asn1::context(9, Asn1::sequence(
             Asn1::context(1, Asn1::octetString('foo')),
@@ -102,31 +102,31 @@ class MatchingRuleFilterSpec extends ObjectBehavior
         )));
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $rule = new MatchingRuleFilter('foo', 'foo', 'bar', true);
 
         $this->fromAsn1($rule->toAsn1())->shouldBeLike($rule);
     }
 
-    function it_should_get_the_string_filter_representation()
+    public function it_should_get_the_string_filter_representation()
     {
         $this->toString()->shouldBeEqualTo('(bar:foo:=foobar)');
     }
 
-    function it_should_get_the_filter_representation_with_a_dn_match()
+    public function it_should_get_the_filter_representation_with_a_dn_match()
     {
         $this->setUseDnAttributes(true);
 
         $this->toString()->shouldBeEqualTo('(bar:foo:dn:=foobar)');
     }
 
-    function it_should_have_a_filter_as_a_toString_representation()
+    public function it_should_have_a_filter_as_a_toString_representation()
     {
         $this->__toString()->shouldBeEqualTo('(bar:foo:=foobar)');
     }
 
-    function it_should_escape_values_on_the_string_representation()
+    public function it_should_escape_values_on_the_string_representation()
     {
         $this->beConstructedWith('foo', 'bar', ')(bar=*5');
         $this->toString()->shouldBeEqualTo('(bar:foo:=\29\28bar=\2a5)');

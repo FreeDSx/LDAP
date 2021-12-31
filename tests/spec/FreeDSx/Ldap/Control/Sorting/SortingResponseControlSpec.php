@@ -11,34 +11,34 @@
 namespace spec\FreeDSx\Ldap\Control\Sorting;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PhpSpec\ObjectBehavior;
 
 class SortingResponseControlSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(0, 'cn');
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(SortingResponseControl::class);
     }
 
-    function it_should_get_the_result()
+    public function it_should_get_the_result()
     {
         $this->getResult()->shouldBeEqualTo(0);
     }
 
-    function it_should_get_the_attribute()
+    public function it_should_get_the_attribute()
     {
         $this->getAttribute()->shouldBeEqualTo('cn');
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $encoder = new LdapEncoder();
 
@@ -52,7 +52,7 @@ class SortingResponseControlSpec extends ObjectBehavior
         ))->setValue(null)->shouldBeLike(new SortingResponseControl(0, 'cn'));
     }
 
-    function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1()
     {
         $encoder = new LdapEncoder();
         $this->toAsn1()->shouldBeLike(

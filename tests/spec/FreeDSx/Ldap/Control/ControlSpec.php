@@ -16,48 +16,48 @@ use PhpSpec\ObjectBehavior;
 
 class ControlSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith('foo');
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(Control::class);
     }
 
-    function it_should_get_the_control_type()
+    public function it_should_get_the_control_type()
     {
         $this->getTypeOid()->shouldBeEqualTo('foo');
         $this->setTypeOid('bar')->getTypeOid()->shouldBeEqualTo('bar');
     }
 
-    function it_should_get_the_control_value()
+    public function it_should_get_the_control_value()
     {
         $this->getValue()->shouldBeEqualTo(null);
         $this->setValue('bar')->getValue()->shouldBeEqualTo('bar');
     }
 
-    function it_should_get_the_criticality()
+    public function it_should_get_the_criticality()
     {
         $this->getCriticality()->shouldBeEqualTo(false);
         $this->setCriticality(true)->getCriticality()->shouldBeEqualTo(true);
     }
 
-    function it_should_have_a_string_representation_of_the_oid_type()
+    public function it_should_have_a_string_representation_of_the_oid_type()
     {
         $this->__toString()->shouldBeEqualTo('foo');
     }
 
-    function it_should_generate_correct_ASN1()
+    public function it_should_generate_correct_ASN1()
     {
         $this->toAsn1()->shouldBeLike(Asn1::sequence(
-           Asn1::octetString('foo'),
-           Asn1::boolean(false)
+            Asn1::octetString('foo'),
+            Asn1::boolean(false)
         ));
     }
 
-    function it_should_be_constructed_from_ASN1()
+    public function it_should_be_constructed_from_ASN1()
     {
         $this->beConstructedThrough('fromAsn1', [Asn1::sequence(
             Asn1::octetString('foobar'),

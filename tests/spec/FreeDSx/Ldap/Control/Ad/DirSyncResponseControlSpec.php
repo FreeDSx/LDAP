@@ -10,43 +10,43 @@ use PhpSpec\ObjectBehavior;
 
 class DirSyncResponseControlSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(0);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(DirSyncResponseControl::class);
     }
 
-    function it_should_get_the_more_results_value()
+    public function it_should_get_the_more_results_value()
     {
         $this->getMoreResults()->shouldBeEqualTo(0);
     }
 
-    function it_should_return_false_for_has_more_results_when_more_results_is_0()
+    public function it_should_return_false_for_has_more_results_when_more_results_is_0()
     {
         $this->hasMoreResults()->shouldBeEqualTo(false);
     }
 
-    function it_should_return_false_for_has_more_results_when_more_results_is_not_0()
+    public function it_should_return_false_for_has_more_results_when_more_results_is_not_0()
     {
         $this->beConstructedWith(1);
         $this->hasMoreResults()->shouldBeEqualTo(true);
     }
 
-    function it_should_get_the_cookie()
+    public function it_should_get_the_cookie()
     {
         $this->getCookie()->shouldBeEqualTo('');
     }
 
-    function it_should_get_the_unused_value()
+    public function it_should_get_the_unused_value()
     {
         $this->getUnused(0);
     }
 
-    function it_should_generate_correct_ASN1()
+    public function it_should_generate_correct_ASN1()
     {
         $encoder = new LdapEncoder();
 
@@ -61,7 +61,7 @@ class DirSyncResponseControlSpec extends ObjectBehavior
         ));
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $encoder = new LdapEncoder();
 

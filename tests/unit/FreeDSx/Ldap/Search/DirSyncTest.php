@@ -58,7 +58,7 @@ class DirSyncTest extends LdapTestCase
         $this->assertCount(10001, $all);
 
         $entry = $this->client->read('cn=Vivie Niebudek,ou=Administrative,ou=FreeDSx-Test,dc=example,dc=com');
-        $entry->set('description', 'foobar '.rand());
+        $entry->set('description', 'foobar ' . rand());
         $this->client->update($entry);
 
         $this->assertCount(1, $this->dirSync->getChanges());

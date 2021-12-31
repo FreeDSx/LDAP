@@ -18,37 +18,37 @@ use PhpSpec\ObjectBehavior;
 
 class ExpectedEntryCountControlSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(1, 50);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ExpectedEntryCountControl::class);
     }
 
-    function it_should_set_the_maximum()
+    public function it_should_set_the_maximum()
     {
         $this->setMaximum(100)->getMaximum()->shouldBeEqualTo(100);
     }
 
-    function it_should_get_the_maximum()
+    public function it_should_get_the_maximum()
     {
         $this->getMaximum()->shouldBeEqualTo(50);
     }
 
-    function it_should_set_the_minimum()
+    public function it_should_set_the_minimum()
     {
         $this->setMinimum(100)->getMinimum()->shouldBeEqualTo(100);
     }
 
-    function it_should_get_the_minimum()
+    public function it_should_get_the_minimum()
     {
         $this->getMinimum()->shouldBeEqualTo(1);
     }
 
-    function it_should_generate_correct_ASN1()
+    public function it_should_generate_correct_ASN1()
     {
         $encoder = new LdapEncoder();
 
@@ -62,7 +62,7 @@ class ExpectedEntryCountControlSpec extends ObjectBehavior
         ));
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $encoder = new LdapEncoder();
 

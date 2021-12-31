@@ -11,47 +11,47 @@
 namespace spec\FreeDSx\Ldap\Operation;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PhpSpec\ObjectBehavior;
 
 class LdapResultSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(0, 'foo', 'bar');
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(LdapResult::class);
     }
 
-    function it_should_get_the_diagnostic_message()
+    public function it_should_get_the_diagnostic_message()
     {
         $this->getDiagnosticMessage()->shouldBeEqualTo('bar');
     }
 
-    function it_should_get_the_result_code()
+    public function it_should_get_the_result_code()
     {
         $this->getResultCode()->shouldBeEqualTo(0);
     }
 
-    function it_should_get_the_dn()
+    public function it_should_get_the_dn()
     {
         $this->getDn()->shouldBeLike(new Dn('foo'));
     }
 
-    function it_shouod_get_the_referrals()
+    public function it_shouod_get_the_referrals()
     {
         $this->getReferrals()->shouldBeEqualTo([]);
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $encoder = new LdapEncoder();
         $this->beConstructedThrough('fromAsn1', [Asn1::sequence(
@@ -60,7 +60,7 @@ class LdapResultSpec extends ObjectBehavior
             Asn1::octetString('foo'),
             Asn1::context(3, (new IncompleteType(
                 $encoder->encode(Asn1::octetString('ldap://foo'))
-                .$encoder->encode(Asn1::octetString('ldap://bar'))
+                . $encoder->encode(Asn1::octetString('ldap://bar'))
             ))->setIsConstructed(true))
         )]);
 
@@ -73,7 +73,7 @@ class LdapResultSpec extends ObjectBehavior
         ]);
     }
 
-    function it_should_throw_a_protocol_exception_if_the_referral_cannot_be_parsed()
+    public function it_should_throw_a_protocol_exception_if_the_referral_cannot_be_parsed()
     {
         $encoder = new LdapEncoder();
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
@@ -82,7 +82,7 @@ class LdapResultSpec extends ObjectBehavior
             Asn1::octetString('foo'),
             Asn1::context(3, (new IncompleteType(
                 $encoder->encode(Asn1::octetString('ldap://foo'))
-                .$encoder->encode(Asn1::octetString('bar'))
+                . $encoder->encode(Asn1::octetString('bar'))
             ))->setIsConstructed(true))
         )]);
     }

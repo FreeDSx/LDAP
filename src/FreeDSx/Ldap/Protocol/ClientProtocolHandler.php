@@ -33,7 +33,7 @@ use FreeDSx\Socket\SocketPool;
  */
 class ClientProtocolHandler
 {
-    const ROOTDSE_ATTRIBUTES = [
+    public const ROOTDSE_ATTRIBUTES = [
         'supportedSaslMechanisms',
         'supportedControl',
         'supportedLDAPVersion',

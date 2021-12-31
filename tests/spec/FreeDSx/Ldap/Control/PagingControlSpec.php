@@ -11,42 +11,42 @@
 namespace spec\FreeDSx\Ldap\Control;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 use PhpSpec\ObjectBehavior;
 
 class PagingControlSpec extends ObjectBehavior
 {
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(PagingControl::class);
     }
-    function let()
+    public function let()
     {
         $this->beConstructedWith(0, 'foo');
     }
 
-    function it_should_default_to_an_empty_cookie_on_construction()
+    public function it_should_default_to_an_empty_cookie_on_construction()
     {
         $this->beConstructedWith(10);
 
         $this->getCookie()->shouldBeEqualTo('');
     }
 
-    function it_should_set_the_size()
+    public function it_should_set_the_size()
     {
         $this->getSize(0);
         $this->setSize(1)->getSize()->shouldBeEqualTo(1);
     }
 
-    function it_should_set_the_cookie()
+    public function it_should_set_the_cookie()
     {
         $this->getCookie()->shouldBeEqualTo('foo');
         $this->setCookie('bar')->getCookie()->shouldBeEqualTo('bar');
     }
 
-    function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1()
     {
         $encoder = new LdapEncoder();
 
@@ -60,7 +60,7 @@ class PagingControlSpec extends ObjectBehavior
         ));
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $encoder = new LdapEncoder();
 

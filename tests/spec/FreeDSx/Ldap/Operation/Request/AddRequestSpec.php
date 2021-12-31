@@ -23,19 +23,19 @@ class AddRequestSpec extends ObjectBehavior
         $this->beConstructedWith(Entry::create('cn=foo,dc=foo,dc=bar', ['cn' => 'foo']));
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(AddRequest::class);
     }
 
-    function it_should_set_entry()
+    public function it_should_set_entry()
     {
         $entry = Entry::create('cn=foobar,dc=foo,dc=bar', ['cn' => 'foobar']);
         $this->getEntry()->shouldBeLike(Entry::create('cn=foo,dc=foo,dc=bar', ['cn' => 'foo']));
         $this->setEntry($entry)->getEntry()->shouldBeEqualTo($entry);
     }
 
-    function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1()
     {
         $this->beConstructedWith(Entry::create('cn=foo,dc=foo,dc=bar', ['cn' => 'foo', 'sn' => ['foo', 'bar']]));
 
@@ -59,14 +59,14 @@ class AddRequestSpec extends ObjectBehavior
         )));
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $add = new AddRequest(Entry::create('cn=foo,dc=foo,dc=bar', ['cn' => 'foo', 'sn' => ['foo', 'bar']]));
 
         $this::fromAsn1($add->toAsn1())->shouldBeLike(new AddRequest(Entry::create('cn=foo,dc=foo,dc=bar', ['cn' => 'foo', 'sn' => ['foo', 'bar']])));
     }
 
-    function it_should_detect_a_malformed_asn1_request()
+    public function it_should_detect_a_malformed_asn1_request()
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::octetString('foo')]);
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
@@ -85,7 +85,7 @@ class AddRequestSpec extends ObjectBehavior
         )]);
     }
 
-    function it_should_detect_a_malformed_asn1_request_partial_attribute()
+    public function it_should_detect_a_malformed_asn1_request_partial_attribute()
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
             Asn1::octetString('foo'),

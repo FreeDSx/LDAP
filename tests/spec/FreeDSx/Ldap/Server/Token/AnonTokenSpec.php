@@ -16,32 +16,32 @@ use PhpSpec\ObjectBehavior;
 
 class AnonTokenSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith('foo');
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(AnonToken::class);
     }
 
-    function it_should_implement_token_interface()
+    public function it_should_implement_token_interface()
     {
         $this->shouldImplement(TokenInterface::class);
     }
 
-    function it_should_get_the_username()
+    public function it_should_get_the_username()
     {
         $this->getUsername()->shouldBeEqualTo('foo');
     }
 
-    function it_should_get_a_null_password()
+    public function it_should_get_a_null_password()
     {
         $this->getPassword()->shouldBeNull();
     }
 
-    function it_should_get_the_version()
+    public function it_should_get_the_version()
     {
         $this->getVersion()->shouldBeEqualTo(3);
     }

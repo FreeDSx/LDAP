@@ -27,12 +27,12 @@ use Prophecy\Argument;
 
 class ServerSearchHandlerSpec extends ObjectBehavior
 {
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ServerSearchHandler::class);
     }
 
-    function it_should_send_a_search_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_a_search_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
     {
         $search = new LdapMessageRequest(
             2,

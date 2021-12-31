@@ -18,27 +18,27 @@ use PhpSpec\ObjectBehavior;
 
 class SetOwnerControlSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith('foo');
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(SetOwnerControl::class);
     }
 
-    function it_should_get_the_sid()
+    public function it_should_get_the_sid()
     {
         $this->getSid()->shouldBeEqualTo('foo');
     }
 
-    function it_should_set_the_sid()
+    public function it_should_set_the_sid()
     {
         $this->setSid('bar')->getSid()->shouldBeEqualTo('bar');
     }
 
-    function it_should_generate_correct_ASN1()
+    public function it_should_generate_correct_ASN1()
     {
         $encoder = new LdapEncoder();
 
@@ -49,7 +49,7 @@ class SetOwnerControlSpec extends ObjectBehavior
         ));
     }
 
-    function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1()
     {
         $encoder = new LdapEncoder();
 

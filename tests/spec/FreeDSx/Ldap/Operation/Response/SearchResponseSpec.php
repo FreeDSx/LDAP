@@ -20,17 +20,17 @@ use PhpSpec\ObjectBehavior;
 
 class SearchResponseSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(new LdapResult(0, 'dc=foo,dc=bar', 'foo', new LdapUrl('foo')), new Entries(...[Entry::create('foo'), Entry::create('bar')]));
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(SearchResponse::class);
     }
 
-    function it_should_get_the_ldap_result_values()
+    public function it_should_get_the_ldap_result_values()
     {
         $this->getResultCode()->shouldBeEqualTo(0);
         $this->getDn()->shouldBeLike(new Dn('dc=foo,dc=bar'));
@@ -38,7 +38,7 @@ class SearchResponseSpec extends ObjectBehavior
         $this->getReferrals()->shouldBeLike([new LdapUrl('foo')]);
     }
 
-    function it_should_get_the_entries()
+    public function it_should_get_the_entries()
     {
         $this->getEntries()->shouldBeLike(new Entries(...[
            Entry::create('foo'),

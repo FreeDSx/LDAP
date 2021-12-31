@@ -24,18 +24,18 @@ use PhpSpec\ObjectBehavior;
 
 class ServerWhoAmIHandlerSpec extends ObjectBehavior
 {
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ServerWhoAmIHandler::class);
     }
 
-    function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_DN_name(ServerQueue $queue, RequestHandlerInterface $handler)
+    public function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_DN_name(ServerQueue $queue, RequestHandlerInterface $handler)
     {
         $request = new LdapMessageRequest(2, new ExtendedRequest(ExtendedRequest::OID_WHOAMI));
 
         $queue->sendMessage(new LdapMessageResponse(
             2,
-            new ExtendedResponse(new LdapResult(0), null,'dn:cn=foo,dc=foo,dc=bar')
+            new ExtendedResponse(new LdapResult(0), null, 'dn:cn=foo,dc=foo,dc=bar')
         ));
 
         $this->handleRequest(
@@ -47,13 +47,13 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
         );
     }
 
-    function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_non_DN_name(ServerQueue $queue, RequestHandlerInterface $handler)
+    public function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_non_DN_name(ServerQueue $queue, RequestHandlerInterface $handler)
     {
         $request = new LdapMessageRequest(2, new ExtendedRequest(ExtendedRequest::OID_WHOAMI));
 
         $queue->sendMessage(new LdapMessageResponse(
             2,
-            new ExtendedResponse(new LdapResult(0), null,'u:foo@bar.local')
+            new ExtendedResponse(new LdapResult(0), null, 'u:foo@bar.local')
         ))->shouldBeCalled();
 
         $this->handleRequest(
@@ -65,7 +65,7 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
         );
     }
 
-    function it_should_handle_a_who_am_i_when_there_is_no_token_yet(ServerQueue $queue, RequestHandlerInterface $handler)
+    public function it_should_handle_a_who_am_i_when_there_is_no_token_yet(ServerQueue $queue, RequestHandlerInterface $handler)
     {
         $request = new LdapMessageRequest(2, new ExtendedRequest(ExtendedRequest::OID_WHOAMI));
 

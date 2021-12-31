@@ -21,12 +21,12 @@ use Prophecy\Argument;
 
 class PcntlServerRunnerSpec extends ObjectBehavior
 {
-    function let()
+    public function let()
     {
         $this->beConstructedWith(['request_handler' => GenericRequestHandler::class]);
     }
 
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         if (!extension_loaded('pcntl')) {
             throw new SkippingException('The PCNTL extension is required for this spec.');
@@ -35,7 +35,7 @@ class PcntlServerRunnerSpec extends ObjectBehavior
         $this->shouldHaveType(PcntlServerRunner::class);
     }
 
-    function it_should_implement_server_runner_interface()
+    public function it_should_implement_server_runner_interface()
     {
         if (!extension_loaded('pcntl')) {
             throw new SkippingException('The PCNTL extension is required for this spec.');
@@ -44,7 +44,7 @@ class PcntlServerRunnerSpec extends ObjectBehavior
         $this->shouldImplement(ServerRunnerInterface::class);
     }
 
-    function it_should_send_incoming_requests_to_the_server_protocol_handler(SocketServer $server, Socket $client)
+    public function it_should_send_incoming_requests_to_the_server_protocol_handler(SocketServer $server, Socket $client)
     {
         if (!extension_loaded('pcntl')) {
             throw new SkippingException('The PCNTL extension is required for this spec.');

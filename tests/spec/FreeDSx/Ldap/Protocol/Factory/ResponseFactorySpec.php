@@ -38,60 +38,60 @@ use PhpSpec\ObjectBehavior;
 
 class ResponseFactorySpec extends ObjectBehavior
 {
-    function it_is_initializable()
+    public function it_is_initializable()
     {
         $this->shouldHaveType(ResponseFactory::class);
     }
 
-    function it_should_get_a_bind_response()
+    public function it_should_get_a_bind_response()
     {
         $this->getStandardResponse(new LdapMessageRequest(1, new SimpleBindRequest('foo', 'bar')), 0, 'foo')
             ->shouldBeLike(new LdapMessageResponse(1, new BindResponse(new LdapResult(0, '', 'foo'))));
     }
 
-    function it_should_get_an_add_response()
+    public function it_should_get_an_add_response()
     {
         $this->getStandardResponse(new LdapMessageRequest(1, new AddRequest(Entry::create('foo'))), 0, 'foo')
             ->shouldBeLike(new LdapMessageResponse(1, new AddResponse(0, 'foo', 'foo')));
     }
 
-    function it_should_get_a_compare_response()
+    public function it_should_get_a_compare_response()
     {
         $this->getStandardResponse(new LdapMessageRequest(1, new CompareRequest('foo', Filters::equal('foo', 'bar'))), ResultCode::COMPARE_TRUE, 'foo')
             ->shouldBeLike(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_TRUE, 'foo', 'foo')));
     }
 
-    function it_should_get_a_modify_response()
+    public function it_should_get_a_modify_response()
     {
         $this->getStandardResponse(new LdapMessageRequest(1, new ModifyRequest('foo', Change::add('foo', 'bar'))), 0, 'foo')
             ->shouldBeLike(new LdapMessageResponse(1, new ModifyResponse(0, 'foo', 'foo')));
     }
 
-    function it_should_get_a_modify_dn_response()
+    public function it_should_get_a_modify_dn_response()
     {
         $this->getStandardResponse(new LdapMessageRequest(1, new ModifyDnRequest('foo', 'cn=bar', true)), 0, 'foo')
             ->shouldBeLike(new LdapMessageResponse(1, new ModifyDnResponse(0, 'foo', 'foo')));
     }
 
-    function it_should_get_an_extended_response()
+    public function it_should_get_an_extended_response()
     {
         $this->getStandardResponse(new LdapMessageRequest(1, new ExtendedRequest('foo', 'bar')), 0, 'foo')
             ->shouldBeLike(new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(0, '', 'foo'))));
     }
 
-    function it_should_get_a_delete_response()
+    public function it_should_get_a_delete_response()
     {
         $this->getStandardResponse(new LdapMessageRequest(1, new DeleteRequest('foo')), 0, 'foo')
             ->shouldBeLike(new LdapMessageResponse(1, new DeleteResponse(0, 'foo', 'foo')));
     }
 
-    function it_should_get_a_search_response()
+    public function it_should_get_a_search_response()
     {
         $this->getStandardResponse(new LdapMessageRequest(1, new SearchRequest(Filters::present('objectClass'))), 0, 'foo')
             ->shouldBeLike(new LdapMessageResponse(1, new SearchResultDone(0, '', 'foo')));
     }
 
-    function it_should_get_an_extended_error_response()
+    public function it_should_get_an_extended_error_response()
     {
         $this->getExtendedError('foo', ResultCode::PROTOCOL_ERROR, ExtendedRequest::OID_START_TLS)->shouldBeLike(
             new LdapMessageResponse(0, new ExtendedResponse(

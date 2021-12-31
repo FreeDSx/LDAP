@@ -16,7 +16,8 @@ use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
 
 require __DIR__ . '/../../vendor/autoload.php';
 
-class LdapServerRequestHandler extends GenericRequestHandler{
+class LdapServerRequestHandler extends GenericRequestHandler
+{
     private $users = [
         'cn=user,dc=foo,dc=bar' => '12345',
     ];
@@ -119,7 +120,7 @@ class LdapServerRequestHandler extends GenericRequestHandler{
         string $type,
         string $message
     ): void {
-        echo "---$type--- $message".PHP_EOL;
+        echo "---$type--- $message" . PHP_EOL;
     }
 }
 
@@ -128,6 +129,6 @@ $server = new LdapServer([
     'port' => 3389,
 ]);
 
-echo "server starting...".PHP_EOL;
+echo "server starting..." . PHP_EOL;
 
 $server->run();
