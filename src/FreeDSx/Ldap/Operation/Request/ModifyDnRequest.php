@@ -171,10 +171,7 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
         }
         $newSuperior = ($newSuperior instanceof IncompleteType)
             ? (new LdapEncoder())->complete($newSuperior, AbstractType::TAG_TYPE_OCTET_STRING)
-            : null;
-        if ($newSuperior !== null && !$newSuperior instanceof OctetStringType) {
-            throw new ProtocolException('The modify dn request is malformed');
-        }
+            : $newSuperior;
         $newSuperior = ($newSuperior !== null) ? $newSuperior->getValue() : null;
 
         return new self($entry->getValue(), $newRdn->getValue(), $deleteOldRdn->getValue(), $newSuperior);
