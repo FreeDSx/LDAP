@@ -46,7 +46,10 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
             'vendorName' => $options['dse_vendor_name'] ?? '',
         ]);
         if (isset($options['ssl_cert'])) {
-            $entry->set('supportedExtension', ExtendedRequest::OID_START_TLS);
+            $entry->add(
+                'supportedExtension',
+                ExtendedRequest::OID_START_TLS
+            );
         }
         if (isset($options['vendor_version'])) {
             $entry->set('vendorVersion', $options['vendor_version']);
