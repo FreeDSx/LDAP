@@ -124,9 +124,14 @@ class LdapServerRequestHandler extends GenericRequestHandler
     }
 }
 
+$sslKey = "/etc/ssl/private/slapd.key";
+$sslCert = "/etc/ssl/certs/slapd.crt";
+
 $server = new LdapServer([
     'request_handler' => LdapServerRequestHandler::class,
     'port' => 3389,
+    'ssl_cert' => $sslCert,
+    'ssl_cert_key' => $sslKey,
 ]);
 
 echo "server starting..." . PHP_EOL;

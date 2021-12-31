@@ -44,7 +44,8 @@ class LdapServerTest extends LdapTestCase
 
         $this->client = new LdapClient([
             'port' => 3389,
-            'servers' => '127.0.0.1'
+            'servers' => '127.0.0.1',
+            'ssl_validate_cert' => false,
         ]);
     }
 
@@ -240,6 +241,7 @@ class LdapServerTest extends LdapTestCase
                 ],
                 'supportedExtension' => [
                     '1.3.6.1.4.1.4203.1.11.3',
+                    '1.3.6.1.4.1.1466.20037',
                 ],
                 'supportedLDAPVersion' => [
                     '3',
@@ -316,6 +318,14 @@ class LdapServerTest extends LdapTestCase
         $output = $this->client->whoami();
 
         $this->assertNull($output);
+    }
+
+    public function testItCanStartTLSThenStillPerformOperations()
+    {
+        $this->client->startTls();
+        $result = $this->client->read();
+
+        $this->assertNotNull($result);
     }
 
     private function authenticate(): void
