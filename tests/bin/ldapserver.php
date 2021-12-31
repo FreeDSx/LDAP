@@ -124,16 +124,42 @@ class LdapServerRequestHandler extends GenericRequestHandler
     }
 }
 
+function cleanupUnixSocket(): void
+{
+    if (file_exists('/var/run/ldap.socket')) {
+        unlink('/var/run/ldap.socket');
+    }
+}
+
 $sslKey = "/etc/ssl/private/slapd.key";
 $sslCert = "/etc/ssl/certs/slapd.crt";
+
+$transport = $argv[1] ?? 'tcp';
+$useSsl = false;
+
+if ($transport === 'ssl') {
+    $transport = 'tcp';
+    $useSsl = true;
+}
+
+# We must remove the socket first if it already exists...
+if ($transport === 'unix') {
+    cleanupUnixSocket();
+}
 
 $server = new LdapServer([
     'request_handler' => LdapServerRequestHandler::class,
     'port' => 3389,
+    'transport' => $transport,
     'ssl_cert' => $sslCert,
     'ssl_cert_key' => $sslKey,
+    'use_ssl' => $useSsl,
 ]);
 
 echo "server starting..." . PHP_EOL;
 
 $server->run();
+
+if ($transport === 'unix') {
+    cleanupUnixSocket();
+}

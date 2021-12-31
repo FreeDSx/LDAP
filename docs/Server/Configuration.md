@@ -4,6 +4,8 @@ LDAP Server Configuration
 * [General Options](#general-options)
     * [ip](#ip)
     * [port](#port)
+    * [unix_socket](#unix_socket)
+    * [transport](#transport)
     * [idle_timeout](#idle_timeout)
     * [require_authentication](#require_authentication)
     * [allow_anonymous](#allow_anonymous)
@@ -50,6 +52,25 @@ first 1024 ports, it will require administrative access when running the server.
 than 1024 instead if needed.
 
 **Default**: `389`
+
+------------------
+#### unix_socket
+
+When using `unix` as the transport type, this is the full path to the socket file the client must interact with. 
+
+**Default**: `/var/run/ldap.socket`
+
+------------------
+#### transport
+
+The transport mechanism for the server to use. Use either:
+
+* `tcp`
+* `unix`
+
+If using `unix` for the transport you can change set the `unix_socket` to a file path representing the unix socket the clients must connect to.
+
+**Default**: `tcp`
 
 ------------------
 #### idle_timeout
@@ -139,3 +160,13 @@ The server certificate private key. This can also be bundled with the certificat
 The passphrase needed for the server certificate's private key. 
 
 **Default**: `(null)`
+
+------------------
+#### use_ssl
+
+If set to true, and the transport is `tcp`, the server will use an SSL stream to bind to the IP address. This forces clients
+to use an encrypted stream only for communication to the server.
+
+**Note**: LDAP over SSL, commonly referred to as LDAPS, is not an official LDAP standard. Support is dependent on the client.
+
+**Default**: `false`

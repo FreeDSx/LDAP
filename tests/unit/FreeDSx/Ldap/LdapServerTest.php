@@ -35,26 +35,13 @@ class LdapServerTest extends LdapTestCase
     {
         parent::setUp();
 
-        $this->subject = new Process([
-            'php',
-            __DIR__ . '/../../../bin/ldapserver.php'
-        ]);
-        $this->subject->start();
-        $this->waitForServerOutput('server starting...');
-
-        $this->client = new LdapClient([
-            'port' => 3389,
-            'servers' => '127.0.0.1',
-            'ssl_validate_cert' => false,
-        ]);
+        $this->createServerProcess('tcp');
     }
 
     public function tearDown(): void
     {
         parent::tearDown();
-        $this->client->unbind();
-        $this->client = null;
-        $this->subject->stop();
+        $this->stopServer();
     }
 
     public function testItAcceptsBindWithCorrectCredentials(): void
@@ -328,6 +315,24 @@ class LdapServerTest extends LdapTestCase
         $this->assertNotNull($result);
     }
 
+    public function testItCanRunOverSSLOnly()
+    {
+        $this->stopServer();
+        $this->createServerProcess('ssl');
+
+        $result = $this->client->read('');
+        $this->assertNotNull($result);
+    }
+
+    public function testItCanRunOverUnixSocket()
+    {
+        $this->stopServer();
+        $this->createServerProcess('unix');
+
+        $result = $this->client->read('');
+        $this->assertNotNull($result);
+    }
+
     private function authenticate(): void
     {
         $this->client->bind(
@@ -362,5 +367,42 @@ class LdapServerTest extends LdapTestCase
             $marker,
             $i
         ));
+    }
+
+    private function createServerProcess(string $transport): void
+    {
+        $this->subject = new Process([
+            'php',
+            __DIR__ . '/../../../bin/ldapserver.php',
+            $transport,
+        ]);
+        $this->subject->start();
+        $this->waitForServerOutput('server starting...');
+
+        $useSsl = false;
+        $servers = '127.0.0.1';
+
+        if ($transport === 'ssl') {
+            $transport = 'tcp';
+            $useSsl = true;
+        }
+        if ($transport === 'unix') {
+            $servers = '/var/run/ldap.socket';
+        }
+
+        $this->client = $this->getClient([
+            'port' => 3389,
+            'transport' => $transport,
+            'servers' => $servers,
+            'ssl_validate_cert' => false,
+            'use_ssl' => $useSsl,
+        ]);
+    }
+
+    private function stopServer(): void
+    {
+        $this->client->unbind();
+        $this->client = null;
+        $this->subject->stop();
     }
 }

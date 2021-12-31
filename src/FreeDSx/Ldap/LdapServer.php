@@ -32,10 +32,13 @@ class LdapServer
     protected $options = [
         'ip' => '0.0.0.0',
         'port' => 389,
+        'unix_socket' => '/var/run/ldap.socket',
+        'transport' => 'tcp',
         'idle_timeout' => 600,
         'require_authentication' => true,
         'allow_anonymous' => false,
         'request_handler' => null,
+        'use_ssl' => false,
         'ssl_cert' => null,
         'ssl_cert_passphrase' => null,
         'dse_alt_server' => null,
@@ -68,7 +71,15 @@ class LdapServer
      */
     public function run(): void
     {
-        $this->runner->run(SocketServer::bind($this->options['ip'], $this->options['port'], $this->options));
+        $resource = $this->options['transport'] === 'unix'
+            ? $this->options['unix_socket']
+            : $this->options['ip'];
+
+        $this->runner->run(SocketServer::bind(
+            $resource,
+            $this->options['port'],
+            $this->options
+        ));
     }
 
     /**
