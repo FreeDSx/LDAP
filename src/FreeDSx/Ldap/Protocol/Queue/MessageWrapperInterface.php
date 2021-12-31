@@ -10,6 +10,7 @@
 
 namespace FreeDSx\Ldap\Protocol\Queue;
 
+use FreeDSx\Sasl\Exception\SaslException;
 use FreeDSx\Socket\Queue\Buffer;
 
 /**
@@ -24,6 +25,7 @@ interface MessageWrapperInterface
      *
      * @param string $message
      * @return string
+     * @throws SaslException
      */
     public function wrap(string $message): string;
 
@@ -32,6 +34,7 @@ interface MessageWrapperInterface
      *
      * @param string $message
      * @return Buffer
+     * @throws SaslException
      */
     public function unwrap(string $message): Buffer;
 }

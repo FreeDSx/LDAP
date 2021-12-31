@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -41,10 +42,6 @@ class ServerProtocolHandlerFactory
         }
     }
 
-    /**
-     * @param RequestInterface $request
-     * @return bool
-     */
     protected function isRootDseSearch(RequestInterface $request): bool
     {
         if (!$request instanceof SearchRequest) {

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,6 +11,7 @@
 
 namespace FreeDSx\Ldap\Exception;
 
+use Exception;
 use FreeDSx\Ldap\Operation\ResultCode;
 
 /**
@@ -19,7 +21,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class OperationException extends \Exception
+class OperationException extends Exception
 {
     public function __construct(string $message = '', int $code = ResultCode::OPERATIONS_ERROR, \Throwable $previous = null)
     {

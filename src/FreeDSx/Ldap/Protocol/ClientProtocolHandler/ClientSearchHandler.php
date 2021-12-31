@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,8 +11,12 @@
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
@@ -20,6 +25,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
+use FreeDSx\Socket\Exception\ConnectionException;
 
 /**
  * Logic for handling search operations.
@@ -31,10 +37,10 @@ class ClientSearchHandler extends ClientBasicHandler
     /**
      * @param ClientProtocolContext $context
      * @return LdapMessageResponse|null
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws EncoderException
+     * @throws ProtocolException
+     * @throws UnsolicitedNotificationException
+     * @throws ConnectionException
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
@@ -54,10 +60,10 @@ class ClientSearchHandler extends ClientBasicHandler
      * @param array $options
      * @return LdapMessageResponse|null
      * @throws OperationException
-     * @throws \FreeDSx\Ldap\Exception\BindException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws BindException
+     * @throws ProtocolException
+     * @throws UnsolicitedNotificationException
+     * @throws ConnectionException
      */
     public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse
     {

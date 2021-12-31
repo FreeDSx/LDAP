@@ -1,9 +1,12 @@
 <?php
+
 /**
- * Created by PhpStorm.
- * User: Chad
- * Date: 1/1/2018
- * Time: 9:28 PM
+ * This file is part of the FreeDSx LDAP package.
+ *
+ * (c) Chad Sikorra <Chad.Sikorra@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
  */
 
 namespace FreeDSx\Ldap;

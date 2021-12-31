@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -10,7 +11,9 @@
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Socket\Exception\ConnectionException;
 
 /**
  * Logic for handling an unbind operation.
@@ -24,8 +27,8 @@ class ClientUnbindHandler implements RequestHandlerInterface
     /**
      * @param ClientProtocolContext $context
      * @return null
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws EncoderException
+     * @throws ConnectionException
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
