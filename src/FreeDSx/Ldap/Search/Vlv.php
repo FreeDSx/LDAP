@@ -13,10 +13,12 @@ namespace FreeDSx\Ldap\Search;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
+use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Control\Vlv\VlvControl;
 use FreeDSx\Ldap\Control\Vlv\VlvResponseControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -78,7 +80,7 @@ class Vlv
     /**
      * @param LdapClient $client
      * @param SearchRequest $search
-     * @param SortingControl|\FreeDSx\Ldap\Control\Sorting\SortKey|string $sort
+     * @param SortingControl|SortKey|string $sort
      * @param int $before
      * @param int $after
      */
@@ -262,15 +264,7 @@ class Vlv
     /**
      * @return Entries
      * @throws ProtocolException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\BindException
-     * @throws \FreeDSx\Ldap\Exception\ConnectionException
-     * @throws \FreeDSx\Ldap\Exception\OperationException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \Throwable
+     * @throws OperationException
      */
     public function getEntries(): Entries
     {
@@ -279,16 +273,7 @@ class Vlv
 
     /**
      * @return Entries
-     * @throws ProtocolException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\BindException
-     * @throws \FreeDSx\Ldap\Exception\ConnectionException
-     * @throws \FreeDSx\Ldap\Exception\OperationException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \Throwable
+     * @throws OperationException
      */
     protected function send(): Entries
     {

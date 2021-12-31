@@ -16,6 +16,7 @@ use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
+use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\SocketServer;
 
 /**
@@ -51,7 +52,7 @@ class LdapServer
     /**
      * @param array $options
      * @param ServerRunnerInterface|null $serverRunner
-     * @throws \FreeDSx\Ldap\Exception\RuntimeException
+     * @throws RuntimeException
      */
     public function __construct(array $options = [], ServerRunnerInterface $serverRunner = null)
     {
@@ -62,8 +63,8 @@ class LdapServer
 
     /**
      * Runs the LDAP server. Binds the socket on the request IP/port and sends it to the server runner.
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     *
+     * @throws ConnectionException
      */
     public function run(): void
     {
@@ -74,7 +75,7 @@ class LdapServer
      * The request handler should be constructed from a string class name. This is to make sure that each client instance
      * has its own version of the handler to avoid conflicts and potential security issues sharing a request handler.
      *
-     * @throws \FreeDSx\Ldap\Exception\RuntimeException
+     * @throws RuntimeException
      */
     protected function validateRequestHandler(): void
     {
