@@ -23,7 +23,8 @@
     "phpunit/phpunit": "^9.3|^8.0|^7.0",
     "symplify/easy-coding-standard": "^6.1|^7.3|^9.0",
     "friends-of-phpspec/phpspec-code-coverage": "^4.3|^6.1",
-    "phpstan/phpstan": "^0.12.70"
+    "phpstan/phpstan": "^0.12.70",
+    "symfony/process": "^3.0|^4.0|^5.0"
   },
   "suggest": {
     "ext-openssl": "For SSL/TLS support and some SASL mechanisms."
