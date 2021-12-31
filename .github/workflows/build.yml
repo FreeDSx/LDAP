@@ -53,6 +53,8 @@ jobs:
       - name: Run Specs
         run: composer run-script test-spec
 
+      # Not ideal, but we run as root here because the LDAP server needs access to certs / keys system directories.
+      # For tests this seems fine, but in a real scenario this would be bad...
       - name: Run Integration Tests
         if: runner.os == 'Linux'
-        run: composer run-script test-integration
+        run: sudo composer run-script test-integration
