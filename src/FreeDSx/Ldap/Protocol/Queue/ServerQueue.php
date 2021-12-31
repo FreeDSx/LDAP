@@ -11,9 +11,11 @@
 namespace FreeDSx\Ldap\Protocol\Queue;
 
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\LdapQueue;
+use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Queue\Message;
 
 /**
@@ -27,8 +29,8 @@ class ServerQueue extends LdapQueue
      * @param int|null $id
      * @return LdapMessageRequest
      * @throws ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws UnsolicitedNotificationException
+     * @throws ConnectionException
      */
     public function getMessage(?int $id = null): LdapMessageRequest
     {

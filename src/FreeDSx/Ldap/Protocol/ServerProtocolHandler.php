@@ -13,6 +13,7 @@ namespace FreeDSx\Ldap\Protocol;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
@@ -21,6 +22,7 @@ use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Socket\Exception\ConnectionException;
 
 /**
  * Handles server-client specific protocol interactions.
@@ -101,6 +103,8 @@ class ServerProtocolHandler
      */
     public function handle(): void
     {
+        $message = null;
+
         try {
             while ($message = $this->queue->getMessage()) {
                 $this->dispatchRequest($message);
@@ -112,13 +116,11 @@ class ServerProtocolHandler
         } catch (OperationException $e) {
             # OperationExceptions may be thrown by any handler and will be sent back to the client as the response
             # specific error code and message associated with the exception.
-            if (isset($message)) {
-                $this->queue->sendMessage($this->responseFactory->getStandardResponse(
-                    $message,
-                    $e->getCode(),
-                    $e->getMessage()
-                ));
-            }
+            $this->queue->sendMessage($this->responseFactory->getStandardResponse(
+                $message,
+                $e->getCode(),
+                $e->getMessage()
+            ));
         } catch (EncoderException | ProtocolException $e) {
             # Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with a
             # result code of protocol error.
@@ -140,8 +142,8 @@ class ServerProtocolHandler
      *
      * @throws OperationException
      * @throws EncoderException
-     * @throws \FreeDSx\Ldap\Exception\RuntimeException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
+     * @throws RuntimeException
+     * @throws ConnectionException
      */
     protected function dispatchRequest(LdapMessageRequest $message): void
     {
@@ -211,7 +213,7 @@ class ServerProtocolHandler
      *
      * @throws OperationException
      * @throws EncoderException
-     * @throws \FreeDSx\Ldap\Exception\RuntimeException
+     * @throws RuntimeException
      */
     protected function handleAuthRequest(LdapMessageRequest $message): TokenInterface
     {
