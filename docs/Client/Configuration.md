@@ -4,7 +4,7 @@ LDAP Client Configuration
 * [General Options](#general-options)
     * [base_dn](#base_dn)
     * [page_size](#page_size)
-    * [transport] (#transport)
+    * [transport](#transport)
     * [port](#port)
     * [servers](#servers)
     * [timeout_connect](#timeout_connect)
