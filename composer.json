@@ -3,7 +3,9 @@
   "description": "A Pure PHP LDAP library",
   "homepage": "https://github.com/FreeDSx/LDAP",
   "keywords": [
-    "LDAP"
+    "LDAP",
+    "OpenLDAP",
+    "ActiveDirectory"
   ],
   "license": "MIT",
   "authors": [
