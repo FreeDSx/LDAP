@@ -264,6 +264,14 @@ class LdapClientTest extends LdapTestCase
         $this->assertRegExp('/^(dn|u):.*/', $this->client->whoami());
     }
 
+    public function testSetOptionsDisconnectsIfRequested()
+    {
+        $this->bindClient($this->client);
+        $this->client->setOptions([], true);
+
+        $this->assertFalse($this->client->isConnected());
+    }
+
     public function testStartTls()
     {
         $this->client = $this->getClient();
