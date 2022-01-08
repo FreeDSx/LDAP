@@ -22,10 +22,16 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerStartTlsHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnbindHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerWhoAmIHandler;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use PhpSpec\ObjectBehavior;
 
 class ServerProtocolHandlerFactorySpec extends ObjectBehavior
 {
+    public function let(HandlerFactoryInterface $handlerFactory)
+    {
+        $this->beConstructedWith($handlerFactory);
+    }
+
     public function it_is_initializable()
     {
         $this->shouldHaveType(ServerProtocolHandlerFactory::class);

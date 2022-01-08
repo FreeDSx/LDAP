@@ -31,6 +31,11 @@ use Prophecy\Argument;
 
 class ServerRootDseHandlerSpec extends ObjectBehavior
 {
+    public function let()
+    {
+        $this->beConstructedWith(null);
+    }
+
     public function it_is_initializable()
     {
         $this->shouldHaveType(ServerRootDseHandler::class);
@@ -64,8 +69,14 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         );
     }
 
-    public function it_should_send_a_request_to_the_dispatcher_if_it_implements_a_rootdse_aware_interface(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
-    {
+    public function it_should_send_a_request_to_the_dispatcher_if_it_implements_a_rootdse_aware_interface(
+        ServerQueue $queue,
+        RequestHandlerInterface $handler,
+        TokenInterface $token,
+        RootDseHandlerInterface $rootDseHandler
+    ) {
+        $this->beConstructedWith($rootDseHandler);
+
         $searchReqeust = (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope();
         $search = new LdapMessageRequest(
             1,
@@ -81,8 +92,7 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         ]);
 
         $handlerRootDse = Entry::fromArray('', ['foo' => 'bar']);
-        $handler->implement(RootDseHandlerInterface::class);
-        $handler->rootDse(Argument::type(RequestContext::class), $searchReqeust, $rootDse)
+        $rootDseHandler->rootDse(Argument::type(RequestContext::class), $searchReqeust, $rootDse)
             ->shouldBeCalled()
             ->willReturn($handlerRootDse);
 

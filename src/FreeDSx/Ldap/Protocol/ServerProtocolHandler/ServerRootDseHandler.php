@@ -33,10 +33,25 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 class ServerRootDseHandler implements ServerProtocolHandlerInterface
 {
     /**
+     * @var RootDseHandlerInterface|null
+     */
+    private $rootDseHandler;
+
+    public function __construct(?RootDseHandlerInterface $rootDseHandler = null)
+    {
+        $this->rootDseHandler = $rootDseHandler;
+    }
+
+    /**
      * @throws \FreeDSx\Asn1\Exception\EncoderException
      */
-    public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): void
-    {
+    public function handleRequest(
+        LdapMessageRequest $message,
+        TokenInterface $token,
+        RequestHandlerInterface $dispatcher,
+        ServerQueue $queue,
+        array $options
+    ): void {
         $entry = Entry::fromArray('', [
             'namingContexts' => $options['dse_naming_contexts'] ?? '',
             'supportedExtension' => [
@@ -62,8 +77,8 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
         $request = $message->getRequest();
         $this->filterEntryAttributes($request, $entry);
 
-        if ($dispatcher instanceof RootDseHandlerInterface) {
-            $entry = $dispatcher->rootDse(
+        if ($this->rootDseHandler) {
+            $entry = $this->rootDseHandler->rootDse(
                 new RequestContext($message->controls(), $token),
                 $request,
                 $entry

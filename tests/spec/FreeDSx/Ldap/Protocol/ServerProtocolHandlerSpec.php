@@ -31,6 +31,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use PhpSpec\ObjectBehavior;
@@ -38,18 +39,26 @@ use Prophecy\Argument;
 
 class ServerProtocolHandlerSpec extends ObjectBehavior
 {
-    public function let(ServerQueue $queue, ServerProtocolHandlerFactory $protocolHandlerFactory, ServerBindHandlerFactory $bindHandlerFactory, RequestHandlerInterface $dispatcher, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
-    {
+    public function let(
+        ServerQueue $queue,
+        ServerProtocolHandlerFactory $protocolHandlerFactory,
+        HandlerFactoryInterface $handlerFactory,
+        ServerBindHandlerFactory $bindHandlerFactory,
+        RequestHandlerInterface $dispatcher,
+        ServerProtocolHandler\BindHandlerInterface $bindHandler,
+        ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler
+    ) {
         $queue->close()->hasReturnVoid();
         $queue->isConnected()->willReturn(true);
         $queue->isEncrypted()->willReturn(false);
         $queue->sendMessage(Argument::any())->willReturn($queue);
         $bindHandlerFactory->get(Argument::any())->willReturn($bindHandler);
         $protocolHandlerFactory->get(Argument::any())->willReturn($protocolHandler);
+        $handlerFactory->makeRequestHandler()->willReturn($dispatcher);
 
         $this->beConstructedWith(
             $queue,
-            $dispatcher,
+            $handlerFactory,
             [],
             $protocolHandlerFactory,
             $bindHandlerFactory

@@ -12,8 +12,8 @@
 namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -38,6 +38,7 @@ class LdapServer
         'require_authentication' => true,
         'allow_anonymous' => false,
         'request_handler' => null,
+        'rootdse_handler' => null,
         'use_ssl' => false,
         'ssl_cert' => null,
         'ssl_cert_passphrase' => null,
@@ -57,10 +58,14 @@ class LdapServer
      * @param ServerRunnerInterface|null $serverRunner
      * @throws RuntimeException
      */
-    public function __construct(array $options = [], ServerRunnerInterface $serverRunner = null)
-    {
-        $this->options = array_merge($this->options, $options);
-        $this->validateRequestHandler();
+    public function __construct(
+        array $options = [],
+        ServerRunnerInterface $serverRunner = null
+    ) {
+        $this->options = array_merge(
+            $this->options,
+            $options
+        );
         $this->runner = $serverRunner ?? new PcntlServerRunner($this->options);
     }
 
@@ -83,35 +88,28 @@ class LdapServer
     }
 
     /**
-     * The request handler should be constructed from a string class name. This is to make sure that each client instance
-     * has its own version of the handler to avoid conflicts and potential security issues sharing a request handler.
+     * Specify an instance of a request handler to use for incoming LDAP requests.
      *
-     * @throws RuntimeException
+     * @param RequestHandlerInterface $requestHandler
+     * @return $this
      */
-    protected function validateRequestHandler(): void
+    public function useRequestHandler(RequestHandlerInterface $requestHandler): self
     {
-        if (!isset($this->options['request_handler'])) {
-            $this->options['request_handler'] = GenericRequestHandler::class;
+        $this->options['request_handler'] = $requestHandler;
 
-            return;
-        }
-        if (!\is_string($this->options['request_handler'])) {
-            throw new RuntimeException(sprintf(
-                'The request handler must be a string class name, got %s.',
-                gettype($this->options['request_handler'])
-            ));
-        }
-        if (!\class_exists($this->options['request_handler'])) {
-            throw new RuntimeException(sprintf(
-                'The request handler class does not exist: %s',
-                $this->options['request_handler']
-            ));
-        }
-        if (!\is_subclass_of($this->options['request_handler'], RequestHandlerInterface::class)) {
-            throw new RuntimeException(sprintf(
-                'The request handler class must implement "%s"',
-                RequestHandlerInterface::class
-            ));
-        }
+        return $this;
+    }
+
+    /**
+     * Specify an instance of a RootDSE handler to use for RootDSE requests.
+     *
+     * @param RootDseHandlerInterface $rootDseHandler
+     * @return $this
+     */
+    public function useRootDseHandler(RootDseHandlerInterface $rootDseHandler): self
+    {
+        $this->options['rootdse_handler'] = $rootDseHandler;
+
+        return $this;
     }
 }

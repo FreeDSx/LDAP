@@ -9,7 +9,9 @@ LDAP Server Configuration
     * [idle_timeout](#idle_timeout)
     * [require_authentication](#require_authentication)
     * [allow_anonymous](#allow_anonymous)
-    * [request_handler](#request_handler)
+* [LDAP Protocol Handlers](#ldap-protocol-handlers)
+   * [request_handler](#request_handler)
+   * [rootdse_handler](#rootdse_handler)
 * [RootDSE Options](#rootdse-options)
     * [dse_naming_contexts](#dse_naming_contexts)
     * [dse_alt_server](#dse_alt_server)
@@ -96,15 +98,59 @@ Whether or not anonymous binds should be allowed.
 
 **Default**: `false`
 
+
+## LDAP Protocol Handlers
+
+The LDAP server works by being provided "handler" classes. These classes implement interfaces to handle specific LDAP
+client requests and finish responses to them. You can either define a fully qualified class name for the handler in the 
+option, or provide an instance of the class. There are also methods available on the server for setting instances of these
+handlers (which will be detailed below).
+
 ------------------
 #### request_handler
 
-This should be a string class name that implements `FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface`. Server 
+This should be a string class name or object instance that implements `FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface`. Server 
 request operations are then passed to this class along with the request context.
 
-This request handler is instantiated for each client connection, so there can be no special constructor involved.
+This request handler is used for each client connection.
+
+You can also set this handler after instantiating the server and before running it:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use App\MySpecialRequestHandler;
+
+$server = new LdapServer([
+    'dse_alt_server' => 'dc2.local',
+    'port' => 33389,
+]);
+
+$server->useRequestHandler(new MySpecialRequestHandler());
+```
 
 **Default**: `FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler`
+
+#### rootdse_handler
+
+This should be a fully qualified class name string or object instance that implements `FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface`. If this is defined,
+the server will use it when responding to RootDSE requests from clients. If it is not defined, then the server will always
+respond with a default RootDSE entry composed of values provided in the `dse_*` config options.
+
+You can also set this handler after instantiating the server and before running it:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use App\MySpecialRootDseHandler;
+
+$server = new LdapServer([
+    'dse_alt_server' => 'dc2.local',
+    'port' => 33389,
+]);
+
+$server->useRootDseHandler(new MySpecialRootDseHandler());
+```
+
+**Default**: `null`
 
 ## RootDSE Options
 

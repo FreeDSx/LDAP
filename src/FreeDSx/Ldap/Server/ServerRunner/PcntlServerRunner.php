@@ -14,6 +14,7 @@ namespace FreeDSx\Ldap\Server\ServerRunner;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+use FreeDSx\Ldap\Server\RequestHandler\HandlerFactory;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Socket\SocketServer;
 
@@ -61,30 +62,13 @@ class PcntlServerRunner implements ServerRunnerInterface
             } elseif ($pid === 0) {
                 $serverProtocolHandler = new ServerProtocolHandler(
                     new ServerQueue($socket),
-                    $this->constructRequestHandler(),
+                    new HandlerFactory($this->options),
                     $this->options
                 );
                 $serverProtocolHandler->handle();
                 $this->server->removeClient($socket);
                 exit;
             }
-        }
-    }
-
-    /**
-     * Try to instantiate the user supplied request handler.
-     *
-     * @throws RuntimeException
-     */
-    protected function constructRequestHandler(): RequestHandlerInterface
-    {
-        try {
-            return new $this->options['request_handler']();
-        } catch (\Throwable $e) {
-            throw new RuntimeException(sprintf(
-                'Unable to instantiate the request handler: "%s"',
-                $e->getMessage()
-            ), $e->getCode(), $e);
         }
     }
 }

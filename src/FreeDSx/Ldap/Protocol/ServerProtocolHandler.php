@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Factory\ServerBindHandlerFactory;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
 
@@ -56,9 +56,9 @@ class ServerProtocolHandler
     protected $messageIds = [];
 
     /**
-     * @var RequestHandlerInterface
+     * @var HandlerFactoryInterface
      */
-    protected $dispatcher;
+    protected $handlerFactory;
 
     /**
      * @var ServerAuthorization
@@ -82,7 +82,7 @@ class ServerProtocolHandler
 
     public function __construct(
         ServerQueue $queue,
-        RequestHandlerInterface $dispatcher,
+        HandlerFactoryInterface $handlerFactory,
         array $options = [],
         ServerProtocolHandlerFactory $protocolHandlerFactory = null,
         ServerBindHandlerFactory $bindHandlerFactory = null,
@@ -90,16 +90,17 @@ class ServerProtocolHandler
         ResponseFactory $responseFactory = null
     ) {
         $this->queue = $queue;
-        $this->dispatcher = $dispatcher;
+        $this->handlerFactory = $handlerFactory;
         $this->options = \array_merge($this->options, $options);
         $this->authorizer = $authorizer ?? new ServerAuthorization(null, $this->options);
-        $this->protocolHandlerFactory = $protocolHandlerFactory ?? new ServerProtocolHandlerFactory();
+        $this->protocolHandlerFactory = $protocolHandlerFactory ?? new ServerProtocolHandlerFactory($handlerFactory);
         $this->bindHandlerFactory = $bindHandlerFactory ?? new ServerBindHandlerFactory();
         $this->responseFactory = $responseFactory ?? new ResponseFactory();
     }
 
     /**
      * Listens for messages from the socket and handles the responses/actions needed.
+     *
      * @throws EncoderException
      */
     public function handle(): void
@@ -168,7 +169,7 @@ class ServerProtocolHandler
             $handler->handleRequest(
                 $message,
                 $this->authorizer->getToken(),
-                $this->dispatcher,
+                $this->handlerFactory->makeRequestHandler(),
                 $this->queue,
                 $this->options
             );
@@ -184,6 +185,7 @@ class ServerProtocolHandler
 
     /**
      * Checks that the message ID is valid. It cannot be zero or a message ID that was already used.
+     *
      * @throws EncoderException
      * @throws EncoderException
      */
@@ -213,7 +215,6 @@ class ServerProtocolHandler
      * Sends a bind request to the bind handler and returns the token.
      *
      * @throws OperationException
-     * @throws EncoderException
      * @throws RuntimeException
      */
     protected function handleAuthRequest(LdapMessageRequest $message): TokenInterface
@@ -227,7 +228,7 @@ class ServerProtocolHandler
 
         return $this->bindHandlerFactory->get($message->getRequest())->handleBind(
             $message,
-            $this->dispatcher,
+            $this->handlerFactory->makeRequestHandler(),
             $this->queue,
             $this->options
         );

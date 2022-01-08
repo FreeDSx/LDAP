@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerProtocolHandlerInterface;
+use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 
 /**
  * Determines the correct handler for the request.
@@ -25,14 +26,25 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerProtocolHandlerInterface;
  */
 class ServerProtocolHandlerFactory
 {
-    public function get(RequestInterface $request): ServerProtocolHandlerInterface
+    /**
+     * @var HandlerFactoryInterface
+     */
+    private $handlerFactory;
+
+    public function __construct(HandlerFactoryInterface $handlerFactory)
     {
+        $this->handlerFactory = $handlerFactory;
+    }
+
+    public function get(
+        RequestInterface $request
+    ): ServerProtocolHandlerInterface {
         if ($request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_WHOAMI) {
             return new ServerProtocolHandler\ServerWhoAmIHandler();
         } elseif ($request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_START_TLS) {
             return new ServerProtocolHandler\ServerStartTlsHandler();
         } elseif ($this->isRootDseSearch($request)) {
-            return new ServerProtocolHandler\ServerRootDseHandler();
+            return $this->getRootDseHandler();
         } elseif ($request instanceof SearchRequest) {
             return new ServerProtocolHandler\ServerSearchHandler();
         } elseif ($request instanceof UnbindRequest) {
@@ -42,7 +54,7 @@ class ServerProtocolHandlerFactory
         }
     }
 
-    protected function isRootDseSearch(RequestInterface $request): bool
+    private function isRootDseSearch(RequestInterface $request): bool
     {
         if (!$request instanceof SearchRequest) {
             return false;
@@ -50,5 +62,12 @@ class ServerProtocolHandlerFactory
 
         return $request->getScope() === SearchRequest::SCOPE_BASE_OBJECT
                 && ((string)$request->getBaseDn() === '');
+    }
+
+    private function getRootDseHandler(): ServerProtocolHandler\ServerRootDseHandler
+    {
+        $rootDseHandler = $this->handlerFactory->makeRootDseHandler();
+
+        return new ServerProtocolHandler\ServerRootDseHandler($rootDseHandler);
     }
 }
