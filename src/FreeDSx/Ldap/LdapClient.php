@@ -405,14 +405,25 @@ class LdapClient
     }
 
     /**
-     * Merge a set of options.
+     * Merge a set of options. Depending on what you are changing, you many want to set the $forceDisconnect param to
+     * true, which forces the client to disconnect. After which you would have to manually bind again.
      *
-     * @param array $options
+     * @param array $options The set of options to merge in.
+     * @param bool $forceDisconnect Whether the client should disconnect; forcing a manual re-connect / bind. This is
+     *                              false by default.
      * @return $this
      */
-    public function setOptions(array $options): self
-    {
-        $this->options = array_merge($this->options, $options);
+    public function setOptions(
+        array $options,
+        bool $forceDisconnect = false
+    ): self {
+        $this->options = array_merge(
+            $this->options,
+            $options
+        );
+        if ($forceDisconnect) {
+            $this->unbindIfConnected();
+        }
 
         return $this;
     }
@@ -446,9 +457,7 @@ class LdapClient
      */
     public function __destruct()
     {
-        if ($this->handler !== null && $this->handler->isConnected()) {
-            $this->unbind();
-        }
+        $this->unbindIfConnected();
     }
 
     protected function handler(): ClientProtocolHandler
@@ -458,5 +467,16 @@ class LdapClient
         }
 
         return $this->handler;
+    }
+
+    /**
+     * @throws Exception\ConnectionException
+     * @throws OperationException
+     */
+    private function unbindIfConnected(): void
+    {
+        if ($this->handler !== null && $this->handler->isConnected()) {
+            $this->unbind();
+        }
     }
 }
