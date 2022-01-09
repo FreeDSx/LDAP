@@ -88,6 +88,16 @@ class LdapServer
     }
 
     /**
+     * Get the options currently set for the LDAP server.
+     *
+     * @return array<string, mixed>
+     */
+    public function getOptions(): array
+    {
+        return $this->options;
+    }
+
+    /**
      * Specify an instance of a request handler to use for incoming LDAP requests.
      *
      * @param RequestHandlerInterface $requestHandler
