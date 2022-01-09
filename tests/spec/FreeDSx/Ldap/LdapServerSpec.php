@@ -29,19 +29,11 @@ class LdapServerSpec extends ObjectBehavior
 
     public function it_is_initializable()
     {
-        if (!extension_loaded('pcntl')) {
-            throw new SkippingException('The PCNTL extension is required for this spec.');
-        }
-
         $this->shouldHaveType(LdapServer::class);
     }
 
     public function it_should_run_the_server(ServerRunnerInterface $serverRunner)
     {
-        if (!extension_loaded('pcntl')) {
-            throw new SkippingException('The PCNTL extension is required for this spec.');
-        }
-
         $serverRunner->run(Argument::type(SocketServer::class))->shouldBeCalled();
 
         $this->run();
@@ -49,17 +41,15 @@ class LdapServerSpec extends ObjectBehavior
 
     public function it_should_use_the_request_handler_specified(RequestHandlerInterface $requestHandler)
     {
-        if (!extension_loaded('pcntl')) {
-            throw new SkippingException('The PCNTL extension is required for this spec.');
-        }
-
         $this->useRequestHandler($requestHandler);
+
         $this->getOptions()->shouldHaveKeyWithValue('request_handler', $requestHandler);
     }
 
     public function it_should_use_the_rootdse_handler_specified(RootDseHandlerInterface $rootDseHandler)
     {
         $this->useRootDseHandler($rootDseHandler);
+
         $this->getOptions()->shouldHaveKeyWithValue('rootdse_handler', $rootDseHandler);
     }
 
