@@ -45,7 +45,7 @@ class RequestContext
     /**
      * @return ControlBag
      */
-    public function controls()
+    public function controls(): ControlBag
     {
         return $this->controls;
     }
@@ -53,7 +53,7 @@ class RequestContext
     /**
      * @return TokenInterface
      */
-    public function token()
+    public function token(): TokenInterface
     {
         return $this->token;
     }
