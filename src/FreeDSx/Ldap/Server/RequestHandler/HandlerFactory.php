@@ -96,14 +96,9 @@ class HandlerFactory implements HandlerFactoryInterface
             );
         }
 
-        if (!$handler instanceof RootDseHandlerInterface) {
-            throw new RuntimeException(sprintf(
-                'Expected an instance of %s, got: %s',
-                RootDseHandlerInterface::class,
-                get_class($handler)
-            ));
+        if ($handler instanceof RootDseHandlerInterface) {
+            $this->rootdseHandler = $handler;
         }
-        $this->rootdseHandler = $handler;
 
         return $this->rootdseHandler;
     }

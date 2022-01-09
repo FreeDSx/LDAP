@@ -83,4 +83,13 @@ class HandlerFactorySpec extends ObjectBehavior
 
         $this->shouldNotThrow(RuntimeException::class)->during('makeRootDseHandler');
     }
+
+    public function it_should_allow_a_null_rootdse_handler()
+    {
+        $this->beConstructedWith([
+            'rootdse_handler' => null,
+        ]);
+
+        $this->makeRootDseHandler()->shouldBeNull();
+    }
 }
