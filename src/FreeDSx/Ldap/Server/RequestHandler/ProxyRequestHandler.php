@@ -45,18 +45,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     protected $options = [];
 
     /**
-     * @param string $username
-     * @param string $password
-     * @return bool
-     * @throws OperationException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\ConnectionException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \Throwable
+     * @inheritDoc
      */
     public function bind(string $username, string $password): bool
     {
@@ -68,18 +57,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * @param RequestContext $context
-     * @param ModifyRequest $modify
-     * @throws BindException
-     * @throws OperationException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\ConnectionException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \Throwable
+     * @inheritDoc
      */
     public function modify(RequestContext $context, ModifyRequest $modify): void
     {
@@ -87,18 +65,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * @param RequestContext $context
-     * @param ModifyDnRequest $modifyDn
-     * @throws BindException
-     * @throws OperationException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\ConnectionException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \Throwable
+     * @inheritDoc
      */
     public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn): void
     {
@@ -106,18 +73,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * @param RequestContext $context
-     * @param DeleteRequest $delete
-     * @throws BindException
-     * @throws OperationException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\ConnectionException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \Throwable
+     * @inheritDoc
      */
     public function delete(RequestContext $context, DeleteRequest $delete): void
     {
@@ -125,18 +81,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * @param RequestContext $context
-     * @param AddRequest $add
-     * @throws BindException
-     * @throws OperationException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\ConnectionException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \Throwable
+     * @inheritDoc
      */
     public function add(RequestContext $context, AddRequest $add): void
     {
@@ -144,19 +89,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * @param RequestContext $context
-     * @param SearchRequest $search
-     * @return Entries
-     * @throws BindException
-     * @throws OperationException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\ConnectionException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \Throwable
+     * @inheritDoc
      */
     public function search(RequestContext $context, SearchRequest $search): Entries
     {
@@ -164,19 +97,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * @param RequestContext $context
-     * @param CompareRequest $compare
-     * @return bool
-     * @throws BindException
-     * @throws OperationException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\ConnectionException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \Throwable
+     * @inheritDoc
      */
     public function compare(RequestContext $context, CompareRequest $compare): bool
     {
@@ -189,18 +110,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
     }
 
     /**
-     * @param RequestContext $context
-     * @param ExtendedRequest $extended
-     * @throws BindException
-     * @throws OperationException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\ConnectionException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \Throwable
+     * @inheritDoc
      */
     public function extended(RequestContext $context, ExtendedRequest $extended): void
     {
