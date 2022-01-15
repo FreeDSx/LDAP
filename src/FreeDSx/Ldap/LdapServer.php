@@ -49,7 +49,7 @@ class LdapServer
     ];
 
     /**
-     * @var ServerRunnerInterface
+     * @var ServerRunnerInterface|null
      */
     protected $runner;
 
@@ -60,7 +60,7 @@ class LdapServer
      */
     public function __construct(
         array $options = [],
-        ServerRunnerInterface $serverRunner = null
+        ?ServerRunnerInterface $serverRunner = null
     ) {
         $this->options = array_merge(
             $this->options,
