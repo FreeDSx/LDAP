@@ -66,7 +66,7 @@ class LdapServer
             $this->options,
             $options
         );
-        $this->runner = $serverRunner ?? new PcntlServerRunner($this->options);
+        $this->runner = $serverRunner;
     }
 
     /**
@@ -80,7 +80,7 @@ class LdapServer
             ? $this->options['unix_socket']
             : $this->options['ip'];
 
-        $this->runner->run(SocketServer::bind(
+        $this->runner()->run(SocketServer::bind(
             $resource,
             $this->options['port'],
             $this->options
@@ -121,5 +121,14 @@ class LdapServer
         $this->options['rootdse_handler'] = $rootDseHandler;
 
         return $this;
+    }
+
+    private function runner(): ServerRunnerInterface
+    {
+        if (!$this->runner) {
+            $this->runner = new PcntlServerRunner($this->options);
+        }
+
+        return $this->runner;
     }
 }
