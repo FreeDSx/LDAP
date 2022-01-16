@@ -11,6 +11,7 @@
 
 namespace spec\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -23,6 +24,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerRootDseHandler;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\RequestContext;
+use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -66,6 +68,41 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $handler,
             $queue,
             ['dse_vendor_name' => 'Foo', 'dse_naming_contexts' => ['dc=Foo,dc=Bar']]
+        );
+    }
+
+    public function it_should_send_back_a_RootDSE_with_paging_support_if_the_paging_handler_is_set(
+        ServerQueue $queue,
+        RequestHandlerInterface $handler,
+        TokenInterface $token
+    ) {
+        $search = new LdapMessageRequest(
+            1,
+            (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope()
+        );
+
+        $queue->sendMessage(
+            Argument::that(function (LdapMessageResponse $response) {
+                /** @var SearchResultEntry $search */
+               $search = $response->getResponse();
+                $entry = $search->getEntry();
+
+                return $entry->get('supportedControl')
+                    ->has(Control::OID_PAGING);
+            }),
+            new LdapMessageResponse(1, new SearchResultDone(0))
+        )->shouldBeCalled();
+
+        $this->handleRequest(
+            $search,
+            $token,
+            $handler,
+            $queue,
+            [
+                'paging_handler' => PagingHandlerInterface::class,
+                'dse_vendor_name' => 'Foo',
+                'dse_naming_contexts' => ['dc=Foo,dc=Bar'],
+            ]
         );
     }
 

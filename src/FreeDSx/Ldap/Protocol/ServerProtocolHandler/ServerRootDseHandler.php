@@ -11,6 +11,8 @@
 
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -43,7 +45,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
     }
 
     /**
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      */
     public function handleRequest(
         LdapMessageRequest $message,
@@ -64,6 +66,12 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
             $entry->add(
                 'supportedExtension',
                 ExtendedRequest::OID_START_TLS
+            );
+        }
+        if (isset($options['paging_handler'])) {
+            $entry->add(
+                'supportedControl',
+                Control::OID_PAGING
             );
         }
         if (isset($options['vendor_version'])) {
