@@ -18,7 +18,7 @@
 
     <testsuites>
         <testsuite name="FreeDSx LDAP Unit Tests">
-            <directory>./tests/unit</directory>
+            <directory>./tests/integration</directory>
         </testsuite>
     </testsuites>
 
