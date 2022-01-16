@@ -12,6 +12,7 @@ LDAP Server Configuration
 * [LDAP Protocol Handlers](#ldap-protocol-handlers)
    * [request_handler](#request_handler)
    * [rootdse_handler](#rootdse_handler)
+   * [paging_handler](#paging_handler)
 * [RootDSE Options](#rootdse-options)
     * [dse_naming_contexts](#dse_naming_contexts)
     * [dse_alt_server](#dse_alt_server)
@@ -148,6 +149,29 @@ $server = new LdapServer([
 ]);
 
 $server->useRootDseHandler(new MySpecialRootDseHandler());
+```
+
+**Default**: `null`
+
+#### paging_handler
+
+This should be a fully qualified class name string or object instance that implements `FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface`. If this is defined,
+the server will use it when responding to client paged search requests. If it is not defined, then the server may
+send an operation error to the client if it requested a paged search as critical. If the paged search was not marked as
+critical, then the server will ignore the client paging control and send the search through the standard `request_handler` class.
+
+You can also set this handler after instantiating the server and before running it:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use App\MySpecialPagingHandler;
+
+$server = new LdapServer([
+    'dse_alt_server' => 'dc2.local',
+    'port' => 33389,
+]);
+
+$server->usePagingHandler(new MySpecialPagingHandler());
 ```
 
 **Default**: `null`

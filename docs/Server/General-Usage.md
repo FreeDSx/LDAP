@@ -5,7 +5,8 @@ General LDAP Server Usage
 * [Handling Client Requests](#handling-client-requests)
   * [Proxy Request Handler](#proxy-request-handler)
   * [Generic Request Handler](#generic-request-handler)
-  * [Handling the RootDSE](#handling-the-rootdse)
+* [Handling the RootDSE](#handling-the-rootdse)
+* [Handling Client Paging Requests](#handling-client-paging-requests)
 * [StartTLS SSL Certificate Support](#starttls-ssl-certificate-support)
 
 The LdapServer class is used to run a LDAP server process that accepts client requests and sends back a response. It
@@ -167,12 +168,14 @@ $server = new LdapServer([ 'request_handler' => LdapRequestHandler::class ]);
 $server->run();
 ```
 
-### Handling the RootDSE
+## Handling the RootDSE
 
 If you need more control over the RootDSE that gets returned, you can implement the `RootDseHandlerInterface`. This
-allows you modify / return your own RootDSE in response to a client request for one.
+allows you to modify / return your own RootDSE in response to a client request for one.
 
-It can be used like so:
+An example of using it to proxy RootDSE requests to a different LDAP server...
+
+1. Create a class implementing `FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface`:
 
 ```php
 namespace Foo;
@@ -181,7 +184,7 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 
-class LdapProxyHandler extends ProxyRequestHandler implements RootDseHandlerInterface
+class RootDseProxyHandler extends ProxyRequestHandler implements RootDseHandlerInterface
 {
     /**
      * Set the options for the LdapClient in the constructor.
@@ -196,9 +199,109 @@ class LdapProxyHandler extends ProxyRequestHandler implements RootDseHandlerInte
     
     public function rootDse(RequestContext $context, SearchRequest $request, Entry $rootDse): Entry
     {
-        return $this->ldap()->search($search, ...$context->controls()->toArray())->first();
+        return $this->ldap()
+            ->search($search, ...$context->controls()->toArray())
+            ->first();
     }
 }
+```
+
+2. Use the implemented class when instantiating the LDAP server:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use Foo\RootDseProxyHandler;
+
+$server = new LdapServer(['rootdse_handler' => RootDseProxyHandler::class]);
+$server->run();
+```
+
+The above would pass on a RootDSE request as a proxy and send it back to the client.
+
+## Handling Client Paging Requests
+
+The basic RequestHandlerInterface by default will not support paging requests from clients. To support client paging
+search requests you must create a class that implements `FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface`.
+
+An example of using it to handle a client paging request... 
+
+1. Create a class implementing `FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface`:
+
+```php
+namespace Foo;
+
+use FreeDSx\Ldap\Entry\Entries;use FreeDSx\Ldap\Entry\Entry;use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Server\Paging\PagingRequest;use FreeDSx\Ldap\Server\Paging\PagingResponse;use FreeDSx\Ldap\Server\RequestContext;use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
+use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
+
+class MyPagingHandler implements PagingHandlerInterface
+{
+    /**
+     * @inheritDoc
+     */
+    public function page(
+        PagingRequest $pagingRequest,
+        RequestContext $context
+        ): PagingResponse {
+        // Every time a client asks for a new "page" of results, this method will be called.
+        
+        // Get the iteration of the "page" set we are on...
+        $iteration = $pagingRequest->getIteration();
+        // Get the size of the results the client is requesting...
+        $size = $pagingRequest->getSize();
+        // The actual search request...
+        $search = $pagingRequest->getSearchRequest();
+
+
+        // Perform the logic necessary to build up an Entries object with the results
+        // Just an example. Populate this based on actual search, size, and iteration.
+        $entries = new Entries(
+            Entry::fromArray('cn=Foo,dc=FreeDSx,dc=local', [
+                'cn' => 'Foo',
+                'sn' => 'Bar',
+                'givenName' => 'Foo',
+            ]),
+            Entry::fromArray('cn=Chad,dc=FreeDSx,dc=local', [
+                'cn' => 'Chad',
+                'sn' => 'Sikorra',
+                'givenName' => 'Chad',
+            ])
+        );
+        
+        // Perform actual logic to determine if it is the final result set...
+        $isFinalResponse = false;
+        
+        // ...
+ 
+        if ($isFinalResponse) {
+            // If this is the final result in the paging set, make a response indicating as such:
+            return PagingResponse::makeFinal($entries);
+        } else {
+            // If you know an estimate of the remaining entries, pass it as a second param here.
+            return PagingResponse::make($entries);
+        }
+    }
+    
+    /**
+     * @inheritDoc
+     */
+    public function remove(PagingRequest $pagingRequest,RequestContext $context) : void
+    {
+        // This is to indicate that the client is done paging.
+        // Use this to clean up any resources involved in handling the paging request.
+    }
+}
+```
+
+2. Use the implemented class when instantiating the LDAP server:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use Foo\MyPagingHandler;
+
+$server = new LdapServer();
+$server->usePagingHandler(new MyPagingHandler());
+$server->run();
 ```
 
 The above would pass on a RootDSE request as a proxy and send it back to the client.
