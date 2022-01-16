@@ -18,9 +18,7 @@ class PagingResponseSpec extends ObjectBehavior
 {
     public function let()
     {
-        $this->beConstructedWith(
-            new Entries(),
-        );
+        $this->beConstructedWith(new Entries());
     }
 
     public function it_should_not_be_complete_by_default()
