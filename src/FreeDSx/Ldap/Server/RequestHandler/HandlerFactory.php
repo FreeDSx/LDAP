@@ -34,6 +34,11 @@ class HandlerFactory implements HandlerFactoryInterface
     private $rootdseHandler;
 
     /**
+     * @var PagingHandlerInterface|null
+     */
+    private $pagingHandler;
+
+    /**
      * @var array<string, mixed>
      */
     private $options;
@@ -48,7 +53,6 @@ class HandlerFactory implements HandlerFactoryInterface
 
     /**
      * @inheritDoc
-     * @throws RuntimeException
      */
     public function makeRequestHandler(): RequestHandlerInterface
     {
@@ -101,6 +105,35 @@ class HandlerFactory implements HandlerFactoryInterface
         }
 
         return $this->rootdseHandler;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function makePagingHandler(): ?PagingHandlerInterface
+    {
+        if ($this->pagingHandler) {
+            return $this->pagingHandler;
+        }
+
+        $handler = null;
+        if (isset($this->options['paging_handler'])) {
+            $handler = $this->makeOrReturnInstanceOf(
+                'paging_handler',
+                PagingHandlerInterface::class
+            );
+        }
+
+        if ($handler !== null && !$handler instanceof PagingHandlerInterface) {
+            throw new RuntimeException(sprintf(
+                'Expected an instance of %s, got: %s',
+                PagingHandlerInterface::class,
+                get_class($handler)
+            ));
+        }
+        $this->pagingHandler = $handler;
+
+        return $this->pagingHandler;
     }
 
     /**

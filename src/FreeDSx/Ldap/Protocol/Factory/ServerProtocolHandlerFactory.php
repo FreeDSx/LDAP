@@ -11,6 +11,8 @@
 
 namespace FreeDSx\Ldap\Protocol\Factory;
 
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -18,6 +20,7 @@ use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerProtocolHandlerInterface;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
+use FreeDSx\Ldap\Server\RequestHistory;
 
 /**
  * Determines the correct handler for the request.
@@ -31,13 +34,22 @@ class ServerProtocolHandlerFactory
      */
     private $handlerFactory;
 
-    public function __construct(HandlerFactoryInterface $handlerFactory)
-    {
+    /**
+     * @var RequestHistory
+     */
+    private $requestHistory;
+
+    public function __construct(
+        HandlerFactoryInterface $handlerFactory,
+        RequestHistory $requestHistory
+    ) {
         $this->handlerFactory = $handlerFactory;
+        $this->requestHistory = $requestHistory;
     }
 
     public function get(
-        RequestInterface $request
+        RequestInterface $request,
+        ControlBag $controls
     ): ServerProtocolHandlerInterface {
         if ($request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_WHOAMI) {
             return new ServerProtocolHandler\ServerWhoAmIHandler();
@@ -45,6 +57,8 @@ class ServerProtocolHandlerFactory
             return new ServerProtocolHandler\ServerStartTlsHandler();
         } elseif ($this->isRootDseSearch($request)) {
             return $this->getRootDseHandler();
+        } elseif ($this->isPagingSearch($request, $controls)) {
+            return $this->getPagingHandler();
         } elseif ($request instanceof SearchRequest) {
             return new ServerProtocolHandler\ServerSearchHandler();
         } elseif ($request instanceof UnbindRequest) {
@@ -64,10 +78,32 @@ class ServerProtocolHandlerFactory
                 && ((string)$request->getBaseDn() === '');
     }
 
+    private function isPagingSearch(
+        RequestInterface $request,
+        ControlBag $controls
+    ): bool {
+        return $request instanceof SearchRequest
+            && $controls->has(Control::OID_PAGING);
+    }
+
     private function getRootDseHandler(): ServerProtocolHandler\ServerRootDseHandler
     {
         $rootDseHandler = $this->handlerFactory->makeRootDseHandler();
 
         return new ServerProtocolHandler\ServerRootDseHandler($rootDseHandler);
+    }
+
+    private function getPagingHandler(): ServerProtocolHandlerInterface
+    {
+        $pagingHandler = $this->handlerFactory->makePagingHandler();
+
+        if (!$pagingHandler) {
+            return new ServerProtocolHandler\ServerPagingUnsupportedHandler();
+        }
+
+        return new ServerProtocolHandler\ServerPagingHandler(
+            $pagingHandler,
+            $this->requestHistory
+        );
     }
 }

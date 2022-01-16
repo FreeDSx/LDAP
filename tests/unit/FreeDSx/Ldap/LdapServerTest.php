@@ -17,6 +17,8 @@ use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Search\Filters;
 use Symfony\Component\Process\Process;
 
 class LdapServerTest extends LdapTestCase
@@ -307,6 +309,43 @@ class LdapServerTest extends LdapTestCase
         $this->assertNull($output);
     }
 
+    public function testItCanHandlingPaging()
+    {
+        $this->stopServer();
+        $this->createServerProcess('tcp', 'paging');
+        $this->authenticate();
+
+        $allEntries = [];
+        $i = 0;
+
+        $search = Operations::search(Filters::raw('(cn=foo)'));
+        $paging = $this->client->paging($search);
+
+        try {
+            while ($paging->hasEntries()) {
+                $i++;
+                $entries = $paging->getEntries(100);
+                $allEntries = array_merge(
+                    $allEntries,
+                    $entries->toArray()
+                );
+
+                $output = $this->waitForServerOutput('---paging---');
+
+                if ($i === 3) {
+                    $this->assertStringContainsString('Final response', $output);
+                } else {
+                    $this->assertStringContainsString('Regular response', $output);
+                }
+            }
+        } catch (OperationException $e) {
+            var_dump($this->subject->getOutput());
+            throw $e;
+        }
+
+        $this->assertCount(300, $allEntries);
+    }
+
     public function testItCanStartTLSThenStillPerformOperations()
     {
         $this->client->startTls();
@@ -369,13 +408,21 @@ class LdapServerTest extends LdapTestCase
         ));
     }
 
-    private function createServerProcess(string $transport): void
-    {
-        $this->subject = new Process([
+    private function createServerProcess(
+        string $transport,
+        ?string $handler = null
+    ): void {
+        $processArgs = [
             'php',
             __DIR__ . '/../../../bin/ldapserver.php',
             $transport,
-        ]);
+        ];
+
+        if ($handler) {
+            $processArgs[] = $handler;
+        }
+
+        $this->subject = new Process($processArgs);
         $this->subject->start();
         $this->waitForServerOutput('server starting...');
 

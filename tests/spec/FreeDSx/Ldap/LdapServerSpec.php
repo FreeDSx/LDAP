@@ -12,11 +12,11 @@
 namespace spec\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Socket\SocketServer;
-use PhpSpec\Exception\Example\SkippingException;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
@@ -53,6 +53,13 @@ class LdapServerSpec extends ObjectBehavior
         $this->getOptions()->shouldHaveKeyWithValue('rootdse_handler', $rootDseHandler);
     }
 
+    public function it_should_use_the_paging_handler_specified(PagingHandlerInterface $pagingHandler)
+    {
+        $this->usePagingHandler($pagingHandler);
+
+        $this->getOptions()->shouldHaveKeyWithValue('paging_handler', $pagingHandler);
+    }
+
     public function it_should_get_the_default_options_with_any_merged_values()
     {
         $this->getOptions()->shouldBeEqualTo([
@@ -65,6 +72,7 @@ class LdapServerSpec extends ObjectBehavior
             'allow_anonymous' => false,
             'request_handler' => null,
             'rootdse_handler' => null,
+            'paging_handler' => null,
             'use_ssl' => false,
             'ssl_cert' => null,
             'ssl_cert_passphrase' => null,

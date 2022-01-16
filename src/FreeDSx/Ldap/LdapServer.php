@@ -12,6 +12,7 @@
 namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
@@ -39,6 +40,7 @@ class LdapServer
         'allow_anonymous' => false,
         'request_handler' => null,
         'rootdse_handler' => null,
+        'paging_handler' => null,
         'use_ssl' => false,
         'ssl_cert' => null,
         'ssl_cert_passphrase' => null,
@@ -119,6 +121,19 @@ class LdapServer
     public function useRootDseHandler(RootDseHandlerInterface $rootDseHandler): self
     {
         $this->options['rootdse_handler'] = $rootDseHandler;
+
+        return $this;
+    }
+
+    /**
+     * Specify an instance of a paging handler to use for paged search requests.
+     *
+     * @param PagingHandlerInterface $pagingHandler
+     * @return $this
+     */
+    public function usePagingHandler(PagingHandlerInterface $pagingHandler): self
+    {
+        $this->options['paging_handler'] = $pagingHandler;
 
         return $this;
     }

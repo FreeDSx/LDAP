@@ -53,7 +53,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $queue->isEncrypted()->willReturn(false);
         $queue->sendMessage(Argument::any())->willReturn($queue);
         $bindHandlerFactory->get(Argument::any())->willReturn($bindHandler);
-        $protocolHandlerFactory->get(Argument::any())->willReturn($protocolHandler);
+        $protocolHandlerFactory->get(Argument::any(), Argument::any())->willReturn($protocolHandler);
         $handlerFactory->makeRequestHandler()->willReturn($dispatcher);
 
         $this->beConstructedWith(

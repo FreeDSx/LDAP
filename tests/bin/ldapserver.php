@@ -11,10 +11,74 @@ use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
+use FreeDSx\Ldap\Server\Paging\PagingRequest;
+use FreeDSx\Ldap\Server\Paging\PagingResponse;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
 
 require __DIR__ . '/../../vendor/autoload.php';
+
+class LdapServerPagingHandler implements PagingHandlerInterface
+{
+    public function page(
+        PagingRequest $pagingRequest,
+        RequestContext $context
+    ): PagingResponse {
+        $i = 0;
+
+        $entries = [];
+        while ($i < $pagingRequest->getSize()) {
+            $i++;
+            $entries[] = Entry::fromArray(
+                "cn=foo$i,dc=foo,dc=bar",
+                [
+                    'foo' => $i,
+                    'bar' => $i,
+                ]
+            );
+        }
+        $entries = new Entries(...$entries);
+
+        if ($pagingRequest->getIteration() === 3) {
+            $this->logRequest(
+                'paging',
+                'Final response with ' . $entries->count() . ' entries'
+            );
+
+            return PagingResponse::makeFinal($entries);
+        } else {
+            $this->logRequest(
+                'paging',
+                'Regular response with '
+                . $entries->count() . ' entries, iteration '
+                . $pagingRequest->getIteration()
+            );
+
+            return PagingResponse::make(
+                $entries,
+                ($pagingRequest->getSize() * 3) - ($pagingRequest->getIteration() * $pagingRequest->getSize())
+            );
+        }
+    }
+
+    public function remove(
+        PagingRequest $pagingRequest,
+        RequestContext $context
+    ): void {
+        $this->logRequest(
+            'remove',
+            'On iteration ' . $pagingRequest->getIteration()
+        );
+    }
+
+    private function logRequest(
+        string $type,
+        string $message
+    ): void {
+        echo "---$type--- $message" . PHP_EOL;
+    }
+}
 
 class LdapServerRequestHandler extends GenericRequestHandler
 {
@@ -135,6 +199,7 @@ $sslKey = "/etc/ssl/private/slapd.key";
 $sslCert = "/etc/ssl/certs/slapd.crt";
 
 $transport = $argv[1] ?? 'tcp';
+$handler = $argv[2] ?? null;
 $useSsl = false;
 
 if ($transport === 'ssl') {
@@ -155,6 +220,10 @@ $server = new LdapServer([
     'ssl_cert_key' => $sslKey,
     'use_ssl' => $useSsl,
 ]);
+
+if ($handler === 'paging') {
+    $server->usePagingHandler(new LdapServerPagingHandler());
+}
 
 echo "server starting..." . PHP_EOL;
 

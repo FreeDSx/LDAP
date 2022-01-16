@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Protocol\Factory\ServerBindHandlerFactory;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
+use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
 
@@ -93,7 +94,10 @@ class ServerProtocolHandler
         $this->handlerFactory = $handlerFactory;
         $this->options = \array_merge($this->options, $options);
         $this->authorizer = $authorizer ?? new ServerAuthorization(null, $this->options);
-        $this->protocolHandlerFactory = $protocolHandlerFactory ?? new ServerProtocolHandlerFactory($handlerFactory);
+        $this->protocolHandlerFactory = $protocolHandlerFactory ?? new ServerProtocolHandlerFactory(
+            $handlerFactory,
+            new RequestHistory()
+        );
         $this->bindHandlerFactory = $bindHandlerFactory ?? new ServerBindHandlerFactory();
         $this->responseFactory = $responseFactory ?? new ResponseFactory();
     }
@@ -162,7 +166,10 @@ class ServerProtocolHandler
             return;
         }
         $request = $message->getRequest();
-        $handler = $this->protocolHandlerFactory->get($request);
+        $handler = $this->protocolHandlerFactory->get(
+            $request,
+            $message->controls()
+        );
 
         # They are authenticated or authentication is not required, so pass the request along...
         if ($this->authorizer->isAuthenticated() || !$this->authorizer->isAuthenticationRequired($request)) {
