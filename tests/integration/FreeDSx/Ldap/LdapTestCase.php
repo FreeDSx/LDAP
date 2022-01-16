@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace unit\FreeDSx\Ldap;
+namespace integration\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\LdapClient;
 use PHPUnit\Framework\TestCase;

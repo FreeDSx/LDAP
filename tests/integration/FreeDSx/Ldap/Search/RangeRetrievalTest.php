@@ -9,12 +9,12 @@
  * file that was distributed with this source code.
  */
 
-namespace unit\FreeDSx\Ldap\Search;
+namespace integration\FreeDSx\Ldap\Search;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Search\RangeRetrieval;
-use unit\FreeDSx\Ldap\LdapTestCase;
+use integration\FreeDSx\Ldap\LdapTestCase;
 
 class RangeRetrievalTest extends LdapTestCase
 {

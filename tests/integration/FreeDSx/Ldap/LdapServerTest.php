@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace unit\FreeDSx\Ldap;
+namespace integration\FreeDSx\Ldap;
 
 use Exception;
 use FreeDSx\Ldap\Entry\Entry;

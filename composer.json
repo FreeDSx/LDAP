@@ -37,7 +37,7 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "unit\\FreeDSx\\Ldap\\": "tests/unit/FreeDSx/Ldap",
+      "integration\\FreeDSx\\Ldap\\": "tests/integration/FreeDSx/Ldap",
       "spec\\FreeDSx\\Ldap\\": "tests/spec/FreeDSx/Ldap"
     }
   },

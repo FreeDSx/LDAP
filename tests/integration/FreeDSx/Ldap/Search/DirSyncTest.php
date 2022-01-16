@@ -9,13 +9,13 @@
  * file that was distributed with this source code.
  */
 
-namespace unit\FreeDSx\Ldap\Search;
+namespace integration\FreeDSx\Ldap\Search;
 
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Search\DirSync;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
-use unit\FreeDSx\Ldap\LdapTestCase;
+use integration\FreeDSx\Ldap\LdapTestCase;
 
 class DirSyncTest extends LdapTestCase
 {
