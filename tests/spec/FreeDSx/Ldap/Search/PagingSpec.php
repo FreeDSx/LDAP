@@ -14,6 +14,7 @@ namespace spec\FreeDSx\Ldap\Search;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -87,5 +88,60 @@ class PagingSpec extends ObjectBehavior
     public function it_should_get_the_entries_from_the_response()
     {
         $this->getEntries()->shouldBeLike(new Entries(Entry::create('foo'), Entry::create('bar')));
+    }
+
+    public function it_should_get_marked_as_ended_if_not_critical_and_no_control_is_returned(
+        LdapClient $newClient,
+        SearchRequest $searchRequest
+    ) {
+        $newClient->sendAndReceive(
+                $searchRequest,
+            (new PagingControl(1000, ''))->setCriticality(false)
+            )->willReturn(new LdapMessageResponse(
+                1,
+                new SearchResponse(
+                    new LdapResult(0, '', ''),
+                    new Entries(
+                        Entry::create('foo'),
+                        Entry::create('bar')
+                    )
+                )
+            ));
+        $this->beConstructedWith(
+            $newClient,
+            $searchRequest,
+            1000
+        );
+
+        $this->getEntries()->shouldBeLike(new Entries(Entry::create('foo'), Entry::create('bar')));
+        $this->hasEntries()->shouldBeEqualTo(false);
+    }
+
+
+    public function it_should_throw_an_exception_if_marked_as_critical_and_no_control_is_received(
+        LdapClient $newClient,
+        SearchRequest $searchRequest
+    ) {
+        $newClient->sendAndReceive(
+            $searchRequest,
+            (new PagingControl(1000, ''))->setCriticality(true)
+        )->willReturn(new LdapMessageResponse(
+            1,
+            new SearchResponse(
+                new LdapResult(0, '', ''),
+                new Entries(
+                    Entry::create('foo'),
+                    Entry::create('bar')
+                )
+            )
+        ));
+        $this->beConstructedWith(
+            $newClient,
+            $searchRequest,
+            1000
+        );
+
+        $this->isCritical();
+        $this->shouldThrow(new ProtocolException('Expected a paging control, but received none.'))->during('getEntries');
     }
 }

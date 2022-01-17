@@ -54,6 +54,11 @@ class Paging
     protected $ended = false;
 
     /**
+     * @var bool
+     */
+    protected $isCritical = false;
+
+    /**
      * @param LdapClient $client
      * @param SearchRequest $search
      * @param int $size
@@ -63,6 +68,20 @@ class Paging
         $this->search = $search;
         $this->client = $client;
         $this->size = $size;
+    }
+
+    /**
+     * Set the criticality of the control. Setting this will cause the LDAP server to return an error if paging is not
+     * possible.
+     *
+     * @param bool $isCritical
+     * @return $this
+     */
+    public function isCritical(bool $isCritical = true): self
+    {
+        $this->isCritical = $isCritical;
+
+        return $this;
     }
 
     /**
@@ -135,9 +154,17 @@ class Paging
      */
     protected function send(?int $size = null)
     {
-        $cookie = ($this->control !== null) ? $this->control->getCookie() : '';
-        $message = $this->client->sendAndReceive($this->search, Controls::paging($size ?? $this->size, $cookie));
-        $control = $message->controls()->get(Control::OID_PAGING);
+        $cookie = ($this->control !== null)
+            ? $this->control->getCookie()
+            : '';
+        $message = $this->client->sendAndReceive(
+            $this->search,
+            Controls::paging($size ?? $this->size, $cookie)
+                ->setCriticality($this->isCritical)
+        );
+        $control = $message->controls()
+            ->get(Control::OID_PAGING);
+
         if ($control !== null && !$control instanceof PagingControl) {
             throw new ProtocolException(sprintf(
                 'Expected a paging control, but received: %s.',
@@ -146,8 +173,13 @@ class Paging
         }
         # OpenLDAP returns no paging control in response to an abandon request. However, other LDAP implementations do;
         # such as Active Directory. It's not clear from the paging RFC which is correct.
-        if ($control === null && $size !== 0) {
+        if ($control === null && $size !== 0 && $this->isCritical) {
             throw new ProtocolException('Expected a paging control, but received none.');
+        }
+        # The server does not support paging, but the control was not marked as critical. In this case the server will
+        # return results but might ignore the control altogether.
+        if ($control === null && $size !== 0 && !$this->isCritical) {
+            $this->ended = true;
         }
         $this->control = $control;
         /** @var SearchResponse $response */
