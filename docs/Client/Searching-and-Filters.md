@@ -6,6 +6,7 @@
   * [Subtree Search](#subtree-search)
 * [Sorting](#sorting)
 * [Paging](#paging)
+  * [Paging Criticality](#paging-criticality)
 * [VLV](#vlv)
 * [Filters](#filters)
   * [Construction Using Objects](#construction-using-objects)
@@ -133,7 +134,7 @@ foreach ($entries as $entry) {
 
 A paging search retrieves a certain subset of the search results at a time. This allows you to go through the results in
 smaller chunks, then move on to the next. Also, some LDAP servers may limit search results to a certain number of entries.
-This may make it necessary to use paging for some searches to retrieve all of the results of a search.
+This may make it necessary to use paging for some searches to retrieve all the results of a search.
 
 ```php
 use FreeDSx\Ldap\Operations;
@@ -158,6 +159,19 @@ while ($paging->hasEntries()) {
 
 At any time during the paging operation you can call the `$paging->end()` operation and break the loop. This will
 gracefully abort the paged search.
+
+### Paging Criticality
+
+You can optionally set the paging operation to critical. This forces the server to return an error if paging is not supported.
+Otherwise, the server may ignore the paging control and simply return the responses.
+
+```php
+# Create a paged search
+$paging = $ldap->paging($search);
+
+# Set the paging operation to be critical
+$paging->isCritical();
+```
 
 ## VLV
 
