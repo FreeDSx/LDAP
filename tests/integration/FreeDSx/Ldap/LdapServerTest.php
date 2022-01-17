@@ -321,26 +321,21 @@ class LdapServerTest extends LdapTestCase
         $search = Operations::search(Filters::raw('(cn=foo)'));
         $paging = $this->client->paging($search);
 
-        try {
-            while ($paging->hasEntries()) {
-                $i++;
-                $entries = $paging->getEntries(100);
-                $allEntries = array_merge(
-                    $allEntries,
-                    $entries->toArray()
-                );
+        while ($paging->hasEntries()) {
+            $i++;
+            $entries = $paging->getEntries(100);
+            $allEntries = array_merge(
+                $allEntries,
+                $entries->toArray()
+            );
 
-                $output = $this->waitForServerOutput('---paging---');
+            $output = $this->waitForServerOutput('---paging---');
 
-                if ($i === 3) {
-                    $this->assertStringContainsString('Final response', $output);
-                } else {
-                    $this->assertStringContainsString('Regular response', $output);
-                }
+            if ($i === 3) {
+                $this->assertStringContainsString('Final response', $output);
+            } else {
+                $this->assertStringContainsString('Regular response', $output);
             }
-        } catch (OperationException $e) {
-            var_dump($this->subject->getOutput());
-            throw $e;
         }
 
         $this->assertCount(300, $allEntries);
