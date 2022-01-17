@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use PhpCsFixer\Fixer\ArrayNotation\ArraySyntaxFixer;
-use PhpCsFixer\Fixer\NamespaceNotation\BlankLineAfterNamespaceFixer;
+use PhpCsFixer\Fixer\Import\NoUnusedImportsFixer;
 use PhpCsFixer\Fixer\PhpTag\BlankLineAfterOpeningTagFixer;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symplify\CodingStandard\Fixer\Strict\BlankLineAfterStrictTypesFixer;
@@ -24,6 +24,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ]]);
     $services->set(BlankLineAfterStrictTypesFixer::class);
     $services->set(BlankLineAfterOpeningTagFixer::class);
+    $services->set(NoUnusedImportsFixer::class);
 
     $containerConfigurator->import(SetList::PSR_12);
 };

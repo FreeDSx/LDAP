@@ -26,7 +26,9 @@
     "symplify/easy-coding-standard": "^6.1|^7.3|^9.0",
     "friends-of-phpspec/phpspec-code-coverage": "^4.3|^6.1",
     "phpstan/phpstan": "^0.12.70",
-    "symfony/process": "^3.0|^4.0|^5.0"
+    "symfony/process": "^3.0|^4.0|^5.0",
+    "squizlabs/php_codesniffer": "3.*",
+    "slevomat/coding-standard": "~7.0"
   },
   "suggest": {
     "ext-openssl": "For SSL/TLS support and some SASL mechanisms.",
@@ -54,6 +56,10 @@
     ],
     "analyse": [
       "phpstan analyse"
+    ],
+    "cs-fix": [
+      "phpcbf --standard=ruleset.xml --extensions=php --tab-width=4 -sp src",
+      "ecs --fix"
     ]
   }
 }
