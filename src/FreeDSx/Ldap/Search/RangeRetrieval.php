@@ -15,6 +15,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Option;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\LdapClient;
 
@@ -119,7 +120,7 @@ class RangeRetrieval
      * @param Attribute $attribute
      * @param string|int $amount
      * @return Attribute
-     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws OperationException
      */
     public function getMoreValues($entry, Attribute $attribute, $amount = '*'): Attribute
     {
@@ -158,7 +159,7 @@ class RangeRetrieval
      * @param Entry|Dn|string $entry
      * @param string|Attribute $attribute
      * @return Attribute
-     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws OperationException
      */
     public function getAllValues($entry, $attribute): Attribute
     {

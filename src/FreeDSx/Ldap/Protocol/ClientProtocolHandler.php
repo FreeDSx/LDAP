@@ -11,11 +11,15 @@
 
 namespace FreeDSx\Ldap\Protocol;
 
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
@@ -24,6 +28,7 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientProtocolContext;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
+use FreeDSx\Sasl\Exception\SaslException;
 use FreeDSx\Socket\Exception\ConnectionException as SocketException;
 use FreeDSx\Socket\SocketPool;
 
@@ -96,12 +101,11 @@ class ClientProtocolHandler
      * @throws OperationException
      * @throws SocketException
      * @throws UnsolicitedNotificationException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\BindException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
-     * @throws \Throwable
+     * @throws EncoderException
+     * @throws BindException
+     * @throws ProtocolException
+     * @throws ReferralException
+     * @throws SaslException
      */
     public function fetchRootDse(bool $reload = false): Entry
     {
@@ -135,12 +139,11 @@ class ClientProtocolHandler
      * @throws OperationException
      * @throws SocketException
      * @throws UnsolicitedNotificationException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\BindException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
-     * @throws \Throwable
+     * @throws EncoderException
+     * @throws BindException
+     * @throws ProtocolException
+     * @throws ReferralException
+     * @throws SaslException
      */
     public function send(RequestInterface $request, Control ...$controls): ?LdapMessageResponse
     {

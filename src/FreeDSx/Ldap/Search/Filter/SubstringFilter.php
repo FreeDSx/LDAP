@@ -12,6 +12,7 @@
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\OctetStringType;
@@ -195,7 +196,7 @@ class SubstringFilter implements FilterInterface
     /**
      * {@inheritDoc}
      * @return SubstringFilter
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {

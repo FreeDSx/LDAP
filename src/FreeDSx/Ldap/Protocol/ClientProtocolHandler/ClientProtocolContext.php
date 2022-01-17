@@ -11,12 +11,20 @@
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\ReferralException;
+use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
+use FreeDSx\Sasl\Exception\SaslException;
 
 /**
  * Contains client protocol specific details that get passed to the request handlers.
@@ -115,16 +123,15 @@ class ClientProtocolContext
     /**
      * @param bool $reload force reload the RootDSE
      * @return Entry
-     * @throws \FreeDSx\Ldap\Exception\ConnectionException
-     * @throws \FreeDSx\Ldap\Exception\OperationException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws ConnectionException
+     * @throws OperationException
+     * @throws UnsolicitedNotificationException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\BindException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
-     * @throws \Throwable
+     * @throws EncoderException
+     * @throws BindException
+     * @throws ProtocolException
+     * @throws ReferralException
+     * @throws SaslException
      */
     public function getRootDse(bool $reload = false): Entry
     {

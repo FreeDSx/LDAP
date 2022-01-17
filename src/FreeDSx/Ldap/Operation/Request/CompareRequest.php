@@ -12,11 +12,13 @@
 namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 
 /**
@@ -93,8 +95,8 @@ class CompareRequest implements RequestInterface, DnRequestInterface
     /**
      * {@inheritDoc}
      * @return self
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\RuntimeException
+     * @throws EncoderException
+     * @throws RuntimeException
      */
     public static function fromAsn1(AbstractType $type)
     {

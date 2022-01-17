@@ -12,6 +12,7 @@
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Exception\FilterParseException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\Exception\RuntimeException;
@@ -53,10 +54,13 @@ class ClientReferralHandler implements ResponseHandlerInterface
      * @return LdapMessageResponse|null
      * @throws OperationException
      * @throws ReferralException
-     * @throws \Throwable
      */
-    public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse
-    {
+    public function handleResponse(
+        LdapMessageRequest $messageTo,
+        LdapMessageResponse $messageFrom,
+        ClientQueue $queue,
+        array $options
+    ): ?LdapMessageResponse {
         $this->options = $options;
         $result = $messageFrom->getResponse();
         switch ($this->options['referral']) {
@@ -81,8 +85,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
      * @return LdapMessageResponse|null
      * @throws OperationException
      * @throws SkipReferralException
-     * @throws \FreeDSx\Ldap\Exception\FilterParseException
-     * @throws \Throwable
+     * @throws FilterParseException
      */
     protected function followReferral(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom): ?LdapMessageResponse
     {
@@ -179,7 +182,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
     /**
      * @param RequestInterface $request
      * @param LdapUrl $referral
-     * @throws \FreeDSx\Ldap\Exception\FilterParseException
+     * @throws FilterParseException
      */
     protected function mergeReferralOptions(RequestInterface $request, LdapUrl $referral): void
     {

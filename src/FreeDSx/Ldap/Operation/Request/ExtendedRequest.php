@@ -12,6 +12,8 @@
 namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -112,7 +114,7 @@ class ExtendedRequest implements RequestInterface
 
     /**
      * @return AbstractType
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      */
     public function toAsn1(): AbstractType
     {
@@ -145,8 +147,8 @@ class ExtendedRequest implements RequestInterface
      * @param AbstractType $type
      * @return AbstractType
      * @throws ProtocolException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Asn1\Exception\PartialPduException
+     * @throws EncoderException
+     * @throws PartialPduException
      */
     protected static function decodeEncodedValue(AbstractType $type): ?AbstractType
     {

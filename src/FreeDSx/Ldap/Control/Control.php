@@ -12,6 +12,8 @@
 namespace FreeDSx\Ldap\Control;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\BooleanType;
 use FreeDSx\Asn1\Type\OctetStringType;
@@ -149,7 +151,7 @@ class Control implements ProtocolElementInterface
 
     /**
      * @return AbstractType
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      */
     public function toAsn1(): AbstractType
     {
@@ -220,8 +222,8 @@ class Control implements ProtocolElementInterface
      * @param AbstractType $type
      * @return AbstractType
      * @throws ProtocolException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Asn1\Exception\PartialPduException
+     * @throws EncoderException
+     * @throws PartialPduException
      */
     protected static function decodeEncodedValue(AbstractType $type)
     {

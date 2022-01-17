@@ -11,9 +11,14 @@
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\ReferralException;
+use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -21,6 +26,7 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapper\SaslMessageWrapper;
+use FreeDSx\Sasl\Exception\SaslException;
 use FreeDSx\Sasl\Mechanism\MechanismInterface;
 use FreeDSx\Sasl\Sasl;
 use FreeDSx\Sasl\SaslContext;
@@ -55,14 +61,13 @@ class ClientSaslBindHandler implements RequestHandlerInterface
      * @return LdapMessageResponse|null
      * @throws BindException
      * @throws ProtocolException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\ConnectionException
-     * @throws \FreeDSx\Ldap\Exception\OperationException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
+     * @throws EncoderException
+     * @throws ConnectionException
+     * @throws OperationException
+     * @throws ReferralException
+     * @throws UnsolicitedNotificationException
+     * @throws SaslException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \Throwable
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
@@ -109,14 +114,13 @@ class ClientSaslBindHandler implements RequestHandlerInterface
      * @return MechanismInterface
      * @throws BindException
      * @throws ProtocolException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\ConnectionException
-     * @throws \FreeDSx\Ldap\Exception\OperationException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
+     * @throws EncoderException
+     * @throws ConnectionException
+     * @throws OperationException
+     * @throws ReferralException
+     * @throws UnsolicitedNotificationException
+     * @throws SaslException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \Throwable
      */
     protected function selectSaslMech(SaslBindRequest $request, ClientProtocolContext $context): MechanismInterface
     {
@@ -143,9 +147,9 @@ class ClientSaslBindHandler implements RequestHandlerInterface
      * @return LdapMessageResponse
      * @throws BindException
      * @throws ProtocolException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
+     * @throws EncoderException
+     * @throws UnsolicitedNotificationException
+     * @throws SaslException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function processSaslChallenge(
@@ -186,8 +190,8 @@ class ClientSaslBindHandler implements RequestHandlerInterface
      * @param ClientQueue $queue
      * @return LdapMessageResponse
      * @throws ProtocolException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
+     * @throws EncoderException
+     * @throws UnsolicitedNotificationException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     protected function sendRequestGetResponse(SaslBindRequest $request, ClientQueue $queue): LdapMessageResponse
@@ -218,14 +222,13 @@ class ClientSaslBindHandler implements RequestHandlerInterface
      * @param ClientProtocolContext $context
      * @throws BindException
      * @throws ProtocolException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\ConnectionException
-     * @throws \FreeDSx\Ldap\Exception\OperationException
-     * @throws \FreeDSx\Ldap\Exception\ReferralException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Sasl\Exception\SaslException
+     * @throws EncoderException
+     * @throws ConnectionException
+     * @throws OperationException
+     * @throws ReferralException
+     * @throws UnsolicitedNotificationException
+     * @throws SaslException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \Throwable
      */
     protected function checkDowngradeAttempt(ClientProtocolContext $context): void
     {

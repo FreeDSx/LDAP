@@ -12,6 +12,8 @@
 namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -86,7 +88,7 @@ class ExtendedResponse extends LdapResult
     /**
      * {@inheritDoc}
      * @return self
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {
@@ -99,7 +101,7 @@ class ExtendedResponse extends LdapResult
     /**
      * @return AbstractType
      * @throws ProtocolException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      */
     public function toAsn1(): AbstractType
     {
@@ -146,7 +148,7 @@ class ExtendedResponse extends LdapResult
      * @param AbstractType $type
      * @return LdapResult
      * @throws ProtocolException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      */
     protected static function createLdapResult(AbstractType $type)
     {
@@ -159,8 +161,8 @@ class ExtendedResponse extends LdapResult
      * @param AbstractType $type
      * @return AbstractType|null
      * @throws ProtocolException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Asn1\Exception\PartialPduException
+     * @throws EncoderException
+     * @throws PartialPduException
      */
     protected static function decodeEncodedValue(AbstractType $type)
     {

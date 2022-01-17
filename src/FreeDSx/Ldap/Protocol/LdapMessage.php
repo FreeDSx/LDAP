@@ -12,6 +12,8 @@
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\IntegerType;
@@ -21,6 +23,7 @@ use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Operation\Response;
 use FreeDSx\Socket\PduInterface;
@@ -105,7 +108,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
     /**
      * @return AbstractType
      * @psalm-return SequenceType
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      */
     public function toAsn1(): AbstractType
     {
@@ -129,9 +132,9 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
     /**
      * {@inheritDoc}
      * @return self
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Asn1\Exception\PartialPduException
-     * @throws \FreeDSx\Ldap\Exception\RuntimeException
+     * @throws EncoderException
+     * @throws PartialPduException
+     * @throws RuntimeException
      */
     public static function fromAsn1(AbstractType $type)
     {

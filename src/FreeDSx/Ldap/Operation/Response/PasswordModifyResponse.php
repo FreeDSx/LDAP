@@ -12,8 +12,11 @@
 namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\LdapResult;
 
 /**
@@ -64,9 +67,9 @@ class PasswordModifyResponse extends ExtendedResponse
     /**
      * @param AbstractType $type
      * @return PasswordModifyResponse
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Asn1\Exception\PartialPduException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
+     * @throws EncoderException
+     * @throws PartialPduException
+     * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type)
     {

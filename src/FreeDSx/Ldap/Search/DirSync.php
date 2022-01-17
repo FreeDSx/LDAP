@@ -267,7 +267,6 @@ class DirSync
     /**
      * @return SearchRequest
      * @throws OperationException
-     * @throws \Throwable
      */
     protected function getSearchRequest(): SearchRequest
     {

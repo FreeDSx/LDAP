@@ -12,6 +12,8 @@
 namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -136,8 +138,8 @@ class PasswordModifyRequest extends ExtendedRequest
     /**
      * {@inheritDoc}
      * @return PasswordModifyRequest
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Asn1\Exception\PartialPduException
+     * @throws EncoderException
+     * @throws PartialPduException
      */
     public static function fromAsn1(AbstractType $type)
     {

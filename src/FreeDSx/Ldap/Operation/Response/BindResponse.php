@@ -12,8 +12,10 @@
 namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\LdapResult;
 
 /**
@@ -57,7 +59,7 @@ class BindResponse extends LdapResult
 
     /**
      * @return SequenceType
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
+     * @throws ProtocolException
      */
     public function toAsn1(): AbstractType
     {
@@ -74,7 +76,7 @@ class BindResponse extends LdapResult
     /**
      * {@inheritDoc}
      * @return self
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {

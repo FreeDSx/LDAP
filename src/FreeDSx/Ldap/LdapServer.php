@@ -82,11 +82,13 @@ class LdapServer
             ? $this->options['unix_socket']
             : $this->options['ip'];
 
-        $this->runner()->run(SocketServer::bind(
+        $socketServer = SocketServer::bind(
             $resource,
             $this->options['port'],
             $this->options
-        ));
+        );
+
+        $this->runner()->run($socketServer);
     }
 
     /**

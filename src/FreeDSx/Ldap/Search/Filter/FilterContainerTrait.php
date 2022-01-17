@@ -13,6 +13,7 @@ namespace FreeDSx\Ldap\Search\Filter;
 
 use ArrayIterator;
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SetType;
@@ -156,7 +157,7 @@ trait FilterContainerTrait
      * {@inheritDoc}
      * @param AbstractType $type
      * @return self
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      * @throws ProtocolException
      */
     public static function fromAsn1(AbstractType $type)

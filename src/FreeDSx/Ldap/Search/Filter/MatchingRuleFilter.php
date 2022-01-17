@@ -12,6 +12,7 @@
 namespace FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\BooleanType;
 use FreeDSx\Asn1\Type\IncompleteType;
@@ -196,7 +197,7 @@ class MatchingRuleFilter implements FilterInterface
     /**
      * {@inheritDoc}
      * @return MatchingRuleFilter
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      */
     public static function fromAsn1(AbstractType $type)
     {

@@ -11,6 +11,7 @@
 
 namespace FreeDSx\Ldap\Server\ServerRunner;
 
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
@@ -49,7 +50,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     }
 
     /**
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      */
     public function run(SocketServer $server): void
     {

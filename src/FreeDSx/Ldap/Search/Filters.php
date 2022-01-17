@@ -11,6 +11,7 @@
 
 namespace FreeDSx\Ldap\Search;
 
+use FreeDSx\Ldap\Exception\FilterParseException;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
@@ -216,7 +217,7 @@ class Filters
      *
      * @param string $filter
      * @return FilterInterface
-     * @throws \FreeDSx\Ldap\Exception\FilterParseException
+     * @throws FilterParseException
      */
     public static function raw(string $filter): FilterInterface
     {
