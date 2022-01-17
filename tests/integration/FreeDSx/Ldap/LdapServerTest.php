@@ -341,6 +341,31 @@ class LdapServerTest extends LdapTestCase
         $this->assertCount(300, $allEntries);
     }
 
+    public function testItThrowsAnExceptionForPagingWhenNotSupported()
+    {
+        $this->authenticate();
+
+        $this->expectExceptionMessage('The server does not support the paging control.');
+        $this->expectExceptionCode(ResultCode::UNAVAILABLE_CRITICAL_EXTENSION);
+
+        $search = Operations::search(Filters::raw('(cn=foo)'));
+        $this->client->paging($search)
+            ->isCritical()
+            ->getEntries();
+    }
+
+    public function testItDoesASearchWhenPagingIsNotMarkedAsCritical()
+    {
+        $this->authenticate();
+
+        $search = Operations::search(Filters::raw('(cn=foo)'));
+        $paging = $this->client->paging($search);
+        $result = $paging->getEntries();
+
+        $this->assertFalse($paging->hasEntries());
+        $this->assertNotEmpty($result->toArray());
+    }
+
     public function testItCanStartTLSThenStillPerformOperations()
     {
         $this->client->startTls();
