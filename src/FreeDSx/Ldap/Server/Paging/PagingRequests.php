@@ -58,7 +58,7 @@ final class PagingRequests
             throw new ProtocolException('The supplied cookie is invalid.');
         }
 
-       return $request;
+        return $request;
     }
 
     public function has(string $cookie): bool

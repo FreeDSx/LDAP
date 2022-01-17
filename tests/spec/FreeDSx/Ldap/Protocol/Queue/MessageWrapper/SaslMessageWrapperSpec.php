@@ -16,7 +16,6 @@ use FreeDSx\Sasl\SaslContext;
 use FreeDSx\Sasl\Security\SecurityLayerInterface;
 use FreeDSx\Socket\Exception\PartialMessageException;
 use FreeDSx\Socket\Queue\Buffer;
-use FreeDSx\Socket\Queue\Message;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 

@@ -11,9 +11,12 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use ArrayIterator;
 use Countable;
 use IteratorAggregate;
 use Traversable;
+use function array_search;
+use function count;
 
 /**
  * Represents a set of change objects.
@@ -59,7 +62,7 @@ class Changes implements Countable, IteratorAggregate
      */
     public function has(Change $change)
     {
-        return \array_search($change, $this->changes, true) !== false;
+        return array_search($change, $this->changes, true) !== false;
     }
 
     /**
@@ -71,7 +74,7 @@ class Changes implements Countable, IteratorAggregate
     public function remove(Change ...$changes)
     {
         foreach ($changes as $change) {
-            if (($index = \array_search($change, $this->changes, true)) !== false) {
+            if (($index = array_search($change, $this->changes, true)) !== false) {
                 unset($this->changes[$index]);
             }
         }
@@ -118,7 +121,7 @@ class Changes implements Countable, IteratorAggregate
      */
     public function count(): int
     {
-        return \count($this->changes);
+        return count($this->changes);
     }
 
     /**
@@ -127,6 +130,6 @@ class Changes implements Countable, IteratorAggregate
      */
     public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->changes);
+        return new ArrayIterator($this->changes);
     }
 }

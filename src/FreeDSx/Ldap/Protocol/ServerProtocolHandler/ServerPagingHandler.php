@@ -151,7 +151,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $pagingRequest->updatePagingControl($this->getPagingControlFromMessage($message));
 
         if ($pagingRequest->isAbandonRequest()) {
-            $response =  PagingResponse::makeFinal(new Entries());
+            $response = PagingResponse::makeFinal(new Entries());
         } else {
             $response = $this->pagingHandler->page(
                 $pagingRequest,

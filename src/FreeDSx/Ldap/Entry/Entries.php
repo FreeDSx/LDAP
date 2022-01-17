@@ -11,9 +11,15 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use ArrayIterator;
 use Countable;
 use IteratorAggregate;
 use Traversable;
+use function array_merge;
+use function array_search;
+use function count;
+use function end;
+use function reset;
 
 /**
  * Represents a collection of entry objects.
@@ -41,7 +47,7 @@ class Entries implements Countable, IteratorAggregate
      */
     public function add(Entry ...$entries)
     {
-        $this->entries = \array_merge($this->entries, $entries);
+        $this->entries = array_merge($this->entries, $entries);
 
         return $this;
     }
@@ -53,7 +59,7 @@ class Entries implements Countable, IteratorAggregate
     public function remove(Entry ...$entries)
     {
         foreach ($entries as $entry) {
-            if (($index = \array_search($entry, $this->entries, true)) !== false) {
+            if (($index = array_search($entry, $this->entries, true)) !== false) {
                 unset($this->entries[$index]);
             }
         }
@@ -70,7 +76,7 @@ class Entries implements Countable, IteratorAggregate
     public function has($entry): bool
     {
         if ($entry instanceof Entry) {
-            return (\array_search($entry, $this->entries, true) !== false);
+            return (array_search($entry, $this->entries, true) !== false);
         }
 
         foreach ($this->entries as $entryObj) {
@@ -106,7 +112,7 @@ class Entries implements Countable, IteratorAggregate
      */
     public function first(): ?Entry
     {
-        $entry = \reset($this->entries);
+        $entry = reset($this->entries);
 
         return $entry === false ? null : $entry;
     }
@@ -118,8 +124,8 @@ class Entries implements Countable, IteratorAggregate
      */
     public function last(): ?Entry
     {
-        $entry = \end($this->entries);
-        \reset($this->entries);
+        $entry = end($this->entries);
+        reset($this->entries);
 
         return $entry === false ? null : $entry;
     }
@@ -137,7 +143,7 @@ class Entries implements Countable, IteratorAggregate
      */
     public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->entries);
+        return new ArrayIterator($this->entries);
     }
 
     /**
@@ -145,6 +151,6 @@ class Entries implements Countable, IteratorAggregate
      */
     public function count(): int
     {
-        return \count($this->entries);
+        return count($this->entries);
     }
 }

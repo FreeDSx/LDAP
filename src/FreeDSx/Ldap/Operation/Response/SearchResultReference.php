@@ -16,6 +16,7 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UrlParseException;
 use FreeDSx\Ldap\LdapUrl;
+use function array_map;
 
 /**
  * A search result reference. RFC 4511, 4.5.3.
@@ -74,7 +75,7 @@ class SearchResultReference implements ResponseInterface
      */
     public function toAsn1(): AbstractType
     {
-        return Asn1::application(self::TAG_NUMBER, Asn1::sequence(...\array_map(function ($ref) {
+        return Asn1::application(self::TAG_NUMBER, Asn1::sequence(...array_map(function ($ref) {
             /** @var LdapUrl $ref */
             return Asn1::octetString($ref->toString());
         }, $this->referrals)));

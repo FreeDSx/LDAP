@@ -11,6 +11,7 @@
 
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
@@ -20,6 +21,8 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Socket\Exception\ConnectionException;
+use function extension_loaded;
 
 /**
  * Handles StartTLS logic.
@@ -36,7 +39,7 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
     public function __construct()
     {
         if (self::$hasOpenssl === null) {
-            $this::$hasOpenssl = \extension_loaded('openssl');
+            $this::$hasOpenssl = extension_loaded('openssl');
         }
     }
 
@@ -46,10 +49,8 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
      * @param RequestHandlerInterface $dispatcher
      * @param ServerQueue $queue
      * @param array $options
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws ConnectionException
+     * @throws EncoderException
      */
     public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): void
     {

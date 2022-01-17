@@ -11,8 +11,12 @@
 
 namespace FreeDSx\Ldap\Protocol\Queue;
 
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
+use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\LdapQueue;
@@ -50,7 +54,7 @@ class ServerQueue extends LdapQueue
     /**
      * @param LdapMessageResponse ...$response
      * @return $this
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      */
     public function sendMessage(LdapMessageResponse ...$response): self
     {
@@ -62,11 +66,11 @@ class ServerQueue extends LdapQueue
     /**
      * @param Message $message
      * @param int|null $id
-     * @return LdapMessageRequest|mixed
+     * @return LdapMessage
      * @throws ProtocolException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Asn1\Exception\PartialPduException
-     * @throws \FreeDSx\Ldap\Exception\RuntimeException
+     * @throws EncoderException
+     * @throws PartialPduException
+     * @throws RuntimeException
      */
     protected function constructMessage(Message $message, ?int $id = null)
     {

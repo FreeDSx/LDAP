@@ -11,6 +11,8 @@
 
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use Exception;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
@@ -29,7 +31,7 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 class ServerWhoAmIHandler implements ServerProtocolHandlerInterface
 {
     /**
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      */
     public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): void
     {
@@ -39,7 +41,7 @@ class ServerWhoAmIHandler implements ServerProtocolHandlerInterface
             try {
                 (new Dn($userId))->toArray();
                 $userId = 'dn:' . $userId;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $userId = 'u:' . $userId;
             }
         }

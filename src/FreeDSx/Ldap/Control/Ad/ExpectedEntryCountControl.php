@@ -12,6 +12,8 @@
 namespace FreeDSx\Ldap\Control\Ad;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\SequenceType;
@@ -93,8 +95,8 @@ class ExpectedEntryCountControl extends Control
     /**
      * {@inheritDoc}
      * @return Control
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Asn1\Exception\PartialPduException
+     * @throws EncoderException
+     * @throws PartialPduException
      */
     public static function fromAsn1(AbstractType $type)
     {

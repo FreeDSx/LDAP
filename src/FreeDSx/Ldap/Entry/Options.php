@@ -15,6 +15,8 @@ use ArrayIterator;
 use Countable;
 use IteratorAggregate;
 use Traversable;
+use function count;
+use function sort;
 
 /**
  * Represents a collection of attribute options.
@@ -135,7 +137,7 @@ class Options implements Countable, IteratorAggregate
     {
         $opts = $this->options;
         if ($sortedlc) {
-            \sort($opts);
+            sort($opts);
         }
 
         $options = '';
@@ -154,7 +156,7 @@ class Options implements Countable, IteratorAggregate
     {
         return $this->options;
     }
-    
+
     /**
      * @return string
      */
@@ -178,6 +180,6 @@ class Options implements Countable, IteratorAggregate
      */
     public function count(): int
     {
-        return \count($this->options);
+        return count($this->options);
     }
 }

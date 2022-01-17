@@ -47,16 +47,16 @@ class RangeRetrieval
     public function getRanged(Entry $entry, $attribute): ?Attribute
     {
         $attribute = $attribute instanceof Attribute ? new Attribute($attribute->getName()) : new Attribute($attribute);
-        
+
         foreach ($this->getAllRanged($entry) as $rangedAttribute) {
             if ($rangedAttribute->equals($attribute)) {
                 return $rangedAttribute;
             }
         }
-        
+
         return null;
     }
-    
+
     /**
      * Get all ranged attributes as an array from a entry.
      *
@@ -107,7 +107,7 @@ class RangeRetrieval
         if (($range = $this->getRangeOption($attribute)) === null) {
             return false;
         }
-        
+
         return $range->getHighRange() !== '*';
     }
 
@@ -148,7 +148,7 @@ class RangeRetrieval
                 $result->getDn()->toString()
             ));
         }
-        
+
         return $attrResult;
     }
 
@@ -174,7 +174,7 @@ class RangeRetrieval
                 $entry->getDn()->toString()
             ));
         }
-        
+
         $attrResult->add(...$attribute->getValues());
         while ($this->hasMoreValues($attribute)) {
             $attribute = $this->getMoreValues($entry, $attribute);

@@ -36,14 +36,14 @@ class PagingResponseSpec extends ObjectBehavior
         $this->getEntries()->shouldBeLike(new Entries());
     }
 
-    function it_should_make_a_complete_response()
+    public function it_should_make_a_complete_response()
     {
         $this->beConstructedThrough('makeFinal', [new Entries()]);
 
         $this->isComplete()->shouldBeEqualTo(true);
     }
 
-    function it_should_make_a_regular_response()
+    public function it_should_make_a_regular_response()
     {
         $this->beConstructedThrough('make', [new Entries()]);
 

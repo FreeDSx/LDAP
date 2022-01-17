@@ -12,7 +12,6 @@
 namespace spec\FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Ldap\LdapUrl;
-use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Protocol\ReferralContext;
 use PhpSpec\ObjectBehavior;
 

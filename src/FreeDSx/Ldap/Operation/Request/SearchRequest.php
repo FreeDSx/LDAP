@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use function array_map;
 
 /**
  * A Search Request. RFC 4511, 4.5.1.
@@ -397,13 +398,15 @@ class SearchRequest implements RequestInterface
         }
         $filter = FilterFactory::get($filter);
 
-        if (!($baseDn instanceof OctetStringType
+        if (
+            !($baseDn instanceof OctetStringType
             && $scope instanceof EnumeratedType
             && $deref instanceof EnumeratedType
             && $sizeLimit instanceof IntegerType
             && $timeLimit instanceof IntegerType
             && $typesOnly instanceof BooleanType
-            && $attributes instanceof SequenceType)) {
+            && $attributes instanceof SequenceType)
+        ) {
             throw new ProtocolException('The search request is malformed');
         }
 
@@ -443,7 +446,7 @@ class SearchRequest implements RequestInterface
             Asn1::integer($this->timeLimit),
             Asn1::boolean($this->attributesOnly),
             $this->filter->toAsn1(),
-            Asn1::sequenceOf(...\array_map(function ($attr) {
+            Asn1::sequenceOf(...array_map(function ($attr) {
                 /** @var Attribute|string $attr */
                 return Asn1::octetString($attr instanceof Attribute ? $attr->getDescription() : $attr);
             }, $this->attributes))

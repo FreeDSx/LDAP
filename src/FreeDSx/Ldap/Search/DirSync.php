@@ -11,6 +11,7 @@
 
 namespace FreeDSx\Ldap\Search;
 
+use Closure;
 use FreeDSx\Ldap\Control\Ad\DirSyncRequestControl;
 use FreeDSx\Ldap\Control\Ad\DirSyncResponseControl;
 use FreeDSx\Ldap\Control\Control;
@@ -104,7 +105,7 @@ class DirSync
      * @param int $checkInterval How often to check for changes (in seconds).
      * @throws OperationException
      */
-    public function watch(\Closure $handler, int $checkInterval = 10): void
+    public function watch(Closure $handler, int $checkInterval = 10): void
     {
         $handler($this->getChanges(), true);
         while ($this->hasChanges()) {

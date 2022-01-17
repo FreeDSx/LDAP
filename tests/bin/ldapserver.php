@@ -11,11 +11,11 @@ use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\Paging\PagingResponse;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
+use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 
 require __DIR__ . '/../../vendor/autoload.php';
 

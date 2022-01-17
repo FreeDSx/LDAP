@@ -13,7 +13,6 @@ namespace spec\FreeDSx\Ldap\Entry;
 
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use PhpSpec\ObjectBehavior;
 
 class EntriesSpec extends ObjectBehavior

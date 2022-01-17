@@ -95,18 +95,18 @@ class PagingSpec extends ObjectBehavior
         SearchRequest $searchRequest
     ) {
         $newClient->sendAndReceive(
-                $searchRequest,
+            $searchRequest,
             (new PagingControl(1000, ''))->setCriticality(false)
-            )->willReturn(new LdapMessageResponse(
-                1,
-                new SearchResponse(
+        )->willReturn(new LdapMessageResponse(
+            1,
+            new SearchResponse(
                     new LdapResult(0, '', ''),
                     new Entries(
                         Entry::create('foo'),
                         Entry::create('bar')
                     )
                 )
-            ));
+        ));
         $this->beConstructedWith(
             $newClient,
             $searchRequest,

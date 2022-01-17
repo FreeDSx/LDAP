@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use function count;
 
 /**
  * Handles RootDSE based search requests.
@@ -110,7 +111,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
      */
     protected function filterEntryAttributes(SearchRequest $request, Entry $entry): void
     {
-        if (\count($request->getAttributes()) !== 0) {
+        if (count($request->getAttributes()) !== 0) {
             foreach ($entry->getAttributes() as $dseAttr) {
                 $found = false;
                 foreach ($request->getAttributes() as $attribute) {

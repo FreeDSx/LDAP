@@ -11,10 +11,17 @@
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Socket\Exception\ConnectionException;
+use ReflectionClass;
+use ReflectionException;
 
 /**
  * Logic for handling extended operations.
@@ -37,12 +44,12 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
      * @param ClientProtocolContext $context
      * @return LdapMessageResponse|null
      * @throws OperationException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \ReflectionException
-     * @throws \FreeDSx\Ldap\Exception\RuntimeException
+     * @throws EncoderException
+     * @throws ProtocolException
+     * @throws UnsolicitedNotificationException
+     * @throws ConnectionException
+     * @throws ReflectionException
+     * @throws RuntimeException
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
@@ -61,7 +68,7 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
             $messageFrom->getResponse()->toAsn1(),
             $request->getName()
         );
-        $prop = (new \ReflectionClass(LdapMessageResponse::class))->getProperty('response');
+        $prop = (new ReflectionClass(LdapMessageResponse::class))->getProperty('response');
         $prop->setAccessible(true);
         $prop->setValue($messageFrom, $response);
 

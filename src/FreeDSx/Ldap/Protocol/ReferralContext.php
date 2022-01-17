@@ -13,6 +13,8 @@ namespace FreeDSx\Ldap\Protocol;
 
 use Countable;
 use FreeDSx\Ldap\LdapUrl;
+use function count;
+use function strtolower;
 
 /**
  * Keeps track of referrals while they are being chased.
@@ -60,7 +62,7 @@ class ReferralContext implements Countable
     public function hasReferral(LdapUrl $url): bool
     {
         foreach ($this->referrals as $referral) {
-            if (\strtolower($referral->toString()) === \strtolower($url->toString())) {
+            if (strtolower($referral->toString()) === strtolower($url->toString())) {
                 return true;
             }
         }
@@ -74,6 +76,6 @@ class ReferralContext implements Countable
      */
     public function count(): int
     {
-        return \count($this->referrals);
+        return count($this->referrals);
     }
 }

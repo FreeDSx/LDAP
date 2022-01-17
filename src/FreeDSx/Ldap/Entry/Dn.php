@@ -11,10 +11,17 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use ArrayIterator;
 use Countable;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\UnexpectedValueException;
 use IteratorAggregate;
+use Traversable;
+use function array_slice;
+use function count;
+use function implode;
+use function ltrim;
+use function preg_split;
 
 /**
  * Represents a Distinguished Name.
@@ -66,11 +73,11 @@ class Dn implements IteratorAggregate, Countable
         if ($this->pieces === null) {
             $this->parse();
         }
-        if (\count((array) $this->pieces) < 2) {
+        if (count((array) $this->pieces) < 2) {
             return null;
         }
 
-        return new Dn(\implode(',', \array_slice((array) $this->pieces, 1)));
+        return new Dn(implode(',', array_slice((array) $this->pieces, 1)));
     }
 
     /**
@@ -78,9 +85,9 @@ class Dn implements IteratorAggregate, Countable
      * @@psalm-return \ArrayIterator<array-key, Rdn>
      * @throws UnexpectedValueException
      */
-    public function getIterator(): \Traversable
+    public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->toArray());
+        return new ArrayIterator($this->toArray());
     }
 
     /**
@@ -102,7 +109,7 @@ class Dn implements IteratorAggregate, Countable
             $this->parse();
         }
 
-        return \count((array) $this->pieces);
+        return count((array) $this->pieces);
     }
 
     /**
@@ -154,10 +161,10 @@ class Dn implements IteratorAggregate, Countable
 
             return;
         }
-        $pieces = \preg_split('/(?<!\\\\),/', $this->dn);
+        $pieces = preg_split('/(?<!\\\\),/', $this->dn);
         $pieces = ($pieces === false) ? [] : $pieces;
 
-        if (\count($pieces) === 0) {
+        if (count($pieces) === 0) {
             throw new UnexpectedValueException(sprintf(
                 'The DN value "%s" is not valid.',
                 $this->dn
@@ -166,7 +173,7 @@ class Dn implements IteratorAggregate, Countable
 
         $rdns = [];
         foreach ($pieces as $i => $piece) {
-            $rdns[$i] = Rdn::create(\ltrim($piece));
+            $rdns[$i] = Rdn::create(ltrim($piece));
         }
 
         $this->pieces = $rdns;

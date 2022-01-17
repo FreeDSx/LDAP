@@ -91,7 +91,8 @@ class ClientSaslBindHandler implements RequestHandlerInterface
             return $response;
         }
         $response = $this->processSaslChallenge($request, $queue, $saslResponse, $mech);
-        if ($detectDowngrade
+        if (
+            $detectDowngrade
             && $response !== null
             && $response->getResponse() instanceof BindResponse
             && $response->getResponse()->getResultCode() === ResultCode::SUCCESS

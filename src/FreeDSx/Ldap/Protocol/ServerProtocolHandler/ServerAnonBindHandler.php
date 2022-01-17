@@ -11,6 +11,8 @@
 
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -32,8 +34,8 @@ class ServerAnonBindHandler extends ServerBindHandler
      * @param ServerQueue $queue
      * @param array $options
      * @return AnonToken
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\OperationException
+     * @throws EncoderException
+     * @throws OperationException
      * @throws RuntimeException
      */
     public function handleBind(LdapMessageRequest $message, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): TokenInterface

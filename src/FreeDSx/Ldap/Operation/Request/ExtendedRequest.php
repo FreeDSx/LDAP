@@ -17,6 +17,7 @@ use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
+use function count;
 
 /**
  * An Extended Request. RFC 4511, 4.12
@@ -162,7 +163,7 @@ class ExtendedRequest implements RequestInterface
      */
     protected static function parseAsn1ExtendedRequest(AbstractType $type)
     {
-        if (!($type instanceof SequenceType && (\count($type) === 1 || \count($type) === 2))) {
+        if (!($type instanceof SequenceType && (count($type) === 1 || count($type) === 2))) {
             throw new ProtocolException('The extended request is malformed');
         }
         $oid = null;

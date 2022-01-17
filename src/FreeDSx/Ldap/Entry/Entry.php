@@ -11,9 +11,12 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use ArrayIterator;
 use Countable;
 use IteratorAggregate;
 use Traversable;
+use function count;
+use function is_array;
 
 /**
  * Represents an Entry in LDAP.
@@ -80,7 +83,7 @@ class Entry implements IteratorAggregate, Countable
     {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
 
-        if (\count($attribute->getValues()) !== 0) {
+        if (count($attribute->getValues()) !== 0) {
             if (($exists = $this->get($attribute, true)) !== null) {
                 $exists->remove(...$attribute->getValues());
             }
@@ -221,7 +224,7 @@ class Entry implements IteratorAggregate, Countable
      */
     public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->attributes);
+        return new ArrayIterator($this->attributes);
     }
 
     /**
@@ -230,7 +233,7 @@ class Entry implements IteratorAggregate, Countable
      */
     public function count(): int
     {
-        return \count($this->attributes);
+        return count($this->attributes);
     }
 
     public function __toString(): string
@@ -248,7 +251,7 @@ class Entry implements IteratorAggregate, Countable
      */
     public function __set(string $name, $value): void
     {
-        $this->set($name, ...(\is_array($value) ? $value : [$value]));
+        $this->set($name, ...(is_array($value) ? $value : [$value]));
     }
 
     public function __isset(string $name): bool
@@ -286,7 +289,7 @@ class Entry implements IteratorAggregate, Countable
         $entryAttr = [];
 
         foreach ($attributes as $attribute => $value) {
-            $entryAttr[] = new Attribute($attribute, ...(\is_array($value) ? $value : [$value]));
+            $entryAttr[] = new Attribute($attribute, ...(is_array($value) ? $value : [$value]));
         }
 
         return new self($dn, ...$entryAttr);

@@ -12,6 +12,7 @@
 namespace FreeDSx\Ldap\Control\Vlv;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\RuntimeException;
@@ -161,8 +162,8 @@ class VlvControl extends Control
     }
 
     /**
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
-     * @throws \FreeDSx\Ldap\Exception\RuntimeException
+     * @throws EncoderException
+     * @throws RuntimeException
      */
     public function toAsn1(): AbstractType
     {

@@ -12,6 +12,7 @@
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Encoder\EncoderInterface;
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
@@ -20,6 +21,8 @@ use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Queue\Asn1MessageQueue;
 use FreeDSx\Socket\Queue\Buffer;
 use FreeDSx\Socket\Socket;
+use function strlen;
+use function substr;
 
 /**
  * The LDAP Queue class for sending and receiving messages.
@@ -130,9 +133,10 @@ class LdapQueue extends Asn1MessageQueue
      *
      * The logic in the loop is to send the messages in chunks of 8192 bytes to lessen the amount of TCP writes we need
      * to perform if sending out many messages.
+     *
      * @param LdapMessage ...$messages
      * @return static
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws EncoderException
      */
     protected function sendLdapMessage(LdapMessage ...$messages): self
     {
@@ -141,13 +145,13 @@ class LdapQueue extends Asn1MessageQueue
         foreach ($messages as $message) {
             $encoded = $this->encoder->encode($message->toAsn1());
             $buffer .= $this->messageWrapper !== null ? $this->messageWrapper->wrap($encoded) : $encoded;
-            $bufferLen = \strlen($buffer);
+            $bufferLen = strlen($buffer);
             if ($bufferLen >= self::BUFFER_SIZE) {
-                $this->socket->write(\substr($buffer, 0, self::BUFFER_SIZE));
-                $buffer = $bufferLen > self::BUFFER_SIZE ? \substr($buffer, self::BUFFER_SIZE) : '';
+                $this->socket->write(substr($buffer, 0, self::BUFFER_SIZE));
+                $buffer = $bufferLen > self::BUFFER_SIZE ? substr($buffer, self::BUFFER_SIZE) : '';
             }
         }
-        if (\strlen($buffer) > 0) {
+        if (strlen($buffer) > 0) {
             $this->socket->write($buffer);
         }
 

@@ -15,11 +15,11 @@ use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\Paging\PagingResponse;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
+use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use PhpSpec\ObjectBehavior;
@@ -74,7 +74,7 @@ class HandlerFactorySpec extends ObjectBehavior
 
     public function it_should_allow_a_rootdse_handler_as_a_string_implementing_rootdse_handler_interface()
     {
-        $handler = new class implements RootDseHandlerInterface {
+        $handler = new class() implements RootDseHandlerInterface {
             public function rootDse(RequestContext $context, SearchRequest $request, Entry $rootDse): Entry
             {
                 return new Entry('');
@@ -107,7 +107,7 @@ class HandlerFactorySpec extends ObjectBehavior
 
     public function it_should_allow_a_paging_handler_as_a_string_implementing_paging_handler_interface()
     {
-        $handler = new class implements PagingHandlerInterface {
+        $handler = new class() implements PagingHandlerInterface {
             public function page(PagingRequest $pagingRequest, RequestContext $context): PagingResponse
             {
                 return PagingResponse::make(new Entries());

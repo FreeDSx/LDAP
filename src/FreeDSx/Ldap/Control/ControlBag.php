@@ -11,9 +11,13 @@
 
 namespace FreeDSx\Ldap\Control;
 
+use ArrayIterator;
 use Countable;
 use IteratorAggregate;
 use Traversable;
+use function array_search;
+use function count;
+use function is_string;
 
 /**
  * Represents a set of controls.
@@ -54,7 +58,7 @@ class ControlBag implements IteratorAggregate, Countable
             return false;
         }
 
-        return \array_search($control, $this->controls, true) !== false;
+        return array_search($control, $this->controls, true) !== false;
     }
 
     /**
@@ -112,14 +116,14 @@ class ControlBag implements IteratorAggregate, Countable
     {
         /** @var Control|string $control */
         foreach ($controls as $control) {
-            if (\is_string($control)) {
+            if (is_string($control)) {
                 foreach ($this->controls as $i => $ctrl) {
                     if ($ctrl->getTypeOid() === $control) {
                         unset($this->controls[$i]);
                     }
                 }
             } else {
-                if (($i = \array_search($control, $this->controls, true)) !== false) {
+                if (($i = array_search($control, $this->controls, true)) !== false) {
                     unset($this->controls[$i]);
                 }
             }
@@ -155,7 +159,7 @@ class ControlBag implements IteratorAggregate, Countable
      */
     public function count(): int
     {
-        return \count($this->controls);
+        return count($this->controls);
     }
 
     /**
@@ -164,6 +168,6 @@ class ControlBag implements IteratorAggregate, Countable
      */
     public function getIterator(): Traversable
     {
-        return new \ArrayIterator($this->controls);
+        return new ArrayIterator($this->controls);
     }
 }

@@ -13,6 +13,7 @@ namespace FreeDSx\Ldap\Exception;
 
 use Exception;
 use FreeDSx\Ldap\Operation\ResultCode;
+use Throwable;
 
 /**
  * Used in client-side requests to indicate generic issues with non-success request responses for operations. Used to
@@ -23,7 +24,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
  */
 class OperationException extends Exception
 {
-    public function __construct(string $message = '', int $code = ResultCode::OPERATIONS_ERROR, \Throwable $previous = null)
+    public function __construct(string $message = '', int $code = ResultCode::OPERATIONS_ERROR, Throwable $previous = null)
     {
         parent::__construct($message, $code, $previous);
     }

@@ -20,6 +20,8 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use function array_map;
+use function count;
 
 /**
  * A request to add an entry to LDAP. RFC 4511, 4.7.
@@ -99,7 +101,7 @@ class AddRequest implements RequestInterface
 
         $attributes = [];
         foreach ($attrList->getChildren() as $attrListing) {
-            if (!($attrListing instanceof SequenceType && \count($attrListing->getChildren()) == 2)) {
+            if (!($attrListing instanceof SequenceType && count($attrListing->getChildren()) == 2)) {
                 throw new ProtocolException(sprintf(
                     'Expected a sequence type, but received: %s',
                     get_class($attrListing)
@@ -137,7 +139,7 @@ class AddRequest implements RequestInterface
         foreach ($this->entry->getAttributes() as $attribute) {
             $attr = Asn1::sequence(Asn1::octetString($attribute->getDescription()));
 
-            $attrValues = Asn1::setOf(...\array_map(function ($value) {
+            $attrValues = Asn1::setOf(...array_map(function ($value) {
                 return Asn1::octetString($value);
             }, $attribute->getValues()));
 

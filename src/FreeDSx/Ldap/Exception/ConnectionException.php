@@ -11,6 +11,8 @@
 
 namespace FreeDSx\Ldap\Exception;
 
-class ConnectionException extends \Exception
+use Exception;
+
+class ConnectionException extends Exception
 {
 }

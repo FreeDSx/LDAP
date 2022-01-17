@@ -382,7 +382,7 @@ class LdapClient
     {
         return new RangeRetrieval($this);
     }
-    
+
     /**
      * Access to add/set/remove/reset the controls to be used for each request. If you want request specific controls in
      * addition to these, then pass them as a parameter to the send() method.

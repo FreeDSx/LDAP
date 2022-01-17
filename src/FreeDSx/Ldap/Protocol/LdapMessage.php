@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Operation\Response;
 use FreeDSx\Socket\PduInterface;
+use function count;
 
 /**
  * The LDAP Message envelope (PDU). RFC 4511, 4.1.1
@@ -113,7 +114,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
             $this->getOperationAsn1()
         );
 
-        if (\count($this->controls->toArray()) !== 0) {
+        if (count($this->controls->toArray()) !== 0) {
             /** @var SequenceOfType $controls */
             $controls = Asn1::context(0, Asn1::sequenceOf());
             foreach ($this->controls->toArray() as $control) {
@@ -140,7 +141,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                 get_class($type)
             ));
         }
-        $count = \count($type->getChildren());
+        $count = count($type->getChildren());
         if ($count < 2) {
             throw new ProtocolException(sprintf(
                 'Expected an ASN1 sequence with at least 2 elements, but it has %s',

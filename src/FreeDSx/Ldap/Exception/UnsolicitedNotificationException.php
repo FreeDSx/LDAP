@@ -11,6 +11,8 @@
 
 namespace FreeDSx\Ldap\Exception;
 
+use Throwable;
+
 /**
  * Thrown when an unsolicited notification is received. Holds the error, code, and OID of the notification type.
  *
@@ -29,7 +31,7 @@ class UnsolicitedNotificationException extends ProtocolException
      * @param \Throwable|null $previous
      * @param string $oid
      */
-    public function __construct($message = "", $code = 0, \Throwable $previous = null, $oid = "")
+    public function __construct($message = "", $code = 0, Throwable $previous = null, $oid = "")
     {
         $this->oid = $oid;
         parent::__construct($message, $code, $previous);

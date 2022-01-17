@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use function count;
 
 /**
  * A Modify DN Request. RFC 4511, 4.9
@@ -156,7 +157,7 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
      */
     public static function fromAsn1(AbstractType $type)
     {
-        if (!($type instanceof SequenceType && \count($type) >= 3 && \count($type) <= 4)) {
+        if (!($type instanceof SequenceType && count($type) >= 3 && count($type) <= 4)) {
             throw new ProtocolException('The modify dn request is malformed');
         }
         $entry = $type->getChild(0);

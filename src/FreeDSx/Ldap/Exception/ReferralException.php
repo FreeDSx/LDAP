@@ -11,6 +11,7 @@
 
 namespace FreeDSx\Ldap\Exception;
 
+use Exception;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\ResultCode;
 
@@ -19,7 +20,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ReferralException extends \Exception
+class ReferralException extends Exception
 {
     /**
      * @var LdapUrl[]

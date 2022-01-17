@@ -11,14 +11,19 @@
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
+use FreeDSx\Socket\Exception\ConnectionException;
+use function in_array;
 
 /**
  * Logic for handling basic operations.
@@ -41,10 +46,10 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
     /**
      * @param ClientProtocolContext $context
      * @return LdapMessageResponse
-     * @throws \FreeDSx\Ldap\Exception\ProtocolException
-     * @throws \FreeDSx\Ldap\Exception\UnsolicitedNotificationException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     * @throws \FreeDSx\Asn1\Exception\EncoderException
+     * @throws ProtocolException
+     * @throws UnsolicitedNotificationException
+     * @throws ConnectionException
+     * @throws EncoderException
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
@@ -75,7 +80,7 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
 
         # The success code above should satisfy the majority of cases. This checks if the result code is really a non
         # error condition defined in RFC 4511, A.1
-        if (\in_array($result->getResultCode(), self::NON_ERROR_CODES, true)) {
+        if (in_array($result->getResultCode(), self::NON_ERROR_CODES, true)) {
             return $messageFrom;
         }
 

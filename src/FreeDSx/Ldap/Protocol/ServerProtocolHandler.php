@@ -11,6 +11,7 @@
 
 namespace FreeDSx\Ldap\Protocol;
 
+use Exception;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -25,6 +26,9 @@ use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
+use Throwable;
+use function array_merge;
+use function in_array;
 
 /**
  * Handles server-client specific protocol interactions.
@@ -92,7 +96,7 @@ class ServerProtocolHandler
     ) {
         $this->queue = $queue;
         $this->handlerFactory = $handlerFactory;
-        $this->options = \array_merge($this->options, $options);
+        $this->options = array_merge($this->options, $options);
         $this->authorizer = $authorizer ?? new ServerAuthorization(null, $this->options);
         $this->protocolHandlerFactory = $protocolHandlerFactory ?? new ServerProtocolHandlerFactory(
             $handlerFactory,
@@ -131,7 +135,7 @@ class ServerProtocolHandler
             # Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with a
             # result code of protocol error.
             $this->sendNoticeOfDisconnect('The message encoding is malformed.');
-        } catch (\Exception | \Throwable $e) {
+        } catch (Exception | Throwable $e) {
             if ($this->queue->isConnected()) {
                 $this->sendNoticeOfDisconnect();
             }
@@ -206,7 +210,7 @@ class ServerProtocolHandler
 
             return false;
         }
-        if (\in_array($message->getMessageId(), $this->messageIds, true)) {
+        if (in_array($message->getMessageId(), $this->messageIds, true)) {
             $this->queue->sendMessage($this->responseFactory->getExtendedError(
                 sprintf('The message ID %s is not valid.', $message->getMessageId()),
                 ResultCode::PROTOCOL_ERROR

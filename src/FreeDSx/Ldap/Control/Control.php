@@ -19,6 +19,7 @@ use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
+use function count;
 
 /**
  * Represents a control. RFC 4511, 4.1.11
@@ -204,7 +205,7 @@ class Control implements ProtocolElementInterface
      */
     protected static function mergeControlData(Control $control, AbstractType $type)
     {
-        if (!($type instanceof SequenceType && \count($type->getChildren()) <= 3)) {
+        if (!($type instanceof SequenceType && count($type->getChildren()) <= 3)) {
             throw new ProtocolException(sprintf(
                 'The received control is malformed. Expected at least 3 sequence values. Received %s.',
                 count($type->getChildren())

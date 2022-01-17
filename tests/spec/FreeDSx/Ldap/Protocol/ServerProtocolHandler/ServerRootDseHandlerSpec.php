@@ -84,7 +84,7 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $queue->sendMessage(
             Argument::that(function (LdapMessageResponse $response) {
                 /** @var SearchResultEntry $search */
-               $search = $response->getResponse();
+                $search = $response->getResponse();
                 $entry = $search->getEntry();
 
                 return $entry->get('supportedControl')

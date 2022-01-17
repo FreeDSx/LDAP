@@ -13,7 +13,6 @@ namespace FreeDSx\Ldap\Protocol\Queue\MessageWrapper;
 
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapperInterface;
 use FreeDSx\Sasl\Exception\SaslBufferException;
-use FreeDSx\Sasl\Exception\SaslException;
 use FreeDSx\Sasl\SaslBuffer;
 use FreeDSx\Sasl\SaslContext;
 use FreeDSx\Sasl\Security\SecurityLayerInterface;

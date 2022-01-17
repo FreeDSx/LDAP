@@ -11,6 +11,8 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use function count;
+
 /**
  * Represents an entry change.
  *
@@ -105,7 +107,7 @@ class Change
      */
     public function isDelete(): bool
     {
-        return $this->modType === self::TYPE_DELETE && \count($this->attribute->getValues()) !== 0;
+        return $this->modType === self::TYPE_DELETE && count($this->attribute->getValues()) !== 0;
     }
 
     /**
@@ -121,7 +123,7 @@ class Change
      */
     public function isReset(): bool
     {
-        return $this->modType === self::TYPE_DELETE && \count($this->attribute->getValues()) === 0;
+        return $this->modType === self::TYPE_DELETE && count($this->attribute->getValues()) === 0;
     }
 
     /**

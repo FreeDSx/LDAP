@@ -30,6 +30,8 @@ use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\ReferralContext;
 use FreeDSx\Ldap\ReferralChaserInterface;
 use FreeDSx\Ldap\Search\Filters;
+use Throwable;
+use function count;
 
 /**
  * Logic for handling referrals.
@@ -91,7 +93,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
                 ReferralChaserInterface::class
             ));
         }
-        if (!$messageFrom->getResponse() instanceof LdapResult || \count($messageFrom->getResponse()->getReferrals()) === 0) {
+        if (!$messageFrom->getResponse() instanceof LdapResult || count($messageFrom->getResponse()->getReferrals()) === 0) {
             throw new OperationException(
                 'Encountered a referral request, but no referrals were supplied.',
                 ResultCode::REFERRAL
@@ -162,7 +164,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
                 }
                 # Other operation errors should bubble up, so throw it
                 throw  $e;
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 throw $e;
             }
         }
