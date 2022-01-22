@@ -4,6 +4,7 @@ jobs:
   run:
     runs-on: ${{ matrix.operating-system }}
     strategy:
+      fail-fast: false
       matrix:
         operating-system: [ubuntu-latest, windows-latest]
         php-versions: ['7.1', '7.2', '7.3', '7.4', '8.0', '8.1']
@@ -19,10 +20,10 @@ jobs:
           coverage: xdebug
 
       - name: Install OpenLDAP
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && matrix.php-versions >= '7.4'
         run: sudo ./tests/resources/openldap/setup.sh
 
-    # Cannot get the reboot to work properly for this...
+    # Github Actions runner does not support reboots to work properly for this...
     #- name: Install Active Directory
     #  if: runner.os == 'Windows'
     #  run: powershell .\tests\resources\activedirectory\Install-AD-Step1.ps1
@@ -56,5 +57,5 @@ jobs:
       # Not ideal, but we run as root here because the LDAP server needs access to certs / keys system directories.
       # For tests this seems fine, but in a real scenario this would be bad...
       - name: Run Integration Tests
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && matrix.php-versions >= '7.4'
         run: sudo composer run-script test-integration
