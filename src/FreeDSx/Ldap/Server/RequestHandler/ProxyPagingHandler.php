@@ -81,7 +81,9 @@ class ProxyPagingHandler implements PagingHandlerInterface
                 $pagingRequest->getSearchRequest(),
                 $pagingRequest->getSize()
             );
-
+            $this->pagers[$pagingRequest->getUniqueId()]->isCritical(
+                $pagingRequest->isCritical()
+            );
         }
 
         return $this->pagers[$pagingRequest->getUniqueId()];

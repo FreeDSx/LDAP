@@ -56,6 +56,9 @@ class ProxyPagingHandlerSpec extends ObjectBehavior
             ->shouldBeCalled()
             ->willReturn($paging);
 
+        $paging->isCritical(false)
+            ->shouldBeCalled()
+            ->willReturn($paging);
         $paging->getEntries(25)->shouldBeCalled()
             ->willReturn($entries);
         $paging->hasEntries()->shouldBeCalled()
@@ -86,6 +89,9 @@ class ProxyPagingHandlerSpec extends ObjectBehavior
             ->shouldBeCalled()
             ->willReturn($paging);
 
+        $paging->isCritical(false)
+            ->shouldBeCalled()
+            ->willReturn($paging);
         $paging->getEntries(25)->shouldBeCalled()
             ->willReturn($entries);
         $paging->hasEntries()->shouldBeCalled()
