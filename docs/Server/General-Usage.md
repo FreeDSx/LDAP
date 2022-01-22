@@ -200,7 +200,7 @@ class RootDseProxyHandler extends ProxyRequestHandler implements RootDseHandlerI
     public function rootDse(RequestContext $context, SearchRequest $request, Entry $rootDse): Entry
     {
         return $this->ldap()
-            ->search($search, ...$context->controls()->toArray())
+            ->search($request, ...$context->controls()->toArray())
             ->first();
     }
 }
