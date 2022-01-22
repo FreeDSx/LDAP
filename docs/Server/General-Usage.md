@@ -270,16 +270,18 @@ class MyPagingHandler implements PagingHandlerInterface
     public function page(
         PagingRequest $pagingRequest,
         RequestContext $context
-        ): PagingResponse {
+    ): PagingResponse {
         // Every time a client asks for a new "page" of results, this method will be called.
         
+        // Get the unique ID of the paging request.
+        // This will remain the same across the series of paging requests.
+        $uniqueId = $pagingRequest->getUniqueId();
         // Get the iteration of the "page" set we are on...
         $iteration = $pagingRequest->getIteration();
         // Get the size of the results the client is requesting...
         $size = $pagingRequest->getSize();
         // The actual search request...
         $search = $pagingRequest->getSearchRequest();
-
 
         // Perform the logic necessary to build up an Entries object with the results
         // Just an example. Populate this based on actual search, size, and iteration.
@@ -313,8 +315,10 @@ class MyPagingHandler implements PagingHandlerInterface
     /**
      * @inheritDoc
      */
-    public function remove(PagingRequest $pagingRequest,RequestContext $context) : void
-    {
+    public function remove(
+        PagingRequest $pagingRequest,
+        RequestContext $context
+    ): void {
         // This is to indicate that the client is done paging.
         // Use this to clean up any resources involved in handling the paging request.
     }
