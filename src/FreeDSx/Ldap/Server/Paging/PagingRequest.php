@@ -60,6 +60,11 @@ final class PagingRequest
     private $created;
 
     /**
+     * @var string
+     */
+    private $uniqueId;
+
+    /**
      * @var bool
      */
     private $hasProcessed = false;
@@ -69,13 +74,35 @@ final class PagingRequest
         SearchRequest $request,
         ControlBag $controls,
         string $nextCookie,
-        ?DateTimeInterface $created = null
+        ?DateTimeInterface $created = null,
+        ?string $uniqueId = null
     ) {
         $this->control = $control;
         $this->request = $request;
         $this->controls = $controls;
         $this->nextCookie = $nextCookie;
         $this->created = $created ?? new DateTime();
+        $this->uniqueId = $uniqueId ?? random_bytes(16);
+    }
+
+    /**
+     * An opaque value that uniquely identifies this paging request across its lifecycle.
+     *
+     * @return string
+     */
+    public function getUniqueId(): string
+    {
+        return $this->uniqueId;
+    }
+
+    /**
+     * Whether the paging control is considered critical or not.
+     *
+     * @return bool
+     */
+    public function isCritical(): bool
+    {
+        return $this->control->getCriticality();
     }
 
     /**
