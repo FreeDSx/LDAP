@@ -82,4 +82,13 @@ class LdapServerSpec extends ObjectBehavior
             'dse_vendor_version' => null,
         ]);
     }
+
+    public function it_should_make_a_proxy_server()
+    {
+        $this->beConstructedThrough('makeProxy', ['localhost']);
+
+        $this->getOptions()->shouldHaveKey('request_handler');
+        $this->getOptions()->shouldHaveKey('paging_handler');
+        $this->getOptions()->shouldHaveKey('rootdse_handler');
+    }
 }

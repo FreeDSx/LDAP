@@ -13,6 +13,8 @@ namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
+use FreeDSx\Ldap\Server\RequestHandler\ProxyHandler;
+use FreeDSx\Ldap\Server\RequestHandler\ProxyPagingHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
@@ -143,6 +145,34 @@ class LdapServer
         $this->options['paging_handler'] = $pagingHandler;
 
         return $this;
+    }
+
+    /**
+     * Convenience method for generating an LDAP server instance that will proxy client request's to an LDAP server.
+     *
+     * Note: This is only intended to work with the PCNTL server runner.
+     *
+     * @param string|string[] $servers The LDAP server(s) to proxy the request to.
+     * @param array<string, mixed> $clientOptions Any additional client options for the proxy connection.
+     * @param array<string, mixed> $serverOptions Any additional server options for the LDAP server.
+     * @return LdapServer
+     */
+    public static function makeProxy(
+        $servers,
+        array $clientOptions = [],
+        array $serverOptions = []
+    ): LdapServer {
+        $client = new LdapClient(array_merge([
+            'servers' => $servers,
+        ], $clientOptions));
+
+        $proxyRequestHandler = new ProxyHandler($client);
+        $server = new LdapServer($serverOptions);
+        $server->useRequestHandler($proxyRequestHandler);
+        $server->useRootDseHandler($proxyRequestHandler);
+        $server->usePagingHandler(new ProxyPagingHandler($client));
+
+        return $server;
     }
 
     private function runner(): ServerRunnerInterface
