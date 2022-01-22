@@ -11,27 +11,16 @@
 
 namespace integration\FreeDSx\Ldap;
 
-use Exception;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
-use Symfony\Component\Process\Process;
 
-class LdapServerTest extends LdapTestCase
+class LdapServerTest extends ServerTestCase
 {
-    /**
-     * @var Process
-     */
-    private $subject;
-
-    /**
-     * @var LdapClient
-     */
-    private $client;
+    protected $serverExec = 'ldapserver';
 
     public function setUp(): void
     {
@@ -40,13 +29,7 @@ class LdapServerTest extends LdapTestCase
         $this->createServerProcess('tcp');
     }
 
-    public function tearDown(): void
-    {
-        parent::tearDown();
-        $this->stopServer();
-    }
-
-    public function testItAcceptsBindWithCorrectCredentials(): void
+    public function testItCanBind(): void
     {
         $response = $this->client->bind(
             'cn=user,dc=foo,dc=bar',
@@ -390,86 +373,5 @@ class LdapServerTest extends LdapTestCase
 
         $result = $this->client->read('');
         $this->assertNotNull($result);
-    }
-
-    private function authenticate(): void
-    {
-        $this->client->bind(
-            'cn=user,dc=foo,dc=bar',
-            '12345'
-        );
-    }
-
-    private function waitForServerOutput(string $marker): string
-    {
-        $maxWait = 10;
-        $i = 0;
-
-        while ($this->subject->isRunning()) {
-            $output = $this->subject->getOutput();
-            //$this->subject->clearOutput();
-
-            if (strpos($output, $marker) !== false) {
-                return $output;
-            }
-
-            $i++;
-            if ($i === $maxWait) {
-                break;
-            }
-
-            sleep(1);
-        }
-
-        throw new Exception(sprintf(
-            'The expected output (%s) was not received after %d seconds.',
-            $marker,
-            $i
-        ));
-    }
-
-    private function createServerProcess(
-        string $transport,
-        ?string $handler = null
-    ): void {
-        $processArgs = [
-            'php',
-            __DIR__ . '/../../../bin/ldapserver.php',
-            $transport,
-        ];
-
-        if ($handler) {
-            $processArgs[] = $handler;
-        }
-
-        $this->subject = new Process($processArgs);
-        $this->subject->start();
-        $this->waitForServerOutput('server starting...');
-
-        $useSsl = false;
-        $servers = '127.0.0.1';
-
-        if ($transport === 'ssl') {
-            $transport = 'tcp';
-            $useSsl = true;
-        }
-        if ($transport === 'unix') {
-            $servers = '/var/run/ldap.socket';
-        }
-
-        $this->client = $this->getClient([
-            'port' => 3389,
-            'transport' => $transport,
-            'servers' => $servers,
-            'ssl_validate_cert' => false,
-            'use_ssl' => $useSsl,
-        ]);
-    }
-
-    private function stopServer(): void
-    {
-        $this->client->unbind();
-        $this->client = null;
-        $this->subject->stop();
     }
 }

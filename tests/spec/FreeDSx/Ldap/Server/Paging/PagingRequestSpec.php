@@ -129,4 +129,14 @@ class PagingRequestSpec extends ObjectBehavior
     {
         $this->lastProcessedAt()->shouldBeNull();
     }
+
+    public function it_should_get_a_unique_id()
+    {
+        $this->getUniqueId()->shouldBeString();
+    }
+
+    public function it_should_get_the_criticality_of_the_control()
+    {
+        $this->isCritical()->shouldBeEqualTo(false);
+    }
 }
