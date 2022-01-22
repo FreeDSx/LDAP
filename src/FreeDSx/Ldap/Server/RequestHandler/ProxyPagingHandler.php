@@ -11,10 +11,8 @@
 
 namespace FreeDSx\Ldap\Server\RequestHandler;
 
-use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\LdapClient;
-use FreeDSx\Ldap\Operation\Response\SearchResponse;
+use FreeDSx\Ldap\Search\Paging;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\Paging\PagingResponse;
 use FreeDSx\Ldap\Server\RequestContext;
@@ -32,6 +30,11 @@ class ProxyPagingHandler implements PagingHandlerInterface
     private $client;
 
     /**
+     * @var array<string, Paging>
+     */
+    private $pagers = [];
+
+    /**
      * @param LdapClient $client
      */
     public function __construct(LdapClient $client)
@@ -46,22 +49,15 @@ class ProxyPagingHandler implements PagingHandlerInterface
         PagingRequest $pagingRequest,
         RequestContext $context
     ): PagingResponse {
-        $response = $this->client->sendAndReceive(
-            $pagingRequest->getSearchRequest(),
-            ...$context->controls()->toArray()
-        );
+        $paging = $this->getPagerForClient($pagingRequest);
+        $entries = $paging->getEntries($pagingRequest->getSize());
 
-        /** @var SearchResponse $searchResponse */
-        $searchResponse = $response->getResponse();
-        /** @var PagingControl|null $cookie */
-        $cookie = $response->controls()->get(Control::OID_PAGING);
-
-        if (!$cookie || $cookie->getCookie() === '') {
-            return PagingResponse::makeFinal($searchResponse->getEntries());
+        if (!$paging->hasEntries()) {
+            return PagingResponse::makeFinal($entries);
         } else {
             return PagingResponse::make(
-                $searchResponse->getEntries(),
-                $cookie->getSize()
+                $entries,
+                $paging->sizeEstimate() ?? 0
             );
         }
     }
@@ -73,6 +69,21 @@ class ProxyPagingHandler implements PagingHandlerInterface
         PagingRequest $pagingRequest,
         RequestContext $context
     ): void {
-        // nothing to do for this class...
+        if (isset($this->pagers[$pagingRequest->getUniqueId()])) {
+            unset($this->pagers[$pagingRequest->getUniqueId()]);
+        }
+    }
+
+    private function getPagerForClient(PagingRequest $pagingRequest): Paging
+    {
+        if (!isset($this->pagers[$pagingRequest->getUniqueId()])) {
+            $this->pagers[$pagingRequest->getUniqueId()] = $this->client->paging(
+                $pagingRequest->getSearchRequest(),
+                $pagingRequest->getSize()
+            );
+
+        }
+
+        return $this->pagers[$pagingRequest->getUniqueId()];
     }
 }

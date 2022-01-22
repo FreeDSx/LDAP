@@ -16,11 +16,9 @@ use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapClient;
-use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Operation\Response\SearchResponse;
-use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Search\Paging;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
@@ -49,20 +47,21 @@ class ProxyPagingHandlerSpec extends ObjectBehavior
 
     public function it_should_handle_a_paging_request_when_paging_is_stil_going(
         LdapClient $client,
-        RequestContext $context
+        RequestContext $context,
+        Paging $paging
     ) {
         $request = new SearchRequest(Filters::equal('cn', 'foo'));
         $entries = new Entries(new Entry('cn=foo,dc=foo,dc=bar'));
-        $client->sendAndReceive($request, Argument::any())
+        $client->paging($request, Argument::any())
             ->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(
-                2,
-                new SearchResponse(
-                    new LdapResult(0),
-                    $entries
-                ),
-                new PagingControl(25, 'foo')
-            ));
+            ->willReturn($paging);
+
+        $paging->getEntries(25)->shouldBeCalled()
+            ->willReturn($entries);
+        $paging->hasEntries()->shouldBeCalled()
+            ->willReturn(true);
+        $paging->sizeEstimate()->shouldBeCalled()
+            ->willReturn(25);
 
         $pagingRequest = new PagingRequest(
             new PagingControl(25, ''),
@@ -78,48 +77,19 @@ class ProxyPagingHandlerSpec extends ObjectBehavior
 
     public function it_should_handle_a_paging_request_when_paging_is_complete(
         LdapClient $client,
-        RequestContext $context
+        RequestContext $context,
+        Paging $paging
     ) {
         $request = new SearchRequest(Filters::equal('cn', 'foo'));
         $entries = new Entries(new Entry('cn=foo,dc=foo,dc=bar'));
-        $client->sendAndReceive($request, Argument::any())
+        $client->paging($request, Argument::any())
             ->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(
-                2,
-                new SearchResponse(
-                    new LdapResult(0),
-                    $entries
-                ),
-                new PagingControl(0, '')
-            ));
+            ->willReturn($paging);
 
-        $pagingRequest = new PagingRequest(
-            new PagingControl(25, ''),
-            $request,
-            new ControlBag(),
-            'foo'
-        );
-
-        $this->page($pagingRequest, $context)->isComplete()->shouldBeEqualTo(true);
-        $this->page($pagingRequest, $context)->getEntries()->shouldBeEqualTo($entries);
-        $this->page($pagingRequest, $context)->getRemaining()->shouldBeEqualTo(0);
-    }
-
-    public function it_should_handle_a_paging_request_when_paging_is_not_returned_from_the_proxy(
-        LdapClient $client,
-        RequestContext $context
-    ) {
-        $request = new SearchRequest(Filters::equal('cn', 'foo'));
-        $entries = new Entries(new Entry('cn=foo,dc=foo,dc=bar'));
-        $client->sendAndReceive($request, Argument::any())
-            ->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(
-                2,
-                new SearchResponse(
-                    new LdapResult(0),
-                    $entries
-                )
-            ));
+        $paging->getEntries(25)->shouldBeCalled()
+            ->willReturn($entries);
+        $paging->hasEntries()->shouldBeCalled()
+            ->willReturn(false);
 
         $pagingRequest = new PagingRequest(
             new PagingControl(25, ''),
