@@ -2,6 +2,7 @@ General LDAP Server Usage
 ===================
 
 * [Running the Server](#running-the-server)
+* [Creating a Proxy Server](#creating-a-proxy-server)
 * [Handling Client Requests](#handling-client-requests)
   * [Proxy Request Handler](#proxy-request-handler)
   * [Generic Request Handler](#generic-request-handler)
@@ -26,6 +27,31 @@ rejects client requests for any operation.
 use FreeDSx\Ldap\LdapServer;
 
 $server = (new LdapServer())->run();
+```
+
+### Creating a Proxy Server
+
+The LDAP server is capable of acting as a proxy between other LDAP servers through the use of the handlers. There is a
+helper factory method defined on the LdapServer class that makes creating a proxy server very easy. However, it provides
+no real extensibility if you aren't defining your own handlers.
+
+The proxy server can be constructed as follows:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+
+$server = LdapServer::makeProxy(
+    // The LDAP server to proxy connections to...
+    'ldap.example.com',
+    // Any additional LdapClient options for the proxy...
+    [],
+    // Any additional LdapServer options. In this case, run over port 3389
+    [
+        'port' => 3389,
+    ]
+);
+
+$server->run();
 ```
 
 ## Handling Client Requests
@@ -63,6 +89,8 @@ However, there is a generic request handler you can extend to implement only wha
 requests to a separate LDAP server.
 
 ### Proxy Request Handler
+
+**Note**: If you just want to create an LDAP server that serves as a proxy, see the section on [creating a proxy server](#creating-a-proxy-server).
 
 The proxy request handler simply forwards the LDAP request from the FreeDSx server to a different LDAP server, then sends
 the response back to the client. You should extend the ProxyRequestHandler class and add your own client options to be
