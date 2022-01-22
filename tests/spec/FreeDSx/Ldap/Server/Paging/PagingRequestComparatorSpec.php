@@ -93,6 +93,24 @@ class PagingRequestComparatorSpec extends ObjectBehavior
         $this->compare($old, $new)->shouldBeEqualTo(false);
     }
 
+    public function it_compares_false_when_the_paging_criticality_is_different()
+    {
+        $old = new PagingRequest(
+            (new PagingControl(100, 'foo'))->setCriticality(true),
+            new SearchRequest(new EqualityFilter('cn', 'foo')),
+            new ControlBag(new SdFlagsControl(SdFlagsControl::DACL_SECURITY_INFORMATION)),
+            'bar'
+        );
+        $new = new PagingRequest(
+            new PagingControl(50, 'bar'),
+            new SearchRequest(new EqualityFilter('cn', 'foo')),
+            new ControlBag(),
+            'foo'
+        );
+
+        $this->compare($old, $new)->shouldBeEqualTo(false);
+    }
+
     public function it_compares_false_when_the_controls_are_different_in_value()
     {
         $old = new PagingRequest(

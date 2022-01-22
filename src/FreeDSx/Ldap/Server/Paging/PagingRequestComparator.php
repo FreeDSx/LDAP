@@ -59,7 +59,8 @@ class PagingRequestComparator
         $oldSearch = $oldPagingRequest->getSearchRequest();
         $newSearch = $newPagingRequest->getSearchRequest();
 
-        return $oldSearch->getAttributesOnly() === $newSearch->getAttributesOnly()
+        return $newPagingRequest->isCritical() === $oldPagingRequest->isCritical()
+            && $oldSearch->getAttributesOnly() === $newSearch->getAttributesOnly()
             && $oldSearch->getDereferenceAliases() === $newSearch->getDereferenceAliases()
             && $oldSearch->getScope() === $newSearch->getScope()
             && $oldSearch->getTimeLimit() === $newSearch->getTimeLimit()
