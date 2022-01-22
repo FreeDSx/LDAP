@@ -78,9 +78,14 @@ class LdapServer
      */
     public function run(): void
     {
-        $resource = $this->options['transport'] === 'unix'
+        $isUnixSocket = $this->options['transport'] === 'unix';
+        $resource = $isUnixSocket
             ? $this->options['unix_socket']
             : $this->options['ip'];
+
+        if ($isUnixSocket) {
+            $this->removeExistingSocketIfNeeded($resource);
+        }
 
         $socketServer = SocketServer::bind(
             $resource,
@@ -147,5 +152,26 @@ class LdapServer
         }
 
         return $this->runner;
+    }
+
+    private function removeExistingSocketIfNeeded(string $socket): void
+    {
+        if (!file_exists($socket)) {
+            return;
+        }
+
+        if (!is_writeable($socket)) {
+            throw new RuntimeException(sprintf(
+                'The socket "%s" already exists and is not writeable. To run the LDAP server, you must remove the existing socket.',
+                $socket
+            ));
+        }
+
+        if (!unlink($socket)) {
+            throw new RuntimeException(sprintf(
+                'The existing socket "%s" could not be removed. To run the LDAP server, you must remove the existing socket.',
+                $socket
+            ));
+        }
     }
 }
