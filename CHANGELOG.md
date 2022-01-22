@@ -1,6 +1,17 @@
 CHANGELOG
 =========
 
+0.7.0 (2022-01-22)
+------------------
+* Add the ability to run the LDAP server / client over a UNIX socket.
+* Add the ability to run the LDAP server over an SSL / TLS only socket.
+* Add the ability for the server to handle client paging requests via a handler.
+* Add a helper factory method for creating a proxy LDAP server.
+* The LDAP server handlers can now be set as a class instance in addition to the class FQCN string.
+* When setting the options on the LdapClient you can now choose to force a disconnect at the same time.
+* The criticality for paging can now be set using the "isCritical" method.
+* Add integration tests for the LDAP server / proxy.
+
 0.6.1 (2021-12-11)
 ------------------
 * Support PHP 8.0 / 8.1.
