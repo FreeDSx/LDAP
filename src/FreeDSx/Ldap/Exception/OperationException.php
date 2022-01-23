@@ -24,8 +24,53 @@ use Throwable;
  */
 class OperationException extends Exception
 {
-    public function __construct(string $message = '', int $code = ResultCode::OPERATIONS_ERROR, Throwable $previous = null)
+    public function __construct(
+        string $message = '',
+        int $code = ResultCode::OPERATIONS_ERROR,
+        Throwable $previous = null
+    ) {
+        $message = empty($message)
+            ? $this->generateMessage($code)
+            : $message;
+
+        parent::__construct(
+            $message,
+            $code,
+            $previous
+        );
+    }
+
+    /**
+     * Get the LDAP result code as a short string (as defined in the LDAP RFC).
+     *
+     * @return string|null
+     */
+    public function getCodeShort(): ?string
     {
-        parent::__construct($message, $code, $previous);
+        return ResultCode::MEANING_SHORT[$this->getCode()] ?? null;
+    }
+
+    /**
+     * Get the LDAP result code meaning description (as defined in the LDAP RFC).
+     *
+     * @return string|null
+     */
+    public function getCodeDescription(): ?string
+    {
+        return ResultCode::MEANING_DESCRIPTION[$this->getCode()] ?? null;
+    }
+
+    private function generateMessage(int $resultCode): string
+    {
+        $message = sprintf('The result code %d was thrown', $resultCode);
+
+        if (isset(ResultCode::MEANING_SHORT[$resultCode])) {
+            $message .= sprintf(' (%s)', ResultCode::MEANING_SHORT[$resultCode]);
+        }
+        if (isset(ResultCode::MEANING_DESCRIPTION[$resultCode])) {
+            $message .= '. ' . ResultCode::MEANING_DESCRIPTION[$resultCode];
+        }
+
+        return $message;
     }
 }

@@ -26,4 +26,19 @@ class OperationExceptionSpec extends ObjectBehavior
     {
         $this->getCode()->shouldBeEqualTo(ResultCode::OPERATIONS_ERROR);
     }
+
+    public function it_should_get_the_code_short_string()
+    {
+        $this->getCodeShort()->shouldBeEqualTo('operationsError');
+    }
+
+    public function it_should_get_the_code_description()
+    {
+        $this->getCodeDescription()->shouldBeEqualTo(ResultCode::MEANING_DESCRIPTION[ResultCode::OPERATIONS_ERROR]);
+    }
+
+    public function it_should_generate_a_message_if_none_was_provided()
+    {
+        $this->getMessage()->shouldBeEqualTo('The result code 1 was thrown (operationsError). Indicates that the operation is not properly sequenced with relation to other operations (of same or different type).');
+    }
 }
