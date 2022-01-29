@@ -336,8 +336,6 @@ $server->usePagingHandler(new MyPagingHandler());
 $server->run();
 ```
 
-The above would pass on a RootDSE request as a proxy and send it back to the client.
-
 ## StartTLS SSL Certificate Support
 
 To allow clients to issue a StartTLS command against the LDAP server you need to provide an SSL certificate, key, and
