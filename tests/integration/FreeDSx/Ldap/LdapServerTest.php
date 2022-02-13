@@ -374,4 +374,13 @@ class LdapServerTest extends ServerTestCase
         $result = $this->client->read('');
         $this->assertNotNull($result);
     }
+
+    public function testItCanHandleMultipleClients()
+    {
+        $this->client->read();
+        $client2 = $this->getClient($this->client->getOptions());
+
+        $result = $client2->read();
+        $this->assertNotNull($result);
+    }
 }
