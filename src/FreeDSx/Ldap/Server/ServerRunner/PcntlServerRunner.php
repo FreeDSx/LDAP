@@ -113,7 +113,9 @@ class PcntlServerRunner implements ServerRunnerInterface
         try {
             $this->acceptClients();
         } finally {
-            $this->handleServerShutdown();
+            if ($this->isServer) {
+                $this->handleServerShutdown();
+            }
         }
     }
 
