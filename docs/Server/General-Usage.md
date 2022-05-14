@@ -258,8 +258,13 @@ An example of using it to handle a client paging request...
 ```php
 namespace Foo;
 
-use FreeDSx\Ldap\Entry\Entries;use FreeDSx\Ldap\Entry\Entry;use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Server\Paging\PagingRequest;use FreeDSx\Ldap\Server\Paging\PagingResponse;use FreeDSx\Ldap\Server\RequestContext;use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
+use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Server\Paging\PagingRequest;
+use FreeDSx\Ldap\Server\Paging\PagingResponse;
+use FreeDSx\Ldap\Server\RequestContext;
+use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 
 class MyPagingHandler implements PagingHandlerInterface
