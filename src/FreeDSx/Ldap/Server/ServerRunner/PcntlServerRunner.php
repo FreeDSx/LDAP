@@ -34,6 +34,11 @@ class PcntlServerRunner implements ServerRunnerInterface
     private const SOCKET_ACCEPT_TIMEOUT = 5;
 
     /**
+     * The max time to wait (in seconds) for any child processes before we force kill them.
+     */
+    private const MAX_SHUTDOWN_WAIT_TIME = 15;
+
+    /**
      * @var SocketServer
      */
     protected $server;
@@ -54,6 +59,26 @@ class PcntlServerRunner implements ServerRunnerInterface
     protected $isServer = true;
 
     /**
+     * @var null|ChildProcess
+     */
+    protected $childProcess = null;
+
+    /**
+     * @var int[] These are the POSIX signals we handle for shutdown purposes.
+     */
+    protected $handledSignals = [];
+
+    /**
+     * @var bool
+     */
+    protected $isPosixExtLoaded;
+
+    /**
+     * @var bool
+     */
+    protected $isServerSignalsInstalled = false;
+
+    /**
      * @param array $options
      * @psalm-param array{request_handler?: class-string<RequestHandlerInterface>} $options
      * @throws RuntimeException
@@ -64,6 +89,18 @@ class PcntlServerRunner implements ServerRunnerInterface
             throw new RuntimeException('The PCNTL extension is needed to fork incoming requests, which is only available on Linux.');
         }
         $this->options = $options;
+
+        // posix_kill needs this...we cannot clean up child processes without it on shutdown...
+        $this->isPosixExtLoaded = extension_loaded('posix');
+        // We need to be able to handle signals as they come in, regardless of what is going on...
+        pcntl_async_signals(true);
+
+        $this->handledSignals = [
+            SIGHUP,
+            SIGINT,
+            SIGTERM,
+            SIGQUIT,
+        ];
     }
 
     /**
@@ -118,19 +155,22 @@ class PcntlServerRunner implements ServerRunnerInterface
 
             $pid = pcntl_fork();
             if ($pid == -1) {
-                // In parent process, but could not fork....
+                // In parent process, but could not fork...
                 throw new RuntimeException('Unable to fork process.');
             } elseif ($pid === 0) {
                 // This is the child's thread of execution...
-                $this->isServer = false;
-                $this->handleSocket($socket);
-            } else {
-                // We are in the parent; the PID is the child process.
-                $this->childProcesses[] = new ChildProcess(
+                $this->startChildProcessAndWait(
                     $pid,
                     $socket
                 );
-                $this->cleanUpChildProcesses();
+
+                exit(0);
+            } else {
+                // We are in the parent; the PID is the child process.
+                $this->runAfterChildStarted(
+                    $pid,
+                    $socket
+                );
             }
         } while ($this->server->isConnected());
     }
@@ -147,6 +187,116 @@ class PcntlServerRunner implements ServerRunnerInterface
             $this->options
         );
         $serverProtocolHandler->handle();
-        exit;
+    }
+
+    private function installChildSignalHandlers(): void
+    {
+        foreach ($this->handledSignals as $signal) {
+            pcntl_signal(
+                $signal,
+                function () {
+                    if ($this->childProcess) {
+                        $this->childProcess->closeSocket();
+                    }
+                }
+            );
+        }
+    }
+
+    private function installServerSignalHandlers(): void
+    {
+        foreach ($this->handledSignals as $signal) {
+            $this->isServerSignalsInstalled = pcntl_signal(
+                $signal,
+                function () {
+                    $this->handleServerShutdown();
+                }
+            );
+        }
+    }
+
+    private function handleServerShutdown(): void
+    {
+        // We can't do anything else without the posix ext ... :(
+        if (!$this->isPosixExtLoaded) {
+            $this->cleanUpChildProcesses();
+
+            return;
+        }
+        // Ask nicely first...
+        $this->endChildProcesses(SIGTERM);
+
+        $waitTime = 0;
+        while (!empty($this->childProcess)) {
+            $this->cleanUpChildProcesses();
+
+            // We are still waiting for some children to shut down, wait on them.
+            if (!empty($this->childProcess)) {
+                sleep(5);
+                $waitTime += 5;
+            }
+
+            // If we reach max wait time, attempt to force end them and then stop.
+            if ($waitTime >= self::MAX_SHUTDOWN_WAIT_TIME) {
+                $this->forceEndChildProcesses();
+
+                break;
+            }
+        }
+
+        $this->server->close();
+    }
+
+    private function endChildProcesses(int $signal): void
+    {
+        foreach ($this->childProcesses as $childProcess) {
+            posix_kill(
+                $childProcess->getPid(),
+                $signal
+            );
+            $childProcess->closeSocket();
+        }
+    }
+
+    /**
+     * @throws EncoderException
+     */
+    private function startChildProcessAndWait(
+        int $pid,
+        Socket $socket
+    ): void {
+        $this->isServer = false;
+        $this->childProcess = new ChildProcess(
+            $pid,
+            $socket
+        );
+        $this->installChildSignalHandlers();
+        $this->handleSocket($socket);
+    }
+
+    private function runAfterChildStarted(
+        int $pid,
+        Socket $socket
+    ): void {
+        if (!$this->isServerSignalsInstalled) {
+            $this->installServerSignalHandlers();
+        }
+        $this->childProcesses[] = new ChildProcess(
+            $pid,
+            $socket
+        );
+        $this->cleanUpChildProcesses();
+    }
+
+    private function forceEndChildProcesses(): void
+    {
+        // One last check before we force end them all.
+        $this->cleanUpChildProcesses();
+        if (empty($this->childProcesses)) {
+            return;
+        }
+
+        $this->endChildProcesses(SIGKILL);
+        $this->cleanUpChildProcesses();
     }
 }

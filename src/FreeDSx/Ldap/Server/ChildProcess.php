@@ -42,4 +42,9 @@ class ChildProcess
     {
         return $this->socket;
     }
+
+    public function closeSocket(): void
+    {
+        $this->socket->close();
+    }
 }
