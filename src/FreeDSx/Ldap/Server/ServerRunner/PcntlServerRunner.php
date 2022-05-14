@@ -49,6 +49,11 @@ class PcntlServerRunner implements ServerRunnerInterface
     protected $childProcesses = [];
 
     /**
+     * @var bool
+     */
+    protected $isServer = true;
+
+    /**
      * @param array $options
      * @psalm-param array{request_handler?: class-string<RequestHandlerInterface>} $options
      * @throws RuntimeException
@@ -68,29 +73,11 @@ class PcntlServerRunner implements ServerRunnerInterface
     {
         $this->server = $server;
 
-        do {
-            $socket = $this->server->accept(self::SOCKET_ACCEPT_TIMEOUT);
+        try {
+            $this->acceptClients();
+        } finally {
             $this->cleanUpChildProcesses();
-            if ($socket === null) {
-                continue;
-            }
-
-            $pid = pcntl_fork();
-            if ($pid == -1) {
-                // In parent process, but could not fork....
-                throw new RuntimeException('Unable to fork process.');
-            } elseif ($pid === 0) {
-                // This is the child's thread of execution...
-                $this->handleSocket($socket);
-            } else {
-                // We are in the parent; the PID is the child process.
-                $this->childProcesses[] = new ChildProcess(
-                    $pid,
-                    $socket
-                );
-                $this->cleanUpChildProcesses();
-            }
-        } while ($this->server->isConnected());
+        }
     }
 
     /**
@@ -98,6 +85,10 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     private function cleanUpChildProcesses(): void
     {
+        if (!$this->isServer) {
+            return;
+        }
+
         foreach ($this->childProcesses as $index => $childProcess) {
             // No use for this at the moment, but define it anyway.
             $status = null;
@@ -113,6 +104,35 @@ class PcntlServerRunner implements ServerRunnerInterface
                 $this->server->removeClient($childProcess->getSocket());
             }
         }
+    }
+
+    private function acceptClients(): void
+    {
+        do {
+            $socket = $this->server->accept(self::SOCKET_ACCEPT_TIMEOUT);
+            $this->cleanUpChildProcesses();
+
+            if ($socket === null) {
+                continue;
+            }
+
+            $pid = pcntl_fork();
+            if ($pid == -1) {
+                // In parent process, but could not fork....
+                throw new RuntimeException('Unable to fork process.');
+            } elseif ($pid === 0) {
+                // This is the child's thread of execution...
+                $this->isServer = false;
+                $this->handleSocket($socket);
+            } else {
+                // We are in the parent; the PID is the child process.
+                $this->childProcesses[] = new ChildProcess(
+                    $pid,
+                    $socket
+                );
+                $this->cleanUpChildProcesses();
+            }
+        } while ($this->server->isConnected());
     }
 
     /**
