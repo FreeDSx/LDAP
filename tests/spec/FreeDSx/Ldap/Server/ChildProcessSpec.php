@@ -36,4 +36,11 @@ class ChildProcessSpec extends ObjectBehavior
     {
         $this->getSocket()->shouldBeAnInstanceOf(Socket::class);
     }
+
+    public function it_should_close_the_socket(Socket $socket)
+    {
+        $socket->close()->shouldBeCalled();
+
+        $this->closeSocket();
+    }
 }
