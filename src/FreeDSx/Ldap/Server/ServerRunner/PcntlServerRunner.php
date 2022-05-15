@@ -230,19 +230,18 @@ class PcntlServerRunner implements ServerRunnerInterface
 
         $waitTime = 0;
         while (!empty($this->childProcess)) {
+            // If we reach max wait time, attempt to force end them and then stop.
+            if ($waitTime >= self::MAX_SHUTDOWN_WAIT_TIME) {
+                $this->forceEndChildProcesses();
+
+                break;
+            }
             $this->cleanUpChildProcesses();
 
             // We are still waiting for some children to shut down, wait on them.
             if (!empty($this->childProcess)) {
                 sleep(5);
                 $waitTime += 5;
-            }
-
-            // If we reach max wait time, attempt to force end them and then stop.
-            if ($waitTime >= self::MAX_SHUTDOWN_WAIT_TIME) {
-                $this->forceEndChildProcesses();
-
-                break;
             }
         }
 
