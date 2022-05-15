@@ -153,7 +153,9 @@ class PcntlServerRunner implements ServerRunnerInterface
             $socket = $this->server->accept(self::SOCKET_ACCEPT_TIMEOUT);
 
             if ($this->isShuttingDown) {
-                $socket->close();
+                if ($socket) {
+                    $socket->close();
+                }
 
                 break;
             }
