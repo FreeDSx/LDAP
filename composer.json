@@ -43,6 +43,11 @@
       "spec\\FreeDSx\\Ldap\\": "tests/spec/FreeDSx/Ldap"
     }
   },
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
+  },
   "scripts": {
     "test-coverage": [
       "phpspec run --no-interaction -c phpspec.cov.yml",
