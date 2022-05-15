@@ -222,4 +222,15 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
 
         $this->handle();
     }
+
+    public function it_should_send_a_notice_of_disconnect_and_close_the_queue_on_shutdown(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    {
+        $queue->sendMessage(new LdapMessageResponse(0, new ExtendedResponse(
+            new LdapResult(ResultCode::UNAVAILABLE, '', 'The server is shutting down.'),
+            ExtendedResponse::OID_NOTICE_OF_DISCONNECTION
+        )))->shouldBeCalled();
+        $queue->close()->shouldBeCalled();
+
+        $this->shutdown();
+    }
 }

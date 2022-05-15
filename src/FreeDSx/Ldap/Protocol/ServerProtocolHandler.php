@@ -147,6 +147,20 @@ class ServerProtocolHandler
     }
 
     /**
+     * Used asynchronously to end a client session when the server process is shutting down.
+     *
+     * @throws EncoderException
+     */
+    public function shutdown(): void
+    {
+        $this->sendNoticeOfDisconnect(
+            'The server is shutting down.',
+            ResultCode::UNAVAILABLE
+        );
+        $this->queue->close();
+    }
+
+    /**
      * Routes requests from the message queue based off the current authorization state and what protocol handler the
      * request is mapped to.
      *
@@ -249,11 +263,13 @@ class ServerProtocolHandler
      * @param string $message
      * @throws EncoderException
      */
-    protected function sendNoticeOfDisconnect(string $message = ''): void
-    {
+    protected function sendNoticeOfDisconnect(
+        string $message = '',
+        int $reasonCode = ResultCode::PROTOCOL_ERROR
+    ): void {
         $this->queue->sendMessage($this->responseFactory->getExtendedError(
             $message,
-            ResultCode::PROTOCOL_ERROR,
+            $reasonCode,
             ExtendedResponse::OID_NOTICE_OF_DISCONNECTION
         ));
     }
