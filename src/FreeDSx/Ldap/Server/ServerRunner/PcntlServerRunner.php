@@ -377,7 +377,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         );
         $serverProtocolHandler->handle();
         $this->logInfo(
-            'The client process is ending.',
+            'The child process is ending.',
             $context
         );
 
