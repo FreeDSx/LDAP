@@ -1,6 +1,12 @@
 CHANGELOG
 =========
 
+0.8.0 (2022-05-21)
+------------------
+* Properly handle and reap child processes in the LDAP server.
+* Handle POSIX signals sent to the LDAP server / child processes to properly shutdown existing clients.
+* Allow a PSR-3 compatible logging instance to be set on the LDAP server for info / error events.
+
 0.7.0 (2022-01-22)
 ------------------
 * Add the ability to run the LDAP server / client over a UNIX socket.
