@@ -6,6 +6,7 @@ LDAP Server Configuration
     * [port](#port)
     * [unix_socket](#unix_socket)
     * [transport](#transport)
+    * [logger](#logger)
     * [idle_timeout](#idle_timeout)
     * [require_authentication](#require_authentication)
     * [allow_anonymous](#allow_anonymous)
@@ -74,6 +75,25 @@ The transport mechanism for the server to use. Use either:
 If using `unix` for the transport you can change set the `unix_socket` to a file path representing the unix socket the clients must connect to.
 
 **Default**: `tcp`
+
+------------------
+#### logger
+
+Specify a PSR-3 compatible logging instance to use. This will log various server events and errors.
+
+You can also set the logger after instantiating the server and before running it:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+
+$server = new LdapServer();
+
+// instantiate some logger class...
+
+$server->useLogger($logger);
+```
+
+**Default**: `null`
 
 ------------------
 #### idle_timeout

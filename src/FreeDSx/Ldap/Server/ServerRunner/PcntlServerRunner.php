@@ -13,6 +13,7 @@ namespace FreeDSx\Ldap\Server\ServerRunner;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\LoggerTrait;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\ChildProcess;
@@ -28,6 +29,8 @@ use FreeDSx\Socket\SocketServer;
  */
 class PcntlServerRunner implements ServerRunnerInterface
 {
+    use LoggerTrait;
+
     /**
      * The time to wait, in seconds, before we run some clean-up tasks to then wait again.
      */
@@ -79,6 +82,11 @@ class PcntlServerRunner implements ServerRunnerInterface
     protected $isShuttingDown = false;
 
     /**
+     * @var array<string, mixed>
+     */
+    protected $defaultContext = [];
+
+    /**
      * @param array $options
      * @psalm-param array{request_handler?: class-string<RequestHandlerInterface>} $options
      * @throws RuntimeException
@@ -100,6 +108,9 @@ class PcntlServerRunner implements ServerRunnerInterface
             SIGINT,
             SIGTERM,
             SIGQUIT,
+        ];
+        $this->defaultContext = [
+            'pid' => posix_getpid(),
         ];
     }
 
@@ -139,6 +150,13 @@ class PcntlServerRunner implements ServerRunnerInterface
                 $socket = $childProcess->getSocket();
                 $this->server->removeClient($socket);
                 $socket->close();
+                $this->logInfo(
+                    'The child process has ended.',
+                    array_merge(
+                        $this->defaultContext,
+                        ['child_pid' => $childProcess->getPid()]
+                    )
+                );
             }
         }
     }
@@ -149,11 +167,20 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     private function acceptClients(): void
     {
+        $this->logInfo(
+            'The server process has started and is now accepting clients.',
+            $this->defaultContext
+        );
+
         do {
             $socket = $this->server->accept(self::SOCKET_ACCEPT_TIMEOUT);
 
             if ($this->isShuttingDown) {
                 if ($socket) {
+                    $this->logInfo(
+                        'A client was accepted, but the server is shutting down. Closing connection.',
+                        $this->defaultContext
+                    );
                     $socket->close();
                 }
 
@@ -170,10 +197,16 @@ class PcntlServerRunner implements ServerRunnerInterface
             $pid = pcntl_fork();
             if ($pid == -1) {
                 // In parent process, but could not fork...
-                throw new RuntimeException('Unable to fork process.');
+                $this->logAndThrow(
+                    'Unable to fork process.',
+                    $this->defaultContext
+                );
             } elseif ($pid === 0) {
                 // This is the child's thread of execution...
-                $this->runChildProcessThenExit($socket);
+                $this->runChildProcessThenExit(
+                    $socket,
+                    posix_getpid()
+                );
             } else {
                 // We are in the parent; the PID is the child process.
                 $this->runAfterChildStarted(
@@ -187,13 +220,28 @@ class PcntlServerRunner implements ServerRunnerInterface
     /**
      * Install signal handlers responsible for sending a notice of disconnect to the client and stopping the queue.
      */
-    private function installChildSignalHandlers(ServerProtocolHandler $protocolHandler): void
-    {
+    private function installChildSignalHandlers(
+        ServerProtocolHandler $protocolHandler,
+        array $context
+    ): void {
         foreach ($this->handledSignals as $signal) {
+            $context = array_merge(
+                $context,
+                ['signal' => $signal]
+            );
             pcntl_signal(
                 $signal,
-                function () use ($protocolHandler) {
-                    $protocolHandler->shutdown();
+                function () use ($protocolHandler, $context) {
+                    // Ignore it if a signal was already acknowledged...
+                    if ($this->isShuttingDown) {
+                        return;
+                    }
+                    $this->isShuttingDown = true;
+                    $this->logInfo(
+                        'The child process has received a signal to stop.',
+                        $context
+                    );
+                    $protocolHandler->shutdown($context);
                 }
             );
         }
@@ -226,7 +274,15 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     private function handleServerShutdown(): void
     {
+        // Want to make sure we are only handling this once...
+        if ($this->isShuttingDown) {
+            return;
+        }
         $this->isShuttingDown = true;
+        $this->logInfo(
+            'The server shutdown process has started.',
+            $this->defaultContext
+        );
 
         // We can't do anything else without the posix ext ... :(
         if (!$this->isPosixExtLoaded) {
@@ -255,6 +311,10 @@ class PcntlServerRunner implements ServerRunnerInterface
         }
 
         $this->server->close();
+        $this->logInfo(
+            'The server shutdown process has completed.',
+            $this->defaultContext
+        );
     }
 
     /**
@@ -265,6 +325,19 @@ class PcntlServerRunner implements ServerRunnerInterface
         bool $closeSocket = false
     ): void {
         foreach ($this->childProcesses as $childProcess) {
+            $context = array_merge(
+                $this->defaultContext,
+                ['child_pid' => $childProcess->getPid()]
+            );
+
+            $message = ($signal === SIGKILL)
+                ? 'Force ending child process.'
+                : 'Sending graceful signal to end child process.';
+            $this->logInfo(
+                $message,
+                $context
+            );
+
             posix_kill(
                 $childProcess->getPid(),
                 $signal
@@ -281,7 +354,11 @@ class PcntlServerRunner implements ServerRunnerInterface
      *
      * @throws EncoderException
      */
-    private function runChildProcessThenExit(Socket $socket): void {
+    private function runChildProcessThenExit(
+        Socket $socket,
+        int $pid
+    ): void {
+        $context = ['pid' => $pid];
         $this->isMainProcess = false;
         $serverProtocolHandler = new ServerProtocolHandler(
             new ServerQueue($socket),
@@ -289,8 +366,20 @@ class PcntlServerRunner implements ServerRunnerInterface
             $this->options
         );
 
-        $this->installChildSignalHandlers($serverProtocolHandler);
+        $this->installChildSignalHandlers(
+            $serverProtocolHandler,
+            $context
+        );
+
+        $this->logInfo(
+            'Handling LDAP connection in new child process.',
+            $context
+        );
         $serverProtocolHandler->handle();
+        $this->logInfo(
+            'The client process is ending.',
+            $context
+        );
 
         exit(0);
     }
@@ -312,6 +401,13 @@ class PcntlServerRunner implements ServerRunnerInterface
         $this->childProcesses[] = new ChildProcess(
             $pid,
             $socket
+        );
+        $this->logInfo(
+            'A new client has connected.',
+            array_merge(
+                ['child_pid' => $pid],
+                $this->defaultContext
+            )
         );
         $this->cleanUpChildProcesses();
     }

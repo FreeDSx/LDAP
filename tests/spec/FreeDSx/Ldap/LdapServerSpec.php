@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Socket\SocketServer;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
+use Psr\Log\LoggerInterface;
 
 class LdapServerSpec extends ObjectBehavior
 {
@@ -60,6 +61,13 @@ class LdapServerSpec extends ObjectBehavior
         $this->getOptions()->shouldHaveKeyWithValue('paging_handler', $pagingHandler);
     }
 
+    public function it_should_use_the_logger_specified(LoggerInterface $logger)
+    {
+        $this->useLogger($logger);
+
+        $this->getOptions()->shouldHaveKeyWithValue('logger', $logger);
+    }
+
     public function it_should_get_the_default_options_with_any_merged_values()
     {
         $this->getOptions()->shouldBeEqualTo([
@@ -73,6 +81,7 @@ class LdapServerSpec extends ObjectBehavior
             'request_handler' => null,
             'rootdse_handler' => null,
             'paging_handler' => null,
+            'logger' => null,
             'use_ssl' => false,
             'ssl_cert' => null,
             'ssl_cert_passphrase' => null,

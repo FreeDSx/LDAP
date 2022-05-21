@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\SocketServer;
+use Psr\Log\LoggerInterface;
 
 /**
  * The LDAP server.
@@ -29,6 +30,8 @@ use FreeDSx\Socket\SocketServer;
  */
 class LdapServer
 {
+    use LoggerTrait;
+
     /**
      * @var array
      */
@@ -43,6 +46,7 @@ class LdapServer
         'request_handler' => null,
         'rootdse_handler' => null,
         'paging_handler' => null,
+        'logger' => null,
         'use_ssl' => false,
         'ssl_cert' => null,
         'ssl_cert_passphrase' => null,
@@ -148,6 +152,16 @@ class LdapServer
     }
 
     /**
+     * Specify a logger to be used by the server process.
+     */
+    public function useLogger(LoggerInterface $logger): self
+    {
+        $this->options['logger'] = $logger;
+
+        return $this;
+    }
+
+    /**
      * Convenience method for generating an LDAP server instance that will proxy client request's to an LDAP server.
      *
      * Note: This is only intended to work with the PCNTL server runner.
@@ -191,14 +205,14 @@ class LdapServer
         }
 
         if (!is_writeable($socket)) {
-            throw new RuntimeException(sprintf(
+            $this->logAndThrow(sprintf(
                 'The socket "%s" already exists and is not writeable. To run the LDAP server, you must remove the existing socket.',
                 $socket
             ));
         }
 
         if (!unlink($socket)) {
-            throw new RuntimeException(sprintf(
+            $this->logAndThrow(sprintf(
                 'The existing socket "%s" could not be removed. To run the LDAP server, you must remove the existing socket.',
                 $socket
             ));

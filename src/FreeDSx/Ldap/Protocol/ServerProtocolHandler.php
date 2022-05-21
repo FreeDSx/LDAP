@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\RequestHistory;
+use FreeDSx\Ldap\LoggerTrait;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
 use Throwable;
@@ -37,6 +38,8 @@ use function in_array;
  */
 class ServerProtocolHandler
 {
+    use LoggerTrait;
+
     /**
      * @var array
      */
@@ -85,6 +88,11 @@ class ServerProtocolHandler
      */
     protected $bindHandlerFactory;
 
+    /**
+     * @var array<string, mixed>
+     */
+    protected $defaultContext = [];
+
     public function __construct(
         ServerQueue $queue,
         HandlerFactoryInterface $handlerFactory,
@@ -111,9 +119,10 @@ class ServerProtocolHandler
      *
      * @throws EncoderException
      */
-    public function handle(): void
+    public function handle(array $defaultContext = []): void
     {
         $message = null;
+        $this->defaultContext = $defaultContext;
 
         try {
             while ($message = $this->queue->getMessage()) {
@@ -135,7 +144,18 @@ class ServerProtocolHandler
             # Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with a
             # result code of protocol error.
             $this->sendNoticeOfDisconnect('The message encoding is malformed.');
+            $this->logError(
+                'The client sent a malformed request. Terminating their connection.',
+                $this->defaultContext
+            );
         } catch (Exception | Throwable $e) {
+            $this->logError(
+                'An unexpected exception was caught while handling the client. Terminating their connection.',
+                array_merge(
+                    $this->defaultContext,
+                    ['exception' => $e]
+                )
+            );
             if ($this->queue->isConnected()) {
                 $this->sendNoticeOfDisconnect();
             }
@@ -151,13 +171,17 @@ class ServerProtocolHandler
      *
      * @throws EncoderException
      */
-    public function shutdown(): void
+    public function shutdown(array $context = []): void
     {
         $this->sendNoticeOfDisconnect(
             'The server is shutting down.',
             ResultCode::UNAVAILABLE
         );
         $this->queue->close();
+        $this->logInfo(
+            'Sent notice of disconnect to client and closed the connection.',
+            $context
+        );
     }
 
     /**
