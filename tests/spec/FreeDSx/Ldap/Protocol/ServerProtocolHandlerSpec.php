@@ -34,6 +34,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
+use FreeDSx\Socket\Exception\ConnectionException;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
@@ -150,6 +151,13 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             new LdapResult(ResultCode::PROTOCOL_ERROR, '', 'The message encoding is malformed.'),
             ExtendedResponse::OID_NOTICE_OF_DISCONNECTION
         )))->shouldBeCalled();
+
+        $this->handle();
+    }
+
+    public function it_should_handle_a_socket_exception_from_the_message_queue_and_end_normally(ServerQueue $queue)
+    {
+        $queue->getMessage()->willThrow(new ConnectionException('Foo'));
 
         $this->handle();
     }

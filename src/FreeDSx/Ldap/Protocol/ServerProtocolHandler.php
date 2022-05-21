@@ -140,6 +140,14 @@ class ServerProtocolHandler
                 $e->getCode(),
                 $e->getMessage()
             ));
+        } catch (ConnectionException $e) {
+            $this->logInfo(
+                'Ending LDAP client due to client connection issues.',
+                array_merge(
+                    ['message' => $e->getMessage()],
+                    $this->defaultContext
+                )
+            );
         } catch (EncoderException | ProtocolException $e) {
             # Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with a
             # result code of protocol error.
