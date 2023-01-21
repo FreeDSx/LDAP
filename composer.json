@@ -16,9 +16,9 @@
   ],
   "require": {
     "php": ">=7.1",
-    "freedsx/asn1": "^0.4.0",
-    "freedsx/socket": "^0.5.2",
-    "freedsx/sasl": "^0.1.0",
+    "freedsx/asn1": ">=0.4.0",
+    "freedsx/socket": ">=0.5.0",
+    "freedsx/sasl": ">=0.1.0",
     "psr/log": "^1|^2|^3"
   },
   "require-dev": {
