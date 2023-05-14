@@ -22,6 +22,8 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Control\SubentriesControl;
+use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Control\Vlv\VlvControl;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
@@ -81,6 +83,18 @@ class Controls
     {
         return new ExtendedDnControl($useHexFormat);
     }
+
+    /**
+     * Creates a ManageDsaIt control specified in RFC 3296. Indicates that the operation is intended to manage objects
+     * within the DSA (server) Information Tree.
+     *
+     * @return Control
+     */
+    public static function manageDsaIt() : Control
+    {
+        return new Control(Control::OID_MANAGE_DSA_IT, true);
+    }
+
 
     /**
      * Create a paging control with a specific size.
@@ -164,6 +178,19 @@ class Controls
     }
 
     /**
+     * Creates a subentries control. Defined in RFC 3672. Used in a search request to control the visibility of entries
+     * and subentries which are within scope. Non-visible entries or subentries are not returned in response to the
+     * request.
+     *
+     * @param bool $visible
+     * @return SubentriesControl
+     */
+    public static function subentries(bool $visible = true)
+    {
+        return new SubentriesControl($visible);
+    }
+
+    /**
      * Create a control for a subtree delete. On a delete request this will do a recursive delete from the DN and all
      * of its children.
      *
@@ -173,6 +200,18 @@ class Controls
     public static function subtreeDelete(bool $criticality = false): Control
     {
         return new Control(Control::OID_SUBTREE_DELETE, $criticality);
+    }
+
+    /**
+     * @param string|null $cookie
+     * @param int $mode
+     * @return SyncRequestControl
+     */
+    public static function syncRequest(
+        ?string $cookie = null,
+        int $mode = SyncRequestControl::MODE_REFRESH_ONLY
+    ): SyncRequestControl {
+        return new SyncRequestControl($mode, $cookie);
     }
 
     /**

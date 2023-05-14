@@ -41,6 +41,8 @@ class Control implements ProtocolElementInterface
 
     public const OID_EXTENDED_DN = '1.2.840.113556.1.4.529';
 
+    public const OID_MANAGE_DSA_IT = '2.16.840.1.113730.3.4.2';
+
     public const OID_PAGING = '1.2.840.113556.1.4.319';
 
     public const OID_POLICY_HINTS = '1.2.840.113556.1.4.2239';
@@ -54,6 +56,14 @@ class Control implements ProtocolElementInterface
     public const OID_SHOW_DELETED = '1.2.840.113556.1.4.417';
 
     public const OID_SHOW_RECYCLED = '1.2.840.113556.1.4.2064';
+
+    public const OID_SUBENTRIES = '1.3.6.1.4.1.4203.1.10.1';
+
+    public const OID_SYNC_REQUEST = '1.3.6.1.4.1.4203.1.9.1.1';
+
+    public const OID_SYNC_STATE = '1.3.6.1.4.1.4203.1.9.1.2';
+
+    public const OID_SYNC_DONE = '1.3.6.1.4.1.4203.1.9.1.3';
 
     public const OID_SUBTREE_DELETE = '1.2.840.113556.1.4.805';
 

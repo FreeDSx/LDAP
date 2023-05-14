@@ -1,0 +1,6 @@
+dn: olcOverlay=syncprov,olcDatabase={1}hdb,cn=config
+objectClass: olcOverlayConfig
+objectClass: olcSyncProvConfig
+olcOverlay: syncprov
+olcSpNoPresent: TRUE
+olcSpReloadHint: TRUE

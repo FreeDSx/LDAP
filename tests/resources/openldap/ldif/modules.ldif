@@ -6,3 +6,4 @@ olcModulePath: /usr/lib/ldap
 olcModuleLoad: memberof.la
 olcModuleLoad: refint.la
 olcModuleLoad: sssvlv.la
+olcModuleLoad: syncprov.la

@@ -15,6 +15,7 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 /**
  * RFC 4511, 4.13.
@@ -27,6 +28,8 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class IntermediateResponse implements ResponseInterface
 {
+    public const OID_SYNC_INFO = '1.3.6.1.4.1.4203.1.9.1.4';
+
     protected const TAG_NUMBER = 25;
 
     /**
@@ -101,9 +104,51 @@ class IntermediateResponse implements ResponseInterface
             $response->addChild(Asn1::context(0, Asn1::octetString($this->responseName)));
         }
         if ($this->responseValue !== null) {
-            $response->addChild(Asn1::context(1, Asn1::octetString($this->responseValue)));
+            $value = $this->responseValue;
+
+            if ($this->responseValue instanceof AbstractType) {
+                $value = (new LdapEncoder())->encode($this->responseValue);
+            }
+
+            $response->addChild(Asn1::context(
+                1,
+                Asn1::octetString($value)
+            ));
         }
 
         return Asn1::application(self::TAG_NUMBER, $response);
+    }
+
+    /**
+     * @param AbstractType $type
+     * @param array $tagMap
+     * @return AbstractType
+     * @throws ProtocolException
+     */
+    protected static function decodeEncodedValue(
+        AbstractType $type,
+        array $tagMap
+    ): AbstractType {
+        $responseValue = $type->getChild(1);
+        if (!($responseValue && $responseValue->getTagNumber() === 1 && $responseValue->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC)) {
+            throw new ProtocolException('The intermediate response either contains no value or is not an octet string.');
+        }
+
+        return (new LdapEncoder())->decode($responseValue->getValue(), $tagMap);
+    }
+
+    /**
+     * @param AbstractType $type
+     * @return string|null
+     * @throws ProtocolException
+     */
+    protected static function decodeResponseName(AbstractType $type) : ?string
+    {
+        $responseName = $type->getChild(0);
+        if ($responseName && !($responseName->getTagNumber() === 0 && $responseName->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC)) {
+            throw new ProtocolException('Expected a responseName value with a tag of 0 and a context specific class type.');
+        }
+
+        return $responseName ? $responseName->getValue() : $responseName;
     }
 }

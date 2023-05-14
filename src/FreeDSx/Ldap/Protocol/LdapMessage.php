@@ -180,6 +180,15 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                             case Control\Control::OID_DIR_SYNC:
                                 $controls[] = Control\Ad\DirSyncResponseControl::fromAsn1($control);
                                 break;
+                            case Control\Control::OID_SYNC_STATE:
+                                $controls[] = Control\Sync\SyncStateControl::fromAsn1($control);
+                                break;
+                            case Control\Control::OID_SYNC_REQUEST:
+                                $controls[] = Control\Sync\SyncRequestControl::fromAsn1($control);
+                                break;
+                            case Control\Control::OID_SYNC_DONE:
+                                $controls[] = Control\Sync\SyncDoneControl::fromAsn1($control);
+                                break;
                             default:
                                 $controls[] = Control\Control::fromAsn1($control);
                                 break;
@@ -259,6 +268,9 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                 break;
             case 25:
                 $operation = Response\IntermediateResponse::fromAsn1($opAsn1);
+                if ($operation->getName() === Response\IntermediateResponse::OID_SYNC_INFO) {
+                    $operation = Response\SyncInfoMessage::fromAsn1($opAsn1);
+                }
                 break;
             default:
                 throw new ProtocolException(sprintf(
