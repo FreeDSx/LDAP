@@ -121,11 +121,6 @@ class PagingRequestComparator
             return false;
         }
 
-        // Short circuit this...nothing to check. Only a paging control.
-        if (empty($oldControls) && empty($newControls)) {
-            return true;
-        }
-
         $oldControls = $oldControls->toArray();
         $newControls = $newControls->toArray();
 
