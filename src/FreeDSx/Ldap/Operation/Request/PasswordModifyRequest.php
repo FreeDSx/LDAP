@@ -108,7 +108,7 @@ class PasswordModifyRequest extends ExtendedRequest
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type): PasswordModifyRequest
+    public static function fromAsn1(AbstractType $type): static
     {
         $request = self::decodeEncodedValue($type);
         if ($request === null) {
@@ -135,7 +135,7 @@ class PasswordModifyRequest extends ExtendedRequest
             }
         }
 
-        return new self(
+        return new static(
             $userIdentity !== null ? $userIdentity->getValue() : null,
             $oldPasswd !== null ? $oldPasswd->getValue() : null,
             $newPasswd !== null ? $newPasswd->getValue() : null
