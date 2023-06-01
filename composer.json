@@ -15,21 +15,21 @@
     }
   ],
   "require": {
-    "php": ">=7.1",
+    "php": ">=8.1",
     "freedsx/asn1": ">=0.4.0",
     "freedsx/socket": ">=0.5.0",
     "freedsx/sasl": ">=0.1.0",
-    "psr/log": "^1|^2|^3"
+    "psr/log": "^3"
   },
   "require-dev": {
-    "phpspec/phpspec": "^7.2|^7.1|^6.1|^5.1",
-    "phpunit/phpunit": "^9.3|^8.0|^7.0",
-    "symplify/easy-coding-standard": "^6.1|^7.3|^9.0",
-    "friends-of-phpspec/phpspec-code-coverage": "^4.3|^6.1|dev-master",
+    "phpspec/phpspec": "^7.2",
+    "phpunit/phpunit": "^9.6",
+    "symplify/easy-coding-standard": "^9.4",
+    "friends-of-phpspec/phpspec-code-coverage": "^6.3",
     "phpstan/phpstan": "^0.12.70",
-    "symfony/process": "^3.0|^4.0|^5.0",
-    "squizlabs/php_codesniffer": "3.*",
-    "slevomat/coding-standard": "~7.0"
+    "symfony/process": "^5.4",
+    "squizlabs/php_codesniffer": "^3.7",
+    "slevomat/coding-standard": "^7.2"
   },
   "suggest": {
     "ext-openssl": "For SSL/TLS support and some SASL mechanisms.",
