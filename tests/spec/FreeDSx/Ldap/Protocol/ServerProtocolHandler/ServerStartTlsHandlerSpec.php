@@ -34,7 +34,7 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
     {
         $queue->isEncrypted()->willReturn(false);
 
-        $queue->encrypt()->shouldBeCalled();
+        $queue->encrypt()->shouldBeCalled()->willReturn($queue);
         $queue->sendMessage(new LdapMessageResponse(
             1,
             new ExtendedResponse(

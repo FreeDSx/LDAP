@@ -40,7 +40,7 @@ class ClientStartTlsHandlerSpec extends ObjectBehavior
         $startTls = new LdapMessageRequest(1, new ExtendedRequest(ExtendedRequest::OID_START_TLS));
         $response = new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(0), ExtendedRequest::OID_START_TLS));
 
-        $queue->encrypt()->shouldBeCalledOnce();
+        $queue->encrypt()->shouldBeCalledOnce()->willReturn($queue);
         $this->handleResponse($startTls, $response, $queue, [])->shouldBeAnInstanceOf(LdapMessageResponse::class);
     }
 
