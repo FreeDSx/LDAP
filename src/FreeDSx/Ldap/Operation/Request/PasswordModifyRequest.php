@@ -112,7 +112,7 @@ class PasswordModifyRequest extends ExtendedRequest
     {
         $request = self::decodeEncodedValue($type);
         if ($request === null) {
-            return new self();
+            return new static();
         }
         if (!($request instanceof SequenceType)) {
             throw new ProtocolException('The password modify request is malformed.');

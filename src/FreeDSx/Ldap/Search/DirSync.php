@@ -83,7 +83,7 @@ class DirSync
     public function watch(
         Closure $handler,
         int $checkInterval = 10
-    ): never {
+    ): void {
         $handler($this->getChanges(), true);
         while ($this->hasChanges()) {
             $handler($this->getChanges(), true);

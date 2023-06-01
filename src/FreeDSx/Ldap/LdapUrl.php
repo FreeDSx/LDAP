@@ -226,7 +226,7 @@ class LdapUrl
 
         $url = new LdapUrl($pieces['host'] ?? null);
         $url->setUseSsl($pieces['scheme'] === 'ldaps');
-        $url->setPort($pieces['port'] ?? null);
+        $url->setPort(isset($pieces['port']) ? (int) $pieces['port'] : null);
         $url->setDn((isset($pieces['path']) && $pieces['path'] !== '/') ? self::decode(ltrim($pieces['path'], '/')) : null);
 
         $query = explode('?', $pieces['query'] ?? '');
@@ -289,6 +289,7 @@ class LdapUrl
             throw new UrlParseException(sprintf('The URL scheme "%s" is not valid. It must be "ldap" or "ldaps".', $pieces['scheme']));
         }
 
+        /** @phpstan-ignore-next-line */
         return $pieces;
     }
 
@@ -329,6 +330,7 @@ class LdapUrl
         for ($i = 0; $i <= $last; $i++) {
             $url .= '?';
             if (isset($query[$i])) {
+                /** @phpstan-ignore-next-line */
                 $url .= $query[$i];
             }
         }
