@@ -1,34 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
-<phpunit backupGlobals="false"
-         backupStaticAttributes="false"
-         colors="true"
-         convertErrorsToExceptions="true"
-         convertNoticesToExceptions="true"
-         convertWarningsToExceptions="true"
-         processIsolation="false"
-         stopOnFailure="false"
-         bootstrap="vendor/autoload.php"
->
-    <filter>
-        <whitelist processUncoveredFilesFromWhitelist="true">
-            <directory suffix=".php">src</directory>
-        </whitelist>
-    </filter>
-
-    <testsuites>
-        <testsuite name="FreeDSx LDAP Unit Tests">
-            <directory>./tests/integration</directory>
-        </testsuite>
-    </testsuites>
-
-    <php>
-        <env name="LDAP_SERVER" value="example.com"/>
-        <env name="LDAP_USERNAME" value="cn=admin,dc=example,dc=com"/>
-        <env name="LDAP_PASSWORD" value="P@ssword12345"/>
-        <env name="LDAP_BASE_DN" value="ou=FreeDSx-Test,dc=example,dc=com"/>
-        <env name="LDAP_PORT" value="389"/>
-        <env name="LDAP_CA_CERT" value=""/>
-    </php>
-
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" backupGlobals="false" backupStaticAttributes="false" colors="true" convertErrorsToExceptions="true" convertNoticesToExceptions="true" convertWarningsToExceptions="true" processIsolation="false" stopOnFailure="false" bootstrap="vendor/autoload.php" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd">
+  <coverage processUncoveredFiles="true">
+    <include>
+      <directory suffix=".php">src</directory>
+    </include>
+  </coverage>
+  <testsuites>
+    <testsuite name="FreeDSx LDAP Unit Tests">
+      <directory>./tests/integration</directory>
+    </testsuite>
+  </testsuites>
+  <php>
+    <env name="LDAP_SERVER" value="example.com"/>
+    <env name="LDAP_USERNAME" value="cn=admin,dc=example,dc=com"/>
+    <env name="LDAP_PASSWORD" value="P@ssword12345"/>
+    <env name="LDAP_BASE_DN" value="ou=FreeDSx-Test,dc=example,dc=com"/>
+    <env name="LDAP_PORT" value="389"/>
+    <env name="LDAP_CA_CERT" value=""/>
+  </php>
 </phpunit>

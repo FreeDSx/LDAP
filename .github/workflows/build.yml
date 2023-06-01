@@ -45,4 +45,6 @@ jobs:
       # For tests this seems fine, but in a real scenario this would be bad...
       - name: Run Integration Tests
         if: runner.os == 'Linux'
+        env:
+          COMPOSER_ALLOW_SUPERUSER: 1
         run: sudo composer run-script test-integration

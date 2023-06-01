@@ -36,6 +36,8 @@ jobs:
         run: composer run-script analyse
 
       - name: Run Test Coverage
+        env:
+          COMPOSER_ALLOW_SUPERUSER: 1
         run: sudo composer run-script --timeout=0 test-coverage
 
       - name: Upload Spec Coverage to Codecov
