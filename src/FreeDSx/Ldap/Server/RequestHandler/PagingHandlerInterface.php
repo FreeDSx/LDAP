@@ -24,10 +24,6 @@ interface PagingHandlerInterface
 {
     /**
      * Indicates a paging request that has been received and needs a response.
-     *
-     * @param PagingRequest $pagingRequest
-     * @param RequestContext $context
-     * @return PagingResponse
      */
     public function page(
         PagingRequest $pagingRequest,

@@ -42,8 +42,6 @@ class OperationException extends Exception
 
     /**
      * Get the LDAP result code as a short string (as defined in the LDAP RFC).
-     *
-     * @return string|null
      */
     public function getCodeShort(): ?string
     {
@@ -52,8 +50,6 @@ class OperationException extends Exception
 
     /**
      * Get the LDAP result code meaning description (as defined in the LDAP RFC).
-     *
-     * @return string|null
      */
     public function getCodeDescription(): ?string
     {

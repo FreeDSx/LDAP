@@ -39,20 +39,11 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
 {
     use ServerSearchTrait;
 
-    /**
-     * @var PagingHandlerInterface
-     */
-    private $pagingHandler;
+    private PagingHandlerInterface $pagingHandler;
 
-    /**
-     * @var RequestHistory
-     */
-    private $requestHistory;
+    private RequestHistory $requestHistory;
 
-    /**
-     * @var PagingRequestComparator
-     */
-    private $requestComparator;
+    private PagingRequestComparator $requestComparator;
 
     public function __construct(
         PagingHandlerInterface $pagingHandler,
@@ -197,7 +188,6 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
 
     /**
      * @todo It would be useful to prefix these by a unique client ID or something else somewhat identifiable.
-     * @return string
      * @throws OperationException
      */
     private function generateCookie(): string
@@ -213,8 +203,6 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
     }
 
     /**
-     * @param LdapMessageRequest $message
-     * @return PagingRequest
      * @throws OperationException
      * @throws ProtocolException
      */
@@ -233,8 +221,6 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
     }
 
     /**
-     * @param LdapMessageRequest $message
-     * @return PagingRequest
      * @throws OperationException
      */
     private function makePagingRequest(LdapMessageRequest $message): PagingRequest
@@ -258,8 +244,6 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
     }
 
     /**
-     * @param string $cookie
-     * @return PagingRequest
      * @throws OperationException
      */
     private function findPagingRequestOrThrow(string $cookie): PagingRequest
@@ -277,9 +261,6 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
     }
 
     /**
-     * @param PagingRequest $pagingRequest
-     * @param RequestContext $context
-     * @return PagingResponse
      * @throws OperationException
      */
     private function handlePagingStart(

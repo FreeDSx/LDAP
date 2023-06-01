@@ -42,9 +42,11 @@ class ResponseFactory
     /**
      * Retrieve the expected response type for the request that was given.
      */
-    public function getStandardResponse(LdapMessageRequest $message, int $resultCode = ResultCode::SUCCESS, string $diagnostic = ''): LdapMessageResponse
-    {
-        $response = null;
+    public function getStandardResponse(
+        LdapMessageRequest $message,
+        int $resultCode = ResultCode::SUCCESS,
+        string $diagnostic = '',
+    ): LdapMessageResponse {
         $request = $message->getRequest();
 
         if ($request instanceof BindRequest) {
@@ -76,8 +78,11 @@ class ResponseFactory
     /**
      * Retrieve an extended error, which has a message ID of zero.
      */
-    public function getExtendedError(string $message, int $errorCode, ?string $responseName = null): LdapMessageResponse
-    {
+    public function getExtendedError(
+        string $message,
+        int $errorCode,
+        ?string $responseName = null,
+    ): LdapMessageResponse {
         return new LdapMessageResponse(
             0,
             new ExtendedResponse(new LdapResult($errorCode, '', $message), $responseName)

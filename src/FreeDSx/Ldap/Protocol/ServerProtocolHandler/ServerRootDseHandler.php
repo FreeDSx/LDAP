@@ -38,7 +38,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
     /**
      * @var RootDseHandlerInterface|null
      */
-    private $rootDseHandler;
+    private ?RootDseHandlerInterface $rootDseHandler;
 
     public function __construct(?RootDseHandlerInterface $rootDseHandler = null)
     {
@@ -46,6 +46,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
     }
 
     /**
+     * {@inheritDoc}
      * @throws EncoderException
      */
     public function handleRequest(
@@ -109,8 +110,10 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
     /**
      * Filters attributes from an entry to return only what was requested.
      */
-    protected function filterEntryAttributes(SearchRequest $request, Entry $entry): void
-    {
+    private function filterEntryAttributes(
+        SearchRequest $request,
+        Entry $entry
+    ): void {
         if (count($request->getAttributes()) !== 0) {
             foreach ($entry->getAttributes() as $dseAttr) {
                 $found = false;

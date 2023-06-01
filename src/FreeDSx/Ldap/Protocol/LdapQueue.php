@@ -31,38 +31,28 @@ use function substr;
  */
 class LdapQueue extends Asn1MessageQueue
 {
-    /**
-     * @var int
-     */
-    protected const BUFFER_SIZE = 8192;
+    private const BUFFER_SIZE = 8192;
 
-    /**
-     * @var int
-     */
-    protected $id = 0;
+    private int $id = 0;
 
-    /**
-     * @var Socket
-     */
-    protected $socket;
+    private ?MessageWrapperInterface $messageWrapper = null;
 
-    /**
-     * @var MessageWrapperInterface|null
-     */
-    protected $messageWrapper;
-
-    public function __construct(Socket $socket, EncoderInterface $encoder = null)
-    {
-        parent::__construct($socket, $encoder ?? new LdapEncoder());
+    public function __construct(
+        Socket $socket,
+        EncoderInterface $encoder = null
+    ) {
+        parent::__construct(
+            $socket,
+            $encoder ?? new LdapEncoder()
+        );
     }
 
     /**
      * Encrypt messages sent by the socket for the queue.
      *
-     * @return $this
      * @throws ConnectionException
      */
-    public function encrypt()
+    public function encrypt(): static
     {
         $this->socket->block(true);
         $this->socket->encrypt(true);
@@ -71,9 +61,6 @@ class LdapQueue extends Asn1MessageQueue
         return $this;
     }
 
-    /**
-     * @return bool
-     */
     public function isEncrypted(): bool
     {
         return ($this->socket->isConnected() && $this->socket->isEncrypted());
@@ -105,11 +92,7 @@ class LdapQueue extends Asn1MessageQueue
         return $this->id;
     }
 
-    /**
-     * @param MessageWrapperInterface|null $messageWrapper
-     * @return $this
-     */
-    public function setMessageWrapper(?MessageWrapperInterface $messageWrapper)
+    public function setMessageWrapper(?MessageWrapperInterface $messageWrapper): static
     {
         $this->messageWrapper = $messageWrapper;
 
@@ -134,11 +117,9 @@ class LdapQueue extends Asn1MessageQueue
      * The logic in the loop is to send the messages in chunks of 8192 bytes to lessen the amount of TCP writes we need
      * to perform if sending out many messages.
      *
-     * @param LdapMessage ...$messages
-     * @return static
      * @throws EncoderException
      */
-    protected function sendLdapMessage(LdapMessage ...$messages): self
+    protected function sendLdapMessage(LdapMessage ...$messages): static
     {
         $buffer = '';
 
@@ -158,9 +139,6 @@ class LdapQueue extends Asn1MessageQueue
         return $this;
     }
 
-    /**
-     * @return bool
-     */
     public function isConnected(): bool
     {
         return $this->socket->isConnected();

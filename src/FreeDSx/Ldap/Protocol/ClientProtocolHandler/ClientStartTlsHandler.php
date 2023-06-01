@@ -26,16 +26,16 @@ use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 class ClientStartTlsHandler implements ResponseHandlerInterface
 {
     /**
-     * @param LdapMessageRequest $messageTo
-     * @param LdapMessageResponse $messageFrom
-     * @param ClientQueue $queue
-     * @param array $options
-     * @return LdapMessageResponse
+     * {@inheritDoc}
      * @throws ConnectionException
      * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
-    public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse
-    {
+    public function handleResponse(
+        LdapMessageRequest $messageTo,
+        LdapMessageResponse $messageFrom,
+        ClientQueue $queue,
+        array $options
+    ): ?LdapMessageResponse {
         /** @var ExtendedResponse $response */
         $response = $messageFrom->getResponse();
 

@@ -15,6 +15,7 @@ use FreeDSx\Ldap\Exception\FilterParseException;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
+use FreeDSx\Ldap\Search\Filter\NotFilter;
 use FreeDSx\Ldap\Search\Filter\OrFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 
@@ -25,32 +26,19 @@ use FreeDSx\Ldap\Search\Filter\SubstringFilter;
  */
 class FilterParser
 {
-    protected const MATCHING_RULE = '/^([a-zA-Z0-9\.]+)?(\:dn)?(\:([a-zA-Z0-9\.]+))?$/';
+    private const MATCHING_RULE = '/^([a-zA-Z0-9\.]+)?(\:dn)?(\:([a-zA-Z0-9\.]+))?$/';
+
+    private string $filter = '';
+
+    private int $length = 0;
+
+    private int $depth = 0;
 
     /**
-     * @var string
+     * @var null|array<int, array{startAt?: int, endAt: null|int}>
      */
-    protected $filter = '';
+    protected ?array $containers = null;
 
-    /**
-     * @var int
-     */
-    protected $length = 0;
-
-    /**
-     * @var int
-     */
-    protected $depth = 0;
-
-    /**
-     * @var null|array
-     * @psalm-var null|array<0|positive-int, array{startAt?: int, endAt: null|int}>
-     */
-    protected $containers;
-
-    /**
-     * @param string $filter
-     */
     public function __construct(string $filter)
     {
         $this->filter = $filter;
@@ -58,9 +46,6 @@ class FilterParser
     }
 
     /**
-     * @param string $filter
-     * @return FilterInterface
-     * @psalm-return AndFilter|Filter\ApproximateFilter|Filter\EqualityFilter|Filter\GreaterThanOrEqualFilter|Filter\LessThanOrEqualFilter|Filter\NotFilter|Filter\PresentFilter|MatchingRuleFilter|OrFilter|SubstringFilter
      * @throws FilterParseException
      */
     public static function parse(string $filter): FilterInterface
@@ -73,14 +58,13 @@ class FilterParser
     }
 
     /**
-     * @param int $startAt
-     * @param bool $isRoot
-     * @return array
-     * @psalm-return array{0: int|null, 1: AndFilter|Filter\ApproximateFilter|Filter\EqualityFilter|Filter\GreaterThanOrEqualFilter|Filter\LessThanOrEqualFilter|Filter\NotFilter|Filter\PresentFilter|MatchingRuleFilter|OrFilter|SubstringFilter}
+     * @return array{0: ?int, 1: FilterInterface}
      * @throws FilterParseException
      */
-    protected function parseFilterString(int $startAt, bool $isRoot = false): array
-    {
+    protected function parseFilterString(
+        int $startAt,
+        bool $isRoot = false
+    ): array {
         if ($this->isAtFilterContainer($startAt)) {
             [$endsAt, $filter] = $this->parseFilterContainer($startAt, $isRoot);
         } else {
@@ -96,11 +80,7 @@ class FilterParser
         return [$endsAt, $filter];
     }
 
-    /**
-     * @param int $pos
-     * @return bool
-     */
-    protected function isAtFilterContainer(int $pos): bool
+    private function isAtFilterContainer(int $pos): bool
     {
         if (!$this->startsWith(FilterInterface::PAREN_LEFT, $pos)) {
             return false;
@@ -118,14 +98,13 @@ class FilterParser
     /**
      * Parse a filter container. Always returns the ending position followed by the filter container.
      *
-     * @param int $startAt
-     * @param bool $isRoot
-     * @return array
-     * @psalm-return array{0: int, 1: AndFilter|Filter\NotFilter|OrFilter}
+     * @return array{0: int, 1: AndFilter|NotFilter|OrFilter}
      * @throws FilterParseException
      */
-    protected function parseFilterContainer(int $startAt, bool $isRoot): array
-    {
+    private function parseFilterContainer(
+        int $startAt,
+        bool $isRoot
+    ): array {
         if ($this->containers === null) {
             $this->parseContainerDepths();
         }
@@ -156,14 +135,13 @@ class FilterParser
     /**
      * Parse a comparison operator. Always returns the ending position followed by the filter.
      *
-     * @param int $startAt
-     * @param bool $isRoot
-     * @return array
-     * @psalm-return array{0: int, 1: Filter\ApproximateFilter|Filter\EqualityFilter|Filter\GreaterThanOrEqualFilter|Filter\LessThanOrEqualFilter|Filter\PresentFilter|MatchingRuleFilter|SubstringFilter}
+     * @return array{0: int, 1: FilterInterface}
      * @throws FilterParseException
      */
-    protected function parseComparisonFilter(int $startAt, bool $isRoot = false): array
-    {
+    protected function parseComparisonFilter(
+        int $startAt,
+        bool $isRoot = false
+    ): array {
         $parenthesis = $this->validateComparisonFilter($startAt, $isRoot);
         $endAt = !$parenthesis && $isRoot ? $this->length : $this->nextClosingParenthesis($startAt) + 1;
 
@@ -213,13 +191,12 @@ class FilterParser
     /**
      * Validates some initial filter logic and determines if the filter is wrapped in parenthesis (validly).
      *
-     * @param int $startAt
-     * @param bool $isRoot
-     * @return bool
      * @throws FilterParseException
      */
-    protected function validateComparisonFilter(int $startAt, bool $isRoot): bool
-    {
+    protected function validateComparisonFilter(
+        int $startAt,
+        bool $isRoot
+    ): bool {
         $parenthesis = true;
 
         # A filter without an opening parenthesis is only valid if it is the root. And it cannot have a closing parenthesis.
@@ -273,15 +250,13 @@ class FilterParser
     }
 
     /**
-     * @param string $operator
-     * @param string $attribute
-     * @param string $value
-     * @return FilterInterface
-     * @psalm-return Filter\ApproximateFilter|Filter\EqualityFilter|Filter\GreaterThanOrEqualFilter|Filter\LessThanOrEqualFilter|Filter\PresentFilter|MatchingRuleFilter|SubstringFilter
      * @throws FilterParseException
      */
-    protected function getComparisonFilterObject(string $operator, string $attribute, string $value): FilterInterface
-    {
+    private function getComparisonFilterObject(
+        string $operator,
+        string $attribute,
+        string $value
+    ): FilterInterface {
         if ($operator === FilterInterface::FILTER_LTE) {
             return Filters::lessThanOrEqual($attribute, $this->unescapeValue($value));
         } elseif ($operator === FilterInterface::FILTER_GTE) {
@@ -304,13 +279,12 @@ class FilterParser
     }
 
     /**
-     * @param string $attribute
-     * @param string $value
-     * @return MatchingRuleFilter
      * @throws FilterParseException
      */
-    protected function getMatchingRuleFilterObject(string $attribute, string $value): MatchingRuleFilter
-    {
+    private function getMatchingRuleFilterObject(
+        string $attribute,
+        string $value
+    ): MatchingRuleFilter {
         if (preg_match(self::MATCHING_RULE, $attribute, $matches) === 0) {
             throw new FilterParseException(sprintf('The matching rule is not valid: %s', $attribute));
         }
@@ -340,13 +314,12 @@ class FilterParser
     }
 
     /**
-     * @param string $attribute
-     * @param string $value
-     * @return SubstringFilter
      * @throws FilterParseException
      */
-    protected function getSubstringFilterObject(string $attribute, string $value): SubstringFilter
-    {
+    protected function getSubstringFilterObject(
+        string $attribute,
+        string $value
+    ): SubstringFilter {
         $filter = new SubstringFilter($attribute);
         $substrings = preg_split('/\*/', $value, -1, PREG_SPLIT_OFFSET_CAPTURE | PREG_SPLIT_NO_EMPTY);
         if (!is_array($substrings)) {
@@ -375,14 +348,12 @@ class FilterParser
     }
 
     /**
-     * @param int $startAt
-     * @param int $endAt
-     * @return FilterInterface
-     * @psalm-return Filter\NotFilter
      * @throws FilterParseException
      */
-    protected function getNotFilterObject(int $startAt, int $endAt): FilterInterface
-    {
+    protected function getNotFilterObject(
+        int $startAt,
+        int $endAt
+    ): FilterInterface {
         if ($this->isAtFilterContainer($startAt + 2)) {
             throw new FilterParseException(sprintf(
                 'The "not" filter at position %s cannot contain multiple filters.',
@@ -400,14 +371,12 @@ class FilterParser
         return Filters::not($info[1]);
     }
 
-    /**
-     * @param string $char
-     * @param int $pos
-     * @return bool
-     */
-    protected function startsWith(string $char, int $pos): bool
-    {
-        return isset($this->filter[$pos]) && $this->filter[$pos] === $char;
+    private function startsWith(
+        string $char,
+        int $pos
+    ): bool {
+        return isset($this->filter[$pos])
+            && $this->filter[$pos] === $char;
     }
 
     /**
@@ -421,7 +390,7 @@ class FilterParser
      *
      * @throws FilterParseException
      */
-    protected function parseContainerDepths(): void
+    private function parseContainerDepths(): void
     {
         $this->containers = $this->containers ?? [];
 
@@ -446,11 +415,9 @@ class FilterParser
     }
 
     /**
-     * @param int $startAt
-     * @return int
      * @throws FilterParseException
      */
-    protected function nextClosingParenthesis(int $startAt)
+    protected function nextClosingParenthesis(int $startAt): int
     {
         for ($i = $startAt; $i < $this->length; $i++) {
             # Look for the char, but ignore it if it is escaped
@@ -465,15 +432,13 @@ class FilterParser
         ));
     }
 
-    /**
-     * @param string $value
-     * @return string
-     */
-    protected function unescapeValue(string $value)
+    protected function unescapeValue(string $value): string
     {
-        return (string) preg_replace_callback('/\\\\([0-9A-Fa-f]{2})/', function ($matches) {
-            return hex2bin($matches[1]);
-        }, $value);
+        return (string) preg_replace_callback(
+            '/\\\\([0-9A-Fa-f]{2})/',
+            fn (array $matches) => (string) hex2bin($matches[1]),
+            $value,
+        );
     }
 
     /**

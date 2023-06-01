@@ -49,19 +49,14 @@ class VlvResponseControl extends Control
 {
     use VlvTrait;
 
-    /**
-     * @var int
-     */
-    protected $result;
+    private int $result;
 
-    /**
-     * @param int $offset
-     * @param int $count
-     * @param int $result
-     * @param null|string $contextId
-     */
-    public function __construct(int $offset, int $count, int $result, ?string $contextId = null)
-    {
+    public function __construct(
+        int $offset,
+        int $count,
+        int $result,
+        ?string $contextId = null,
+    ) {
         $this->offset = $offset;
         $this->count = $count;
         $this->result = $result;
@@ -69,9 +64,6 @@ class VlvResponseControl extends Control
         parent::__construct(self::OID_VLV_RESPONSE);
     }
 
-    /**
-     * @return int
-     */
     public function getResult(): int
     {
         return $this->result;
@@ -79,11 +71,10 @@ class VlvResponseControl extends Control
 
     /**
      * {@inheritDoc}
-     * @return Control
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $vlv = self::decodeEncodedValue($type);
 
@@ -108,16 +99,19 @@ class VlvResponseControl extends Control
             throw new ProtocolException('The VLV response value contains an unexpected ASN1 type.');
         }
 
-        $response = new self(
+        $response = new static(
             $offset->getValue(),
             $count->getValue(),
-            $result->getValue()
+            $result->getValue(),
         );
         if ($contextId !== null) {
             $response->contextId = $contextId->getValue();
         }
 
-        return parent::mergeControlData($response, $type);
+        return parent::mergeControlData(
+            $response,
+            $type,
+        );
     }
 
     /**

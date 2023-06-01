@@ -29,8 +29,15 @@ interface ServerProtocolHandlerInterface
     /**
      * Handle protocol actions specific to the request received.
      *
+     * @param array<string, mixed> $options
      * @throws OperationException
      * @throws ConnectionException
      */
-    public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): void;
+    public function handleRequest(
+        LdapMessageRequest $message,
+        TokenInterface $token,
+        RequestHandlerInterface $dispatcher,
+        ServerQueue $queue,
+        array $options
+    ): void;
 }

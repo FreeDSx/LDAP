@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Operation;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ResultCode
+final class ResultCode
 {
     public const SUCCESS = 0;
 

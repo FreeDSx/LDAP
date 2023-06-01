@@ -30,12 +30,16 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 class ServerBindHandler extends BaseServerHandler implements BindHandlerInterface
 {
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      * @throws RuntimeException
      * @throws OperationException
      */
-    public function handleBind(LdapMessageRequest $message, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): TokenInterface
-    {
+    public function handleBind(
+        LdapMessageRequest $message,
+        RequestHandlerInterface $dispatcher,
+        ServerQueue $queue,
+        array $options
+    ): TokenInterface {
         /** @var BindRequest $request */
         $request = $message->getRequest();
         if (!$request instanceof SimpleBindRequest) {
@@ -53,22 +57,6 @@ class ServerBindHandler extends BaseServerHandler implements BindHandlerInterfac
     }
 
     /**
-     * @return BindToken
-     * @throws OperationException
-     */
-    protected function simpleBind(RequestHandlerInterface $dispatcher, SimpleBindRequest $request): TokenInterface
-    {
-        if (!$dispatcher->bind($request->getUsername(), $request->getPassword())) {
-            throw new OperationException(
-                'Invalid credentials.',
-                ResultCode::INVALID_CREDENTIALS
-            );
-        }
-
-        return new BindToken($request->getUsername(), $request->getPassword());
-    }
-
-    /**
      * @throws OperationException
      */
     protected function validateVersion(BindRequest $request): void
@@ -80,5 +68,22 @@ class ServerBindHandler extends BaseServerHandler implements BindHandlerInterfac
                 ResultCode::PROTOCOL_ERROR
             );
         }
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function simpleBind(
+        RequestHandlerInterface $dispatcher,
+        SimpleBindRequest $request
+    ): TokenInterface {
+        if (!$dispatcher->bind($request->getUsername(), $request->getPassword())) {
+            throw new OperationException(
+                'Invalid credentials.',
+                ResultCode::INVALID_CREDENTIALS
+            );
+        }
+
+        return new BindToken($request->getUsername(), $request->getPassword());
     }
 }

@@ -31,10 +31,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class CancelRequest extends ExtendedRequest
 {
-    /**
-     * @var int
-     */
-    protected $messageId;
+    private int $messageId;
 
     /**
      * @param int $messageId
@@ -45,18 +42,12 @@ class CancelRequest extends ExtendedRequest
         parent::__construct(self::OID_CANCEL);
     }
 
-    /**
-     * @return int
-     */
     public function getMessageId(): int
     {
         return $this->messageId;
     }
 
-    /**
-     * @return $this
-     */
-    public function setMessageId(int $messageId)
+    public function setMessageId(int $messageId): self
     {
         $this->messageId = $messageId;
 
@@ -75,18 +66,16 @@ class CancelRequest extends ExtendedRequest
 
     /**
      * {@inheritDoc}
-     * @param AbstractType $type
-     * @return self
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $value = self::decodeEncodedValue($type);
         if (!($value instanceof SequenceType && $value->getChild(0) instanceof IntegerType)) {
             throw new ProtocolException('The cancel request value is malformed.');
         }
 
-        return new self($value->getChild(0)->getValue());
+        return new static($value->getChild(0)->getValue());
     }
 }

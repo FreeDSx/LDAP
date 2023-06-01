@@ -20,10 +20,7 @@ use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
  */
 abstract class BaseServerHandler
 {
-    /**
-     * @var ResponseFactory
-     */
-    protected $responseFactory;
+    protected ResponseFactory $responseFactory;
 
     public function __construct(ResponseFactory $responseFactory = null)
     {

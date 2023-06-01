@@ -18,34 +18,21 @@ namespace FreeDSx\Ldap\Search\Filter;
  */
 trait FilterAttributeTrait
 {
-    /**
-     * @var string
-     */
-    protected $attribute;
+    protected string $attribute;
 
-    /**
-     * @return string
-     */
     public function getAttribute(): string
     {
         return $this->attribute;
     }
 
-    /**
-     * @param string $attribute
-     * @return $this
-     */
-    public function setAttribute(string $attribute)
+    public function setAttribute(string $attribute): static
     {
         $this->attribute = $attribute;
 
         return $this;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function __toString()
+    public function __toString(): string
     {
         return $this->toString();
     }

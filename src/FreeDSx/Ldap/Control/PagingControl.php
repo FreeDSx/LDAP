@@ -33,59 +33,37 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class PagingControl extends Control
 {
-    /**
-     * @var string
-     */
-    protected $cookie;
+    private string $cookie;
 
-    /**
-     * @var int
-     */
-    protected $size;
+    private int $size;
 
-    /**
-     * @param int $size
-     * @param string $cookie
-     */
-    public function __construct(int $size, string $cookie = '')
-    {
+    public function __construct(
+        int $size,
+        string $cookie = ''
+    ) {
         $this->size = $size;
         $this->cookie = $cookie;
         parent::__construct(self::OID_PAGING);
     }
 
-    /**
-     * @return string
-     */
     public function getCookie(): string
     {
         return $this->cookie;
     }
 
-    /**
-     * @return int
-     */
     public function getSize(): int
     {
         return $this->size;
     }
 
-    /**
-     * @param string $cookie
-     * @return $this
-     */
-    public function setCookie(string $cookie)
+    public function setCookie(string $cookie): self
     {
         $this->cookie = $cookie;
 
         return $this;
     }
 
-    /**
-     * @param int $size
-     * @return $this
-     */
-    public function setSize(int $size)
+    public function setSize(int $size): self
     {
         $this->size = $size;
 
@@ -94,12 +72,10 @@ class PagingControl extends Control
 
     /**
      * {@inheritDoc}
-     * @param AbstractType $type
-     * @return Control
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $paging = self::decodeEncodedValue($type);
         if (!$paging instanceof SequenceType) {
@@ -113,9 +89,15 @@ class PagingControl extends Control
         if (!$cookie instanceof OctetStringType) {
             throw new ProtocolException('A paged control value sequence 1 must be an octet string type.');
         }
-        $control = new self($count->getValue(), $cookie->getValue());
+        $control = new static(
+            $count->getValue(),
+            $cookie->getValue()
+        );
 
-        return self::mergeControlData($control, $type);
+        return self::mergeControlData(
+            $control,
+            $type
+        );
     }
 
     /**

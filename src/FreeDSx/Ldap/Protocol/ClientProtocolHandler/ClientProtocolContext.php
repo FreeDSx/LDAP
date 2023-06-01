@@ -34,34 +34,22 @@ use FreeDSx\Sasl\Exception\SaslException;
 class ClientProtocolContext
 {
     /**
-     * @var ClientProtocolHandler
+     * @var array<string, mixed>
      */
-    protected $protocolHandler;
-
-    /**
-     * @var ClientQueue
-     */
-    protected $clientQueue;
-
-    /**
-     * @var array
-     */
-    protected $options;
-
-    /**
-     * @var RequestInterface
-     */
-    protected $request;
+    private array $options;
 
     /**
      * @var Control[]
      */
-    protected $controls;
+    private array $controls;
 
-    /**
-     * @var LdapMessageRequest
-     */
-    protected $sentMessage;
+    private ClientProtocolHandler $protocolHandler;
+
+    private ClientQueue $clientQueue;
+
+    private RequestInterface $request;
+
+    private ?LdapMessageRequest $sentMessage = null;
 
     public function __construct(
         RequestInterface $request,
@@ -84,7 +72,6 @@ class ClientProtocolContext
 
     /**
      * @return Control[]
-     * @psalm-return array<array-key, Control>
      */
     public function getControls(): array
     {
@@ -122,7 +109,6 @@ class ClientProtocolContext
 
     /**
      * @param bool $reload force reload the RootDSE
-     * @return Entry
      * @throws ConnectionException
      * @throws OperationException
      * @throws UnsolicitedNotificationException

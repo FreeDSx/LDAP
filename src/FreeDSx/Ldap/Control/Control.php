@@ -65,93 +65,60 @@ class Control implements ProtocolElementInterface
 
     public const OID_VLV_RESPONSE = '2.16.840.1.113730.3.4.10';
 
-    /**
-     * @var string
-     */
-    protected $controlType;
+    protected string $controlType;
 
-    /**
-     * @var bool
-     */
-    protected $criticality;
+    protected bool $criticality;
 
-    /**
-     * @var AbstractType|ProtocolElementInterface|string|null
-     */
-    protected $controlValue;
+    protected AbstractType|ProtocolElementInterface|string|null $controlValue;
 
-    /**
-     * @param string $controlType
-     * @param bool $criticality
-     * @param null|mixed $controlValue
-     */
-    public function __construct(string $controlType, bool $criticality = false, $controlValue = null)
-    {
+    public function __construct(
+        string $controlType,
+        bool $criticality = false,
+        AbstractType|ProtocolElementInterface|string|null $controlValue = null
+    ) {
         $this->controlType = $controlType;
         $this->criticality = $criticality;
         $this->controlValue = $controlValue;
     }
 
-    /**
-     * @param string $oid
-     * @return $this
-     */
-    public function setTypeOid(string $oid)
+    public function setTypeOid(string $oid): static
     {
         $this->controlType = $oid;
 
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function getTypeOid(): string
     {
         return $this->controlType;
     }
 
-    /**
-     * @param bool $criticality
-     * @return $this
-     */
-    public function setCriticality(bool $criticality)
+    public function setCriticality(bool $criticality): static
     {
         $this->criticality = $criticality;
 
         return $this;
     }
 
-    /**
-     * @return bool
-     */
     public function getCriticality(): bool
     {
         return $this->criticality;
     }
 
-    /**
-     * @param AbstractType|ProtocolElementInterface|string|null $controlValue
-     * @return $this
-     */
-    public function setValue($controlValue)
+    public function setValue(AbstractType|ProtocolElementInterface|string|null $controlValue): static
     {
         $this->controlValue = $controlValue;
 
         return $this;
     }
 
-    /**
-     * @return AbstractType|ProtocolElementInterface|string|null
-     */
-    public function getValue()
+    public function getValue(): AbstractType|ProtocolElementInterface|string|null
     {
         return $this->controlValue;
     }
 
     /**
-     * @return AbstractType
-     * @throws EncoderException
+     * @inheritDoc
      */
     public function toAsn1(): AbstractType
     {
@@ -175,19 +142,15 @@ class Control implements ProtocolElementInterface
         return $asn1;
     }
 
-    /**
-     * @return string
-     */
-    public function __toString()
+    public function __toString(): string
     {
         return $this->controlType;
     }
 
     /**
      * {@inheritDoc}
-     * @return static|ProtocolElementInterface
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         if (!$type instanceof SequenceType) {
             throw new ProtocolException(sprintf(
@@ -200,13 +163,15 @@ class Control implements ProtocolElementInterface
     }
 
     /**
-     * @param Control $control
-     * @param AbstractType $type
-     * @return self
+     * @template T of Control
+     * @param T $control
+     * @return T
      * @throws ProtocolException
      */
-    protected static function mergeControlData(Control $control, AbstractType $type)
-    {
+    protected static function mergeControlData(
+        $control,
+        AbstractType $type
+    ): Control {
         if (!($type instanceof SequenceType && count($type->getChildren()) <= 3)) {
             throw new ProtocolException(sprintf(
                 'The received control is malformed. Expected at least 3 sequence values. Received %s.',
@@ -219,13 +184,11 @@ class Control implements ProtocolElementInterface
     }
 
     /**
-     * @param AbstractType $type
-     * @return AbstractType
      * @throws ProtocolException
      * @throws EncoderException
      * @throws PartialPduException
      */
-    protected static function decodeEncodedValue(AbstractType $type)
+    protected static function decodeEncodedValue(AbstractType $type): AbstractType
     {
         if (!$type instanceof SequenceType) {
             throw new ProtocolException('The received control is malformed. Unable to get the encoded value.');
@@ -240,10 +203,9 @@ class Control implements ProtocolElementInterface
     }
 
     /**
-     * @param SequenceType $type
-     * @return array
+     * @return array{0: string, 1: bool, 2: string|null}
      */
-    protected static function parseAsn1ControlValues(SequenceType $type)
+    protected static function parseAsn1ControlValues(SequenceType $type): array
     {
         $oid = null;
         $criticality = false;

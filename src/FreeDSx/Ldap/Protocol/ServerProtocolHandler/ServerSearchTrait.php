@@ -13,7 +13,6 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
-use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -26,12 +25,6 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 
 trait ServerSearchTrait
 {
-    /**
-     * @param SearchResult $searchResult
-     * @param LdapMessageRequest $message
-     * @param ServerQueue $queue
-     * @return void
-     */
     private function sendEntriesToClient(
         SearchResult $searchResult,
         LdapMessageRequest $message,
@@ -61,10 +54,6 @@ trait ServerSearchTrait
         $queue->sendMessage(...$messages);
     }
 
-    /**
-     * @param LdapMessageRequest $message
-     * @return SearchRequest
-     */
     private function getSearchRequestFromMessage(LdapMessageRequest $message): SearchRequest
     {
         $request = $message->getRequest();
@@ -79,8 +68,6 @@ trait ServerSearchTrait
     }
 
     /**
-     * @param LdapMessageRequest $message
-     * @return PagingControl
      * @throws OperationException
      */
     private function getPagingControlFromMessage(LdapMessageRequest $message): PagingControl

@@ -56,8 +56,6 @@ interface FilterInterface extends ProtocolElementInterface
 
     /**
      * Get the string representation of the filter.
-     *
-     * @return string
      */
     public function toString(): string;
 }

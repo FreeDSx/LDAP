@@ -63,82 +63,67 @@ class DirSyncRequestControl extends Control
     /**
      * @var int
      */
-    protected $flags;
+    private int $flags;
 
     /**
      * @var int
      */
-    protected $maxBytes;
+    private int $maxBytes;
 
     /**
      * @var string
      */
-    protected $cookie;
+    private string $cookie;
 
     /**
      * @param int $flags
      * @param int $maxBytes
      * @param string $cookie
      */
-    public function __construct(int $flags = self::FLAG_INCREMENTAL_VALUES, string $cookie = '', int $maxBytes = 2147483647)
-    {
+    public function __construct(
+        int $flags = self::FLAG_INCREMENTAL_VALUES,
+        string $cookie = '',
+        int $maxBytes = 2147483647
+    ) {
         $this->flags = $flags;
         $this->maxBytes = $maxBytes;
         $this->cookie = $cookie;
-        parent::__construct(self::OID_DIR_SYNC, true);
+        parent::__construct(
+            self::OID_DIR_SYNC,
+            true
+        );
     }
 
-    /**
-     * @return int
-     */
     public function getFlags(): int
     {
         return $this->flags;
     }
 
-    /**
-     * @param int $flags
-     * @return $this
-     */
-    public function setFlags(int $flags)
+    public function setFlags(int $flags): self
     {
         $this->flags = $flags;
 
         return $this;
     }
 
-    /**
-     * @return int
-     */
     public function getMaxBytes(): int
     {
         return $this->maxBytes;
     }
 
-    /**
-     * @param int $maxBytes
-     * @return $this
-     */
-    public function setMaxBytes(int $maxBytes)
+    public function setMaxBytes(int $maxBytes): self
     {
         $this->maxBytes = $maxBytes;
 
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function getCookie(): string
     {
         return $this->cookie;
     }
 
-    /**
-     * @param string $cookie
-     * @return $this
-     */
-    public function setCookie(string $cookie)
+    public function setCookie(string $cookie): self
     {
         $this->cookie = $cookie;
 
@@ -147,11 +132,10 @@ class DirSyncRequestControl extends Control
 
     /**
      * {@inheritDoc}
-     * @return Control
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $request = self::decodeEncodedValue($type);
         if (!$request instanceof SequenceType) {
@@ -171,13 +155,16 @@ class DirSyncRequestControl extends Control
         }
 
         /** @var SequenceType $request */
-        $control = new self(
+        $control = new static(
             $flags->getValue(),
             $cookie->getValue(),
             $maxBytes->getValue()
         );
 
-        return self::mergeControlData($control, $type);
+        return self::mergeControlData(
+            $control,
+            $type
+        );
     }
 
     /**

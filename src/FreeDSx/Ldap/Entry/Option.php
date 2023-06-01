@@ -25,15 +25,9 @@ class Option
 {
     protected const MATCH_RANGE = '/range=(\d+)-(.*)/';
 
-    /**
-     * @var string
-     */
-    protected $option;
+    private string $option;
 
-    /**
-     * @var string
-     */
-    protected $lcOption;
+    private ?string $lcOption = null;
 
     /**
      * @param string $option
@@ -43,17 +37,11 @@ class Option
         $this->option = $option;
     }
 
-    /**
-     * @return bool
-     */
     public function isLanguageTag(): bool
     {
         return $this->startsWith('lang-');
     }
 
-    /**
-     * @return bool
-     */
     public function isRange(): bool
     {
         return $this->startsWith('range=');
@@ -63,8 +51,6 @@ class Option
      * A convenience method to get the high value of a range option.
      *
      * @see https://msdn.microsoft.com/en-us/library/cc223242.aspx
-     *
-     * @return null|string
      */
     public function getHighRange(): ?string
     {
@@ -80,7 +66,6 @@ class Option
      * A convenience method to get the low value of a range option.
      *
      * @see https://msdn.microsoft.com/en-us/library/cc223242.aspx
-     * @return string|null
      */
     public function getLowRange(): ?string
     {
@@ -92,10 +77,6 @@ class Option
         return $match[1] ?? null;
     }
 
-    /**
-     * @param string $option
-     * @return bool
-     */
     public function startsWith(string $option): bool
     {
         if ($this->lcOption === null) {
@@ -103,14 +84,11 @@ class Option
         }
         $option = strtolower($option);
 
-        return substr($this->lcOption, 0, strlen($option)) === $option;
+        return str_starts_with($this->lcOption, $option);
     }
 
     /**
-     * Options are case insensitive, so use this to optimize case-insensitive checks.
-     *
-     * @param Option $option
-     * @return bool
+     * Options are case-insensitive, so use this to optimize case-insensitive checks.
      */
     public function equals(Option $option): bool
     {
@@ -126,7 +104,6 @@ class Option
 
     /**
      * @param bool $lowercase forces the string representation to lowercase.
-     * @return string
      */
     public function toString(bool $lowercase = false): string
     {
@@ -141,10 +118,7 @@ class Option
         return $this->option;
     }
 
-    /**
-     * @return string
-     */
-    public function __toString()
+    public function __toString(): string
     {
         return $this->option;
     }
@@ -153,12 +127,11 @@ class Option
      * Convenience factory method for creating a range option.
      *
      * @see https://msdn.microsoft.com/en-us/library/cc223242.aspx
-     * @param string $startAt
-     * @param string $endAt
-     * @return Option
      */
-    public static function fromRange(string $startAt, string $endAt = '*')
-    {
+    public static function fromRange(
+        string $startAt,
+        string $endAt = '*'
+    ): self {
         return new self('range=' . $startAt . '-' . $endAt);
     }
 }

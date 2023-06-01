@@ -20,29 +20,26 @@ use Throwable;
  */
 class UnsolicitedNotificationException extends ProtocolException
 {
-    /**
-     * @var string
-     */
-    protected $oid;
+    private string $oid;
 
-    /**
-     * @param string $message
-     * @param int $code
-     * @param \Throwable|null $previous
-     * @param string $oid
-     */
-    public function __construct($message = "", $code = 0, Throwable $previous = null, $oid = "")
-    {
+    public function __construct(
+        string $message = "",
+        int $code = 0,
+        Throwable $previous = null,
+        string $oid = ""
+    ) {
         $this->oid = $oid;
-        parent::__construct($message, $code, $previous);
+        parent::__construct(
+            $message,
+            $code,
+            $previous
+        );
     }
 
     /**
      * Get the name OID identifying the unsolicited notification.
-     *
-     * @return string
      */
-    public function getOid()
+    public function getOid(): string
     {
         return $this->oid;
     }

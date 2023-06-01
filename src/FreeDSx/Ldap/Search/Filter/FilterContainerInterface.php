@@ -20,40 +20,28 @@ interface FilterContainerInterface extends FilterInterface
 {
     /**
      * Add a filter.
-     *
-     * @param FilterInterface ...$filters
-     * @return $this
      */
-    public function add(FilterInterface ...$filters);
+    public function add(FilterInterface ...$filters): self;
 
     /**
      * Get the filters.
      *
-     * @return FilterInterface[]|FilterContainerInterface[]
+     * @return array<FilterInterface|FilterContainerInterface>
      */
     public function get(): array;
 
     /**
      * Check if a filter exists.
-     *
-     * @param FilterInterface $filter
-     * @return bool
      */
     public function has(FilterInterface $filter): bool;
 
     /**
      * Remove a specific filter.
-     *
-     * @param FilterInterface ...$filters
-     * @return $this
      */
-    public function remove(FilterInterface ...$filters);
+    public function remove(FilterInterface ...$filters): self;
 
     /**
      * Set the filters.
-     *
-     * @param FilterInterface ...$filters
-     * @return $this
      */
-    public function set(FilterInterface ...$filters);
+    public function set(FilterInterface ...$filters): self;
 }

@@ -27,18 +27,14 @@ use function strlen;
  */
 class SaslMessageWrapper implements MessageWrapperInterface
 {
-    /**
-     * @var SaslContext
-     */
-    protected $context;
+    private SaslContext $context;
 
-    /**
-     * @var SecurityLayerInterface
-     */
-    protected $securityLayer;
+    private SecurityLayerInterface $securityLayer;
 
-    public function __construct(SecurityLayerInterface $securityLayer, SaslContext $context)
-    {
+    public function __construct(
+        SecurityLayerInterface $securityLayer,
+        SaslContext $context,
+    ) {
         $this->securityLayer = $securityLayer;
         $this->context = $context;
     }
@@ -55,6 +51,7 @@ class SaslMessageWrapper implements MessageWrapperInterface
 
     /**
      * @inheritDoc
+     * @throws PartialMessageException
      */
     public function unwrap(string $message): Buffer
     {

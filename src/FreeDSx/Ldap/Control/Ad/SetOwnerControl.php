@@ -29,34 +29,24 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class SetOwnerControl extends Control
 {
-    /**
-     * @var string
-     */
-    protected $sid;
+    private string $sid;
 
-    /**
-     * @param string $sid
-     */
     public function __construct(string $sid)
     {
         $this->sid = $sid;
-        parent::__construct(self::OID_SET_OWNER, true);
+        parent::__construct(
+            self::OID_SET_OWNER,
+            true
+        );
     }
 
-    /**
-     * @param string $sid
-     * @return $this
-     */
-    public function setSid(string $sid)
+    public function setSid(string $sid): self
     {
         $this->sid = $sid;
 
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function getSid(): string
     {
         return $this->sid;
@@ -74,21 +64,20 @@ class SetOwnerControl extends Control
 
     /**
      * {@inheritDoc}
-     * @return Control
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $request = self::decodeEncodedValue($type);
         if (!$request instanceof OctetStringType) {
             throw new ProtocolException('A SetOwner control value must be an octet string type.');
         }
-        /** @var OctetStringType $request */
-        $control = new self(
-            $request->getValue()
-        );
+        $control = new static($request->getValue());
 
-        return self::mergeControlData($control, $type);
+        return self::mergeControlData(
+            $control,
+            $type
+        );
     }
 }

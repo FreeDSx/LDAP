@@ -33,64 +33,80 @@ class GenericRequestHandler implements RequestHandlerInterface
     /**
      * {@inheritdoc}
      */
-    public function add(RequestContext $context, AddRequest $add): void
-    {
+    public function add(
+        RequestContext $context,
+        AddRequest $add
+    ): void {
         throw new OperationException('The add operation is not supported.');
     }
 
-    /**
-     * @return false
-     */
-    public function bind(string $username, string $password): bool
-    {
+    public function bind(
+        string $username,
+        string $password
+    ): bool {
         return false;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function compare(RequestContext $context, CompareRequest $compare): bool
-    {
+    public function compare(
+        RequestContext $context,
+        CompareRequest $compare
+    ): bool {
         throw new OperationException('The compare operation is not supported.');
     }
 
     /**
      * {@inheritdoc}
      */
-    public function delete(RequestContext $context, DeleteRequest $delete): void
-    {
+    public function delete(
+        RequestContext $context,
+        DeleteRequest $delete,
+    ): void {
         throw new OperationException('The delete operation is not supported.');
     }
 
     /**
      * {@inheritdoc}
      */
-    public function extended(RequestContext $context, ExtendedRequest $extended): void
-    {
-        throw new OperationException(sprintf('The extended operation %s is not supported.', $extended->getName()));
+    public function extended(
+        RequestContext $context,
+        ExtendedRequest $extended
+    ): void {
+        throw new OperationException(sprintf(
+            'The extended operation %s is not supported.',
+            $extended->getName()
+        ));
     }
 
     /**
      * {@inheritdoc}
      */
-    public function modify(RequestContext $context, ModifyRequest $modify): void
-    {
+    public function modify(
+        RequestContext $context,
+        ModifyRequest $modify
+    ): void {
         throw new OperationException('The modify operation is not supported.');
     }
 
     /**
      * {@inheritdoc}
      */
-    public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn): void
-    {
+    public function modifyDn(
+        RequestContext $context,
+        ModifyDnRequest $modifyDn
+    ): void {
         throw new OperationException('The modify dn operation is not supported.');
     }
 
     /**
      * {@inheritdoc}
      */
-    public function search(RequestContext $context, SearchRequest $search): Entries
-    {
+    public function search(
+        RequestContext $context,
+        SearchRequest $search
+    ): Entries {
         throw new OperationException('The search operation is not supported.');
     }
 }

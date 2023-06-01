@@ -35,152 +35,138 @@ class Change
      */
     public const TYPE_REPLACE = 2;
 
-    /**
-     * @var int
-     */
-    protected $modType;
+    private int $modType;
 
-    /**
-     * @var Attribute
-     */
-    protected $attribute;
+    private Attribute $attribute;
 
-    /**
-     * @param int $modType
-     * @param string|Attribute $attribute
-     * @param string ...$values
-     */
-    public function __construct(int $modType, $attribute, ...$values)
-    {
+    public function __construct(
+        int $modType,
+        Attribute|string $attribute,
+        string ...$values
+    ) {
         $this->modType = $modType;
-        $this->attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
+        $this->attribute = $attribute instanceof Attribute
+            ? $attribute
+            : new Attribute($attribute, ...$values);
     }
 
-    /**
-     * @return Attribute
-     */
     public function getAttribute(): Attribute
     {
         return $this->attribute;
     }
 
-    /**
-     * @param Attribute $attribute
-     * @return $this
-     */
-    public function setAttribute(Attribute $attribute)
+    public function setAttribute(Attribute $attribute): self
     {
         $this->attribute = $attribute;
 
         return $this;
     }
 
-    /**
-     * @return int
-     */
     public function getType(): int
     {
         return $this->modType;
     }
 
-    /**
-     * @param int $modType
-     * @return $this
-     */
-    public function setType(int $modType)
+    public function setType(int $modType): self
     {
         $this->modType = $modType;
 
         return $this;
     }
 
-    /**
-     * @return bool
-     */
     public function isAdd(): bool
     {
         return $this->modType === self::TYPE_ADD;
     }
 
-    /**
-     * @return bool
-     */
     public function isDelete(): bool
     {
         return $this->modType === self::TYPE_DELETE && count($this->attribute->getValues()) !== 0;
     }
 
-    /**
-     * @return bool
-     */
     public function isReplace(): bool
     {
         return $this->modType === self::TYPE_REPLACE;
     }
 
-    /**
-     * @return bool
-     */
     public function isReset(): bool
     {
-        return $this->modType === self::TYPE_DELETE && count($this->attribute->getValues()) === 0;
+        return $this->modType === self::TYPE_DELETE
+            && count($this->attribute->getValues()) === 0;
     }
 
     /**
      * Add the values contained in the attribute, creating the attribute if necessary.
-     *
-     * @param string|Attribute $attribute
-     * @param string ...$values
-     * @return Change
      */
-    public static function add($attribute, ...$values): Change
-    {
-        $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
+    public static function add(
+        Attribute|string $attribute,
+        string ...$values
+    ): Change {
+        $attribute = $attribute instanceof Attribute
+            ? $attribute
+            : new Attribute($attribute, ...$values);
 
-        return new self(self::TYPE_ADD, $attribute);
+        return new self(
+            self::TYPE_ADD,
+            $attribute
+        );
     }
 
     /**
      * Delete values from the attribute. If no values are listed, or if all current values of the attribute are listed,
      * the entire attribute is removed.
-     *
-     * @param Attribute|string $attribute
-     * @param string ...$values
-     * @return Change
      */
-    public static function delete($attribute, ...$values): Change
-    {
-        $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
+    public static function delete(
+        Attribute|string $attribute,
+        string ...$values
+    ): Change {
+        $attribute = $attribute instanceof Attribute
+            ? $attribute
+            : new Attribute(
+                $attribute,
+                ...$values
+            );
 
-        return new self(self::TYPE_DELETE, $attribute);
+        return new self(
+            self::TYPE_DELETE,
+            $attribute
+        );
     }
 
     /**
      * Replace all existing values with the new values, creating the attribute if it did not already exist.  A replace
      * with no value will delete the entire attribute if it exists, and it is ignored if the attribute does not exist.
-     *
-     * @param Attribute|string $attribute
-     * @param string ...$values
-     * @return Change
      */
-    public static function replace($attribute, ...$values): Change
-    {
-        $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
+    public static function replace(
+        Attribute|string $attribute,
+        string ...$values
+    ): Change {
+        $attribute = $attribute instanceof Attribute
+            ? $attribute
+            : new Attribute(
+                $attribute,
+                ...$values
+            );
 
-        return new self(self::TYPE_REPLACE, $attribute);
+        return new self(
+            self::TYPE_REPLACE,
+            $attribute
+        );
     }
 
     /**
      * Remove all values from an attribute, essentially un-setting/resetting it. This is the same type as delete when
      * going to LDAP. The real difference being that no values are attached to the change.
-     *
-     * @param string|Attribute $attribute
-     * @return Change
      */
-    public static function reset($attribute): Change
+    public static function reset(Attribute|string $attribute): Change
     {
-        $attribute = $attribute instanceof Attribute ? new Attribute($attribute->getDescription()) : new Attribute($attribute);
+        $attribute = $attribute instanceof Attribute
+            ? new Attribute($attribute->getDescription())
+            : new Attribute($attribute);
 
-        return new self(self::TYPE_DELETE, $attribute);
+        return new self(
+            self::TYPE_DELETE,
+            $attribute
+        );
     }
 }

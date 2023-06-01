@@ -31,10 +31,7 @@ use function extension_loaded;
  */
 class ServerStartTlsHandler implements ServerProtocolHandlerInterface
 {
-    /**
-     * @var bool
-     */
-    protected static $hasOpenssl;
+    private static ?bool $hasOpenssl = null;
 
     public function __construct()
     {
@@ -44,16 +41,17 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
     }
 
     /**
-     * @param LdapMessageRequest $message
-     * @param TokenInterface $token
-     * @param RequestHandlerInterface $dispatcher
-     * @param ServerQueue $queue
-     * @param array $options
+     * {@inheritDoc}
      * @throws ConnectionException
      * @throws EncoderException
      */
-    public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): void
-    {
+    public function handleRequest(
+        LdapMessageRequest $message,
+        TokenInterface $token,
+        RequestHandlerInterface $dispatcher,
+        ServerQueue $queue,
+        array $options
+    ): void {
         # If we don't have a SSL cert or the OpenSSL extension is not available, then we can do nothing...
         if (!isset($options['ssl_cert']) || !self::$hasOpenssl) {
             $queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(

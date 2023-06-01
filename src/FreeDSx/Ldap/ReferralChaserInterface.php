@@ -28,19 +28,18 @@ interface ReferralChaserInterface
      *
      * To skip a referral throw the SkipReferralException.
      *
-     * @param LdapMessageRequest $request
-     * @param LdapUrl $referral
-     * @param BindRequest|null $bind
      * @throws SkipReferralException
-     * @return BindRequest|null
      */
-    public function chase(LdapMessageRequest $request, LdapUrl $referral, ?BindRequest $bind): ?BindRequest;
+    public function chase(
+        LdapMessageRequest $request,
+        LdapUrl $referral,
+        ?BindRequest $bind
+    ): ?BindRequest;
 
     /**
      * Construct the LdapClient with the options you want, and perform other tasks (such as StartTLS)
      *
-     * @param array $options
-     * @return LdapClient
+     * @param array<string, mixed> $options
      */
     public function client(array $options): LdapClient;
 }

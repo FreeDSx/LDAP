@@ -25,5 +25,5 @@ class DeleteResponse extends LdapResult
     /**
      * @var int
      */
-    protected $tagNumber = 11;
+    protected int $tagNumber = 11;
 }

@@ -28,43 +28,23 @@ use FreeDSx\Ldap\Operation\Response\SearchResponse;
  */
 class Paging
 {
-    /**
-     * @var PagingControl|null
-     */
-    protected $control;
+    private ?PagingControl $control = null;
 
-    /**
-     * @var LdapClient
-     */
-    protected $client;
+    private LdapClient $client;
 
-    /**
-     * @var int
-     */
-    protected $size;
+    private int $size;
 
-    /**
-     * @var SearchRequest
-     */
-    protected $search;
+    private SearchRequest $search;
 
-    /**
-     * @var bool
-     */
-    protected $ended = false;
+    private bool $ended = false;
 
-    /**
-     * @var bool
-     */
-    protected $isCritical = false;
+    private bool $isCritical = false;
 
-    /**
-     * @param LdapClient $client
-     * @param SearchRequest $search
-     * @param int $size
-     */
-    public function __construct(LdapClient $client, SearchRequest $search, int $size = 1000)
-    {
+    public function __construct(
+        LdapClient $client,
+        SearchRequest $search,
+        int $size = 1000,
+    ) {
         $this->search = $search;
         $this->client = $client;
         $this->size = $size;
@@ -73,9 +53,6 @@ class Paging
     /**
      * Set the criticality of the control. Setting this will cause the LDAP server to return an error if paging is not
      * possible.
-     *
-     * @param bool $isCritical
-     * @return $this
      */
     public function isCritical(bool $isCritical = true): self
     {
@@ -86,12 +63,11 @@ class Paging
 
     /**
      * Start a new paging operation with a search request. This must be called first if you reuse the paging object.
-     *
-     * @param SearchRequest $search
-     * @param int|null $size
      */
-    public function start(SearchRequest $search, ?int $size = null): void
-    {
+    public function start(
+        SearchRequest $search,
+        ?int $size = null
+    ): void {
         $this->size = $size ?? $this->size;
         $this->search = $search;
         $this->control = null;
@@ -101,10 +77,9 @@ class Paging
     /**
      * End the paging operation. This can be triggered at any time.
      *
-     * @return $this
      * @throws OperationException
      */
-    public function end()
+    public function end(): self
     {
         $this->send(0);
         $this->ended = true;
@@ -115,8 +90,6 @@ class Paging
     /**
      * Get the next set of entries of results.
      *
-     * @param int|null $size
-     * @return Entries
      * @throws OperationException
      */
     public function getEntries(?int $size = null): Entries
@@ -124,10 +97,7 @@ class Paging
         return $this->send($size);
     }
 
-    /**
-     * @return bool
-     */
-    public function hasEntries()
+    public function hasEntries(): bool
     {
         if ($this->ended) {
             return false;
@@ -139,8 +109,6 @@ class Paging
     /**
      * The size may be set to the server's estimate of the total number of entries in the entire result set. Servers
      * that cannot provide such an estimate may set this size to zero.
-     *
-     * @return int|null
      */
     public function sizeEstimate(): ?int
     {
@@ -148,11 +116,9 @@ class Paging
     }
 
     /**
-     * @param int|null $size
-     * @return Entries
      * @throws OperationException
      */
-    protected function send(?int $size = null)
+    private function send(?int $size = null): Entries
     {
         $cookie = ($this->control !== null)
             ? $this->control->getCookie()

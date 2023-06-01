@@ -24,50 +24,23 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
  */
 final class PagingRequest
 {
-    /**
-     * @var PagingControl
-     */
-    private $control;
+    private PagingControl $control;
 
-    /**
-     * @var SearchRequest
-     */
-    private $request;
+    private SearchRequest $request;
 
-    /**
-     * @var ControlBag
-     */
-    private $controls;
+    private ControlBag $controls;
 
-    /**
-     * @var int
-     */
-    private $iteration = 1;
+    private int $iteration = 1;
 
-    /**
-     * @var string
-     */
-    private $nextCookie;
+    private string $nextCookie;
 
-    /**
-     * @var DateTimeInterface|null
-     */
-    private $lastProcessed = null;
+    private ?DateTimeInterface $lastProcessed = null;
 
-    /**
-     * @var DateTimeInterface
-     */
-    private $created;
+    private DateTimeInterface|DateTime $created;
 
-    /**
-     * @var string
-     */
-    private $uniqueId;
+    private string $uniqueId;
 
-    /**
-     * @var bool
-     */
-    private $hasProcessed = false;
+    private bool $hasProcessed = false;
 
     public function __construct(
         PagingControl $control,
@@ -87,8 +60,6 @@ final class PagingRequest
 
     /**
      * An opaque value that uniquely identifies this paging request across its lifecycle.
-     *
-     * @return string
      */
     public function getUniqueId(): string
     {
@@ -97,8 +68,6 @@ final class PagingRequest
 
     /**
      * Whether the paging control is considered critical or not.
-     *
-     * @return bool
      */
     public function isCritical(): bool
     {
@@ -107,8 +76,6 @@ final class PagingRequest
 
     /**
      * When the paging request was originally created.
-     *
-     * @return DateTimeInterface
      */
     public function createdAt(): DateTimeInterface
     {
@@ -117,33 +84,22 @@ final class PagingRequest
 
     /**
      * When the request was last processed. May be null if not processed yet.
-     *
-     * @return DateTimeInterface|null
      */
     public function lastProcessedAt(): ?DateTimeInterface
     {
         return $this->lastProcessed;
     }
 
-    /**
-     * @return SearchRequest
-     */
     public function getSearchRequest(): SearchRequest
     {
         return $this->request;
     }
 
-    /**
-     * @return ControlBag
-     */
     public function controls(): ControlBag
     {
         return $this->controls;
     }
 
-    /**
-     * @return string
-     */
     public function getCookie(): string
     {
         return $this->control->getCookie();
@@ -151,8 +107,6 @@ final class PagingRequest
 
     /**
      * The current iteration of paging that this request represents. Incremented by one for each request.
-     *
-     * @return int
      */
     public function getIteration(): int
     {
@@ -161,8 +115,6 @@ final class PagingRequest
 
     /**
      * The size of the result set to return, as requested by the client.
-     *
-     * @return int
      */
     public function getSize(): int
     {
@@ -171,8 +123,6 @@ final class PagingRequest
 
     /**
      * Whether this represents a request to abandon the paging request.
-     *
-     * @return bool
      */
     public function isAbandonRequest(): bool
     {
@@ -182,8 +132,6 @@ final class PagingRequest
 
     /**
      * Whether this represents the start of an unprocessed paging request.
-     *
-     * @return bool
      */
     public function isPagingStart(): bool
     {
@@ -196,7 +144,6 @@ final class PagingRequest
     }
 
     /**
-     * @return string
      * @internal
      */
     public function getNextCookie(): string
@@ -205,7 +152,6 @@ final class PagingRequest
     }
 
     /**
-     * @param PagingControl $pagingControl
      * @internal
      */
     public function updatePagingControl(PagingControl $pagingControl): void
@@ -214,7 +160,6 @@ final class PagingRequest
     }
 
     /**
-     * @param string $cookie
      * @internal
      */
     public function updateNextCookie(string $cookie): void

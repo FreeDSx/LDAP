@@ -51,38 +51,24 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class SortingResponseControl extends Control
 {
-    /**
-     * @var int
-     */
-    protected $result;
+    private int $result;
 
-    /**
-     * @var null|string
-     */
-    protected $attribute;
+    private ?string $attribute;
 
-    /**
-     * @param int $result
-     * @param null|string $attribute
-     */
-    public function __construct(int $result, ?string $attribute = null)
-    {
+    public function __construct(
+        int $result,
+        ?string $attribute = null
+    ) {
         $this->result = $result;
         $this->attribute = $attribute;
         parent::__construct(self::OID_SORTING_RESPONSE);
     }
 
-    /**
-     * @return int
-     */
     public function getResult(): int
     {
         return $this->result;
     }
 
-    /**
-     * @return null|string
-     */
     public function getAttribute(): ?string
     {
         return $this->attribute;
@@ -90,11 +76,10 @@ class SortingResponseControl extends Control
 
     /**
      * {@inheritDoc}
-     * @return Control
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $sorting = parent::decodeEncodedValue($type);
         if (!$sorting instanceof SequenceType) {
@@ -106,12 +91,15 @@ class SortingResponseControl extends Control
             throw new ProtocolException('The server side sorting response is malformed.');
         }
 
-        $response = new self(
+        $response = new static(
             $result->getValue(),
             ($attribute !== null) ? $attribute->getValue() : null
         );
 
-        return parent::mergeControlData($response, $type);
+        return parent::mergeControlData(
+            $response,
+            $type
+        );
     }
 
     /**
