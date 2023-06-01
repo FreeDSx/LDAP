@@ -25,5 +25,5 @@ class ModifyDnResponse extends LdapResult
     /**
      * @var int
      */
-    protected $tagNumber = 13;
+    protected int $tagNumber = 13;
 }

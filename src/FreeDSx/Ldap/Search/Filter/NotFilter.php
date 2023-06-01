@@ -30,32 +30,19 @@ class NotFilter implements FilterInterface
 {
     protected const CHOICE_TAG = 2;
 
-    /**
-     * @var FilterInterface
-     */
-    protected $filter;
+    private FilterInterface $filter;
 
-    /**
-     * @param FilterInterface $filter
-     */
     public function __construct(FilterInterface $filter)
     {
         $this->filter = $filter;
     }
 
-    /**
-     * @return FilterInterface
-     */
     public function get(): FilterInterface
     {
         return $this->filter;
     }
 
-    /**
-     * @param FilterInterface $filter
-     * @return $this
-     */
-    public function set(FilterInterface $filter)
+    public function set(FilterInterface $filter): self
     {
         $this->filter = $filter;
 
@@ -67,7 +54,10 @@ class NotFilter implements FilterInterface
      */
     public function toAsn1(): AbstractType
     {
-        return Asn1::context(self::CHOICE_TAG, Asn1::sequence($this->filter->toAsn1()));
+        return Asn1::context(
+            self::CHOICE_TAG,
+            Asn1::sequence($this->filter->toAsn1())
+        );
     }
 
     /**
@@ -81,23 +71,18 @@ class NotFilter implements FilterInterface
             . self::PAREN_RIGHT;
     }
 
-    /**
-     * @return string
-     */
-    public function __toString()
+    public function __toString(): string
     {
         return $this->toString();
     }
 
     /**
      * {@inheritDoc}
-     * @param AbstractType $type
-     * @return NotFilter
      * @throws ProtocolException
      * @throws EncoderException
      * @throws RuntimeException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
         if (!($type instanceof SequenceType && count($type) === 1)) {
@@ -108,6 +93,6 @@ class NotFilter implements FilterInterface
             throw new ProtocolException('The "not" filter is malformed.');
         }
 
-        return new self(FilterFactory::get($child));
+        return new static(FilterFactory::get($child));
     }
 }

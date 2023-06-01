@@ -26,9 +26,6 @@ trait EscapeTrait
 {
     /**
      * Escape all characters in a value.
-     *
-     * @param string $value
-     * @return string
      */
     public static function escapeAll(string $value): string
     {

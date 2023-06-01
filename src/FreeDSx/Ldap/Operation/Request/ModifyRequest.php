@@ -46,19 +46,14 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
     /**
      * @var Change[]
      */
-    protected $changes;
+    private array $changes;
 
-    /**
-     * @var Dn
-     */
-    protected $dn;
+    private Dn $dn;
 
-    /**
-     * @param string|Dn $dn
-     * @param Change ...$changes
-     */
-    public function __construct($dn, Change ...$changes)
-    {
+    public function __construct(
+        Dn|string $dn,
+        Change ...$changes,
+    ) {
         $this->setDn($dn);
         $this->changes = $changes;
     }
@@ -71,31 +66,22 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
         return $this->changes;
     }
 
-    /**
-     * @param Change ...$changes
-     * @return $this
-     */
-    public function setChanges(Change ...$changes)
+    public function setChanges(Change ...$changes): self
     {
         $this->changes = $changes;
 
         return $this;
     }
 
-    /**
-     * @param string|Dn $dn
-     * @return $this
-     */
-    public function setDn($dn)
+    public function setDn(Dn|string $dn): static
     {
-        $this->dn = $dn instanceof $dn ? $dn : new Dn($dn);
+        $this->dn = $dn instanceof Dn
+            ? $dn
+            : new Dn($dn);
 
         return $this;
     }
 
-    /**
-     * @return Dn
-     */
     public function getDn(): Dn
     {
         return $this->dn;
@@ -103,9 +89,8 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
 
     /**
      * {@inheritDoc}
-     * @return self
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): self
     {
         if (!($type instanceof SequenceType && count($type) === 2)) {
             throw new ProtocolException('The modify request is malformed');
@@ -122,7 +107,10 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
             $changeList[] = self::parseChange($change);
         }
 
-        return new self($dn->getValue(), ...$changeList);
+        return new self(
+            $dn->getValue(),
+            ...$changeList
+        );
     }
 
     /**
@@ -152,11 +140,9 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
     }
 
     /**
-     * @param AbstractType $type
-     * @return Change
      * @throws ProtocolException
      */
-    protected static function parseChange(AbstractType $type): Change
+    private static function parseChange(AbstractType $type): Change
     {
         if (!($type instanceof SequenceType && count($type->getChildren()) === 2)) {
             throw new ProtocolException('The change for the modify request is malformed.');
@@ -172,11 +158,9 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
     }
 
     /**
-     * @param SequenceType $type
-     * @return Attribute
      * @throws ProtocolException
      */
-    protected static function parsePartialAttribute(SequenceType $type): Attribute
+    private static function parsePartialAttribute(SequenceType $type): Attribute
     {
         if (count($type->getChildren()) !== 2) {
             throw new ProtocolException('The partial attribute for the modify request is malformed.');

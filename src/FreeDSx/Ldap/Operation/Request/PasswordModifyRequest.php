@@ -30,85 +30,53 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class PasswordModifyRequest extends ExtendedRequest
 {
-    /**
-     * @var null|string
-     */
-    protected $userIdentity;
+    private ?string $userIdentity;
 
-    /**
-     * @var null|string
-     */
-    protected $oldPassword;
+    private ?string $oldPassword;
 
-    /**
-     * @var null|string
-     */
-    protected $newPassword;
+    private ?string $newPassword;
 
-    /**
-     * @param null|string $userIdentity
-     * @param null|string $oldPassword
-     * @param null|string $newPassword
-     */
-    public function __construct(?string $userIdentity = null, ?string $oldPassword = null, ?string $newPassword = null)
-    {
+    public function __construct(
+        ?string $userIdentity = null,
+        ?string $oldPassword = null,
+        ?string $newPassword = null
+    ) {
         $this->userIdentity = $userIdentity;
         $this->oldPassword = $oldPassword;
         $this->newPassword = $newPassword;
         parent::__construct(self::OID_PWD_MODIFY);
     }
 
-    /**
-     * @return null|string
-     */
     public function getUsername(): ?string
     {
         return $this->userIdentity;
     }
 
-    /**
-     * @param null|string $username
-     * @return $this
-     */
-    public function setUsername(?string $username)
+    public function setUsername(?string $username): self
     {
         $this->userIdentity = $username;
 
         return $this;
     }
 
-    /**
-     * @return null|string
-     */
     public function getNewPassword(): ?string
     {
         return $this->newPassword;
     }
 
-    /**
-     * @param null|string $newPassword
-     * @return $this
-     */
-    public function setNewPassword(?string $newPassword)
+    public function setNewPassword(?string $newPassword): self
     {
         $this->newPassword = $newPassword;
 
         return $this;
     }
 
-    /**
-     * @return null|string
-     */
     public function getOldPassword(): ?string
     {
         return $this->oldPassword;
     }
 
-    /**
-     * @param null|string $oldPassword
-     * @return $this
-     */
-    public function setOldPassword(?string $oldPassword)
+    public function setOldPassword(?string $oldPassword): self
     {
         $this->oldPassword = $oldPassword;
 
@@ -137,11 +105,10 @@ class PasswordModifyRequest extends ExtendedRequest
 
     /**
      * {@inheritDoc}
-     * @return PasswordModifyRequest
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): PasswordModifyRequest
     {
         $request = self::decodeEncodedValue($type);
         if ($request === null) {

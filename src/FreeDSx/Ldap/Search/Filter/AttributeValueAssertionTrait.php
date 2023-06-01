@@ -31,35 +31,23 @@ trait AttributeValueAssertionTrait
 {
     use FilterAttributeTrait;
 
-    /**
-     * @var string
-     */
-    protected $value;
+    protected string $value;
 
-    /**
-     * @param string $attribute
-     * @param string $value
-     */
-    public function __construct(string $attribute, string $value)
-    {
+    public function __construct(
+        string $attribute,
+        string $value
+    ) {
         $this->attribute = $attribute;
         $this->value = $value;
     }
 
-    /**
-     * @param string $value
-     * @return $this
-     */
-    public function setValue(string $value)
+    public function setValue(string $value): self
     {
         $this->value = $value;
 
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function getValue(): string
     {
         return $this->value;
@@ -90,13 +78,11 @@ trait AttributeValueAssertionTrait
 
     /**
      * {@inheritDoc}
-     * @param AbstractType $type
-     * @return self
      * @throws EncoderException
      * @throws RuntimeException
      * @throws ProtocolException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
         if (!($type instanceof SequenceType && count($type) === 2)) {
@@ -109,6 +95,9 @@ trait AttributeValueAssertionTrait
             throw new ProtocolException('The attribute value assertion is malformed.');
         }
 
-        return new static($attribute->getValue(), $value->getValue());
+        return new static(
+            $attribute->getValue(),
+            $value->getValue(),
+        );
     }
 }

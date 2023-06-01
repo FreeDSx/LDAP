@@ -33,9 +33,9 @@ class LdapServer
     use LoggerTrait;
 
     /**
-     * @var array
+     * @var array<string, mixed>
      */
-    protected $options = [
+    protected array $options = [
         'ip' => '0.0.0.0',
         'port' => 389,
         'unix_socket' => '/var/run/ldap.socket',
@@ -59,11 +59,11 @@ class LdapServer
     /**
      * @var ServerRunnerInterface|null
      */
-    protected $runner;
+    protected ?ServerRunnerInterface $runner;
 
     /**
-     * @param array $options
-     * @param ServerRunnerInterface|null $serverRunner
+     * @param array<string, mixed> $options
+     *
      * @throws RuntimeException
      */
     public function __construct(
@@ -114,9 +114,6 @@ class LdapServer
 
     /**
      * Specify an instance of a request handler to use for incoming LDAP requests.
-     *
-     * @param RequestHandlerInterface $requestHandler
-     * @return $this
      */
     public function useRequestHandler(RequestHandlerInterface $requestHandler): self
     {
@@ -127,9 +124,6 @@ class LdapServer
 
     /**
      * Specify an instance of a RootDSE handler to use for RootDSE requests.
-     *
-     * @param RootDseHandlerInterface $rootDseHandler
-     * @return $this
      */
     public function useRootDseHandler(RootDseHandlerInterface $rootDseHandler): self
     {
@@ -140,9 +134,6 @@ class LdapServer
 
     /**
      * Specify an instance of a paging handler to use for paged search requests.
-     *
-     * @param PagingHandlerInterface $pagingHandler
-     * @return $this
      */
     public function usePagingHandler(PagingHandlerInterface $pagingHandler): self
     {
@@ -169,7 +160,6 @@ class LdapServer
      * @param string|string[] $servers The LDAP server(s) to proxy the request to.
      * @param array<string, mixed> $clientOptions Any additional client options for the proxy connection.
      * @param array<string, mixed> $serverOptions Any additional server options for the LDAP server.
-     * @return LdapServer
      */
     public static function makeProxy(
         $servers,

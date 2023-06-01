@@ -37,22 +37,15 @@ class SortingControl extends Control
     /**
      * @var SortKey[]
      */
-    protected $sortKeys = [];
+    private array $sortKeys;
 
-    /**
-     * @param SortKey ...$sortKeys
-     */
     public function __construct(SortKey ...$sortKeys)
     {
         $this->sortKeys = $sortKeys;
         parent::__construct(self::OID_SORTING);
     }
 
-    /**
-     * @param SortKey ...$sortKeys
-     * @return $this
-     */
-    public function addSortKeys(SortKey ...$sortKeys)
+    public function addSortKeys(SortKey ...$sortKeys): self
     {
         foreach ($sortKeys as $sortKey) {
             $this->sortKeys[] = $sortKey;
@@ -61,11 +54,7 @@ class SortingControl extends Control
         return $this;
     }
 
-    /**
-     * @param SortKey ...$sortKeys
-     * @return $this
-     */
-    public function setSortKeys(SortKey ...$sortKeys)
+    public function setSortKeys(SortKey ...$sortKeys): self
     {
         $this->sortKeys = $sortKeys;
 
@@ -82,11 +71,10 @@ class SortingControl extends Control
 
     /**
      * {@inheritDoc}
-     * @return Control
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $response = self::decodeEncodedValue($type);
         if (!$response instanceof SequenceType) {
@@ -126,9 +114,12 @@ class SortingControl extends Control
 
             $sortKeys[] = new SortKey($attrName, $useReverseOrder, $matchRule);
         }
-        $control = new self(...$sortKeys);
+        $control = new static(...$sortKeys);
 
-        return self::mergeControlData($control, $type);
+        return self::mergeControlData(
+            $control,
+            $type
+        );
     }
 
     /**

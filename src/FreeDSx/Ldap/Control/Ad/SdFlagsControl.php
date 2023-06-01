@@ -47,39 +47,29 @@ class SdFlagsControl extends Control
      */
     public const SACL_SECURITY_INFORMATION = 8;
 
-    /**
-     * @var int
-     */
-    protected $flags;
+    private int $flags;
 
-    /**
-     * @param int $flags
-     */
     public function __construct(int $flags)
     {
         $this->flags = $flags;
         parent::__construct(self::OID_SD_FLAGS);
     }
 
-    /**
-     * @return int
-     */
     public function getFlags(): int
     {
         return $this->flags;
     }
 
-    /**
-     * @param int $flags
-     * @return $this
-     */
-    public function setFlags(int $flags)
+    public function setFlags(int $flags): self
     {
         $this->flags = $flags;
 
         return $this;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function toAsn1(): AbstractType
     {
         $this->controlValue = Asn1::sequence(Asn1::integer($this->flags));

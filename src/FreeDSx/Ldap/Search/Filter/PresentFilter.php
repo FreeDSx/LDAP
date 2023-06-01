@@ -30,9 +30,6 @@ class PresentFilter implements FilterInterface
 
     protected const APP_TAG = 7;
 
-    /**
-     * @param string $attribute
-     */
     public function __construct(string $attribute)
     {
         $this->attribute = $attribute;
@@ -46,9 +43,6 @@ class PresentFilter implements FilterInterface
         return Asn1::context(self::APP_TAG, Asn1::octetString($this->attribute));
     }
 
-    /**
-     * @return string
-     */
     public function toString(): string
     {
         return self::PAREN_LEFT . $this->attribute . self::FILTER_EQUAL . '*' . self::PAREN_RIGHT;
@@ -56,18 +50,19 @@ class PresentFilter implements FilterInterface
 
     /**
      * {@inheritDoc}
-     * @param AbstractType $type
-     * @return PresentFilter
      * @throws ProtocolException
      * @throws EncoderException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
-        $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_OCTET_STRING) : $type;
-        if (!($type instanceof OctetStringType)) {
+        $type = $type instanceof IncompleteType
+            ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_OCTET_STRING)
+            : $type;
+
+        if (!$type instanceof OctetStringType) {
             throw new ProtocolException('The present filter is malformed');
         }
 
-        return new self($type->getValue());
+        return new static($type->getValue());
     }
 }

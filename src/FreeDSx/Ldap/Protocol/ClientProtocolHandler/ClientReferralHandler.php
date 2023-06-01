@@ -42,16 +42,13 @@ use function count;
 class ClientReferralHandler implements ResponseHandlerInterface
 {
     /**
-     * @var array
+     * @var array<string, mixed>
      */
-    protected $options = [];
+    private array $options = [];
 
     /**
-     * @param LdapMessageRequest $messageTo
-     * @param LdapMessageResponse $messageFrom
-     * @param ClientQueue $queue
-     * @param array $options
-     * @return LdapMessageResponse|null
+     * {@inheritDoc}
+     *
      * @throws OperationException
      * @throws ReferralException
      */
@@ -80,15 +77,14 @@ class ClientReferralHandler implements ResponseHandlerInterface
     }
 
     /**
-     * @param LdapMessageRequest $messageTo
-     * @param LdapMessageResponse $messageFrom
-     * @return LdapMessageResponse|null
      * @throws OperationException
      * @throws SkipReferralException
      * @throws FilterParseException
      */
-    protected function followReferral(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom): ?LdapMessageResponse
-    {
+    private function followReferral(
+        LdapMessageRequest $messageTo,
+        LdapMessageResponse $messageFrom
+    ): ?LdapMessageResponse {
         $referralChaser = $this->options['referral_chaser'];
         if (!($referralChaser === null || $referralChaser instanceof ReferralChaserInterface)) {
             throw new RuntimeException(sprintf(
@@ -180,12 +176,12 @@ class ClientReferralHandler implements ResponseHandlerInterface
     }
 
     /**
-     * @param RequestInterface $request
-     * @param LdapUrl $referral
      * @throws FilterParseException
      */
-    protected function mergeReferralOptions(RequestInterface $request, LdapUrl $referral): void
-    {
+    private function mergeReferralOptions(
+        RequestInterface $request,
+        LdapUrl $referral
+    ): void {
         if ($referral->getDn() !== null && $request instanceof SearchRequest) {
             $request->setBaseDn($referral->getDn());
         } elseif ($referral->getDn() !== null && $request instanceof DnRequestInterface) {

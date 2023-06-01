@@ -33,59 +33,44 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class ExpectedEntryCountControl extends Control
 {
-    /**
-     * @var int
-     */
-    protected $minimum;
+    private int $minimum;
 
-    /**
-     * @var int
-     */
-    protected $maximum;
+    private int $maximum;
 
     /**
      * @param int $min
      * @param int $max
      */
-    public function __construct(int $min, int $max)
-    {
+    public function __construct(
+        int $min,
+        int $max
+    ) {
         $this->minimum = $min;
         $this->maximum = $max;
-        parent::__construct(self::OID_EXPECTED_ENTRY_COUNT, true);
+        parent::__construct(
+            self::OID_EXPECTED_ENTRY_COUNT,
+            true
+        );
     }
 
-    /**
-     * @return int
-     */
     public function getMaximum(): int
     {
         return $this->maximum;
     }
 
-    /**
-     * @param int $max
-     * @return $this
-     */
-    public function setMaximum(int $max)
+    public function setMaximum(int $max): self
     {
         $this->maximum = $max;
 
         return $this;
     }
 
-    /**
-     * @return int
-     */
     public function getMinimum(): int
     {
         return $this->minimum;
     }
 
-    /**
-     * @param int $min
-     * @return $this
-     */
-    public function setMinimum(int $min)
+    public function setMinimum(int $min): self
     {
         $this->minimum = $min;
 
@@ -94,11 +79,10 @@ class ExpectedEntryCountControl extends Control
 
     /**
      * {@inheritDoc}
-     * @return Control
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $request = self::decodeEncodedValue($type);
         if (!$request instanceof SequenceType) {
@@ -112,12 +96,15 @@ class ExpectedEntryCountControl extends Control
         if (!$max instanceof IntegerType) {
             throw new ProtocolException('An ExpectedEntryCount control value sequence 1 must be an integer type.');
         }
-        $control = new self(
+        $control = new static(
             $min->getValue(),
-            $max->getValue()
+            $max->getValue(),
         );
 
-        return self::mergeControlData($control, $type);
+        return self::mergeControlData(
+            $control,
+            $type,
+        );
     }
 
     /**
@@ -134,7 +121,6 @@ class ExpectedEntryCountControl extends Control
     }
 
     /**
-     * @param AbstractType $type
      * @throws ProtocolException
      */
     protected static function validate(AbstractType $type): void

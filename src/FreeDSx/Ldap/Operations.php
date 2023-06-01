@@ -45,34 +45,27 @@ class Operations
 {
     /**
      * A request to abandon an ongoing operation.
-     *
-     * @param int $id
-     * @return AbandonRequest
      */
-    public static function abandon(int $id)
+    public static function abandon(int $id): AbandonRequest
     {
         return new AbandonRequest($id);
     }
 
     /**
      * Add an entry to LDAP.
-     *
-     * @param Entry $entry
-     * @return AddRequest
      */
-    public static function add(Entry $entry)
+    public static function add(Entry $entry): AddRequest
     {
         return new AddRequest($entry);
     }
 
     /**
      * A simple bind request with a username and password.
-     *
-     * @param string $username
-     * @param string $password
-     * @return SimpleBindRequest
      */
-    public static function bind(string $username, string $password)
+    public static function bind(
+        string $username,
+        string $password,
+    ): SimpleBindRequest
     {
         return new SimpleBindRequest($username, $password);
     }
@@ -80,23 +73,24 @@ class Operations
     /**
      * A SASL bind request with a specific mechanism and their associated options.
      *
-     * @param array $options
-     * @param string $mechanism
-     * @param string|null $credentials
-     * @return SaslBindRequest
+     * @param array<string, mixed> $options
      */
-    public static function bindSasl(array $options = [], string $mechanism = '', ?string $credentials = null)
-    {
-        return new SaslBindRequest($mechanism, $credentials, $options);
+    public static function bindSasl(
+        array $options = [],
+        string $mechanism = '',
+        ?string $credentials = null,
+    ): SaslBindRequest {
+        return new SaslBindRequest(
+            $mechanism,
+            $credentials,
+            $options
+        );
     }
 
     /**
      * An anonymous bind request.
-     *
-     * @param string $username
-     * @return AnonBindRequest
      */
-    public static function bindAnonymously(string $username = '')
+    public static function bindAnonymously(string $username = ''): AnonBindRequest
     {
         return new AnonBindRequest($username);
     }
@@ -111,11 +105,12 @@ class Operations
 
     /**
      * A comparison operation to check if an entry has an attribute with a certain value.
-     *
-     * @return CompareRequest
      */
-    public static function compare(string $dn, string $attributeName, string $value): CompareRequest
-    {
+    public static function compare(
+        string $dn,
+        string $attributeName,
+        string $value
+    ): CompareRequest {
         return new CompareRequest($dn, Filters::equal($attributeName, $value));
     }
 
@@ -129,20 +124,28 @@ class Operations
 
     /**
      * Perform an extended operation.
-     *
-     * @param null|AbstractType|ProtocolElementInterface|string $value
      */
-    public static function extended(string $name, $value = null): ExtendedRequest
-    {
-        return new ExtendedRequest($name, $value);
+    public static function extended(
+        string $name,
+        ProtocolElementInterface|AbstractType|string|null $value = null,
+    ): ExtendedRequest {
+        return new ExtendedRequest(
+            $name,
+            $value
+        );
     }
 
     /**
      * Perform modification(s) on an LDAP entry.
      */
-    public static function modify(string $dn, Change ...$changes): ModifyRequest
-    {
-        return new ModifyRequest($dn, ...$changes);
+    public static function modify(
+        string $dn,
+        Change ...$changes,
+    ): ModifyRequest {
+        return new ModifyRequest(
+            $dn,
+            ...$changes
+        );
     }
 
     /**
@@ -150,19 +153,33 @@ class Operations
      *
      * @throws UnexpectedValueException
      */
-    public static function move(string $dn, string $newParentDn): ModifyDnRequest
-    {
+    public static function move(
+        string $dn,
+        string $newParentDn,
+    ): ModifyDnRequest {
         $dnObj = new Dn($dn);
 
-        return new ModifyDnRequest($dn, $dnObj->getRdn()->toString(), true, $newParentDn);
+        return new ModifyDnRequest(
+            $dn,
+            $dnObj->getRdn()->toString(),
+            true,
+            $newParentDn
+        );
     }
 
     /**
      * Creates a password modify extended operation.
      */
-    public static function passwordModify(string $username, string $oldPassword, string $newPassword): PasswordModifyRequest
-    {
-        return new PasswordModifyRequest($username, $oldPassword, $newPassword);
+    public static function passwordModify(
+        string $username,
+        string $oldPassword,
+        string $newPassword
+    ): PasswordModifyRequest {
+        return new PasswordModifyRequest(
+            $username,
+            $oldPassword,
+            $newPassword,
+        );
     }
 
     /**
@@ -175,49 +192,60 @@ class Operations
 
     /**
      * Rename an LDAP entry by modifying its RDN.
-     *
-     * @param string|Rdn $rdn
      */
-    public static function rename(string $dn, $rdn, bool $deleteOldRdn = true): ModifyDnRequest
-    {
-        return new ModifyDnRequest($dn, $rdn, $deleteOldRdn);
+    public static function rename(
+        string|Dn $dn,
+        string|Rdn $rdn,
+        bool $deleteOldRdn = true
+    ): ModifyDnRequest {
+        return new ModifyDnRequest(
+            $dn,
+            $rdn,
+            $deleteOldRdn
+        );
     }
 
     /**
      * Search LDAP with a given filter, scope, etc to retrieve a set of entries.
-     *
-     * @param string|Attribute ...$attributes
      */
-    public static function search(FilterInterface $filter, ...$attributes): SearchRequest
-    {
-        return new SearchRequest($filter, ...$attributes);
+    public static function search(
+        FilterInterface $filter,
+        Attribute|string ...$attributes,
+    ): SearchRequest {
+        return new SearchRequest(
+            $filter,
+            ...$attributes
+        );
     }
 
     /**
      * Search for a specific base DN object to read. This sets a 'present' filter for the 'objectClass' attribute to help
      * simplify it.
-     *
-     * @param string|Attribute ...$attributes
      */
-    public static function read(string $baseDn, ...$attributes): SearchRequest
-    {
-        return (new SearchRequest(Filters::present('objectClass'), ...$attributes))->base($baseDn)->useBaseScope();
+    public static function read(
+        string $baseDn,
+        Attribute|string ...$attributes,
+    ): SearchRequest {
+        return (new SearchRequest(Filters::present('objectClass'), ...$attributes))
+            ->base($baseDn)
+            ->useBaseScope();
     }
 
     /**
      * Search a single level list from a base DN object.
-     *
-     * @param string|Attribute ...$attributes
      */
-    public static function list(FilterInterface $filter, string $baseDn, ...$attributes): SearchRequest
-    {
-        return (new SearchRequest($filter, ...$attributes))->base($baseDn)->useSingleLevelScope();
+    public static function list(
+        FilterInterface $filter,
+        string $baseDn,
+        Attribute|string ...$attributes
+    ): SearchRequest {
+        return (new SearchRequest($filter, ...$attributes))
+            ->base($baseDn)
+            ->useSingleLevelScope();
     }
 
     /**
      * A request to unbind. This actually causes the server to terminate the client connection.
-     *
-     * @return UnbindRequest
      */
     public static function unbind(): UnbindRequest
     {
@@ -226,8 +254,6 @@ class Operations
 
     /**
      * A request to determine who is currently authorized against LDAP for the current session.
-     *
-     * @return ExtendedRequest
      */
     public static function whoami(): ExtendedRequest
     {

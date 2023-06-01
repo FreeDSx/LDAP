@@ -25,6 +25,13 @@ interface ResponseHandlerInterface
 {
     /**
      * Pass the message response to the handler specific to it.
+     *
+     * @param array<string, mixed> $options
      */
-    public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse;
+    public function handleResponse(
+        LdapMessageRequest $messageTo,
+        LdapMessageResponse $messageFrom,
+        ClientQueue $queue,
+        array $options
+    ): ?LdapMessageResponse;
 }

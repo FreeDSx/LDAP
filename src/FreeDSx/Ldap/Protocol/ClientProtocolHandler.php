@@ -45,38 +45,24 @@ class ClientProtocolHandler
         'supportedLDAPVersion',
     ];
 
-    /**
-     * @var SocketPool
-     */
-    protected $pool;
+    private SocketPool $pool;
 
-    /**
-     * @var ClientQueue|null
-     */
-    protected $queue;
+    private ?ClientQueue $queue;
 
-    /**
-     * @var array
-     */
-    protected $options;
+    private array $options;
 
-    /**
-     * @var ControlBag
-     */
-    protected $controls;
+    private ControlBag $controls;
 
-    /**
-     * @var ClientProtocolHandlerFactory
-     */
-    protected $protocolHandlerFactory;
+    private ClientProtocolHandlerFactory $protocolHandlerFactory;
 
-    /**
-     * @var null|Entry
-     */
-    protected $rootDse;
+    private ?Entry $rootDse = null;
 
-    public function __construct(array $options, ClientQueue $queue = null, SocketPool $pool = null, ClientProtocolHandlerFactory $clientProtocolHandlerFactory = null)
-    {
+    public function __construct(
+        array $options,
+        ClientQueue $queue = null,
+        SocketPool $pool = null,
+        ClientProtocolHandlerFactory $clientProtocolHandlerFactory = null
+    ) {
         $this->options = $options;
         $this->pool = $pool ?? new SocketPool($options);
         $this->protocolHandlerFactory = $clientProtocolHandlerFactory ?? new ClientProtocolHandlerFactory();
@@ -84,9 +70,6 @@ class ClientProtocolHandler
         $this->queue = $queue;
     }
 
-    /**
-     * @return ControlBag
-     */
     public function controls(): ControlBag
     {
         return $this->controls;
@@ -95,8 +78,6 @@ class ClientProtocolHandler
     /**
      * Make a single search request to fetch the RootDSE. Handle the various errors that could occur.
      *
-     * @param bool $reload
-     * @return Entry
      * @throws ConnectionException
      * @throws OperationException
      * @throws SocketException
@@ -132,9 +113,6 @@ class ClientProtocolHandler
     }
 
     /**
-     * @param RequestInterface $request
-     * @param Control ...$controls
-     * @return LdapMessageResponse|null
      * @throws ConnectionException
      * @throws OperationException
      * @throws SocketException
@@ -145,8 +123,10 @@ class ClientProtocolHandler
      * @throws ReferralException
      * @throws SaslException
      */
-    public function send(RequestInterface $request, Control ...$controls): ?LdapMessageResponse
-    {
+    public function send(
+        RequestInterface $request,
+        Control ...$controls
+    ): ?LdapMessageResponse {
         try {
             $context = new ClientProtocolContext(
                 $request,
@@ -187,9 +167,6 @@ class ClientProtocolHandler
         }
     }
 
-    /**
-     * @return bool
-     */
     public function isConnected(): bool
     {
         return ($this->queue !== null && $this->queue->isConnected());
@@ -198,7 +175,7 @@ class ClientProtocolHandler
     /**
      * @throws SocketException
      */
-    protected function queue(): ClientQueue
+    private function queue(): ClientQueue
     {
         if ($this->queue === null) {
             $this->queue = new ClientQueue($this->pool);

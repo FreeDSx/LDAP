@@ -40,6 +40,9 @@ trait LoggerTrait
         throw new RuntimeException($message);
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     protected function logError(
         string $message,
         array $context = []
@@ -51,6 +54,9 @@ trait LoggerTrait
         );
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     protected function logInfo(
         string $message,
         array $context = []
@@ -65,9 +71,7 @@ trait LoggerTrait
     /**
      * Log a message with a level and context (if we have a logger).
      *
-     * @param string $level
-     * @param string $message
-     * @param array $context
+     * @param array<string, mixed> $context
      */
     private function log(
         string $level,

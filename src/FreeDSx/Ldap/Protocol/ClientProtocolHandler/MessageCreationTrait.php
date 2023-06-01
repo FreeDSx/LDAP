@@ -11,6 +11,7 @@
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapQueue;
@@ -22,8 +23,14 @@ use FreeDSx\Ldap\Protocol\LdapQueue;
  */
 trait MessageCreationTrait
 {
-    protected function makeRequest(LdapQueue $queue, RequestInterface $request, array $controls): LdapMessageRequest
-    {
+    /**
+     * @param Control[] $controls
+     */
+    protected function makeRequest(
+        LdapQueue $queue,
+        RequestInterface $request,
+        array $controls
+    ): LdapMessageRequest {
         return new LdapMessageRequest(
             $queue->generateId(),
             $request,

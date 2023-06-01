@@ -28,21 +28,14 @@ class Options implements Countable, IteratorAggregate
     /**
      * @var Option[]
      */
-    protected $options;
+    private array $options;
 
-    /**
-     * @param string|Option ...$options
-     */
-    public function __construct(...$options)
+    public function __construct(string|Option ...$options)
     {
         $this->set(...$options);
     }
 
-    /**
-     * @param string|Option ...$options
-     * @return $this
-     */
-    public function add(...$options)
+    public function add(string|Option ...$options): self
     {
         foreach ($options as $option) {
             $this->options[] = $option instanceof Option ? $option : new Option($option);
@@ -51,11 +44,7 @@ class Options implements Countable, IteratorAggregate
         return $this;
     }
 
-    /**
-     * @param string|Option ...$options
-     * @return $this
-     */
-    public function set(...$options)
+    public function set(string|Option ...$options): self
     {
         $this->options = [];
         foreach ($options as $i => $option) {
@@ -69,11 +58,7 @@ class Options implements Countable, IteratorAggregate
         return $this;
     }
 
-    /**
-     * @param string|Option $option
-     * @return bool
-     */
-    public function has($option): bool
+    public function has(string|Option $option): bool
     {
         $option = $option instanceof Option ? $option : new Option($option);
 
@@ -86,11 +71,7 @@ class Options implements Countable, IteratorAggregate
         return false;
     }
 
-    /**
-     * @param string|Option ...$options
-     * @return $this
-     */
-    public function remove(...$options)
+    public function remove(string|Option ...$options): self
     {
         foreach ($options as $option) {
             $option = $option instanceof Option ? $option : new Option($option);
@@ -106,8 +87,6 @@ class Options implements Countable, IteratorAggregate
 
     /**
      * Retrieve the first option, if it exists.
-     *
-     * @return Option|null
      */
     public function first(): ?Option
     {
@@ -118,8 +97,6 @@ class Options implements Countable, IteratorAggregate
 
     /**
      * Retrieve the last option, if it exists.
-     *
-     * @return Option|null
      */
     public function last(): ?Option
     {
@@ -131,7 +108,6 @@ class Options implements Countable, IteratorAggregate
 
     /**
      * @param bool $sortedlc Used for comparison, as both case and order of options are irrelevant for options equality.
-     * @return string
      */
     public function toString(bool $sortedlc = false): string
     {
@@ -150,24 +126,20 @@ class Options implements Countable, IteratorAggregate
 
     /**
      * @return Option[]
-     * @psalm-return array<array-key, Option>
      */
     public function toArray(): array
     {
         return $this->options;
     }
 
-    /**
-     * @return string
-     */
-    public function __toString()
+    public function __toString(): string
     {
         return $this->toString();
     }
 
     /**
      * @inheritDoc
-     * @psalm-return ArrayIterator<array-key, Option>
+     * @return Traversable<Option>
      */
     public function getIterator(): Traversable
     {

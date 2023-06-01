@@ -20,9 +20,5 @@ use FreeDSx\Ldap\Entry\Dn;
  */
 interface DnRequestInterface
 {
-    /**
-     * @param string|Dn $dn
-     * @return $this
-     */
-    public function setDn($dn);
+    public function setDn(Dn|string $dn): static;
 }

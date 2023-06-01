@@ -35,61 +35,38 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class DirSyncResponseControl extends Control
 {
-    /**
-     * @var int
-     */
-    protected $moreResults;
+    private int $moreResults;
 
-    /**
-     * @var int
-     */
-    protected $unused;
+    private int $unused;
 
-    /**
-     * @var string
-     */
-    protected $cookie;
+    private string $cookie;
 
-    /**
-     * @param int $moreResults
-     * @param int $unused
-     * @param string $cookie
-     */
-    public function __construct(int $moreResults, int $unused = 0, string $cookie = '')
-    {
+    public function __construct(
+        int $moreResults,
+        int $unused = 0,
+        string $cookie = ''
+    ) {
         $this->moreResults = $moreResults;
         $this->unused = $unused;
         $this->cookie = $cookie;
         parent::__construct(self::OID_DIR_SYNC);
     }
 
-    /**
-     * @return int
-     */
     public function getMoreResults(): int
     {
         return $this->moreResults;
     }
 
-    /**
-     * @return bool
-     */
     public function hasMoreResults(): bool
     {
         return $this->moreResults !== 0;
     }
 
-    /**
-     * @return int
-     */
     public function getUnused(): int
     {
         return $this->unused;
     }
 
-    /**
-     * @return string
-     */
     public function getCookie(): string
     {
         return $this->cookie;
@@ -97,11 +74,10 @@ class DirSyncResponseControl extends Control
 
     /**
      * {@inheritDoc}
-     * @return Control
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $response = self::decodeEncodedValue($type);
         if (!$response instanceof SequenceType) {
@@ -120,13 +96,16 @@ class DirSyncResponseControl extends Control
             throw new ProtocolException('A DirSyncResponse control value sequence 2 must be an octet string type.');
         }
 
-        $control = new self(
+        $control = new static(
             $more->getValue(),
             $unused->getValue(),
             $cookie->getValue()
         );
 
-        return self::mergeControlData($control, $type);
+        return self::mergeControlData(
+            $control,
+            $type
+        );
     }
 
     /**

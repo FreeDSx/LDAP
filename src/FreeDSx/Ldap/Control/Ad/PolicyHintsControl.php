@@ -32,34 +32,24 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class PolicyHintsControl extends Control
 {
-    /**
-     * @var bool
-     */
-    protected $isEnabled;
+    private bool $isEnabled;
 
-    /**
-     * @param bool $isEnabled
-     */
     public function __construct(bool $isEnabled = true)
     {
         $this->isEnabled = $isEnabled;
-        parent::__construct(self::OID_POLICY_HINTS, true);
+        parent::__construct(
+            self::OID_POLICY_HINTS,
+            true
+        );
     }
 
-    /**
-     * @param bool $isEnabled
-     * @return $this
-     */
-    public function setIsEnabled(bool $isEnabled)
+    public function setIsEnabled(bool $isEnabled): self
     {
         $this->isEnabled = $isEnabled;
 
         return $this;
     }
 
-    /**
-     * @return bool
-     */
     public function getIsEnabled(): bool
     {
         return $this->isEnabled;
@@ -77,11 +67,10 @@ class PolicyHintsControl extends Control
 
     /**
      * {@inheritDoc}
-     * @return Control
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $request = self::decodeEncodedValue($type);
         if (!$request instanceof SequenceType) {
@@ -91,8 +80,11 @@ class PolicyHintsControl extends Control
         if (!$isEnabled instanceof IntegerType) {
             throw new ProtocolException('A PolicyHints control value sequence 0 must be an integer type.');
         }
-        $control = new self($isEnabled->getValue());
+        $control = new static($isEnabled->getValue());
 
-        return self::mergeControlData($control, $type);
+        return self::mergeControlData(
+            $control,
+            $type
+        );
     }
 }

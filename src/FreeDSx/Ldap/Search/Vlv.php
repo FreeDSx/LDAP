@@ -32,60 +32,31 @@ use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
  */
 class Vlv
 {
-    /**
-     * @var LdapClient
-     */
-    protected $client;
+    private LdapClient $client;
 
-    /**
-     * @var SearchRequest
-     */
-    protected $search;
+    private SearchRequest $search;
 
-    /**
-     * @var VlvResponseControl|null
-     */
-    protected $control;
+    private ?VlvResponseControl $control = null;
 
-    /**
-     * @var int
-     */
-    protected $before;
+    private int $before;
 
-    /**
-     * @var int
-     */
-    protected $after;
+    private int $after;
 
-    /**
-     * @var int
-     */
-    protected $offset = 1;
+    private int $offset = 1;
 
-    /**
-     * @var GreaterThanOrEqualFilter
-     */
-    protected $filter;
+    private ?GreaterThanOrEqualFilter $filter = null;
 
-    /**
-     * @var SortingControl
-     */
-    protected $sort;
+    private SortingControl $sort;
 
-    /**
-     * @var bool
-     */
-    protected $asPercentage = false;
+    private bool $asPercentage = false;
 
-    /**
-     * @param LdapClient $client
-     * @param SearchRequest $search
-     * @param SortingControl|SortKey|string $sort
-     * @param int $before
-     * @param int $after
-     */
-    public function __construct(LdapClient $client, SearchRequest $search, $sort, int $after = 100, int $before = 0)
-    {
+    public function __construct(
+        LdapClient $client,
+        SearchRequest $search,
+        SortingControl|SortKey|string $sort,
+        int $after = 100,
+        int $before = 0
+    ) {
         $this->client = $client;
         $this->search = $search;
         $this->sort = $sort instanceof SortingControl ? $sort : Controls::sort($sort);
@@ -96,11 +67,8 @@ class Vlv
     /**
      * As a percentage the moveTo, moveForward, moveBackward, and position methods work with numbers 0 - 100 and should
      * be interpreted as percentages.
-     *
-     * @param bool $asPercentage
-     * @return $this
      */
-    public function asPercentage(bool $asPercentage = true)
+    public function asPercentage(bool $asPercentage = true): self
     {
         $this->asPercentage = $asPercentage;
 
@@ -109,11 +77,8 @@ class Vlv
 
     /**
      * Request to start at a specific offset/percentage of entries.
-     *
-     * @param int $offset
-     * @return $this
      */
-    public function startAt(int $offset)
+    public function startAt(int $offset): self
     {
         $this->offset = $offset;
 
@@ -122,11 +87,8 @@ class Vlv
 
     /**
      * Move backward the specified number or percentage from the current position.
-     *
-     * @param int $size
-     * @return $this
      */
-    public function moveBackward(int $size)
+    public function moveBackward(int $size): self
     {
         $this->offset = ($this->offset - $size < 0) ? 0 : $this->offset - $size;
 
@@ -135,11 +97,8 @@ class Vlv
 
     /**
      * Move forward the specified number or percentage from the current position.
-     *
-     * @param int $size
-     * @return $this
      */
-    public function moveForward(int $size)
+    public function moveForward(int $size): self
     {
         $this->offset = ($this->asPercentage && ($this->offset + $size) > 100) ? 100 : $this->offset + $size;
 
@@ -148,22 +107,16 @@ class Vlv
 
     /**
      * Moves the starting entry of the list to a specific position/percentage of the total list. An alias for startAt().
-     *
-     * @param int $position
-     * @return Vlv
      */
-    public function moveTo(int $position)
+    public function moveTo(int $position): self
     {
         return $this->startAt($position);
     }
 
     /**
      * Retrieve the following number of entries after the position specified.
-     *
-     * @param int $after
-     * @return $this
      */
-    public function afterPosition(int $after)
+    public function afterPosition(int $after): self
     {
         $this->after = $after;
 
@@ -172,11 +125,8 @@ class Vlv
 
     /**
      * Retrieve the following number of entries before the position specified.
-     *
-     * @param int $before
-     * @return $this
      */
-    public function beforePosition(int $before)
+    public function beforePosition(int $before): self
     {
         $this->before = $before;
 
@@ -184,9 +134,7 @@ class Vlv
     }
 
     /**
-     * Get the servers entry offset of the current list.
-     *
-     * @return int|null
+     * Get the server's entry offset of the current list.
      */
     public function listOffset(): ?int
     {
@@ -195,8 +143,6 @@ class Vlv
 
     /**
      * Get the severs estimate, from the last request, that indicates how many entries are in the list.
-     *
-     * @return int|null
      */
     public function listSize(): ?int
     {
@@ -206,13 +152,11 @@ class Vlv
     /**
      * Get the current position in the list. When as percentage was specified this will be expressed as a percentage.
      * Use listOffset for a specific entry offset position.
-     *
-     * @return int|null
      */
     public function position(): ?int
     {
         $control = $this->control;
-        $pos = $control === null ? null : $control->getOffset();
+        $pos = $control?->getOffset();
         if ($control === null || $pos === null) {
             return null;
         }
@@ -225,9 +169,7 @@ class Vlv
     }
 
     /**
-     * Whether or not we are at the end of the list.
-     *
-     * @return bool
+     * Whether we are at the end of the list.
      */
     public function isAtEndOfList(): bool
     {
@@ -244,9 +186,7 @@ class Vlv
     }
 
     /**
-     * Whether or not we are currently at the start of the list.
-     *
-     * @return bool
+     * Whether we are currently at the start of the list.
      */
     public function isAtStartOfList(): bool
     {
@@ -262,7 +202,6 @@ class Vlv
     }
 
     /**
-     * @return Entries
      * @throws ProtocolException
      * @throws OperationException
      */
@@ -272,15 +211,15 @@ class Vlv
     }
 
     /**
-     * @return Entries
      * @throws OperationException
+     * @throws ProtocolException
      */
-    protected function send(): Entries
+    private function send(): Entries
     {
         $contextId = ($this->control !== null) ? $this->control->getContextId() : null;
         $message = $this->client->sendAndReceive($this->search, $this->createVlvControl($contextId), $this->sort);
         $control = $message->controls()->get(Control::OID_VLV_RESPONSE);
-        if ($control === null || !$control instanceof VlvResponseControl) {
+        if (!$control instanceof VlvResponseControl) {
             throw new ProtocolException('Expected a VLV response control, but received none.');
         }
         $this->control = $control;
@@ -290,10 +229,7 @@ class Vlv
         return $response->getEntries();
     }
 
-    /**
-     * @return VlvControl
-     */
-    protected function createVlvControl(?string $contextId): VlvControl
+    private function createVlvControl(?string $contextId): VlvControl
     {
         if ($this->filter !== null) {
             return Controls::vlvFilter($this->before, $this->after, $this->filter, $contextId);
@@ -319,6 +255,12 @@ class Vlv
             $offset = (int) round(((int) $this->control->getCount() / 100) * $offset);
         }
 
-        return Controls::vlv($this->before, $this->after, $offset, $count, $contextId);
+        return Controls::vlv(
+            $this->before,
+            $this->after,
+            $offset,
+            $count,
+            $contextId
+        );
     }
 }

@@ -27,18 +27,15 @@ use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 class ExtendedResponseFactory
 {
     /**
-     * @var string[]
+     * @var array<string, string>
      */
-    protected static $map = [
+    private static array $map = [
         ExtendedRequest::OID_PWD_MODIFY => PasswordModifyResponse::class,
     ];
 
     /**
      * Retrieve the Request Response/Request class given a protocol number and the ASN1.
      *
-     * @param AbstractType $asn1
-     * @param string $oid
-     * @return ExtendedResponse
      * @throws ProtocolException
      * @throws RuntimeException
      */
@@ -63,11 +60,8 @@ class ExtendedResponseFactory
 
     /**
      * Check whether a specific control OID is mapped to a class.
-     *
-     * @param string $oid
-     * @return bool
      */
-    public function has(string $oid)
+    public function has(string $oid): bool
     {
         return isset(self::$map[$oid]);
     }

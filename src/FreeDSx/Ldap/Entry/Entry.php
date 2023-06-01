@@ -25,27 +25,20 @@ use function is_array;
  */
 class Entry implements IteratorAggregate, Countable
 {
-    /**
-     * @var Attribute[]
-     */
-    protected $attributes;
+    protected array $attributes;
 
-    /**
-     * @var Dn
-     */
-    protected $dn;
+    protected Dn $dn;
 
-    /**
-     * @var Changes
-     */
-    protected $changes;
+    protected Changes $changes;
 
     /**
      * @param string|Dn $dn
      * @param Attribute ...$attributes
      */
-    public function __construct($dn, Attribute ...$attributes)
-    {
+    public function __construct(
+        Dn|string $dn,
+        Attribute ...$attributes
+    ) {
         $this->dn = $dn instanceof Dn ? $dn : new Dn($dn);
         $this->attributes = $attributes;
         $this->changes = new Changes();
@@ -53,14 +46,14 @@ class Entry implements IteratorAggregate, Countable
 
     /**
      * Add an attribute and its values.
-     *
-     * @param string|Attribute $attribute
-     * @param string ...$values
-     * @return $this
      */
-    public function add($attribute, ...$values)
-    {
-        $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
+    public function add(
+        Attribute|string $attribute,
+        mixed ...$values
+    ): static {
+        $attribute = $attribute instanceof Attribute
+            ? $attribute
+            : new Attribute($attribute, ...$values);
 
         if (($exists = $this->get($attribute, true)) !== null) {
             $exists->add(...$attribute->getValues());
@@ -74,13 +67,11 @@ class Entry implements IteratorAggregate, Countable
 
     /**
      * Remove an attribute's value(s).
-     *
-     * @param string|Attribute $attribute
-     * @param mixed|string ...$values
-     * @return $this
      */
-    public function remove($attribute, ...$values)
-    {
+    public function remove(
+        Attribute|string $attribute,
+        mixed ...$values
+    ): static {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
 
         if (count($attribute->getValues()) !== 0) {
@@ -95,11 +86,8 @@ class Entry implements IteratorAggregate, Countable
 
     /**
      * Reset an attribute, which removes any values it may have.
-     *
-     * @param string|Attribute ...$attributes
-     * @return $this
      */
-    public function reset(...$attributes)
+    public function reset(Attribute|string ...$attributes): static
     {
         foreach ($attributes as $attribute) {
             $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute);
@@ -117,13 +105,11 @@ class Entry implements IteratorAggregate, Countable
 
     /**
      * Set an attribute on the entry, replacing any value(s) that may exist on it.
-     *
-     * @param string|Attribute $attribute
-     * @param mixed ...$values
-     * @return $this
      */
-    public function set($attribute, ...$values)
-    {
+    public function set(
+        Attribute|string $attribute,
+        mixed ...$values
+    ): static {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
 
         $exists = false;
@@ -145,12 +131,12 @@ class Entry implements IteratorAggregate, Countable
     /**
      * Get a specific attribute by name (or Attribute object).
      *
-     * @param string|Attribute $attribute
      * @param bool $strict If set to true, then options on the attribute must also match.
-     * @return null|Attribute
      */
-    public function get($attribute, bool $strict = false): ?Attribute
-    {
+    public function get(
+        Attribute|string $attribute,
+        bool $strict = false
+    ): ?Attribute {
         $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute);
 
         foreach ($this->attributes as $attr) {
@@ -164,16 +150,19 @@ class Entry implements IteratorAggregate, Countable
 
     /**
      * Check if a specific attribute exists on the entry.
-     *
-     * @param string|Attribute $attribute
-     * @param bool $strict
-     * @return bool
      */
-    public function has($attribute, bool $strict = false): bool
-    {
-        $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute);
+    public function has(
+        Attribute|string $attribute,
+        bool $strict = false
+    ): bool {
+        $attribute = $attribute instanceof Attribute
+            ? $attribute
+            : new Attribute($attribute);
 
-        return (bool) $this->get($attribute, $strict);
+        return (bool) $this->get(
+            $attribute,
+            $strict
+        );
     }
 
     /**
@@ -184,9 +173,6 @@ class Entry implements IteratorAggregate, Countable
         return $this->attributes;
     }
 
-    /**
-     * @return Dn
-     */
     public function getDn(): Dn
     {
         return $this->dn;
@@ -194,8 +180,6 @@ class Entry implements IteratorAggregate, Countable
 
     /**
      * Get the changes accumulated for this entry.
-     *
-     * @return Changes
      */
     public function changes(): Changes
     {
@@ -205,7 +189,7 @@ class Entry implements IteratorAggregate, Countable
     /**
      * Get the entry representation as an associative array.
      *
-     * @return array
+     * @return array<string, string[]>
      */
     public function toArray(): array
     {
@@ -228,7 +212,6 @@ class Entry implements IteratorAggregate, Countable
     }
 
     /**
-     * @return int
      * @psalm-return 0|positive-int
      */
     public function count(): int
@@ -246,10 +229,7 @@ class Entry implements IteratorAggregate, Countable
         return $this->get($name);
     }
 
-    /**
-     * @param string[]|string $value
-     */
-    public function __set(string $name, $value): void
+    public function __set(string $name, mixed $value): void
     {
         $this->set($name, ...(is_array($value) ? $value : [$value]));
     }
@@ -267,24 +247,27 @@ class Entry implements IteratorAggregate, Countable
     /**
      * An alias of fromArray().
      *
-     * @param string $dn
-     * @param array $attributes
-     * @return Entry
+     * @param array<string, string|array> $attributes
      */
-    public static function create(string $dn, array $attributes = []): Entry
-    {
-        return self::fromArray($dn, $attributes);
+    public static function create(
+        string $dn,
+        array $attributes = []
+    ): Entry {
+        return self::fromArray(
+            $dn,
+            $attributes
+        );
     }
 
     /**
      * Construct an entry from an associative array.
      *
-     * @param string $dn
-     * @param array $attributes
-     * @return Entry
+     * @param array<string, string|array> $attributes
      */
-    public static function fromArray(string $dn, array $attributes = []): Entry
-    {
+    public static function fromArray(
+        string $dn,
+        array $attributes = []
+    ): Entry {
         /** @var Attribute[] $entryAttr */
         $entryAttr = [];
 

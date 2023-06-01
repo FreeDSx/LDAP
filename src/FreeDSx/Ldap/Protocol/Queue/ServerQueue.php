@@ -16,7 +16,6 @@ use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
-use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\LdapQueue;
@@ -31,8 +30,6 @@ use FreeDSx\Socket\Queue\Message;
 class ServerQueue extends LdapQueue
 {
     /**
-     * @param int|null $id
-     * @return LdapMessageRequest
      * @throws ProtocolException
      * @throws UnsolicitedNotificationException
      * @throws ConnectionException
@@ -52,8 +49,6 @@ class ServerQueue extends LdapQueue
     }
 
     /**
-     * @param LdapMessageResponse ...$response
-     * @return $this
      * @throws EncoderException
      */
     public function sendMessage(LdapMessageResponse ...$response): self
@@ -64,15 +59,13 @@ class ServerQueue extends LdapQueue
     }
 
     /**
-     * @param Message $message
-     * @param int|null $id
-     * @return LdapMessage
+     * {@inheritDoc}
      * @throws ProtocolException
      * @throws EncoderException
      * @throws PartialPduException
      * @throws RuntimeException
      */
-    protected function constructMessage(Message $message, ?int $id = null)
+    protected function constructMessage(Message $message, ?int $id = null): LdapMessageRequest
     {
         return LdapMessageRequest::fromAsn1($message->getMessage());
     }

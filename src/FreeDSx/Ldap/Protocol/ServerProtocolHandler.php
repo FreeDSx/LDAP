@@ -41,9 +41,9 @@ class ServerProtocolHandler
     use LoggerTrait;
 
     /**
-     * @var array
+     * @var array<string, mixed>
      */
-    protected $options = [
+    private array $options = [
         'allow_anonymous' => false,
         'require_authentication' => true,
         'request_handler' => null,
@@ -53,46 +53,26 @@ class ServerProtocolHandler
         'dse_vendor_version' => null,
     ];
 
-    /**
-     * @var ServerQueue
-     */
-    protected $queue;
+    private ServerQueue $queue;
 
     /**
      * @var int[]
      */
-    protected $messageIds = [];
+    private array $messageIds = [];
+
+    private HandlerFactoryInterface $handlerFactory;
+
+    private ServerAuthorization $authorizer;
+
+    private ServerProtocolHandlerFactory $protocolHandlerFactory;
+
+    private ResponseFactory $responseFactory;
+
+    private ServerBindHandlerFactory $bindHandlerFactory;
 
     /**
-     * @var HandlerFactoryInterface
+     * @param array<string, mixed> $options
      */
-    protected $handlerFactory;
-
-    /**
-     * @var ServerAuthorization
-     */
-    protected $authorizer;
-
-    /**
-     * @var ServerProtocolHandlerFactory
-     */
-    protected $protocolHandlerFactory;
-
-    /**
-     * @var ResponseFactory
-     */
-    protected $responseFactory;
-
-    /**
-     * @var ServerBindHandlerFactory
-     */
-    protected $bindHandlerFactory;
-
-    /**
-     * @var array<string, mixed>
-     */
-    protected $defaultContext = [];
-
     public function __construct(
         ServerQueue $queue,
         HandlerFactoryInterface $handlerFactory,
@@ -122,7 +102,6 @@ class ServerProtocolHandler
     public function handle(array $defaultContext = []): void
     {
         $message = null;
-        $this->defaultContext = $defaultContext;
 
         try {
             while ($message = $this->queue->getMessage()) {
@@ -145,7 +124,7 @@ class ServerProtocolHandler
                 'Ending LDAP client due to client connection issues.',
                 array_merge(
                     ['message' => $e->getMessage()],
-                    $this->defaultContext
+                    $defaultContext
                 )
             );
         } catch (EncoderException | ProtocolException $e) {
@@ -154,13 +133,13 @@ class ServerProtocolHandler
             $this->sendNoticeOfDisconnect('The message encoding is malformed.');
             $this->logError(
                 'The client sent a malformed request. Terminating their connection.',
-                $this->defaultContext
+                $defaultContext
             );
         } catch (Exception | Throwable $e) {
             $this->logError(
                 'An unexpected exception was caught while handling the client. Terminating their connection.',
                 array_merge(
-                    $this->defaultContext,
+                    $defaultContext,
                     ['exception' => $e]
                 )
             );
@@ -292,7 +271,6 @@ class ServerProtocolHandler
     }
 
     /**
-     * @param string $message
      * @throws EncoderException
      */
     protected function sendNoticeOfDisconnect(

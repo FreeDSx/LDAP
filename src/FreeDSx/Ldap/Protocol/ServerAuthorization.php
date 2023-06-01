@@ -29,33 +29,21 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 class ServerAuthorization
 {
-    /**
-     * @var bool
-     */
-    protected $isAuthRequired;
+    private bool $isAuthRequired;
 
-    /**
-     * @var bool
-     */
-    protected $isAnonymousAllowed;
+    private bool $isAnonymousAllowed;
 
-    /**
-     * @var TokenInterface
-     */
-    protected $token;
+    private TokenInterface $token;
 
     public function __construct(TokenInterface $token = null, array $options = [])
     {
         $this->token = $token ?? new AnonToken();
-        $this->isAuthRequired = isset($options['require_authentication']) ? (bool) $options['require_authentication'] : true;
-        $this->isAnonymousAllowed = isset($options['allow_anonymous']) ? (bool) $options['allow_anonymous'] : false;
+        $this->isAuthRequired = !isset($options['require_authentication']) || $options['require_authentication'];
+        $this->isAnonymousAllowed = isset($options['allow_anonymous']) && $options['allow_anonymous'];
     }
 
     /**
      * Helps determine if a specific request type actually requires authentication to complete.
-     *
-     * @param RequestInterface $request
-     * @return bool
      */
     public function isAuthenticationRequired(RequestInterface $request): bool
     {
@@ -127,11 +115,7 @@ class ServerAuthorization
         return $this->token;
     }
 
-    /**
-     * @param RequestInterface $request
-     * @return bool
-     */
-    protected function isRootDseSearch(RequestInterface $request): bool
+    private function isRootDseSearch(RequestInterface $request): bool
     {
         if (!$request instanceof SearchRequest) {
             return false;

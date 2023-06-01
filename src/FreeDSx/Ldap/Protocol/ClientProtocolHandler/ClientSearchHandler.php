@@ -35,8 +35,6 @@ use FreeDSx\Socket\Exception\ConnectionException;
 class ClientSearchHandler extends ClientBasicHandler
 {
     /**
-     * @param ClientProtocolContext $context
-     * @return LdapMessageResponse|null
      * @throws EncoderException
      * @throws ProtocolException
      * @throws UnsolicitedNotificationException
@@ -54,19 +52,19 @@ class ClientSearchHandler extends ClientBasicHandler
     }
 
     /**
-     * @param LdapMessageRequest $messageTo
-     * @param LdapMessageResponse $messageFrom
-     * @param ClientQueue $queue
-     * @param array $options
-     * @return LdapMessageResponse|null
+     * {@inheritDoc}
      * @throws OperationException
      * @throws BindException
      * @throws ProtocolException
      * @throws UnsolicitedNotificationException
      * @throws ConnectionException
      */
-    public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse
-    {
+    public function handleResponse(
+        LdapMessageRequest $messageTo,
+        LdapMessageResponse $messageFrom,
+        ClientQueue $queue,
+        array $options,
+    ): ?LdapMessageResponse {
         $entries = [];
 
         while (!($messageFrom->getResponse() instanceof SearchResultDone)) {
@@ -89,6 +87,11 @@ class ClientSearchHandler extends ClientBasicHandler
             ...$messageFrom->controls()->toArray()
         );
 
-        return parent::handleResponse($messageTo, $finalResponse, $queue, $options);
+        return parent::handleResponse(
+            $messageTo,
+            $finalResponse,
+            $queue,
+            $options
+        );
     }
 }

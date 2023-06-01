@@ -40,58 +40,38 @@ class Rdn
         '>' => '\\3e',
     ];
 
-    /**
-     * @var string
-     */
-    protected $name;
+    private string $name;
 
-    /**
-     * @var string
-     */
-    protected $value;
+    private string $value;
 
     /**
      * @var Rdn[]
      */
-    protected $additional = [];
+    protected array $additional = [];
 
-    /**
-     * @param string $name
-     * @param string $value
-     */
-    public function __construct(string $name, string $value)
-    {
+    public function __construct(
+        string $name,
+        string $value
+    ) {
         $this->name = $name;
         $this->value = $value;
     }
 
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return $this->name;
     }
 
-    /**
-     * @return string
-     */
     public function getValue(): string
     {
         return $this->value;
     }
 
-    /**
-     * @return bool
-     */
     public function isMultivalued(): bool
     {
         return count($this->additional) !== 0;
     }
 
-    /**
-     * @return string
-     */
     public function toString(): string
     {
         $rdn = $this->name . '=' . $this->value;
@@ -103,17 +83,12 @@ class Rdn
         return $rdn;
     }
 
-    /**
-     * @return string
-     */
-    public function __toString()
+    public function __toString(): string
     {
         return $this->toString();
     }
 
     /**
-     * @param string $rdn
-     * @return Rdn
      * @throws InvalidArgumentException
      */
     public static function create(string $rdn): Rdn
@@ -147,9 +122,6 @@ class Rdn
 
     /**
      * Escape an RDN value.
-     *
-     * @param string $value
-     * @return string
      */
     public static function escape(string $value): string
     {

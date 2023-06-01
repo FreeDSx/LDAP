@@ -24,12 +24,9 @@ final class RequestHistory
     /**
      * @var int[]
      */
-    private $ids = [];
+    private array $ids = [];
 
-    /**
-     * @var PagingRequests
-     */
-    private $pagingRequests;
+    private PagingRequests $pagingRequests;
 
     public function __construct(PagingRequests $pagingRequests = null)
     {
@@ -39,7 +36,6 @@ final class RequestHistory
     /**
      * Add a specific message ID that the client has used.
      *
-     * @param int $id
      * @throws ProtocolException
      */
     public function addId(int $id): void
@@ -56,8 +52,6 @@ final class RequestHistory
 
     /**
      * The currently active paging requests from the client.
-     *
-     * @return PagingRequests
      */
     public function pagingRequest(): PagingRequests
     {

@@ -27,13 +27,9 @@ class Changes implements Countable, IteratorAggregate
 {
     /**
      * @var Change[]
-     * @psalm-var list<Change>
      */
-    protected $changes = [];
+    private array $changes;
 
-    /**
-     * @param Change ...$changes
-     */
     public function __construct(Change ...$changes)
     {
         $this->changes = $changes;
@@ -41,11 +37,8 @@ class Changes implements Countable, IteratorAggregate
 
     /**
      * Add a change to the list.
-     *
-     * @param Change ...$changes
-     * @return $this
      */
-    public function add(Change ...$changes)
+    public function add(Change ...$changes): self
     {
         foreach ($changes as $change) {
             $this->changes[] = $change;
@@ -56,22 +49,20 @@ class Changes implements Countable, IteratorAggregate
 
     /**
      * Check if the change is in the change list.
-     *
-     * @param Change $change
-     * @return bool
      */
-    public function has(Change $change)
+    public function has(Change $change): bool
     {
-        return array_search($change, $this->changes, true) !== false;
+        return in_array(
+            $change,
+            $this->changes,
+            true
+        );
     }
 
     /**
      * Remove a change from the list.
-     *
-     * @param Change ...$changes
-     * @return $this
      */
-    public function remove(Change ...$changes)
+    public function remove(Change ...$changes): self
     {
         foreach ($changes as $change) {
             if (($index = array_search($change, $this->changes, true)) !== false) {
@@ -84,10 +75,8 @@ class Changes implements Countable, IteratorAggregate
 
     /**
      * Removes all changes from the list.
-     *
-     * @return $this
      */
-    public function reset()
+    public function reset(): self
     {
         $this->changes = [];
 
@@ -96,11 +85,8 @@ class Changes implements Countable, IteratorAggregate
 
     /**
      * Set the change list to just these changes.
-     *
-     * @param Change ...$changes
-     * @return $this
      */
-    public function set(Change ...$changes)
+    public function set(Change ...$changes): self
     {
         $this->changes = $changes;
 
@@ -125,8 +111,7 @@ class Changes implements Countable, IteratorAggregate
     }
 
     /**
-     * @inheritDoc
-     * @psalm-return \ArrayIterator<int, Change>
+     * @return  Traversable<int, Change>
      */
     public function getIterator(): Traversable
     {

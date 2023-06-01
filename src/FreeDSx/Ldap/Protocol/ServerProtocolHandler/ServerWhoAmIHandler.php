@@ -31,10 +31,16 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 class ServerWhoAmIHandler implements ServerProtocolHandlerInterface
 {
     /**
+     * {@inheritDoc}
      * @throws EncoderException
      */
-    public function handleRequest(LdapMessageRequest $message, TokenInterface $token, RequestHandlerInterface $dispatcher, ServerQueue $queue, array $options): void
-    {
+    public function handleRequest(
+        LdapMessageRequest $message,
+        TokenInterface $token,
+        RequestHandlerInterface $dispatcher,
+        ServerQueue $queue,
+        array $options
+    ): void {
         $userId = $token->getUsername();
 
         if ($userId !== null) {

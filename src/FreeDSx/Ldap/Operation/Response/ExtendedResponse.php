@@ -34,41 +34,33 @@ use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 class ExtendedResponse extends LdapResult
 {
     /**
-     * @var int
-     */
-    protected $tagNumber = 24;
-
-    /**
      * RFC 4511, 4.4.1. Used by the server to notify the client it is terminating the LDAP session.
      */
     public const OID_NOTICE_OF_DISCONNECTION = '1.3.6.1.4.1.1466.20036';
 
-    /**
-     * @var null|string
-     */
-    protected $responseName;
+    protected int $tagNumber = 24;
 
-    /**
-     * @var null|string|AbstractType|ProtocolElementInterface
-     */
-    protected $responseValue;
+    protected ?string $responseName;
 
-    /**
-     * @param LdapResult $result
-     * @param null|string $responseName
-     * @param null|string $responseValue
-     */
-    public function __construct(LdapResult $result, ?string $responseName = null, $responseValue = null)
-    {
+    protected AbstractType|ProtocolElementInterface|string|null $responseValue;
+
+    public function __construct(
+        LdapResult $result,
+        ?string $responseName = null,
+        $responseValue = null
+    ) {
         $this->responseValue = $responseValue;
         $this->responseName = $responseName;
-        parent::__construct($result->getResultCode(), $result->getDn(), $result->getDiagnosticMessage(), ...$result->getReferrals());
+        parent::__construct(
+            $result->getResultCode(),
+            $result->getDn(),
+            $result->getDiagnosticMessage(),
+            ...$result->getReferrals()
+        );
     }
 
     /**
      * Get the OID name of the extended response.
-     *
-     * @return null|string
      */
     public function getName(): ?string
     {
@@ -77,8 +69,6 @@ class ExtendedResponse extends LdapResult
 
     /**
      * Get the value of the extended response.
-     *
-     * @return null|string
      */
     public function getValue(): ?string
     {
@@ -87,19 +77,17 @@ class ExtendedResponse extends LdapResult
 
     /**
      * {@inheritDoc}
-     * @return self
      * @throws EncoderException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
-        return new self(
+        return new static(
             self::createLdapResult($type),
             ...self::parseExtendedResponse($type)
         );
     }
 
     /**
-     * @return AbstractType
      * @throws ProtocolException
      * @throws EncoderException
      */
@@ -126,10 +114,9 @@ class ExtendedResponse extends LdapResult
     }
 
     /**
-     * @param AbstractType $type
-     * @return array
+     * @return array{0: ?string, 1: ?string}
      */
-    protected static function parseExtendedResponse(AbstractType $type)
+    protected static function parseExtendedResponse(AbstractType $type): array
     {
         $info = [0 => null, 1 => null];
 
@@ -145,32 +132,35 @@ class ExtendedResponse extends LdapResult
     }
 
     /**
-     * @param AbstractType $type
-     * @return LdapResult
      * @throws ProtocolException
      * @throws EncoderException
      */
-    protected static function createLdapResult(AbstractType $type)
+    protected static function createLdapResult(AbstractType $type): LdapResult
     {
         [$resultCode, $dn, $diagnosticMessage, $referrals] = self::parseResultData($type);
 
-        return new LdapResult($resultCode, $dn, $diagnosticMessage, ...$referrals);
+        return new LdapResult(
+            $resultCode,
+            $dn,
+            $diagnosticMessage,
+            ...$referrals
+        );
     }
 
     /**
-     * @param AbstractType $type
-     * @return AbstractType|null
      * @throws ProtocolException
      * @throws EncoderException
      * @throws PartialPduException
      */
-    protected static function decodeEncodedValue(AbstractType $type)
+    protected static function decodeEncodedValue(AbstractType $type): ?AbstractType
     {
         if (!$type instanceof SequenceType) {
             throw new ProtocolException('The received control is malformed. Unable to get the encoded value.');
         }
         [1 => $value] = self::parseExtendedResponse($type);
 
-        return $value === null ? null : (new LdapEncoder())->decode($value);
+        return $value === null
+            ? null
+            : (new LdapEncoder())->decode($value);
     }
 }

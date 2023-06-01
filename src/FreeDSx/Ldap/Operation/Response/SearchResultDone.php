@@ -22,8 +22,5 @@ use FreeDSx\Ldap\Operation\LdapResult;
  */
 class SearchResultDone extends LdapResult
 {
-    /**
-     * @var int
-     */
-    protected $tagNumber = 5;
+    protected int $tagNumber = 5;
 }

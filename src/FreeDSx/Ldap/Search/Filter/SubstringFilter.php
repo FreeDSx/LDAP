@@ -41,29 +41,21 @@ class SubstringFilter implements FilterInterface
 
     protected const CHOICE_TAG = 4;
 
-    /**
-     * @var null|string
-     */
-    protected $startsWith;
+    private ?string $startsWith;
 
-    /**
-     * @var null|string
-     */
-    protected $endsWith;
+    private ?string $endsWith;
 
     /**
      * @var string[]
      */
-    protected $contains = [];
+    private array $contains;
 
-    /**
-     * @param string $attribute
-     * @param null|string $startsWith
-     * @param null|string $endsWith
-     * @param string ...$contains
-     */
-    public function __construct(string $attribute, ?string $startsWith = null, ?string $endsWith = null, string ...$contains)
-    {
+    public function __construct(
+        string $attribute,
+        ?string $startsWith = null,
+        ?string $endsWith = null,
+        string ...$contains
+    ) {
         $this->attribute = $attribute;
         $this->startsWith = $startsWith;
         $this->endsWith = $endsWith;
@@ -72,8 +64,6 @@ class SubstringFilter implements FilterInterface
 
     /**
      * Get the value that it should start with.
-     *
-     * @return null|string
      */
     public function getStartsWith(): ?string
     {
@@ -82,11 +72,8 @@ class SubstringFilter implements FilterInterface
 
     /**
      * Set the value it should start with.
-     *
-     * @param null|string $value
-     * @return $this
      */
-    public function setStartsWith(?string $value)
+    public function setStartsWith(?string $value): self
     {
         $this->startsWith = $value;
 
@@ -95,8 +82,6 @@ class SubstringFilter implements FilterInterface
 
     /**
      * Get the value it should end with.
-     *
-     * @return null|string
      */
     public function getEndsWith(): ?string
     {
@@ -105,11 +90,8 @@ class SubstringFilter implements FilterInterface
 
     /**
      * Set the value it should end with.
-     *
-     * @param null|string $value
-     * @return $this
      */
-    public function setEndsWith(?string $value)
+    public function setEndsWith(?string $value): self
     {
         $this->endsWith = $value;
 
@@ -128,11 +110,8 @@ class SubstringFilter implements FilterInterface
 
     /**
      * Set the values it should contain.
-     *
-     * @param string ...$values
-     * @return $this
      */
-    public function setContains(string ...$values)
+    public function setContains(string ...$values): self
     {
         $this->contains = $values;
 
@@ -195,10 +174,9 @@ class SubstringFilter implements FilterInterface
 
     /**
      * {@inheritDoc}
-     * @return SubstringFilter
      * @throws EncoderException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): self
     {
         $encoder = new LdapEncoder();
         $type = $type instanceof IncompleteType ? $encoder->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
@@ -213,20 +191,27 @@ class SubstringFilter implements FilterInterface
         }
         [$startsWith, $endsWith, $contains] = self::parseSubstrings($substrings);
 
-        return new self($attrType->getValue(), $startsWith, $endsWith, ...$contains);
+        return new self(
+            $attrType->getValue(),
+            $startsWith,
+            $endsWith,
+            ...$contains
+        );
     }
 
     /**
-     * @psalm-return array{0: mixed|null, 1: mixed|null, 2: list<mixed>}
+     * @return array{0: string|null, 1: string|null, 2: string[]}
      * @throws ProtocolException
      */
     protected static function parseSubstrings(SequenceType $substrings): array
     {
+        /** @var OctetStringType|null $startsWith */
         $startsWith = null;
+        /** @var OctetStringType|null $endsWith */
         $endsWith = null;
+        /** @var  string[] $contains */
         $contains = [];
 
-        /** @var AbstractType $substring */
         foreach ($substrings->getChildren() as $substring) {
             if ($substring->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
                 throw new ProtocolException('The substring filter is malformed.');
@@ -239,7 +224,11 @@ class SubstringFilter implements FilterInterface
                     $startsWith = $substring;
                 }
             } elseif ($substring->getTagNumber() === 1) {
-                $contains[] = $substring->getValue();
+                $value = $substring->getValue();
+                if (!is_string($value)) {
+                    $value = '';
+                }
+                $contains[] = $value;
             } elseif ($substring->getTagNumber() === 2) {
                 if ($endsWith !== null) {
                     throw new ProtocolException('The substring filter is malformed.');
@@ -251,9 +240,12 @@ class SubstringFilter implements FilterInterface
             }
         }
 
+        $startsWith = $startsWith?->getValue();
+        $endsWith = $endsWith?->getValue();
+
         return [
-            ($startsWith !== null) ? $startsWith->getValue() : null,
-            ($endsWith !== null) ? $endsWith->getValue() : null,
+            is_string($startsWith) ? $startsWith : null,
+            is_string($endsWith) ? $endsWith : null,
             $contains
         ];
     }

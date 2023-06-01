@@ -35,7 +35,7 @@ class Attribute implements IteratorAggregate, Countable
 {
     use EscapeTrait;
 
-    protected const ESCAPE_MAP = [
+    private const ESCAPE_MAP = [
         '\\' => '\5c',
         '*' => '\2a',
         '(' => '\28',
@@ -43,43 +43,29 @@ class Attribute implements IteratorAggregate, Countable
         "\x00" => '\00',
     ];
 
-    /**
-     * @var string
-     */
-    protected $attribute;
+    private string $attribute;
+
+    private ?string $lcAttribute = null;
 
     /**
-     * @var null|string
+     * @var string[]
      */
-    protected $lcAttribute;
+    private array $values;
 
-    /**
-     * @var mixed[]|string[]
-     */
-    protected $values = [];
+    private ?Options $options = null;
 
-    /**
-     * @var null|Options
-     */
-    protected $options;
-
-    /**
-     * @param string $attribute
-     * @param mixed|string ...$values
-     */
-    public function __construct(string $attribute, ...$values)
-    {
+    public function __construct(
+        string $attribute,
+        string ...$values
+    ) {
         $this->attribute = $attribute;
         $this->values = $values;
     }
 
     /**
      * Add a value, or values, to the attribute.
-     *
-     * @param mixed|string ...$values
-     * @return $this
      */
-    public function add(...$values): self
+    public function add(string ...$values): self
     {
         foreach ($values as $value) {
             $this->values[] = $value;
@@ -90,22 +76,20 @@ class Attribute implements IteratorAggregate, Countable
 
     /**
      * Check if the attribute has a specific value.
-     *
-     * @param mixed|string $value
-     * @return bool
      */
-    public function has($value): bool
+    public function has(string $value): bool
     {
-        return array_search($value, $this->values, true) !== false;
+        return in_array(
+            $value,
+            $this->values,
+            true
+        );
     }
 
     /**
      * Remove a specific value, or values, from an attribute.
-     *
-     * @param mixed|string ...$values
-     * @return $this
      */
-    public function remove(...$values): self
+    public function remove(string ...$values): self
     {
         foreach ($values as $value) {
             if (($i = array_search($value, $this->values, true)) !== false) {
@@ -118,8 +102,6 @@ class Attribute implements IteratorAggregate, Countable
 
     /**
      * Resets the values to any empty array.
-     *
-     * @return $this
      */
     public function reset(): self
     {
@@ -130,11 +112,8 @@ class Attribute implements IteratorAggregate, Countable
 
     /**
      * Set the values for the attribute.
-     *
-     * @param mixed|string ...$values
-     * @return $this
      */
-    public function set(...$values): self
+    public function set(string ...$values): self
     {
         $this->values = $values;
 
@@ -143,8 +122,6 @@ class Attribute implements IteratorAggregate, Countable
 
     /**
      * Gets the name (AttributeType) portion of the AttributeDescription, which excludes the options.
-     *
-     * @return string
      */
     public function getName(): string
     {
@@ -155,8 +132,6 @@ class Attribute implements IteratorAggregate, Countable
 
     /**
      * Gets the full AttributeDescription (RFC 4512, 2.5), which contains the attribute type (name) and options.
-     *
-     * @return string
      */
     public function getDescription(): string
     {
@@ -165,8 +140,6 @@ class Attribute implements IteratorAggregate, Countable
 
     /**
      * Gets any values associated with the attribute.
-     *
-     * @return array
      */
     public function getValues(): array
     {
@@ -175,20 +148,16 @@ class Attribute implements IteratorAggregate, Countable
 
     /**
      * Retrieve the first value of the attribute.
-     *
-     * @return string|mixed|null
      */
-    public function firstValue()
+    public function firstValue(): ?string
     {
         return $this->values[0] ?? null;
     }
 
     /**
      * Retrieve the last value of the attribute.
-     *
-     * @return string|mixed|null
      */
-    public function lastValue()
+    public function lastValue(): ?string
     {
         $last = end($this->values);
         reset($this->values);
@@ -198,17 +167,12 @@ class Attribute implements IteratorAggregate, Countable
 
     /**
      * Gets the options within the AttributeDescription (semi-colon separated list of options).
-     *
-     * @return Options
      */
     public function getOptions(): Options
     {
         return $this->options();
     }
 
-    /**
-     * @return bool
-     */
     public function hasOptions(): bool
     {
         return ($this->options()->count() > 0);
@@ -231,12 +195,12 @@ class Attribute implements IteratorAggregate, Countable
     }
 
     /**
-     * @param Attribute $attribute
      * @param bool $strict If set to true, then options must also match.
-     * @return bool
      */
-    public function equals(Attribute $attribute, bool $strict = false): bool
-    {
+    public function equals(
+        Attribute $attribute,
+        bool $strict = false
+    ): bool {
         $this->options();
         $attribute->options();
         if ($this->lcAttribute === null) {
@@ -256,9 +220,6 @@ class Attribute implements IteratorAggregate, Countable
         return $nameMatches;
     }
 
-    /**
-     * @return string
-     */
     public function __toString(): string
     {
         return implode(', ', $this->values);
@@ -266,9 +227,6 @@ class Attribute implements IteratorAggregate, Countable
 
     /**
      * Escape an attribute value for a filter.
-     *
-     * @param string $value
-     * @return string
      */
     public static function escape(string $value): string
     {

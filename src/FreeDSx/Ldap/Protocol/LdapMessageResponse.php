@@ -24,33 +24,25 @@ use FreeDSx\Ldap\Operation\Response\ResponseInterface;
  */
 class LdapMessageResponse extends LdapMessage
 {
-    /**
-     * @var ResponseInterface
-     */
-    protected $response;
+    private ResponseInterface $response;
 
-    /**
-     * @param int $messageId
-     * @param ResponseInterface $response
-     * @param Control ...$controls
-     */
-    public function __construct(int $messageId, ResponseInterface $response, Control ...$controls)
-    {
+    public function __construct(
+        int $messageId,
+        ResponseInterface $response,
+        Control ...$controls
+    ) {
         $this->response = $response;
-        parent::__construct($messageId, ...$controls);
+        parent::__construct(
+            $messageId,
+            ...$controls
+        );
     }
 
-    /**
-     * @return ResponseInterface|LdapResult
-     */
-    public function getResponse(): ResponseInterface
+    public function getResponse(): ResponseInterface|LdapResult
     {
         return $this->response;
     }
 
-    /**
-     * @return AbstractType
-     */
     protected function getOperationAsn1(): AbstractType
     {
         return $this->response->toAsn1();

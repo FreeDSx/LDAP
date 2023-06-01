@@ -18,84 +18,52 @@ namespace FreeDSx\Ldap\Control\Sorting;
  */
 class SortKey
 {
-    /**
-     * @var string
-     */
-    protected $attribute;
+    private string $attribute;
 
-    /**
-     * @var null|string
-     */
-    protected $orderingRule;
+    private ?string $orderingRule;
 
-    /**
-     * @var bool
-     */
-    protected $useReverseOrder;
+    private bool $useReverseOrder;
 
-    /**
-     * @param string $attribute
-     * @param bool $useReverseOrder
-     * @param null|string $orderingRule
-     */
-    public function __construct(string $attribute, bool $useReverseOrder = false, ?string $orderingRule = null)
-    {
+    public function __construct(
+        string $attribute,
+        bool $useReverseOrder = false,
+        ?string $orderingRule = null
+    ) {
         $this->attribute = $attribute;
         $this->orderingRule = $orderingRule;
         $this->useReverseOrder = $useReverseOrder;
     }
 
-    /**
-     * @return string
-     */
     public function getAttribute(): string
     {
         return $this->attribute;
     }
 
-    /**
-     * @param string $attribute
-     * @return $this
-     */
-    public function setAttribute(string $attribute)
+    public function setAttribute(string $attribute): self
     {
         $this->attribute = $attribute;
 
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function getOrderingRule(): ?string
     {
         return $this->orderingRule;
     }
 
-    /**
-     * @param null|string $orderingRule
-     * @return $this
-     */
-    public function setOrderingRule(?string $orderingRule)
+    public function setOrderingRule(?string $orderingRule): self
     {
         $this->orderingRule = $orderingRule;
 
         return $this;
     }
 
-    /**
-     * @return bool
-     */
     public function getUseReverseOrder(): bool
     {
         return $this->useReverseOrder;
     }
 
-    /**
-     * @param bool $useReverseOrder
-     * @return $this
-     */
-    public function setUseReverseOrder(bool $useReverseOrder)
+    public function setUseReverseOrder(bool $useReverseOrder): self
     {
         $this->useReverseOrder = $useReverseOrder;
 
@@ -104,25 +72,29 @@ class SortKey
 
     /**
      * Create an ascending sort key.
-     *
-     * @param string $attribute
-     * @param null|string $matchRule
-     * @return SortKey
      */
-    public static function ascending(string $attribute, ?string $matchRule = null)
-    {
-        return new self($attribute, false, $matchRule);
+    public static function ascending(
+        string $attribute,
+        ?string $matchRule = null
+    ): self {
+        return new self(
+            $attribute,
+            false,
+            $matchRule,
+        );
     }
 
     /**
      * Create a descending sort key.
-     *
-     * @param string $attribute
-     * @param null|string $matchRule
-     * @return SortKey
      */
-    public static function descending(string $attribute, ?string $matchRule = null)
-    {
-        return new self($attribute, true, $matchRule);
+    public static function descending(
+        string $attribute,
+        ?string $matchRule = null
+    ): self {
+        return new self(
+            $attribute,
+            true,
+            $matchRule,
+        );
     }
 }

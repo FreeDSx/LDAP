@@ -27,33 +27,20 @@ class AbandonRequest implements RequestInterface
 {
     protected const APP_TAG = 16;
 
-    /**
-     * @var int
-     */
-    protected $messageID;
+    private int $messageID;
 
-    /**
-     * @param int $messageID
-     */
     public function __construct(int $messageID)
     {
         $this->messageID = $messageID;
     }
 
-    /**
-     * @param int $messageID
-     * @return $this
-     */
-    public function setMessageId(int $messageID)
+    public function setMessageId(int $messageID): self
     {
         $this->messageID = $messageID;
 
         return $this;
     }
 
-    /**
-     * @return int
-     */
     public function getMessageId(): int
     {
         return $this->messageID;
@@ -61,9 +48,8 @@ class AbandonRequest implements RequestInterface
 
     /**
      * {@inheritDoc}
-     * @return AbandonRequest
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): self
     {
         if (!$type instanceof IntegerType) {
             throw new ProtocolException('The abandon request is malformed');
@@ -77,6 +63,9 @@ class AbandonRequest implements RequestInterface
      */
     public function toAsn1(): AbstractType
     {
-        return Asn1::application(self::APP_TAG, Asn1::integer($this->messageID));
+        return Asn1::application(
+            self::APP_TAG,
+            Asn1::integer($this->messageID)
+        );
     }
 }

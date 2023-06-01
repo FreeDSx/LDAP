@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Protocol\LdapQueue;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Queue\Message;
 use FreeDSx\Socket\SocketPool;
+use Generator;
 
 /**
  * The LDAP Queue class for sending and receiving messages for clients.
@@ -32,23 +33,22 @@ use FreeDSx\Socket\SocketPool;
  */
 class ClientQueue extends LdapQueue
 {
-    /**
-     * @var bool
-     */
-    protected $shouldReconnect = false;
+    private bool $shouldReconnect = false;
 
-    /**
-     * @var SocketPool
-     */
-    protected $socketPool;
+    private SocketPool $socketPool;
 
     /**
      * @throws ConnectionException
      */
-    public function __construct(SocketPool $socketPool, EncoderInterface $encoder = null)
-    {
+    public function __construct(
+        SocketPool $socketPool,
+        EncoderInterface $encoder = null
+    ) {
         $this->socketPool = $socketPool;
-        parent::__construct($socketPool->connect(), $encoder);
+        parent::__construct(
+            $socketPool->connect(),
+            $encoder
+        );
     }
 
     /**
@@ -72,11 +72,10 @@ class ClientQueue extends LdapQueue
     }
 
     /**
-     * @param int|null $id
-     * @return \Generator
+     * @return Generator<LdapMessageResponse>
      * @throws ConnectionException
      */
-    public function getMessages(?int $id = null)
+    public function getMessages(?int $id = null): Generator
     {
         $this->initSocket();
 
@@ -84,8 +83,6 @@ class ClientQueue extends LdapQueue
     }
 
     /**
-     * @param LdapMessageRequest ...$messages
-     * @return $this
      * @throws ConnectionException
      * @throws EncoderException
      */
@@ -118,16 +115,16 @@ class ClientQueue extends LdapQueue
     }
 
     /**
-     * @param Message $message
-     * @param int|null $id
-     * @return LdapMessage
+     * {@inheritDoc}
      * @throws ProtocolException
      * @throws EncoderException
      * @throws PartialPduException
      * @throws RuntimeException
      */
-    protected function constructMessage(Message $message, ?int $id = null)
-    {
+    protected function constructMessage(
+        Message $message,
+        ?int $id = null
+    ): LdapMessageResponse {
         return LdapMessageResponse::fromAsn1($message->getMessage());
     }
 }

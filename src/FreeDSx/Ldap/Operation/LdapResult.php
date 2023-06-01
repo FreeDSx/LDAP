@@ -85,50 +85,36 @@ use function count;
  */
 class LdapResult implements ResponseInterface
 {
-    /**
-     * @var int
-     */
-    protected $tagNumber;
+    protected int $tagNumber;
 
-    /**
-     * @var int
-     */
-    protected $resultCode;
+    protected int $resultCode;
 
-    /**
-     * @var Dn
-     */
-    protected $dn;
+    protected Dn $dn;
 
-    /**
-     * @var string
-     */
-    protected $diagnosticMessage;
+    protected string $diagnosticMessage;
 
     /**
      * @var LdapUrl[]
      */
-    protected $referrals = [];
+    protected array $referrals = [];
 
-    public function __construct(int $resultCode, string $dn = '', string $diagnosticMessage = '', LdapUrl ...$referrals)
-    {
+    public function __construct(
+        int $resultCode,
+        string $dn = '',
+        string $diagnosticMessage = '',
+        LdapUrl ...$referrals
+    ) {
         $this->resultCode = $resultCode;
         $this->dn = new Dn($dn);
         $this->diagnosticMessage = $diagnosticMessage;
         $this->referrals = $referrals;
     }
 
-    /**
-     * @return string
-     */
     public function getDiagnosticMessage(): string
     {
         return $this->diagnosticMessage;
     }
 
-    /**
-     * @return Dn
-     */
     public function getDn(): Dn
     {
         return $this->dn;
@@ -142,16 +128,12 @@ class LdapResult implements ResponseInterface
         return $this->referrals;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getResultCode(): int
     {
         return $this->resultCode;
     }
 
     /**
-     * @return AbstractType
      * @throws ProtocolException
      */
     public function toAsn1(): AbstractType
@@ -166,33 +148,32 @@ class LdapResult implements ResponseInterface
                 return Asn1::octetString($v);
             }, $this->referrals))));
         }
-        if ($this->tagNumber === null) {
-            throw new ProtocolException(sprintf('You must define the tag number property on %s', get_parent_class()));
-        }
 
         return Asn1::application($this->tagNumber, $result);
     }
 
     /**
      * {@inheritDoc}
-     * @return self
      * @throws EncoderException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         [$resultCode, $dn, $diagnosticMessage, $referrals] = self::parseResultData($type);
 
-        return new static($resultCode, $dn, $diagnosticMessage, ...$referrals);
+        return new static(
+            $resultCode,
+            $dn,
+            $diagnosticMessage,
+            ...$referrals
+        );
     }
 
     /**
-     * @param AbstractType $type
-     * @return array
-     * @psalm-return array{0: mixed, 1: mixed, 2: mixed, 3: list<LdapUrl>}
+     * @return array{0: mixed, 1: mixed, 2: mixed, 3: list<LdapUrl>}
      * @throws ProtocolException
      * @throws EncoderException
      */
-    protected static function parseResultData(AbstractType $type)
+    protected static function parseResultData(AbstractType $type): array
     {
         if (!$type instanceof SequenceType) {
             throw new ProtocolException('The LDAP result is malformed.');

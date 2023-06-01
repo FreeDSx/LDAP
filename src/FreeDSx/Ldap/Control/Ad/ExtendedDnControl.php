@@ -29,33 +29,20 @@ use function count;
  */
 class ExtendedDnControl extends Control
 {
-    /**
-     * @var bool
-     */
-    protected $useHexFormat;
+    private bool $useHexFormat;
 
-    /**
-     * @param bool $useHexFormat
-     */
     public function __construct(bool $useHexFormat = false)
     {
         $this->useHexFormat = $useHexFormat;
         parent::__construct(self::OID_EXTENDED_DN);
     }
 
-    /**
-     * @return bool
-     */
     public function getUseHexFormat(): bool
     {
         return $this->useHexFormat;
     }
 
-    /**
-     * @param bool $useHexFormat
-     * @return $this
-     */
-    public function setUseHexFormat(bool $useHexFormat)
+    public function setUseHexFormat(bool $useHexFormat): self
     {
         $this->useHexFormat = $useHexFormat;
 
@@ -64,11 +51,10 @@ class ExtendedDnControl extends Control
 
     /**
      * {@inheritDoc}
-     * @return ExtendedDnControl
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         if (!$type instanceof SequenceType) {
             throw new ProtocolException('The extended DN control is malformed.');
@@ -88,7 +74,7 @@ class ExtendedDnControl extends Control
             $useHexFormat = ($useHexFormat->getValue() === 0);
         }
 
-        $control = new self($useHexFormat);
+        $control = new static($useHexFormat);
         $control->controlType = $oid;
         $control->criticality = $criticality;
 
@@ -107,7 +93,6 @@ class ExtendedDnControl extends Control
     }
 
     /**
-     * @param AbstractType $type
      * @throws ProtocolException
      */
     protected static function validate(AbstractType $type): void
