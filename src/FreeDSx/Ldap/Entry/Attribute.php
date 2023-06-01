@@ -50,7 +50,7 @@ class Attribute implements IteratorAggregate, Countable
     /**
      * @var string[]
      */
-    private array $values;
+    private array $values = [];
 
     private ?Options $options = null;
 
