@@ -54,7 +54,7 @@ class ExtendedRequest implements RequestInterface
      */
     public const OID_PWD_MODIFY = '1.3.6.1.4.1.4203.1.11.1';
 
-    protected string $requestName;
+    private string $requestName;
 
     protected null|string|AbstractType|ProtocolElementInterface $requestValue;
 
@@ -111,7 +111,10 @@ class ExtendedRequest implements RequestInterface
             ));
         }
 
-        return Asn1::application(self::APP_TAG, $asn1);
+        return Asn1::application(
+            tagNumber: self::APP_TAG,
+            type: $asn1,
+        );
     }
 
     /**

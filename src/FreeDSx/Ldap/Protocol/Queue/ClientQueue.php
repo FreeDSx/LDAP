@@ -104,17 +104,6 @@ class ClientQueue extends LdapQueue
     }
 
     /**
-     * @throws ConnectionException
-     */
-    protected function initSocket(): void
-    {
-        if ($this->shouldReconnect) {
-            $this->socket = $this->socketPool->connect();
-            $this->shouldReconnect = false;
-        }
-    }
-
-    /**
      * {@inheritDoc}
      * @throws ProtocolException
      * @throws EncoderException
@@ -126,5 +115,16 @@ class ClientQueue extends LdapQueue
         ?int $id = null
     ): LdapMessageResponse {
         return LdapMessageResponse::fromAsn1($message->getMessage());
+    }
+
+    /**
+     * @throws ConnectionException
+     */
+    private function initSocket(): void
+    {
+        if ($this->shouldReconnect) {
+            $this->socket = $this->socketPool->connect();
+            $this->shouldReconnect = false;
+        }
     }
 }

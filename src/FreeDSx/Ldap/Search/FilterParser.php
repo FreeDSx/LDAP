@@ -37,7 +37,7 @@ class FilterParser
     /**
      * @var null|array<int, array{startAt?: int, endAt: null|int}>
      */
-    protected ?array $containers = null;
+    private ?array $containers = null;
 
     public function __construct(string $filter)
     {
@@ -61,7 +61,7 @@ class FilterParser
      * @return array{0: ?int, 1: FilterInterface}
      * @throws FilterParseException
      */
-    protected function parseFilterString(
+    private function parseFilterString(
         int $startAt,
         bool $isRoot = false
     ): array {
@@ -138,7 +138,7 @@ class FilterParser
      * @return array{0: int, 1: FilterInterface}
      * @throws FilterParseException
      */
-    protected function parseComparisonFilter(
+    private function parseComparisonFilter(
         int $startAt,
         bool $isRoot = false
     ): array {
@@ -193,7 +193,7 @@ class FilterParser
      *
      * @throws FilterParseException
      */
-    protected function validateComparisonFilter(
+    private function validateComparisonFilter(
         int $startAt,
         bool $isRoot
     ): bool {
@@ -227,7 +227,7 @@ class FilterParser
      *
      * @throws FilterParseException
      */
-    protected function validateParsedFilter(
+    private function validateParsedFilter(
         ?string $filterType,
         ?int $startsAt,
         ?int $startValue,
@@ -316,7 +316,7 @@ class FilterParser
     /**
      * @throws FilterParseException
      */
-    protected function getSubstringFilterObject(
+    private function getSubstringFilterObject(
         string $attribute,
         string $value
     ): SubstringFilter {
@@ -350,7 +350,7 @@ class FilterParser
     /**
      * @throws FilterParseException
      */
-    protected function getNotFilterObject(
+    private function getNotFilterObject(
         int $startAt,
         int $endAt
     ): FilterInterface {
@@ -417,7 +417,7 @@ class FilterParser
     /**
      * @throws FilterParseException
      */
-    protected function nextClosingParenthesis(int $startAt): int
+    private function nextClosingParenthesis(int $startAt): int
     {
         for ($i = $startAt; $i < $this->length; $i++) {
             # Look for the char, but ignore it if it is escaped
@@ -432,7 +432,7 @@ class FilterParser
         ));
     }
 
-    protected function unescapeValue(string $value): string
+    private function unescapeValue(string $value): string
     {
         return (string) preg_replace_callback(
             '/\\\\([0-9A-Fa-f]{2})/',
@@ -445,7 +445,7 @@ class FilterParser
      * @psalm-param 0|positive-int $child
      * @throws FilterParseException
      */
-    protected function parseContainerStart(int $i, ?int $child): array
+    private function parseContainerStart(int $i, ?int $child): array
     {
         # Is the parenthesis followed by an (ie. |, &, !) operator? If so it can contain children ...
         if (isset($this->filter[$i + 1]) && in_array($this->filter[$i + 1], FilterInterface::OPERATORS, true)) {
@@ -485,7 +485,7 @@ class FilterParser
     /**
      * @throws FilterParseException
      */
-    protected function parseContainerEnd(int $i): void
+    private function parseContainerEnd(int $i): void
     {
         $matchFound = false;
         foreach (array_reverse((array) $this->containers, true) as $ci => $info) {

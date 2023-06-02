@@ -56,7 +56,7 @@ class LdapServer
         'dse_vendor_version' => null,
     ];
 
-    protected ?ServerRunnerInterface $runner;
+    private ?ServerRunnerInterface $runner;
 
     /**
      * @param array<string, mixed> $options
