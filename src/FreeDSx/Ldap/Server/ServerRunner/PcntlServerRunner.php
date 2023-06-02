@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\ChildProcess;
 use FreeDSx\Ldap\Server\RequestHandler\HandlerFactory;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
 

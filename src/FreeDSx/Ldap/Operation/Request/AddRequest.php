@@ -112,7 +112,8 @@ class AddRequest implements RequestInterface
         }
 
         return new self(new Entry(
-            $dn, ...$attributes
+            $dn,
+            ...$attributes
         ));
     }
 

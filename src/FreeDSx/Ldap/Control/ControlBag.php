@@ -16,8 +16,8 @@ use Countable;
 use IteratorAggregate;
 use Traversable;
 use function array_search;
-use function in_array;
 use function count;
+use function in_array;
 use function is_string;
 
 /**

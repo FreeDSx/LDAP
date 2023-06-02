@@ -24,7 +24,6 @@ use function count;
 use function explode;
 use function implode;
 use function str_replace;
-use function strpos;
 use function strtolower;
 
 /**

@@ -143,14 +143,14 @@ class ClientProtocolHandler
             $messageTo = $context->messageToSend();
             if ($messageFrom !== null) {
                 $messageFrom = $this->protocolHandlerFactory->forResponse(
-                        $messageTo->getRequest(),
-                        $messageFrom->getResponse()
-                    )->handleResponse(
-                        $messageTo,
-                        $messageFrom,
-                        $this->queue(),
-                        $this->options
-                    );
+                    $messageTo->getRequest(),
+                    $messageFrom->getResponse()
+                )->handleResponse(
+                    $messageTo,
+                    $messageFrom,
+                    $this->queue(),
+                    $this->options
+                );
             }
 
             return $messageFrom;

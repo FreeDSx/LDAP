@@ -133,13 +133,13 @@ class LdapClient
     ): bool {
         /** @var CompareResponse $response */
         $response = $this->sendAndReceive(
-                Operations::compare(
-                    $dn,
-                    $attributeName,
-                    $value
-                ),
-                ...$controls
-            )->getResponse();
+            Operations::compare(
+                $dn,
+                $attributeName,
+                $value
+            ),
+            ...$controls
+        )->getResponse();
 
         return $response->getResultCode() === ResultCode::COMPARE_TRUE;
     }
@@ -200,9 +200,9 @@ class LdapClient
         Control ...$controls
     ): Entry {
         $entryObj = $this->search(
-                Operations::read($entry, ...$attributes),
-                ...$controls
-            )
+            Operations::read($entry, ...$attributes),
+            ...$controls
+        )
             ->first();
 
         if ($entryObj === null) {
@@ -294,9 +294,9 @@ class LdapClient
     ): Entries {
         /** @var SearchResponse $response */
         $response = $this->sendAndReceive(
-                $request,
-                ...$controls
-            )->getResponse();
+            $request,
+            ...$controls
+        )->getResponse();
 
         return $response->getEntries();
     }

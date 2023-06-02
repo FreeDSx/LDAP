@@ -26,8 +26,8 @@ use function ltrim;
 use function parse_url;
 use function preg_match;
 use function reset;
+use function str_contains;
 use function strlen;
-use function strpos;
 use function strtolower;
 
 /**
