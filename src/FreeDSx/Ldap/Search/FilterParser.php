@@ -225,14 +225,14 @@ class FilterParser
     /**
      * Validate some basic aspects of the filter after it is parsed.
      *
-     * @param string|null $filterType
-     * @param int|null $startsAt
-     * @param int|null $startValue
-     * @param int $endAt
      * @throws FilterParseException
      */
-    protected function validateParsedFilter(?string $filterType, ?int $startsAt, ?int $startValue, $endAt): void
-    {
+    protected function validateParsedFilter(
+        ?string $filterType,
+        ?int $startsAt,
+        ?int $startValue,
+        int $endAt
+    ): void {
         if ($filterType === null) {
             throw new FilterParseException(sprintf(
                 'Expected one of "%s" in the filter after position %s, but received none.',

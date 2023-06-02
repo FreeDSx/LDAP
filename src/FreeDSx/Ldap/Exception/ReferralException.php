@@ -27,9 +27,6 @@ class ReferralException extends Exception
      */
     private array $referrals;
 
-    /**
-     * @param LdapUrl ...$referrals
-     */
     public function __construct(
         string $diagnostic,
         LdapUrl ...$referrals

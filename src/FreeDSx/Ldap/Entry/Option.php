@@ -30,9 +30,6 @@ class Option implements Stringable
 
     private ?string $lcOption = null;
 
-    /**
-     * @param string $option
-     */
     public function __construct(string $option)
     {
         $this->option = $option;

@@ -33,9 +33,6 @@ class CancelRequest extends ExtendedRequest
 {
     private int $messageId;
 
-    /**
-     * @param int $messageId
-     */
     public function __construct(int $messageId)
     {
         $this->messageId = $messageId;

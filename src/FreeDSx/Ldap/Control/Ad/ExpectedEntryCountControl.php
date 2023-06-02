@@ -37,10 +37,6 @@ class ExpectedEntryCountControl extends Control
 
     private int $maximum;
 
-    /**
-     * @param int $min
-     * @param int $max
-     */
     public function __construct(
         int $min,
         int $max

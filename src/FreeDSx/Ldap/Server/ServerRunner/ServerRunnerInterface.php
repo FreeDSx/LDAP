@@ -22,8 +22,6 @@ interface ServerRunnerInterface
 {
     /**
      * Runs the socket server to accept incoming client connections and dispatch them to the protocol handler.
-     *
-     * @param SocketServer $server
      */
     public function run(SocketServer $server): void;
 }
