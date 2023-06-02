@@ -109,7 +109,10 @@ class SortingResponseControl extends Control
     {
         $this->controlValue = Asn1::sequence(Asn1::enumerated($this->result));
         if ($this->attribute !== null) {
-            $this->controlValue->addChild(Asn1::context(0, Asn1::octetString($this->attribute)));
+            $this->controlValue->addChild(Asn1::context(
+                tagNumber: 0,
+                type: Asn1::octetString($this->attribute)
+            ));
         }
 
         return parent::toAsn1();

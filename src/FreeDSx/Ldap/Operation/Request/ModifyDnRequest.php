@@ -158,7 +158,10 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
             Asn1::boolean($this->deleteOldRdn)
         ));
         if ($this->newParentDn !== null) {
-            $asn1->addChild(Asn1::context(0, Asn1::octetString($this->newParentDn->toString())));
+            $asn1->addChild(Asn1::context(
+                tagNumber: 0,
+                type: Asn1::octetString($this->newParentDn->toString())
+            ));
         }
 
         return $asn1;

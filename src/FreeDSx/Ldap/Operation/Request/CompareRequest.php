@@ -34,14 +34,8 @@ class CompareRequest implements RequestInterface, DnRequestInterface
 {
     protected const APP_TAG = 14;
 
-    /**
-     * @var Dn
-     */
     private Dn $dn;
 
-    /**
-     * @var EqualityFilter
-     */
     private EqualityFilter $filter;
 
     public function __construct(

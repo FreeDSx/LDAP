@@ -56,8 +56,8 @@ class NotFilter implements FilterInterface, Stringable
     public function toAsn1(): AbstractType
     {
         return Asn1::context(
-            self::CHOICE_TAG,
-            Asn1::sequence($this->filter->toAsn1())
+            tagNumber: self::CHOICE_TAG,
+            type: Asn1::sequence($this->filter->toAsn1()),
         );
     }
 

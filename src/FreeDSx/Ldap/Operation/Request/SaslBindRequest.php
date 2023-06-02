@@ -87,7 +87,10 @@ class SaslBindRequest extends BindRequest
             $sasl->addChild(Asn1::octetString($this->credentials));
         }
 
-        return Asn1::context(3, $sasl);
+        return Asn1::context(
+            tagNumber: 3,
+            type: $sasl
+        );
     }
 
     /**

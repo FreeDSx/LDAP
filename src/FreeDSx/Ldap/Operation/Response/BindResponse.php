@@ -61,8 +61,8 @@ class BindResponse extends LdapResult
 
         if ($this->saslCreds !== null) {
             $response->addChild(Asn1::context(
-                7,
-                Asn1::octetString($this->saslCreds)
+                tagNumber: 7,
+                type: Asn1::octetString($this->saslCreds)
             ));
         }
 

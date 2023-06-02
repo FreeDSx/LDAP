@@ -50,7 +50,10 @@ class PasswordModifyResponse extends ExtendedResponse
     public function toAsn1(): AbstractType
     {
         if ($this->generatedPassword !== null) {
-            $this->responseValue = Asn1::sequence(Asn1::context(0, Asn1::octetString($this->generatedPassword)));
+            $this->responseValue = Asn1::sequence(Asn1::context(
+                tagNumber: 0,
+                type: Asn1::octetString($this->generatedPassword)
+            ));
         }
 
         return parent::toAsn1();

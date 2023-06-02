@@ -123,7 +123,6 @@ class AddRequest implements RequestInterface
     {
         $attributeList = Asn1::sequenceOf();
 
-        /** @var Attribute $attribute */
         foreach ($this->entry->getAttributes() as $attribute) {
             $attr = Asn1::sequence(Asn1::octetString($attribute->getDescription()));
 

@@ -94,28 +94,49 @@ class Rdn implements Stringable
      */
     public static function create(string $rdn): Rdn
     {
-        $pieces = preg_split('/(?<!\\\\)\+/', $rdn);
+        $pieces = preg_split(
+            '/(?<!\\\\)\+/',
+            $rdn
+        );
         if ($pieces === false) {
-            throw new InvalidArgumentException(sprintf('The RDN "%s" is invalid.', $rdn));
+            throw new InvalidArgumentException(sprintf(
+                'The RDN "%s" is invalid.',
+                $rdn
+            ));
         }
 
         // @todo Simplify this logic somehow?
         $obj = null;
         foreach ($pieces as $piece) {
-            $parts = explode('=', $piece, 2);
+            $parts = explode(
+                separator: '=',
+                string: $piece,
+                limit: 2
+            );
             if (count($parts) !== 2) {
-                throw new InvalidArgumentException(sprintf('The RDN "%s" is invalid.', $piece));
+                throw new InvalidArgumentException(sprintf(
+                    'The RDN "%s" is invalid.',
+                    $piece
+                ));
             }
             if ($obj === null) {
-                $obj = new self($parts[0], $parts[1]);
+                $obj = new self(
+                    name: $parts[0],
+                    value: $parts[1]
+                );
             } else {
-                /** @var Rdn $obj */
-                $obj->additional[] = new self($parts[0], $parts[1]);
+                $obj->additional[] = new self(
+                    name: $parts[0],
+                    value: $parts[1],
+                );
             }
         }
 
         if ($obj === null) {
-            throw new InvalidArgumentException(sprintf("The RDN '%s' is not valid.", $rdn));
+            throw new InvalidArgumentException(sprintf(
+                "The RDN '%s' is not valid.",
+                $rdn
+            ));
         }
 
         return $obj;
@@ -129,7 +150,11 @@ class Rdn implements Stringable
         if (self::shouldNotEscape($value)) {
             return $value;
         }
-        $value = str_replace(array_keys(self::ESCAPE_MAP), array_values(self::ESCAPE_MAP), $value);
+        $value = str_replace(
+            search: array_keys(self::ESCAPE_MAP),
+            replace: array_values(self::ESCAPE_MAP),
+            subject: $value,
+        );
 
         if ($value[0] === '#' || $value[0] === ' ') {
             $value = ($value[0] === '#' ? '\23' : '\20') . substr($value, 1);

@@ -111,17 +111,32 @@ class MatchingRuleFilter implements FilterInterface, Stringable
      */
     public function toAsn1(): AbstractType
     {
-        /** @var \FreeDSx\Asn1\Type\SequenceType $matchingRule */
-        $matchingRule = Asn1::context(self::CHOICE_TAG, Asn1::sequence());
+        /** @var SequenceType $matchingRule */
+        $matchingRule = Asn1::context(
+            tagNumber: self::CHOICE_TAG,
+            type: Asn1::sequence()
+        );
 
         if ($this->matchingRule !== null) {
-            $matchingRule->addChild(Asn1::context(1, Asn1::octetString($this->matchingRule)));
+            $matchingRule->addChild(Asn1::context(
+                tagNumber: 1,
+                type: Asn1::octetString($this->matchingRule),
+            ));
         }
         if ($this->attribute !== null) {
-            $matchingRule->addChild(Asn1::context(2, Asn1::octetString($this->attribute)));
+            $matchingRule->addChild(Asn1::context(
+                tagNumber: 2,
+                type: Asn1::octetString($this->attribute),
+            ));
         }
-        $matchingRule->addChild(Asn1::context(3, Asn1::octetString($this->value)));
-        $matchingRule->addChild(Asn1::context(4, Asn1::boolean($this->useDnAttributes)));
+        $matchingRule->addChild(Asn1::context(
+            tagNumber: 3,
+            type: Asn1::octetString($this->value),
+        ));
+        $matchingRule->addChild(Asn1::context(
+            tagNumber: 4,
+            type: Asn1::boolean($this->useDnAttributes),
+        ));
 
         return $matchingRule;
     }
@@ -142,7 +157,11 @@ class MatchingRuleFilter implements FilterInterface, Stringable
             $filter .= ':dn';
         }
 
-        return self::PAREN_LEFT . $filter . self::FILTER_EXT . Attribute::escape($this->value) . self::PAREN_RIGHT;
+        return self::PAREN_LEFT
+            . $filter
+            . self::FILTER_EXT
+            . Attribute::escape($this->value)
+            . self::PAREN_RIGHT;
     }
 
     public function __toString(): string

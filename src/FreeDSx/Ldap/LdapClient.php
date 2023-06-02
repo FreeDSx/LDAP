@@ -132,7 +132,14 @@ class LdapClient
         Control ...$controls
     ): bool {
         /** @var CompareResponse $response */
-        $response = $this->sendAndReceive(Operations::compare($dn, $attributeName, $value), ...$controls)->getResponse();
+        $response = $this->sendAndReceive(
+                Operations::compare(
+                    $dn,
+                    $attributeName,
+                    $value
+                ),
+                ...$controls
+            )->getResponse();
 
         return $response->getResultCode() === ResultCode::COMPARE_TRUE;
     }
@@ -146,7 +153,10 @@ class LdapClient
         Entry $entry,
         Control ...$controls
     ): LdapMessageResponse {
-        $response = $this->sendAndReceive(Operations::add($entry), ...$controls);
+        $response = $this->sendAndReceive(
+            Operations::add($entry),
+            ...$controls
+        );
         $entry->changes()->reset();
 
         return $response;
@@ -160,8 +170,9 @@ class LdapClient
      */
     public function read(
         string $entry = '',
-        array $attributes = [], Control ...$controls): ?Entry
-    {
+        array $attributes = [],
+        Control ...$controls
+    ): ?Entry {
         try {
             return $this->readOrFail(
                 $entry,
@@ -188,7 +199,12 @@ class LdapClient
         array $attributes = [],
         Control ...$controls
     ): Entry {
-        $entryObj = $this->search(Operations::read($entry, ...$attributes), ...$controls)->first();
+        $entryObj = $this->search(
+                Operations::read($entry, ...$attributes),
+                ...$controls
+            )
+            ->first();
+
         if ($entryObj === null) {
             throw new OperationException(sprintf(
                 'The entry "%s" was not found.',
@@ -223,7 +239,13 @@ class LdapClient
         Entry $entry,
         Control ...$controls
     ): LdapMessageResponse {
-        $response = $this->sendAndReceive(Operations::modify($entry->getDn(), ...$entry->changes()), ...$controls);
+        $response = $this->sendAndReceive(
+            Operations::modify(
+                $entry->getDn(),
+                ...$entry->changes()->toArray()
+            ),
+            ...$controls
+        );
         $entry->changes()->reset();
 
         return $response;
@@ -271,7 +293,10 @@ class LdapClient
         Control ...$controls
     ): Entries {
         /** @var SearchResponse $response */
-        $response = $this->sendAndReceive($request, ...$controls)->getResponse();
+        $response = $this->sendAndReceive(
+                $request,
+                ...$controls
+            )->getResponse();
 
         return $response->getEntries();
     }
@@ -284,9 +309,9 @@ class LdapClient
         ?int $size = null
     ): Paging {
         return new Paging(
-            $this,
-            $search,
-            $size ?? (int) $this->options['page_size']
+            client: $this,
+            search: $search,
+            size: $size ?? (int) $this->options['page_size']
         );
     }
 
@@ -299,10 +324,10 @@ class LdapClient
         int $afterCount
     ): Vlv {
         return new Vlv(
-            $this,
-            $search,
-            $sort,
-            $afterCount
+            client: $this,
+            search: $search,
+            sort: $sort,
+            after: $afterCount
         );
     }
 
@@ -351,7 +376,10 @@ class LdapClient
         RequestInterface $request,
         Control ...$controls
     ): LdapMessageResponse {
-        $response = $this->send($request, ...$controls);
+        $response = $this->send(
+            $request,
+            ...$controls
+        );
         if ($response === null) {
             throw new OperationException('Expected an LDAP message response, but none was received.');
         }

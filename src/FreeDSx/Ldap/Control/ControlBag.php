@@ -96,7 +96,6 @@ class ControlBag implements IteratorAggregate, Countable
      */
     public function remove(Control|string ...$controls): self
     {
-        /** @var Control|string $control */
         foreach ($controls as $control) {
             if (is_string($control)) {
                 foreach ($this->controls as $i => $ctrl) {

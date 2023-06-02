@@ -41,12 +41,19 @@ class PresentFilter implements FilterInterface, Stringable
      */
     public function toAsn1(): AbstractType
     {
-        return Asn1::context(self::APP_TAG, Asn1::octetString($this->attribute));
+        return Asn1::context(
+            tagNumber: self::APP_TAG,
+            type: Asn1::octetString($this->attribute),
+        );
     }
 
     public function toString(): string
     {
-        return self::PAREN_LEFT . $this->attribute . self::FILTER_EQUAL . '*' . self::PAREN_RIGHT;
+        return self::PAREN_LEFT
+            . $this->attribute
+            . self::FILTER_EQUAL
+            . '*'
+            . self::PAREN_RIGHT;
     }
 
     /**

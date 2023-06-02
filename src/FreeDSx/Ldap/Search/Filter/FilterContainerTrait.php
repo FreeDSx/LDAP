@@ -92,11 +92,13 @@ trait FilterContainerTrait
      */
     public function toAsn1(): AbstractType
     {
-        return Asn1::context(self::CHOICE_TAG, Asn1::setOf(
-            ...array_map(function (FilterInterface $filter) {
-                return $filter->toAsn1();
-            }, $this->filters)
-        ));
+        return Asn1::context(
+            tagNumber: self::CHOICE_TAG,
+            type: Asn1::setOf(...array_map(
+                fn (FilterInterface $filter) => $filter->toAsn1(),
+                $this->filters
+            )),
+        );
     }
 
     /**
@@ -141,8 +143,14 @@ trait FilterContainerTrait
      */
     public static function fromAsn1(AbstractType $type): self
     {
-        $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_SET) : $type;
-        if (!($type instanceof SetType)) {
+        if ($type instanceof IncompleteType) {
+            $type = (new LdapEncoder())->complete(
+                type: $type,
+                tagType: AbstractType::TAG_TYPE_SET
+            );
+        }
+
+        if (!$type instanceof SetType) {
             throw new ProtocolException('The filter is malformed');
         }
 

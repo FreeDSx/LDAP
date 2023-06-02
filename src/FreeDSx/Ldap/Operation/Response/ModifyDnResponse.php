@@ -22,8 +22,5 @@ use FreeDSx\Ldap\Operation\LdapResult;
  */
 class ModifyDnResponse extends LdapResult
 {
-    /**
-     * @var int
-     */
     protected int $tagNumber = 13;
 }

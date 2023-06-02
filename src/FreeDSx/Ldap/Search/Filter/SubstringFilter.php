@@ -130,21 +130,33 @@ class SubstringFilter implements FilterInterface, Stringable
         $substrings = Asn1::sequenceOf();
 
         if ($this->startsWith !== null) {
-            $substrings->addChild(Asn1::context(0, Asn1::octetString($this->startsWith)));
+            $substrings->addChild(Asn1::context(
+                tagNumber: 0,
+                type: Asn1::octetString($this->startsWith)
+            ));
         }
 
         foreach ($this->contains as $contain) {
-            $substrings->addChild(Asn1::context(1, Asn1::octetString($contain)));
+            $substrings->addChild(Asn1::context(
+                tagNumber: 1,
+                type: Asn1::octetString($contain),
+            ));
         }
 
         if ($this->endsWith !== null) {
-            $substrings->addChild(Asn1::context(2, Asn1::octetString($this->endsWith)));
+            $substrings->addChild(Asn1::context(
+                tagNumber: 2,
+                type: Asn1::octetString($this->endsWith),
+            ));
         }
 
-        return Asn1::context(self::CHOICE_TAG, Asn1::sequence(
-            Asn1::octetString($this->attribute),
-            $substrings
-        ));
+        return Asn1::context(
+            tagNumber: self::CHOICE_TAG,
+            type: Asn1::sequence(
+                Asn1::octetString($this->attribute),
+                $substrings
+            )
+        );
     }
 
     /**

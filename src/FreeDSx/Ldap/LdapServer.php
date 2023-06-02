@@ -56,9 +56,6 @@ class LdapServer
         'dse_vendor_version' => null,
     ];
 
-    /**
-     * @var ServerRunnerInterface|null
-     */
     protected ?ServerRunnerInterface $runner;
 
     /**

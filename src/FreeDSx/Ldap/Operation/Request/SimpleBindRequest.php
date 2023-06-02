@@ -57,7 +57,10 @@ class SimpleBindRequest extends BindRequest
      */
     protected function getAsn1AuthChoice(): AbstractType
     {
-        return Asn1::context(0, Asn1::octetString($this->password));
+        return Asn1::context(
+            tagNumber: 0,
+            type: Asn1::octetString($this->password)
+        );
     }
 
     /**
