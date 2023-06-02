@@ -48,7 +48,7 @@ class Rdn implements Stringable
     /**
      * @var Rdn[]
      */
-    protected array $additional = [];
+    private array $additional = [];
 
     public function __construct(
         string $name,

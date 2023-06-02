@@ -31,7 +31,7 @@ trait AttributeValueAssertionTrait
 {
     use FilterAttributeTrait;
 
-    protected string $value;
+    private string $value;
 
     public function __construct(
         string $attribute,

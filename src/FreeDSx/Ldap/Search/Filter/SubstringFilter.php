@@ -216,7 +216,7 @@ class SubstringFilter implements FilterInterface, Stringable
      * @return array{0: string|null, 1: string|null, 2: string[]}
      * @throws ProtocolException
      */
-    protected static function parseSubstrings(SequenceType $substrings): array
+    private static function parseSubstrings(SequenceType $substrings): array
     {
         /** @var OctetStringType|null $startsWith */
         $startsWith = null;

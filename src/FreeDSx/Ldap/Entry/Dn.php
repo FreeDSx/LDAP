@@ -134,7 +134,7 @@ class Dn implements IteratorAggregate, Countable, Stringable
      *
      * @throws UnexpectedValueException
      */
-    protected function parse(): void
+    private function parse(): void
     {
         if ($this->dn === '') {
             $this->pieces = [];

@@ -248,7 +248,7 @@ class Attribute implements IteratorAggregate, Countable, Stringable
     /**
      * A one time check and load of any attribute options.
      */
-    protected function options(): Options
+    private function options(): Options
     {
         if ($this->options !== null) {
             return $this->options;

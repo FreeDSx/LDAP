@@ -180,7 +180,7 @@ class ServerProtocolHandler
      * @throws RuntimeException
      * @throws ConnectionException
      */
-    protected function dispatchRequest(LdapMessageRequest $message): void
+    private function dispatchRequest(LdapMessageRequest $message): void
     {
         if (!$this->isValidRequest($message)) {
             return;
@@ -225,7 +225,7 @@ class ServerProtocolHandler
      * @throws EncoderException
      * @throws EncoderException
      */
-    protected function isValidRequest(LdapMessageRequest $message): bool
+    private function isValidRequest(LdapMessageRequest $message): bool
     {
         if ($message->getMessageId() === 0) {
             $this->queue->sendMessage($this->responseFactory->getExtendedError(
@@ -253,7 +253,7 @@ class ServerProtocolHandler
      * @throws OperationException
      * @throws RuntimeException
      */
-    protected function handleAuthRequest(LdapMessageRequest $message): TokenInterface
+    private function handleAuthRequest(LdapMessageRequest $message): TokenInterface
     {
         if (!$this->authorizer->isAuthenticationTypeSupported($message->getRequest())) {
             throw new OperationException(
@@ -273,7 +273,7 @@ class ServerProtocolHandler
     /**
      * @throws EncoderException
      */
-    protected function sendNoticeOfDisconnect(
+    private function sendNoticeOfDisconnect(
         string $message = '',
         int $reasonCode = ResultCode::PROTOCOL_ERROR
     ): void {
