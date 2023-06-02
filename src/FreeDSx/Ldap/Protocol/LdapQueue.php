@@ -153,6 +153,13 @@ class LdapQueue extends Asn1MessageQueue
     {
         $message = parent::getMessage($id);
 
+        if (!$message instanceof LdapMessage) {
+            throw new ProtocolException(sprintf(
+                'Expected instance of LdapMessage, received %s',
+                is_object($message) ? $message::class : gettype($message)
+            ));
+        }
+
         /**
          * This logic exists in the queue because an unsolicited notification can be received at any time. So we cannot
          * rely on logic in the handler determined for the initial request / response.
