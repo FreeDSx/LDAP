@@ -35,9 +35,6 @@ use function count;
  */
 class ServerRootDseHandler implements ServerProtocolHandlerInterface
 {
-    /**
-     * @var RootDseHandlerInterface|null
-     */
     private ?RootDseHandlerInterface $rootDseHandler;
 
     public function __construct(?RootDseHandlerInterface $rootDseHandler = null)

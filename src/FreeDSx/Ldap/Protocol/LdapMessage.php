@@ -104,7 +104,10 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
 
         if (count($this->controls->toArray()) !== 0) {
             /** @var SequenceOfType $controls */
-            $controls = Asn1::context(0, Asn1::sequenceOf());
+            $controls = Asn1::context(
+                tagNumber: 0,
+                type: Asn1::sequenceOf(),
+            );
             foreach ($this->controls->toArray() as $control) {
                 $controls->addChild($control->toAsn1());
             }

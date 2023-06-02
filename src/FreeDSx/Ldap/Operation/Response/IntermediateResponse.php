@@ -86,20 +86,20 @@ class IntermediateResponse implements ResponseInterface
 
         if ($this->responseName !== null) {
             $response->addChild(Asn1::context(
-                0,
-                Asn1::octetString($this->responseName))
-            );
+                tagNumber: 0,
+                type: Asn1::octetString($this->responseName),
+            ));
         }
         if ($this->responseValue !== null) {
             $response->addChild(Asn1::context(
-                1,
-                Asn1::octetString($this->responseValue))
-            );
+                tagNumber: 1,
+                type: Asn1::octetString($this->responseValue),
+            ));
         }
 
         return Asn1::application(
-            self::TAG_NUMBER,
-            $response
+            tagNumber: self::TAG_NUMBER,
+            type: $response,
         );
     }
 }

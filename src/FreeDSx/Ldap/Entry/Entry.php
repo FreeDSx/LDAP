@@ -275,7 +275,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
     /**
      * Construct an entry from an associative array.
      *
-     * @param array<string, string|array> $attributes
+     * @param array<string, string|string[]> $attributes
      */
     public static function fromArray(
         string $dn,
@@ -285,9 +285,15 @@ class Entry implements IteratorAggregate, Countable, Stringable
         $entryAttr = [];
 
         foreach ($attributes as $attribute => $value) {
-            $entryAttr[] = new Attribute($attribute, ...(is_array($value) ? $value : [$value]));
+            $entryAttr[] = new Attribute(
+                $attribute,
+                ...(is_array($value) ? $value : [$value])
+            );
         }
 
-        return new self($dn, ...$entryAttr);
+        return new self(
+            $dn,
+            ...$entryAttr
+        );
     }
 }

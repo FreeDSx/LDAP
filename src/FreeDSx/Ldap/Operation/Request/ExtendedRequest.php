@@ -92,7 +92,10 @@ class ExtendedRequest implements RequestInterface
 
     public function toAsn1(): AbstractType
     {
-        $asn1 = Asn1::sequence(Asn1::context(0, Asn1::octetString($this->requestName)));
+        $asn1 = Asn1::sequence(Asn1::context(
+            tagNumber: 0,
+            type: Asn1::octetString($this->requestName),
+        ));
 
         if ($this->requestValue !== null) {
             $value = $this->requestValue;
@@ -102,7 +105,10 @@ class ExtendedRequest implements RequestInterface
             } elseif ($value instanceof ProtocolElementInterface) {
                 $value = $encoder->encode($value->toAsn1());
             }
-            $asn1->addChild(Asn1::context(1, Asn1::octetString($value)));
+            $asn1->addChild(Asn1::context(
+                tagNumber: 1,
+                type: Asn1::octetString($value)
+            ));
         }
 
         return Asn1::application(self::APP_TAG, $asn1);

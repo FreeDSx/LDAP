@@ -127,7 +127,7 @@ class DirSync
         /** @var LdapMessageResponse $response */
         $response = $this->client->send($this->getSearchRequest(), $this->getDirSyncControl());
         $lastResponse = $response->controls()->get(Control::OID_DIR_SYNC);
-        if ($lastResponse === null || !$lastResponse instanceof DirSyncResponseControl) {
+        if (!$lastResponse instanceof DirSyncResponseControl) {
             throw new RuntimeException('Expected a DirSync control in the response, but none was received.');
         }
         $this->lastResponse = $lastResponse;

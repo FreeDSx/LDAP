@@ -91,13 +91,22 @@ class PasswordModifyRequest extends ExtendedRequest
         $this->requestValue = Asn1::sequence();
 
         if ($this->userIdentity !== null) {
-            $this->requestValue->addChild(Asn1::context(0, Asn1::octetString($this->userIdentity)));
+            $this->requestValue->addChild(Asn1::context(
+                tagNumber: 0,
+                type: Asn1::octetString($this->userIdentity)
+            ));
         }
         if ($this->oldPassword !== null) {
-            $this->requestValue->addChild(Asn1::context(1, Asn1::octetString($this->oldPassword)));
+            $this->requestValue->addChild(Asn1::context(
+                tagNumber: 1,
+                type: Asn1::octetString($this->oldPassword)
+            ));
         }
         if ($this->newPassword !== null) {
-            $this->requestValue->addChild(Asn1::context(2, Asn1::octetString($this->newPassword)));
+            $this->requestValue->addChild(Asn1::context(
+                tagNumber: 2,
+                type: Asn1::octetString($this->newPassword)
+            ));
         }
 
         return parent::toAsn1();
@@ -121,8 +130,7 @@ class PasswordModifyRequest extends ExtendedRequest
         $userIdentity = null;
         $oldPasswd = null;
         $newPasswd = null;
-        foreach ($request as $value) {
-            /** @var AbstractType $value */
+        foreach ($request->getChildren() as $value) {
             if ($value->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
                 throw new ProtocolException('The password modify request is malformed');
             }

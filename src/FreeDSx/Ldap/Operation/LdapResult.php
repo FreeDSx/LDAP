@@ -144,12 +144,21 @@ class LdapResult implements ResponseInterface
             Asn1::octetString($this->diagnosticMessage)
         );
         if (count($this->referrals) !== 0) {
-            $result->addChild(Asn1::context(3, Asn1::sequence(...array_map(function ($v) {
-                return Asn1::octetString($v);
-            }, $this->referrals))));
+            $result->addChild(Asn1::context(
+                tagNumber: 3,
+                type: Asn1::sequence(
+                    ...array_map(
+                        fn (LdapUrl $v) => Asn1::octetString($v->toString()),
+                        $this->referrals
+                    )
+                )
+            ));
         }
 
-        return Asn1::application($this->tagNumber, $result);
+        return Asn1::application(
+            tagNumber: $this->tagNumber,
+            type: $result,
+        );
     }
 
     /**

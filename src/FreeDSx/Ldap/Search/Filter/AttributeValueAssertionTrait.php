@@ -58,10 +58,13 @@ trait AttributeValueAssertionTrait
      */
     public function toAsn1(): AbstractType
     {
-        return Asn1::context(self::CHOICE_TAG, Asn1::sequence(
-            Asn1::octetString($this->attribute),
-            Asn1::octetString($this->value)
-        ));
+        return Asn1::context(
+            tagNumber: self::CHOICE_TAG,
+            type: Asn1::sequence(
+                Asn1::octetString($this->attribute),
+                Asn1::octetString($this->value),
+            ),
+        );
     }
 
     /**

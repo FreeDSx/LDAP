@@ -97,7 +97,10 @@ class ExtendedResponse extends LdapResult
         $asn1 = parent::toAsn1();
 
         if ($this->responseName !== null) {
-            $asn1->addChild(Asn1::context(10, Asn1::octetString($this->responseName)));
+            $asn1->addChild(Asn1::context(
+                tagNumber: 10,
+                type: Asn1::octetString($this->responseName),
+            ));
         }
         if ($this->responseValue !== null) {
             $encoder = new LdapEncoder();
@@ -107,7 +110,10 @@ class ExtendedResponse extends LdapResult
             } elseif ($value instanceof ProtocolElementInterface) {
                 $value = $encoder->encode($value->toAsn1());
             }
-            $asn1->addChild(Asn1::context(11, Asn1::octetString($value)));
+            $asn1->addChild(Asn1::context(
+                tagNumber: 11,
+                type: Asn1::octetString($value),
+            ));
         }
 
         return $asn1;

@@ -60,26 +60,12 @@ class DirSyncRequestControl extends Control
      */
     public const FLAG_INCREMENTAL_VALUES = -0x80000000;
 
-    /**
-     * @var int
-     */
     private int $flags;
 
-    /**
-     * @var int
-     */
     private int $maxBytes;
 
-    /**
-     * @var string
-     */
     private string $cookie;
 
-    /**
-     * @param int $flags
-     * @param int $maxBytes
-     * @param string $cookie
-     */
     public function __construct(
         int $flags = self::FLAG_INCREMENTAL_VALUES,
         string $cookie = '',
@@ -154,7 +140,6 @@ class DirSyncRequestControl extends Control
             throw new ProtocolException('A DirSyncRequest control value sequence 2 must be an octet string type.');
         }
 
-        /** @var SequenceType $request */
         $control = new static(
             $flags->getValue(),
             $cookie->getValue(),

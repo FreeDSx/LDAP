@@ -45,9 +45,6 @@ class ClientSaslBindHandler implements RequestHandlerInterface
      */
     private array $controls = [];
 
-    /**
-     * @var Sasl
-     */
     private Sasl $sasl;
 
     public function __construct(?Sasl $sasl = null)

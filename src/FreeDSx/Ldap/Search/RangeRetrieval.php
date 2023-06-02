@@ -67,8 +67,7 @@ class RangeRetrieval
             if (!$attribute->hasOptions()) {
                 continue;
             }
-            /** @var Option $option */
-            foreach ($attribute->getOptions() as $option) {
+            foreach ($attribute->getOptions()->toArray() as $option) {
                 if ($option->isRange()) {
                     $ranged[] = $attribute;
                     break;
