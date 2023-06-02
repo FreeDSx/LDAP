@@ -42,9 +42,9 @@ class Controls
         ProtocolElementInterface|AbstractType $value = null
     ): Control {
         return new Control(
-            $oid,
-            $criticality,
-            $value,
+            controlType: $oid,
+            criticality: $criticality,
+            controlValue: $value,
         );
     }
 
@@ -56,7 +56,11 @@ class Controls
         string $cookie = '',
         int $maxBytes = 2147483647
     ): DirSyncRequestControl {
-        return new DirSyncRequestControl($flags, $cookie, $maxBytes);
+        return new DirSyncRequestControl(
+            flags: $flags,
+            cookie: $cookie,
+            maxBytes: $maxBytes,
+        );
     }
 
     /**
@@ -67,8 +71,8 @@ class Controls
         int $max
     ): ExpectedEntryCountControl {
         return new ExpectedEntryCountControl(
-            $min,
-            $max
+            min: $min,
+            max: $max,
         );
     }
 
@@ -87,7 +91,10 @@ class Controls
         int $size,
         string $cookie = ''
     ): PagingControl {
-        return new PagingControl($size, $cookie);
+        return new PagingControl(
+            size: $size,
+            cookie: $cookie,
+        );
     }
 
     /**
@@ -103,7 +110,10 @@ class Controls
      */
     public static function pwdPolicy(bool $criticality = true): Control
     {
-        return new Control(Control::OID_PWD_POLICY, $criticality);
+        return new Control(
+            controlType: Control::OID_PWD_POLICY,
+            criticality: $criticality,
+        );
     }
 
     /**
@@ -120,8 +130,8 @@ class Controls
     public static function showDeleted(): Control
     {
         return self::create(
-            Control::OID_SHOW_DELETED,
-            true
+            oid: Control::OID_SHOW_DELETED,
+            criticality: true,
         );
     }
 
@@ -131,8 +141,8 @@ class Controls
     public static function showRecycled(): Control
     {
         return self::create(
-            Control::OID_SHOW_RECYCLED,
-            true
+            oid: Control::OID_SHOW_RECYCLED,
+            criticality: true,
         );
     }
 
@@ -155,7 +165,10 @@ class Controls
      */
     public static function subtreeDelete(bool $criticality = false): Control
     {
-        return new Control(Control::OID_SUBTREE_DELETE, $criticality);
+        return new Control(
+            controlType: Control::OID_SUBTREE_DELETE,
+            criticality: $criticality
+        );
     }
 
     /**
@@ -169,12 +182,12 @@ class Controls
         ?string $contextId = null
     ): VlvControl {
         return new VlvControl(
-            $before,
-            $after,
-            $offset,
-            $count,
-            null,
-            $contextId
+            before: $before,
+            after: $after,
+            offset: $offset,
+            count: $count,
+            filter: null,
+            contextId: $contextId,
         );
     }
 
@@ -188,12 +201,12 @@ class Controls
         ?string $contextId = null
     ): VlvControl {
         return new VlvControl(
-            $before,
-            $after,
-            null,
-            null,
-            $filter,
-            $contextId
+            before: $before,
+            after: $after,
+            offset: null,
+            count: null,
+            filter: $filter,
+            contextId: $contextId,
         );
     }
 

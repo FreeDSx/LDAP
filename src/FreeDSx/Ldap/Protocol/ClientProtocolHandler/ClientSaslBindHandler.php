@@ -220,7 +220,7 @@ class ClientSaslBindHandler implements RequestHandlerInterface
     private function checkDowngradeAttempt(ClientProtocolContext $context): void
     {
         $priorRootDse = $context->getRootDse();
-        $rootDse = $context->getRootDse(true);
+        $rootDse = $context->getRootDse(reload: true);
 
         $mechs = $rootDse->get('supportedSaslMechanisms');
         $priorMechs = $priorRootDse->get('supportedSaslMechanisms');

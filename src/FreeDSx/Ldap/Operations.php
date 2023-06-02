@@ -65,9 +65,11 @@ class Operations
     public static function bind(
         string $username,
         string $password,
-    ): SimpleBindRequest
-    {
-        return new SimpleBindRequest($username, $password);
+    ): SimpleBindRequest {
+        return new SimpleBindRequest(
+            username: $username,
+            password: $password,
+        );
     }
 
     /**
@@ -81,9 +83,9 @@ class Operations
         ?string $credentials = null,
     ): SaslBindRequest {
         return new SaslBindRequest(
-            $mechanism,
-            $credentials,
-            $options
+            mechanism: $mechanism,
+            credentials: $credentials,
+            options: $options,
         );
     }
 
@@ -111,7 +113,13 @@ class Operations
         string $attributeName,
         string $value
     ): CompareRequest {
-        return new CompareRequest($dn, Filters::equal($attributeName, $value));
+        return new CompareRequest(
+            dn: $dn,
+            filter: Filters::equal(
+                attribute: $attributeName,
+                value: $value,
+            )
+        );
     }
 
     /**
@@ -130,8 +138,8 @@ class Operations
         ProtocolElementInterface|AbstractType|string|null $value = null,
     ): ExtendedRequest {
         return new ExtendedRequest(
-            $name,
-            $value
+            requestName: $name,
+            requestValue: $value,
         );
     }
 
@@ -160,10 +168,10 @@ class Operations
         $dnObj = new Dn($dn);
 
         return new ModifyDnRequest(
-            $dn,
-            $dnObj->getRdn()->toString(),
-            true,
-            $newParentDn
+            dn: $dn,
+            newRdn: $dnObj->getRdn()->toString(),
+            deleteOldRdn: true,
+            newParentDn: $newParentDn,
         );
     }
 
@@ -176,9 +184,9 @@ class Operations
         string $newPassword
     ): PasswordModifyRequest {
         return new PasswordModifyRequest(
-            $username,
-            $oldPassword,
-            $newPassword,
+            userIdentity: $username,
+            oldPassword: $oldPassword,
+            newPassword: $newPassword,
         );
     }
 
@@ -199,9 +207,9 @@ class Operations
         bool $deleteOldRdn = true
     ): ModifyDnRequest {
         return new ModifyDnRequest(
-            $dn,
-            $rdn,
-            $deleteOldRdn
+            dn: $dn,
+            newRdn: $rdn,
+            deleteOldRdn: $deleteOldRdn,
         );
     }
 

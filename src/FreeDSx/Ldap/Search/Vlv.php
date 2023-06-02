@@ -232,10 +232,17 @@ class Vlv
     private function createVlvControl(?string $contextId): VlvControl
     {
         if ($this->filter !== null) {
-            return Controls::vlvFilter($this->before, $this->after, $this->filter, $contextId);
+            return Controls::vlvFilter(
+                before: $this->before,
+                after: $this->after,
+                filter: $this->filter,
+                contextId: $contextId,
+            );
         }
         # An offset of 1 and a content size of zero starts from the beginning entry (server uses its assumed count).
-        $count = ($this->control !== null) ? (int) $this->control->getCount() : 0;
+        $count = ($this->control !== null)
+            ? (int) $this->control->getCount()
+            : 0;
 
         # In percentage mode start off with an assumed count of 100, as the formula the server uses should give us the
         # expected result
@@ -256,11 +263,11 @@ class Vlv
         }
 
         return Controls::vlv(
-            $this->before,
-            $this->after,
-            $offset,
-            $count,
-            $contextId
+            before: $this->before,
+            after: $this->after,
+            offset: $offset,
+            count: $count,
+            contextId: $contextId,
         );
     }
 }

@@ -221,7 +221,7 @@ class Attribute implements IteratorAggregate, Countable, Stringable
         # If strict is selected, or the attribute to be checked has explicit options, then the opposing attribute must too
         if ($strict || $attribute->hasOptions()) {
             return $nameMatches
-                && ($this->getOptions()->toString(true) === $attribute->getOptions()->toString(true));
+                && ($this->getOptions()->toString(sortedlc: true) === $attribute->getOptions()->toString(sortedlc: true));
         }
 
         return $nameMatches;
