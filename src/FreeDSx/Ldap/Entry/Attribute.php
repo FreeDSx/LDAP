@@ -143,7 +143,7 @@ class Attribute implements IteratorAggregate, Countable, Stringable
     /**
      * Gets any values associated with the attribute.
      *
-     * @return array<string>
+     * @return string[]
      */
     public function getValues(): array
     {

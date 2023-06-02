@@ -196,7 +196,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
     /**
      * Get the entry representation as an associative array.
      *
-     * @return array<string, array<string>>
+     * @return array<string, string[]>
      */
     public function toArray(): array
     {
@@ -206,6 +206,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
             $attributes[$attribute->getDescription()] = $attribute->getValues();
         }
 
+        // PHPStan sees the attribute value as mixed due to splatting. However, it can realistically never be mixed.
         /** @phpstan-ignore-next-line */
         return $attributes;
     }

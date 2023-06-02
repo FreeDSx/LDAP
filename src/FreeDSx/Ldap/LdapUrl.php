@@ -333,7 +333,6 @@ class LdapUrl implements Stringable
         for ($i = 0; $i <= $last; $i++) {
             $url .= '?';
             if (isset($query[$i])) {
-                /** @phpstan-ignore-next-line */
                 $url .= $query[$i];
             }
         }
