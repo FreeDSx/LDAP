@@ -206,6 +206,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
             $attributes[$attribute->getDescription()] = $attribute->getValues();
         }
 
+        /** @phpstan-ignore-next-line */
         return $attributes;
     }
 
