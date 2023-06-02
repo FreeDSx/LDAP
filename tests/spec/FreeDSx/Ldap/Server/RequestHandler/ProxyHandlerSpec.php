@@ -63,7 +63,7 @@ class ProxyHandlerSpec extends ObjectBehavior
             ->shouldBeCalled()
             ->willReturn(new Entries($rootDse));
 
-        $this->rootDse($context,$request, new Entry(''))->shouldBeEqualTo($rootDse);
+        $this->rootDse($context, $request, new Entry(''))->shouldBeEqualTo($rootDse);
     }
 
     public function it_should_handle_a_root_dse_request_when_non_is_returned(
@@ -76,6 +76,6 @@ class ProxyHandlerSpec extends ObjectBehavior
             ->willReturn(new Entries());
 
         $this->shouldThrow(new OperationException('Entry not found.', ResultCode::NO_SUCH_OBJECT))
-            ->during('rootDse', [$context,$request, new Entry('')]);
+            ->during('rootDse', [$context, $request, new Entry('')]);
     }
 }

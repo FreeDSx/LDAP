@@ -13,9 +13,8 @@ namespace FreeDSx\Ldap\Entry;
 
 use Stringable;
 use function preg_match;
-use function strlen;
+use function str_starts_with;
 use function strtolower;
-use function substr;
 
 /**
  * Represents an attribute option. Described in RFC 4512, Section 2.5.2.

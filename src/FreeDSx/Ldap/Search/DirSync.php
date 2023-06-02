@@ -251,9 +251,9 @@ class DirSync
     {
         if ($this->defaultRootNc === null) {
             $this->defaultRootNc = (string) $this->client->readOrFail(
-                    '',
-                    ['defaultNamingContext']
-                )->get('defaultNamingContext');
+                '',
+                ['defaultNamingContext']
+            )->get('defaultNamingContext');
         }
         if ($this->defaultRootNc === '') {
             throw new RuntimeException('Unable to determine the root naming context automatically.');

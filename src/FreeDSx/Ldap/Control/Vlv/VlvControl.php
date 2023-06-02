@@ -140,7 +140,8 @@ class VlvControl extends Control
                 tagNumber: 0,
                 type: Asn1::sequence(
                     Asn1::integer((int) $this->offset),
-                    Asn1::integer((int) $this->count))
+                    Asn1::integer((int) $this->count)
+                )
             ));
         }
 

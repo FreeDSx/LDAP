@@ -31,7 +31,6 @@ use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\ReferralContext;
 use FreeDSx\Ldap\ReferralChaserInterface;
 use FreeDSx\Ldap\Search\Filters;
-use Throwable;
 use function count;
 
 /**

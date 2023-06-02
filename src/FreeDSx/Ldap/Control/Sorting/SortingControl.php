@@ -102,9 +102,9 @@ class SortingControl extends Control
                         throw new ProtocolException('The sorting control is malformed.');
                     }
                     $useReverseOrder = $encoder->complete(
-                            type: $keyItem,
-                            tagType: AbstractType::TAG_TYPE_BOOLEAN
-                        )->getValue();
+                        type: $keyItem,
+                        tagType: AbstractType::TAG_TYPE_BOOLEAN
+                    )->getValue();
                 } else {
                     throw new ProtocolException('The sorting control contains unexpected data.');
                 }

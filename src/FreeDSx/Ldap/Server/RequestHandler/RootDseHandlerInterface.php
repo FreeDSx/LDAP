@@ -28,6 +28,6 @@ interface RootDseHandlerInterface
     public function rootDse(
         RequestContext $context,
         SearchRequest $request,
-        Entry $rootDse)
-    : Entry;
+        Entry $rootDse,
+    ): Entry;
 }
