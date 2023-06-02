@@ -98,7 +98,7 @@ class FilterParser
     /**
      * Parse a filter container. Always returns the ending position followed by the filter container.
      *
-     * @return array{0: int, 1: AndFilter|NotFilter|OrFilter}
+     * @return array{0: int, 1: FilterInterface}
      * @throws FilterParseException
      */
     private function parseFilterContainer(

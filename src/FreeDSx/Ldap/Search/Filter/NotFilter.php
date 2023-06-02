@@ -20,13 +20,14 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use Stringable;
 
 /**
  * Represents the negation of a filter. RFC 4511, 4.5.1
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class NotFilter implements FilterInterface
+class NotFilter implements FilterInterface, Stringable
 {
     protected const CHOICE_TAG = 2;
 

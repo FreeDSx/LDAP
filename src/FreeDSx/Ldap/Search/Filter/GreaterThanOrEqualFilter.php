@@ -11,12 +11,14 @@
 
 namespace FreeDSx\Ldap\Search\Filter;
 
+use Stringable;
+
 /**
  * Represents a greater-than-or-equal-to filter. RFC 4511, 4.5.1.7.3
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class GreaterThanOrEqualFilter implements FilterInterface
+class GreaterThanOrEqualFilter implements FilterInterface, Stringable
 {
     use AttributeValueAssertionTrait;
 

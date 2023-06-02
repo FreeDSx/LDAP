@@ -12,6 +12,7 @@
 namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Exception\UrlParseException;
+use Stringable;
 use function explode;
 use function str_ireplace;
 use function str_replace;
@@ -22,7 +23,7 @@ use function substr;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class LdapUrlExtension
+class LdapUrlExtension implements Stringable
 {
     use LdapUrlTrait;
 

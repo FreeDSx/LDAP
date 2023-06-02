@@ -18,13 +18,14 @@ use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use Stringable;
 
 /**
  * Checks for the presence of an attribute (ie. whether or not it contains a value). RFC 4511, 4.5.1.7.5
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class PresentFilter implements FilterInterface
+class PresentFilter implements FilterInterface, Stringable
 {
     use FilterAttributeTrait;
 
