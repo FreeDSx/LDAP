@@ -32,9 +32,9 @@ trait LoggerTrait
         array $context = []
     ): void {
         $this->log(
-            LogLevel::ERROR,
-            $message,
-            $context
+            level: LogLevel::ERROR,
+            message: $message,
+            context: $context
         );
 
         throw new RuntimeException($message);
@@ -48,9 +48,9 @@ trait LoggerTrait
         array $context = []
     ): void {
         $this->log(
-            LogLevel::ERROR,
-            $message,
-            $context
+            level: LogLevel::ERROR,
+            message: $message,
+            context: $context,
         );
     }
 
@@ -62,9 +62,9 @@ trait LoggerTrait
         array $context = []
     ): void {
         $this->log(
-            LogLevel::INFO,
-            $message,
-            $context
+            level: LogLevel::INFO,
+            message:$message,
+            context: $context,
         );
     }
 
@@ -80,9 +80,9 @@ trait LoggerTrait
     ): void {
         if (isset($this->options['logger']) && $this->options['logger'] instanceof LoggerInterface) {
             $this->options['logger']->log(
-                $level,
-                $message,
-                $context
+                level: $level,
+                message: $message,
+                context: $context,
             );
         }
     }

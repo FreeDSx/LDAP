@@ -26,7 +26,7 @@ trait LdapUrlTrait
     /**
      * @var array<string, string>
      */
-    protected static array $escapeMap = [
+    private static array $escapeMap = [
         '%' => '%25',
         '?' => '%3f',
         ' ' => '%20',
@@ -51,9 +51,9 @@ trait LdapUrlTrait
     protected static function encode(?string $value): string
     {
         return str_replace(
-            array_keys(self::$escapeMap),
-            array_values(self::$escapeMap),
-            (string) $value
+            search: array_keys(self::$escapeMap),
+            replace: array_values(self::$escapeMap),
+            subject: (string) $value,
         );
     }
 
@@ -63,9 +63,9 @@ trait LdapUrlTrait
     protected static function decode(string $value): string
     {
         return str_ireplace(
-            array_values(self::$escapeMap),
-            array_keys(self::$escapeMap),
-            $value
+            search: array_values(self::$escapeMap),
+            replace: array_keys(self::$escapeMap),
+            subject: $value,
         );
     }
 }

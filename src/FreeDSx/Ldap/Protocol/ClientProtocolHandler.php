@@ -129,22 +129,28 @@ class ClientProtocolHandler
     ): ?LdapMessageResponse {
         try {
             $context = new ClientProtocolContext(
-                $request,
-                $controls,
-                $this,
-                $this->queue(),
-                $this->options
+                request: $request,
+                controls: $controls,
+                protocolHandler: $this,
+                queue: $this->queue(),
+                options: $this->options,
             );
 
-            $messageFrom = $this->protocolHandlerFactory->forRequest($request)->handleRequest($context);
+            $messageFrom = $this->protocolHandlerFactory
+                ->forRequest($request)
+                ->handleRequest($context);
+
             $messageTo = $context->messageToSend();
             if ($messageFrom !== null) {
-                $messageFrom = $this->protocolHandlerFactory->forResponse($messageTo->getRequest(), $messageFrom->getResponse())->handleResponse(
-                    $messageTo,
-                    $messageFrom,
-                    $this->queue(),
-                    $this->options
-                );
+                $messageFrom = $this->protocolHandlerFactory->forResponse(
+                        $messageTo->getRequest(),
+                        $messageFrom->getResponse()
+                    )->handleResponse(
+                        $messageTo,
+                        $messageFrom,
+                        $this->queue(),
+                        $this->options
+                    );
             }
 
             return $messageFrom;

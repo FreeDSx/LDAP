@@ -287,7 +287,10 @@ class LdapUrl implements Stringable
         $pieces['scheme'] = strtolower($pieces['scheme']);
 
         if (!($pieces['scheme'] === 'ldap' || $pieces['scheme'] === 'ldaps')) {
-            throw new UrlParseException(sprintf('The URL scheme "%s" is not valid. It must be "ldap" or "ldaps".', $pieces['scheme']));
+            throw new UrlParseException(sprintf(
+                'The URL scheme "%s" is not valid. It must be "ldap" or "ldaps".',
+                $pieces['scheme']
+            ));
         }
 
         /** @phpstan-ignore-next-line */
@@ -302,8 +305,7 @@ class LdapUrl implements Stringable
         $query = [];
 
         if (count($this->attributes) !== 0) {
-            $query[0] = implode(',', array_map(function ($v) {
-                /** @var $v Attribute */
+            $query[0] = implode(',', array_map(function (Attribute $v) {
                 return self::encode($v->getDescription());
             }, $this->attributes));
         }
