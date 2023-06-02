@@ -14,6 +14,7 @@ namespace FreeDSx\Ldap\Entry;
 use ArrayIterator;
 use Countable;
 use IteratorAggregate;
+use Stringable;
 use Traversable;
 use function count;
 use function sort;
@@ -23,7 +24,7 @@ use function sort;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Options implements Countable, IteratorAggregate
+class Options implements Countable, IteratorAggregate, Stringable
 {
     /**
      * @var Option[]

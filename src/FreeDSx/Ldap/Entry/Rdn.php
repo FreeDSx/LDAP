@@ -12,6 +12,7 @@
 namespace FreeDSx\Ldap\Entry;
 
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use Stringable;
 use function array_keys;
 use function array_values;
 use function count;
@@ -26,7 +27,7 @@ use function substr_replace;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Rdn
+class Rdn implements Stringable
 {
     use EscapeTrait;
 

@@ -21,6 +21,7 @@ use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use Stringable;
 
 /**
  * Represents an extensible matching rule filter. RFC 4511, 4.5.1.7.7
@@ -33,7 +34,7 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class MatchingRuleFilter implements FilterInterface
+class MatchingRuleFilter implements FilterInterface, Stringable
 {
     protected const CHOICE_TAG = 9;
 

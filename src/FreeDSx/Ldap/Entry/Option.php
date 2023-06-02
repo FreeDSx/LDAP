@@ -11,6 +11,7 @@
 
 namespace FreeDSx\Ldap\Entry;
 
+use Stringable;
 use function preg_match;
 use function strlen;
 use function strtolower;
@@ -21,7 +22,7 @@ use function substr;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Option
+class Option implements Stringable
 {
     protected const MATCH_RANGE = '/range=(\d+)-(.*)/';
 

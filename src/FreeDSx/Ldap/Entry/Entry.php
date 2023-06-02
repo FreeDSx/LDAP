@@ -14,6 +14,7 @@ namespace FreeDSx\Ldap\Entry;
 use ArrayIterator;
 use Countable;
 use IteratorAggregate;
+use Stringable;
 use Traversable;
 use function count;
 use function is_array;
@@ -23,18 +24,14 @@ use function is_array;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Entry implements IteratorAggregate, Countable
+class Entry implements IteratorAggregate, Countable, Stringable
 {
-    protected array $attributes;
+    private array $attributes;
 
-    protected Dn $dn;
+    private Dn $dn;
 
-    protected Changes $changes;
+    private Changes $changes;
 
-    /**
-     * @param string|Dn $dn
-     * @param Attribute ...$attributes
-     */
     public function __construct(
         Dn|string $dn,
         Attribute ...$attributes
@@ -49,7 +46,7 @@ class Entry implements IteratorAggregate, Countable
      */
     public function add(
         Attribute|string $attribute,
-        mixed ...$values
+        Stringable|string ...$values
     ): static {
         $attribute = $attribute instanceof Attribute
             ? $attribute
@@ -70,9 +67,14 @@ class Entry implements IteratorAggregate, Countable
      */
     public function remove(
         Attribute|string $attribute,
-        mixed ...$values
+        Stringable|string ...$values
     ): static {
-        $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
+        $attribute = $attribute instanceof Attribute
+            ? $attribute
+            : new Attribute(
+                $attribute,
+                ...$values
+            );
 
         if (count($attribute->getValues()) !== 0) {
             if (($exists = $this->get($attribute, true)) !== null) {
@@ -108,9 +110,14 @@ class Entry implements IteratorAggregate, Countable
      */
     public function set(
         Attribute|string $attribute,
-        mixed ...$values
+        Stringable|string ...$values
     ): static {
-        $attribute = $attribute instanceof Attribute ? $attribute : new Attribute($attribute, ...$values);
+        $attribute = $attribute instanceof Attribute
+            ? $attribute
+            : new Attribute(
+                $attribute,
+                ...$values
+            );
 
         $exists = false;
         foreach ($this->attributes as $i => $attr) {
@@ -189,7 +196,7 @@ class Entry implements IteratorAggregate, Countable
     /**
      * Get the entry representation as an associative array.
      *
-     * @return array<string, string[]>
+     * @return array<string, array<string>>
      */
     public function toArray(): array
     {
@@ -204,7 +211,8 @@ class Entry implements IteratorAggregate, Countable
 
     /**
      * @inheritDoc
-     * @psalm-return \ArrayIterator<array-key, Attribute>
+     *
+     * @return Traversable<Attribute>
      */
     public function getIterator(): Traversable
     {
@@ -229,9 +237,12 @@ class Entry implements IteratorAggregate, Countable
         return $this->get($name);
     }
 
-    public function __set(string $name, mixed $value): void
+    public function __set(string $name, Stringable|string|array $value): void
     {
-        $this->set($name, ...(is_array($value) ? $value : [$value]));
+        $this->set(
+            $name,
+            ...(is_array($value) ? $value : [(string) $value])
+        );
     }
 
     public function __isset(string $name): bool

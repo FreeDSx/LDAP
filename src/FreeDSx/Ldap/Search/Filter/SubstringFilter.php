@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use Stringable;
 
 /**
  * Represents a substring filter. RFC 4511, 4.5.1.7.2.
@@ -35,7 +36,7 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class SubstringFilter implements FilterInterface
+class SubstringFilter implements FilterInterface, Stringable
 {
     use FilterAttributeTrait;
 

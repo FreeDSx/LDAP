@@ -15,6 +15,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\UrlParseException;
+use Stringable;
 use function array_map;
 use function count;
 use function end;
@@ -35,7 +36,7 @@ use function strtolower;
  * @see https://tools.ietf.org/html/rfc4516
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class LdapUrl
+class LdapUrl implements Stringable
 {
     use LdapUrlTrait;
 

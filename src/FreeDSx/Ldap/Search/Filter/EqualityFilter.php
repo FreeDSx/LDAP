@@ -11,12 +11,14 @@
 
 namespace FreeDSx\Ldap\Search\Filter;
 
+use Stringable;
+
 /**
  * Represents an equality match filter. RFC 4511, 4.5.1.7.1
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class EqualityFilter implements FilterInterface
+class EqualityFilter implements FilterInterface, Stringable
 {
     use AttributeValueAssertionTrait;
 

@@ -63,7 +63,7 @@ class PasswordModifyResponse extends ExtendedResponse
      * @throws PartialPduException
      * @throws ProtocolException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $result = self::createLdapResult($type);
         $generatedPassword = null;
@@ -77,7 +77,7 @@ class PasswordModifyResponse extends ExtendedResponse
             }
         }
 
-        return new self(
+        return new static(
             $result,
             $generatedPassword
         );

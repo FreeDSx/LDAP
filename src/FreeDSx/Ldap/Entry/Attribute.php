@@ -14,6 +14,7 @@ namespace FreeDSx\Ldap\Entry;
 use ArrayIterator;
 use Countable;
 use IteratorAggregate;
+use Stringable;
 use Traversable;
 use function array_keys;
 use function array_search;
@@ -31,7 +32,7 @@ use function strtolower;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Attribute implements IteratorAggregate, Countable
+class Attribute implements IteratorAggregate, Countable, Stringable
 {
     use EscapeTrait;
 
@@ -50,7 +51,7 @@ class Attribute implements IteratorAggregate, Countable
     /**
      * @var string[]
      */
-    private array $values = [];
+    private array $values;
 
     private ?Options $options = null;
 
@@ -135,11 +136,14 @@ class Attribute implements IteratorAggregate, Countable
      */
     public function getDescription(): string
     {
-        return $this->getName() . ($this->options()->count() > 0 ? ';' . $this->options()->toString() : '');
+        return $this->getName()
+            . ($this->options()->count() > 0 ? ';' . $this->options()->toString() : '');
     }
 
     /**
      * Gets any values associated with the attribute.
+     *
+     * @return array<string>
      */
     public function getValues(): array
     {
@@ -162,7 +166,9 @@ class Attribute implements IteratorAggregate, Countable
         $last = end($this->values);
         reset($this->values);
 
-        return $last === false ? null : $last;
+        return $last === false
+            ? null
+            : $last;
     }
 
     /**
@@ -214,7 +220,8 @@ class Attribute implements IteratorAggregate, Countable
         # Only the name of the attribute is checked for by default.
         # If strict is selected, or the attribute to be checked has explicit options, then the opposing attribute must too
         if ($strict || $attribute->hasOptions()) {
-            return $nameMatches && ($this->getOptions()->toString(true) === $attribute->getOptions()->toString(true));
+            return $nameMatches
+                && ($this->getOptions()->toString(true) === $attribute->getOptions()->toString(true));
         }
 
         return $nameMatches;
@@ -246,7 +253,7 @@ class Attribute implements IteratorAggregate, Countable
         if ($this->options !== null) {
             return $this->options;
         }
-        if (strpos($this->attribute, ';') === false) {
+        if (!str_contains($this->attribute, ';')) {
             $this->options = new Options();
 
             return $this->options;
