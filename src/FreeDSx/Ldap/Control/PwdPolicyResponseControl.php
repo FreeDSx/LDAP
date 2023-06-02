@@ -42,60 +42,39 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
  */
 class PwdPolicyResponseControl extends Control
 {
-    /**
-     * @var int|null
-     */
-    protected $timeBeforeExpiration;
+    private ?int $timeBeforeExpiration;
 
-    /**
-     * @var int|null
-     */
-    protected $graceAuthRemaining;
+    private ?int $graceAuthRemaining;
 
-    /**
-     * @var int|null
-     */
-    protected $error;
+    private ?int $error;
 
-    /**
-     * @param int|null $timeBeforeExpiration
-     * @param int|null $graceAuthRemaining
-     * @param int|null $error
-     */
-    public function __construct(?int $timeBeforeExpiration = null, ?int $graceAuthRemaining = null, ?int $error = null)
-    {
+    public function __construct(
+        ?int $timeBeforeExpiration = null,
+        ?int $graceAuthRemaining = null,
+        ?int $error = null
+    ) {
         $this->timeBeforeExpiration = $timeBeforeExpiration;
         $this->graceAuthRemaining = $graceAuthRemaining;
         $this->error = $error;
         parent::__construct(self::OID_PWD_POLICY);
     }
 
-    /**
-     * @return int|null
-     */
     public function getTimeBeforeExpiration(): ?int
     {
         return $this->timeBeforeExpiration;
     }
 
-    /**
-     * @return int|null
-     */
     public function getGraceAttemptsRemaining(): ?int
     {
         return $this->graceAuthRemaining;
     }
 
-    /**
-     * @return int|null
-     */
     public function getError(): ?int
     {
         return $this->error;
     }
 
     /**
-     * @return AbstractType
      * @throws ProtocolException
      * @throws EncoderException
      */
@@ -108,21 +87,34 @@ class PwdPolicyResponseControl extends Control
             throw new ProtocolException('The password policy response cannot have both a time expiration and a grace auth value.');
         }
         if ($this->timeBeforeExpiration !== null) {
-            $warning = Asn1::context(0, Asn1::sequence(
-                Asn1::context(0, Asn1::integer($this->timeBeforeExpiration))
-            ));
+            $warning = Asn1::context(
+                tagNumber: 0,
+                type: Asn1::sequence(
+                    Asn1::context(
+                        tagNumber: 0,
+                        type: Asn1::integer($this->timeBeforeExpiration)
+                    )
+                )
+            );
         }
         if ($this->graceAuthRemaining !== null) {
-            $warning = Asn1::context(0, Asn1::sequence(
-                Asn1::context(1, Asn1::integer($this->graceAuthRemaining))
-            ));
+            $warning = Asn1::context(
+                tagNumber: 0,
+                type: Asn1::sequence(Asn1::context(
+                    tagNumber: 1,
+                    type: Asn1::integer($this->graceAuthRemaining)
+                ))
+            );
         }
 
         if ($warning !== null) {
             $response->addChild($warning);
         }
         if ($this->error !== null) {
-            $response->addChild(Asn1::context(1, Asn1::enumerated($this->error)));
+            $response->addChild(Asn1::context(
+                tagNumber: 1,
+                type: Asn1::enumerated($this->error)
+            ));
         }
         $this->controlValue = $response;
 
@@ -131,11 +123,10 @@ class PwdPolicyResponseControl extends Control
 
     /**
      * {@inheritDoc}
-     * @return Control
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         /** @var SequenceType $response */
         $response = self::decodeEncodedValue($type);
@@ -156,7 +147,6 @@ class PwdPolicyResponseControl extends Control
                         1 => AbstractType::TAG_TYPE_INTEGER,
                     ],
                 ]);
-                /** @var AbstractType $warning */
                 foreach ($warnings->getChildren() as $warning) {
                     if ($warning->getTagNumber() === 0) {
                         $timeBeforeExpiration = $warning->getValue();
@@ -170,8 +160,15 @@ class PwdPolicyResponseControl extends Control
                 $error = $encoder->complete($child, AbstractType::TAG_TYPE_ENUMERATED)->getValue();
             }
         }
-        $control = new self($timeBeforeExpiration, $graceAttemptsRemaining, $error);
+        $control = new static(
+            $timeBeforeExpiration,
+            $graceAttemptsRemaining,
+            $error
+        );
 
-        return self::mergeControlData($control, $type);
+        return self::mergeControlData(
+            $control,
+            $type
+        );
     }
 }

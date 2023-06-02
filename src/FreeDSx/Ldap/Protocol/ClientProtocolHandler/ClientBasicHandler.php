@@ -35,7 +35,7 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
     /**
      * RFC 4511, A.1. These are considered result codes that do not indicate an error condition.
      */
-    protected const NON_ERROR_CODES = [
+    private const NON_ERROR_CODES = [
         ResultCode::SUCCESS,
         ResultCode::COMPARE_FALSE,
         ResultCode::COMPARE_TRUE,
@@ -44,8 +44,6 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
     ];
 
     /**
-     * @param ClientProtocolContext $context
-     * @return LdapMessageResponse
      * @throws ProtocolException
      * @throws UnsolicitedNotificationException
      * @throws ConnectionException
@@ -61,16 +59,15 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
     }
 
     /**
-     * @param LdapMessageRequest $messageTo
-     * @param LdapMessageResponse $messageFrom
-     * @param ClientQueue $queue
-     * @param array $options
-     * @return LdapMessageResponse
      * @throws BindException
      * @throws OperationException
      */
-    public function handleResponse(LdapMessageRequest $messageTo, LdapMessageResponse $messageFrom, ClientQueue $queue, array $options): ?LdapMessageResponse
-    {
+    public function handleResponse(
+        LdapMessageRequest $messageTo,
+        LdapMessageResponse $messageFrom,
+        ClientQueue $queue,
+        array $options
+    ): ?LdapMessageResponse {
         $result = $messageFrom->getResponse();
 
         # No action to take if we received something that isn't an LDAP Result, or on success.
@@ -91,6 +88,9 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
             );
         }
 
-        throw new OperationException($result->getDiagnosticMessage(), $result->getResultCode());
+        throw new OperationException(
+            $result->getDiagnosticMessage(),
+            $result->getResultCode()
+        );
     }
 }

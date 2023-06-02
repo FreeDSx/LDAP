@@ -17,7 +17,7 @@ namespace FreeDSx\Ldap\Control;
  * @see https://tools.ietf.org/html/draft-behera-ldap-password-policy-10
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class PwdPolicyError
+final class PwdPolicyError
 {
     public const PASSWORD_EXPIRED = 0;
 

@@ -29,48 +29,32 @@ class IntermediateResponse implements ResponseInterface
 {
     protected const TAG_NUMBER = 25;
 
-    /**
-     * @var null|string
-     */
-    protected $responseName;
+    private ?string $responseName;
 
-    /**
-     * @var null|string
-     */
-    protected $responseValue;
+    private ?string $responseValue;
 
-    /**
-     * @param null|string $responseName
-     * @param null|string $responseValue
-     */
-    public function __construct(?string $responseName, ?string $responseValue)
-    {
+    public function __construct(
+        ?string $responseName,
+        ?string $responseValue,
+    ) {
         $this->responseName = $responseName;
         $this->responseValue = $responseValue;
     }
 
-    /**
-     * @return null|string
-     */
     public function getName(): ?string
     {
         return $this->responseName;
     }
 
-    /**
-     * @return null|string
-     */
     public function getValue(): ?string
     {
         return $this->responseValue;
     }
 
     /**
-     * @param AbstractType $type
-     * @return self
-     * @throws ProtocolException
+     * {@inheritDoc}
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): IntermediateResponse
     {
         if (!$type instanceof SequenceType) {
             throw new ProtocolException('The intermediate response is malformed');
@@ -87,7 +71,10 @@ class IntermediateResponse implements ResponseInterface
             }
         }
 
-        return new self($name, $value);
+        return new self(
+            $name,
+            $value
+        );
     }
 
     /**
@@ -98,12 +85,21 @@ class IntermediateResponse implements ResponseInterface
         $response = Asn1::sequence();
 
         if ($this->responseName !== null) {
-            $response->addChild(Asn1::context(0, Asn1::octetString($this->responseName)));
+            $response->addChild(Asn1::context(
+                tagNumber: 0,
+                type: Asn1::octetString($this->responseName),
+            ));
         }
         if ($this->responseValue !== null) {
-            $response->addChild(Asn1::context(1, Asn1::octetString($this->responseValue)));
+            $response->addChild(Asn1::context(
+                tagNumber: 1,
+                type: Asn1::octetString($this->responseValue),
+            ));
         }
 
-        return Asn1::application(self::TAG_NUMBER, $response);
+        return Asn1::application(
+            tagNumber: self::TAG_NUMBER,
+            type: $response,
+        );
     }
 }

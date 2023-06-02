@@ -18,7 +18,6 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\SetType;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use Traversable;
@@ -33,21 +32,14 @@ trait FilterContainerTrait
     /**
      * @var FilterInterface[]
      */
-    protected $filters = [];
+    protected array $filters = [];
 
-    /**
-     * @param FilterInterface ...$filters
-     */
     public function __construct(FilterInterface ...$filters)
     {
         $this->filters = $filters;
     }
 
-    /**
-     * @param FilterInterface ...$filters
-     * @return $this
-     */
-    public function add(FilterInterface ...$filters)
+    public function add(FilterInterface ...$filters): self
     {
         foreach ($filters as $filter) {
             $this->filters[] = $filter;
@@ -56,20 +48,16 @@ trait FilterContainerTrait
         return $this;
     }
 
-    /**
-     * @param FilterInterface $filter
-     * @return bool
-     */
     public function has(FilterInterface $filter): bool
     {
-        return array_search($filter, $this->filters, true) !== false;
+        return in_array(
+            $filter,
+            $this->filters,
+            true
+        );
     }
 
-    /**
-     * @param FilterInterface ...$filters
-     * @return $this
-     */
-    public function remove(FilterInterface ...$filters)
+    public function remove(FilterInterface ...$filters): self
     {
         foreach ($filters as $filter) {
             if (($i = array_search($filter, $this->filters, true)) !== false) {
@@ -80,11 +68,7 @@ trait FilterContainerTrait
         return $this;
     }
 
-    /**
-     * @param FilterInterface ...$filters
-     * @return $this
-     */
-    public function set(FilterInterface ...$filters)
+    public function set(FilterInterface ...$filters): self
     {
         $this->filters = $filters;
 
@@ -104,12 +88,13 @@ trait FilterContainerTrait
      */
     public function toAsn1(): AbstractType
     {
-        return Asn1::context(self::CHOICE_TAG, Asn1::setOf(
-            ...array_map(function ($filter) {
-                /** @var FilterInterface $filter */
-                return $filter->toAsn1();
-            }, $this->filters)
-        ));
+        return Asn1::context(
+            tagNumber: self::CHOICE_TAG,
+            type: Asn1::setOf(...array_map(
+                fn (FilterInterface $filter) => $filter->toAsn1(),
+                $this->filters
+            )),
+        );
     }
 
     /**
@@ -119,17 +104,14 @@ trait FilterContainerTrait
     {
         return self::PAREN_LEFT
             . self::FILTER_OPERATOR
-            . implode('', array_map(function ($filter) {
-                /** @var FilterInterface $filter */
+            . implode('', array_map(function (FilterInterface $filter) {
                 return $filter->toString();
             }, $this->filters))
             . self::PAREN_RIGHT;
     }
 
     /**
-     * @inheritDoc
-     * @psalm-return ArrayIterator<array-key, FilterInterface>
-     * @throws RuntimeException
+     * @return Traversable<FilterInterface>
      */
     public function getIterator(): Traversable
     {
@@ -145,25 +127,26 @@ trait FilterContainerTrait
         return count($this->filters);
     }
 
-    /**
-     * @return string
-     */
-    public function __toString()
+    public function __toString(): string
     {
         return $this->toString();
     }
 
     /**
      * {@inheritDoc}
-     * @param AbstractType $type
-     * @return self
      * @throws EncoderException
      * @throws ProtocolException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): self
     {
-        $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_SET) : $type;
-        if (!($type instanceof SetType)) {
+        if ($type instanceof IncompleteType) {
+            $type = (new LdapEncoder())->complete(
+                type: $type,
+                tagType: AbstractType::TAG_TYPE_SET
+            );
+        }
+
+        if (!$type instanceof SetType) {
             throw new ProtocolException('The filter is malformed');
         }
 

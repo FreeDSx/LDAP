@@ -26,10 +26,6 @@ use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
  */
 class ClientProtocolHandlerFactory
 {
-    /**
-     * @param Request\RequestInterface $request
-     * @return ClientProtocolHandler\ClientBasicHandler|ClientProtocolHandler\ClientSaslBindHandler|ClientProtocolHandler\ClientUnbindHandler
-     */
     public function forRequest(Request\RequestInterface $request): RequestHandlerInterface
     {
         if ($request instanceof Request\SearchRequest) {
@@ -43,14 +39,10 @@ class ClientProtocolHandlerFactory
         }
     }
 
-
-    /**
-     * @param Request\RequestInterface $request
-     * @param Response\ResponseInterface $response
-     * @return ClientProtocolHandler\ClientBasicHandler|ClientProtocolHandler\ClientReferralHandler|ClientProtocolHandler\ClientStartTlsHandler
-     */
-    public function forResponse(Request\RequestInterface $request, Response\ResponseInterface $response): ResponseHandlerInterface
-    {
+    public function forResponse(
+        Request\RequestInterface $request,
+        Response\ResponseInterface $response
+    ): ResponseHandlerInterface {
         if ($response instanceof Response\SearchResultDone || $response instanceof Response\SearchResultEntry || $response instanceof Response\SearchResultReference) {
             return new ClientProtocolHandler\ClientSearchHandler();
         } elseif ($response instanceof Operation\LdapResult && $response->getResultCode() === ResultCode::REFERRAL) {

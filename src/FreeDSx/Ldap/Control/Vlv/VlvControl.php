@@ -37,31 +37,20 @@ class VlvControl extends Control
 {
     use VlvTrait;
 
-    /**
-     * @var int
-     */
-    protected $after;
+    private int $after;
 
-    /**
-     * @var int
-     */
-    protected $before;
+    private int $before;
 
-    /**
-     * @var null|GreaterThanOrEqualFilter
-     */
-    protected $filter;
+    private ?GreaterThanOrEqualFilter $filter;
 
-    /**
-     * @param int $before
-     * @param int $after
-     * @param null|int $offset
-     * @param null|int $count
-     * @param GreaterThanOrEqualFilter|null $filter
-     * @param null|string $contextId
-     */
-    public function __construct(int $before, int $after, ?int $offset = null, ?int $count = null, GreaterThanOrEqualFilter $filter = null, ?string $contextId = null)
-    {
+    public function __construct(
+        int $before,
+        int $after,
+        ?int $offset = null,
+        ?int $count = null,
+        GreaterThanOrEqualFilter $filter = null,
+        ?string $contextId = null
+    ) {
         $this->before = $before;
         $this->after = $after;
         $this->offset = $offset;
@@ -71,90 +60,57 @@ class VlvControl extends Control
         parent::__construct(self::OID_VLV);
     }
 
-    /**
-     * @return int
-     */
     public function getAfter(): int
     {
         return $this->after;
     }
 
-    /**
-     * @param int $after
-     * @return $this
-     */
-    public function setAfter(int $after)
+    public function setAfter(int $after): self
     {
         $this->after = $after;
 
         return $this;
     }
 
-    /**
-     * @return int
-     */
     public function getBefore(): int
     {
         return $this->before;
     }
 
-    /**
-     * @param int $before
-     * @return $this
-     */
-    public function setBefore(int $before)
+    public function setBefore(int $before): self
     {
         $this->before = $before;
 
         return $this;
     }
 
-    /**
-     * @param null|int $count
-     * @return $this
-     */
-    public function setCount(?int $count)
+    public function setCount(?int $count): self
     {
         $this->count = $count;
 
         return $this;
     }
 
-    /**
-     * @param string|null $contextId
-     * @return $this
-     */
-    public function setContextId($contextId)
+    public function setContextId(?string $contextId): self
     {
         $this->contextId = $contextId;
 
         return $this;
     }
 
-    /**
-     * @param null|int $offset
-     * @return $this
-     */
-    public function setOffset(?int $offset)
+    public function setOffset(?int $offset): self
     {
         $this->offset = $offset;
 
         return $this;
     }
 
-    /**
-     * @return null|GreaterThanOrEqualFilter
-     */
     public function getFilter(): ?GreaterThanOrEqualFilter
     {
         return $this->filter;
     }
 
-    /**
-     * @param GreaterThanOrEqualFilter|null $filter
-     * @return $this
-     */
-    public function setFilter(GreaterThanOrEqualFilter $filter = null)
+    public function setFilter(GreaterThanOrEqualFilter $filter = null): self
     {
         $this->filter = $filter;
 
@@ -175,12 +131,18 @@ class VlvControl extends Control
             throw new RuntimeException('You must specify a filter or offset and count for a VLV request.');
         }
         if ($this->filter !== null) {
-            $this->controlValue->addChild(Asn1::context(1, $this->filter->toAsn1()));
+            $this->controlValue->addChild(Asn1::context(
+                tagNumber: 1,
+                type: $this->filter->toAsn1()
+            ));
         } else {
-            $this->controlValue->addChild(Asn1::context(0, Asn1::sequence(
-                Asn1::integer((int) $this->offset),
-                Asn1::integer((int) $this->count)
-            )));
+            $this->controlValue->addChild(Asn1::context(
+                tagNumber: 0,
+                type: Asn1::sequence(
+                    Asn1::integer((int) $this->offset),
+                    Asn1::integer((int) $this->count)
+                )
+            ));
         }
 
         return parent::toAsn1();
@@ -188,10 +150,9 @@ class VlvControl extends Control
 
     /**
      * {@inheritDoc}
-     * @return void
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
-        // TODO: Implement fromAsn1() method.
+        throw new RuntimeException('Control parsing not yet implemented.');
     }
 }

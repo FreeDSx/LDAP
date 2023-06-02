@@ -26,11 +26,8 @@ class ReferralContext implements Countable
     /**
      * @var LdapUrl[]
      */
-    protected $referrals = [];
+    private array $referrals = [];
 
-    /**
-     * @param LdapUrl ...$referrals
-     */
     public function __construct(LdapUrl ...$referrals)
     {
         $this->referrals = $referrals;
@@ -44,21 +41,13 @@ class ReferralContext implements Countable
         return $this->referrals;
     }
 
-    /**
-     * @param LdapUrl $referral
-     * @return $this
-     */
-    public function addReferral(LdapUrl $referral)
+    public function addReferral(LdapUrl $referral): self
     {
         $this->referrals[] = $referral;
 
         return $this;
     }
 
-    /**
-     * @param LdapUrl $url
-     * @return bool
-     */
     public function hasReferral(LdapUrl $url): bool
     {
         foreach ($this->referrals as $referral) {

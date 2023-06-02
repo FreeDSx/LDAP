@@ -24,19 +24,13 @@ use FreeDSx\Ldap\Server\RequestContext;
  */
 class ProxyPagingHandler implements PagingHandlerInterface
 {
-    /**
-     * @var LdapClient
-     */
-    private $client;
+    private LdapClient $client;
 
     /**
      * @var array<string, Paging>
      */
-    private $pagers = [];
+    private array $pagers = [];
 
-    /**
-     * @param LdapClient $client
-     */
     public function __construct(LdapClient $client)
     {
         $this->client = $client;

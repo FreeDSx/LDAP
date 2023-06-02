@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use Stringable;
 use function count;
 
 /**
@@ -38,113 +39,77 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
 {
     protected const APP_TAG = 12;
 
-    /**
-     * @var Dn
-     */
-    protected $dn;
+    private Dn $dn;
 
-    /**
-     * @var Rdn
-     */
-    protected $newRdn;
+    private Rdn $newRdn;
 
-    /**
-     * @var bool
-     */
-    protected $deleteOldRdn;
+    private bool $deleteOldRdn;
 
-    /**
-     * @var null|Dn
-     */
-    protected $newParentDn;
+    private ?Dn $newParentDn;
 
-    /**
-     * @param string|Dn $dn
-     * @param string|Rdn $newRdn
-     * @param bool $deleteOldRdn
-     * @param null|string|Dn $newParentDn
-     */
-    public function __construct($dn, $newRdn, bool $deleteOldRdn, $newParentDn = null)
-    {
+    public function __construct(
+        Dn|Stringable|string $dn,
+        Rdn|Stringable|string $newRdn,
+        bool $deleteOldRdn,
+        Dn|Stringable|string|null $newParentDn = null,
+    ) {
         $this->setDn($dn);
         $this->setNewRdn($newRdn);
         $this->setNewParentDn($newParentDn);
         $this->deleteOldRdn = $deleteOldRdn;
     }
 
-    /**
-     * @return Dn
-     */
     public function getDn(): Dn
     {
         return $this->dn;
     }
 
-    /**
-     * @param string|Dn $dn
-     * @return $this
-     */
-    public function setDn($dn)
+    public function setDn(Dn|Stringable|string $dn): static
     {
-        $this->dn = $dn instanceof Dn ? $dn : new Dn($dn);
+        $this->dn = $dn instanceof Dn
+            ? $dn
+            : new Dn((string) $dn);
 
         return $this;
     }
 
-    /**
-     * @return Rdn
-     */
     public function getNewRdn(): Rdn
     {
         return $this->newRdn;
     }
 
-    /**
-     * @param string|Rdn $newRdn
-     * @return $this
-     */
-    public function setNewRdn($newRdn)
+    public function setNewRdn(Rdn|Stringable|string $newRdn): self
     {
-        $this->newRdn = $newRdn instanceof Rdn ? $newRdn : Rdn::create($newRdn);
+        $this->newRdn = $newRdn instanceof Rdn
+            ? $newRdn
+            : Rdn::create((string) $newRdn);
 
         return $this;
     }
 
-    /**
-     * @return bool
-     */
     public function getDeleteOldRdn(): bool
     {
         return $this->deleteOldRdn;
     }
 
-    /**
-     * @param bool $deleteOldRdn
-     * @return $this
-     */
-    public function setDeleteOldRdn(bool $deleteOldRdn)
+    public function setDeleteOldRdn(bool $deleteOldRdn): self
     {
         $this->deleteOldRdn = $deleteOldRdn;
 
         return $this;
     }
 
-    /**
-     * @return null|Dn
-     */
     public function getNewParentDn(): ?Dn
     {
         return $this->newParentDn;
     }
 
-    /**
-     * @param null|string|Dn $newParentDn
-     * @return $this
-     */
-    public function setNewParentDn($newParentDn)
+    public function setNewParentDn(Dn|Stringable|string|null $newParentDn): self
     {
         if ($newParentDn !== null) {
-            $newParentDn = $newParentDn instanceof Dn ? $newParentDn : new Dn($newParentDn);
+            $newParentDn = $newParentDn instanceof Dn
+                ? $newParentDn
+                : new Dn((string) $newParentDn);
         }
         $this->newParentDn = $newParentDn;
 
@@ -153,9 +118,8 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
 
     /**
      * {@inheritDoc}
-     * @return self
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         if (!($type instanceof SequenceType && count($type) >= 3 && count($type) <= 4)) {
             throw new ProtocolException('The modify dn request is malformed');
@@ -176,15 +140,17 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
             : $newSuperior;
         $newSuperior = ($newSuperior !== null) ? $newSuperior->getValue() : null;
 
-        return new self($entry->getValue(), $newRdn->getValue(), $deleteOldRdn->getValue(), $newSuperior);
+        return new static(
+            $entry->getValue(),
+            $newRdn->getValue(),
+            $deleteOldRdn->getValue(),
+            $newSuperior
+        );
     }
 
-    /**
-     * @return SequenceType
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
-        /** @var \FreeDSx\Asn1\Type\SequenceType $asn1 */
+        /** @var SequenceType $asn1 */
         $asn1 = Asn1::application(self::APP_TAG, Asn1::sequence(
             Asn1::octetString($this->dn->toString()),
             // @todo Make a RDN type. Future validation purposes?
@@ -192,7 +158,10 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
             Asn1::boolean($this->deleteOldRdn)
         ));
         if ($this->newParentDn !== null) {
-            $asn1->addChild(Asn1::context(0, Asn1::octetString($this->newParentDn->toString())));
+            $asn1->addChild(Asn1::context(
+                tagNumber: 0,
+                type: Asn1::octetString($this->newParentDn->toString())
+            ));
         }
 
         return $asn1;

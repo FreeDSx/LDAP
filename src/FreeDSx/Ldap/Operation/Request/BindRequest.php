@@ -32,49 +32,29 @@ abstract class BindRequest implements RequestInterface
 {
     protected const APP_TAG = 0;
 
-    /**
-     * @var int
-     */
-    protected $version = 3;
+    protected int $version = 3;
 
-    /**
-     * @var string
-     */
-    protected $username;
+    protected string $username;
 
-    /**
-     * @param int $version
-     * @return $this
-     */
-    public function setVersion(int $version)
+    public function setVersion(int $version): static
     {
         $this->version = $version;
 
         return $this;
     }
 
-    /**
-     * @return int
-     */
     public function getVersion(): int
     {
         return $this->version;
     }
 
-    /**
-     * @param string $username
-     * @return $this
-     */
-    public function setUsername(string $username)
+    public function setUsername(string $username): static
     {
         $this->username = $username;
 
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function getUsername(): string
     {
         return $this->username;
@@ -96,9 +76,8 @@ abstract class BindRequest implements RequestInterface
 
     /**
      * {@inheritDoc}
-     * @return AnonBindRequest|SimpleBindRequest
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): BindRequest
     {
         if (!$type instanceof SequenceType) {
             throw new ProtocolException('The bind request in malformed');
@@ -133,8 +112,6 @@ abstract class BindRequest implements RequestInterface
 
     /**
      * Get the ASN1 AuthenticationChoice for the bind request.
-     *
-     * @return AbstractType
      */
     abstract protected function getAsn1AuthChoice(): AbstractType;
 

@@ -23,25 +23,16 @@ use Throwable;
  */
 class HandlerFactory implements HandlerFactoryInterface
 {
-    /**
-     * @var RequestHandlerInterface|null
-     */
-    private $requestHandler;
+    private ?RequestHandlerInterface $requestHandler = null;
 
-    /**
-     * @var RootDseHandlerInterface|null
-     */
-    private $rootdseHandler;
+    private ?RootDseHandlerInterface $rootdseHandler = null;
 
-    /**
-     * @var PagingHandlerInterface|null
-     */
-    private $pagingHandler;
+    private ?PagingHandlerInterface $pagingHandler = null;
 
     /**
      * @var array<string, mixed>
      */
-    private $options;
+    private array $options;
 
     /**
      * @param array<string, mixed> $options
@@ -137,14 +128,12 @@ class HandlerFactory implements HandlerFactoryInterface
     }
 
     /**
-     * @param string $optionName
      * @param class-string $class
-     * @return object
      */
     private function makeOrReturnInstanceOf(
         string $optionName,
         string $class
-    ) {
+    ): object {
         if (!isset($this->options[$optionName])) {
             throw new RuntimeException(sprintf(
                 'Option "%s" must be an instance of or fully qualified class-name implementing "%s".',

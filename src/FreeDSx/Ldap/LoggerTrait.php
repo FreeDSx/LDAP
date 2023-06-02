@@ -32,42 +32,46 @@ trait LoggerTrait
         array $context = []
     ): void {
         $this->log(
-            LogLevel::ERROR,
-            $message,
-            $context
+            level: LogLevel::ERROR,
+            message: $message,
+            context: $context
         );
 
         throw new RuntimeException($message);
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     protected function logError(
         string $message,
         array $context = []
     ): void {
         $this->log(
-            LogLevel::ERROR,
-            $message,
-            $context
+            level: LogLevel::ERROR,
+            message: $message,
+            context: $context,
         );
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     protected function logInfo(
         string $message,
         array $context = []
     ): void {
         $this->log(
-            LogLevel::INFO,
-            $message,
-            $context
+            level: LogLevel::INFO,
+            message:$message,
+            context: $context,
         );
     }
 
     /**
      * Log a message with a level and context (if we have a logger).
      *
-     * @param string $level
-     * @param string $message
-     * @param array $context
+     * @param array<string, mixed> $context
      */
     private function log(
         string $level,
@@ -76,9 +80,9 @@ trait LoggerTrait
     ): void {
         if (isset($this->options['logger']) && $this->options['logger'] instanceof LoggerInterface) {
             $this->options['logger']->log(
-                $level,
-                $message,
-                $context
+                level: $level,
+                message: $message,
+                context: $context,
             );
         }
     }

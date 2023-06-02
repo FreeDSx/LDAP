@@ -23,7 +23,7 @@ final class PagingRequests
     /**
      * @var PagingRequest[]
      */
-    private $requests;
+    private array $requests;
 
     /**
      * @param PagingRequest[] $pagingRequests

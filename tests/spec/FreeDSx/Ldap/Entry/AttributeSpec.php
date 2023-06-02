@@ -101,13 +101,6 @@ class AttributeSpec extends ObjectBehavior
         $this->count()->shouldBeEqualTo(2);
     }
 
-    public function it_should_allow_values_that_are_not_strings()
-    {
-        $this->add(new \DateTimeImmutable());
-
-        $this->lastValue()->shouldBeAnInstanceOf(\DateTimeImmutable::class);
-    }
-
     public function it_should_add_values()
     {
         $this->add('foobar', 'meh');

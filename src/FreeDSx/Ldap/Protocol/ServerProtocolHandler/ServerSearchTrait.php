@@ -26,12 +26,6 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 
 trait ServerSearchTrait
 {
-    /**
-     * @param Entries $entries
-     * @param LdapMessageRequest $message
-     * @param ServerQueue $queue
-     * @return void
-     */
     private function sendEntriesToClient(
         Entries $entries,
         LdapMessageRequest $message,
@@ -56,10 +50,6 @@ trait ServerSearchTrait
         $queue->sendMessage(...$messages);
     }
 
-    /**
-     * @param LdapMessageRequest $message
-     * @return SearchRequest
-     */
     private function getSearchRequestFromMessage(LdapMessageRequest $message): SearchRequest
     {
         $request = $message->getRequest();
@@ -74,8 +64,6 @@ trait ServerSearchTrait
     }
 
     /**
-     * @param LdapMessageRequest $message
-     * @return PagingControl
      * @throws OperationException
      */
     private function getPagingControlFromMessage(LdapMessageRequest $message): PagingControl

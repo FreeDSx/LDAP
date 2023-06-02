@@ -28,36 +28,24 @@ use FreeDSx\Ldap\Exception\BindException;
  */
 class SimpleBindRequest extends BindRequest
 {
-    /**
-     * @var string
-     */
-    protected $password;
+    protected string $password;
 
-    /**
-     * @param string $username
-     * @param string $password
-     * @param int $version
-     */
-    public function __construct(string $username, string $password, int $version = 3)
-    {
+    public function __construct(
+        string $username,
+        string $password,
+        int $version = 3
+    ) {
         $this->username = $username;
         $this->password = $password;
         $this->version = $version;
     }
 
-    /**
-     * @return string
-     */
     public function getPassword(): string
     {
         return $this->password;
     }
 
-    /**
-     * @param string $password
-     * @return $this
-     */
-    public function setPassword(string $password)
+    public function setPassword(string $password): self
     {
         $this->password = $password;
 
@@ -69,7 +57,10 @@ class SimpleBindRequest extends BindRequest
      */
     protected function getAsn1AuthChoice(): AbstractType
     {
-        return Asn1::context(0, Asn1::octetString($this->password));
+        return Asn1::context(
+            tagNumber: 0,
+            type: Asn1::octetString($this->password)
+        );
     }
 
     /**

@@ -29,15 +29,9 @@ use FreeDSx\Ldap\Server\RequestHistory;
  */
 class ServerProtocolHandlerFactory
 {
-    /**
-     * @var HandlerFactoryInterface
-     */
-    private $handlerFactory;
+    private HandlerFactoryInterface $handlerFactory;
 
-    /**
-     * @var RequestHistory
-     */
-    private $requestHistory;
+    private RequestHistory $requestHistory;
 
     public function __construct(
         HandlerFactoryInterface $handlerFactory,

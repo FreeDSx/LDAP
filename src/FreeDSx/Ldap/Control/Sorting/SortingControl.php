@@ -37,22 +37,15 @@ class SortingControl extends Control
     /**
      * @var SortKey[]
      */
-    protected $sortKeys = [];
+    private array $sortKeys;
 
-    /**
-     * @param SortKey ...$sortKeys
-     */
     public function __construct(SortKey ...$sortKeys)
     {
         $this->sortKeys = $sortKeys;
         parent::__construct(self::OID_SORTING);
     }
 
-    /**
-     * @param SortKey ...$sortKeys
-     * @return $this
-     */
-    public function addSortKeys(SortKey ...$sortKeys)
+    public function addSortKeys(SortKey ...$sortKeys): self
     {
         foreach ($sortKeys as $sortKey) {
             $this->sortKeys[] = $sortKey;
@@ -61,11 +54,7 @@ class SortingControl extends Control
         return $this;
     }
 
-    /**
-     * @param SortKey ...$sortKeys
-     * @return $this
-     */
-    public function setSortKeys(SortKey ...$sortKeys)
+    public function setSortKeys(SortKey ...$sortKeys): self
     {
         $this->sortKeys = $sortKeys;
 
@@ -82,11 +71,10 @@ class SortingControl extends Control
 
     /**
      * {@inheritDoc}
-     * @return Control
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $response = self::decodeEncodedValue($type);
         if (!$response instanceof SequenceType) {
@@ -104,7 +92,6 @@ class SortingControl extends Control
             $useReverseOrder = false;
 
             $encoder = new LdapEncoder();
-            /** @var AbstractType $keyItem */
             foreach ($sequence->getChildren() as $keyItem) {
                 if ($keyItem instanceof OctetStringType && $keyItem->getTagClass() === AbstractType::TAG_CLASS_UNIVERSAL) {
                     $attrName = $keyItem->getValue();
@@ -114,8 +101,10 @@ class SortingControl extends Control
                     if (!$keyItem instanceof IncompleteType) {
                         throw new ProtocolException('The sorting control is malformed.');
                     }
-                    /** @var IncompleteType $keyItem */
-                    $useReverseOrder = $encoder->complete($keyItem, AbstractType::TAG_TYPE_BOOLEAN)->getValue();
+                    $useReverseOrder = $encoder->complete(
+                        type: $keyItem,
+                        tagType: AbstractType::TAG_TYPE_BOOLEAN
+                    )->getValue();
                 } else {
                     throw new ProtocolException('The sorting control contains unexpected data.');
                 }
@@ -124,11 +113,18 @@ class SortingControl extends Control
                 throw new ProtocolException('The sort key is missing an attribute description.');
             }
 
-            $sortKeys[] = new SortKey($attrName, $useReverseOrder, $matchRule);
+            $sortKeys[] = new SortKey(
+                attribute: $attrName,
+                useReverseOrder: $useReverseOrder,
+                orderingRule: $matchRule,
+            );
         }
-        $control = new self(...$sortKeys);
+        $control = new static(...$sortKeys);
 
-        return self::mergeControlData($control, $type);
+        return self::mergeControlData(
+            $control,
+            $type
+        );
     }
 
     /**
@@ -141,10 +137,16 @@ class SortingControl extends Control
         foreach ($this->sortKeys as $sortKey) {
             $child = Asn1::sequence(Asn1::octetString($sortKey->getAttribute()));
             if ($sortKey->getOrderingRule() !== null) {
-                $child->addChild(Asn1::context(0, Asn1::octetString($sortKey->getOrderingRule())));
+                $child->addChild(Asn1::context(
+                    tagNumber: 0,
+                    type: Asn1::octetString($sortKey->getOrderingRule())
+                ));
             }
             if ($sortKey->getUseReverseOrder()) {
-                $child->addChild(Asn1::context(1, Asn1::boolean(true)));
+                $child->addChild(Asn1::context(
+                    tagNumber: 1,
+                    type: Asn1::boolean(true)
+                ));
             }
             $this->controlValue->addChild($child);
         }

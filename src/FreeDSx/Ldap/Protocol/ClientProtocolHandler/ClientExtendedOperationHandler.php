@@ -30,10 +30,7 @@ use ReflectionException;
  */
 class ClientExtendedOperationHandler extends ClientBasicHandler
 {
-    /**
-     * @var ExtendedResponseFactory
-     */
-    protected $extendedResponseFactory;
+    private ExtendedResponseFactory $extendedResponseFactory;
 
     public function __construct(ExtendedResponseFactory $extendedResponseFactory = null)
     {
@@ -41,8 +38,6 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
     }
 
     /**
-     * @param ClientProtocolContext $context
-     * @return LdapMessageResponse|null
      * @throws OperationException
      * @throws EncoderException
      * @throws ProtocolException
@@ -69,7 +64,6 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
             $request->getName()
         );
         $prop = (new ReflectionClass(LdapMessageResponse::class))->getProperty('response');
-        $prop->setAccessible(true);
         $prop->setValue($messageFrom, $response);
 
         return $messageFrom;

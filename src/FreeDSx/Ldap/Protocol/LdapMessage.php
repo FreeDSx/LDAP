@@ -67,29 +67,18 @@ use function count;
  */
 abstract class LdapMessage implements ProtocolElementInterface, PduInterface
 {
-    /**
-     * @var int
-     */
-    protected $messageId;
+    private int $messageId;
 
-    /**
-     * @var ControlBag
-     */
-    protected $controls;
+    private ControlBag $controls;
 
-    /**
-     * @param int $messageId
-     * @param Control\Control ...$controls
-     */
-    public function __construct(int $messageId, Control\Control ...$controls)
-    {
+    public function __construct(
+        int $messageId,
+        Control\Control ...$controls
+    ) {
         $this->messageId = $messageId;
         $this->controls = new ControlBag(...$controls);
     }
 
-    /**
-     * @return int
-     */
     public function getMessageId(): int
     {
         return $this->messageId;
@@ -97,8 +86,6 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
 
     /**
      * Get the controls for this specific message.
-     *
-     * @return ControlBag
      */
     public function controls(): ControlBag
     {
@@ -106,11 +93,9 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
     }
 
     /**
-     * @return AbstractType
-     * @psalm-return SequenceType
      * @throws EncoderException
      */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $asn1 = Asn1::sequence(
             Asn1::integer($this->messageId),
@@ -119,7 +104,10 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
 
         if (count($this->controls->toArray()) !== 0) {
             /** @var SequenceOfType $controls */
-            $controls = Asn1::context(0, Asn1::sequenceOf());
+            $controls = Asn1::context(
+                tagNumber: 0,
+                type: Asn1::sequenceOf(),
+            );
             foreach ($this->controls->toArray() as $control) {
                 $controls->addChild($control->toAsn1());
             }
@@ -131,12 +119,11 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
 
     /**
      * {@inheritDoc}
-     * @return self
      * @throws EncoderException
      * @throws PartialPduException
      * @throws RuntimeException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         if (!$type instanceof SequenceType) {
             throw new ProtocolException(sprintf(
@@ -161,36 +148,29 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                         throw new ProtocolException('The ASN1 structure for the controls is malformed.');
                     }
                     /** @var SequenceOfType $child */
-                    $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
+                    $child = (new LdapEncoder())->complete(
+                        $child,
+                        AbstractType::TAG_TYPE_SEQUENCE
+                    );
 
                     foreach ($child->getChildren() as $control) {
                         if (!($control instanceof SequenceType && $control->getChild(0) !== null && $control->getChild(0) instanceof OctetStringType)) {
                             throw new ProtocolException('The control either is not a sequence or has no OID value attached.');
                         }
-                        switch ($control->getChild(0)->getValue()) {
-                            case Control\Control::OID_PAGING:
-                                $controls[] = Control\PagingControl::fromAsn1($control);
-                                break;
-                            case Control\Control::OID_SORTING_RESPONSE:
-                                $controls[] = Control\Sorting\SortingResponseControl::fromAsn1($control);
-                                break;
-                            case Control\Control::OID_VLV_RESPONSE:
-                                $controls[] = Control\Vlv\VlvResponseControl::fromAsn1($control);
-                                break;
-                            case Control\Control::OID_DIR_SYNC:
-                                $controls[] = Control\Ad\DirSyncResponseControl::fromAsn1($control);
-                                break;
-                            default:
-                                $controls[] = Control\Control::fromAsn1($control);
-                                break;
-                        }
+                        $controls[] = match ($control->getChild(0)->getValue()) {
+                            Control\Control::OID_PAGING => Control\PagingControl::fromAsn1($control),
+                            Control\Control::OID_SORTING_RESPONSE => Control\Sorting\SortingResponseControl::fromAsn1($control),
+                            Control\Control::OID_VLV_RESPONSE => Control\Vlv\VlvResponseControl::fromAsn1($control),
+                            Control\Control::OID_DIR_SYNC => Control\Ad\DirSyncResponseControl::fromAsn1($control),
+                            default => Control\Control::fromAsn1($control),
+                        };
                     }
                 }
             }
         }
 
         $messageId = $type->getChild(0);
-        if (!($messageId !== null && $messageId instanceof IntegerType)) {
+        if (!($messageId instanceof IntegerType)) {
             throw new ProtocolException('Expected an LDAP message ID as an ASN.1 integer type. None received.');
         }
         /** @var SequenceType|null $opAsn1 */
@@ -199,73 +179,32 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
             throw new ProtocolException('The LDAP message is malformed.');
         }
 
-        switch ($opAsn1->getTagNumber()) {
-            case 0:
-                $operation = Request\BindRequest::fromAsn1($opAsn1);
-                break;
-            case 1:
-                $operation = Response\BindResponse::fromAsn1($opAsn1);
-                break;
-            case 2:
-                $operation = Request\UnbindRequest::fromAsn1($opAsn1);
-                break;
-            case 3:
-                $operation = Request\SearchRequest::fromAsn1($opAsn1);
-                break;
-            case 4:
-                $operation = Response\SearchResultEntry::fromAsn1($opAsn1);
-                break;
-            case 5:
-                $operation = Response\SearchResultDone::fromAsn1($opAsn1);
-                break;
-            case 6:
-                $operation = Request\ModifyRequest::fromAsn1($opAsn1);
-                break;
-            case 7:
-                $operation = Response\ModifyResponse::fromAsn1($opAsn1);
-                break;
-            case 8:
-                $operation = Request\AddRequest::fromAsn1($opAsn1);
-                break;
-            case 9:
-                $operation = Response\AddResponse::fromAsn1($opAsn1);
-                break;
-            case 10:
-                $operation = Request\DeleteRequest::fromAsn1($opAsn1);
-                break;
-            case 11:
-                $operation = Response\DeleteResponse::fromAsn1($opAsn1);
-                break;
-            case 12:
-                $operation = Request\ModifyDnRequest::fromAsn1($opAsn1);
-                break;
-            case 13:
-                $operation = Response\ModifyDnResponse::fromAsn1($opAsn1);
-                break;
-            case 14:
-                $operation = Request\CompareRequest::fromAsn1($opAsn1);
-                break;
-            case 15:
-                $operation = Response\CompareResponse::fromAsn1($opAsn1);
-                break;
-            case 19:
-                $operation = Response\SearchResultReference::fromAsn1($opAsn1);
-                break;
-            case 23:
-                $operation = Request\ExtendedRequest::fromAsn1($opAsn1);
-                break;
-            case 24:
-                $operation = Response\ExtendedResponse::fromAsn1($opAsn1);
-                break;
-            case 25:
-                $operation = Response\IntermediateResponse::fromAsn1($opAsn1);
-                break;
-            default:
-                throw new ProtocolException(sprintf(
-                    'The tag %s for the LDAP operation is not supported.',
-                    $opAsn1->getTagNumber()
-                ));
-        }
+        $operation = match ($opAsn1->getTagNumber()) {
+            0 => Request\BindRequest::fromAsn1($opAsn1),
+            1 => Response\BindResponse::fromAsn1($opAsn1),
+            2 => Request\UnbindRequest::fromAsn1($opAsn1),
+            3 => Request\SearchRequest::fromAsn1($opAsn1),
+            4 => Response\SearchResultEntry::fromAsn1($opAsn1),
+            5 => Response\SearchResultDone::fromAsn1($opAsn1),
+            6 => Request\ModifyRequest::fromAsn1($opAsn1),
+            7 => Response\ModifyResponse::fromAsn1($opAsn1),
+            8 => Request\AddRequest::fromAsn1($opAsn1),
+            9 => Response\AddResponse::fromAsn1($opAsn1),
+            10 => Request\DeleteRequest::fromAsn1($opAsn1),
+            11 => Response\DeleteResponse::fromAsn1($opAsn1),
+            12 => Request\ModifyDnRequest::fromAsn1($opAsn1),
+            13 => Response\ModifyDnResponse::fromAsn1($opAsn1),
+            14 => Request\CompareRequest::fromAsn1($opAsn1),
+            15 => Response\CompareResponse::fromAsn1($opAsn1),
+            19 => Response\SearchResultReference::fromAsn1($opAsn1),
+            23 => Request\ExtendedRequest::fromAsn1($opAsn1),
+            24 => Response\ExtendedResponse::fromAsn1($opAsn1),
+            25 => Response\IntermediateResponse::fromAsn1($opAsn1),
+            default => throw new ProtocolException(sprintf(
+                'The tag %s for the LDAP operation is not supported.',
+                $opAsn1->getTagNumber()
+            )),
+        };
 
         return new static(
             $messageId->getValue(),
@@ -274,8 +213,5 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
         );
     }
 
-    /**
-     * @return AbstractType
-     */
     abstract protected function getOperationAsn1(): AbstractType;
 }

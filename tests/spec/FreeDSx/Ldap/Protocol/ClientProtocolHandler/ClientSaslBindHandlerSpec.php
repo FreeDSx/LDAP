@@ -173,8 +173,14 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
         $this->handleRequest($context)->shouldBeEqualTo($this->saslComplete);
     }
 
-    public function it_should_set_the_set_the_security_layer_on_the_queue_if_one_was_negotiated(SecurityLayerInterface $securityLayer, ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue)
-    {
+    public function it_should_set_the_set_the_security_layer_on_the_queue_if_one_was_negotiated(
+        SecurityLayerInterface $securityLayer,
+        ChallengeInterface $challenge,
+        MechanismInterface $mech,
+        Sasl $sasl,
+        ClientProtocolContext $context,
+        ClientQueue $queue
+    ) {
         $saslBind = Operations::bindSasl(['username' => 'foo', 'password' => 'bar'], 'DIGEST-MD5');
         $context->getRequest()->willReturn($saslBind);
         $context->messageToSend()->willReturn(new LdapMessageRequest(1, $saslBind));
@@ -199,7 +205,7 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
         );
         $mech->securityLayer()->shouldBeCalled()->willReturn($securityLayer);
 
-        $queue->setMessageWrapper(Argument::type(SaslMessageWrapper::class))->shouldBeCalled();
+        $queue->setMessageWrapper(Argument::type(SaslMessageWrapper::class))->shouldBeCalled()->willReturn($queue);
         $this->handleRequest($context)->shouldBeEqualTo($this->saslComplete);
     }
 }

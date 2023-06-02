@@ -24,10 +24,6 @@ interface PagingHandlerInterface
 {
     /**
      * Indicates a paging request that has been received and needs a response.
-     *
-     * @param PagingRequest $pagingRequest
-     * @param RequestContext $context
-     * @return PagingResponse
      */
     public function page(
         PagingRequest $pagingRequest,
@@ -43,9 +39,6 @@ interface PagingHandlerInterface
      *  1. The client is explicitly asking to abandon the paging request.
      *  2. The client paging request is being removed due to server resource constraints (request age, max outstanding requests, etc)
      *  3. The paging request has been successfully completed and all results have been returned.
-     *
-     * @param PagingRequest $pagingRequest
-     * @param RequestContext $context
      */
     public function remove(
         PagingRequest $pagingRequest,

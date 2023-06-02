@@ -34,58 +34,38 @@ class CompareRequest implements RequestInterface, DnRequestInterface
 {
     protected const APP_TAG = 14;
 
-    /**
-     * @var Dn
-     */
-    protected $dn;
+    private Dn $dn;
 
-    /**
-     * @var EqualityFilter
-     */
-    protected $filter;
+    private EqualityFilter $filter;
 
-    /**
-     * @param string|Dn $dn
-     * @param EqualityFilter $filter
-     */
-    public function __construct($dn, EqualityFilter $filter)
-    {
+    public function __construct(
+        Dn|string $dn,
+        EqualityFilter $filter
+    ) {
         $this->setDn($dn);
         $this->filter = $filter;
     }
 
-    /**
-     * @return Dn
-     */
     public function getDn(): Dn
     {
         return $this->dn;
     }
 
-    /**
-     * @param string|Dn $dn
-     * @return $this
-     */
-    public function setDn($dn)
+    public function setDn(Dn|string $dn): static
     {
-        $this->dn = $dn instanceof Dn ? $dn : new Dn($dn);
+        $this->dn = $dn instanceof Dn
+            ? $dn
+            : new Dn($dn);
 
         return $this;
     }
 
-    /**
-     * @return EqualityFilter
-     */
     public function getFilter(): EqualityFilter
     {
         return $this->filter;
     }
 
-    /**
-     * @param EqualityFilter $filter
-     * @return $this
-     */
-    public function setFilter(EqualityFilter $filter)
+    public function setFilter(EqualityFilter $filter): self
     {
         $this->filter = $filter;
 
@@ -94,11 +74,10 @@ class CompareRequest implements RequestInterface, DnRequestInterface
 
     /**
      * {@inheritDoc}
-     * @return self
      * @throws EncoderException
      * @throws RuntimeException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): self
     {
         if (!($type instanceof SequenceType && count($type->getChildren()) === 2)) {
             throw new ProtocolException('The compare request is malformed');

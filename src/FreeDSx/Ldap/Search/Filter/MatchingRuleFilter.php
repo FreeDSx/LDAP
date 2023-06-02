@@ -21,6 +21,7 @@ use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use Stringable;
 
 /**
  * Represents an extensible matching rule filter. RFC 4511, 4.5.1.7.7
@@ -33,114 +34,72 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class MatchingRuleFilter implements FilterInterface
+class MatchingRuleFilter implements FilterInterface, Stringable
 {
     protected const CHOICE_TAG = 9;
 
-    /**
-     * @var null|string
-     */
-    protected $matchingRule;
+    private ?string $matchingRule;
 
-    /**
-     * @var null|string
-     */
-    protected $attribute;
+    private ?string $attribute;
 
-    /**
-     * @var string
-     */
-    protected $value;
+    private string $value;
 
-    /**
-     * @var bool
-     */
-    protected $useDnAttributes;
+    private bool $useDnAttributes;
 
-    /**
-     * @param null|string $matchingRule
-     * @param null|string $attribute
-     * @param string $value
-     * @param bool $useDnAttributes
-     */
-    public function __construct(?string $matchingRule, ?string $attribute, string $value, bool $useDnAttributes = false)
-    {
+    public function __construct(
+        ?string $matchingRule,
+        ?string $attribute,
+        string $value,
+        bool $useDnAttributes = false
+    ) {
         $this->matchingRule = $matchingRule;
         $this->attribute = $attribute;
         $this->value = $value;
         $this->useDnAttributes = $useDnAttributes;
     }
 
-    /**
-     * @return null|string
-     */
     public function getAttribute(): ?string
     {
         return $this->attribute;
     }
 
-    /**
-     * @param null|string $attribute
-     * @return $this
-     */
-    public function setAttribute(?string $attribute)
+    public function setAttribute(?string $attribute): self
     {
         $this->attribute = $attribute;
 
         return $this;
     }
 
-    /**
-     * @return null|string
-     */
     public function getMatchingRule(): ?string
     {
         return $this->matchingRule;
     }
 
-    /**
-     * @param null|string $matchingRule
-     * @return $this
-     */
-    public function setMatchingRule(?string $matchingRule)
+    public function setMatchingRule(?string $matchingRule): self
     {
         $this->matchingRule = $matchingRule;
 
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function getValue(): string
     {
         return $this->value;
     }
 
-    /**
-     * @param string $value
-     * @return $this
-     */
-    public function setValue(string $value)
+    public function setValue(string $value): self
     {
         $this->value = $value;
 
         return $this;
     }
 
-    /**
-     * @return bool
-     */
     public function getUseDnAttributes(): bool
     {
         return $this->useDnAttributes;
     }
 
-    /**
-     * @param bool $useDnAttributes
-     * @return $this
-     */
-    public function setUseDnAttributes(bool $useDnAttributes)
+    public function setUseDnAttributes(bool $useDnAttributes): self
     {
         $this->useDnAttributes = $useDnAttributes;
 
@@ -152,17 +111,32 @@ class MatchingRuleFilter implements FilterInterface
      */
     public function toAsn1(): AbstractType
     {
-        /** @var \FreeDSx\Asn1\Type\SequenceType $matchingRule */
-        $matchingRule = Asn1::context(self::CHOICE_TAG, Asn1::sequence());
+        /** @var SequenceType $matchingRule */
+        $matchingRule = Asn1::context(
+            tagNumber: self::CHOICE_TAG,
+            type: Asn1::sequence()
+        );
 
         if ($this->matchingRule !== null) {
-            $matchingRule->addChild(Asn1::context(1, Asn1::octetString($this->matchingRule)));
+            $matchingRule->addChild(Asn1::context(
+                tagNumber: 1,
+                type: Asn1::octetString($this->matchingRule),
+            ));
         }
         if ($this->attribute !== null) {
-            $matchingRule->addChild(Asn1::context(2, Asn1::octetString($this->attribute)));
+            $matchingRule->addChild(Asn1::context(
+                tagNumber: 2,
+                type: Asn1::octetString($this->attribute),
+            ));
         }
-        $matchingRule->addChild(Asn1::context(3, Asn1::octetString($this->value)));
-        $matchingRule->addChild(Asn1::context(4, Asn1::boolean($this->useDnAttributes)));
+        $matchingRule->addChild(Asn1::context(
+            tagNumber: 3,
+            type: Asn1::octetString($this->value),
+        ));
+        $matchingRule->addChild(Asn1::context(
+            tagNumber: 4,
+            type: Asn1::boolean($this->useDnAttributes),
+        ));
 
         return $matchingRule;
     }
@@ -183,23 +157,23 @@ class MatchingRuleFilter implements FilterInterface
             $filter .= ':dn';
         }
 
-        return self::PAREN_LEFT . $filter . self::FILTER_EXT . Attribute::escape($this->value) . self::PAREN_RIGHT;
+        return self::PAREN_LEFT
+            . $filter
+            . self::FILTER_EXT
+            . Attribute::escape($this->value)
+            . self::PAREN_RIGHT;
     }
 
-    /**
-     * @return string
-     */
-    public function __toString()
+    public function __toString(): string
     {
         return $this->toString();
     }
 
     /**
      * {@inheritDoc}
-     * @return MatchingRuleFilter
      * @throws EncoderException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): self
     {
         $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
         if (!($type instanceof SequenceType && (count($type) >= 1 && count($type) <= 4))) {
@@ -238,7 +212,7 @@ class MatchingRuleFilter implements FilterInterface
         }
         $matchingRule = ($matchingRule !== null) ? $matchingRule->getValue() : null;
         $matchingType = ($matchingType !== null) ? $matchingType->getValue() : null;
-        $useDnAttr = ($useDnAttr !== null) ? $useDnAttr->getValue() : false;
+        $useDnAttr = $useDnAttr !== null && $useDnAttr->getValue();
 
         return new self(
             $matchingRule,

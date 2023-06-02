@@ -18,22 +18,14 @@ namespace FreeDSx\Ldap\Server\Token;
  */
 class AnonToken implements TokenInterface
 {
-    /**
-     * @var null|string
-     */
-    protected $username;
+    private ?string $username;
 
-    /**
-     * @var int
-     */
-    protected $version;
+    private int $version;
 
-    /**
-     * @param null|string $username
-     * @param int $version
-     */
-    public function __construct(?string $username = null, int $version = 3)
-    {
+    public function __construct(
+        ?string $username = null,
+        int $version = 3
+    ) {
         $this->username = $username;
         $this->version = $version;
     }
@@ -46,9 +38,6 @@ class AnonToken implements TokenInterface
         return $this->username;
     }
 
-    /**
-     * @return null
-     */
     public function getPassword(): ?string
     {
         return null;

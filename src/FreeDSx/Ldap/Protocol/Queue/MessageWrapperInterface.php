@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -23,8 +24,6 @@ interface MessageWrapperInterface
     /**
      * Wrap the message after it is encode to ASN.1.
      *
-     * @param string $message
-     * @return string
      * @throws SaslException
      */
     public function wrap(string $message): string;
@@ -32,8 +31,6 @@ interface MessageWrapperInterface
     /**
      * Unwrap the message before it is decoded to ASN.1.
      *
-     * @param string $message
-     * @return Buffer
      * @throws SaslException
      */
     public function unwrap(string $message): Buffer;

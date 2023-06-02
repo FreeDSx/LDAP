@@ -21,24 +21,21 @@ use FreeDSx\Ldap\Operation\LdapResult;
  */
 class SearchResponse extends LdapResult
 {
-    /**
-     * @var Entries
-     */
-    protected $entries;
+    private Entries $entries;
 
-    /**
-     * @param LdapResult $result
-     * @param Entries $entries
-     */
-    public function __construct(LdapResult $result, Entries $entries)
-    {
+    public function __construct(
+        LdapResult $result,
+        Entries $entries
+    ) {
         $this->entries = $entries;
-        parent::__construct($result->resultCode, $result->dn, $result->diagnosticMessage, ...$result->referrals);
+        parent::__construct(
+            $result->resultCode,
+            $result->dn,
+            $result->diagnosticMessage,
+            ...$result->referrals
+        );
     }
 
-    /**
-     * @return Entries
-     */
     public function getEntries(): Entries
     {
         return $this->entries;

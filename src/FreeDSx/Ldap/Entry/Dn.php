@@ -16,6 +16,7 @@ use Countable;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\UnexpectedValueException;
 use IteratorAggregate;
+use Stringable;
 use Traversable;
 use function array_slice;
 use function count;
@@ -28,28 +29,18 @@ use function preg_split;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Dn implements IteratorAggregate, Countable
+class Dn implements IteratorAggregate, Countable, Stringable
 {
-    /**
-     * @var string
-     */
-    protected $dn;
+    private string $dn;
 
-    /**
-     * @var null|Rdn[]
-     */
-    protected $pieces;
+    private ?array $pieces = null;
 
-    /**
-     * @param string $dn
-     */
     public function __construct(string $dn)
     {
         $this->dn = $dn;
     }
 
     /**
-     * @return Rdn
      * @throws UnexpectedValueException
      */
     public function getRdn(): Rdn
@@ -65,7 +56,6 @@ class Dn implements IteratorAggregate, Countable
     }
 
     /**
-     * @return null|Dn
      * @throws UnexpectedValueException
      */
     public function getParent(): ?Dn
@@ -82,7 +72,7 @@ class Dn implements IteratorAggregate, Countable
 
     /**
      * @inheritDoc
-     * @@psalm-return \ArrayIterator<array-key, Rdn>
+     * @return Traversable<Rdn>
      * @throws UnexpectedValueException
      */
     public function getIterator(): Traversable
@@ -90,9 +80,6 @@ class Dn implements IteratorAggregate, Countable
         return new ArrayIterator($this->toArray());
     }
 
-    /**
-     * @return string
-     */
     public function toString(): string
     {
         return $this->dn;
@@ -112,10 +99,7 @@ class Dn implements IteratorAggregate, Countable
         return count((array) $this->pieces);
     }
 
-    /**
-     * @return string
-     */
-    public function __toString()
+    public function __toString(): string
     {
         return $this->dn;
     }
@@ -134,10 +118,6 @@ class Dn implements IteratorAggregate, Countable
         return ($this->pieces === null) ? [] : $this->pieces;
     }
 
-    /**
-     * @param string $dn
-     * @return bool
-     */
     public static function isValid(string $dn): bool
     {
         try {
@@ -154,7 +134,7 @@ class Dn implements IteratorAggregate, Countable
      *
      * @throws UnexpectedValueException
      */
-    protected function parse(): void
+    private function parse(): void
     {
         if ($this->dn === '') {
             $this->pieces = [];

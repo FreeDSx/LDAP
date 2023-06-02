@@ -50,32 +50,19 @@ class AddRequest implements RequestInterface
 {
     protected const APP_TAG = 8;
 
-    /**
-     * @var Entry
-     */
-    protected $entry;
+    private Entry $entry;
 
-    /**
-     * @param Entry $entry
-     */
     public function __construct(Entry $entry)
     {
         $this->entry = $entry;
     }
 
-    /**
-     * @return Entry
-     */
     public function getEntry(): Entry
     {
         return $this->entry;
     }
 
-    /**
-     * @param Entry $entry
-     * @return $this
-     */
-    public function setEntry(Entry $entry)
+    public function setEntry(Entry $entry): self
     {
         $this->entry = $entry;
 
@@ -84,9 +71,8 @@ class AddRequest implements RequestInterface
 
     /**
      * {@inheritDoc}
-     * @return self
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): self
     {
         if (!($type instanceof SequenceType && count($type) === 2)) {
             throw new ProtocolException('The add request is malformed: %s');
@@ -125,7 +111,10 @@ class AddRequest implements RequestInterface
             $attributes[] = new Attribute($attrType->getValue(), ...$attrValues);
         }
 
-        return new self(new Entry($dn, ...$attributes));
+        return new self(new Entry(
+            $dn,
+            ...$attributes
+        ));
     }
 
     /**
@@ -135,7 +124,6 @@ class AddRequest implements RequestInterface
     {
         $attributeList = Asn1::sequenceOf();
 
-        /** @var Attribute $attribute */
         foreach ($this->entry->getAttributes() as $attribute) {
             $attr = Asn1::sequence(Asn1::octetString($attribute->getDescription()));
 

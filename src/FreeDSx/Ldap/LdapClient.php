@@ -15,6 +15,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
@@ -23,6 +24,9 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\Response\CompareResponse;
+use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -32,6 +36,7 @@ use FreeDSx\Ldap\Search\Paging;
 use FreeDSx\Ldap\Search\RangeRetrieval;
 use FreeDSx\Ldap\Search\Vlv;
 use FreeDSx\Sasl\Exception\SaslException;
+use Stringable;
 
 /**
  * The LDAP client.
@@ -47,9 +52,9 @@ class LdapClient
     public const REFERRAL_THROW = 'throw';
 
     /**
-     * @var array
+     * @var array<string, mixed>
      */
-    protected $options = [
+    private array $options = [
         'version' => 3,
         'servers' => [],
         'port' => 389,
@@ -68,61 +73,73 @@ class LdapClient
         'referral_limit' => 10,
     ];
 
-    /**
-     * @var ClientProtocolHandler|null
-     */
-    protected $handler;
+    private ?ClientProtocolHandler $handler = null;
 
     /**
-     * @param array $options
+     * @param array<string, mixed> $options
      */
     public function __construct(array $options = [])
     {
-        $this->options = array_merge($this->options, $options);
+        $this->options = array_merge(
+            $this->options,
+            $options,
+        );
     }
 
     /**
      * A Simple Bind to LDAP with a username and password.
      *
-     * @param string $username
-     * @param string $password
-     * @return LdapMessageResponse
      * @throws Exception\BindException
      */
-    public function bind(string $username, string $password): LdapMessageResponse
-    {
-        return $this->sendAndReceive(Operations::bind($username, $password)->setVersion($this->options['version']));
+    public function bind(
+        string $username,
+        string $password
+    ): LdapMessageResponse {
+        return $this->sendAndReceive(
+            Operations::bind($username, $password)
+                ->setVersion($this->options['version'])
+        );
     }
 
     /**
      * A SASL Bind to LDAP with SASL options and an optional specific mechanism type.
      *
-     * @param array $options The SASL options (ie. ['username' => '...', 'password' => '...'])
+     * @param array<string, mixed> $options The SASL options (ie. ['username' => '...', 'password' => '...'])
      * @param string $mechanism A specific mechanism to use. If none is supplied, one will be selected.
-     * @return LdapMessageResponse
      * @throws Exception\BindException
      * @throws OperationException
      * @throws SaslException
      */
-    public function bindSasl(array $options = [], string $mechanism = ''): LdapMessageResponse
-    {
-        return $this->sendAndReceive(Operations::bindSasl($options, $mechanism)->setVersion($this->options['version']));
+    public function bindSasl(
+        array $options = [],
+        string $mechanism = ''
+    ): LdapMessageResponse {
+        return $this->sendAndReceive(
+            Operations::bindSasl($options, $mechanism)
+                ->setVersion($this->options['version'])
+        );
     }
 
     /**
      * Check whether an entry matches a certain attribute and value.
      *
-     * @param string|Dn $dn
-     * @param string $attributeName
-     * @param string $value
-     * @param Control ...$controls
-     * @return bool
      * @throws OperationException
      */
-    public function compare($dn, string $attributeName, string $value, Control ...$controls): bool
-    {
-        /** @var \FreeDSx\Ldap\Operation\Response\CompareResponse $response */
-        $response = $this->sendAndReceive(Operations::compare($dn, $attributeName, $value), ...$controls)->getResponse();
+    public function compare(
+        Dn|string $dn,
+        string $attributeName,
+        string $value,
+        Control ...$controls
+    ): bool {
+        /** @var CompareResponse $response */
+        $response = $this->sendAndReceive(
+            Operations::compare(
+                $dn,
+                $attributeName,
+                $value
+            ),
+            ...$controls
+        )->getResponse();
 
         return $response->getResultCode() === ResultCode::COMPARE_TRUE;
     }
@@ -130,14 +147,16 @@ class LdapClient
     /**
      * Create a new entry.
      *
-     * @param Entry $entry
-     * @param Control ...$controls
-     * @return LdapMessageResponse
      * @throws OperationException
      */
-    public function create(Entry $entry, Control ...$controls): LdapMessageResponse
-    {
-        $response = $this->sendAndReceive(Operations::add($entry), ...$controls);
+    public function create(
+        Entry $entry,
+        Control ...$controls
+    ): LdapMessageResponse {
+        $response = $this->sendAndReceive(
+            Operations::add($entry),
+            ...$controls
+        );
         $entry->changes()->reset();
 
         return $response;
@@ -146,20 +165,25 @@ class LdapClient
     /**
      * Read an entry.
      *
-     * @param string $entry
-     * @param string[] $attributes
-     * @param Control ...$controls
-     * @return Entry|null
+     * @param array<Attribute|string> $attributes
      * @throws OperationException
      */
-    public function read(string $entry = '', $attributes = [], Control ...$controls): ?Entry
-    {
+    public function read(
+        string $entry = '',
+        array $attributes = [],
+        Control ...$controls
+    ): ?Entry {
         try {
-            return $this->readOrFail($entry, $attributes, ...$controls);
+            return $this->readOrFail(
+                $entry,
+                $attributes,
+                ...$controls
+            );
         } catch (Exception\OperationException $e) {
             if ($e->getCode() === ResultCode::NO_SUCH_OBJECT) {
                 return null;
             }
+
             throw $e;
         }
     }
@@ -167,15 +191,20 @@ class LdapClient
     /**
      * Read an entry from LDAP. If the entry is not found an OperationException is thrown.
      *
-     * @param string $entry
-     * @param string[] $attributes
-     * @param Control ...$controls
-     * @return Entry
+     * @param array<string|Attribute> $attributes
      * @throws OperationException
      */
-    public function readOrFail(string $entry = '', $attributes = [], Control ...$controls): Entry
-    {
-        $entryObj = $this->search(Operations::read($entry, ...$attributes), ...$controls)->first();
+    public function readOrFail(
+        string $entry = '',
+        array $attributes = [],
+        Control ...$controls
+    ): Entry {
+        $entryObj = $this->search(
+            Operations::read($entry, ...$attributes),
+            ...$controls
+        )
+            ->first();
+
         if ($entryObj === null) {
             throw new OperationException(sprintf(
                 'The entry "%s" was not found.',
@@ -189,27 +218,34 @@ class LdapClient
     /**
      * Delete an entry.
      *
-     * @param string $entry
-     * @param Control ...$controls
-     * @return LdapMessageResponse
      * @throws OperationException
      */
-    public function delete(string $entry, Control ...$controls): LdapMessageResponse
-    {
-        return $this->sendAndReceive(Operations::delete($entry), ...$controls);
+    public function delete(
+        string $entry,
+        Control ...$controls
+    ): LdapMessageResponse {
+        return $this->sendAndReceive(
+            Operations::delete($entry),
+            ...$controls
+        );
     }
 
     /**
      * Update an existing entry.
      *
-     * @param Entry $entry
-     * @param Control ...$controls
-     * @return LdapMessageResponse
      * @throws OperationException
      */
-    public function update(Entry $entry, Control ...$controls): LdapMessageResponse
-    {
-        $response = $this->sendAndReceive(Operations::modify($entry->getDn(), ...$entry->changes()), ...$controls);
+    public function update(
+        Entry $entry,
+        Control ...$controls
+    ): LdapMessageResponse {
+        $response = $this->sendAndReceive(
+            Operations::modify(
+                $entry->getDn(),
+                ...$entry->changes()->toArray()
+            ),
+            ...$controls
+        );
         $entry->changes()->reset();
 
         return $response;
@@ -218,112 +254,132 @@ class LdapClient
     /**
      * Move an entry to a new location.
      *
-     * @param string|Entry $dn
-     * @param string|Entry $newParentDn
-     * @return LdapMessageResponse
      * @throws OperationException
      */
-    public function move($dn, $newParentDn): LdapMessageResponse
-    {
-        return $this->sendAndReceive(Operations::move($dn, $newParentDn));
+    public function move(
+        Stringable|string $dn,
+        Stringable|string $newParentDn
+    ): LdapMessageResponse {
+        return $this->sendAndReceive(Operations::move(
+            (string) $dn,
+            (string) $newParentDn
+        ));
     }
 
     /**
      * Rename an entry (changing the RDN).
      *
-     * @param string|Entry $dn
-     * @param string|Rdn $newRdn
-     * @param bool $deleteOldRdn
-     * @return LdapMessageResponse
      * @throws OperationException
      */
-    public function rename($dn, $newRdn, bool $deleteOldRdn = true): LdapMessageResponse
-    {
-        return $this->sendAndReceive(Operations::rename($dn, $newRdn, $deleteOldRdn));
+    public function rename(
+        Stringable|string $dn,
+        Stringable|string $newRdn,
+        bool $deleteOldRdn = true
+    ): LdapMessageResponse {
+        return $this->sendAndReceive(Operations::rename(
+            $dn,
+            $newRdn,
+            $deleteOldRdn
+        ));
     }
 
     /**
      * Send a search response and return the entries.
      *
-     * @param SearchRequest $request
-     * @param Control ...$controls
-     * @return Entries
      * @throws OperationException
      */
-    public function search(SearchRequest $request, Control ...$controls): Entries
-    {
-        /** @var \FreeDSx\Ldap\Operation\Response\SearchResponse $response */
-        $response = $this->sendAndReceive($request, ...$controls)->getResponse();
+    public function search(
+        SearchRequest $request,
+        Control ...$controls
+    ): Entries {
+        /** @var SearchResponse $response */
+        $response = $this->sendAndReceive(
+            $request,
+            ...$controls
+        )->getResponse();
 
         return $response->getEntries();
     }
 
     /**
      * A helper for performing a paging based search.
-     *
-     * @param SearchRequest $search
-     * @param null|int $size
-     * @return Paging
      */
-    public function paging(SearchRequest $search, ?int $size = null): Paging
-    {
-        return new Paging($this, $search, $size ?? $this->options['page_size']);
+    public function paging(
+        SearchRequest $search,
+        ?int $size = null
+    ): Paging {
+        return new Paging(
+            client: $this,
+            search: $search,
+            size: $size ?? (int) $this->options['page_size']
+        );
     }
 
     /**
      * A helper for performing a VLV (Virtual List View) based search.
-     *
-     * @param SearchRequest $search
-     * @param SortingControl|string|SortKey $sort
-     * @param int $afterCount
-     * @return Vlv
      */
-    public function vlv(SearchRequest $search, $sort, int $afterCount): Vlv
-    {
-        return new Vlv($this, $search, $sort, $afterCount);
+    public function vlv(
+        SearchRequest $search,
+        SortKey|SortingControl|string $sort,
+        int $afterCount
+    ): Vlv {
+        return new Vlv(
+            client: $this,
+            search: $search,
+            sort: $sort,
+            after: $afterCount
+        );
     }
 
     /**
      * A helper for performing a DirSync search operation against AD.
-     *
-     * @param string|null $rootNc
-     * @param FilterInterface|null $filter
-     * @param mixed ...$attributes
-     * @return DirSync
      */
-    public function dirSync(?string $rootNc = null, FilterInterface $filter = null, ...$attributes): DirSync
-    {
-        return new DirSync($this, $rootNc, $filter, ...$attributes);
+    public function dirSync(
+        ?string $rootNc = null,
+        FilterInterface $filter = null,
+        Attribute|string ...$attributes
+    ): DirSync {
+        return new DirSync(
+            $this,
+            $rootNc,
+            $filter,
+            ...$attributes
+        );
     }
 
     /**
      * Send a request operation to LDAP. This may return null if the request expects no response.
      *
-     * @param RequestInterface $request
-     * @param Control ...$controls
-     * @return LdapMessageResponse|null
      * @throws Exception\BindException
      * @throws Exception\ConnectionException
      * @throws OperationException
      */
-    public function send(RequestInterface $request, Control ...$controls): ?LdapMessageResponse
-    {
-        return $this->handler()->send($request, ...$controls);
+    public function send(
+        RequestInterface $request,
+        Control ...$controls
+    ): ?LdapMessageResponse {
+        return $this->handler()
+            ->send(
+                $request,
+                ...$controls
+            );
     }
 
     /**
      * Send a request to LDAP that expects a response. If none is received an OperationException is thrown.
      *
-     * @param RequestInterface $request
-     * @param Control ...$controls
-     * @return LdapMessageResponse
      * @throws Exception\BindException
      * @throws Exception\ConnectionException
      * @throws OperationException
      */
-    public function sendAndReceive(RequestInterface $request, Control ...$controls): LdapMessageResponse
-    {
-        $response = $this->send($request, ...$controls);
+    public function sendAndReceive(
+        RequestInterface $request,
+        Control ...$controls
+    ): LdapMessageResponse {
+        $response = $this->send(
+            $request,
+            ...$controls
+        );
         if ($response === null) {
             throw new OperationException('Expected an LDAP message response, but none was received.');
         }
@@ -334,7 +390,6 @@ class LdapClient
     /**
      * Issue a startTLS to encrypt the LDAP connection.
      *
-     * @return $this
      * @throws Exception\ConnectionException
      * @throws OperationException
      */
@@ -348,7 +403,6 @@ class LdapClient
     /**
      * Unbind and close the LDAP TCP connection.
      *
-     * @return $this
      * @throws Exception\ConnectionException
      * @throws OperationException
      */
@@ -362,12 +416,11 @@ class LdapClient
     /**
      * Perform a whoami request and get the returned value.
      *
-     * @return string
      * @throws OperationException
      */
     public function whoami(): ?string
     {
-        /** @var \FreeDSx\Ldap\Operation\Response\ExtendedResponse $response */
+        /** @var ExtendedResponse $response */
         $response = $this->sendAndReceive(Operations::whoami())->getResponse();
 
         return $response->getValue();
@@ -375,8 +428,6 @@ class LdapClient
 
     /**
      * Get a helper class for handling ranged attributes.
-     *
-     * @return RangeRetrieval
      */
     public function range(): RangeRetrieval
     {
@@ -386,8 +437,6 @@ class LdapClient
     /**
      * Access to add/set/remove/reset the controls to be used for each request. If you want request specific controls in
      * addition to these, then pass them as a parameter to the send() method.
-     *
-     * @return ControlBag
      */
     public function controls(): ControlBag
     {
@@ -397,7 +446,7 @@ class LdapClient
     /**
      * Get the options currently set.
      *
-     * @return array
+     * @return array<string, mixed>
      */
     public function getOptions(): array
     {
@@ -408,10 +457,9 @@ class LdapClient
      * Merge a set of options. Depending on what you are changing, you many want to set the $forceDisconnect param to
      * true, which forces the client to disconnect. After which you would have to manually bind again.
      *
-     * @param array $options The set of options to merge in.
+     * @param array<string, mixed> $options The set of options to merge in.
      * @param bool $forceDisconnect Whether the client should disconnect; forcing a manual re-connect / bind. This is
      *                              false by default.
-     * @return $this
      */
     public function setOptions(
         array $options,
@@ -428,10 +476,6 @@ class LdapClient
         return $this;
     }
 
-    /**
-     * @param ClientProtocolHandler|null $handler
-     * @return $this
-     */
     public function setProtocolHandler(ClientProtocolHandler $handler = null): self
     {
         $this->handler = $handler;
@@ -441,8 +485,6 @@ class LdapClient
 
     /**
      * A simple check to determine if this client has an established connection to a server.
-     *
-     * @return bool
      */
     public function isConnected(): bool
     {
@@ -460,7 +502,7 @@ class LdapClient
         $this->unbindIfConnected();
     }
 
-    protected function handler(): ClientProtocolHandler
+    private function handler(): ClientProtocolHandler
     {
         if ($this->handler === null) {
             $this->handler = new Protocol\ClientProtocolHandler($this->options);

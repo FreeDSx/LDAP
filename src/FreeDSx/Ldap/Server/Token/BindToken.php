@@ -18,44 +18,27 @@ namespace FreeDSx\Ldap\Server\Token;
  */
 class BindToken implements TokenInterface
 {
-    /**
-     * @var string
-     */
-    protected $username;
+    private string $username;
 
-    /**
-     * @var string
-     */
-    protected $password;
+    private string $password;
 
-    /**
-     * @var int
-     */
-    protected $version;
+    private int $version;
 
-    /**
-     * @param string $username
-     * @param string $password
-     * @param int $version
-     */
-    public function __construct(string $username, string $password, int $version = 3)
-    {
+    public function __construct(
+        string $username,
+        string $password,
+        int $version = 3
+    ) {
         $this->username = $username;
         $this->password = $password;
         $this->version = $version;
     }
 
-    /**
-     * @return string
-     */
     public function getUsername(): ?string
     {
         return $this->username;
     }
 
-    /**
-     * @return string
-     */
     public function getPassword(): ?string
     {
         return $this->password;

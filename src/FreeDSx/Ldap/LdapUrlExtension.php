@@ -12,6 +12,7 @@
 namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Exception\UrlParseException;
+use Stringable;
 use function explode;
 use function str_ireplace;
 use function str_replace;
@@ -22,69 +23,44 @@ use function substr;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class LdapUrlExtension
+class LdapUrlExtension implements Stringable
 {
     use LdapUrlTrait;
 
-    /**
-     * @var string
-     */
-    protected $name;
+    private string $name;
 
-    /**
-     * @var null|string
-     */
-    protected $value;
+    private ?string $value;
 
-    /**
-     * @var bool
-     */
-    protected $isCritical = false;
+    private bool $isCritical;
 
-    /**
-     * @param string $name
-     * @param null|string $value
-     * @param bool $isCritical
-     */
-    public function __construct(string $name, ?string $value = null, bool $isCritical = false)
-    {
+    public function __construct(
+        string $name,
+        ?string $value = null,
+        bool $isCritical = false
+    ) {
         $this->name = $name;
         $this->value = $value;
         $this->isCritical = $isCritical;
     }
 
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return $this->name;
     }
 
-    /**
-     * @param string $name
-     * @return $this
-     */
-    public function setName(string $name)
+    public function setName(string $name): self
     {
         $this->name = $name;
 
         return $this;
     }
 
-    /**
-     * @return null|string
-     */
     public function getValue(): ?string
     {
         return $this->value;
     }
 
-    /**
-     * @param null|string $value
-     * @return $this
-     */
-    public function setValue(?string $value)
+    public function setValue(?string $value): self
     {
         $this->value = $value;
 
@@ -96,59 +72,71 @@ class LdapUrlExtension
         return $this->isCritical;
     }
 
-    /**
-     * @param bool $isCritical
-     * @return $this
-     */
-    public function setIsCritical(bool $isCritical)
+    public function setIsCritical(bool $isCritical): self
     {
         $this->isCritical = $isCritical;
 
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function toString(): string
     {
         $ext = ($this->isCritical ? '!' : '') . str_replace(',', '%2c', self::encode($this->name));
 
         if ($this->value !== null) {
-            $ext .= '=' . str_replace(',', '%2c', self::encode($this->value));
+            $ext .= '=' . str_replace(
+                search: ',',
+                replace: '%2c',
+                subject: self::encode($this->value),
+            );
         }
 
         return $ext;
     }
 
-    /**
-     * @return string
-     */
-    public function __toString()
+    public function __toString(): string
     {
         return $this->toString();
     }
 
     /**
-     * @param string $extension
-     * @return LdapUrlExtension
      * @throws UrlParseException
      */
     public static function parse(string $extension): LdapUrlExtension
     {
         if (preg_match('/!?\w+(=.*)?/', $extension) !== 1) {
-            throw new UrlParseException(sprintf('The LDAP URL extension is malformed: %s', $extension));
+            throw new UrlParseException(sprintf(
+                'The LDAP URL extension is malformed: %s',
+                $extension
+            ));
         }
-        $pieces = explode('=', $extension, 2);
+        $pieces = explode(
+            separator: '=',
+            string: $extension,
+            limit: 2
+        );
 
         $isCritical = isset($pieces[0][0]) && $pieces[0][0] === '!';
         if ($isCritical) {
-            $pieces[0] = substr($pieces[0], 1);
+            $pieces[0] = substr(
+                string: $pieces[0],
+                offset: 1,
+            );
         }
 
         $name = str_ireplace('%2c', ',', self::decode($pieces[0]));
-        $value = isset($pieces[1]) ? str_ireplace('%2c', ',', self::decode($pieces[1])) : null;
+        $value = isset($pieces[1])
+            ? str_ireplace(
+                search: '%2c',
+                replace: ',',
+                subject: self::decode($pieces[1])
+            )
+            : null;
 
-        return new self($name, $value, $isCritical);
+        return new self(
+            $name,
+            $value,
+            $isCritical
+        );
     }
 }

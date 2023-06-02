@@ -21,12 +21,10 @@ use FreeDSx\Asn1\Type\AbstractType;
  */
 class AnonBindRequest extends BindRequest
 {
-    /**
-     * @param string $username
-     * @param int $version
-     */
-    public function __construct(string $username = '', int $version = 3)
-    {
+    public function __construct(
+        string $username = '',
+        int $version = 3
+    ) {
         $this->username = $username;
         $this->version = $version;
     }

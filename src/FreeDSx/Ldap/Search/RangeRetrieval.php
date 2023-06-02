@@ -27,14 +27,8 @@ use FreeDSx\Ldap\LdapClient;
  */
 class RangeRetrieval
 {
-    /**
-     * @var LdapClient
-     */
-    protected $client;
+    private LdapClient $client;
 
-    /**
-     * @param LdapClient $client
-     */
     public function __construct(LdapClient $client)
     {
         $this->client = $client;
@@ -42,12 +36,14 @@ class RangeRetrieval
 
     /**
      * Get a specific ranged attribute by name from an entry. If it does not exist it will return null.
-     *
-     * @param string|Attribute $attribute
      */
-    public function getRanged(Entry $entry, $attribute): ?Attribute
-    {
-        $attribute = $attribute instanceof Attribute ? new Attribute($attribute->getName()) : new Attribute($attribute);
+    public function getRanged(
+        Entry $entry,
+        Attribute|string $attribute
+    ): ?Attribute {
+        $attribute = $attribute instanceof Attribute
+            ? new Attribute($attribute->getName())
+            : new Attribute($attribute);
 
         foreach ($this->getAllRanged($entry) as $rangedAttribute) {
             if ($rangedAttribute->equals($attribute)) {
@@ -61,9 +57,7 @@ class RangeRetrieval
     /**
      * Get all ranged attributes as an array from a entry.
      *
-     * @param Entry $entry
      * @return Attribute[]
-     * @psalm-return list<Attribute>
      */
     public function getAllRanged(Entry $entry): array
     {
@@ -73,8 +67,7 @@ class RangeRetrieval
             if (!$attribute->hasOptions()) {
                 continue;
             }
-            /** @var Option $option */
-            foreach ($attribute->getOptions() as $option) {
+            foreach ($attribute->getOptions()->toArray() as $option) {
                 if ($option->isRange()) {
                     $ranged[] = $attribute;
                     break;
@@ -87,21 +80,18 @@ class RangeRetrieval
 
     /**
      * A simple check to determine if an entry contains any ranged attributes. Optionally pass an attribute
-     *
-     * @param Entry $entry
-     * @param Attribute|string|null $attribute
-     * @return bool
      */
-    public function hasRanged(Entry $entry, $attribute = null): bool
-    {
-        return (bool) ($attribute !== null ? $this->getRanged($entry, $attribute) : $this->getAllRanged($entry));
+    public function hasRanged(
+        Entry $entry,
+        Attribute|string $attribute = null
+    ): bool {
+        return $attribute !== null
+            ? (bool) $this->getRanged($entry, $attribute)
+            : (bool) $this->getAllRanged($entry);
     }
 
     /**
      * Check if an attribute has more range values that can be queried.
-     *
-     * @param Attribute $attribute
-     * @return bool
      */
     public function hasMoreValues(Attribute $attribute): bool
     {
@@ -116,14 +106,13 @@ class RangeRetrieval
      * Given a specific Entry/DN and an attribute, get the next set of ranged values available. Optionally pass a third
      * parameter to control how many values to grab next.
      *
-     * @param Entry|Dn|string $entry
-     * @param Attribute $attribute
-     * @param string|int $amount
-     * @return Attribute
      * @throws OperationException
      */
-    public function getMoreValues($entry, Attribute $attribute, $amount = '*'): Attribute
-    {
+    public function getMoreValues(
+        Entry|Dn|string $entry,
+        Attribute $attribute,
+        string|int $amount = '*'
+    ): Attribute {
         if (($range = $this->getRangeOption($attribute)) === null || !$this->hasMoreValues($attribute)) {
             return new Attribute($attribute->getName());
         }
@@ -156,13 +145,12 @@ class RangeRetrieval
     /**
      * Given a specific entry and attribute, range retrieve all values of the attribute.
      *
-     * @param Entry|Dn|string $entry
-     * @param string|Attribute $attribute
-     * @return Attribute
      * @throws OperationException
      */
-    public function getAllValues($entry, $attribute): Attribute
-    {
+    public function getAllValues(
+        Entry|Dn|string $entry,
+        Attribute|string $attribute,
+    ): Attribute {
         $attrResult = $attribute instanceof Attribute ? new Attribute($attribute->getName()) : new Attribute($attribute);
         $attrResult->getOptions()->set(Option::fromRange('0'));
 
@@ -185,11 +173,7 @@ class RangeRetrieval
         return $attrResult;
     }
 
-    /**
-     * @param Attribute $attribute
-     * @return Option|null
-     */
-    protected function getRangeOption(Attribute $attribute): ?Option
+    private function getRangeOption(Attribute $attribute): ?Option
     {
         /** @var Option $option */
         foreach ($attribute->getOptions() as $option) {

@@ -102,9 +102,9 @@ class PagingSpec extends ObjectBehavior
             new SearchResponse(
                 new LdapResult(0, '', ''),
                 new Entries(
-                        Entry::create('foo'),
-                        Entry::create('bar')
-                    )
+                    Entry::create('foo'),
+                    Entry::create('bar')
+                )
             )
         ));
         $this->beConstructedWith(

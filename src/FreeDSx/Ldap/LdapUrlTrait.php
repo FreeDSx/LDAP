@@ -24,9 +24,9 @@ use function str_replace;
 trait LdapUrlTrait
 {
     /**
-     * @var array
+     * @var array<string, string>
      */
-    protected static $escapeMap = [
+    private static array $escapeMap = [
         '%' => '%25',
         '?' => '%3f',
         ' ' => '%20',
@@ -47,31 +47,25 @@ trait LdapUrlTrait
 
     /**
      * Percent-encode certain values in the URL.
-     *
-     * @param null|string $value
-     * @return string
      */
     protected static function encode(?string $value): string
     {
         return str_replace(
-            array_keys(self::$escapeMap),
-            array_values(self::$escapeMap),
-            (string) $value
+            search: array_keys(self::$escapeMap),
+            replace: array_values(self::$escapeMap),
+            subject: (string) $value,
         );
     }
 
     /**
      * Percent-decode values from the URL.
-     *
-     * @param string $value
-     * @return string
      */
     protected static function decode(string $value): string
     {
         return str_ireplace(
-            array_values(self::$escapeMap),
-            array_keys(self::$escapeMap),
-            $value
+            search: array_values(self::$escapeMap),
+            replace: array_keys(self::$escapeMap),
+            subject: $value,
         );
     }
 }

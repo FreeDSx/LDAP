@@ -15,15 +15,9 @@ use FreeDSx\Socket\Socket;
 
 class ChildProcess
 {
-    /**
-     * @var int
-     */
-    private $pid;
+    private int $pid;
 
-    /**
-     * @var Socket
-     */
-    private $socket;
+    private Socket $socket;
 
     public function __construct(
         int $pid,

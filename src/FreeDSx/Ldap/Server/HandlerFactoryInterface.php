@@ -24,19 +24,16 @@ use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 interface HandlerFactoryInterface
 {
     /**
-     * @return RequestHandlerInterface
      * @throws RuntimeException
      */
     public function makeRequestHandler(): RequestHandlerInterface;
 
     /**
-     * @return RootDseHandlerInterface|null
      * @throws RuntimeException
      */
     public function makeRootDseHandler(): ?RootDseHandlerInterface;
 
     /**
-     * @return PagingHandlerInterface|null
      * @throws RuntimeException
      */
     public function makePagingHandler(): ?PagingHandlerInterface;

@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
  *
  * When the client wants to retrieve more entries for the result set, it MUST
  * send to the server a searchRequest with all values identical to the
- * initial request with the exception of the messageID, the cookie, and
+ * initial request except the messageID, the cookie, and
  * optionally a modified pageSize. The cookie MUST be the octet string
  * on the last searchResultDone response returned by the server.
  *
@@ -31,10 +31,7 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
  */
 class PagingRequestComparator
 {
-    /**
-     * @var LdapEncoder
-     */
-    private $encoder;
+    private LdapEncoder $encoder;
 
     public function __construct(LdapEncoder $encoder = null)
     {
@@ -46,7 +43,6 @@ class PagingRequestComparator
      *
      * @param PagingRequest $oldPagingRequest The previous paging request.
      * @param PagingRequest $newPagingRequest The paging request that was received.
-     * @return bool
      */
     public function compare(
         PagingRequest $oldPagingRequest,
@@ -74,7 +70,6 @@ class PagingRequestComparator
     /**
      * @param Attribute[] $oldAttrs
      * @param Attribute[] $newAttrs
-     * @return bool
      */
     private function attributesMatch(
         array $oldAttrs,
@@ -108,10 +103,6 @@ class PagingRequestComparator
      *   3. Compares the collections encoded value to see if they match.
      *
      * If the encoded values of the two collections are the same, then they are considered "equal".
-     *
-     * @param ControlBag $newControls
-     * @param ControlBag $oldControls
-     * @return bool
      */
     private function controlsMatch(
         ControlBag $newControls,
@@ -119,11 +110,6 @@ class PagingRequestComparator
     ): bool {
         if ($oldControls->count() !== $newControls->count()) {
             return false;
-        }
-
-        // Short circuit this...nothing to check. Only a paging control.
-        if (empty($oldControls) && empty($newControls)) {
-            return true;
         }
 
         $oldControls = $oldControls->toArray();

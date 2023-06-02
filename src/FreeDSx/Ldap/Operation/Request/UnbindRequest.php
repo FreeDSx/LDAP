@@ -29,9 +29,8 @@ class UnbindRequest implements RequestInterface
 
     /**
      * {@inheritDoc}
-     * @return self
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): self
     {
         if (!$type instanceof NullType) {
             throw new ProtocolException('The unbind request is invalid');
@@ -45,6 +44,9 @@ class UnbindRequest implements RequestInterface
      */
     public function toAsn1(): AbstractType
     {
-        return Asn1::application(self::APP_TAG, Asn1::null());
+        return Asn1::application(
+            self::APP_TAG,
+            Asn1::null()
+        );
     }
 }

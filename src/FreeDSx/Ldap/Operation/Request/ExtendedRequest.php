@@ -54,71 +54,48 @@ class ExtendedRequest implements RequestInterface
      */
     public const OID_PWD_MODIFY = '1.3.6.1.4.1.4203.1.11.1';
 
-    /**
-     * @var string
-     */
-    protected $requestName;
+    private string $requestName;
 
-    /**
-     * @var null|AbstractType|ProtocolElementInterface|string
-     */
-    protected $requestValue;
+    protected null|string|AbstractType|ProtocolElementInterface $requestValue;
 
-    /**
-     * @param string $requestName
-     * @param null|AbstractType|ProtocolElementInterface|string $requestValue
-     */
-    public function __construct(string $requestName, $requestValue = null)
-    {
+    public function __construct(
+        string $requestName,
+        null|string|AbstractType|ProtocolElementInterface $requestValue = null,
+    ) {
         $this->requestName = $requestName;
         $this->requestValue = $requestValue;
     }
 
-    /**
-     * @param string $requestName
-     * @return $this
-     */
-    public function setName(string $requestName)
+    public function setName(string $requestName): self
     {
         $this->requestName = $requestName;
 
         return $this;
     }
 
-    /**
-     * @return string
-     */
     public function getName(): string
     {
         return $this->requestName;
     }
 
-    /**
-     * @param AbstractType|ProtocolElementInterface|string|null $requestValue
-     * @return $this
-     */
-    public function setValue($requestValue)
+    public function setValue(null|string|AbstractType|ProtocolElementInterface $requestValue): static
     {
         $this->requestValue = $requestValue;
 
         return $this;
     }
 
-    /**
-     * @return AbstractType|ProtocolElementInterface|string|null
-     */
-    public function getValue()
+    public function getValue(): null|string|AbstractType|ProtocolElementInterface
     {
         return $this->requestValue;
     }
 
-    /**
-     * @return AbstractType
-     * @throws EncoderException
-     */
     public function toAsn1(): AbstractType
     {
-        $asn1 = Asn1::sequence(Asn1::context(0, Asn1::octetString($this->requestName)));
+        $asn1 = Asn1::sequence(Asn1::context(
+            tagNumber: 0,
+            type: Asn1::octetString($this->requestName),
+        ));
 
         if ($this->requestValue !== null) {
             $value = $this->requestValue;
@@ -128,24 +105,27 @@ class ExtendedRequest implements RequestInterface
             } elseif ($value instanceof ProtocolElementInterface) {
                 $value = $encoder->encode($value->toAsn1());
             }
-            $asn1->addChild(Asn1::context(1, Asn1::octetString($value)));
+            $asn1->addChild(Asn1::context(
+                tagNumber: 1,
+                type: Asn1::octetString($value)
+            ));
         }
 
-        return Asn1::application(self::APP_TAG, $asn1);
+        return Asn1::application(
+            tagNumber: self::APP_TAG,
+            type: $asn1,
+        );
     }
 
     /**
      * {@inheritDoc}
-     * @return self
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
-        return new self(...self::parseAsn1ExtendedRequest($type));
+        return new static(...self::parseAsn1ExtendedRequest($type));
     }
 
     /**
-     * @param AbstractType $type
-     * @return AbstractType
      * @throws ProtocolException
      * @throws EncoderException
      * @throws PartialPduException
@@ -158,12 +138,10 @@ class ExtendedRequest implements RequestInterface
     }
 
     /**
-     * @param AbstractType $type
-     * @return array
      * @throws ProtocolException
-     * @psalm-return array{0: mixed, 1: mixed|null}
+     * @return array{0: mixed, 1: mixed|null}
      */
-    protected static function parseAsn1ExtendedRequest(AbstractType $type)
+    protected static function parseAsn1ExtendedRequest(AbstractType $type): array
     {
         if (!($type instanceof SequenceType && (count($type) === 1 || count($type) === 2))) {
             throw new ProtocolException('The extended request is malformed');

@@ -15,6 +15,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\UrlParseException;
+use Stringable;
 use function array_map;
 use function count;
 use function end;
@@ -25,8 +26,8 @@ use function ltrim;
 use function parse_url;
 use function preg_match;
 use function reset;
+use function str_contains;
 use function strlen;
-use function strpos;
 use function strtolower;
 
 /**
@@ -35,7 +36,7 @@ use function strtolower;
  * @see https://tools.ietf.org/html/rfc4516
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class LdapUrl
+class LdapUrl implements Stringable
 {
     use LdapUrlTrait;
 
@@ -45,58 +46,38 @@ class LdapUrl
 
     public const SCOPE_SUB = 'sub';
 
-    /**
-     * @var null|int
-     */
-    protected $port;
+    private ?int $port = null;
 
-    /**
-     * @var bool
-     */
-    protected $useSsl = false;
+    private bool $useSsl = false;
 
-    /**
-     * @var null|string
-     */
-    protected $host;
+    private ?string $host;
 
-    /**
-     * @var null|Dn
-     */
-    protected $dn;
+    private ?Dn $dn = null;
 
-    /**
-     * @var null|string
-     */
-    protected $scope;
+    private ?string $scope = null;
 
     /**
      * @var Attribute[]
      */
-    protected $attributes = [];
+    private array $attributes = [];
 
-    /**
-     * @var null|string
-     */
-    protected $filter;
+    private ?string $filter = null;
 
     /**
      * @var LdapUrlExtension[]
      */
-    protected $extensions = [];
+    private array $extensions = [];
 
     public function __construct(?string $host = null)
     {
         $this->host = $host;
     }
 
-    /**
-     * @param null|string|Dn $dn
-     * @return $this
-     */
-    public function setDn($dn)
+    public function setDn(Dn|string|null $dn): self
     {
-        $this->dn = $dn === null ? $dn : new Dn($dn);
+        $this->dn = $dn === null
+            ? $dn
+            : new Dn($dn);
 
         return $this;
     }
@@ -111,49 +92,34 @@ class LdapUrl
         return $this->host;
     }
 
-    /**
-     * @return $this
-     */
-    public function setHost(?string $host)
+    public function setHost(?string $host): self
     {
         $this->host = $host;
 
         return $this;
     }
 
-    /**
-     * @param int|null $port
-     * @return $this
-     */
-    public function setPort(?int $port)
+    public function setPort(?int $port): self
     {
         $this->port = $port;
 
         return $this;
     }
 
-    /**
-     * @return int|null
-     */
     public function getPort(): ?int
     {
         return $this->port;
     }
 
-    /**
-     * @return null|string
-     */
     public function getScope(): ?string
     {
         return $this->scope;
     }
 
     /**
-     * @param null|string $scope
-     * @return $this
      * @throws InvalidArgumentException
      */
-    public function setScope(?string $scope)
+    public function setScope(?string $scope): self
     {
         $scope = $scope === null ? $scope : strtolower($scope);
         if ($scope !== null && !in_array($scope, [self::SCOPE_BASE, self::SCOPE_ONE, self::SCOPE_SUB], true)) {
@@ -170,19 +136,12 @@ class LdapUrl
         return $this;
     }
 
-    /**
-     * @return null|string
-     */
     public function getFilter(): ?string
     {
         return $this->filter;
     }
 
-    /**
-     * @param null|string $filter
-     * @return $this
-     */
-    public function setFilter(?string $filter)
+    public function setFilter(?string $filter): self
     {
         $this->filter = $filter;
 
@@ -197,11 +156,7 @@ class LdapUrl
         return $this->extensions;
     }
 
-    /**
-     * @param LdapUrlExtension ...$extensions
-     * @return $this
-     */
-    public function setExtensions(LdapUrlExtension ...$extensions)
+    public function setExtensions(LdapUrlExtension ...$extensions): self
     {
         $this->extensions = $extensions;
 
@@ -216,36 +171,26 @@ class LdapUrl
         return $this->attributes;
     }
 
-    /**
-     * @param string|Attribute ...$attributes
-     * @return $this
-     */
-    public function setAttributes(...$attributes)
+    public function setAttributes(Attribute|string ...$attributes): self
     {
         $attr = [];
         foreach ($attributes as $attribute) {
-            $attr[] = $attribute instanceof Attribute ? $attribute : new Attribute($attribute);
+            $attr[] = $attribute instanceof Attribute
+                ? $attribute
+                : new Attribute($attribute);
         }
         $this->attributes = $attr;
 
         return $this;
     }
 
-
-    /**
-     * @param bool $useSsl
-     * @return static
-     */
-    public function setUseSsl(bool $useSsl)
+    public function setUseSsl(bool $useSsl): self
     {
         $this->useSsl = $useSsl;
 
         return $this;
     }
 
-    /**
-     * @return bool
-     */
     public function getUseSsl(): bool
     {
         return $this->useSsl;
@@ -253,8 +198,6 @@ class LdapUrl
 
     /**
      * Get the string representation of the URL.
-     *
-     * @return string
      */
     public function toString(): string
     {
@@ -267,10 +210,7 @@ class LdapUrl
         return $url . '/' . self::encode($this->dn) . $this->getQueryString();
     }
 
-    /**
-     * @return string
-     */
-    public function __toString()
+    public function __toString(): string
     {
         return $this->toString();
     }
@@ -278,8 +218,6 @@ class LdapUrl
     /**
      * Given a string LDAP URL, get its object representation.
      *
-     * @param string $ldapUrl
-     * @return LdapUrl
      * @throws UrlParseException
      * @throws InvalidArgumentException
      */
@@ -289,7 +227,7 @@ class LdapUrl
 
         $url = new LdapUrl($pieces['host'] ?? null);
         $url->setUseSsl($pieces['scheme'] === 'ldaps');
-        $url->setPort($pieces['port'] ?? null);
+        $url->setPort(isset($pieces['port']) ? (int) $pieces['port'] : null);
         $url->setDn((isset($pieces['path']) && $pieces['path'] !== '/') ? self::decode(ltrim($pieces['path'], '/')) : null);
 
         $query = explode('?', $pieces['query'] ?? '');
@@ -311,11 +249,10 @@ class LdapUrl
     }
 
     /**
-     * @param string $url
-     * @return array
+     * @return array{scheme: ?string, path: ?string, query: ?string, host: ?string, port: ?string}
      * @throws UrlParseException
      */
-    protected static function explodeUrl(string $url): array
+    private static function explodeUrl(string $url): array
     {
         $pieces = parse_url($url);
 
@@ -332,10 +269,10 @@ class LdapUrl
             if (strlen($matches[2]) > 0 && $matches[2][0] === '?') {
                 $query = substr($matches[2], 1);
             # Check if there are any query parameters and a possible path...
-            } elseif (strpos($matches[2], '?') !== false) {
+            } elseif (str_contains($matches[2], '?')) {
                 $parts = explode('?', $matches[2], 2);
                 $path = $parts[0];
-                $query = isset($parts[1]) ? $parts[1] : null;
+                $query = $parts[1] ?? null;
             # A path only...
             } else {
                 $path = $matches[2];
@@ -350,24 +287,25 @@ class LdapUrl
         $pieces['scheme'] = strtolower($pieces['scheme']);
 
         if (!($pieces['scheme'] === 'ldap' || $pieces['scheme'] === 'ldaps')) {
-            throw new UrlParseException(sprintf('The URL scheme "%s" is not valid. It must be "ldap" or "ldaps".', $pieces['scheme']));
+            throw new UrlParseException(sprintf(
+                'The URL scheme "%s" is not valid. It must be "ldap" or "ldaps".',
+                $pieces['scheme']
+            ));
         }
 
+        /** @phpstan-ignore-next-line */
         return $pieces;
     }
 
     /**
      * Generate the query part of the URL string representation. Only generates the parts actually used.
-     *
-     * @return string
      */
-    protected function getQueryString(): string
+    private function getQueryString(): string
     {
         $query = [];
 
         if (count($this->attributes) !== 0) {
-            $query[0] = implode(',', array_map(function ($v) {
-                /** @var $v Attribute */
+            $query[0] = implode(',', array_map(function (Attribute $v) {
                 return self::encode($v->getDescription());
             }, $this->attributes));
         }
@@ -395,7 +333,6 @@ class LdapUrl
         for ($i = 0; $i <= $last; $i++) {
             $url .= '?';
             if (isset($query[$i])) {
-                /* @phpstan-ignore-next-line */
                 $url .= $query[$i];
             }
         }

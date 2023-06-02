@@ -33,11 +33,8 @@ class SearchResultReference implements ResponseInterface
     /**
      * @var LdapUrl[]
      */
-    protected $referrals = [];
+    private array $referrals;
 
-    /**
-     * @param LdapUrl ...$referrals
-     */
     public function __construct(LdapUrl ...$referrals)
     {
         $this->referrals = $referrals;
@@ -53,9 +50,8 @@ class SearchResultReference implements ResponseInterface
 
     /**
      * {@inheritDoc}
-     * @return self
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): self
     {
         $referrals = [];
 
@@ -75,9 +71,11 @@ class SearchResultReference implements ResponseInterface
      */
     public function toAsn1(): AbstractType
     {
-        return Asn1::application(self::TAG_NUMBER, Asn1::sequence(...array_map(function ($ref) {
-            /** @var LdapUrl $ref */
-            return Asn1::octetString($ref->toString());
-        }, $this->referrals)));
+        return Asn1::application(
+            self::TAG_NUMBER,
+            Asn1::sequence(...array_map(function (LdapUrl $ref) {
+                return Asn1::octetString($ref->toString());
+            }, $this->referrals))
+        );
     }
 }

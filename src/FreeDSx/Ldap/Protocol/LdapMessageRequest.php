@@ -23,33 +23,25 @@ use FreeDSx\Ldap\Operation\Request\RequestInterface;
  */
 class LdapMessageRequest extends LdapMessage
 {
-    /**
-     * @var RequestInterface
-     */
-    protected $request;
+    private RequestInterface $request;
 
-    /**
-     * @param int $messageId
-     * @param RequestInterface $request
-     * @param Control ...$controls
-     */
-    public function __construct(int $messageId, RequestInterface $request, Control ...$controls)
-    {
+    public function __construct(
+        int $messageId,
+        RequestInterface $request,
+        Control ...$controls
+    ) {
         $this->request = $request;
-        parent::__construct($messageId, ...$controls);
+        parent::__construct(
+            $messageId,
+            ...$controls
+        );
     }
 
-    /**
-     * @return RequestInterface
-     */
     public function getRequest(): RequestInterface
     {
         return $this->request;
     }
 
-    /**
-     * @return AbstractType
-     */
     protected function getOperationAsn1(): AbstractType
     {
         return $this->request->toAsn1();

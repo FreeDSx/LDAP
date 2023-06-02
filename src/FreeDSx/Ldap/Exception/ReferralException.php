@@ -25,22 +25,23 @@ class ReferralException extends Exception
     /**
      * @var LdapUrl[]
      */
-    protected $referrals;
+    private array $referrals;
 
-    /**
-     * @param string $diagnostic
-     * @param LdapUrl ...$referrals
-     */
-    public function __construct(string $diagnostic, LdapUrl ...$referrals)
-    {
+    public function __construct(
+        string $diagnostic,
+        LdapUrl ...$referrals
+    ) {
         $this->referrals = $referrals;
-        parent::__construct($diagnostic, ResultCode::REFERRAL);
+        parent::__construct(
+            $diagnostic,
+            ResultCode::REFERRAL
+        );
     }
 
     /**
      * @return LdapUrl[]
      */
-    public function getReferrals()
+    public function getReferrals(): array
     {
         return $this->referrals;
     }

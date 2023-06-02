@@ -35,9 +35,9 @@ use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 class FilterFactory
 {
     /**
-     * @var array
+     * @var array<string>
      */
-    protected static $map = [
+    private static array $map = [
         0 => AndFilter::class,
         1 => OrFilter::class,
         2 => NotFilter::class,
@@ -74,22 +74,18 @@ class FilterFactory
         return call_user_func($filterConstruct, $type);
     }
 
-    /**
-     * @param int $filterType
-     * @return bool
-     */
     public static function has(int $filterType): bool
     {
         return isset(self::$map[$filterType]);
     }
 
     /**
-     * @param int $filterType
-     * @param string $filterClass
      * @throws InvalidArgumentException
      */
-    public static function set(int $filterType, string $filterClass): void
-    {
+    public static function set(
+        int $filterType,
+        string $filterClass
+    ): void {
         if (!class_exists($filterClass)) {
             throw new InvalidArgumentException(sprintf('The filter class does not exist: %s', $filterClass));
         }

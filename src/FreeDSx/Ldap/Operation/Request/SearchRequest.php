@@ -85,84 +85,53 @@ class SearchRequest implements RequestInterface
 
     protected const APP_TAG = 3;
 
-    /**
-     * @var Dn|null
-     */
-    protected $baseDn;
+    private ?Dn $baseDn = null;
 
-    /**
-     * @var int
-     */
-    protected $scope = self::SCOPE_WHOLE_SUBTREE;
+    private int $scope = self::SCOPE_WHOLE_SUBTREE;
 
-    /**
-     * @var int
-     */
-    protected $derefAliases = self::DEREF_NEVER;
+    private int $derefAliases = self::DEREF_NEVER;
 
-    /**
-     * @var int
-     */
-    protected $sizeLimit = 0;
+    private int $sizeLimit = 0;
 
-    /**
-     * @var int
-     */
-    protected $timeLimit = 0;
+    private int $timeLimit = 0;
 
-    /**
-     * @var bool
-     */
-    protected $attributesOnly = false;
+    private bool $attributesOnly = false;
 
-    /**
-     * @var FilterInterface
-     */
-    protected $filter;
+    private FilterInterface $filter;
 
     /**
      * @var Attribute[]
      */
-    protected $attributes = [];
+    private array $attributes = [];
 
-    /**
-     * @param FilterInterface $filter
-     * @param string|Attribute ...$attributes
-     */
-    public function __construct(FilterInterface $filter, ...$attributes)
-    {
+    public function __construct(
+        FilterInterface $filter,
+        Attribute|string ...$attributes
+    ) {
         $this->filter = $filter;
         $this->setAttributes(...$attributes);
     }
 
     /**
      * Alias to setAttributes. Convenience for a more fluent method call.
-     *
-     * @param string|Attribute ...$attributes
-     * @return SearchRequest
      */
-    public function select(...$attributes)
+    public function select(Attribute|string ...$attributes): self
     {
         return $this->setAttributes(...$attributes);
     }
 
     /**
      * Alias to setBaseDn. Convenience for a more fluent method call.
-     *
-     * @param string|Dn|null $dn
-     * @return SearchRequest
      */
-    public function base($dn)
+    public function base(string|Dn|null $dn): self
     {
         return $this->setBaseDn($dn);
     }
 
     /**
      * Set the search scope for all children underneath the base DN.
-     *
-     * @return $this
      */
-    public function useSubtreeScope()
+    public function useSubtreeScope(): self
     {
         $this->scope = self::SCOPE_WHOLE_SUBTREE;
 
@@ -171,10 +140,8 @@ class SearchRequest implements RequestInterface
 
     /**
      * Set the search scope to the base DN object only.
-     *
-     * @return $this
      */
-    public function useBaseScope()
+    public function useBaseScope(): self
     {
         $this->scope = self::SCOPE_BASE_OBJECT;
 
@@ -183,10 +150,8 @@ class SearchRequest implements RequestInterface
 
     /**
      * Set the search scope to a single level listing from the base DN.
-     *
-     * @return $this
      */
-    public function useSingleLevelScope()
+    public function useSingleLevelScope(): self
     {
         $this->scope = self::SCOPE_SINGLE_LEVEL;
 
@@ -195,22 +160,16 @@ class SearchRequest implements RequestInterface
 
     /**
      * Alias to setSizeLimit. Convenience for a more fluent method call.
-     *
-     * @param int $size
-     * @return SearchRequest
      */
-    public function sizeLimit(int $size)
+    public function sizeLimit(int $size): self
     {
         return $this->setSizeLimit($size);
     }
 
     /**
      * Alias to setTimeLimit. Convenience for a more fluent method call.
-     *
-     * @param int $time
-     * @return SearchRequest
      */
-    public function timeLimit($time)
+    public function timeLimit(int $time): self
     {
         return $this->setTimeLimit($time);
     }
@@ -223,11 +182,7 @@ class SearchRequest implements RequestInterface
         return $this->attributes;
     }
 
-    /**
-     * @param string|Attribute ...$attributes
-     * @return $this
-     */
-    public function setAttributes(...$attributes)
+    public function setAttributes(Attribute|string ...$attributes): self
     {
         $attr = [];
         foreach ($attributes as $attribute) {
@@ -238,19 +193,12 @@ class SearchRequest implements RequestInterface
         return $this;
     }
 
-    /**
-     * @return Dn|null
-     */
     public function getBaseDn(): ?Dn
     {
         return $this->baseDn;
     }
 
-    /**
-     * @param string|Dn|null $baseDn
-     * @return $this
-     */
-    public function setBaseDn($baseDn)
+    public function setBaseDn(string|Dn|null $baseDn): self
     {
         if ($baseDn !== null) {
             $baseDn = $baseDn instanceof Dn ? $baseDn : new Dn($baseDn);
@@ -260,114 +208,72 @@ class SearchRequest implements RequestInterface
         return $this;
     }
 
-    /**
-     * @return int
-     */
     public function getScope(): int
     {
         return $this->scope;
     }
 
-    /**
-     * @param int $scope
-     * @return $this
-     */
-    public function setScope(int $scope)
+    public function setScope(int $scope): self
     {
         $this->scope = $scope;
 
         return $this;
     }
 
-    /**
-     * @return int
-     */
     public function getDereferenceAliases(): int
     {
         return $this->derefAliases;
     }
 
-    /**
-     * @param int $derefAliases
-     * @return $this
-     */
-    public function setDereferenceAliases(int $derefAliases)
+    public function setDereferenceAliases(int $derefAliases): self
     {
         $this->derefAliases = $derefAliases;
 
         return $this;
     }
 
-    /**
-     * @return int
-     */
     public function getSizeLimit(): int
     {
         return $this->sizeLimit;
     }
 
-    /**
-     * @param int $sizeLimit
-     * @return $this
-     */
-    public function setSizeLimit(int $sizeLimit)
+    public function setSizeLimit(int $sizeLimit): self
     {
         $this->sizeLimit = $sizeLimit;
 
         return $this;
     }
 
-    /**
-     * @return int
-     */
     public function getTimeLimit(): int
     {
         return $this->timeLimit;
     }
 
-    /**
-     * @param int $timeLimit
-     * @return $this
-     */
-    public function setTimeLimit(int $timeLimit)
+    public function setTimeLimit(int $timeLimit): self
     {
         $this->timeLimit = $timeLimit;
 
         return $this;
     }
 
-    /**
-     * @return bool
-     */
     public function getAttributesOnly(): bool
     {
         return $this->attributesOnly;
     }
 
-    /**
-     * @param bool $attributesOnly
-     * @return $this
-     */
-    public function setAttributesOnly(bool $attributesOnly)
+    public function setAttributesOnly(bool $attributesOnly): self
     {
         $this->attributesOnly = $attributesOnly;
 
         return $this;
     }
 
-    /**
-     * @return FilterInterface
-     */
     public function getFilter(): FilterInterface
     {
         return $this->filter;
     }
 
-    /**
-     * @param FilterInterface $filter
-     * @return $this
-     */
-    public function setFilter(FilterInterface $filter)
+    public function setFilter(FilterInterface $filter): self
     {
         $this->filter = $filter;
 
@@ -376,10 +282,10 @@ class SearchRequest implements RequestInterface
 
     /**
      * {@inheritDoc}
-     * @return self
+     *
      * @throws RuntimeException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): self
     {
         if (!($type instanceof SequenceType && count($type) === 8)) {
             throw new ProtocolException('The search request is malformed');
@@ -446,9 +352,8 @@ class SearchRequest implements RequestInterface
             Asn1::integer($this->timeLimit),
             Asn1::boolean($this->attributesOnly),
             $this->filter->toAsn1(),
-            Asn1::sequenceOf(...array_map(function ($attr) {
-                /** @var Attribute|string $attr */
-                return Asn1::octetString($attr instanceof Attribute ? $attr->getDescription() : $attr);
+            Asn1::sequenceOf(...array_map(function (Attribute $attr) {
+                return Asn1::octetString($attr->getDescription());
             }, $this->attributes))
         ));
     }

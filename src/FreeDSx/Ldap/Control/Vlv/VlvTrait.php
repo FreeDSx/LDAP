@@ -18,40 +18,22 @@ namespace FreeDSx\Ldap\Control\Vlv;
  */
 trait VlvTrait
 {
-    /**
-     * @var int|null
-     */
-    protected $count;
+    private ?int $count;
 
-    /**
-     * @var null|string
-     */
-    protected $contextId;
+    private ?string $contextId;
 
-    /**
-     * @var int|null
-     */
-    protected $offset;
+    private ?int $offset;
 
-    /**
-     * @return null|string
-     */
     public function getContextId(): ?string
     {
         return $this->contextId;
     }
 
-    /**
-     * @return int
-     */
     public function getOffset(): ?int
     {
         return $this->offset;
     }
 
-    /**
-     * @return int
-     */
     public function getCount(): ?int
     {
         return $this->count;

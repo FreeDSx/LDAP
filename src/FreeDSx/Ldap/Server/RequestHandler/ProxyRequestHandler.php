@@ -34,21 +34,20 @@ use FreeDSx\Ldap\Server\RequestContext;
  */
 class ProxyRequestHandler implements RequestHandlerInterface
 {
-    /**
-     * @var LdapClient|null
-     */
-    protected $ldap;
+    protected ?LdapClient $ldap = null;
 
     /**
-     * @var array
+     * @var array<string, mixed>
      */
-    protected $options = [];
+    protected array $options = [];
 
     /**
      * @inheritDoc
      */
-    public function bind(string $username, string $password): bool
-    {
+    public function bind(
+        string $username,
+        string $password
+    ): bool {
         try {
             return (bool) $this->ldap()->bind($username, $password);
         } catch (BindException $e) {
@@ -59,48 +58,60 @@ class ProxyRequestHandler implements RequestHandlerInterface
     /**
      * @inheritDoc
      */
-    public function modify(RequestContext $context, ModifyRequest $modify): void
-    {
+    public function modify(
+        RequestContext $context,
+        ModifyRequest $modify
+    ): void {
         $this->ldap()->sendAndReceive($modify, ...$context->controls()->toArray());
     }
 
     /**
      * @inheritDoc
      */
-    public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn): void
-    {
+    public function modifyDn(
+        RequestContext $context,
+        ModifyDnRequest $modifyDn
+    ): void {
         $this->ldap()->sendAndReceive($modifyDn, ...$context->controls()->toArray());
     }
 
     /**
      * @inheritDoc
      */
-    public function delete(RequestContext $context, DeleteRequest $delete): void
-    {
+    public function delete(
+        RequestContext $context,
+        DeleteRequest $delete
+    ): void {
         $this->ldap()->sendAndReceive($delete, ...$context->controls()->toArray());
     }
 
     /**
      * @inheritDoc
      */
-    public function add(RequestContext $context, AddRequest $add): void
-    {
+    public function add(
+        RequestContext $context,
+        AddRequest $add
+    ): void {
         $this->ldap()->sendAndReceive($add, ...$context->controls()->toArray());
     }
 
     /**
      * @inheritDoc
      */
-    public function search(RequestContext $context, SearchRequest $search): Entries
-    {
+    public function search(
+        RequestContext $context,
+        SearchRequest $search
+    ): Entries {
         return $this->ldap()->search($search, ...$context->controls()->toArray());
     }
 
     /**
      * @inheritDoc
      */
-    public function compare(RequestContext $context, CompareRequest $compare): bool
-    {
+    public function compare(
+        RequestContext $context,
+        CompareRequest $compare
+    ): bool {
         $response = $this->ldap()->sendAndReceive($compare, ...$context->controls()->toArray())->getResponse();
         if (!$response instanceof LdapResult) {
             throw new OperationException('The result was malformed.', ResultCode::PROTOCOL_ERROR);
@@ -112,22 +123,18 @@ class ProxyRequestHandler implements RequestHandlerInterface
     /**
      * @inheritDoc
      */
-    public function extended(RequestContext $context, ExtendedRequest $extended): void
-    {
+    public function extended(
+        RequestContext $context,
+        ExtendedRequest $extended
+    ): void {
         $this->ldap()->send($extended, ...$context->controls()->toArray());
     }
 
-    /**
-     * @param LdapClient $client
-     */
     public function setLdapClient(LdapClient $client): void
     {
         $this->ldap = $client;
     }
 
-    /**
-     * @return LdapClient
-     */
     protected function ldap(): LdapClient
     {
         if ($this->ldap === null) {

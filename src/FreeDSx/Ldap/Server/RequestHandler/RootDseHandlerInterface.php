@@ -24,11 +24,10 @@ interface RootDseHandlerInterface
 {
     /**
      * Either return your own RootDse, or just pass back / modify the entry already generated.
-     *
-     * @param RequestContext $context
-     * @param SearchRequest $request
-     * @param Entry $rootDse
-     * @return Entry
      */
-    public function rootDse(RequestContext $context, SearchRequest $request, Entry $rootDse): Entry;
+    public function rootDse(
+        RequestContext $context,
+        SearchRequest $request,
+        Entry $rootDse,
+    ): Entry;
 }

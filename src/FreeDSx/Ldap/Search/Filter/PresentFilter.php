@@ -18,21 +18,19 @@ use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use Stringable;
 
 /**
  * Checks for the presence of an attribute (ie. whether or not it contains a value). RFC 4511, 4.5.1.7.5
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class PresentFilter implements FilterInterface
+class PresentFilter implements FilterInterface, Stringable
 {
     use FilterAttributeTrait;
 
     protected const APP_TAG = 7;
 
-    /**
-     * @param string $attribute
-     */
     public function __construct(string $attribute)
     {
         $this->attribute = $attribute;
@@ -43,31 +41,36 @@ class PresentFilter implements FilterInterface
      */
     public function toAsn1(): AbstractType
     {
-        return Asn1::context(self::APP_TAG, Asn1::octetString($this->attribute));
+        return Asn1::context(
+            tagNumber: self::APP_TAG,
+            type: Asn1::octetString($this->attribute),
+        );
     }
 
-    /**
-     * @return string
-     */
     public function toString(): string
     {
-        return self::PAREN_LEFT . $this->attribute . self::FILTER_EQUAL . '*' . self::PAREN_RIGHT;
+        return self::PAREN_LEFT
+            . $this->attribute
+            . self::FILTER_EQUAL
+            . '*'
+            . self::PAREN_RIGHT;
     }
 
     /**
      * {@inheritDoc}
-     * @param AbstractType $type
-     * @return PresentFilter
      * @throws ProtocolException
      * @throws EncoderException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
-        $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_OCTET_STRING) : $type;
-        if (!($type instanceof OctetStringType)) {
+        $type = $type instanceof IncompleteType
+            ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_OCTET_STRING)
+            : $type;
+
+        if (!$type instanceof OctetStringType) {
             throw new ProtocolException('The present filter is malformed');
         }
 
-        return new self($type->getValue());
+        return new static($type->getValue());
     }
 }

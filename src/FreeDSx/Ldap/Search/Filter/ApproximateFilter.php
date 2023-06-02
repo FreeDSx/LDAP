@@ -11,12 +11,14 @@
 
 namespace FreeDSx\Ldap\Search\Filter;
 
+use Stringable;
+
 /**
  * Represents an approximate attribute value assertion (ie. phonetic/like). RFC 4511, 4.5.1.7.6
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ApproximateFilter implements FilterInterface
+class ApproximateFilter implements FilterInterface, Stringable
 {
     use AttributeValueAssertionTrait;
 

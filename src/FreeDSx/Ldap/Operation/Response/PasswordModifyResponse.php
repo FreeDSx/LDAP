@@ -29,24 +29,16 @@ use FreeDSx\Ldap\Operation\LdapResult;
  */
 class PasswordModifyResponse extends ExtendedResponse
 {
-    /**
-     * @var null|string
-     */
-    protected $generatedPassword;
+    private ?string $generatedPassword;
 
-    /**
-     * @param LdapResult $result
-     * @param null|string $generatedPassword
-     */
-    public function __construct(LdapResult $result, ?string $generatedPassword = null)
-    {
+    public function __construct(
+        LdapResult $result,
+        ?string $generatedPassword = null
+    ) {
         $this->generatedPassword = $generatedPassword;
         parent::__construct($result);
     }
 
-    /**
-     * @return null|string
-     */
     public function getGeneratedPassword(): ?string
     {
         return $this->generatedPassword;
@@ -58,26 +50,29 @@ class PasswordModifyResponse extends ExtendedResponse
     public function toAsn1(): AbstractType
     {
         if ($this->generatedPassword !== null) {
-            $this->responseValue = Asn1::sequence(Asn1::context(0, Asn1::octetString($this->generatedPassword)));
+            $this->responseValue = Asn1::sequence(Asn1::context(
+                tagNumber: 0,
+                type: Asn1::octetString($this->generatedPassword)
+            ));
         }
 
         return parent::toAsn1();
     }
 
     /**
-     * @param AbstractType $type
-     * @return PasswordModifyResponse
+     * {@inheritDoc}
+     *
      * @throws EncoderException
      * @throws PartialPduException
      * @throws ProtocolException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $result = self::createLdapResult($type);
         $generatedPassword = null;
 
         $pwdResponse = self::decodeEncodedValue($type);
-        if ($pwdResponse !== null && $pwdResponse instanceof SequenceType) {
+        if ($pwdResponse instanceof SequenceType) {
             foreach ($pwdResponse->getChildren() as $child) {
                 if ($child->getTagNumber() === 0) {
                     $generatedPassword = $child->getValue();
@@ -85,6 +80,9 @@ class PasswordModifyResponse extends ExtendedResponse
             }
         }
 
-        return new self($result, $generatedPassword);
+        return new static(
+            $result,
+            $generatedPassword
+        );
     }
 }

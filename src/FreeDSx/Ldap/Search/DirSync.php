@@ -16,6 +16,7 @@ use FreeDSx\Ldap\Control\Ad\DirSyncRequestControl;
 use FreeDSx\Ldap\Control\Ad\DirSyncResponseControl;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Controls;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
@@ -32,63 +33,37 @@ use FreeDSx\Ldap\Search\Filter\FilterInterface;
  */
 class DirSync
 {
-    /**
-     * @var DirSyncResponseControl|null
-     */
-    protected $lastResponse;
+    private ?DirSyncResponseControl $lastResponse = null;
 
-    /**
-     * @var SearchRequest
-     */
-    protected $search;
+    private SearchRequest $search;
 
-    /**
-     * @var string|null
-     */
-    protected $namingContext;
+    private ?string $namingContext;
 
-    /**
-     * @var bool
-     */
-    protected $incrementalValues = true;
+    private bool $incrementalValues = true;
 
-    /**
-     * @var bool
-     */
-    protected $objectSecurity = false;
+    private bool $objectSecurity = false;
 
-    /**
-     * @var bool
-     */
-    protected $ancestorFirstOrder = false;
+    private bool $ancestorFirstOrder = false;
 
-    /**
-     * @var null|string
-     */
-    protected $defaultRootNc;
+    private ?string $defaultRootNc = null;
 
-    /**
-     * @var LdapClient
-     */
-    protected $client;
+    private LdapClient $client;
 
-    /**
-     * @var DirSyncRequestControl
-     */
-    protected $dirSyncRequest;
+    private DirSyncRequestControl $dirSyncRequest;
 
-    /**
-     * @param LdapClient $client
-     * @param string|null $namingContext
-     * @param FilterInterface|null $filter
-     * @param mixed ...$attributes
-     */
-    public function __construct(LdapClient $client, ?string $namingContext = null, ?FilterInterface $filter = null, ...$attributes)
-    {
+    public function __construct(
+        LdapClient $client,
+        ?string $namingContext = null,
+        ?FilterInterface $filter = null,
+        Attribute|string ...$attributes
+    ) {
         $this->client = $client;
         $this->namingContext = $namingContext;
         $this->dirSyncRequest = Controls::dirSync();
-        $this->search = (new SearchRequest($filter ?? Filters::present('objectClass'), ...$attributes));
+        $this->search = new SearchRequest(
+            $filter ?? Filters::present('objectClass'),
+            ...$attributes
+        );
     }
 
     /**
@@ -101,17 +76,20 @@ class DirSync
      *
      * An optional second argument then determines how many seconds to wait between checking for changes.
      *
-     * @param \Closure $handler An anonymous function to pass results to.
+     * @param Closure $handler An anonymous function to pass results to.
      * @param int $checkInterval How often to check for changes (in seconds).
      * @throws OperationException
      */
-    public function watch(Closure $handler, int $checkInterval = 10): void
-    {
+    public function watch(
+        Closure $handler,
+        int $checkInterval = 10
+    ): never {
         $handler($this->getChanges(), true);
         while ($this->hasChanges()) {
             $handler($this->getChanges(), true);
         }
 
+        /** @phpstan-ignore-next-line */
         while (true) {
             sleep($checkInterval);
             $entries = $this->getChanges();
@@ -119,6 +97,7 @@ class DirSync
                 continue;
             }
             $handler($entries, false);
+            /** @phpstan-ignore-next-line */
             while ($this->hasChanges()) {
                 $handler($this->getChanges(), false);
             }
@@ -126,9 +105,7 @@ class DirSync
     }
 
     /**
-     * Check whether or not there are more changes to receive.
-     *
-     * @return bool
+     * Check whether there are more changes to receive.
      */
     public function hasChanges(): bool
     {
@@ -143,7 +120,6 @@ class DirSync
      * Get the changes as entries. This may be empty if there are no changes since the last query. This should be
      * followed with a hasChanges() call to determine if more changes are still available.
      *
-     * @return Entries
      * @throws OperationException
      */
     public function getChanges(): Entries
@@ -151,7 +127,7 @@ class DirSync
         /** @var LdapMessageResponse $response */
         $response = $this->client->send($this->getSearchRequest(), $this->getDirSyncControl());
         $lastResponse = $response->controls()->get(Control::OID_DIR_SYNC);
-        if ($lastResponse === null || !$lastResponse instanceof DirSyncResponseControl) {
+        if (!$lastResponse instanceof DirSyncResponseControl) {
             throw new RuntimeException('Expected a DirSync control in the response, but none was received.');
         }
         $this->lastResponse = $lastResponse;
@@ -164,11 +140,8 @@ class DirSync
 
     /**
      * The attributes to return from the DirSync search.
-     *
-     * @param mixed ...$attributes
-     * @return DirSync
      */
-    public function selectAttributes(...$attributes)
+    public function selectAttributes(Attribute|string ...$attributes): self
     {
         $this->search->select(...$attributes);
 
@@ -178,11 +151,8 @@ class DirSync
     /**
      * A specific DirSync cookie to use. For example, this could be a cookie from a previous DirSync request, assuming
      * the server still thinks it's valid.
-     *
-     * @param string $cookie
-     * @return $this
      */
-    public function useCookie(string $cookie)
+    public function useCookie(string $cookie): self
     {
         $this->dirSyncRequest->setCookie($cookie);
 
@@ -191,11 +161,8 @@ class DirSync
 
     /**
      * The naming context to run the DirSync against. This MUST be a root naming context.
-     *
-     * @param string|null $namingContext
-     * @return $this
      */
-    public function useNamingContext(?string $namingContext)
+    public function useNamingContext(?string $namingContext): self
     {
         $this->namingContext = $namingContext;
 
@@ -204,11 +171,8 @@ class DirSync
 
     /**
      * The LDAP filter to limit the results to.
-     *
-     * @param FilterInterface $filter
-     * @return $this
      */
-    public function useFilter(FilterInterface $filter)
+    public function useFilter(FilterInterface $filter): self
     {
         $this->search->setFilter($filter);
 
@@ -216,12 +180,9 @@ class DirSync
     }
 
     /**
-     * Whether or not to return only incremental changes on a multivalued attribute that has changed.
-     *
-     * @param bool $incrementalValues
-     * @return $this
+     * Whether to return only incremental changes on a multivalued attribute that has changed.
      */
-    public function useIncrementalValues(bool $incrementalValues = true)
+    public function useIncrementalValues(bool $incrementalValues = true): self
     {
         $this->incrementalValues = $incrementalValues;
 
@@ -229,12 +190,9 @@ class DirSync
     }
 
     /**
-     * Whether or not to only retrieve objects and attributes that are accessible to the client.
-     *
-     * @param bool $objectSecurity
-     * @return $this
+     * Whether to only retrieve objects and attributes that are accessible to the client.
      */
-    public function useObjectSecurity(bool $objectSecurity = true)
+    public function useObjectSecurity(bool $objectSecurity = true): self
     {
         $this->objectSecurity = $objectSecurity;
 
@@ -242,12 +200,9 @@ class DirSync
     }
 
     /**
-     * Whether or not the server should return parent objects before child objects.
-     *
-     * @param bool $ancestorFirstOrder
-     * @return $this
+     * Whether the server should return parent objects before child objects.
      */
-    public function useAncestorFirstOrder(bool $ancestorFirstOrder = true)
+    public function useAncestorFirstOrder(bool $ancestorFirstOrder = true): self
     {
         $this->ancestorFirstOrder = $ancestorFirstOrder;
 
@@ -256,8 +211,6 @@ class DirSync
 
     /**
      * Get the cookie currently in use.
-     *
-     * @return string
      */
     public function getCookie(): string
     {
@@ -265,20 +218,16 @@ class DirSync
     }
 
     /**
-     * @return SearchRequest
      * @throws OperationException
      */
-    protected function getSearchRequest(): SearchRequest
+    private function getSearchRequest(): SearchRequest
     {
         $this->search->base($this->namingContext ?? $this->getDefaultRootNc());
 
         return $this->search;
     }
 
-    /**
-     * @return DirSyncRequestControl
-     */
-    protected function getDirSyncControl(): DirSyncRequestControl
+    private function getDirSyncControl(): DirSyncRequestControl
     {
         $flags = 0;
         if ($this->incrementalValues) {
@@ -296,13 +245,15 @@ class DirSync
     }
 
     /**
-     * @return string
      * @throws OperationException
      */
-    protected function getDefaultRootNc(): string
+    private function getDefaultRootNc(): string
     {
         if ($this->defaultRootNc === null) {
-            $this->defaultRootNc = (string) $this->client->readOrFail('', ['defaultNamingContext'])->get('defaultNamingContext');
+            $this->defaultRootNc = (string) $this->client->readOrFail(
+                '',
+                ['defaultNamingContext']
+            )->get('defaultNamingContext');
         }
         if ($this->defaultRootNc === '') {
             throw new RuntimeException('Unable to determine the root naming context automatically.');

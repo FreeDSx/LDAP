@@ -20,26 +20,12 @@ use FreeDSx\Ldap\Entry\Entries;
  */
 final class PagingResponse
 {
-    /**
-     * @var Entries
-     */
-    private $entries;
+    private Entries $entries;
 
-    /**
-     * @var int
-     */
-    private $remaining;
+    private int $remaining;
 
-    /**
-     * @var bool
-     */
-    private $isComplete;
+    private bool $isComplete;
 
-    /**
-     * @param Entries $entries
-     * @param bool $isComplete
-     * @param int $remaining
-     */
     public function __construct(
         Entries $entries,
         bool $isComplete = false,
@@ -50,25 +36,16 @@ final class PagingResponse
         $this->remaining = $remaining;
     }
 
-    /**
-     * @return Entries
-     */
     public function getEntries(): Entries
     {
         return $this->entries;
     }
 
-    /**
-     * @return int
-     */
     public function getRemaining(): int
     {
         return $this->remaining;
     }
 
-    /**
-     * @return bool
-     */
     public function isComplete(): bool
     {
         return $this->isComplete;
@@ -79,7 +56,6 @@ final class PagingResponse
      *
      * @param Entries $entries The entries returned for this response.
      * @param int $remaining The number of entries left (if known)
-     * @return self
      */
     public static function make(
         Entries $entries,
@@ -94,9 +70,6 @@ final class PagingResponse
 
     /**
      * Make a final paging response indicating that there are no more entries left to return.
-     *
-     * @param Entries $entries The entries returned for this response.
-     * @return self
      */
     public static function makeFinal(Entries $entries): self
     {

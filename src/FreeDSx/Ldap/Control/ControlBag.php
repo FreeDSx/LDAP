@@ -17,6 +17,7 @@ use IteratorAggregate;
 use Traversable;
 use function array_search;
 use function count;
+use function in_array;
 use function is_string;
 
 /**
@@ -29,12 +30,8 @@ class ControlBag implements IteratorAggregate, Countable
     /**
      * @var Control[]
      */
-    protected $controls;
+    private array $controls;
 
-    /**
-     * ControlBag constructor.
-     * @param Control ...$controls
-     */
     public function __construct(Control ...$controls)
     {
         $this->controls = $controls;
@@ -42,11 +39,8 @@ class ControlBag implements IteratorAggregate, Countable
 
     /**
      * Check if a specific control exists by either the OID string or the Control object (strict check).
-     *
-     * @param string|Control $control
-     * @return bool
      */
-    public function has($control): bool
+    public function has(Control|string $control): bool
     {
         if (is_string($control)) {
             foreach ($this->controls as $ctrl) {
@@ -58,14 +52,11 @@ class ControlBag implements IteratorAggregate, Countable
             return false;
         }
 
-        return array_search($control, $this->controls, true) !== false;
+        return in_array($control, $this->controls, true);
     }
 
     /**
      * Get a control object by the string OID type. If none is found it will return null. Can check first with has.
-     *
-     * @param string $oid
-     * @return null|Control
      */
     public function get(string $oid): ?Control
     {
@@ -80,11 +71,8 @@ class ControlBag implements IteratorAggregate, Countable
 
     /**
      * Add more controls.
-     *
-     * @param Control ...$controls
-     * @return $this
      */
-    public function add(Control ...$controls)
+    public function add(Control ...$controls): self
     {
         foreach ($controls as $control) {
             $this->controls[] = $control;
@@ -95,11 +83,8 @@ class ControlBag implements IteratorAggregate, Countable
 
     /**
      * Set the controls.
-     *
-     * @param Control ...$controls
-     * @return $this
      */
-    public function set(Control ...$controls)
+    public function set(Control ...$controls): self
     {
         $this->controls = $controls;
 
@@ -108,13 +93,9 @@ class ControlBag implements IteratorAggregate, Countable
 
     /**
      * Remove controls by OID or Control object (strict check).
-     *
-     * @param Control|string ...$controls
-     * @return $this
      */
-    public function remove(...$controls)
+    public function remove(Control|string ...$controls): self
     {
-        /** @var Control|string $control */
         foreach ($controls as $control) {
             if (is_string($control)) {
                 foreach ($this->controls as $i => $ctrl) {
@@ -133,11 +114,9 @@ class ControlBag implements IteratorAggregate, Countable
     }
 
     /**
-     * Remove all of the controls.
-     *
-     * @return $this
+     * Remove all controls.
      */
-    public function reset()
+    public function reset(): self
     {
         $this->controls = [];
 
@@ -164,7 +143,7 @@ class ControlBag implements IteratorAggregate, Countable
 
     /**
      * @inheritDoc
-     * @psalm-return \ArrayIterator<array-key, Control>
+     * @return Traversable<Control>
      */
     public function getIterator(): Traversable
     {

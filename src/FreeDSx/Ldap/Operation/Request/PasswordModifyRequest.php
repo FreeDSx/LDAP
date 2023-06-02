@@ -30,85 +30,53 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class PasswordModifyRequest extends ExtendedRequest
 {
-    /**
-     * @var null|string
-     */
-    protected $userIdentity;
+    private ?string $userIdentity;
 
-    /**
-     * @var null|string
-     */
-    protected $oldPassword;
+    private ?string $oldPassword;
 
-    /**
-     * @var null|string
-     */
-    protected $newPassword;
+    private ?string $newPassword;
 
-    /**
-     * @param null|string $userIdentity
-     * @param null|string $oldPassword
-     * @param null|string $newPassword
-     */
-    public function __construct(?string $userIdentity = null, ?string $oldPassword = null, ?string $newPassword = null)
-    {
+    public function __construct(
+        ?string $userIdentity = null,
+        ?string $oldPassword = null,
+        ?string $newPassword = null
+    ) {
         $this->userIdentity = $userIdentity;
         $this->oldPassword = $oldPassword;
         $this->newPassword = $newPassword;
         parent::__construct(self::OID_PWD_MODIFY);
     }
 
-    /**
-     * @return null|string
-     */
     public function getUsername(): ?string
     {
         return $this->userIdentity;
     }
 
-    /**
-     * @param null|string $username
-     * @return $this
-     */
-    public function setUsername(?string $username)
+    public function setUsername(?string $username): self
     {
         $this->userIdentity = $username;
 
         return $this;
     }
 
-    /**
-     * @return null|string
-     */
     public function getNewPassword(): ?string
     {
         return $this->newPassword;
     }
 
-    /**
-     * @param null|string $newPassword
-     * @return $this
-     */
-    public function setNewPassword(?string $newPassword)
+    public function setNewPassword(?string $newPassword): self
     {
         $this->newPassword = $newPassword;
 
         return $this;
     }
 
-    /**
-     * @return null|string
-     */
     public function getOldPassword(): ?string
     {
         return $this->oldPassword;
     }
 
-    /**
-     * @param null|string $oldPassword
-     * @return $this
-     */
-    public function setOldPassword(?string $oldPassword)
+    public function setOldPassword(?string $oldPassword): self
     {
         $this->oldPassword = $oldPassword;
 
@@ -123,13 +91,22 @@ class PasswordModifyRequest extends ExtendedRequest
         $this->requestValue = Asn1::sequence();
 
         if ($this->userIdentity !== null) {
-            $this->requestValue->addChild(Asn1::context(0, Asn1::octetString($this->userIdentity)));
+            $this->requestValue->addChild(Asn1::context(
+                tagNumber: 0,
+                type: Asn1::octetString($this->userIdentity)
+            ));
         }
         if ($this->oldPassword !== null) {
-            $this->requestValue->addChild(Asn1::context(1, Asn1::octetString($this->oldPassword)));
+            $this->requestValue->addChild(Asn1::context(
+                tagNumber: 1,
+                type: Asn1::octetString($this->oldPassword)
+            ));
         }
         if ($this->newPassword !== null) {
-            $this->requestValue->addChild(Asn1::context(2, Asn1::octetString($this->newPassword)));
+            $this->requestValue->addChild(Asn1::context(
+                tagNumber: 2,
+                type: Asn1::octetString($this->newPassword)
+            ));
         }
 
         return parent::toAsn1();
@@ -137,15 +114,14 @@ class PasswordModifyRequest extends ExtendedRequest
 
     /**
      * {@inheritDoc}
-     * @return PasswordModifyRequest
      * @throws EncoderException
      * @throws PartialPduException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         $request = self::decodeEncodedValue($type);
         if ($request === null) {
-            return new self();
+            return new static();
         }
         if (!($request instanceof SequenceType)) {
             throw new ProtocolException('The password modify request is malformed.');
@@ -154,8 +130,7 @@ class PasswordModifyRequest extends ExtendedRequest
         $userIdentity = null;
         $oldPasswd = null;
         $newPasswd = null;
-        foreach ($request as $value) {
-            /** @var AbstractType $value */
+        foreach ($request->getChildren() as $value) {
             if ($value->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
                 throw new ProtocolException('The password modify request is malformed');
             }
@@ -168,7 +143,7 @@ class PasswordModifyRequest extends ExtendedRequest
             }
         }
 
-        return new self(
+        return new static(
             $userIdentity !== null ? $userIdentity->getValue() : null,
             $oldPasswd !== null ? $oldPasswd->getValue() : null,
             $newPasswd !== null ? $newPasswd->getValue() : null

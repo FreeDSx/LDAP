@@ -28,33 +28,20 @@ class DeleteRequest implements RequestInterface, DnRequestInterface
 {
     protected const APP_TAG = 10;
 
-    /**
-     * @var Dn
-     */
-    protected $dn;
+    private Dn $dn;
 
-    /**
-     * @param string|Dn $dn
-     */
-    public function __construct($dn)
+    public function __construct(Dn|string $dn)
     {
         $this->setDn($dn);
     }
 
-    /**
-     * @param string|Dn $dn
-     * @return $this
-     */
-    public function setDn($dn)
+    public function setDn(Dn|string $dn): static
     {
         $this->dn = $dn instanceof Dn ? $dn : new Dn($dn);
 
         return $this;
     }
 
-    /**
-     * @return Dn
-     */
     public function getDn(): Dn
     {
         return $this->dn;
@@ -70,17 +57,15 @@ class DeleteRequest implements RequestInterface, DnRequestInterface
 
     /**
      * {@inheritDoc}
-     * @return self
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         self::validate($type);
 
-        return new self($type->getValue());
+        return new static($type->getValue());
     }
 
     /**
-     * @param AbstractType $type
      * @throws ProtocolException
      */
     protected static function validate(AbstractType $type): void

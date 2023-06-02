@@ -29,45 +29,41 @@ use FreeDSx\Ldap\Operation\LdapResult;
  */
 class BindResponse extends LdapResult
 {
-    /**
-     * @var int
-     */
-    protected $tagNumber = 1;
+    protected int $tagNumber = 1;
 
-    /**
-     * @var null|string
-     */
-    protected $saslCreds;
+    private ?string $saslCreds;
 
-    /**
-     * @param LdapResult $result
-     * @param null|string $saslCreds
-     */
-    public function __construct(LdapResult $result, ?string $saslCreds = null)
-    {
+    public function __construct(
+        LdapResult $result,
+        ?string $saslCreds = null
+    ) {
         $this->saslCreds = $saslCreds;
-        parent::__construct($result->getResultCode(), $result->getDn(), $result->getDiagnosticMessage(), ...$result->getReferrals());
+        parent::__construct(
+            $result->getResultCode(),
+            $result->getDn(),
+            $result->getDiagnosticMessage(),
+            ...$result->getReferrals()
+        );
     }
 
-    /**
-     * @return null|string
-     */
     public function getSaslCredentials(): ?string
     {
         return $this->saslCreds;
     }
 
     /**
-     * @return SequenceType
      * @throws ProtocolException
      */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         /** @var SequenceType $response */
         $response = parent::toAsn1();
 
         if ($this->saslCreds !== null) {
-            $response->addChild(Asn1::context(7, Asn1::octetString($this->saslCreds)));
+            $response->addChild(Asn1::context(
+                tagNumber: 7,
+                type: Asn1::octetString($this->saslCreds)
+            ));
         }
 
         return $response;
@@ -75,10 +71,9 @@ class BindResponse extends LdapResult
 
     /**
      * {@inheritDoc}
-     * @return self
      * @throws EncoderException
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): static
     {
         [$resultCode, $dn, $diag, $ref] = self::parseResultData($type);
         $saslCreds = null;
@@ -90,6 +85,14 @@ class BindResponse extends LdapResult
             }
         }
 
-        return new self(new LdapResult($resultCode, $dn, $diag, ...$ref), $saslCreds);
+        return new static(
+            new LdapResult(
+                $resultCode,
+                $dn,
+                $diag,
+                ...$ref,
+            ),
+            $saslCreds
+        );
     }
 }

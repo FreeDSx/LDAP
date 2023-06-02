@@ -22,37 +22,23 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 class RequestContext
 {
-    /**
-     * @var ControlBag
-     */
-    protected $controls;
+    private ControlBag $controls;
 
-    /**
-     * @var TokenInterface
-     */
-    protected $token;
+    private TokenInterface $token;
 
-    /**
-     * @param ControlBag $controls
-     * @param TokenInterface $token
-     */
-    public function __construct(ControlBag $controls, TokenInterface $token)
-    {
+    public function __construct(
+        ControlBag $controls,
+        TokenInterface $token
+    ) {
         $this->controls = $controls;
         $this->token = $token;
     }
 
-    /**
-     * @return ControlBag
-     */
     public function controls(): ControlBag
     {
         return $this->controls;
     }
 
-    /**
-     * @return TokenInterface
-     */
     public function token(): TokenInterface
     {
         return $this->token;

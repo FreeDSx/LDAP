@@ -32,23 +32,20 @@ use FreeDSx\Ldap\Exception\BindException;
  */
 class SaslBindRequest extends BindRequest
 {
-    /**
-     * @var string
-     */
-    protected $mechanism;
+    private string $mechanism;
+
+    private ?string $credentials;
 
     /**
-     * @var string|null
+     * @var array<string, mixed>
      */
-    protected $credentials;
+    private array $options;
 
-    /**
-     * @var array
-     */
-    protected $options;
-
-    public function __construct(string $mechanism, ?string $credentials = null, array $options = [])
-    {
+    public function __construct(
+        string $mechanism,
+        ?string $credentials = null,
+        array $options = []
+    ) {
         $this->username = '';
         $this->mechanism = $mechanism;
         $this->credentials = $credentials;
@@ -60,9 +57,6 @@ class SaslBindRequest extends BindRequest
         return $this->mechanism;
     }
 
-    /**
-     * @return static
-     */
     public function setMechanism(string $mech): self
     {
         $this->mechanism = $mech;
@@ -75,6 +69,9 @@ class SaslBindRequest extends BindRequest
         return $this->credentials;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getOptions(): array
     {
         return $this->options;
@@ -90,7 +87,10 @@ class SaslBindRequest extends BindRequest
             $sasl->addChild(Asn1::octetString($this->credentials));
         }
 
-        return Asn1::context(3, $sasl);
+        return Asn1::context(
+            tagNumber: 3,
+            type: $sasl
+        );
     }
 
     /**

@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\ChildProcess;
 use FreeDSx\Ldap\Server\RequestHandler\HandlerFactory;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
 
@@ -41,54 +40,38 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     private const MAX_SHUTDOWN_WAIT_TIME = 15;
 
-    /**
-     * @var SocketServer
-     */
-    protected $server;
-
-    /**
-     * @var array
-     */
-    protected $options;
-
-    /**
-     * @var ChildProcess[]
-     */
-    protected $childProcesses = [];
-
-    /**
-     * @var bool
-     */
-    protected $isMainProcess = true;
-
-    /**
-     * @var int[] These are the POSIX signals we handle for shutdown purposes.
-     */
-    protected $handledSignals = [];
-
-    /**
-     * @var bool
-     */
-    protected $isPosixExtLoaded;
-
-    /**
-     * @var bool
-     */
-    protected $isServerSignalsInstalled = false;
-
-    /**
-     * @var bool
-     */
-    protected $isShuttingDown = false;
+    private SocketServer $server;
 
     /**
      * @var array<string, mixed>
      */
-    protected $defaultContext = [];
+    protected array $options;
 
     /**
-     * @param array $options
-     * @psalm-param array{request_handler?: class-string<RequestHandlerInterface>} $options
+     * @var ChildProcess[]
+     */
+    private array $childProcesses = [];
+
+    private bool $isMainProcess = true;
+
+    /**
+     * @var int[] These are the POSIX signals we handle for shutdown purposes.
+     */
+    private array $handledSignals = [];
+
+    private bool $isPosixExtLoaded;
+
+    private bool $isServerSignalsInstalled = false;
+
+    private bool $isShuttingDown = false;
+
+    /**
+     * @var array<string, mixed>
+     */
+    private array $defaultContext = [];
+
+    /**
+     * @param array<string, mixed> $options
      * @throws RuntimeException
      */
     public function __construct(array $options = [])

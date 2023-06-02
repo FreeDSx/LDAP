@@ -25,8 +25,7 @@ class ClientUnbindHandler implements RequestHandlerInterface
     use MessageCreationTrait;
 
     /**
-     * @param ClientProtocolContext $context
-     * @return null
+     * {@inheritDoc}
      * @throws EncoderException
      * @throws ConnectionException
      */

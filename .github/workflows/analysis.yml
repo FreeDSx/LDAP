@@ -11,7 +11,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '7.4'
+          php-version: '8.1'
           extension-csv: openssl,mbstring
           coverage: pcov
 
@@ -36,6 +36,8 @@ jobs:
         run: composer run-script analyse
 
       - name: Run Test Coverage
+        env:
+          COMPOSER_ALLOW_SUPERUSER: 1
         run: sudo composer run-script --timeout=0 test-coverage
 
       - name: Upload Spec Coverage to Codecov

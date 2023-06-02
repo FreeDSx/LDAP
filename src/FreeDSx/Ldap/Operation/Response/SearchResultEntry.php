@@ -36,22 +36,13 @@ class SearchResultEntry implements ResponseInterface
 {
     protected const TAG_NUMBER = 4;
 
-    /**
-     * @var Entry
-     */
-    protected $entry;
+    private Entry $entry;
 
-    /**
-     * @param Entry $entry
-     */
     public function __construct(Entry $entry)
     {
         $this->entry = $entry;
     }
 
-    /**
-     * @return Entry
-     */
     public function getEntry(): Entry
     {
         return $this->entry;
@@ -59,9 +50,8 @@ class SearchResultEntry implements ResponseInterface
 
     /**
      * {@inheritDoc}
-     * @return self
      */
-    public static function fromAsn1(AbstractType $type)
+    public static function fromAsn1(AbstractType $type): self
     {
         $attributes = [];
         $dn = $type->getChild(0);
@@ -71,7 +61,7 @@ class SearchResultEntry implements ResponseInterface
 
         $partialAttributes = $type->getChild(1);
         if ($partialAttributes !== null) {
-            foreach ($partialAttributes as $partialAttribute) {
+            foreach ($partialAttributes->getChildren() as $partialAttribute) {
                 $values = [];
                 /** @var SequenceType|null $attrValues */
                 $attrValues = $partialAttribute->getChild(1);
@@ -82,7 +72,10 @@ class SearchResultEntry implements ResponseInterface
                     }
                 }
 
-                $attributes[] = new Attribute($partialAttribute->getChild(0)->getValue(), ...$values);
+                $attributes[] = new Attribute(
+                    $partialAttribute->getChild(0)?->getValue(),
+                    ...$values
+                );
             }
         }
 
@@ -92,13 +85,13 @@ class SearchResultEntry implements ResponseInterface
         ));
     }
 
-    /**
-     * @return SequenceType
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         /** @var SequenceType $asn1 */
-        $asn1 = Asn1::application(self::TAG_NUMBER, Asn1::sequence());
+        $asn1 = Asn1::application(
+            tagNumber: self::TAG_NUMBER,
+            type: Asn1::sequence(),
+        );
 
         $partialAttributes = Asn1::sequenceOf();
         foreach ($this->entry->getAttributes() as $attribute) {
