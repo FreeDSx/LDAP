@@ -35,9 +35,6 @@ trait FilterContainerTrait
      */
     protected array $filters = [];
 
-    /**
-     * @param FilterInterface ...$filters
-     */
     public function __construct(FilterInterface ...$filters)
     {
         $this->filters = $filters;

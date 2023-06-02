@@ -27,7 +27,6 @@ interface ProtocolElementInterface
     public function toAsn1(): AbstractType;
 
     /**
-     * @param AbstractType $type
      * @return mixed
      * @throws ProtocolException
      */

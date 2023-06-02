@@ -35,9 +35,6 @@ class SearchResultReference implements ResponseInterface
      */
     private array $referrals;
 
-    /**
-     * @param LdapUrl ...$referrals
-     */
     public function __construct(LdapUrl ...$referrals)
     {
         $this->referrals = $referrals;

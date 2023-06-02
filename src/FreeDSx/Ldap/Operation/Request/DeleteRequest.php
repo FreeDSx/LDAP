@@ -66,7 +66,6 @@ class DeleteRequest implements RequestInterface, DnRequestInterface
     }
 
     /**
-     * @param AbstractType $type
      * @throws ProtocolException
      */
     protected static function validate(AbstractType $type): void
