@@ -37,7 +37,7 @@ class LdapServer
     /**
      * @var array<string, mixed>
      */
-    protected array $options = [
+    private array $options = [
         'ip' => '0.0.0.0',
         'port' => 389,
         'unix_socket' => '/var/run/ldap.socket',
