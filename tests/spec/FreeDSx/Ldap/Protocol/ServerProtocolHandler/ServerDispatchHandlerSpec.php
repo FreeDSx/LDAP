@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -32,17 +34,17 @@ use Prophecy\Argument;
 
 class ServerDispatchHandlerSpec extends ObjectBehavior
 {
-    public function let(ServerQueue $queue)
+    public function let(ServerQueue $queue): void
     {
         $queue->sendMessage(Argument::any())->willReturn($queue);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerDispatchHandler::class);
     }
 
-    public function it_should_send_an_add_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_an_add_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
     {
         $add = new LdapMessageRequest(1, new AddRequest(Entry::create('cn=foo,dc=bar')));
 
@@ -50,7 +52,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $this->handleRequest($add, $token, $handler, $queue, []);
     }
 
-    public function it_should_send_a_delete_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_a_delete_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
     {
         $delete = new LdapMessageRequest(1, new DeleteRequest('cn=foo,dc=bar'));
 
@@ -58,7 +60,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $this->handleRequest($delete, $token, $handler, $queue, []);
     }
 
-    public function it_should_send_a_modify_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_a_modify_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
     {
         $modify = new LdapMessageRequest(1, new ModifyRequest('cn=foo,dc=bar', Change::add('foo', 'bar')));
 
@@ -66,7 +68,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $this->handleRequest($modify, $token, $handler, $queue, []);
     }
 
-    public function it_should_send_a_modify_dn_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_a_modify_dn_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
     {
         $modifyDn = new LdapMessageRequest(1, new ModifyDnRequest('cn=foo,dc=bar', 'cn=bar', true));
 
@@ -74,7 +76,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $this->handleRequest($modifyDn, $token, $handler, $queue, []);
     }
 
-    public function it_should_send_an_extended_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_an_extended_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
     {
         $ext = new LdapMessageRequest(1, new ExtendedRequest('foo', 'bar'));
 
@@ -82,7 +84,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $this->handleRequest($ext, $token, $handler, $queue, []);
     }
 
-    public function it_should_send_a_compare_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_send_a_compare_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
     {
         $compare = new LdapMessageRequest(1, new CompareRequest('cn=foo,dc=bar', Filters::equal('foo', 'bar')));
 
@@ -90,7 +92,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $this->handleRequest($compare, $token, $handler, $queue, []);
     }
 
-    public function it_should_throw_an_operation_exception_if_the_request_is_unsupported(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
+    public function it_should_throw_an_operation_exception_if_the_request_is_unsupported(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
     {
         $request = new LdapMessageRequest(2, new AbandonRequest(1));
 

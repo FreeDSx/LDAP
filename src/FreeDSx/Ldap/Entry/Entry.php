@@ -18,9 +18,9 @@ use Countable;
 use IteratorAggregate;
 use Stringable;
 use Traversable;
+use function array_map;
 use function count;
 use function is_array;
-use function array_map;
 
 /**
  * Represents an Entry in LDAP.
@@ -56,7 +56,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
             : new Attribute(
                 $attribute,
                 ...array_map(
-                    fn(Stringable|string $value) => $value instanceof Stringable ? (string) $value : $value,
+                    fn (Stringable|string $value) => $value instanceof Stringable ? (string) $value : $value,
                     $values
                 )
             );
@@ -83,7 +83,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
             : new Attribute(
                 $attribute,
                 ...array_map(
-                    fn(Stringable|string $value) => $value instanceof Stringable ? (string) $value : $value,
+                    fn (Stringable|string $value) => $value instanceof Stringable ? (string) $value : $value,
                     $values
                 )
             );
@@ -129,7 +129,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
             : new Attribute(
                 $attribute,
                 ...array_map(
-                    fn(Stringable|string $value) => $value instanceof Stringable ? (string) $value : $value,
+                    fn (Stringable|string $value) => $value instanceof Stringable ? (string) $value : $value,
                     $values
                 )
             );
@@ -294,7 +294,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
      */
     public static function fromArray(
         Dn|Stringable|string $dn,
-        array             $attributes = []
+        array $attributes = []
     ): Entry {
         /** @var Attribute[] $entryAttr */
         $entryAttr = [];
@@ -302,11 +302,12 @@ class Entry implements IteratorAggregate, Countable, Stringable
         foreach ($attributes as $attribute => $attribute_values) {
             $entryAttr[] = new Attribute(
                 $attribute,
-                ...(is_array($attribute_values)
+                ...(
+                    is_array($attribute_values)
                     ? array_map(
-                          fn($value) => (string) $value,
-                          $attribute_values,
-                      )
+                        fn ($value) => (string) $value,
+                        $attribute_values,
+                    )
                     : [(string) $attribute_values]
                 )
             );

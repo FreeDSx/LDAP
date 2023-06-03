@@ -56,15 +56,15 @@ class VlvTest extends LdapTestCase
 
     public function testVlv(): void
     {
-        $this->assertEquals(
+        $this->assertSame(
             101,
             $this->vlv->getEntries()->count()
         );
-        $this->assertEquals(
+        $this->assertSame(
             453,
             $this->vlv->listSize()
         );
-        $this->assertEquals(
+        $this->assertSame(
             1,
             $this->vlv->listOffset()
         );
@@ -72,40 +72,40 @@ class VlvTest extends LdapTestCase
 
         $this->vlv->moveForward(100);
 
-        $this->assertEquals(
+        $this->assertSame(
             101,
             $this->vlv->getEntries()->count()
         );
-        $this->assertEquals(
+        $this->assertSame(
             101,
             $this->vlv->listOffset()
         );
 
         $this->vlv->moveTo(300);
 
-        $this->assertEquals(
+        $this->assertSame(
             101,
             $this->vlv->getEntries()->count()
         );
-        $this->assertEquals(
+        $this->assertSame(
             300,
             $this->vlv->listOffset()
         );
 
         $this->vlv->moveBackward(100);
 
-        $this->assertEquals(
+        $this->assertSame(
             101,
             $this->vlv->getEntries()->count()
         );
-        $this->assertEquals(
+        $this->assertSame(
             200,
             $this->vlv->listOffset()
         );
 
         $this->vlv->moveTo((int) $this->vlv->listSize());
 
-        $this->assertEquals(
+        $this->assertSame(
             1,
             $this->vlv->getEntries()->count()
         );
@@ -128,7 +128,7 @@ class VlvTest extends LdapTestCase
         $this->vlv->beforePosition(100);
         $this->vlv->moveTo(50);
 
-        $this->assertEquals(
+        $this->assertSame(
             201,
             $this->vlv->getEntries()->count()
         );
@@ -143,12 +143,13 @@ class VlvTest extends LdapTestCase
 
         $this->vlv->moveForward(25);
 
-        $this->assertEquals(
+        $this->assertSame(
             201,
             $this->vlv->getEntries()->count()
         );
         $this->assertGreaterThan(
-            325, $this->vlv->listOffset()
+            325,
+            $this->vlv->listOffset()
         );
         $this->assertLessThan(
             335,
@@ -157,7 +158,7 @@ class VlvTest extends LdapTestCase
 
         $this->vlv->moveBackward(50);
 
-        $this->assertEquals(
+        $this->assertSame(
             201,
             $this->vlv->getEntries()->count()
         );
@@ -170,11 +171,11 @@ class VlvTest extends LdapTestCase
             $this->vlv->listOffset()
         );
 
-        $this->assertEquals(
+        $this->assertSame(
             25,
             $this->vlv->position()
         );
-        $this->assertEquals(
+        $this->assertSame(
             440,
             $this->vlv->listSize()
         );

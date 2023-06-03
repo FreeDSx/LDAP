@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -33,18 +35,21 @@ use Prophecy\Argument;
 
 class ServerRootDseHandlerSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(null);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerRootDseHandler::class);
     }
 
-    public function it_should_send_back_a_RootDSE(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
-    {
+    public function it_should_send_back_a_RootDSE(
+        ServerQueue $queue,
+        RequestHandlerInterface $handler,
+        TokenInterface $token
+    ): void {
         $search = new LdapMessageRequest(
             1,
             (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope()
@@ -75,7 +80,7 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         ServerQueue $queue,
         RequestHandlerInterface $handler,
         TokenInterface $token
-    ) {
+    ): void {
         $search = new LdapMessageRequest(
             1,
             (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope()
@@ -111,7 +116,7 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         RequestHandlerInterface $handler,
         TokenInterface $token,
         RootDseHandlerInterface $rootDseHandler
-    ) {
+    ): void {
         $this->beConstructedWith($rootDseHandler);
 
         $searchReqeust = (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope();
@@ -147,8 +152,11 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         );
     }
 
-    public function it_should_only_return_attribute_names_from_the_RootDSE_if_requested(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
-    {
+    public function it_should_only_return_attribute_names_from_the_RootDSE_if_requested(
+        ServerQueue $queue,
+        RequestHandlerInterface $handler,
+        TokenInterface $token
+    ): void {
         $search = new LdapMessageRequest(
             1,
             (new SearchRequest(Filters::present('objectClass')))
@@ -176,8 +184,11 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         );
     }
 
-    public function it_should_only_return_specific_attributes_from_the_RootDSE_if_requested(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token)
-    {
+    public function it_should_only_return_specific_attributes_from_the_RootDSE_if_requested(
+        ServerQueue $queue,
+        RequestHandlerInterface $handler,
+        TokenInterface $token
+    ): void {
         $search = new LdapMessageRequest(
             1,
             (new SearchRequest(Filters::present('objectClass')))

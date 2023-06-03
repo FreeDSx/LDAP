@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -19,45 +21,45 @@ use PhpSpec\ObjectBehavior;
 
 class DirSyncRequestControlSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(DirSyncRequestControl::class);
     }
 
-    public function it_should_set_the_flags()
+    public function it_should_set_the_flags(): void
     {
         $this->setFlags(DirSyncRequestControl::FLAG_PUBLIC_DATA_ONLY);
         $this->getFlags()->shouldBeEqualTo(DirSyncRequestControl::FLAG_PUBLIC_DATA_ONLY);
     }
 
-    public function it_should_have_incremental_values_as_the_default_flags()
+    public function it_should_have_incremental_values_as_the_default_flags(): void
     {
         $this->getFlags()->shouldBeEqualTo((int) DirSyncRequestControl::FLAG_INCREMENTAL_VALUES);
     }
 
-    public function it_should_set_the_cookie()
+    public function it_should_set_the_cookie(): void
     {
         $this->setCookie('foo');
         $this->getCookie()->shouldBeEqualTo('foo');
     }
 
-    public function it_should_have_an_empty_cookie_by_default()
+    public function it_should_have_an_empty_cookie_by_default(): void
     {
         $this->getCookie()->shouldBeEqualTo('');
     }
 
-    public function it_should_set_the_max_bytes()
+    public function it_should_set_the_max_bytes(): void
     {
         $this->setMaxBytes(2000);
         $this->getMaxBytes()->shouldBeEqualTo(2000);
     }
 
-    public function it_should_have_the_max_value_for_max_bytes_by_default()
+    public function it_should_have_the_max_value_for_max_bytes_by_default(): void
     {
         $this->getMaxBytes()->shouldBeEqualTo(2147483647);
     }
 
-    public function it_should_generate_correct_ASN1()
+    public function it_should_generate_correct_ASN1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -72,7 +74,7 @@ class DirSyncRequestControlSpec extends ObjectBehavior
         ));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
 

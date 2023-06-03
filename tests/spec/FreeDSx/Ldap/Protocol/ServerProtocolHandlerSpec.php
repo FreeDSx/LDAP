@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -48,7 +50,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         RequestHandlerInterface $dispatcher,
         ServerProtocolHandler\BindHandlerInterface $bindHandler,
         ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler
-    ) {
+    ): void {
         $queue->close()->hasReturnVoid();
         $queue->isConnected()->willReturn(true);
         $queue->isEncrypted()->willReturn(false);
@@ -66,12 +68,12 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         );
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerProtocolHandler::class);
     }
 
-    public function it_should_enforce_anonymous_bind_requirements(ServerQueue $queue, ServerBindHandlerFactory $bindHandlerFactory)
+    public function it_should_enforce_anonymous_bind_requirements(ServerQueue $queue, ServerBindHandlerFactory $bindHandlerFactory): void
     {
         $queue->getMessage()->willReturn(
             new LdapMessageRequest(1, new AnonBindRequest('foo')),
@@ -91,7 +93,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    public function it_should_not_allow_a_previous_message_ID_from_a_new_request(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    public function it_should_not_allow_a_previous_message_ID_from_a_new_request(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler): void
     {
         $queue->getMessage()->willReturn(
             new LdapMessageRequest(1, new SimpleBindRequest('foo', 'bar')),
@@ -117,7 +119,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    public function it_should_enforce_authentication_requirements(ServerQueue $queue, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    public function it_should_enforce_authentication_requirements(ServerQueue $queue, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler): void
     {
         $queue->isConnected()->willReturn(true, false);
         $queue->getMessage()->willReturn(
@@ -143,7 +145,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    public function it_should_send_a_notice_of_disconnect_on_a_protocol_exception_from_the_message_queue(ServerQueue $queue)
+    public function it_should_send_a_notice_of_disconnect_on_a_protocol_exception_from_the_message_queue(ServerQueue $queue): void
     {
         $queue->getMessage()->willThrow(new ProtocolException());
 
@@ -155,14 +157,14 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    public function it_should_handle_a_socket_exception_from_the_message_queue_and_end_normally(ServerQueue $queue)
+    public function it_should_handle_a_socket_exception_from_the_message_queue_and_end_normally(ServerQueue $queue): void
     {
         $queue->getMessage()->willThrow(new ConnectionException('Foo'));
 
         $this->handle();
     }
 
-    public function it_should_send_a_notice_of_disconnect_on_an_encoder_exception_from_the_message_queue(ServerQueue $queue)
+    public function it_should_send_a_notice_of_disconnect_on_an_encoder_exception_from_the_message_queue(ServerQueue $queue): void
     {
         $queue->getMessage()->willThrow(new EncoderException());
 
@@ -174,7 +176,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    public function it_should_not_allow_a_message_with_an_ID_of_zero(ServerQueue $queue)
+    public function it_should_not_allow_a_message_with_an_ID_of_zero(ServerQueue $queue): void
     {
         $queue->getMessage()->willReturn(new LdapMessageRequest(0, new ExtendedRequest(ExtendedRequest::OID_START_TLS)), null);
 
@@ -187,7 +189,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    public function it_should_send_a_bind_request_to_the_bind_request_handler(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    public function it_should_send_a_bind_request_to_the_bind_request_handler(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler): void
     {
         $queue->getMessage()->willReturn(
             new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar')),
@@ -203,7 +205,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    public function it_should_handle_operation_errors_thrown_from_the_request_handlers(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    public function it_should_handle_operation_errors_thrown_from_the_request_handlers(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler): void
     {
         $queue->isConnected()->willReturn(true, false);
         $queue->getMessage()->willReturn(
@@ -231,7 +233,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    public function it_should_send_a_notice_of_disconnect_and_close_the_queue_on_shutdown(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler)
+    public function it_should_send_a_notice_of_disconnect_and_close_the_queue_on_shutdown(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler): void
     {
         $queue->sendMessage(new LdapMessageResponse(0, new ExtendedResponse(
             new LdapResult(ResultCode::UNAVAILABLE, '', 'The server is shutting down.'),

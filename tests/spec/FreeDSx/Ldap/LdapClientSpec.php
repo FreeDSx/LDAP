@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -41,185 +43,325 @@ use Prophecy\Argument;
 
 class LdapClientSpec extends ObjectBehavior
 {
-    public function let(ClientProtocolHandler $handler)
+    public function let(ClientProtocolHandler $handler): void
     {
-        $handler->isConnected()->willReturn(false);
+        $handler->isConnected()
+            ->willReturn(false);
+
         $this->setProtocolHandler($handler);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(LdapClient::class);
     }
 
-    public function it_should_send_a_message_and_throw_an_exception_if_no_response_is_received_on_sendAndReceive(ClientProtocolHandler $handler)
+    public function it_should_send_a_message_and_throw_an_exception_if_no_response_is_received_on_sendAndReceive(ClientProtocolHandler $handler): void
     {
-        $handler->send(Argument::any())->shouldBeCalled()->willReturn(null);
+        $handler->send(Argument::any())
+            ->shouldBeCalled()
+            ->willReturn(null);
 
-        $this->shouldThrow(OperationException::class)->during('sendAndReceive', [Operations::read('')]);
+        $this->shouldThrow(OperationException::class)
+            ->during(
+                'sendAndReceive',
+                [Operations::read('')]
+            );
     }
 
-    public function it_should_send_a_message_and_return_the_response_on_sendAndReceive(ClientProtocolHandler $handler, LdapMessageResponse $response)
-    {
-        $handler->send(Argument::any())->shouldBeCalled()->willReturn($response);
+    public function it_should_send_a_message_and_return_the_response_on_sendAndReceive(
+        ClientProtocolHandler $handler,
+        LdapMessageResponse $response,
+    ): void {
+        $handler->send(Argument::any())
+            ->shouldBeCalled()
+            ->willReturn($response);
 
-        $this->sendAndReceive(Operations::read(''))->shouldBeEqualTo($response);
+        $this->sendAndReceive(Operations::read(''))
+            ->shouldBeEqualTo($response);
     }
 
-    public function it_should_send_a_search_and_get_entries_back(ClientProtocolHandler $handler)
+    public function it_should_send_a_search_and_get_entries_back(ClientProtocolHandler $handler): void
     {
-        $search = Operations::search(Filters::equal('foo', 'bar'));
+        $search = Operations::search(Filters::equal(
+            'foo',
+            'bar'
+        ));
 
-        $handler->send($search)->shouldBeCalled()->willReturn(new LdapMessageResponse(1, new SearchResponse(new LdapResult(0, ''), new Entries(Entry::create('dc=foo,dc=bar')))));
+        $handler->send($search)->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(
+                1,
+                new SearchResponse(
+                    new LdapResult(
+                        0,
+                        ''
+                    ),
+                    new Entries(Entry::create('dc=foo,dc=bar'))
+                )
+            ));
 
-        $this->search($search)->shouldBeLike(new Entries(Entry::create('dc=foo,dc=bar')));
+        $this->search($search)
+            ->shouldBeLike(new Entries(Entry::create('dc=foo,dc=bar')));
     }
 
-    public function it_should_bind(ClientProtocolHandler $handler)
+    public function it_should_bind(ClientProtocolHandler $handler): void
     {
-        $response = new LdapMessageResponse(1, new BindResponse(new LdapResult(0, '')));
-        $handler->send(new SimpleBindRequest('foo', 'bar', 3))->shouldBeCalled()->willReturn($response);
+        $response = new LdapMessageResponse(
+            1,
+            new BindResponse(new LdapResult(
+                0,
+                ''
+            ))
+        );
+        $handler->send(new SimpleBindRequest(
+            'foo',
+            'bar',
+            3
+        ))->shouldBeCalled()
+            ->willReturn($response);
 
-        $this->bind('foo', 'bar')->shouldBeEqualTo($response);
+        $this->bind(
+            'foo',
+            'bar'
+        )->shouldBeEqualTo($response);
     }
 
-    public function it_should_construct_a_pager_helper()
+    public function it_should_construct_a_pager_helper(): void
     {
-        $this->paging(Operations::search(Filters::equal('foo', 'bar')))->shouldBeAnInstanceOf(Paging::class);
+        $this->paging(Operations::search(
+            Filters::equal(
+                'foo',
+                'bar'
+            )
+        ))->shouldBeAnInstanceOf(Paging::class);
     }
 
-    public function it_should_construct_a_vlv_helper()
+    public function it_should_construct_a_vlv_helper(): void
     {
-        $this->vlv(Operations::search(Filters::equal('foo', 'bar')), 'cn', 100)->shouldBeAnInstanceOf(Vlv::class);
+        $this->vlv(
+            Operations::search(Filters::equal(
+                'foo',
+                'bar'
+            )),
+            'cn',
+            100
+        )->shouldBeAnInstanceOf(Vlv::class);
     }
 
-    public function it_should_construct_a_dirsync_helper()
+    public function it_should_construct_a_dirsync_helper(): void
     {
-        $this->dirSync()->shouldBeAnInstanceOf(DirSync::class);
+        $this->dirSync()
+            ->shouldBeAnInstanceOf(DirSync::class);
     }
 
-    public function it_should_construct_a_range_retrieval_helper()
+    public function it_should_construct_a_range_retrieval_helper(): void
     {
-        $this->range()->shouldBeAnInstanceOf(RangeRetrieval::class);
+        $this->range()
+            ->shouldBeAnInstanceOf(RangeRetrieval::class);
     }
     
-    public function it_should_start_tls(ClientProtocolHandler $handler)
+    public function it_should_start_tls(ClientProtocolHandler $handler): void
     {
-        $handler->send(Operations::extended(ExtendedRequest::OID_START_TLS))->shouldBeCalled()->willReturn(null);
+        $handler->send(Operations::extended(ExtendedRequest::OID_START_TLS))
+            ->shouldBeCalled()
+            ->willReturn(null);
 
         $this->startTls();
     }
 
-    public function it_should_unbind_if_requested(ClientProtocolHandler $handler)
+    public function it_should_unbind_if_requested(ClientProtocolHandler $handler): void
     {
-        $handler->send(new UnbindRequest())->shouldBeCalled()->willReturn(null);
+        $handler->send(new UnbindRequest())
+            ->shouldBeCalled()
+            ->willReturn(null);
 
         $this->unbind();
     }
 
-    public function it_should_return_a_whoami(ClientProtocolHandler $handler)
+    public function it_should_return_a_whoami(ClientProtocolHandler $handler): void
     {
-        $handler->send(Operations::extended(ExtendedRequest::OID_WHOAMI))->willReturn(new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(0, ''), null, 'foo')));
+        $handler->send(Operations::extended(ExtendedRequest::OID_WHOAMI))
+            ->willReturn(new LdapMessageResponse(
+                1,
+                new ExtendedResponse(
+                    new LdapResult(0, ''),
+                    null,
+                    'foo'
+                )
+            ));
 
-        $this->whoami()->shouldBeEqualTo('foo');
+        $this->whoami()
+            ->shouldBeEqualTo('foo');
     }
 
-    public function it_should_return_a_correct_compare_response_on_a_match(ClientProtocolHandler $handler)
+    public function it_should_return_a_correct_compare_response_on_a_match(ClientProtocolHandler $handler): void
     {
-        $handler->send(Operations::compare('cn=foo', 'foo', 'bar'))->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_TRUE)));
+        $handler->send(Operations::compare(
+            'cn=foo',
+            'foo',
+            'bar'
+        ))->willReturn(new LdapMessageResponse(
+            1,
+            new CompareResponse(ResultCode::COMPARE_TRUE)
+        ));
 
-        $this->compare('cn=foo', 'foo', 'bar')->shouldBeEqualTo(true);
+        $this->compare(
+            'cn=foo',
+            'foo',
+            'bar'
+        )->shouldBeEqualTo(true);
     }
 
-    public function it_should_return_a_correct_compare_response_on_a_non_match(ClientProtocolHandler $handler)
+    public function it_should_return_a_correct_compare_response_on_a_non_match(ClientProtocolHandler $handler): void
     {
-        $handler->send(Operations::compare('cn=foo', 'foo', 'bar'))->willReturn(new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_FALSE)));
+        $handler->send(Operations::compare(
+            'cn=foo',
+            'foo',
+            'bar'
+        ))->willReturn(new LdapMessageResponse(
+            1,
+            new CompareResponse(ResultCode::COMPARE_FALSE)
+        ));
 
-        $this->compare('cn=foo', 'foo', 'bar')->shouldBeEqualTo(false);
+        $this->compare(
+            'cn=foo',
+            'foo',
+            'bar'
+        )->shouldBeEqualTo(false);
     }
 
-    public function it_should_send_a_modify_operation_on_update(ClientProtocolHandler $handler)
+    public function it_should_send_a_modify_operation_on_update(ClientProtocolHandler $handler): void
     {
         $entry = Entry::create('cn=foo,dc=local', ['cn' => 'foo']);
         $entry->set('sn', 'bar');
-        $handler->send(Operations::modify($entry->getDn(), ...$entry->changes()))->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(1, new ModifyResponse(ResultCode::SUCCESS)));
+
+        $handler->send(
+            Operations::modify(
+                $entry->getDn(),
+                ...$entry->changes()
+            )
+        )->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(
+                1,
+                new ModifyResponse(ResultCode::SUCCESS)
+            ));
 
         $this->update($entry);
     }
 
-    public function it_should_send_an_add_operation_on_create(ClientProtocolHandler $handler)
+    public function it_should_send_an_add_operation_on_create(ClientProtocolHandler $handler): void
     {
         $entry = Entry::create('cn=foo,dc=local', ['cn' => 'foo']);
-        $handler->send(Operations::add($entry))->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(1, new AddResponse(ResultCode::SUCCESS)));
+
+        $handler->send(Operations::add($entry))
+            ->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(
+                1,
+                new AddResponse(ResultCode::SUCCESS)
+            ));
 
         $this->create($entry);
     }
 
-    public function it_should_send_a_delete_operation_on_delete(ClientProtocolHandler $handler)
+    public function it_should_send_a_delete_operation_on_delete(ClientProtocolHandler $handler): void
     {
         $entry = new Entry('cn=foo,dc=local');
-        $handler->send(Operations::delete('cn=foo,dc=local'))->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(1, new DeleteResponse(ResultCode::SUCCESS)));
 
-        $this->delete($entry);
+        $handler->send(Operations::delete('cn=foo,dc=local'))->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(
+                1,
+                new DeleteResponse(ResultCode::SUCCESS)
+            ));
+
+        $this->delete($entry->getDn()->toString());
     }
 
-    public function it_should_send_a_modify_dn_operation_on_move(ClientProtocolHandler $handler)
+    public function it_should_send_a_modify_dn_operation_on_move(ClientProtocolHandler $handler): void
     {
         $entry = new Entry('cn=foo,dc=local');
         $parent = new Entry('cn=bar,dc=local');
 
-        $handler->send(Operations::move('cn=foo,dc=local', 'cn=bar,dc=local'))->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(1, new ModifyDnResponse(ResultCode::SUCCESS)));
+        $handler->send(Operations::move('cn=foo,dc=local', 'cn=bar,dc=local'))
+            ->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(
+                1,
+                new ModifyDnResponse(ResultCode::SUCCESS)
+            ));
 
-        $this->move($entry, $parent);
+        $this->move(
+            $entry,
+            $parent,
+        );
     }
 
-    public function it_should_send_a_modify_dn_operation_on_rename(ClientProtocolHandler $handler)
+    public function it_should_send_a_modify_dn_operation_on_rename(ClientProtocolHandler $handler): void
     {
         $entry = new Entry('cn=foo,dc=local');
         $newRdn = 'cn=bar';
 
-        $handler->send(Operations::rename('cn=foo,dc=local', 'cn=bar'))->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(1, new ModifyDnResponse(ResultCode::SUCCESS)));
+        $handler->send(Operations::rename('cn=foo,dc=local', 'cn=bar'))
+            ->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(
+                1,
+                new ModifyDnResponse(ResultCode::SUCCESS)
+            ));
 
-        $this->rename($entry, $newRdn);
+        $this->rename(
+            $entry,
+            $newRdn,
+        );
     }
 
-    public function it_should_send_a_base_search_on_a_read_and_return_an_entry(ClientProtocolHandler $handler)
+    public function it_should_send_a_base_search_on_a_read_and_return_an_entry(ClientProtocolHandler $handler): void
     {
         $entry = new Entry('cn=foo,dc=local');
-        $handler->send(Operations::read('cn=foo,dc=local'))->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(1, new SearchResponse(new LdapResult(ResultCode::SUCCESS), new Entries(
-                $entry
-            ))));
+        $handler->send(Operations::read('cn=foo,dc=local'))
+            ->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(
+                1,
+                new SearchResponse(
+                    new LdapResult(ResultCode::SUCCESS),
+                    new Entries($entry)
+                )
+            ));
 
-        $this->read($entry)->shouldBeEqualTo($entry);
+        $this->read($entry->getDn()->toString())
+            ->shouldBeEqualTo($entry);
     }
 
-    public function it_should_send_a_read_to_the_RootDSE_if_it_is_called_with_no_arguments(ClientProtocolHandler $handler)
+    public function it_should_send_a_read_to_the_RootDSE_if_it_is_called_with_no_arguments(ClientProtocolHandler $handler): void
     {
         $entry = new Entry('');
-        $handler->send(Operations::read(''))->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(1, new SearchResponse(new LdapResult(ResultCode::SUCCESS), new Entries(
-                $entry
-            ))));
+        $handler->send(Operations::read(''))
+            ->shouldBeCalled()
+            ->willReturn(new LdapMessageResponse(
+                1,
+                new SearchResponse(
+                    new LdapResult(ResultCode::SUCCESS),
+                    new Entries($entry)
+                )
+            ));
 
-        $this->read()->shouldBeEqualTo($entry);
+        $this->read()
+            ->shouldBeEqualTo($entry);
     }
 
-    public function it_should_send_a_base_search_on_a_read_and_return_null_if_it_does_not_exist(ClientProtocolHandler $handler)
+    public function it_should_send_a_base_search_on_a_read_and_return_null_if_it_does_not_exist(ClientProtocolHandler $handler): void
     {
         $entry = new Entry('cn=foo,dc=local');
-        $handler->send(Operations::read('cn=foo,dc=local'))->shouldBeCalled()
-            ->willThrow(new OperationException('', ResultCode::NO_SUCH_OBJECT));
 
-        $this->read($entry)->shouldBeNull();
+        $handler->send(Operations::read('cn=foo,dc=local'))
+            ->shouldBeCalled()
+            ->willThrow(new OperationException(
+                '',
+                ResultCode::NO_SUCH_OBJECT
+            ));
+
+        $this->read($entry->getDn()->toString())
+            ->shouldBeNull();
     }
 
-    public function it_should_throw_an_exception_on_read_or_fail_if_the_entry_does_not_exist(ClientProtocolHandler $handler)
+    public function it_should_throw_an_exception_on_read_or_fail_if_the_entry_does_not_exist(ClientProtocolHandler $handler): void
     {
         $exception = new OperationException('', ResultCode::NO_SUCH_OBJECT);
         $entry = new Entry('cn=foo,dc=local');
@@ -229,27 +371,41 @@ class LdapClientSpec extends ObjectBehavior
         $this->shouldThrow($exception)->during('readOrFail', [$entry]);
     }
 
-    public function it_should_return_an_entry_on_a_readOrFail_if_it_exists(ClientProtocolHandler $handler)
+    public function it_should_return_an_entry_on_a_readOrFail_if_it_exists(ClientProtocolHandler $handler): void
     {
         $entry = new Entry('cn=foo,dc=local');
         $handler->send(Operations::read('cn=foo,dc=local'))->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(1, new SearchResponse(new LdapResult(ResultCode::SUCCESS), new Entries(
-                $entry
-            ))));
+            ->willReturn(new LdapMessageResponse(
+                1,
+                new SearchResponse(
+                    new LdapResult(ResultCode::SUCCESS),
+                    new Entries($entry)
+                )
+            ));
 
-        $this->readOrFail($entry)->shouldBeEqualTo($entry);
+        $this->readOrFail($entry->getDn()->toString())
+            ->shouldBeEqualTo($entry);
     }
 
-    public function it_should_send_a_base_search_on_a_read_and_throw_an_unrelated_operation_exception(ClientProtocolHandler $handler)
+    public function it_should_send_a_base_search_on_a_read_and_throw_an_unrelated_operation_exception(ClientProtocolHandler $handler): void
     {
         $entry = new Entry('cn=foo,dc=local');
-        $handler->send(Operations::read('cn=foo,dc=local'))->shouldBeCalled()
-            ->willThrow(new OperationException('', ResultCode::INSUFFICIENT_ACCESS_RIGHTS));
 
-        $this->shouldThrow(OperationException::class)->during('read', [$entry]);
+        $handler->send(Operations::read('cn=foo,dc=local'))
+            ->shouldBeCalled()
+            ->willThrow(new OperationException(
+                '',
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS
+            ));
+
+        $this->shouldThrow(OperationException::class)
+            ->during(
+                'read',
+                [$entry]
+            );
     }
 
-    public function it_should_get_the_options()
+    public function it_should_get_the_options(): void
     {
         $this->getOptions()->shouldBeEqualTo([
             'version' => 3,
@@ -271,10 +427,22 @@ class LdapClientSpec extends ObjectBehavior
         ]);
     }
 
-    public function it_should_set_the_options()
+    public function it_should_set_the_options(): void
     {
-        $this->setOptions(['servers' => ['bar', 'foo']]);
+        $this->setOptions([
+            'servers' => [
+                'bar',
+                'foo',
+            ]
+        ]);
 
-        $this->getOptions()->shouldHaveKeyWithValue('servers', ['bar', 'foo']);
+        $this->getOptions()
+            ->shouldHaveKeyWithValue(
+                'servers',
+                [
+                    'bar',
+                    'foo',
+                ]
+            );
     }
 }

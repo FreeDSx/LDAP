@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -20,50 +22,50 @@ use Prophecy\Argument;
 
 class RangeRetrievalSpec extends ObjectBehavior
 {
-    public function let(LdapClient $client)
+    public function let(LdapClient $client): void
     {
         $this->beConstructedWith($client);
     }
     
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(RangeRetrieval::class);
     }
     
-    public function it_should_get_a_specific_ranged_attribute_from_an_entry_if_it_exists()
+    public function it_should_get_a_specific_ranged_attribute_from_an_entry_if_it_exists(): void
     {
         $this->getRanged(Entry::create('dc=foo', ['member;range=0-1500' => [], 'foo' => []]), 'member')->getName()->shouldBeEqualTo('member');
     }
     
-    public function it_should_return_null_on_a_request_for_a_specific_ranged_attribute_that_does_not_exist()
+    public function it_should_return_null_on_a_request_for_a_specific_ranged_attribute_that_does_not_exist(): void
     {
         $this->getRanged(Entry::create('dc=foo', ['member;range=0-1500' => [], 'foo' => []]), 'bar')->shouldBeNull();
     }
     
-    public function it_should_get_all_ranged_attributes_for_an_entry_as_an_array()
+    public function it_should_get_all_ranged_attributes_for_an_entry_as_an_array(): void
     {
         $this->getAllRanged(Entry::create('dc=foo', ['member;range=0-1500' => [], 'foo' => [], 'bar;range=0-1000' => []]))->shouldHaveCount(2);
     }
 
-    public function it_should_return_whether_an_entry_has_an_ranged_attributes()
+    public function it_should_return_whether_an_entry_has_an_ranged_attributes(): void
     {
         $this->hasRanged(Entry::create('dc=foo', ['member;range=0-1500' => [], 'foo' => []]))->shouldBeEqualTo(true);
         $this->hasRanged(Entry::create('dc=foo', ['member' => [], 'foo' => []]))->shouldBeEqualTo(false);
     }
     
-    public function it_should_return_whether_an_entry_has_a_specific_ranged_attribute()
+    public function it_should_return_whether_an_entry_has_a_specific_ranged_attribute(): void
     {
         $this->hasRanged(Entry::create('dc=foo', ['member;range=0-1500' => [], 'foo' => []]), 'member')->shouldBeEqualTo(true);
         $this->hasRanged(Entry::create('dc=foo', ['member;range=0-1500' => [], 'foo' => []]), 'foo')->shouldBeEqualTo(false);
     }
     
-    public function it_should_check_if_a_ranged_attribute_has_more_values_to_retrieve()
+    public function it_should_check_if_a_ranged_attribute_has_more_values_to_retrieve(): void
     {
         $this->hasMoreValues(new Attribute('member'))->shouldBeEqualTo(false);
         $this->hasMoreValues(new Attribute('member;range=0-*'))->shouldBeEqualTo(false);
     }
     
-    public function it_should_get_more_values_for_a_ranged_attribute($client)
+    public function it_should_get_more_values_for_a_ranged_attribute($client): void
     {
         $attrResult = new Attribute('member;range=1501-2000');
         $entry = new Entry('dc=foo', $attrResult);
@@ -75,7 +77,7 @@ class RangeRetrievalSpec extends ObjectBehavior
         $this->getMoreValues('dc=foo', new Attribute('member;range=0-1500'))->shouldBeEqualTo($attrResult);
     }
     
-    public function it_should_use_a_specific_ranged_amount_of_values_to_retrieve_if_specified($client)
+    public function it_should_use_a_specific_ranged_amount_of_values_to_retrieve_if_specified($client): void
     {
         $attrResult = new Attribute('member;range=1501-1600');
         $entry = new Entry('dc=foo', $attrResult);
@@ -87,7 +89,7 @@ class RangeRetrievalSpec extends ObjectBehavior
         $this->getMoreValues('dc=foo', new Attribute('member;range=0-1500'), 100)->shouldBeEqualTo($attrResult);
     }
     
-    public function it_should_retrieve_all_values_for_a_specific_attribute($client)
+    public function it_should_retrieve_all_values_for_a_specific_attribute($client): void
     {
         $entry1 = new Entry('dc=foo', new Attribute('member;range=0-1500', 'foo'));
         $entry2 = new Entry('dc=foo', new Attribute('member;range=1501-*', 'bar'));

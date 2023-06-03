@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -19,37 +21,37 @@ use PhpSpec\ObjectBehavior;
 
 class ExpectedEntryCountControlSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(1, 50);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ExpectedEntryCountControl::class);
     }
 
-    public function it_should_set_the_maximum()
+    public function it_should_set_the_maximum(): void
     {
         $this->setMaximum(100)->getMaximum()->shouldBeEqualTo(100);
     }
 
-    public function it_should_get_the_maximum()
+    public function it_should_get_the_maximum(): void
     {
         $this->getMaximum()->shouldBeEqualTo(50);
     }
 
-    public function it_should_set_the_minimum()
+    public function it_should_set_the_minimum(): void
     {
         $this->setMinimum(100)->getMinimum()->shouldBeEqualTo(100);
     }
 
-    public function it_should_get_the_minimum()
+    public function it_should_get_the_minimum(): void
     {
         $this->getMinimum()->shouldBeEqualTo(1);
     }
 
-    public function it_should_generate_correct_ASN1()
+    public function it_should_generate_correct_ASN1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -63,7 +65,7 @@ class ExpectedEntryCountControlSpec extends ObjectBehavior
         ));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
 

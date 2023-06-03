@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -26,54 +28,54 @@ use PhpSpec\ObjectBehavior;
 
 class GenericRequestHandlerSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(GenericRequestHandler::class);
     }
 
-    public function it_should_implement_request_handler_interface()
+    public function it_should_implement_request_handler_interface(): void
     {
         $this->shouldImplement(RequestHandlerInterface::class);
     }
 
-    public function it_should_throw_an_operations_exception_on_an_add_request(RequestContext $context, AddRequest $request)
+    public function it_should_throw_an_operations_exception_on_an_add_request(RequestContext $context, AddRequest $request): void
     {
         $this->shouldThrow(OperationException::class)->during('add', [$context, $request]);
     }
 
-    public function it_should_throw_an_operations_exception_on_a_delete_request(RequestContext $context, DeleteRequest $request)
+    public function it_should_throw_an_operations_exception_on_a_delete_request(RequestContext $context, DeleteRequest $request): void
     {
         $this->shouldThrow(OperationException::class)->during('delete', [$context, $request]);
     }
 
-    public function it_should_throw_an_operations_exception_on_a_modify_request(RequestContext $context, ModifyRequest $request)
+    public function it_should_throw_an_operations_exception_on_a_modify_request(RequestContext $context, ModifyRequest $request): void
     {
         $this->shouldThrow(OperationException::class)->during('modify', [$context, $request]);
     }
 
-    public function it_should_throw_an_operations_exception_on_a_modify_dn_request(RequestContext $context, ModifyDnRequest $request)
+    public function it_should_throw_an_operations_exception_on_a_modify_dn_request(RequestContext $context, ModifyDnRequest $request): void
     {
         $this->shouldThrow(OperationException::class)->during('modifyDn', [$context, $request]);
     }
 
-    public function it_should_throw_an_operations_exception_on_a_search_request(RequestContext $context, SearchRequest $request)
+    public function it_should_throw_an_operations_exception_on_a_search_request(RequestContext $context, SearchRequest $request): void
     {
         $this->shouldThrow(OperationException::class)->during('search', [$context, $request]);
     }
 
-    public function it_should_throw_an_operations_exception_on_a_compare_request(RequestContext $context, CompareRequest $request)
+    public function it_should_throw_an_operations_exception_on_a_compare_request(RequestContext $context, CompareRequest $request): void
     {
         $this->shouldThrow(OperationException::class)->during('compare', [$context, $request]);
     }
 
-    public function it_should_throw_an_operations_exception_on_an_extended_request(RequestContext $context, ExtendedRequest $request)
+    public function it_should_throw_an_operations_exception_on_an_extended_request(RequestContext $context, ExtendedRequest $request): void
     {
         $request->getName()->willReturn('foo');
 
         $this->shouldThrow(OperationException::class)->during('extended', [$context, $request]);
     }
 
-    public function it_should_return_false_on_a_bind_request()
+    public function it_should_return_false_on_a_bind_request(): void
     {
         $this->bind('foo', 'bar')->shouldBeEqualTo(false);
     }

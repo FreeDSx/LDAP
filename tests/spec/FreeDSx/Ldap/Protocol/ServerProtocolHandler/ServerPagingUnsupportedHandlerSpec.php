@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -31,7 +33,7 @@ use Prophecy\Argument;
 
 class ServerPagingUnsupportedHandlerSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerPagingUnsupportedHandler::class);
     }
@@ -40,7 +42,7 @@ class ServerPagingUnsupportedHandlerSpec extends ObjectBehavior
         ServerQueue $queue,
         RequestHandlerInterface $handler,
         TokenInterface $token
-    ) {
+    ): void {
         $search = new LdapMessageRequest(
             2,
             (new SearchRequest(Filters::equal('foo', 'bar')))->base('dc=foo,dc=bar'),
@@ -83,7 +85,7 @@ class ServerPagingUnsupportedHandlerSpec extends ObjectBehavior
         ServerQueue $queue,
         RequestHandlerInterface $handler,
         TokenInterface $token
-    ) {
+    ): void {
         $search = new LdapMessageRequest(
             2,
             (new SearchRequest(Filters::equal('foo', 'bar')))->base('dc=foo,dc=bar'),

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -20,23 +22,23 @@ use PhpSpec\ObjectBehavior;
 
 class CancelRequestSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(1);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(CancelRequest::class);
     }
 
-    public function it_should_set_the_message_id()
+    public function it_should_set_the_message_id(): void
     {
         $this->getMessageId()->shouldBeEqualTo(1);
         $this->setMessageId(2)->getMessageId()->shouldBeEqualTo(2);
     }
 
-    public function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -48,12 +50,12 @@ class CancelRequestSpec extends ObjectBehavior
         )));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $this::fromAsn1((new CancelRequest(2))->toAsn1())->shouldBeLike(new CancelRequest(2));
     }
 
-    public function it_should_detect_invalid_asn1_from_asn1()
+    public function it_should_detect_invalid_asn1_from_asn1(): void
     {
         $req = new ExtendedRequest('foo', Asn1::octetString('foo'));
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [$req->toAsn1()]);

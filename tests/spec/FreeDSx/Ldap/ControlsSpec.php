@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -29,90 +31,147 @@ use PhpSpec\ObjectBehavior;
 
 class ControlsSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(Controls::class);
     }
 
-    public function it_should_create_a_paging_control()
+    public function it_should_create_a_paging_control(): void
     {
-        $this->paging(100)->shouldBeLike(new PagingControl(100, ''));
+        $this->paging(100)
+            ->shouldBeLike(new PagingControl(
+                100,
+                ''
+            ));
     }
 
-    public function it_should_create_a_vlv_offset_control()
+    public function it_should_create_a_vlv_offset_control(): void
     {
-        $this->vlv(10, 12)->shouldBeLike(new VlvControl(10, 12, 1, 0));
+        $this->vlv(
+            10,
+            12
+        )->shouldBeLike(new VlvControl(
+            10,
+            12,
+            1,
+            0
+        ));
     }
 
-    public function it_should_create_a_vlv_filter_control()
+    public function it_should_create_a_vlv_filter_control(): void
     {
-        $this->vlvFilter(10, 12, Filters::gte('foo', 'bar'))->shouldBeLike(new VlvControl(10, 12, null, null, new GreaterThanOrEqualFilter('foo', 'bar')));
+        $this->vlvFilter(
+            10,
+            12,
+            Filters::gte(
+                'foo',
+                'bar'
+            )
+        )->shouldBeLike(new VlvControl(
+            10,
+            12,
+            null,
+            null,
+            new GreaterThanOrEqualFilter(
+                'foo',
+                'bar'
+            )
+        ));
     }
 
-    public function it_should_create_an_sd_flags_control()
+    public function it_should_create_an_sd_flags_control(): void
     {
-        $this->sdFlags(7)->shouldBeLike(new SdFlagsControl(7));
+        $this->sdFlags(7)
+            ->shouldBeLike(new SdFlagsControl(7));
     }
 
-    public function it_should_create_a_password_policy_control()
+    public function it_should_create_a_password_policy_control(): void
     {
-        $this->pwdPolicy()->shouldBeLike(new Control(Control::OID_PWD_POLICY, true));
+        $this->pwdPolicy()
+            ->shouldBeLike(new Control(
+                Control::OID_PWD_POLICY,
+                true
+            ));
     }
 
-    public function it_should_create_a_subtree_delete_control()
+    public function it_should_create_a_subtree_delete_control(): void
     {
-        $this->subtreeDelete()->shouldBeLike(new Control(Control::OID_SUBTREE_DELETE));
+        $this->subtreeDelete()
+            ->shouldBeLike(new Control(Control::OID_SUBTREE_DELETE));
     }
 
-    public function it_should_create_a_sorting_control_using_a_string()
+    public function it_should_create_a_sorting_control_using_a_string(): void
     {
-        $this->sort('cn')->shouldBeLike(new SortingControl(new SortKey('cn')));
+        $this->sort('cn')
+            ->shouldBeLike(new SortingControl(new SortKey('cn')));
     }
 
-    public function it_should_create_a_sorting_control_using_a_sort_key()
+    public function it_should_create_a_sorting_control_using_a_sort_key(): void
     {
-        $this->sort(new SortKey('foo'))->shouldBeLike(new SortingControl(new SortKey('foo')));
+        $this->sort(new SortKey('foo'))
+            ->shouldBeLike(new SortingControl(new SortKey('foo')));
     }
 
-    public function it_should_create_an_extended_dn_control()
+    public function it_should_create_an_extended_dn_control(): void
     {
-        $this->extendedDn()->shouldBeLike(new ExtendedDnControl());
+        $this->extendedDn()
+            ->shouldBeLike(new ExtendedDnControl());
     }
 
-    public function it_should_create_a_dir_sync_control()
+    public function it_should_create_a_dir_sync_control(): void
     {
-        $this->dirSync()->shouldBeLike(new DirSyncRequestControl());
+        $this->dirSync()
+            ->shouldBeLike(new DirSyncRequestControl());
     }
 
-    public function it_should_create_a_dir_sync_control_with_options()
+    public function it_should_create_a_dir_sync_control_with_options(): void
     {
-        $this->dirSync(DirSyncRequestControl::FLAG_INCREMENTAL_VALUES | DirSyncRequestControl::FLAG_OBJECT_SECURITY, 'foo')->shouldBeLike(
-            new DirSyncRequestControl(DirSyncRequestControl::FLAG_INCREMENTAL_VALUES | DirSyncRequestControl::FLAG_OBJECT_SECURITY, 'foo')
+        $this->dirSync(
+            DirSyncRequestControl::FLAG_INCREMENTAL_VALUES
+            | DirSyncRequestControl::FLAG_OBJECT_SECURITY,
+            'foo'
+        )->shouldBeLike(
+            new DirSyncRequestControl(
+                DirSyncRequestControl::FLAG_INCREMENTAL_VALUES
+                | DirSyncRequestControl::FLAG_OBJECT_SECURITY,
+                'foo'
+            )
         );
     }
 
-    public function it_should_create_an_expected_entry_count_control()
+    public function it_should_create_an_expected_entry_count_control(): void
     {
-        $this->expectedEntryCount(1, 100)->shouldBeLike(new ExpectedEntryCountControl(1, 100));
+        $this->expectedEntryCount(1, 100)
+            ->shouldBeLike(new ExpectedEntryCountControl(1, 100));
     }
 
-    public function it_should_create_a_policy_hints_control()
+    public function it_should_create_a_policy_hints_control(): void
     {
-        $this::policyHints()->shouldBeLike(new PolicyHintsControl());
+        $this::policyHints()
+            ->shouldBeLike(new PolicyHintsControl());
     }
 
-    public function it_should_create_a_set_owners_control()
+    public function it_should_create_a_set_owners_control(): void
     {
-        $this::setOwner('foo')->shouldBeLike(new SetOwnerControl('foo'));
+        $this::setOwner('foo')
+            ->shouldBeLike(new SetOwnerControl('foo'));
     }
 
-    public function it_should_create_a_show_deleted_control()
+    public function it_should_create_a_show_deleted_control(): void
     {
-        $this::showDeleted()->shouldBeLike(new Control(Control::OID_SHOW_DELETED, true));
+        $this::showDeleted()
+            ->shouldBeLike(new Control(
+                Control::OID_SHOW_DELETED,
+                true
+            ));
     }
 
-    public function it_should_create_a_show_recycled_control()
+    public function it_should_create_a_show_recycled_control(): void
     {
-        $this::showRecycled()->shouldBeLike(new Control(Control::OID_SHOW_RECYCLED, true));
+        $this::showRecycled()
+            ->shouldBeLike(new Control(
+                Control::OID_SHOW_RECYCLED,
+                true
+            ));
     }
 }

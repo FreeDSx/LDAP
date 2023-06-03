@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -19,22 +21,22 @@ use PhpSpec\ObjectBehavior;
 
 class ExtendedDnControlSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ExtendedDnControl::class);
     }
 
-    public function it_should_set_whether_or_not_to_use_hex_format()
+    public function it_should_set_whether_or_not_to_use_hex_format(): void
     {
         $this->setUseHexFormat(true)->getUseHexFormat()->shouldBeEqualTo(true);
     }
 
-    public function it_should_not_use_hex_format_by_default()
+    public function it_should_not_use_hex_format_by_default(): void
     {
         $this->getUseHexFormat()->shouldBeEqualTo(false);
     }
 
-    public function it_should_generate_correct_ASN1()
+    public function it_should_generate_correct_ASN1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -47,7 +49,7 @@ class ExtendedDnControlSpec extends ObjectBehavior
         ));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -60,7 +62,7 @@ class ExtendedDnControlSpec extends ObjectBehavior
         ))->setValue(null)->shouldBeLike(new ExtendedDnControl());
     }
 
-    public function it_should_be_constructed_from_asn1_when_the_empty_value_form_is_used()
+    public function it_should_be_constructed_from_asn1_when_the_empty_value_form_is_used(): void
     {
         $this::fromAsn1(Asn1::sequence(
             Asn1::octetString(Control::OID_EXTENDED_DN),

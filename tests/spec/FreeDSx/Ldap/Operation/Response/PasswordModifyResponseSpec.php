@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -21,32 +23,32 @@ use PhpSpec\ObjectBehavior;
 
 class PasswordModifyResponseSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(new LdapResult(0, 'foo'), '12345');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(PasswordModifyResponse::class);
     }
 
-    public function it_should_get_the_result_code()
+    public function it_should_get_the_result_code(): void
     {
         $this->getResultCode()->shouldBeEqualTo(0);
     }
 
-    public function it_should_get_the_dn()
+    public function it_should_get_the_dn(): void
     {
         $this->getDn()->shouldBeLike(new Dn('foo'));
     }
 
-    public function it_should_get_the_generated_password()
+    public function it_should_get_the_generated_password(): void
     {
         $this->getGeneratedPassword()->shouldBeEqualTo('12345');
     }
 
-    public function it_should_be_constructed_from_asn1_with_a_generated_password()
+    public function it_should_be_constructed_from_asn1_with_a_generated_password(): void
     {
         $encoder = new LdapEncoder();
 
@@ -68,7 +70,7 @@ class PasswordModifyResponseSpec extends ObjectBehavior
         $this->getDn()->shouldBeLike(new Dn('dc=foo,dc=bar'));
     }
 
-    public function it_should_be_constructed_from_asn1_without_a_generated_password()
+    public function it_should_be_constructed_from_asn1_without_a_generated_password(): void
     {
         $encoder = new LdapEncoder();
 

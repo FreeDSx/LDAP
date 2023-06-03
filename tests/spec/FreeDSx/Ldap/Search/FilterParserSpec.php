@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -17,89 +19,89 @@ use PhpSpec\ObjectBehavior;
 
 class FilterParserSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith('foo');
     }
 
-    public function it_should_parse_an_equals_filter()
+    public function it_should_parse_an_equals_filter(): void
     {
         $this::parse('(foo=bar)')->shouldBeLike(Filters::equal('foo', 'bar'));
     }
 
-    public function it_should_parse_an_approximate_filter()
+    public function it_should_parse_an_approximate_filter(): void
     {
         $this::parse('(foo~=bar)')->shouldBeLike(Filters::approximate('foo', 'bar'));
     }
 
-    public function it_should_parse_a_greater_than_or_equals_filter()
+    public function it_should_parse_a_greater_than_or_equals_filter(): void
     {
         $this::parse('(foo>=1)')->shouldBeLike(Filters::gte('foo', '1'));
     }
 
-    public function it_should_parse_a_less_than_or_equals_filter()
+    public function it_should_parse_a_less_than_or_equals_filter(): void
     {
         $this::parse('(foo<=1)')->shouldBeLike(Filters::lte('foo', '1'));
     }
 
-    public function it_should_parse_a_present_filter()
+    public function it_should_parse_a_present_filter(): void
     {
         $this->parse('(foo=*)')->shouldBeLike(Filters::present('foo'));
     }
 
-    public function it_should_parse_a_substring_starts_with_filter()
+    public function it_should_parse_a_substring_starts_with_filter(): void
     {
         $this::parse('(foo=bar*)')->shouldBeLike(Filters::startsWith('foo', 'bar'));
     }
 
-    public function it_should_parse_a_substring_ends_with_filter()
+    public function it_should_parse_a_substring_ends_with_filter(): void
     {
         $this::parse('(foo=*bar)')->shouldBeLike(Filters::endsWith('foo', 'bar'));
     }
 
-    public function it_should_parse_a_substring_contains_filter()
+    public function it_should_parse_a_substring_contains_filter(): void
     {
         $this::parse('(foo=*bar*)')->shouldBeLike(Filters::contains('foo', 'bar'));
     }
 
-    public function it_should_parse_a_mixed_substring_filter()
+    public function it_should_parse_a_mixed_substring_filter(): void
     {
         $this::parse('(foo=this*is*a*filter)')->shouldBeLike(Filters::substring('foo', 'this', 'filter', 'is', 'a'));
     }
 
-    public function it_should_parse_an_extensible_match_filter_with_an_attribute_only()
+    public function it_should_parse_an_extensible_match_filter_with_an_attribute_only(): void
     {
         $this::parse('givenName:=Chad')->shouldBeLike(Filters::extensible('givenName', 'Chad', null));
     }
 
-    public function it_should_parse_an_extensible_match_filter_with_a_dn_and_matching_rule()
+    public function it_should_parse_an_extensible_match_filter_with_a_dn_and_matching_rule(): void
     {
         $this::parse(':dn:1.2.3:=Chad')->shouldBeLike(Filters::extensible(null, 'Chad', null)->setUseDnAttributes(true)->setMatchingRule('1.2.3'));
     }
 
-    public function it_should_parse_an_extensible_match_filter_with_a_dn_and_attribute_type()
+    public function it_should_parse_an_extensible_match_filter_with_a_dn_and_attribute_type(): void
     {
         $this::parse('o:dn:=Chad')->shouldBeLike(Filters::extensible('o', 'Chad', null)->setUseDnAttributes(true));
     }
 
-    public function it_should_error_on_invalid_matching_rule_syntax()
+    public function it_should_error_on_invalid_matching_rule_syntax(): void
     {
         $this->shouldThrow(FilterParseException::class)->during('parse', [':dn::=Chad']);
         $this->shouldThrow(FilterParseException::class)->during('parse', ['&^]:=Chad']);
         $this->shouldThrow(FilterParseException::class)->during('parse', ['?:=Chad']);
     }
 
-    public function it_should_error_when_parsing_an_extensible_match_with_no_matching_rule_or_type()
+    public function it_should_error_when_parsing_an_extensible_match_with_no_matching_rule_or_type(): void
     {
         $this->shouldThrow(FilterParseException::class)->during('parse', [':dn:=Chad']);
     }
 
-    public function it_should_parse_a_simple_comparison_filter_without_parenthesis()
+    public function it_should_parse_a_simple_comparison_filter_without_parenthesis(): void
     {
         $this::parse('foo=bar')->shouldBeLike(Filters::equal('foo', 'bar'));
     }
 
-    public function it_should_parse_an_and_filter()
+    public function it_should_parse_an_and_filter(): void
     {
         $this::parse('(&(foo=bar)(bar~=foo))')->shouldBeLike(Filters::and(
             Filters::equal('foo', 'bar'),
@@ -107,7 +109,7 @@ class FilterParserSpec extends ObjectBehavior
         ));
     }
 
-    public function it_should_parse_an_or_filter()
+    public function it_should_parse_an_or_filter(): void
     {
         $this::parse('(|(foo=bar)(bar~=foo))')->shouldBeLike(Filters::or(
             Filters::equal('foo', 'bar'),
@@ -115,7 +117,7 @@ class FilterParserSpec extends ObjectBehavior
         ));
     }
 
-    public function it_should_parse_filter_containers_with_nested_containers()
+    public function it_should_parse_filter_containers_with_nested_containers(): void
     {
         $this::parse('(&(|(foo=*bar)(bar<=5))(foo~=bar))')->shouldBeLike(Filters::and(
             Filters::or(Filters::endsWith('foo', 'bar'), Filters::lte('bar', '5')),
@@ -134,17 +136,17 @@ class FilterParserSpec extends ObjectBehavior
         ));
     }
 
-    public function it_should_parse_a_not_filter()
+    public function it_should_parse_a_not_filter(): void
     {
         $this::parse('(!(foo=bar))')->shouldBeLike(Filters::not(Filters::equal('foo', 'bar')));
     }
 
-    public function it_should_not_allow_a_not_filter_to_contain_more_than_one_filter()
+    public function it_should_not_allow_a_not_filter_to_contain_more_than_one_filter(): void
     {
         $this->shouldThrow(FilterParseException::class)->during('parse', ['(!(&(foo=bar)))']);
     }
 
-    public function it_should_decode_hex_encoded_values()
+    public function it_should_decode_hex_encoded_values(): void
     {
         $this::parse('o=Parens R Us \28for all your parenthetical needs\29')->shouldBeLike(Filters::equal('o', 'Parens R Us (for all your parenthetical needs)'));
         $this::parse('(cn=*\2A*)')->shouldBeLike(Filters::contains('cn', '*'));
@@ -152,48 +154,48 @@ class FilterParserSpec extends ObjectBehavior
         $this::parse('(sn=Lu\c4\8di\c4\87)')->shouldBeLike(Filters::equal('sn', 'Lučić'));
     }
 
-    public function it_should_error_on_nested_unmatched_parenthesis()
+    public function it_should_error_on_nested_unmatched_parenthesis(): void
     {
         $this->shouldThrow(FilterParseException::class)->during('parse', ['(&(foo=bar)(|(&(foo=bar)))']);
     }
 
-    public function it_should_error_on_an_unmatched_parenthesis()
+    public function it_should_error_on_an_unmatched_parenthesis(): void
     {
         $this->shouldThrow(FilterParseException::class)->during('parse', ['foo=bar)']);
     }
 
-    public function it_should_error_on_unrecognized_values_at_the_end_of_the_filter()
+    public function it_should_error_on_unrecognized_values_at_the_end_of_the_filter(): void
     {
         $this->shouldThrow(FilterParseException::class)->during('parse', ['(foo=bar)(foo)']);
         $this->shouldThrow(FilterParseException::class)->during('parse', ['(foo=bar)foo']);
     }
 
-    public function it_should_error_on_empty_values()
+    public function it_should_error_on_empty_values(): void
     {
         $this->shouldThrow(FilterParseException::class)->during('parse', ['(foo=)']);
     }
 
-    public function it_should_error_on_unrecognized_operators()
+    public function it_should_error_on_unrecognized_operators(): void
     {
         $this->shouldThrow(FilterParseException::class)->during('parse', ['(foo>4)']);
     }
 
-    public function it_should_error_on_an_empty_attribute_in_the_filter()
+    public function it_should_error_on_an_empty_attribute_in_the_filter(): void
     {
         $this->shouldThrow(FilterParseException::class)->during('parse', ['(=bar)']);
     }
 
-    public function it_should_error_on_empty_containers()
+    public function it_should_error_on_empty_containers(): void
     {
         $this->shouldThrow(FilterParseException::class)->during('parse', ['(&)']);
     }
 
-    public function it_should_error_on_an_empty_filter()
+    public function it_should_error_on_an_empty_filter(): void
     {
         $this->shouldThrow(FilterParseException::class)->during('parse', ['']);
     }
 
-    public function it_should_error_on_a_malformed_container()
+    public function it_should_error_on_a_malformed_container(): void
     {
         $this->shouldThrow(FilterParseException::class)->during('parse', ['(&']);
     }

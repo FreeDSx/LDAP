@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -21,7 +23,7 @@ use PhpSpec\ObjectBehavior;
 
 class PagingRequestComparatorSpec extends ObjectBehavior
 {
-    public function it_compares_true_when_they_are_the_same()
+    public function it_compares_true_when_they_are_the_same(): void
     {
         $old = new PagingRequest(
             new PagingControl(100, 'foo'),
@@ -39,7 +41,7 @@ class PagingRequestComparatorSpec extends ObjectBehavior
         $this->compare($old, $new)->shouldBeEqualTo(true);
     }
 
-    public function it_compares_false_when_the_search_is_different()
+    public function it_compares_false_when_the_search_is_different(): void
     {
         $old = new PagingRequest(
             new PagingControl(100, 'foo'),
@@ -57,7 +59,7 @@ class PagingRequestComparatorSpec extends ObjectBehavior
         $this->compare($old, $new)->shouldBeEqualTo(false);
     }
 
-    public function it_compares_false_when_the_cookie_is_different()
+    public function it_compares_false_when_the_cookie_is_different(): void
     {
         $old = new PagingRequest(
             new PagingControl(100, 'foo'),
@@ -75,7 +77,7 @@ class PagingRequestComparatorSpec extends ObjectBehavior
         $this->compare($old, $new)->shouldBeEqualTo(false);
     }
 
-    public function it_compares_false_when_the_controls_are_different_in_count()
+    public function it_compares_false_when_the_controls_are_different_in_count(): void
     {
         $old = new PagingRequest(
             new PagingControl(100, 'foo'),
@@ -93,7 +95,7 @@ class PagingRequestComparatorSpec extends ObjectBehavior
         $this->compare($old, $new)->shouldBeEqualTo(false);
     }
 
-    public function it_compares_false_when_the_paging_criticality_is_different()
+    public function it_compares_false_when_the_paging_criticality_is_different(): void
     {
         $old = new PagingRequest(
             (new PagingControl(100, 'foo'))->setCriticality(true),
@@ -111,7 +113,7 @@ class PagingRequestComparatorSpec extends ObjectBehavior
         $this->compare($old, $new)->shouldBeEqualTo(false);
     }
 
-    public function it_compares_false_when_the_controls_are_different_in_value()
+    public function it_compares_false_when_the_controls_are_different_in_value(): void
     {
         $old = new PagingRequest(
             new PagingControl(100, 'foo'),
@@ -129,7 +131,7 @@ class PagingRequestComparatorSpec extends ObjectBehavior
         $this->compare($old, $new)->shouldBeEqualTo(false);
     }
 
-    public function it_compares_true_when_the_controls_are_the_same_in_value()
+    public function it_compares_true_when_the_controls_are_the_same_in_value(): void
     {
         $old = new PagingRequest(
             new PagingControl(100, 'foo'),

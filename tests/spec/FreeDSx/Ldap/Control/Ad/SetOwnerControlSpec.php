@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -19,27 +21,27 @@ use PhpSpec\ObjectBehavior;
 
 class SetOwnerControlSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith('foo');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(SetOwnerControl::class);
     }
 
-    public function it_should_get_the_sid()
+    public function it_should_get_the_sid(): void
     {
         $this->getSid()->shouldBeEqualTo('foo');
     }
 
-    public function it_should_set_the_sid()
+    public function it_should_set_the_sid(): void
     {
         $this->setSid('bar')->getSid()->shouldBeEqualTo('bar');
     }
 
-    public function it_should_generate_correct_ASN1()
+    public function it_should_generate_correct_ASN1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -50,7 +52,7 @@ class SetOwnerControlSpec extends ObjectBehavior
         ));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
 

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -17,17 +19,17 @@ use PhpSpec\ObjectBehavior;
 
 class ModifyResponseSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(0, 'foo', 'bar');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ModifyResponse::class);
     }
 
-    public function it_should_extend_ldap_result()
+    public function it_should_extend_ldap_result(): void
     {
         $this->shouldBeAnInstanceOf(LdapResult::class);
     }

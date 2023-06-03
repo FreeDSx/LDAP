@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -23,52 +25,52 @@ use PhpSpec\ObjectBehavior;
 
 class AndFilterSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(Filters::equal('foo', 'bar'), Filters::gte('foo', '2'));
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(AndFilter::class);
     }
 
-    public function it_should_implement_fiter_interface()
+    public function it_should_implement_fiter_interface(): void
     {
         $this->shouldImplement(FilterInterface::class);
     }
 
-    public function it_should_implement_filter_container_interface()
+    public function it_should_implement_filter_container_interface(): void
     {
         $this->shouldImplement(FilterContainerInterface::class);
     }
 
-    public function it_should_implement_countable()
+    public function it_should_implement_countable(): void
     {
         $this->shouldImplement('\Countable');
     }
 
-    public function it_should_implement_iterator_aggregate()
+    public function it_should_implement_iterator_aggregate(): void
     {
         $this->shouldImplement('\IteratorAggregate');
     }
 
-    public function it_should_get_the_filters_it_contains()
+    public function it_should_get_the_filters_it_contains(): void
     {
         $this->get()->shouldBeLike([
            Filters::equal('foo', 'bar'),
-           Filters::gte('foo', 2)
+           Filters::gte('foo', '2')
         ]);
     }
 
-    public function it_should_set_the_filters()
+    public function it_should_set_the_filters(): void
     {
         $this->set(Filters::equal('bar', 'foo'));
 
         $this->get()->shouldBeLike([Filters::equal('bar', 'foo')]);
     }
 
-    public function it_should_add_to_the_filters()
+    public function it_should_add_to_the_filters(): void
     {
         $filter = Filters::equal('foobar', 'foobar');
 
@@ -76,7 +78,7 @@ class AndFilterSpec extends ObjectBehavior
         $this->get()->shouldContain($filter);
     }
 
-    public function it_should_remove_from_the_filters()
+    public function it_should_remove_from_the_filters(): void
     {
         $filter = Filters::equal('foobar', 'foobar');
 
@@ -87,7 +89,7 @@ class AndFilterSpec extends ObjectBehavior
         $this->get()->shouldNotContain($filter);
     }
 
-    public function it_should_check_if_a_filter_exists()
+    public function it_should_check_if_a_filter_exists(): void
     {
         $filter = Filters::equal('foobar', 'foobar');
 
@@ -96,7 +98,7 @@ class AndFilterSpec extends ObjectBehavior
         $this->has($filter)->shouldBeEqualTo(true);
     }
 
-    public function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1(): void
     {
         $this->toAsn1()->shouldBeLike(Asn1::context(0, Asn1::setOf(
             Filters::equal('foo', 'bar')->toAsn1(),
@@ -104,37 +106,37 @@ class AndFilterSpec extends ObjectBehavior
         )));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $and = new AndFilter(new EqualityFilter('foo', 'bar'), new SubstringFilter('bar', 'foo'));
 
         $this::fromAsn1($and->toAsn1())->shouldBeLike($and);
     }
 
-    public function it_should_not_be_constructed_from_invalid_asn1()
+    public function it_should_not_be_constructed_from_invalid_asn1(): void
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence()]);
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::octetString('foo')]);
     }
 
-    public function it_should_get_the_string_filter_representation()
+    public function it_should_get_the_string_filter_representation(): void
     {
         $this->toString()->shouldBeEqualTo('(&(foo=bar)(foo>=2))');
     }
 
-    public function it_should_get_the_string_filter_representation_with_nested_containers()
+    public function it_should_get_the_string_filter_representation_with_nested_containers(): void
     {
         $this->add(Filters::or(Filters::equal('foo', 'bar')));
 
         $this->toString()->shouldBeEqualTo('(&(foo=bar)(foo>=2)(|(foo=bar)))');
     }
 
-    public function it_should_have_a_filter_as_a_toString_representation()
+    public function it_should_have_a_filter_as_a_toString_representation(): void
     {
         $this->__toString()->shouldBeEqualTo('(&(foo=bar)(foo>=2))');
     }
 
-    public function it_should_get_the_count()
+    public function it_should_get_the_count(): void
     {
         $this->count()->shouldBeEqualTo(2);
     }

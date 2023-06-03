@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -19,27 +21,27 @@ use PhpSpec\ObjectBehavior;
 
 class SdFlagsControlSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(SdFlagsControl::DACL_SECURITY_INFORMATION);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(SdFlagsControl::class);
     }
 
-    public function it_should_get_the_flags()
+    public function it_should_get_the_flags(): void
     {
         $this->getFlags()->shouldBeEqualTo(SdFlagsControl::DACL_SECURITY_INFORMATION);
     }
 
-    public function it_should_set_the_flags()
+    public function it_should_set_the_flags(): void
     {
         $this->setFlags(SdFlagsControl::SACL_SECURITY_INFORMATION)->getFlags()->shouldBeEqualTo(SdFlagsControl::SACL_SECURITY_INFORMATION);
     }
 
-    public function it_should_generate_correct_ASN1()
+    public function it_should_generate_correct_ASN1(): void
     {
         $encoder = new LdapEncoder();
 

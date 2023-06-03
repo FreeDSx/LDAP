@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -18,35 +20,35 @@ use PhpSpec\ObjectBehavior;
 
 class SubstringFilterSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith('foo', 'f', 'o', 'o', 'bar');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(SubstringFilter::class);
     }
 
-    public function it_should_get_the_starts_with_value()
+    public function it_should_get_the_starts_with_value(): void
     {
         $this->getStartsWith()->shouldBeEqualTo('f');
         $this->setStartsWith(null)->getStartsWith()->shouldBeEqualTo(null);
     }
 
-    public function it_should_get_the_ends_with_value()
+    public function it_should_get_the_ends_with_value(): void
     {
         $this->getEndsWith()->shouldBeEqualTo('o');
         $this->setEndsWith(null)->getEndsWith()->shouldBeEqualTo(null);
     }
 
-    public function it_should_get_the_contains_value()
+    public function it_should_get_the_contains_value(): void
     {
         $this->getContains()->shouldBeEqualTo(['o', 'bar']);
         $this->setContains(...[])->getContains()->shouldBeEqualTo([]);
     }
 
-    public function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1(): void
     {
         $this->toAsn1()->shouldBeLike(Asn1::context(4, Asn1::sequence(
             Asn1::octetString('foo'),
@@ -78,7 +80,7 @@ class SubstringFilterSpec extends ObjectBehavior
         )));
     }
 
-    public function it_should_error_if_no_starts_with_ends_with_or_contains_was_supplied()
+    public function it_should_error_if_no_starts_with_ends_with_or_contains_was_supplied(): void
     {
         $this->setStartsWith(null);
         $this->setEndsWith(null);
@@ -87,7 +89,7 @@ class SubstringFilterSpec extends ObjectBehavior
         $this->shouldThrow(RuntimeException::class)->duringToAsn1();
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $substring = new SubstringFilter('foo', 'foo', 'bar', 'foobar', 'wee');
         $this::fromAsn1($substring->toAsn1())->shouldBeLike($substring);
@@ -104,12 +106,12 @@ class SubstringFilterSpec extends ObjectBehavior
         $this::fromAsn1($substring->toAsn1())->shouldBeLike($substring);
     }
 
-    public function it_should_get_the_string_filter_representation()
+    public function it_should_get_the_string_filter_representation(): void
     {
         $this->toString()->shouldBeEqualTo('(foo=f*o*bar*o)');
     }
 
-    public function it_should_get_the_filter_representation_with_a_starts_with()
+    public function it_should_get_the_filter_representation_with_a_starts_with(): void
     {
         $this->setStartsWith('bar');
         $this->setEndsWith(null);
@@ -118,7 +120,7 @@ class SubstringFilterSpec extends ObjectBehavior
         $this->toString()->shouldBeEqualTo('(foo=bar*)');
     }
 
-    public function it_should_get_the_filter_representation_with_an_ends_with()
+    public function it_should_get_the_filter_representation_with_an_ends_with(): void
     {
         $this->setStartsWith(null);
         $this->setEndsWith('bar');
@@ -127,7 +129,7 @@ class SubstringFilterSpec extends ObjectBehavior
         $this->toString()->shouldBeEqualTo('(foo=*bar)');
     }
 
-    public function it_should_get_a_filter_representation_with_a_start_and_end()
+    public function it_should_get_a_filter_representation_with_a_start_and_end(): void
     {
         $this->setStartsWith('foo');
         $this->setEndsWith('bar');
@@ -136,7 +138,7 @@ class SubstringFilterSpec extends ObjectBehavior
         $this->toString()->shouldBeEqualTo('(foo=foo*bar)');
     }
 
-    public function it_should_get_a_filter_representation_with_a_start_and_contains()
+    public function it_should_get_a_filter_representation_with_a_start_and_contains(): void
     {
         $this->setStartsWith('foo');
         $this->setEndsWith(null);
@@ -145,7 +147,7 @@ class SubstringFilterSpec extends ObjectBehavior
         $this->toString()->shouldBeEqualTo('(foo=foo*b*a*r*)');
     }
 
-    public function it_should_get_a_filter_representation_with_an_end_and_contains()
+    public function it_should_get_a_filter_representation_with_an_end_and_contains(): void
     {
         $this->setStartsWith(null);
         $this->setEndsWith('foo');
@@ -154,12 +156,12 @@ class SubstringFilterSpec extends ObjectBehavior
         $this->toString()->shouldBeEqualTo('(foo=*b*a*r*foo)');
     }
 
-    public function it_should_have_a_filter_as_a_toString_representation()
+    public function it_should_have_a_filter_as_a_toString_representation(): void
     {
         $this->__toString()->shouldBeEqualTo('(foo=f*o*bar*o)');
     }
 
-    public function it_should_escape_values_on_the_string_representation()
+    public function it_should_escape_values_on_the_string_representation(): void
     {
         $this->beConstructedWith('foo', ')(bar=*5');
         $this->setStartsWith('*');

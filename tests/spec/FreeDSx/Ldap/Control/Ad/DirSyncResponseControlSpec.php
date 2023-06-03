@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -19,43 +21,43 @@ use PhpSpec\ObjectBehavior;
 
 class DirSyncResponseControlSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(0);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(DirSyncResponseControl::class);
     }
 
-    public function it_should_get_the_more_results_value()
+    public function it_should_get_the_more_results_value(): void
     {
         $this->getMoreResults()->shouldBeEqualTo(0);
     }
 
-    public function it_should_return_false_for_has_more_results_when_more_results_is_0()
+    public function it_should_return_false_for_has_more_results_when_more_results_is_0(): void
     {
         $this->hasMoreResults()->shouldBeEqualTo(false);
     }
 
-    public function it_should_return_false_for_has_more_results_when_more_results_is_not_0()
+    public function it_should_return_false_for_has_more_results_when_more_results_is_not_0(): void
     {
         $this->beConstructedWith(1);
         $this->hasMoreResults()->shouldBeEqualTo(true);
     }
 
-    public function it_should_get_the_cookie()
+    public function it_should_get_the_cookie(): void
     {
         $this->getCookie()->shouldBeEqualTo('');
     }
 
-    public function it_should_get_the_unused_value()
+    public function it_should_get_the_unused_value(): void
     {
         $this->getUnused(0);
     }
 
-    public function it_should_generate_correct_ASN1()
+    public function it_should_generate_correct_ASN1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -70,7 +72,7 @@ class DirSyncResponseControlSpec extends ObjectBehavior
         ));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
 

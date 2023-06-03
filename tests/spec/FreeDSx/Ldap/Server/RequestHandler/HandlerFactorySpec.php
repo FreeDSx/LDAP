@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -26,7 +28,7 @@ use PhpSpec\ObjectBehavior;
 
 class HandlerFactorySpec extends ObjectBehavior
 {
-    public function it_should_allow_a_request_handler_as_an_object()
+    public function it_should_allow_a_request_handler_as_an_object(): void
     {
         $handler = new GenericRequestHandler();
         $this->beConstructedWith([
@@ -36,7 +38,7 @@ class HandlerFactorySpec extends ObjectBehavior
         $this->makeRequestHandler()->shouldBeEqualTo($handler);
     }
 
-    public function it_should_only_allow_a_request_handler_implementing_request_handler_interface()
+    public function it_should_only_allow_a_request_handler_implementing_request_handler_interface(): void
     {
         $this->beConstructedWith([
             'request_handler' => new Entry('foo'),
@@ -45,7 +47,7 @@ class HandlerFactorySpec extends ObjectBehavior
         $this->shouldThrow(RuntimeException::class)->during('makeRequestHandler');
     }
 
-    public function it_should_allow_a_request_handler_as_a_string_implementing_request_handler_interface()
+    public function it_should_allow_a_request_handler_as_a_string_implementing_request_handler_interface(): void
     {
         $this->beConstructedWith([
             'request_handler' => ProxyRequestHandler::class,
@@ -54,7 +56,7 @@ class HandlerFactorySpec extends ObjectBehavior
         $this->shouldNotThrow(RuntimeException::class)->during('makeRequestHandler');
     }
 
-    public function it_should_allow_a_rootdse_handler_as_an_object(RootDseHandlerInterface $rootDseHandler)
+    public function it_should_allow_a_rootdse_handler_as_an_object(RootDseHandlerInterface $rootDseHandler): void
     {
         $this->beConstructedWith([
             'rootdse_handler' => $rootDseHandler,
@@ -63,7 +65,7 @@ class HandlerFactorySpec extends ObjectBehavior
         $this->makeRootDseHandler()->shouldBeEqualTo($rootDseHandler);
     }
 
-    public function it_should_only_allow_a_rootdse_handler_implementing_rootdse_handler_interface()
+    public function it_should_only_allow_a_rootdse_handler_implementing_rootdse_handler_interface(): void
     {
         $this->beConstructedWith([
             'rootdse_handler' => new Entry('foo'),
@@ -72,7 +74,7 @@ class HandlerFactorySpec extends ObjectBehavior
         $this->shouldThrow(RuntimeException::class)->during('makeRootDseHandler');
     }
 
-    public function it_should_allow_a_rootdse_handler_as_a_string_implementing_rootdse_handler_interface()
+    public function it_should_allow_a_rootdse_handler_as_a_string_implementing_rootdse_handler_interface(): void
     {
         $handler = new class() implements RootDseHandlerInterface {
             public function rootDse(RequestContext $context, SearchRequest $request, Entry $rootDse): Entry
@@ -88,7 +90,7 @@ class HandlerFactorySpec extends ObjectBehavior
         $this->shouldNotThrow(RuntimeException::class)->during('makeRootDseHandler');
     }
 
-    public function it_should_allow_a_null_rootdse_handler()
+    public function it_should_allow_a_null_rootdse_handler(): void
     {
         $this->beConstructedWith([
             'rootdse_handler' => null,
@@ -96,7 +98,7 @@ class HandlerFactorySpec extends ObjectBehavior
 
         $this->makeRootDseHandler()->shouldBeNull();
     }
-    public function it_should_allow_a_paging_handler_implementing_paging_handler_interface()
+    public function it_should_allow_a_paging_handler_implementing_paging_handler_interface(): void
     {
         $this->beConstructedWith([
             'paging_handler' => new Entry('foo'),
@@ -105,7 +107,7 @@ class HandlerFactorySpec extends ObjectBehavior
         $this->shouldThrow(RuntimeException::class)->during('makePagingHandler');
     }
 
-    public function it_should_allow_a_paging_handler_as_a_string_implementing_paging_handler_interface()
+    public function it_should_allow_a_paging_handler_as_a_string_implementing_paging_handler_interface(): void
     {
         $handler = new class() implements PagingHandlerInterface {
             public function page(PagingRequest $pagingRequest, RequestContext $context): PagingResponse
@@ -125,7 +127,7 @@ class HandlerFactorySpec extends ObjectBehavior
         $this->shouldNotThrow(RuntimeException::class)->during('makePagingHandler');
     }
 
-    public function it_should_allow_a_paging_handler_as_an_object(PagingHandlerInterface $pagingHandler)
+    public function it_should_allow_a_paging_handler_as_an_object(PagingHandlerInterface $pagingHandler): void
     {
         $this->beConstructedWith([
             'paging_handler' => $pagingHandler,
@@ -134,7 +136,7 @@ class HandlerFactorySpec extends ObjectBehavior
         $this->makePagingHandler()->shouldBeEqualTo($pagingHandler);
     }
 
-    public function it_should_allow_a_null_paging_handler()
+    public function it_should_allow_a_null_paging_handler(): void
     {
         $this->beConstructedWith([
             'paging_handler' => null,

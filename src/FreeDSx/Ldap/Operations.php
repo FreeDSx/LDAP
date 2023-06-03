@@ -210,7 +210,7 @@ class Operations
         bool $deleteOldRdn = true
     ): ModifyDnRequest {
         return new ModifyDnRequest(
-            dn: $dn ,
+            dn: $dn,
             newRdn: $rdn,
             deleteOldRdn: $deleteOldRdn,
         );

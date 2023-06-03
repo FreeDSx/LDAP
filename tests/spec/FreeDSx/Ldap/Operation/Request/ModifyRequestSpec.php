@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -21,7 +23,7 @@ use PhpSpec\ObjectBehavior;
 
 class ModifyRequestSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(
             'cn=foo,dc=foo,dc=bar',
@@ -30,24 +32,24 @@ class ModifyRequestSpec extends ObjectBehavior
         );
     }
 
-    public function it_should_implement_the_DnRequestInterface()
+    public function it_should_implement_the_DnRequestInterface(): void
     {
         $this->shouldImplement(DnRequestInterface::class);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ModifyRequest::class);
     }
 
-    public function it_should_set_the_dn()
+    public function it_should_set_the_dn(): void
     {
         $this->getDn()->shouldBeLike(new Dn('cn=foo,dc=foo,dc=bar'));
 
         $this->setDn(new Dn('foo'))->getDn()->shouldBeLike(new Dn('foo'));
     }
 
-    public function it_should_set_the_changes()
+    public function it_should_set_the_changes(): void
     {
         $this->getChanges()->shouldBeLike([
             Change::replace('foo', 'bar'),
@@ -59,7 +61,7 @@ class ModifyRequestSpec extends ObjectBehavior
         ]);
     }
 
-    public function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1(): void
     {
         $this->toAsn1()->shouldBeLike(Asn1::application(6, Asn1::sequence(
             Asn1::octetString('cn=foo,dc=foo,dc=bar'),
@@ -87,7 +89,7 @@ class ModifyRequestSpec extends ObjectBehavior
         )));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $req = new ModifyRequest(
             'foo',
@@ -104,7 +106,7 @@ class ModifyRequestSpec extends ObjectBehavior
         ));
     }
 
-    public function it_should_not_be_constructed_from_asn1_with_an_invalid_dn_type()
+    public function it_should_not_be_constructed_from_asn1_with_an_invalid_dn_type(): void
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
             Asn1::integer(1),
@@ -112,7 +114,7 @@ class ModifyRequestSpec extends ObjectBehavior
         )]);
     }
 
-    public function it_should_not_be_constructed_from_asn1_with_an_invalid_changelist()
+    public function it_should_not_be_constructed_from_asn1_with_an_invalid_changelist(): void
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::set(
             Asn1::octetString('dc=foo'),
@@ -120,7 +122,7 @@ class ModifyRequestSpec extends ObjectBehavior
         )]);
     }
 
-    public function it_should_not_be_constructed_from_asn1_with_an_invalid_changelist_type()
+    public function it_should_not_be_constructed_from_asn1_with_an_invalid_changelist_type(): void
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
             Asn1::integer(1),
@@ -128,7 +130,7 @@ class ModifyRequestSpec extends ObjectBehavior
         )]);
     }
 
-    public function it_should_not_be_constructed_from_asn1_with_invalid_attribute_values()
+    public function it_should_not_be_constructed_from_asn1_with_invalid_attribute_values(): void
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
             Asn1::octetString('foo'),
@@ -146,7 +148,7 @@ class ModifyRequestSpec extends ObjectBehavior
         )]);
     }
 
-    public function it_should_not_be_constructed_from_asn1_without_a_partial_attribute_description()
+    public function it_should_not_be_constructed_from_asn1_without_a_partial_attribute_description(): void
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
             Asn1::octetString('foo'),
@@ -163,7 +165,7 @@ class ModifyRequestSpec extends ObjectBehavior
         )]);
     }
 
-    public function it_should_not_be_constructed_from_asn1_without_a_change_type()
+    public function it_should_not_be_constructed_from_asn1_without_a_change_type(): void
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(
             Asn1::octetString('foo'),

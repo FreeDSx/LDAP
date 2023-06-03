@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -28,19 +30,19 @@ use Prophecy\Argument;
 
 class ProxyPagingHandlerSpec extends ObjectBehavior
 {
-    public function let(LdapClient $client, RequestContext $context)
+    public function let(LdapClient $client, RequestContext $context): void
     {
         $context->controls()->willReturn(new ControlBag());
 
         $this->beConstructedWith($client);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ProxyPagingHandler::class);
     }
 
-    public function it_should_implement_paging_handler_interface()
+    public function it_should_implement_paging_handler_interface(): void
     {
         $this->shouldImplement(PagingHandlerInterface::class);
     }
@@ -49,7 +51,7 @@ class ProxyPagingHandlerSpec extends ObjectBehavior
         LdapClient $client,
         RequestContext $context,
         Paging $paging
-    ) {
+    ): void {
         $request = new SearchRequest(Filters::equal('cn', 'foo'));
         $entries = new Entries(new Entry('cn=foo,dc=foo,dc=bar'));
         $client->paging($request, Argument::any())
@@ -82,7 +84,7 @@ class ProxyPagingHandlerSpec extends ObjectBehavior
         LdapClient $client,
         RequestContext $context,
         Paging $paging
-    ) {
+    ): void {
         $request = new SearchRequest(Filters::equal('cn', 'foo'));
         $entries = new Entries(new Entry('cn=foo,dc=foo,dc=bar'));
         $client->paging($request, Argument::any())

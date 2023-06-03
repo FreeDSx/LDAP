@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -22,37 +24,37 @@ use PhpSpec\ObjectBehavior;
 
 class LdapResultSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(0, 'foo', 'bar');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(LdapResult::class);
     }
 
-    public function it_should_get_the_diagnostic_message()
+    public function it_should_get_the_diagnostic_message(): void
     {
         $this->getDiagnosticMessage()->shouldBeEqualTo('bar');
     }
 
-    public function it_should_get_the_result_code()
+    public function it_should_get_the_result_code(): void
     {
         $this->getResultCode()->shouldBeEqualTo(0);
     }
 
-    public function it_should_get_the_dn()
+    public function it_should_get_the_dn(): void
     {
         $this->getDn()->shouldBeLike(new Dn('foo'));
     }
 
-    public function it_shouod_get_the_referrals()
+    public function it_shouod_get_the_referrals(): void
     {
         $this->getReferrals()->shouldBeEqualTo([]);
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
         $this->beConstructedThrough('fromAsn1', [Asn1::sequence(
@@ -74,7 +76,7 @@ class LdapResultSpec extends ObjectBehavior
         ]);
     }
 
-    public function it_should_throw_a_protocol_exception_if_the_referral_cannot_be_parsed()
+    public function it_should_throw_a_protocol_exception_if_the_referral_cannot_be_parsed(): void
     {
         $encoder = new LdapEncoder();
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence(

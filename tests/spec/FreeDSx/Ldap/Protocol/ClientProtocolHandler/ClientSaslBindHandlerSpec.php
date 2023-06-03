@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -35,17 +37,11 @@ use Prophecy\Argument;
 
 class ClientSaslBindHandlerSpec extends ObjectBehavior
 {
-    /**
-     * @var LdapMessageResponse
-     */
-    protected $saslChallenge;
+    private LdapMessageResponse $saslChallenge;
 
-    /**
-     * @var LdapMessageResponse
-     */
-    protected $saslComplete;
+    private LdapMessageResponse $saslComplete;
 
-    public function let(Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue, ClientProtocolHandler $protocolHandler)
+    public function let(Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue, ClientProtocolHandler $protocolHandler): void
     {
         $queue->sendMessage(Argument::any())->willReturn($queue);
         $context->getControls()->willReturn([]);
@@ -67,17 +63,17 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
         $this->beConstructedWith($sasl);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientSaslBindHandler::class);
     }
 
-    public function it_should_implement_RequestHandlerInterface()
+    public function it_should_implement_RequestHandlerInterface(): void
     {
         $this->shouldBeAnInstanceOf(RequestHandlerInterface::class);
     }
 
-    public function it_should_handle_a_sasl_bind_request(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue)
+    public function it_should_handle_a_sasl_bind_request(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue): void
     {
         $saslBind = Operations::bindSasl(['username' => 'foo', 'password' => 'bar']);
         $context->getRequest()->willReturn($saslBind);
@@ -109,7 +105,7 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
         $this->handleRequest($context)->shouldBeEqualTo($this->saslComplete);
     }
 
-    public function it_should_detect_a_downgrade_attack(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue)
+    public function it_should_detect_a_downgrade_attack(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue): void
     {
         $saslBind = Operations::bindSasl(['username' => 'foo', 'password' => 'bar']);
         $context->getRequest()->willReturn($saslBind);
@@ -147,7 +143,7 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
             ->during('handleRequest', [$context]);
     }
 
-    public function it_should_not_query_the_rootdse_if_the_mechanism_was_explicitly_specified(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue)
+    public function it_should_not_query_the_rootdse_if_the_mechanism_was_explicitly_specified(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue): void
     {
         $saslBind = Operations::bindSasl(['username' => 'foo', 'password' => 'bar'], 'DIGEST-MD5');
         $context->getRequest()->willReturn($saslBind);
@@ -180,7 +176,7 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
         Sasl $sasl,
         ClientProtocolContext $context,
         ClientQueue $queue
-    ) {
+    ): void {
         $saslBind = Operations::bindSasl(['username' => 'foo', 'password' => 'bar'], 'DIGEST-MD5');
         $context->getRequest()->willReturn($saslBind);
         $context->messageToSend()->willReturn(new LdapMessageRequest(1, $saslBind));

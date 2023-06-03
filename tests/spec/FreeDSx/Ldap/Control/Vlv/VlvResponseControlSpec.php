@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -19,37 +21,37 @@ use PhpSpec\ObjectBehavior;
 
 class VlvResponseControlSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(10, 9, 0);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(VlvResponseControl::class);
     }
 
-    public function it_should_get_the_offset()
+    public function it_should_get_the_offset(): void
     {
         $this->getOffset()->shouldBeEqualTo(10);
     }
 
-    public function it_should_get_the_count()
+    public function it_should_get_the_count(): void
     {
         $this->getCount()->shouldBeEqualTo(9);
     }
 
-    public function it_should_get_the_context_id()
+    public function it_should_get_the_context_id(): void
     {
         $this->getContextId()->shouldBeNull();
     }
 
-    public function it_should_get_the_result()
+    public function it_should_get_the_result(): void
     {
         $this->getResult()->shouldBeEqualTo(0);
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
 

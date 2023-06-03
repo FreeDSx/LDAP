@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -20,33 +22,33 @@ use PhpSpec\ObjectBehavior;
 
 class DeleteRequestSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith('cn=foo,dc=foo,dc=bar');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(DeleteRequest::class);
     }
 
-    public function it_should_implement_the_DnRequestInterface()
+    public function it_should_implement_the_DnRequestInterface(): void
     {
         $this->shouldImplement(DnRequestInterface::class);
     }
 
-    public function it_should_set_the_dn()
+    public function it_should_set_the_dn(): void
     {
         $this->getDn()->shouldBeLike(new Dn('cn=foo,dc=foo,dc=bar'));
         $this->setDn(new Dn('foo'))->getDn()->shouldBeLike(new Dn('foo'));
     }
 
-    public function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1(): void
     {
         $this->toAsn1()->shouldBeLike(Asn1::application(10, Asn1::octetString('cn=foo,dc=foo,dc=bar')));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $this->beConstructedThrough('fromAsn1', [Asn1::application(10, Asn1::octetString(
             'dc=foo,dc=bar'
@@ -55,7 +57,7 @@ class DeleteRequestSpec extends ObjectBehavior
         $this->getDn()->shouldBeLike(new Dn('dc=foo,dc=bar'));
     }
 
-    public function it_should_not_be_constructed_from_invalid_asn1()
+    public function it_should_not_be_constructed_from_invalid_asn1(): void
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::application(11, Asn1::octetString(
             'dc=foo,dc=bar'

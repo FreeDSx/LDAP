@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -25,12 +27,12 @@ use PhpSpec\ObjectBehavior;
 
 class ServerWhoAmIHandlerSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerWhoAmIHandler::class);
     }
 
-    public function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_DN_name(ServerQueue $queue, RequestHandlerInterface $handler)
+    public function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_DN_name(ServerQueue $queue, RequestHandlerInterface $handler): void
     {
         $request = new LdapMessageRequest(2, new ExtendedRequest(ExtendedRequest::OID_WHOAMI));
 
@@ -48,7 +50,7 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
         );
     }
 
-    public function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_non_DN_name(ServerQueue $queue, RequestHandlerInterface $handler)
+    public function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_non_DN_name(ServerQueue $queue, RequestHandlerInterface $handler): void
     {
         $request = new LdapMessageRequest(2, new ExtendedRequest(ExtendedRequest::OID_WHOAMI));
 
@@ -66,7 +68,7 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
         );
     }
 
-    public function it_should_handle_a_who_am_i_when_there_is_no_token_yet(ServerQueue $queue, RequestHandlerInterface $handler)
+    public function it_should_handle_a_who_am_i_when_there_is_no_token_yet(ServerQueue $queue, RequestHandlerInterface $handler): void
     {
         $request = new LdapMessageRequest(2, new ExtendedRequest(ExtendedRequest::OID_WHOAMI));
 

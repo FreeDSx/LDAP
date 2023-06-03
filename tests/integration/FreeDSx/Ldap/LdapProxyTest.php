@@ -49,7 +49,7 @@ class LdapProxyTest extends ServerTestCase
         $search = Operations::search(
             Filters::equal(
                 'objectClass',
-            'inetOrgPerson'
+                'inetOrgPerson'
             ),
             'cn'
         );
@@ -58,7 +58,7 @@ class LdapProxyTest extends ServerTestCase
 
         $entries = $paging->getEntries();
 
-        $this->assertEquals(
+        $this->assertSame(
             1000,
             $entries->count()
         );
@@ -67,7 +67,7 @@ class LdapProxyTest extends ServerTestCase
             $entries->add(...$paging->getEntries());
         }
 
-        $this->assertEquals(
+        $this->assertSame(
             10001,
             $entries->count()
         );

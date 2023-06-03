@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -24,32 +26,32 @@ use PhpSpec\ObjectBehavior;
 
 class LdapMessageResponseSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(1, new SearchResponse(new SearchResultDone(0, 'dc=foo,dc=bar', ''), new Entries()), new Control('foo'));
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(LdapMessageResponse::class);
     }
 
-    public function it_should_get_the_response()
+    public function it_should_get_the_response(): void
     {
         $this->getResponse()->shouldBeAnInstanceOf(SearchResponse::class);
     }
 
-    public function it_should_get_the_controls()
+    public function it_should_get_the_controls(): void
     {
         $this->controls()->has('foo')->shouldBeEqualTo(true);
     }
 
-    public function it_should_get_the_message_id()
+    public function it_should_get_the_message_id(): void
     {
         $this->getMessageId()->shouldBeEqualTo(1);
     }
 
-    public function it_should_be_constructed_from_ASN1()
+    public function it_should_be_constructed_from_ASN1(): void
     {
         $encoder = new LdapEncoder();
 

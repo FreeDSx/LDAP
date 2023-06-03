@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -17,28 +19,28 @@ use PhpSpec\ObjectBehavior;
 
 class ReferralContextSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(new LdapUrl('foo'));
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ReferralContext::class);
     }
 
-    public function it_should_get_the_referrals()
+    public function it_should_get_the_referrals(): void
     {
         $this->getReferrals()->shouldBeLike([new LdapUrl('foo')]);
     }
 
-    public function it_should_check_if_it_has_a_specific_referral()
+    public function it_should_check_if_it_has_a_specific_referral(): void
     {
         $this->hasReferral(new LdapUrl('Foo'))->shouldBeLike(true);
         $this->hasReferral(new LdapUrl('bar'))->shouldBeLike(false);
     }
 
-    public function it_should_add_a_referral()
+    public function it_should_add_a_referral(): void
     {
         $this->addReferral(new LdapUrl('bar'));
 
@@ -48,7 +50,7 @@ class ReferralContextSpec extends ObjectBehavior
         ]);
     }
 
-    public function it_should_get_the_referral_count()
+    public function it_should_get_the_referral_count(): void
     {
         $this->count()->shouldBeEqualTo(1);
     }

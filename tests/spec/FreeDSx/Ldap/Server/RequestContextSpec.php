@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -18,22 +20,22 @@ use PhpSpec\ObjectBehavior;
 
 class RequestContextSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(new ControlBag(), new AnonToken(null));
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(RequestContext::class);
     }
 
-    public function it_should_get_the_token()
+    public function it_should_get_the_token(): void
     {
         $this->token()->shouldBeAnInstanceOf(new AnonToken(null));
     }
 
-    public function it_should_get_the_controls()
+    public function it_should_get_the_controls(): void
     {
         $this->controls()->shouldBeAnInstanceOf(new ControlBag());
     }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -20,7 +22,7 @@ use Prophecy\Argument;
 
 class LdapQueueSpec extends ObjectBehavior
 {
-    public function let(Socket $socket, EncoderInterface $encoder)
+    public function let(Socket $socket, EncoderInterface $encoder): void
     {
         $socket->read(Argument::any())->willReturn('foo', false);
         $encoder->getLastPosition()->willReturn(3);
@@ -28,22 +30,22 @@ class LdapQueueSpec extends ObjectBehavior
         $this->beConstructedWith($socket, $encoder);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(LdapQueue::class);
     }
 
-    public function it_should_extend_the_Asn1MessageQueue()
+    public function it_should_extend_the_Asn1MessageQueue(): void
     {
         $this->shouldBeAnInstanceOf(Asn1MessageQueue::class);
     }
 
-    public function it_should_get_the_current_id()
+    public function it_should_get_the_current_id(): void
     {
         $this->currentId()->shouldBeEqualTo(0);
     }
 
-    public function it_should_generate_an_id()
+    public function it_should_generate_an_id(): void
     {
         $this->generateId()->shouldBeEqualTo(1);
         $this->generateId()->shouldBeEqualTo(2);

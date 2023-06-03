@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -17,25 +19,25 @@ use PhpSpec\ObjectBehavior;
 
 class FilterFactorySpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(FilterFactory::class);
     }
 
-    public function it_should_check_if_a_mapping_exists()
+    public function it_should_check_if_a_mapping_exists(): void
     {
         $this::has(0)->shouldBeEqualTo(true);
         $this::has(99)->shouldBeEqualTo(false);
     }
 
-    public function it_should_set_a_mapping()
+    public function it_should_set_a_mapping(): void
     {
         $this::set(99, EqualityFilter::class);
 
         $this::has(99)->shouldBeEqualTo(true);
     }
 
-    public function it_should_get_a_mapping()
+    public function it_should_get_a_mapping(): void
     {
         $this::get((new EqualityFilter('foo', 'bar'))->toAsn1())->shouldBeLike(new EqualityFilter('foo', 'bar'));
     }

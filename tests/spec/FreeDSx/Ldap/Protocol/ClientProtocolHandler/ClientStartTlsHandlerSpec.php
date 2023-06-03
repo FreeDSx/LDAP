@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -25,17 +27,17 @@ use PhpSpec\ObjectBehavior;
 
 class ClientStartTlsHandlerSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientStartTlsHandler::class);
     }
 
-    public function it_should_implement_ResponseHandlerInterface()
+    public function it_should_implement_ResponseHandlerInterface(): void
     {
         $this->shouldBeAnInstanceOf(ResponseHandlerInterface::class);
     }
 
-    public function it_should_encrypt_the_queue_if_the_message_response_is_successful(ClientQueue $queue)
+    public function it_should_encrypt_the_queue_if_the_message_response_is_successful(ClientQueue $queue): void
     {
         $startTls = new LdapMessageRequest(1, new ExtendedRequest(ExtendedRequest::OID_START_TLS));
         $response = new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(0), ExtendedRequest::OID_START_TLS));
@@ -44,7 +46,7 @@ class ClientStartTlsHandlerSpec extends ObjectBehavior
         $this->handleResponse($startTls, $response, $queue, [])->shouldBeAnInstanceOf(LdapMessageResponse::class);
     }
 
-    public function it_should_throw_an_exception_if_the_message_response_is_unsuccessful(ClientQueue $queue)
+    public function it_should_throw_an_exception_if_the_message_response_is_unsuccessful(ClientQueue $queue): void
     {
         $startTls = new LdapMessageRequest(1, new ExtendedRequest(ExtendedRequest::OID_START_TLS));
         $response = new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(ResultCode::UNAVAILABLE_CRITICAL_EXTENSION), ExtendedRequest::OID_START_TLS));

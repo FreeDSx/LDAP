@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -35,23 +37,23 @@ use PhpSpec\ObjectBehavior;
 
 class ClientProtocolHandlerFactorySpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientProtocolHandlerFactory::class);
     }
 
-    public function it_should_get_a_search_response_handler(RequestInterface $request)
+    public function it_should_get_a_search_response_handler(RequestInterface $request): void
     {
         $this->forResponse($request, new SearchResultEntry(new Entry('')))->shouldBeAnInstanceOf(ClientSearchHandler::class);
         $this->forResponse($request, new SearchResultDone(0))->shouldBeAnInstanceOf(ClientSearchHandler::class);
     }
 
-    public function it_should_get_an_unbind_request_handler()
+    public function it_should_get_an_unbind_request_handler(): void
     {
         $this->forRequest(Operations::unbind())->shouldBeAnInstanceOf(ClientUnbindHandler::class);
     }
 
-    public function it_should_get_a_basic_request_handler()
+    public function it_should_get_a_basic_request_handler(): void
     {
         $this->forRequest(Operations::delete('cn=foo'))->shouldBeAnInstanceOf(ClientBasicHandler::class);
         $this->forRequest(Operations::bind('foo', 'bar'))->shouldBeAnInstanceOf(ClientBasicHandler::class);
@@ -62,35 +64,35 @@ class ClientProtocolHandlerFactorySpec extends ObjectBehavior
         $this->forRequest(Operations::whoami())->shouldBeAnInstanceOf(ClientBasicHandler::class);
     }
 
-    public function it_should_get_a_referral_handler(RequestInterface $request)
+    public function it_should_get_a_referral_handler(RequestInterface $request): void
     {
         $this->forResponse($request, new DeleteResponse(ResultCode::REFERRAL))->shouldBeAnInstanceOf(
             ClientReferralHandler::class
         );
     }
 
-    public function it_should_get_an_extended_response_handler(RequestInterface $request)
+    public function it_should_get_an_extended_response_handler(RequestInterface $request): void
     {
         $this->forResponse($request, new ExtendedResponse(new LdapResult(0)))->shouldBeAnInstanceOf(
             ClientExtendedOperationHandler::class
         );
     }
 
-    public function it_should_get_a_start_tls_handler()
+    public function it_should_get_a_start_tls_handler(): void
     {
         $this->forResponse(new ExtendedRequest(ExtendedRequest::OID_START_TLS), new ExtendedResponse(new LdapResult(0), ExtendedRequest::OID_START_TLS))->shouldBeAnInstanceOf(
             ClientStartTlsHandler::class
         );
     }
 
-    public function it_should_get_a_basic_response_handler(RequestInterface $request)
+    public function it_should_get_a_basic_response_handler(RequestInterface $request): void
     {
         $this->forResponse($request, new BindResponse(new LdapResult(0)))->shouldBeAnInstanceOf(
             ClientBasicHandler::class
         );
     }
 
-    public function it_should_get_a_sasl_bind_handler()
+    public function it_should_get_a_sasl_bind_handler(): void
     {
         $this->forRequest(new SaslBindRequest('DIGEST-MD5'))->shouldBeAnInstanceOf(
             ClientSaslBindHandler::class

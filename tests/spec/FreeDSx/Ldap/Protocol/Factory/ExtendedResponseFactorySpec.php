@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -23,24 +25,24 @@ use PhpSpec\ObjectBehavior;
 
 class ExtendedResponseFactorySpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ExtendedResponseFactory::class);
     }
 
-    public function it_should_check_if_a_mapping_exists_for_a_specific_request_oid()
+    public function it_should_check_if_a_mapping_exists_for_a_specific_request_oid(): void
     {
         $this->has(ExtendedRequest::OID_PWD_MODIFY)->shouldBeEqualTo(true);
         $this->has('foo')->shouldBeEqualTo(false);
     }
 
-    public function it_should_add_a_mapping_for_a_specific_oid()
+    public function it_should_add_a_mapping_for_a_specific_oid(): void
     {
         $this->set('foo', PasswordModifyResponse::class);
         $this->has('foo')->shouldBeEqualTo(true);
     }
 
-    public function it_should_get_a_mapping_based_on_an_oid_and_asn1()
+    public function it_should_get_a_mapping_based_on_an_oid_and_asn1(): void
     {
         $encoder = new LdapEncoder();
 

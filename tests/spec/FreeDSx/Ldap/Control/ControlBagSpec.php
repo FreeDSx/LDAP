@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -17,55 +19,55 @@ use PhpSpec\ObjectBehavior;
 
 class ControlBagSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(new Control('foo'), new Control('bar'));
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ControlBag::class);
     }
 
-    public function it_should_implement_iterator_aggregate()
+    public function it_should_implement_iterator_aggregate(): void
     {
         $this->shouldImplement('\IteratorAggregate');
     }
 
-    public function it_should_implement_countable()
+    public function it_should_implement_countable(): void
     {
         $this->shouldImplement('\Countable');
     }
 
-    public function it_should_get_the_control_count()
+    public function it_should_get_the_control_count(): void
     {
         $this->count()->shouldBeEqualTo(2);
     }
 
-    public function it_should_get_a_control_by_string()
+    public function it_should_get_a_control_by_string(): void
     {
         $this->get('foo')->shouldBeLike(new Control('foo'));
     }
 
-    public function it_should_return_null_on_a_control_that_doesnt_exist()
+    public function it_should_return_null_on_a_control_that_doesnt_exist(): void
     {
         $this->get('foobar')->shouldBeNull();
     }
 
-    public function it_should_add_a_control()
+    public function it_should_add_a_control(): void
     {
         $this->add(new Control('foobar'));
 
         $this->has('foobar')->shouldBeEqualTo(true);
     }
 
-    public function it_should_check_if_a_control_exists_with_has()
+    public function it_should_check_if_a_control_exists_with_has(): void
     {
         $this->has('bar')->shouldBeEqualTo(true);
         $this->has('foobar')->shouldBeEqualTo(false);
     }
 
-    public function it_should_check_if_a_control_exists_by_an_object_check()
+    public function it_should_check_if_a_control_exists_by_an_object_check(): void
     {
         $foobar = new Control('foobar');
 
@@ -74,14 +76,14 @@ class ControlBagSpec extends ObjectBehavior
         $this->has($foobar)->shouldBeEqualTo(true);
     }
 
-    public function it_should_remove_a_control_by_string()
+    public function it_should_remove_a_control_by_string(): void
     {
         $this->remove('foo');
 
         $this->has('foo')->shouldBeEqualTo(false);
     }
 
-    public function it_should_remove_a_control_by_object()
+    public function it_should_remove_a_control_by_object(): void
     {
         $foobar = new Control('foobar');
         $this->add($foobar);
@@ -91,12 +93,12 @@ class ControlBagSpec extends ObjectBehavior
         $this->has($foobar)->shouldBeEqualTo(false);
     }
 
-    public function it_should_get_the_controls_as_an_array()
+    public function it_should_get_the_controls_as_an_array(): void
     {
         $this->toArray()->shouldBeLike([new Control('foo'), new Control('bar')]);
     }
 
-    public function it_should_reset_the_controls()
+    public function it_should_reset_the_controls(): void
     {
         $this->reset();
 
