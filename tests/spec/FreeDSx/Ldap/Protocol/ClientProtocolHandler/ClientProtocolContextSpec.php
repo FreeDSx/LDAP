@@ -22,24 +22,24 @@ use PhpSpec\ObjectBehavior;
 
 class ClientProtocolContextSpec extends ObjectBehavior
 {
-    public function let(ClientQueue $queue, ClientProtocolHandler $protocolHandler)
+    public function let(ClientQueue $queue, ClientProtocolHandler $protocolHandler): void
     {
         $this->beConstructedWith(new DeleteRequest('foo'), [], $protocolHandler, $queue, ['foo']);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientProtocolContext::class);
     }
 
-    public function it_should_get_the_message_to_send(ClientQueue $queue)
+    public function it_should_get_the_message_to_send(ClientQueue $queue): void
     {
         $queue->generateId()->shouldBeCalled()->willReturn(1);
 
         $this->messageToSend()->shouldBeLike(new LdapMessageRequest(1, new DeleteRequest('foo')));
     }
 
-    public function it_should_fetch_the_root_dse(ClientProtocolHandler $protocolHandler)
+    public function it_should_fetch_the_root_dse(ClientProtocolHandler $protocolHandler): void
     {
         $entry = new Entry(new Dn(''));
         $protocolHandler->fetchRootDse(false)->shouldBeCalled()->willReturn($entry);
@@ -47,7 +47,7 @@ class ClientProtocolContextSpec extends ObjectBehavior
         $this->getRootDse()->shouldBeEqualTo($entry);
     }
 
-    public function it_should_force_fetch_the_root_dse(ClientProtocolHandler $protocolHandler)
+    public function it_should_force_fetch_the_root_dse(ClientProtocolHandler $protocolHandler): void
     {
         $entry = new Entry(new Dn(''));
         $protocolHandler->fetchRootDse(true)->shouldBeCalled()->willReturn($entry);
@@ -55,17 +55,17 @@ class ClientProtocolContextSpec extends ObjectBehavior
         $this->getRootDse(true)->shouldBeEqualTo($entry);
     }
 
-    public function it_should_get_the_controls()
+    public function it_should_get_the_controls(): void
     {
         $this->getControls()->shouldBeEqualTo([]);
     }
 
-    public function it_should_get_the_options()
+    public function it_should_get_the_options(): void
     {
         $this->getOptions()->shouldBeEqualTo(['foo']);
     }
 
-    public function it_should_get_the_queue(ClientQueue $queue)
+    public function it_should_get_the_queue(ClientQueue $queue): void
     {
         $this->getQueue()->shouldBeEqualTo($queue);
     }

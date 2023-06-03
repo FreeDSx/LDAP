@@ -19,27 +19,27 @@ use PhpSpec\ObjectBehavior;
 
 class SortingResponseControlSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(0, 'cn');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(SortingResponseControl::class);
     }
 
-    public function it_should_get_the_result()
+    public function it_should_get_the_result(): void
     {
         $this->getResult()->shouldBeEqualTo(0);
     }
 
-    public function it_should_get_the_attribute()
+    public function it_should_get_the_attribute(): void
     {
         $this->getAttribute()->shouldBeEqualTo('cn');
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -53,7 +53,7 @@ class SortingResponseControlSpec extends ObjectBehavior
         ))->setValue(null)->shouldBeLike(new SortingResponseControl(0, 'cn'));
     }
 
-    public function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1(): void
     {
         $encoder = new LdapEncoder();
         $this->toAsn1()->shouldBeLike(

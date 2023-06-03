@@ -23,7 +23,7 @@ class PagingRequestsSpec extends ObjectBehavior
 {
     private $pagingRequest;
 
-    public function let()
+    public function let(): void
     {
         $this->pagingRequest = new PagingRequest(
             new PagingControl(1, 'foo'),
@@ -37,29 +37,29 @@ class PagingRequestsSpec extends ObjectBehavior
         ]);
     }
 
-    public function it_should_return_true_when_it_has_the_paging_request()
+    public function it_should_return_true_when_it_has_the_paging_request(): void
     {
         $this->has('bar')->shouldBeEqualTo(true);
     }
 
-    public function it_should_return_false_when_it_does_not_have_the_paging_request()
+    public function it_should_return_false_when_it_does_not_have_the_paging_request(): void
     {
         $this->has('foo')->shouldBeEqualTo(false);
     }
 
-    public function it_should_return_the_paging_request_when_it_exists()
+    public function it_should_return_the_paging_request_when_it_exists(): void
     {
         $this->findByNextCookie('bar')->shouldBeEqualTo($this->pagingRequest);
     }
 
-    public function it_should_remove_the_paging_request()
+    public function it_should_remove_the_paging_request(): void
     {
         $this->remove($this->pagingRequest);
 
         $this->has('bar')->shouldBeEqualTo(false);
     }
 
-    public function it_should_add_the_paging_request()
+    public function it_should_add_the_paging_request(): void
     {
         $new = new PagingRequest(
             new PagingControl(1, 'bar'),
@@ -72,7 +72,7 @@ class PagingRequestsSpec extends ObjectBehavior
         $this->findByNextCookie('foo')->shouldBeEqualTo($new);
     }
 
-    public function it_should_throw_an_exception_when_the_request_does_not_exist()
+    public function it_should_throw_an_exception_when_the_request_does_not_exist(): void
     {
         $this->shouldThrow(ProtocolException::class)
             ->during('findByNextCookie', ['ohno']);

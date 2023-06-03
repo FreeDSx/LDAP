@@ -22,22 +22,22 @@ use PhpSpec\ObjectBehavior;
 
 class ServerBindHandlerFactorySpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerBindHandlerFactory::class);
     }
 
-    public function it_should_get_an_anon_bind_handler()
+    public function it_should_get_an_anon_bind_handler(): void
     {
         $this->get(new AnonBindRequest())->shouldBeLike(new ServerAnonBindHandler());
     }
 
-    public function it_should_get_a_simple_bind_handler()
+    public function it_should_get_a_simple_bind_handler(): void
     {
         $this->get(new SimpleBindRequest('foo', 'bar'))->shouldBeLike(new ServerBindHandler());
     }
 
-    public function it_should_throw_an_exception_on_an_unknown_bind_type(BindRequest $request)
+    public function it_should_throw_an_exception_on_an_unknown_bind_type(BindRequest $request): void
     {
         $this->shouldThrow(OperationException::class)->during('get', [$request]);
     }

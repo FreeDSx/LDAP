@@ -16,24 +16,24 @@ use PhpSpec\ObjectBehavior;
 
 class SortKeySpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith('cn');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(SortKey::class);
     }
 
-    public function it_should_be_constructed_via_reverse_order()
+    public function it_should_be_constructed_via_reverse_order(): void
     {
         $this->beConstructedWith('cn', true);
 
         $this->getUseReverseOrder()->shouldBeEqualTo(true);
     }
 
-    public function it_should_be_constructed_ascending()
+    public function it_should_be_constructed_ascending(): void
     {
         $this->beConstructedThrough('ascending', ['foo']);
 
@@ -41,7 +41,7 @@ class SortKeySpec extends ObjectBehavior
         $this->getAttribute()->shouldBeEqualTo('foo');
     }
 
-    public function it_should_be_constructed_descending()
+    public function it_should_be_constructed_descending(): void
     {
         $this->beConstructedThrough('descending', ['foo']);
 
@@ -49,24 +49,24 @@ class SortKeySpec extends ObjectBehavior
         $this->getAttribute()->shouldBeEqualTo('foo');
     }
 
-    public function it_should_not_use_reverse_order_by_default()
+    public function it_should_not_use_reverse_order_by_default(): void
     {
         $this->getUseReverseOrder()->shouldBeEqualTo(false);
     }
 
-    public function it_should_set_the_attribute_to_use()
+    public function it_should_set_the_attribute_to_use(): void
     {
         $this->getAttribute()->shouldBeEqualTo('cn');
         $this->setAttribute('foo')->getAttribute()->shouldBeEqualTo('foo');
     }
 
-    public function it_should_set_the_ordering_rule()
+    public function it_should_set_the_ordering_rule(): void
     {
         $this->getOrderingRule()->shouldBeNull();
         $this->setOrderingRule('foo')->getOrderingRule()->shouldBeEqualTo('foo');
     }
 
-    public function it_should_set_whether_to_use_reverse_order()
+    public function it_should_set_whether_to_use_reverse_order(): void
     {
         $this->setUseReverseOrder(true);
         $this->getUseReverseOrder()->shouldBeEqualTo(true);

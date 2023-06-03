@@ -20,27 +20,27 @@ use PhpSpec\ObjectBehavior;
 
 class ExtendedResponseSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(new LdapResult(0, 'dc=foo,dc=bar', 'foo'), 'foo', 'bar');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ExtendedResponse::class);
     }
 
-    public function it_should_get_the_name()
+    public function it_should_get_the_name(): void
     {
         $this->getName()->shouldBeEqualTo('foo');
     }
 
-    public function it_should_get_the_value()
+    public function it_should_get_the_value(): void
     {
         $this->getValue()->shouldBeEqualTo('bar');
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
         $this->beConstructedThrough('fromAsn1', [Asn1::application(24, Asn1::sequence(

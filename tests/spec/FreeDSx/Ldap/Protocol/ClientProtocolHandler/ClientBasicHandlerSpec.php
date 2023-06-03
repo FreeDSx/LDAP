@@ -34,22 +34,22 @@ use Prophecy\Argument;
 
 class ClientBasicHandlerSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientBasicHandler::class);
     }
 
-    public function it_should_implement_ResponseHandlerInterface()
+    public function it_should_implement_ResponseHandlerInterface(): void
     {
         $this->shouldBeAnInstanceOf(ResponseHandlerInterface::class);
     }
 
-    public function it_should_implement_RequestHandlerInterface()
+    public function it_should_implement_RequestHandlerInterface(): void
     {
         $this->shouldBeAnInstanceOf(RequestHandlerInterface::class);
     }
 
-    public function it_should_handle_a_request_and_return_a_response(ClientProtocolContext $context, ClientQueue $queue, ClientProtocolHandler $protocolHandler)
+    public function it_should_handle_a_request_and_return_a_response(ClientProtocolContext $context, ClientQueue $queue, ClientProtocolHandler $protocolHandler): void
     {
         $context->messageToSend()->willReturn(new LdapMessageRequest(1, new DeleteRequest('cn=foo')));
         $context->getQueue()->willReturn($queue);
@@ -64,7 +64,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         );
     }
 
-    public function it_should_handle_a_response(ClientQueue $queue)
+    public function it_should_handle_a_response(ClientQueue $queue): void
     {
         $messageRequest = new LdapMessageRequest(1, new SimpleBindRequest('foo', 'bar'));
         $messageFrom = new LdapMessageResponse(1, new BindResponse(new LdapResult(0)));
@@ -73,7 +73,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $this->handleResponse($messageRequest, $messageFrom, $queue, $options)->shouldBeEqualTo($messageFrom);
     }
 
-    public function it_should_handle_a_response_with_non_error_codes(ClientQueue $queue)
+    public function it_should_handle_a_response_with_non_error_codes(ClientQueue $queue): void
     {
         $options = [];
         $messageRequest = new LdapMessageRequest(1, new CompareRequest('foo', new EqualityFilter('foo', 'bar')));
@@ -90,7 +90,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $this->handleResponse($messageRequest, $messageFrom, $queue, $options)->shouldBeEqualTo($messageFrom);
     }
 
-    public function it_should_throw_an_operation_exception_on_errors(ClientQueue $queue)
+    public function it_should_throw_an_operation_exception_on_errors(ClientQueue $queue): void
     {
         $messageRequest = new LdapMessageRequest(1, new CompareRequest('foo', new EqualityFilter('foo', 'bar')));
         $messageFrom = new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_FALSE));
@@ -99,7 +99,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $this->handleResponse($messageRequest, $messageFrom, $queue, $options)->shouldBeEqualTo($messageFrom);
     }
 
-    public function it_should_throw_a_specific_bind_exception_for_a_bind_response(ClientQueue $queue)
+    public function it_should_throw_a_specific_bind_exception_for_a_bind_response(ClientQueue $queue): void
     {
         $messageRequest = new LdapMessageRequest(1, new SimpleBindRequest('foo', 'bar'));
         $messageFrom = new LdapMessageResponse(1, new BindResponse(new LdapResult(ResultCode::INVALID_CREDENTIALS, 'foo', 'message')));

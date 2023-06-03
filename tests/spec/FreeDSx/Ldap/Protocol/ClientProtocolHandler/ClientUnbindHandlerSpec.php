@@ -21,17 +21,17 @@ use PhpSpec\ObjectBehavior;
 
 class ClientUnbindHandlerSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientUnbindHandler::class);
     }
 
-    public function it_should_implement_RequestHandlerInterface()
+    public function it_should_implement_RequestHandlerInterface(): void
     {
         $this->shouldBeAnInstanceOf(RequestHandlerInterface::class);
     }
 
-    public function it_should_send_the_message_and_close_the_queue(ClientProtocolContext $context, ClientQueue $queue)
+    public function it_should_send_the_message_and_close_the_queue(ClientProtocolContext $context, ClientQueue $queue): void
     {
         $unbind = new LdapMessageRequest(1, new UnbindRequest());
         $queue->sendMessage($unbind)->shouldBeCalledOnce();

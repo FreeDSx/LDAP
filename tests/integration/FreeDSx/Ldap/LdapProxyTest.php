@@ -49,7 +49,7 @@ class LdapProxyTest extends ServerTestCase
         $search = Operations::search(
             Filters::equal(
                 'objectClass',
-            'inetOrgPerson'
+                'inetOrgPerson'
             ),
             'cn'
         );

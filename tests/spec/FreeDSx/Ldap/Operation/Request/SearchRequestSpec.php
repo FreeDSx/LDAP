@@ -21,82 +21,82 @@ use PhpSpec\ObjectBehavior;
 
 class SearchRequestSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(new EqualityFilter('cn', 'foo'));
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(SearchRequest::class);
     }
 
-    public function it_should_set_the_attributes()
+    public function it_should_set_the_attributes(): void
     {
         $this->getAttributes()->shouldBeEqualTo([]);
         $this->setAttributes(new Attribute('foo'))->getAttributes()->shouldBeLike([new Attribute('foo')]);
     }
 
-    public function it_should_set_the_attributes_using_simple_string_values()
+    public function it_should_set_the_attributes_using_simple_string_values(): void
     {
         $this->setAttributes('foo', 'bar');
         $this->getAttributes()->shouldBeLike([new Attribute('foo'), new Attribute('bar')]);
     }
 
-    public function it_should_set_the_base_dn()
+    public function it_should_set_the_base_dn(): void
     {
         $this->getBaseDn()->shouldBeNull();
         $this->setBaseDn('dc=foo')->getBaseDn()->shouldBeLike(new Dn('dc=foo'));
     }
 
-    public function it_should_set_the_scope()
+    public function it_should_set_the_scope(): void
     {
         $this->getScope()->shouldBeEqualTo(SearchRequest::SCOPE_WHOLE_SUBTREE);
         $this->setScope(SearchRequest::SCOPE_BASE_OBJECT)->getScope()->shouldBeEqualTo(SearchRequest::SCOPE_BASE_OBJECT);
     }
 
-    public function it_should_set_whether_or_not_to_dereference_aliases()
+    public function it_should_set_whether_or_not_to_dereference_aliases(): void
     {
         $this->getDereferenceAliases()->shouldBeEqualTo(SearchRequest::DEREF_NEVER);
         $this->setDereferenceAliases(SearchRequest::DEREF_ALWAYS)->getDereferenceAliases()->shouldBeEqualTo(SearchRequest::DEREF_ALWAYS);
     }
 
-    public function it_should_set_a_size_limit()
+    public function it_should_set_a_size_limit(): void
     {
         $this->getSizeLimit()->shouldBeEqualTo(0);
         $this->setSizeLimit(100)->getSizeLimit()->shouldBeEqualTo(100);
     }
 
-    public function it_should_set_a_time_limit()
+    public function it_should_set_a_time_limit(): void
     {
         $this->getTimeLimit()->shouldBeEqualTo(0);
         $this->setTimeLimit(10)->getTimeLimit()->shouldBeEqualTo(10);
     }
 
-    public function it_should_set_whether_or_not_to_get_attributes_only()
+    public function it_should_set_whether_or_not_to_get_attributes_only(): void
     {
         $this->getAttributesOnly()->shouldBeEqualTo(false);
         $this->setAttributesOnly(true)->getAttributesOnly()->shouldBeEqualTo(true);
     }
 
-    public function it_should_have_an_alias_for_set_attributes_called_select()
+    public function it_should_have_an_alias_for_set_attributes_called_select(): void
     {
         $this->select('foo', 'bar')->getAttributes()->shouldBeLike([new Attribute('foo'), new Attribute('bar')]);
     }
 
-    public function it_should_have_an_alias_for_setBaseDn_called_base()
+    public function it_should_have_an_alias_for_setBaseDn_called_base(): void
     {
         $this->base('dc=foo')->getBaseDn()->shouldBeLike(new Dn('dc=foo'));
     }
 
-    public function it_should_have_a_method_to_set_the_scopes()
+    public function it_should_have_a_method_to_set_the_scopes(): void
     {
         $this->useSubtreeScope()->getScope()->shouldBeEqualTo(SearchRequest::SCOPE_WHOLE_SUBTREE);
         $this->useBaseScope()->getScope()->shouldBeEqualTo(SearchRequest::SCOPE_BASE_OBJECT);
         $this->useSingleLevelScope()->getScope()->shouldBeEqualTo(SearchRequest::SCOPE_SINGLE_LEVEL);
     }
 
-    public function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1(): void
     {
         $this->setBaseDn('dc=foo,dc=bar');
 
@@ -112,7 +112,7 @@ class SearchRequestSpec extends ObjectBehavior
         )));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $search = (new SearchRequest(new EqualityFilter('foo', 'bar'), 'cn'))
             ->base('dc,=foo,dc=bar')
@@ -131,7 +131,7 @@ class SearchRequestSpec extends ObjectBehavior
         $this->getDereferenceAliases()->shouldBeEqualTo(2);
     }
 
-    public function it_should_not_be_constructed_from_invalid_asn1()
+    public function it_should_not_be_constructed_from_invalid_asn1(): void
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::set()]);
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::sequence()]);

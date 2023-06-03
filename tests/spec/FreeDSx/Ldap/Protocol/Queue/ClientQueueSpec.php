@@ -32,7 +32,7 @@ use Prophecy\Argument;
 
 class ClientQueueSpec extends ObjectBehavior
 {
-    public function let(SocketPool $socketPool, Socket $socket, EncoderInterface $encoder)
+    public function let(SocketPool $socketPool, Socket $socket, EncoderInterface $encoder): void
     {
         $socket->read(Argument::any())->willReturn('foo', false);
         $encoder->getLastPosition()->willReturn(3);
@@ -41,12 +41,12 @@ class ClientQueueSpec extends ObjectBehavior
         $this->beConstructedWith($socketPool, $encoder);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientQueue::class);
     }
 
-    public function it_should_send_a_message(Socket $socket, EncoderInterface $encoder)
+    public function it_should_send_a_message(Socket $socket, EncoderInterface $encoder): void
     {
         $encoder->encode(Argument::any())->shouldBeCalledTimes(1)->willReturn('foo');
         $socket->write(Argument::any())->shouldBeCalledTimes(1);
@@ -54,7 +54,7 @@ class ClientQueueSpec extends ObjectBehavior
         $this->sendMessage(new LdapMessageRequest(1, Operations::whoami()));
     }
 
-    public function it_should_get_a_response_message(EncoderInterface $encoder)
+    public function it_should_get_a_response_message(EncoderInterface $encoder): void
     {
         $encoder->decode(Argument::any())->willReturn(Asn1::sequence(
             Asn1::integer(3),
@@ -69,7 +69,7 @@ class ClientQueueSpec extends ObjectBehavior
         $this->getMessage()->shouldBeAnInstanceOf(LdapMessageResponse::class);
     }
 
-    public function it_should_throw_an_unsolicited_notification_exception_when_one_is_received(EncoderInterface $encoder, Socket $socket)
+    public function it_should_throw_an_unsolicited_notification_exception_when_one_is_received(EncoderInterface $encoder, Socket $socket): void
     {
         $encoder->decode(Argument::any())->willReturn(Asn1::sequence(
             Asn1::integer(0),
@@ -84,7 +84,7 @@ class ClientQueueSpec extends ObjectBehavior
         $this->shouldThrow(UnsolicitedNotificationException::class)->during('getMessage');
     }
 
-    public function it_should_throw_a_protocol_exception_if_the_message_id_was_unexpected(EncoderInterface $encoder)
+    public function it_should_throw_a_protocol_exception_if_the_message_id_was_unexpected(EncoderInterface $encoder): void
     {
         $encoder->decode(Argument::any())->willReturn(Asn1::sequence(
             Asn1::integer(3),
@@ -100,7 +100,7 @@ class ClientQueueSpec extends ObjectBehavior
     }
 
 
-    public function it_should_set_a_message_wrapper_and_use_it_when_sending_messages(Socket $socket, EncoderInterface $encoder, MessageWrapperInterface $messageWrapper)
+    public function it_should_set_a_message_wrapper_and_use_it_when_sending_messages(Socket $socket, EncoderInterface $encoder, MessageWrapperInterface $messageWrapper): void
     {
         $encoder->encode(Argument::any())->shouldBeCalledTimes(1)->willReturn('foo');
         $socket->write(Argument::any())->shouldBeCalledTimes(1);
@@ -110,7 +110,7 @@ class ClientQueueSpec extends ObjectBehavior
         $this->sendMessage(new LdapMessageRequest(1, Operations::whoami()));
     }
 
-    public function it_should_set_a_message_wrapper_and_use_it_when_receiving_messages(Socket $socket, EncoderInterface $encoder, MessageWrapperInterface $messageWrapper)
+    public function it_should_set_a_message_wrapper_and_use_it_when_receiving_messages(Socket $socket, EncoderInterface $encoder, MessageWrapperInterface $messageWrapper): void
     {
         $asn1 = Asn1::sequence(
             Asn1::integer(3),

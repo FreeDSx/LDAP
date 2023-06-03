@@ -124,7 +124,8 @@ class LdapClientTest extends LdapTestCase
             $response
         );
         $this->assertEquals(
-            0, $response->getResultCode()
+            0,
+            $response->getResultCode()
         );
     }
 

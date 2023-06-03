@@ -18,32 +18,32 @@ use PhpSpec\ObjectBehavior;
 
 class LessThanOrEqualFilterSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith('foo', 'bar');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(LessThanOrEqualFilter::class);
     }
 
-    public function it_should_implement_fiter_interface()
+    public function it_should_implement_fiter_interface(): void
     {
         $this->shouldImplement(FilterInterface::class);
     }
 
-    public function it_should_get_the_attribute_name()
+    public function it_should_get_the_attribute_name(): void
     {
         $this->getAttribute()->shouldBeEqualTo('foo');
     }
 
-    public function it_should_get_the_value()
+    public function it_should_get_the_value(): void
     {
         $this->getValue()->shouldBeEqualTo('bar');
     }
 
-    public function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1(): void
     {
         $this->toAsn1()->shouldBeLike(Asn1::context(6, Asn1::sequence(
             Asn1::octetString('foo'),
@@ -51,22 +51,22 @@ class LessThanOrEqualFilterSpec extends ObjectBehavior
         )));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $this::fromAsn1((new LessThanOrEqualFilter('foo', 'bar'))->toAsn1())->shouldBeLike(new LessThanOrEqualFilter('foo', 'bar'));
     }
 
-    public function it_should_get_the_string_filter_representation()
+    public function it_should_get_the_string_filter_representation(): void
     {
         $this->toString()->shouldBeEqualTo('(foo<=bar)');
     }
 
-    public function it_should_have_a_filter_as_a_toString_representation()
+    public function it_should_have_a_filter_as_a_toString_representation(): void
     {
         $this->__toString()->shouldBeEqualTo('(foo<=bar)');
     }
 
-    public function it_should_escape_values_on_the_string_representation()
+    public function it_should_escape_values_on_the_string_representation(): void
     {
         $this->beConstructedWith('foo', ')(bar=*5');
         $this->toString()->shouldBeEqualTo('(foo<=\29\28bar=\2a5)');

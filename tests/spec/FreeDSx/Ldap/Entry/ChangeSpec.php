@@ -17,37 +17,37 @@ use PhpSpec\ObjectBehavior;
 
 class ChangeSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(Change::TYPE_REPLACE, new Attribute('foo', 'bar'));
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(Change::class);
     }
 
-    public function it_should_get_the_mod_type()
+    public function it_should_get_the_mod_type(): void
     {
         $this->getType()->shouldBeEqualTo(Change::TYPE_REPLACE);
     }
 
-    public function it_should_set_the_mod_type()
+    public function it_should_set_the_mod_type(): void
     {
         $this->setType(Change::TYPE_ADD)->getType()->shouldBeEqualTo(Change::TYPE_ADD);
     }
 
-    public function it_should_get_the_attribute()
+    public function it_should_get_the_attribute(): void
     {
         $this->getAttribute()->shouldBeLike(new Attribute('foo', 'bar'));
     }
 
-    public function it_should_set_the_attribute()
+    public function it_should_set_the_attribute(): void
     {
         $this->setAttribute(new Attribute('cn', 'foo'))->getAttribute()->shouldBeLike(new Attribute('cn', 'foo'));
     }
 
-    public function it_should_construct_a_reset_change()
+    public function it_should_construct_a_reset_change(): void
     {
         $this->beConstructedThrough('reset', ['foo']);
 
@@ -55,7 +55,7 @@ class ChangeSpec extends ObjectBehavior
         $this->getType()->shouldBeEqualTo(Change::TYPE_DELETE);
     }
 
-    public function it_should_construct_an_add_change()
+    public function it_should_construct_an_add_change(): void
     {
         $this->beConstructedThrough('add', ['foo', 'bar']);
 
@@ -63,7 +63,7 @@ class ChangeSpec extends ObjectBehavior
         $this->getType()->shouldBeEqualTo(Change::TYPE_ADD);
     }
 
-    public function it_should_construct_a_delete_change()
+    public function it_should_construct_a_delete_change(): void
     {
         $this->beConstructedThrough('delete', ['foo', 'bar', 'foobar']);
 
@@ -71,7 +71,7 @@ class ChangeSpec extends ObjectBehavior
         $this->getType()->shouldBeEqualTo(Change::TYPE_DELETE);
     }
 
-    public function it_should_construct_a_replace_change()
+    public function it_should_construct_a_replace_change(): void
     {
         $this->beConstructedThrough('replace', ['foo', 'bar']);
 
@@ -79,14 +79,14 @@ class ChangeSpec extends ObjectBehavior
         $this->getType()->shouldBeEqualTo(Change::TYPE_REPLACE);
     }
 
-    public function it_should_check_whether_it_is_an_add()
+    public function it_should_check_whether_it_is_an_add(): void
     {
         $this->isAdd()->shouldBeEqualTo(false);
         $this->setType(Change::TYPE_ADD);
         $this->isAdd()->shouldBeEqualTo(true);
     }
 
-    public function it_should_check_whether_it_is_a_delete()
+    public function it_should_check_whether_it_is_a_delete(): void
     {
         $this->isDelete()->shouldBeEqualTo(false);
         $this->setType(Change::TYPE_DELETE);
@@ -95,14 +95,14 @@ class ChangeSpec extends ObjectBehavior
         $this->isDelete()->shouldBeEqualTo(false);
     }
 
-    public function it_should_check_whether_it_is_a_replace()
+    public function it_should_check_whether_it_is_a_replace(): void
     {
         $this->isReplace()->shouldBeEqualTo(true);
         $this->setType(Change::TYPE_ADD);
         $this->isReplace()->shouldBeEqualTo(false);
     }
 
-    public function it_should_check_whether_it_is_a_reset()
+    public function it_should_check_whether_it_is_a_reset(): void
     {
         $this->isReset()->shouldBeEqualTo(false);
         $this->setType(Change::TYPE_DELETE);

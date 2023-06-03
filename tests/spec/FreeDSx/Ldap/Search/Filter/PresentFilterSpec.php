@@ -18,42 +18,42 @@ use PhpSpec\ObjectBehavior;
 
 class PresentFilterSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith('foo');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(PresentFilter::class);
     }
 
-    public function it_should_implement_fiter_interface()
+    public function it_should_implement_fiter_interface(): void
     {
         $this->shouldImplement(FilterInterface::class);
     }
 
-    public function it_should_get_the_attribute_name()
+    public function it_should_get_the_attribute_name(): void
     {
         $this->getAttribute()->shouldBeEqualTo('foo');
     }
 
-    public function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1(): void
     {
         $this->toAsn1()->shouldBeLike(Asn1::context(7, Asn1::octetString('foo')));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $this::fromAsn1((new PresentFilter('foo'))->toAsn1())->shouldBeLike(new PresentFilter('foo'));
     }
 
-    public function it_should_get_the_string_filter_representation()
+    public function it_should_get_the_string_filter_representation(): void
     {
         $this->toString()->shouldBeEqualTo('(foo=*)');
     }
 
-    public function it_should_have_a_filter_as_a_toString_representation()
+    public function it_should_have_a_filter_as_a_toString_representation(): void
     {
         $this->__toString()->shouldBeEqualTo('(foo=*)');
     }

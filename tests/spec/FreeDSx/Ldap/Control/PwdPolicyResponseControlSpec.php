@@ -19,32 +19,32 @@ use PhpSpec\ObjectBehavior;
 
 class PwdPolicyResponseControlSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(1, 2, 3);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(PwdPolicyResponseControl::class);
     }
 
-    public function it_should_get_the_error()
+    public function it_should_get_the_error(): void
     {
         $this->getError()->shouldBeEqualTo(3);
     }
 
-    public function it_should_get_the_time_before_expiration()
+    public function it_should_get_the_time_before_expiration(): void
     {
         $this->getTimeBeforeExpiration()->shouldBeEqualTo(1);
     }
 
-    public function it_should_get_the_grace_attempts_remaining()
+    public function it_should_get_the_grace_attempts_remaining(): void
     {
         $this->getGraceAttemptsRemaining()->shouldBeEqualTo(2);
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -63,7 +63,7 @@ class PwdPolicyResponseControlSpec extends ObjectBehavior
         $this->getCriticality()->shouldBeEqualTo(false);
     }
 
-    public function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1(): void
     {
         $this->beConstructedWith(100, null, 2);
 

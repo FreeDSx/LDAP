@@ -27,17 +27,17 @@ use Prophecy\Argument;
 
 class VlvSpec extends ObjectBehavior
 {
-    public function let(LdapClient $client, SearchRequest $search)
+    public function let(LdapClient $client, SearchRequest $search): void
     {
         $this->beConstructedWith($client, $search, 'cn');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(Vlv::class);
     }
 
-    public function it_should_accept_a_sort_key_as_a_sort_argument($client, $search)
+    public function it_should_accept_a_sort_key_as_a_sort_argument($client, $search): void
     {
         $this->beConstructedWith($client, $search, new SortKey('foo'));
 
@@ -50,7 +50,7 @@ class VlvSpec extends ObjectBehavior
         $this->getEntries();
     }
 
-    public function it_should_accept_a_sort_control_as_a_sort_argument($client, $search)
+    public function it_should_accept_a_sort_control_as_a_sort_argument($client, $search): void
     {
         $this->beConstructedWith($client, $search, new SortingControl(new SortKey('foo'), new SortKey('bar')));
 
@@ -63,7 +63,7 @@ class VlvSpec extends ObjectBehavior
         $this->getEntries();
     }
 
-    public function it_should_set_the_offset_using_startAt($client)
+    public function it_should_set_the_offset_using_startAt($client): void
     {
         $client->sendAndReceive(Argument::any(), new VlvControl(0, 100, 1000, 0, null, null), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
@@ -75,7 +75,7 @@ class VlvSpec extends ObjectBehavior
         $this->getEntries();
     }
 
-    public function it_should_set_the_offset_using_moveTo($client)
+    public function it_should_set_the_offset_using_moveTo($client): void
     {
         $client->sendAndReceive(Argument::any(), new VlvControl(0, 100, 1000, 0, null, null), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
@@ -87,12 +87,12 @@ class VlvSpec extends ObjectBehavior
         $this->getEntries();
     }
 
-    public function it_should_return_null_on_position_if_nothing_has_happened()
+    public function it_should_return_null_on_position_if_nothing_has_happened(): void
     {
         $this->position()->shouldBeNull();
     }
 
-    public function it_should_return_the_offset_on_a_call_to_position($client)
+    public function it_should_return_the_offset_on_a_call_to_position($client): void
     {
         $client->sendAndReceive(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
@@ -104,7 +104,7 @@ class VlvSpec extends ObjectBehavior
         $this->position()->shouldBeEqualTo(250);
     }
 
-    public function it_should_return_the_size_of_the_list_returned_from_the_server($client)
+    public function it_should_return_the_size_of_the_list_returned_from_the_server($client): void
     {
         $client->sendAndReceive(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
@@ -116,7 +116,7 @@ class VlvSpec extends ObjectBehavior
         $this->listSize()->shouldBeEqualTo(200);
     }
 
-    public function it_should_get_the_offset_returned_by_the_server_when_calling_list_offset($client)
+    public function it_should_get_the_offset_returned_by_the_server_when_calling_list_offset($client): void
     {
         $client->sendAndReceive(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
@@ -128,7 +128,7 @@ class VlvSpec extends ObjectBehavior
         $this->listOffset()->shouldBeEqualTo(10);
     }
 
-    public function it_should_check_if_we_are_at_the_start_of_the_list($client)
+    public function it_should_check_if_we_are_at_the_start_of_the_list($client): void
     {
         $client->sendAndReceive(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
@@ -141,7 +141,7 @@ class VlvSpec extends ObjectBehavior
         $this->isAtStartOfList()->shouldBeEqualTo(true);
     }
 
-    public function it_should_check_if_we_are_at_the_start_of_the_list_based_on_the_offset_and_before_value($client)
+    public function it_should_check_if_we_are_at_the_start_of_the_list_based_on_the_offset_and_before_value($client): void
     {
         $client->sendAndReceive(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
@@ -154,7 +154,7 @@ class VlvSpec extends ObjectBehavior
         $this->isAtStartOfList()->shouldBeEqualTo(true);
     }
 
-    public function it_should_check_if_we_are_at_the_end_of_the_list($client)
+    public function it_should_check_if_we_are_at_the_end_of_the_list($client): void
     {
         $client->sendAndReceive(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
@@ -167,7 +167,7 @@ class VlvSpec extends ObjectBehavior
         $this->isAtEndOfList()->shouldBeEqualTo(true);
     }
 
-    public function it_should_check_if_we_are_at_the_end_of_the_list_based_on_the_offset_and_after_value($client)
+    public function it_should_check_if_we_are_at_the_end_of_the_list_based_on_the_offset_and_after_value($client): void
     {
         $client->sendAndReceive(Argument::any(), Argument::any(), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
@@ -180,7 +180,7 @@ class VlvSpec extends ObjectBehavior
         $this->isAtEndOfList()->shouldBeEqualTo(true);
     }
 
-    public function it_should_set_the_before_and_after_positions($client)
+    public function it_should_set_the_before_and_after_positions($client): void
     {
         $client->sendAndReceive(Argument::any(), new VlvControl(25, 75, 1, 0), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
@@ -193,7 +193,7 @@ class VlvSpec extends ObjectBehavior
         $this->getEntries();
     }
 
-    public function it_should_indicate_the_position_as_a_percentage_if_specified($client)
+    public function it_should_indicate_the_position_as_a_percentage_if_specified($client): void
     {
         $client->sendAndReceive(Argument::any(), new VlvControl(0, 100, 1, 100), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
@@ -206,7 +206,7 @@ class VlvSpec extends ObjectBehavior
         $this->position()->shouldBeEqualTo(75);
     }
 
-    public function it_should_move_forward_as_a_percentage_if_specified($client)
+    public function it_should_move_forward_as_a_percentage_if_specified($client): void
     {
         $client->sendAndReceive(Argument::any(), new VlvControl(0, 100, 1, 100), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
@@ -229,7 +229,7 @@ class VlvSpec extends ObjectBehavior
         $this->listOffset()->shouldBeEqualTo(20);
     }
 
-    public function it_should_move_backward_as_a_percentage_if_specified($client)
+    public function it_should_move_backward_as_a_percentage_if_specified($client): void
     {
         $client->sendAndReceive(Argument::any(), new VlvControl(0, 100, 50, 100), Argument::any())->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,

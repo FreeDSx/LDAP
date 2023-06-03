@@ -22,17 +22,17 @@ use PhpSpec\ObjectBehavior;
 
 class ServerAuthorizationSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerAuthorization::class);
     }
 
-    public function it_should_have_an_anonymous_token_by_default()
+    public function it_should_have_an_anonymous_token_by_default(): void
     {
         $this->getToken()->shouldBeAnInstanceOf(AnonToken::class);
     }
 
-    public function it_should_set_the_token()
+    public function it_should_set_the_token(): void
     {
         $token = new AnonToken('foo');
 
@@ -40,32 +40,32 @@ class ServerAuthorizationSpec extends ObjectBehavior
         $this->getToken()->shouldBeEqualTo($token);
     }
 
-    public function it_should_not_require_authentication_for_a_start_tls_request()
+    public function it_should_not_require_authentication_for_a_start_tls_request(): void
     {
         $this->isAuthenticationRequired(Operations::extended(ExtendedRequest::OID_START_TLS))->shouldBeEqualTo(false);
     }
 
-    public function it_should_not_require_authentication_for_a_whoami_request()
+    public function it_should_not_require_authentication_for_a_whoami_request(): void
     {
         $this->isAuthenticationRequired(Operations::extended(ExtendedRequest::OID_WHOAMI))->shouldBeEqualTo(false);
     }
 
-    public function it_should_not_require_authentication_for_a_bind_request()
+    public function it_should_not_require_authentication_for_a_bind_request(): void
     {
         $this->isAuthenticationRequired(Operations::bind('foo', 'bar'))->shouldBeEqualTo(false);
     }
 
-    public function it_should_not_require_authentication_for_an_unbind_request()
+    public function it_should_not_require_authentication_for_an_unbind_request(): void
     {
         $this->isAuthenticationRequired(Operations::unbind())->shouldBeEqualTo(false);
     }
 
-    public function it_should_not_require_authentication_for_a_rootdse_request()
+    public function it_should_not_require_authentication_for_a_rootdse_request(): void
     {
         $this->isAuthenticationRequired(Operations::read(''))->shouldBeEqualTo(false);
     }
 
-    public function it_should_require_authentication_for_all_other_operations()
+    public function it_should_require_authentication_for_all_other_operations(): void
     {
         $this->isAuthenticationRequired(Operations::read('cn=bar'))->shouldBeEqualTo(true);
         $this->isAuthenticationRequired(Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'))->shouldBeEqualTo(true);
@@ -79,7 +79,7 @@ class ServerAuthorizationSpec extends ObjectBehavior
         $this->isAuthenticationRequired(Operations::compare('cn=foo', 'foo', 'bar'))->shouldBeEqualTo(true);
     }
 
-    public function it_should_not_require_authentication_if_it_has_been_explicitly_disabled()
+    public function it_should_not_require_authentication_if_it_has_been_explicitly_disabled(): void
     {
         $this->beConstructedWith(null, ['require_authentication' => false]);
 
@@ -95,30 +95,30 @@ class ServerAuthorizationSpec extends ObjectBehavior
         $this->isAuthenticationRequired(Operations::compare('cn=foo', 'foo', 'bar'))->shouldBeEqualTo(false);
     }
 
-    public function it_should_not_allow_anonymous_authentication_by_default()
+    public function it_should_not_allow_anonymous_authentication_by_default(): void
     {
         $this->isAuthenticationTypeSupported(Operations::bindAnonymously())->shouldBeEqualTo(false);
     }
 
-    public function it_should_respect_the_option_for_whether_anon_binds_are_allowed()
+    public function it_should_respect_the_option_for_whether_anon_binds_are_allowed(): void
     {
         $this->beConstructedWith(null, ['allow_anonymous' => true]);
 
         $this->isAuthenticationTypeSupported(Operations::bindAnonymously())->shouldBeEqualTo(true);
     }
 
-    public function it_should_allow_simple_bind_types()
+    public function it_should_allow_simple_bind_types(): void
     {
         $this->isAuthenticationTypeSupported(Operations::bind('foo', 'bar'))->shouldBeEqualTo(true);
     }
 
-    public function it_should_tell_if_a_request_is_an_authentication_type()
+    public function it_should_tell_if_a_request_is_an_authentication_type(): void
     {
         $this->isAuthenticationRequest(Operations::bind('foo', 'bar'))->shouldBeEqualTo(true);
         $this->isAuthenticationRequest(Operations::bindAnonymously())->shouldBeEqualTo(true);
     }
 
-    public function it_should_tell_if_a_request_is_not_an_authentication_type()
+    public function it_should_tell_if_a_request_is_not_an_authentication_type(): void
     {
         $this->isAuthenticationRequest(Operations::read('cn=bar'))->shouldBeEqualTo(false);
         $this->isAuthenticationRequest(Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'))->shouldBeEqualTo(false);
