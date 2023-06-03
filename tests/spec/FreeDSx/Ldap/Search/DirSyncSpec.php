@@ -27,9 +27,9 @@ use Prophecy\Argument;
 
 class DirSyncSpec extends ObjectBehavior
 {
-    protected $initialResponse;
+    private LdapMessageResponse $initialResponse;
 
-    protected $secondResponse;
+    private LdapMessageResponse $secondResponse;
 
     public function let(LdapClient $client): void
     {

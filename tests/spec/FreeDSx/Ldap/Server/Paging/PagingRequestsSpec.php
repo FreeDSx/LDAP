@@ -21,7 +21,7 @@ use PhpSpec\ObjectBehavior;
 
 class PagingRequestsSpec extends ObjectBehavior
 {
-    private $pagingRequest;
+    private PagingRequest $pagingRequest;
 
     public function let(): void
     {
