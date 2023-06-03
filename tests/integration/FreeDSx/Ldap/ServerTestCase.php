@@ -55,7 +55,7 @@ class ServerTestCase extends LdapTestCase
             $output = $this->subject->getOutput();
             $this->subject->clearOutput();
 
-            if (strpos($output, $marker) !== false) {
+            if (str_contains($output, $marker)) {
                 return $output;
             }
 
