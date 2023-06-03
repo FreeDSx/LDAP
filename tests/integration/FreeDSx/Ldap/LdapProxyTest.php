@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -16,50 +18,64 @@ use FreeDSx\Ldap\Search\Filters;
 
 class LdapProxyTest extends ServerTestCase
 {
-    protected $serverExec = 'ldapproxy';
-
     public function setUp(): void
     {
+        $this->setServerMode('ldapproxy');
+
         parent::setUp();
 
         $this->createServerProcess('tcp');
     }
 
-    public function testItBindsToTheProxy()
+    public function testItBindsToTheProxy(): void
     {
         $this->authenticate();
 
-        $this->assertNotEmpty($this->client->whoami());
+        $this->assertNotEmpty($this->ldapClient()->whoami());
     }
 
-    public function testItRetrievesTheRootDse()
+    public function testItRetrievesTheRootDse(): void
     {
         $this->authenticate();
-        $rootDse = $this->client->read();
+        $rootDse = $this->ldapClient()->readOrFail();
 
         $this->assertNotEmpty($rootDse->toArray());
     }
 
-    public function testItCanHandlePaging()
+    public function testItCanHandlePaging(): void
     {
         $this->authenticate();
 
-        $search = Operations::search(Filters::equal('objectClass', 'inetOrgPerson'), 'cn');
-        $paging = $this->client->paging($search);
+        $search = Operations::search(
+            Filters::equal(
+                'objectClass',
+            'inetOrgPerson'
+            ),
+            'cn'
+        );
+        $paging = $this->ldapClient()
+            ->paging($search);
 
         $entries = $paging->getEntries();
-        $this->assertEquals(1000, $entries->count());
+
+        $this->assertEquals(
+            1000,
+            $entries->count()
+        );
 
         while ($paging->hasEntries()) {
             $entries->add(...$paging->getEntries());
         }
 
-        $this->assertEquals(10001, $entries->count());
+        $this->assertEquals(
+            10001,
+            $entries->count()
+        );
     }
 
     protected function authenticate(): void
     {
-        $this->client->bind(
+        $this->ldapClient()->bind(
             $_ENV['LDAP_USERNAME'],
             $_ENV['LDAP_PASSWORD']
         );

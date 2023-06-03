@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -19,20 +21,11 @@ use integration\FreeDSx\Ldap\LdapTestCase;
 
 class DirSyncTest extends LdapTestCase
 {
-    /**
-     * @var LdapClient
-     */
-    protected $client;
+    private LdapClient $client;
 
-    /**
-     * @var DirSync
-     */
-    protected $dirSync;
+    private DirSync $dirSync;
 
-    /**
-     * @var FilterInterface
-     */
-    protected $filter;
+    private FilterInterface $filter;
 
     public function setUp(): void
     {
@@ -43,13 +36,25 @@ class DirSyncTest extends LdapTestCase
         $this->bindClient($this->client);
 
         $this->filter = Filters::and(
-            Filters::equal('objectClass', 'inetOrgPerson'),
-            Filters::not(Filters::equal('isDeleted', 'TRUE'))
+            Filters::equal(
+                'objectClass',
+                'inetOrgPerson'
+            ),
+            Filters::not(Filters::equal(
+                'isDeleted',
+                'TRUE'
+            ))
         );
-        $this->dirSync = new DirSync($this->client, null, $this->filter, 'description');
+
+        $this->dirSync = new DirSync(
+            $this->client,
+            null,
+            $this->filter,
+            'description'
+        );
     }
 
-    public function testPagingSync()
+    public function testPagingSync(): void
     {
         $all = $this->dirSync->getChanges();
 
@@ -58,10 +63,16 @@ class DirSyncTest extends LdapTestCase
         }
         $this->assertCount(10001, $all);
 
-        $entry = $this->client->read('cn=Vivie Niebudek,ou=Administrative,ou=FreeDSx-Test,dc=example,dc=com');
-        $entry->set('description', 'foobar ' . rand());
+        $entry = $this->client->readOrFail('cn=Vivie Niebudek,ou=Administrative,ou=FreeDSx-Test,dc=example,dc=com');
+        $entry->set(
+            'description',
+            'foobar ' . rand()
+        );
         $this->client->update($entry);
 
-        $this->assertCount(1, $this->dirSync->getChanges());
+        $this->assertCount(
+            1,
+            $this->dirSync->getChanges()
+        );
     }
 }
