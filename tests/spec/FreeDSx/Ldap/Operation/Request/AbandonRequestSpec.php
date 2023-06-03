@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -47,6 +49,15 @@ class AbandonRequestSpec extends ObjectBehavior
 
     public function it_should_not_allow_non_integers_from_ASN1(): void
     {
-        $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::application(16, Asn1::octetString(1))]);
+        $this->shouldThrow(ProtocolException::class)
+            ->during(
+                'fromAsn1',
+                [
+                    Asn1::application(
+                        16,
+                        Asn1::octetString('foo')
+                    )
+                ]
+            );
     }
 }
