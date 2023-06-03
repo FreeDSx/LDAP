@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -17,20 +19,11 @@ use Symfony\Component\Process\Process;
 
 class ServerTestCase extends LdapTestCase
 {
-    /**
-     * @var Process
-     */
-    protected $subject;
+    private Process $subject;
 
-    /**
-     * @var LdapClient
-     */
-    protected $client;
+    private ?LdapClient $client;
 
-    /**
-     * @var string
-     */
-    protected $serverExec = 'ldapserver';
+    private string $serverMode = 'ldapserver';
 
     public function tearDown(): void
     {
@@ -40,7 +33,7 @@ class ServerTestCase extends LdapTestCase
 
     protected function authenticate(): void
     {
-        $this->client->bind(
+        $this->ldapClient()->bind(
             'cn=user,dc=foo,dc=bar',
             '12345'
         );
@@ -80,7 +73,7 @@ class ServerTestCase extends LdapTestCase
     ): void {
         $processArgs = [
             'php',
-            __DIR__ . '/../../../bin/' . $this->serverExec . '.php',
+            __DIR__ . '/../../../bin/' . $this->serverMode . '.php',
             $transport,
         ];
 
@@ -114,8 +107,18 @@ class ServerTestCase extends LdapTestCase
 
     protected function stopServer(): void
     {
-        $this->client->unbind();
+        $this->ldapClient()->unbind();
         $this->client = null;
         $this->subject->stop();
+    }
+
+    protected function setServerMode(string $mode): void
+    {
+        $this->serverMode = $mode;
+    }
+
+    protected function ldapClient(): LdapClient
+    {
+        return $this->client ?? throw new \RuntimeException('The test LDAP client is not set.');
     }
 }

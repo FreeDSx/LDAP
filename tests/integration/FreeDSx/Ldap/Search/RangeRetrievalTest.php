@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -18,15 +20,9 @@ use integration\FreeDSx\Ldap\LdapTestCase;
 
 class RangeRetrievalTest extends LdapTestCase
 {
-    /**
-     * @var LdapClient
-     */
-    protected $client;
+    private LdapClient $client;
 
-    /**
-     * @var RangeRetrieval
-     */
-    protected $range;
+    private RangeRetrieval $range;
 
     public function setUp(): void
     {
@@ -47,49 +43,93 @@ class RangeRetrievalTest extends LdapTestCase
         }
     }
     
-    public function testRetrieveAll()
+    public function testRetrieveAll(): void
     {
-        $result = $this->range->getAllValues('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com', 'member');
+        $result = $this->range->getAllValues(
+            'cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com',
+            'member'
+        );
 
-        $this->assertEquals(10001, count($result->getValues()));
+        $this->assertEquals(
+            10001,
+            count($result->getValues())
+        );
     }
 
-    public function testHasRanged()
+    public function testHasRanged(): void
     {
-        $entry = $this->client->read('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com');
+        $entry = $this->client->readOrFail('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com');
 
-        $this->assertTrue($this->range->hasRanged($entry, 'member'));
-        $this->assertFalse($this->range->hasRanged($entry, 'description'));
+        $this->assertTrue($this->range->hasRanged(
+            $entry,
+            'member'
+        ));
+        $this->assertFalse($this->range->hasRanged(
+            $entry,
+            'description'
+        ));
     }
 
-    public function testGetRanged()
+    public function testGetRanged(): void
     {
-        $entry = $this->client->read('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com');
+        $entry = $this->client->readOrFail('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com');
 
-        $this->assertInstanceOf(Attribute::class, $this->range->getRanged($entry, 'member'));
-        $this->assertNull($this->range->getRanged($entry, 'description'));
+        $this->assertInstanceOf(
+            Attribute::class,
+            $this->range->getRanged(
+                $entry,
+                'member'
+            )
+        );
+        $this->assertNull($this->range->getRanged(
+            $entry,
+            'description'
+        ));
     }
 
-    public function testGetAllRanged()
+    public function testGetAllRanged(): void
     {
-        $allUsers = $this->client->read('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com');
-        $adminUsers = $this->client->read('cn=Administrative Users,ou=FreeDSx-Test,dc=example,dc=com');
+        $allUsers = $this->client->readOrFail('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com');
+        $adminUsers = $this->client->readOrFail('cn=Administrative Users,ou=FreeDSx-Test,dc=example,dc=com');
 
-        $this->assertCount(1, $this->range->getAllRanged($allUsers));
-        $this->assertCount(0, $this->range->getAllRanged($adminUsers));
+        $this->assertCount(
+            1,
+            $this->range->getAllRanged($allUsers)
+        );
+        $this->assertCount(
+            0,
+            $this->range->getAllRanged($adminUsers)
+        );
     }
 
-    public function testPagingRangedValues()
+    public function testPagingRangedValues(): void
     {
-        $members = $this->client->read('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com', ['member;range=0-*'])->get('member');
+        $members = $this->client->readOrFail(
+            'cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com',
+            ['member;range=0-*']
+        )->get('member');
+
+        $this->assertInstanceOf(
+            Attribute::class,
+            $members,
+        );
         $this->assertTrue($this->range->hasMoreValues($members));
 
         $all = $members->getValues();
         while ($this->range->hasMoreValues($members)) {
-            $members = $this->range->getMoreValues('cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com', $members);
-            $all = array_merge($all, $members->getValues());
+            $members = $this->range->getMoreValues(
+                'cn=All Employees,ou=FreeDSx-Test,dc=example,dc=com',
+                $members
+            );
+            $all = array_merge(
+                $all,
+                $members->getValues(),
+            );
         }
 
-        $this->assertCount(10001, $all);
+        $this->assertCount(
+            10001,
+            $all
+        );
     }
 }
