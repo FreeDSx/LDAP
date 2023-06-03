@@ -278,7 +278,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
      * @param array<string, string|array> $attributes
      */
     public static function create(
-        Stringable|string $dn,
+        Dn|Stringable|string $dn,
         array $attributes = []
     ): Entry {
         return self::fromArray(
@@ -290,19 +290,25 @@ class Entry implements IteratorAggregate, Countable, Stringable
     /**
      * Construct an entry from an associative array.
      *
-     * @param array<string, string|string[]> $attributes
+     * @param array<string, string|array<string|Stringable>> $attributes
      */
     public static function fromArray(
-        Stringable|string $dn,
+        Dn|Stringable|string $dn,
         array             $attributes = []
     ): Entry {
         /** @var Attribute[] $entryAttr */
         $entryAttr = [];
 
-        foreach ($attributes as $attribute => $value) {
+        foreach ($attributes as $attribute => $attribute_values) {
             $entryAttr[] = new Attribute(
                 $attribute,
-                ...(is_array($value) ? $value : [$value])
+                ...(is_array($attribute_values)
+                    ? array_map(
+                          fn($value) => (string) $value,
+                          $attribute_values,
+                      )
+                    : [(string) $attribute_values]
+                )
             );
         }
 

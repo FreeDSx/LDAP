@@ -33,8 +33,8 @@ class LdapServerPagingHandler implements PagingHandlerInterface
             $entries[] = Entry::fromArray(
                 "cn=foo$i,dc=foo,dc=bar",
                 [
-                    'foo' => $i,
-                    'bar' => $i,
+                    'foo' => (string) $i,
+                    'bar' => (string) $i,
                 ]
             );
         }
@@ -154,7 +154,7 @@ class LdapServerRequestHandler extends GenericRequestHandler
 
     public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn): void
     {
-        $dnLog = 'ParentDn => ' . $modifyDn->getNewParentDn()->toString();
+        $dnLog = 'ParentDn => ' . $modifyDn->getNewParentDn()?->toString();
         $dnLog .= ', ParentRdn => ' . $modifyDn->getNewRdn()->toString();
 
         $this->logRequest(
@@ -167,7 +167,7 @@ class LdapServerRequestHandler extends GenericRequestHandler
     {
         $this->logRequest(
             'search',
-            "base-dn => {$search->getBaseDn()->toString()}, filter => {$search->getFilter()->toString()}"
+            "base-dn => {$search->getBaseDn()?->toString()}, filter => {$search->getFilter()->toString()}"
         );
 
         return new Entries(
