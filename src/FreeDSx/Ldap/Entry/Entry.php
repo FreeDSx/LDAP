@@ -20,6 +20,7 @@ use Stringable;
 use Traversable;
 use function count;
 use function is_array;
+use function array_map;
 
 /**
  * Represents an Entry in LDAP.
@@ -52,7 +53,13 @@ class Entry implements IteratorAggregate, Countable, Stringable
     ): static {
         $attribute = $attribute instanceof Attribute
             ? $attribute
-            : new Attribute($attribute, ...$values);
+            : new Attribute(
+                $attribute,
+                ...array_map(
+                    fn(Stringable|string $value) => $value instanceof Stringable ? (string) $value : $value,
+                    $values
+                )
+            );
 
         if (($exists = $this->get($attribute, true)) !== null) {
             $exists->add(...$attribute->getValues());
@@ -75,7 +82,10 @@ class Entry implements IteratorAggregate, Countable, Stringable
             ? $attribute
             : new Attribute(
                 $attribute,
-                ...$values
+                ...array_map(
+                    fn(Stringable|string $value) => $value instanceof Stringable ? (string) $value : $value,
+                    $values
+                )
             );
 
         if (count($attribute->getValues()) !== 0) {
@@ -118,7 +128,10 @@ class Entry implements IteratorAggregate, Countable, Stringable
             ? $attribute
             : new Attribute(
                 $attribute,
-                ...$values
+                ...array_map(
+                    fn(Stringable|string $value) => $value instanceof Stringable ? (string) $value : $value,
+                    $values
+                )
             );
 
         $exists = false;
@@ -265,11 +278,11 @@ class Entry implements IteratorAggregate, Countable, Stringable
      * @param array<string, string|array> $attributes
      */
     public static function create(
-        string $dn,
+        Stringable|string $dn,
         array $attributes = []
     ): Entry {
         return self::fromArray(
-            $dn,
+            (string) $dn,
             $attributes
         );
     }
@@ -280,8 +293,8 @@ class Entry implements IteratorAggregate, Countable, Stringable
      * @param array<string, string|string[]> $attributes
      */
     public static function fromArray(
-        string $dn,
-        array $attributes = []
+        Stringable|string $dn,
+        array             $attributes = []
     ): Entry {
         /** @var Attribute[] $entryAttr */
         $entryAttr = [];
@@ -294,7 +307,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
         }
 
         return new self(
-            $dn,
+            (string) $dn,
             ...$entryAttr
         );
     }

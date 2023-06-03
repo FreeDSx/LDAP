@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Exception\UrlParseException;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\Response\ResponseInterface;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use Stringable;
 use function array_map;
 use function count;
 
@@ -102,12 +103,12 @@ class LdapResult implements ResponseInterface
 
     public function __construct(
         int $resultCode,
-        string $dn = '',
+        Stringable|string $dn = '',
         string $diagnosticMessage = '',
         LdapUrl ...$referrals
     ) {
         $this->resultCode = $resultCode;
-        $this->dn = new Dn($dn);
+        $this->dn = new Dn((string) $dn);
         $this->diagnosticMessage = $diagnosticMessage;
         $this->referrals = $referrals;
     }
@@ -142,7 +143,7 @@ class LdapResult implements ResponseInterface
     {
         $result = Asn1::sequence(
             Asn1::enumerated($this->resultCode),
-            Asn1::octetString($this->dn),
+            Asn1::octetString($this->dn->toString()),
             Asn1::octetString($this->diagnosticMessage)
         );
         if (count($this->referrals) !== 0) {

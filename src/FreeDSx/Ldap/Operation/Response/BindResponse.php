@@ -42,7 +42,7 @@ class BindResponse extends LdapResult
         $this->saslCreds = $saslCreds;
         parent::__construct(
             $result->getResultCode(),
-            $result->getDn(),
+            $result->getDn()->toString(),
             $result->getDiagnosticMessage(),
             ...$result->getReferrals()
         );

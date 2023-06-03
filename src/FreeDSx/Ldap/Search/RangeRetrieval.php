@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Entry\Option;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\LdapClient;
+use Stringable;
 
 /**
  * Provides simple helper APIs for retrieving ranged results for an entry attribute.
@@ -111,7 +112,7 @@ class RangeRetrieval
      * @throws OperationException
      */
     public function getMoreValues(
-        Entry|Dn|string $entry,
+        Stringable|Entry|Dn|string $entry,
         Attribute $attribute,
         string|int $amount = '*'
     ): Attribute {
@@ -124,7 +125,10 @@ class RangeRetrieval
         $attrReq = new Attribute($attribute->getName());
         $startAt = (int) $range->getHighRange() + 1;
         $attrReq->getOptions()->set(Option::fromRange((string) $startAt, (string) $amount));
-        $result = $this->client->readOrFail($entry, [$attrReq]);
+        $result = $this->client->readOrFail(
+            (string) $entry,
+            [$attrReq]
+        );
 
         $attrResult = $result->get($attribute->getName());
         if ($attrResult === null) {
@@ -150,14 +154,23 @@ class RangeRetrieval
      * @throws OperationException
      */
     public function getAllValues(
-        Entry|Dn|string $entry,
+        Stringable|Entry|Dn|string $entry,
         Attribute|string $attribute,
     ): Attribute {
-        $attrResult = $attribute instanceof Attribute ? new Attribute($attribute->getName()) : new Attribute($attribute);
-        $attrResult->getOptions()->set(Option::fromRange('0'));
+        $attrResult = $attribute instanceof Attribute
+            ? new Attribute($attribute->getName())
+            : new Attribute($attribute);
+        $attrResult->getOptions()
+            ->set(Option::fromRange('0'));
 
-        $entry = $this->client->readOrFail($entry, [$attrResult]);
-        $attribute = $this->getRanged($entry, $attrResult);
+        $entry = $this->client->readOrFail(
+            (string) $entry,
+            [$attrResult]
+        );
+        $attribute = $this->getRanged(
+            $entry,
+            $attrResult
+        );
         if ($attribute === null) {
             throw new RuntimeException(sprintf(
                 'No ranged result received for "%s" on entry "%s".',

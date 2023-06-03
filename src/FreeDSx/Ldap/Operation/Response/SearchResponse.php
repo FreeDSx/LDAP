@@ -32,7 +32,7 @@ class SearchResponse extends LdapResult
         $this->entries = $entries;
         parent::__construct(
             $result->resultCode,
-            $result->dn,
+            $result->dn->toString(),
             $result->diagnosticMessage,
             ...$result->referrals
         );
