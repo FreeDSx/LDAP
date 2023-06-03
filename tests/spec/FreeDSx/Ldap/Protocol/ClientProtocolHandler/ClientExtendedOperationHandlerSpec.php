@@ -27,22 +27,22 @@ use Prophecy\Argument;
 
 class ClientExtendedOperationHandlerSpec extends ObjectBehavior
 {
-    public function let(ExtendedResponseFactory $responseFactory)
+    public function let(ExtendedResponseFactory $responseFactory): void
     {
         $this->beConstructedWith($responseFactory);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientExtendedOperationHandler::class);
     }
 
-    public function it_should_implement_ClientResponseHandler()
+    public function it_should_implement_ClientResponseHandler(): void
     {
         $this->shouldBeAnInstanceOf(ResponseHandlerInterface::class);
     }
 
-    public function it_should_handle_a_response(ExtendedResponseFactory $responseFactory, ClientQueue $queue)
+    public function it_should_handle_a_response(ExtendedResponseFactory $responseFactory, ClientQueue $queue): void
     {
         $responseFactory->has(Argument::any())->willReturn(false);
         $responseFactory->get(Argument::any(), Argument::any())->shouldNotBeCalled();
@@ -56,7 +56,7 @@ class ClientExtendedOperationHandlerSpec extends ObjectBehavior
         )->shouldBeEqualTo($response);
     }
 
-    public function it_should_handle_an_extended_response_that_has_a_mapped_class(ClientProtocolContext $context, ExtendedResponseFactory $responseFactory, ClientQueue $queue)
+    public function it_should_handle_an_extended_response_that_has_a_mapped_class(ClientProtocolContext $context, ExtendedResponseFactory $responseFactory, ClientQueue $queue): void
     {
         $extendedResponse = new PasswordModifyResponse(new LdapResult(0));
         $responseFactory->has(Argument::any())->willReturn(true);

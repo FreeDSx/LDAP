@@ -22,22 +22,22 @@ use PhpSpec\ObjectBehavior;
 
 class BindResponseSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(new LdapResult(0, 'foo', 'bar', new LdapUrl('foo')), 'foo');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(BindResponse::class);
     }
 
-    public function it_should_get_the_sasl_creds()
+    public function it_should_get_the_sasl_creds(): void
     {
         $this->getSaslCredentials()->shouldBeEqualTo('foo');
     }
 
-    public function it_should_get_the_ldap_result_data()
+    public function it_should_get_the_ldap_result_data(): void
     {
         $this->getResultCode()->shouldBeEqualTo(0);
         $this->getDn()->shouldBeLike(new Dn('foo'));
@@ -45,7 +45,7 @@ class BindResponseSpec extends ObjectBehavior
         $this->getReferrals()->shouldBeLike([new LdapUrl('foo')]);
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
         $this->beConstructedThrough('fromAsn1', [Asn1::application(1, Asn1::sequence(

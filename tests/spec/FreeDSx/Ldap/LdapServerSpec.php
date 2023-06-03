@@ -23,52 +23,52 @@ use Psr\Log\LoggerInterface;
 
 class LdapServerSpec extends ObjectBehavior
 {
-    public function let(ServerRunnerInterface $serverRunner)
+    public function let(ServerRunnerInterface $serverRunner): void
     {
         $this->beConstructedWith(['port' => 33389], $serverRunner);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(LdapServer::class);
     }
 
-    public function it_should_run_the_server(ServerRunnerInterface $serverRunner)
+    public function it_should_run_the_server(ServerRunnerInterface $serverRunner): void
     {
         $serverRunner->run(Argument::type(SocketServer::class))->shouldBeCalled();
 
         $this->run();
     }
 
-    public function it_should_use_the_request_handler_specified(RequestHandlerInterface $requestHandler)
+    public function it_should_use_the_request_handler_specified(RequestHandlerInterface $requestHandler): void
     {
         $this->useRequestHandler($requestHandler);
 
         $this->getOptions()->shouldHaveKeyWithValue('request_handler', $requestHandler);
     }
 
-    public function it_should_use_the_rootdse_handler_specified(RootDseHandlerInterface $rootDseHandler)
+    public function it_should_use_the_rootdse_handler_specified(RootDseHandlerInterface $rootDseHandler): void
     {
         $this->useRootDseHandler($rootDseHandler);
 
         $this->getOptions()->shouldHaveKeyWithValue('rootdse_handler', $rootDseHandler);
     }
 
-    public function it_should_use_the_paging_handler_specified(PagingHandlerInterface $pagingHandler)
+    public function it_should_use_the_paging_handler_specified(PagingHandlerInterface $pagingHandler): void
     {
         $this->usePagingHandler($pagingHandler);
 
         $this->getOptions()->shouldHaveKeyWithValue('paging_handler', $pagingHandler);
     }
 
-    public function it_should_use_the_logger_specified(LoggerInterface $logger)
+    public function it_should_use_the_logger_specified(LoggerInterface $logger): void
     {
         $this->useLogger($logger);
 
         $this->getOptions()->shouldHaveKeyWithValue('logger', $logger);
     }
 
-    public function it_should_get_the_default_options_with_any_merged_values()
+    public function it_should_get_the_default_options_with_any_merged_values(): void
     {
         $this->getOptions()->shouldBeEqualTo([
             'ip' => "0.0.0.0",
@@ -92,7 +92,7 @@ class LdapServerSpec extends ObjectBehavior
         ]);
     }
 
-    public function it_should_make_a_proxy_server()
+    public function it_should_make_a_proxy_server(): void
     {
         $this->beConstructedThrough('makeProxy', ['localhost']);
 

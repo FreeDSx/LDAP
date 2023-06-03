@@ -20,35 +20,35 @@ use PhpSpec\ObjectBehavior;
 
 class PasswordModifyRequestSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith('foo', 'bar', '12345');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(PasswordModifyRequest::class);
     }
 
-    public function it_should_get_the_new_password()
+    public function it_should_get_the_new_password(): void
     {
         $this->getNewPassword()->shouldBeEqualTo('12345');
         $this->setNewPassword('foo')->getNewPassword()->shouldBeEqualTo('foo');
     }
 
-    public function it_should_get_the_old_password()
+    public function it_should_get_the_old_password(): void
     {
         $this->getOldPassword()->shouldBeEqualTo('bar');
         $this->setOldPassword('foo')->getOldPassword()->shouldBeEqualTo('foo');
     }
 
-    public function it_should_get_the_username()
+    public function it_should_get_the_username(): void
     {
         $this->getUsername()->shouldBeEqualTo('foo');
         $this->setUsername('bar')->getUsername()->shouldBeEqualTo('bar');
     }
 
-    public function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -85,7 +85,7 @@ class PasswordModifyRequestSpec extends ObjectBehavior
         )));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $passwdMod = new PasswordModifyRequest('foo', 'bar', '12345');
         $this::fromAsn1($passwdMod->toAsn1())->shouldBeLike($passwdMod->setValue(null));
@@ -97,7 +97,7 @@ class PasswordModifyRequestSpec extends ObjectBehavior
         $this::fromAsn1($passwdMod->toAsn1())->shouldBeLike($passwdMod->setValue(null));
     }
 
-    public function it_should_not_be_constructed_from_invalid_asn1()
+    public function it_should_not_be_constructed_from_invalid_asn1(): void
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [
             (new ExtendedRequest('foo'))->setValue(Asn1::set())->toAsn1()

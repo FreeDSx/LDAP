@@ -16,12 +16,12 @@ use PhpSpec\ObjectBehavior;
 
 class UrlParseExceptionSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(UrlParseException::class);
     }
 
-    public function it_should_extend_exception()
+    public function it_should_extend_exception(): void
     {
         $this->shouldBeAnInstanceOf('\Exception');
     }

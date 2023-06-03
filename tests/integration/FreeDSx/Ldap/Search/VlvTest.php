@@ -148,7 +148,8 @@ class VlvTest extends LdapTestCase
             $this->vlv->getEntries()->count()
         );
         $this->assertGreaterThan(
-            325, $this->vlv->listOffset()
+            325,
+            $this->vlv->listOffset()
         );
         $this->assertLessThan(
             335,

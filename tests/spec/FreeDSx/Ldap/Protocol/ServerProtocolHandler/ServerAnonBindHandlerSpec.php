@@ -26,12 +26,12 @@ use Prophecy\Argument;
 
 class ServerAnonBindHandlerSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerAnonBindHandler::class);
     }
 
-    public function it_should_validate_the_version(ServerQueue $queue, RequestHandlerInterface $dispatcher)
+    public function it_should_validate_the_version(ServerQueue $queue, RequestHandlerInterface $dispatcher): void
     {
         $bind = new LdapMessageRequest(
             1,
@@ -46,7 +46,7 @@ class ServerAnonBindHandlerSpec extends ObjectBehavior
         );
     }
 
-    public function it_should_return_an_anon_token_with_the_supplied_username(ServerQueue $queue, RequestHandlerInterface $dispatcher)
+    public function it_should_return_an_anon_token_with_the_supplied_username(ServerQueue $queue, RequestHandlerInterface $dispatcher): void
     {
         $bind = new LdapMessageRequest(
             1,

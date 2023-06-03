@@ -17,27 +17,27 @@ use PhpSpec\ObjectBehavior;
 
 class ChildProcessSpec extends ObjectBehavior
 {
-    public function let(Socket $socket)
+    public function let(Socket $socket): void
     {
         $this->beConstructedWith(9001, $socket);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ChildProcess::class);
     }
 
-    public function it_should_get_the_pid()
+    public function it_should_get_the_pid(): void
     {
         $this->getPid()->shouldBeEqualTo(9001);
     }
 
-    public function it_should_get_the_socket()
+    public function it_should_get_the_socket(): void
     {
         $this->getSocket()->shouldBeAnInstanceOf(Socket::class);
     }
 
-    public function it_should_close_the_socket(Socket $socket)
+    public function it_should_close_the_socket(Socket $socket): void
     {
         $socket->close()->shouldBeCalled();
 

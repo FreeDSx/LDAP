@@ -25,12 +25,12 @@ use PhpSpec\ObjectBehavior;
 
 class ServerStartTlsHandlerSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerStartTlsHandler::class);
     }
 
-    public function it_should_handle_a_start_tls_request(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher)
+    public function it_should_handle_a_start_tls_request(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher): void
     {
         $queue->isEncrypted()->willReturn(false);
 
@@ -47,7 +47,7 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
         $this->handleRequest($startTls, $token, $dispatcher, $queue, ['ssl_cert' => 'foo']);
     }
 
-    public function it_should_send_back_an_error_if_the_queue_is_already_encrypted(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher)
+    public function it_should_send_back_an_error_if_the_queue_is_already_encrypted(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher): void
     {
         $queue->isEncrypted()->willReturn(true);
 
@@ -64,7 +64,7 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
         $this->handleRequest($startTls, $token, $dispatcher, $queue, ['ssl_cert' => 'foo']);
     }
 
-    public function it_should_send_back_an_error_if_encryption_is_not_supported(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher)
+    public function it_should_send_back_an_error_if_encryption_is_not_supported(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher): void
     {
         $queue->isEncrypted()->willReturn(false);
 

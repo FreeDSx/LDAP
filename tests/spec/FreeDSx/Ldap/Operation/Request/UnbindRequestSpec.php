@@ -19,22 +19,22 @@ use PhpSpec\ObjectBehavior;
 
 class UnbindRequestSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(UnbindRequest::class);
     }
 
-    public function it_should_form_correct_asn1()
+    public function it_should_form_correct_asn1(): void
     {
         $this->toAsn1()->shouldBeLike((new NullType())->setTagClass(NullType::TAG_CLASS_APPLICATION)->setTagNumber(2));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $this::fromAsn1(Asn1::null())->shouldBeLike(new UnbindRequest());
     }
 
-    public function it_should_not_be_constructed_from_invalid_asn1()
+    public function it_should_not_be_constructed_from_invalid_asn1(): void
     {
         $this->shouldThrow(ProtocolException::class)->during('fromAsn1', [Asn1::octetString('foo')]);
     }

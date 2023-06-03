@@ -17,32 +17,32 @@ use PhpSpec\ObjectBehavior;
 
 class BindTokenSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith('foo', 'bar');
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(BindToken::class);
     }
 
-    public function it_should_implement_token_interface()
+    public function it_should_implement_token_interface(): void
     {
         $this->shouldImplement(TokenInterface::class);
     }
 
-    public function it_should_get_the_username()
+    public function it_should_get_the_username(): void
     {
         $this->getUsername()->shouldBeEqualTo('foo');
     }
 
-    public function it_should_get_the_password()
+    public function it_should_get_the_password(): void
     {
         $this->getPassword()->shouldBeEqualTo('bar');
     }
 
-    public function it_should_get_the_version()
+    public function it_should_get_the_version(): void
     {
         $this->getVersion()->shouldBeEqualTo(3);
     }

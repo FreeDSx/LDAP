@@ -37,12 +37,9 @@ use Prophecy\Argument;
 
 class ServerPagingHandlerSpec extends ObjectBehavior
 {
-    /**
-     * @var RequestHistory
-     */
-    private $requestHistory;
+    private RequestHistory $requestHistory;
 
-    public function let(PagingHandlerInterface $pagingHandler)
+    public function let(PagingHandlerInterface $pagingHandler): void
     {
         $this->requestHistory = new RequestHistory();
 
@@ -52,7 +49,7 @@ class ServerPagingHandlerSpec extends ObjectBehavior
         );
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerPagingHandler::class);
     }
@@ -62,7 +59,7 @@ class ServerPagingHandlerSpec extends ObjectBehavior
         RequestHandlerInterface $handler,
         TokenInterface $token,
         PagingHandlerInterface $pagingHandler
-    ) {
+    ): void {
         $message = $this->makeSearchMessage();
 
         $entries = new Entries(
@@ -110,7 +107,7 @@ class ServerPagingHandlerSpec extends ObjectBehavior
         RequestHandlerInterface $handler,
         TokenInterface $token,
         PagingHandlerInterface $pagingHandler
-    ) {
+    ): void {
         $message = $this->makeSearchMessage();
 
         $entries = new Entries(
@@ -161,7 +158,7 @@ class ServerPagingHandlerSpec extends ObjectBehavior
         RequestHandlerInterface $handler,
         TokenInterface $token,
         PagingHandlerInterface $pagingHandler
-    ) {
+    ): void {
         $pagingReq = $this->makeExistingPagingRequest();
         $message = $this->makeSearchMessage(
             0,
@@ -198,7 +195,7 @@ class ServerPagingHandlerSpec extends ObjectBehavior
         RequestHandlerInterface $handler,
         TokenInterface $token,
         PagingHandlerInterface $pagingHandler
-    ) {
+    ): void {
         $this->makeExistingPagingRequest();
         $message = $this->makeSearchMessage(
             0,
@@ -238,7 +235,7 @@ class ServerPagingHandlerSpec extends ObjectBehavior
         ServerQueue $queue,
         RequestHandlerInterface $handler,
         TokenInterface $token
-    ) {
+    ): void {
         $message = $this->makeSearchMessage(
             0,
             'foo',

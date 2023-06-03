@@ -17,27 +17,27 @@ use PhpSpec\ObjectBehavior;
 
 class OperationExceptionSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(OperationException::class);
     }
 
-    public function it_should_have_a_default_code_of_operations_error()
+    public function it_should_have_a_default_code_of_operations_error(): void
     {
         $this->getCode()->shouldBeEqualTo(ResultCode::OPERATIONS_ERROR);
     }
 
-    public function it_should_get_the_code_short_string()
+    public function it_should_get_the_code_short_string(): void
     {
         $this->getCodeShort()->shouldBeEqualTo('operationsError');
     }
 
-    public function it_should_get_the_code_description()
+    public function it_should_get_the_code_description(): void
     {
         $this->getCodeDescription()->shouldBeEqualTo(ResultCode::MEANING_DESCRIPTION[ResultCode::OPERATIONS_ERROR]);
     }
 
-    public function it_should_generate_a_message_if_none_was_provided()
+    public function it_should_generate_a_message_if_none_was_provided(): void
     {
         $this->getMessage()->shouldBeEqualTo('The result code 1 was thrown (operationsError). Indicates that the operation is not properly sequenced with relation to other operations (of same or different type).');
     }

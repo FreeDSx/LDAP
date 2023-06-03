@@ -25,7 +25,7 @@ use PhpSpec\ObjectBehavior;
 
 class PagingSpec extends ObjectBehavior
 {
-    public function let(LdapClient $client, SearchRequest $search)
+    public function let(LdapClient $client, SearchRequest $search): void
     {
         $client->sendAndReceive($search, new PagingControl(1000, ''))->willReturn(new LdapMessageResponse(
             1,
@@ -36,23 +36,23 @@ class PagingSpec extends ObjectBehavior
         $this->beConstructedWith($client, $search, 1000);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(Paging::class);
     }
 
-    public function it_should_check_whether_paging_has_entries_left_and_return_true_on_start()
+    public function it_should_check_whether_paging_has_entries_left_and_return_true_on_start(): void
     {
         $this->hasEntries()->shouldBeEqualTo(true);
     }
 
-    public function it_should_return_true_for_entries_when_the_cookie_is_not_empty()
+    public function it_should_return_true_for_entries_when_the_cookie_is_not_empty(): void
     {
         $this->getEntries();
         $this->hasEntries()->shouldBeEqualTo(true);
     }
 
-    public function it_should_return_false_for_entries_when_the_cookie_is_empty($client, $search)
+    public function it_should_return_false_for_entries_when_the_cookie_is_empty($client, $search): void
     {
         $client->sendAndReceive($search, new PagingControl(100, ''))->willReturn(
             new LdapMessageResponse(
@@ -66,7 +66,7 @@ class PagingSpec extends ObjectBehavior
         $this->hasEntries()->shouldBeEqualTo(false);
     }
 
-    public function it_should_abort_a_paging_operation_if_end_is_called($client, $search)
+    public function it_should_abort_a_paging_operation_if_end_is_called($client, $search): void
     {
         $client->sendAndReceive($search, new PagingControl(0, 'foo'))->shouldBeCalled()->willReturn(new LdapMessageResponse(
             1,
@@ -78,14 +78,14 @@ class PagingSpec extends ObjectBehavior
         $this->end();
     }
 
-    public function it_should_get_the_size_estimate_from_the_server_response()
+    public function it_should_get_the_size_estimate_from_the_server_response(): void
     {
         $this->sizeEstimate()->shouldBe(null);
         $this->getEntries();
         $this->sizeEstimate()->shouldBeEqualTo(100);
     }
 
-    public function it_should_get_the_entries_from_the_response()
+    public function it_should_get_the_entries_from_the_response(): void
     {
         $this->getEntries()->shouldBeLike(new Entries(Entry::create('foo'), Entry::create('bar')));
     }
@@ -93,7 +93,7 @@ class PagingSpec extends ObjectBehavior
     public function it_should_get_marked_as_ended_if_not_critical_and_no_control_is_returned(
         LdapClient $newClient,
         SearchRequest $searchRequest
-    ) {
+    ): void {
         $newClient->sendAndReceive(
             $searchRequest,
             (new PagingControl(1000, ''))->setCriticality(false)
@@ -121,7 +121,7 @@ class PagingSpec extends ObjectBehavior
     public function it_should_throw_an_exception_if_marked_as_critical_and_no_control_is_received(
         LdapClient $newClient,
         SearchRequest $searchRequest
-    ) {
+    ): void {
         $newClient->sendAndReceive(
             $searchRequest,
             (new PagingControl(1000, ''))->setCriticality(true)

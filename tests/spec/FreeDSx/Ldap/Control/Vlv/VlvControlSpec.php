@@ -19,40 +19,40 @@ use PhpSpec\ObjectBehavior;
 
 class VlvControlSpec extends ObjectBehavior
 {
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(10, 9, 8, 0);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(VlvControl::class);
     }
 
-    public function it_should_have_a_count_of_zero_by_default()
+    public function it_should_have_a_count_of_zero_by_default(): void
     {
         $this->getCount()->shouldBeEqualTo(0);
     }
 
-    public function it_should_get_and_set_the_value_for_after()
+    public function it_should_get_and_set_the_value_for_after(): void
     {
         $this->getAfter()->shouldBeEqualTo(9);
         $this->setBefore(10)->getBefore()->shouldBeEqualTo(10);
     }
 
-    public function it_should_get_and_set_the_value_for_before()
+    public function it_should_get_and_set_the_value_for_before(): void
     {
         $this->getBefore()->shouldBeEqualTo(10);
         $this->setBefore(20)->getBefore()->shouldBeEqualTo(20);
     }
 
-    public function it_should_get_and_set_the_value_for_the_offset()
+    public function it_should_get_and_set_the_value_for_the_offset(): void
     {
         $this->getOffset()->shouldBeEqualTo(8);
         $this->setOffset(16)->getOffset()->shouldBeEqualTo(16);
     }
 
-    public function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1(): void
     {
         $encoder = new LdapEncoder();
         $this->toAsn1()->shouldBeLike(Asn1::sequence(

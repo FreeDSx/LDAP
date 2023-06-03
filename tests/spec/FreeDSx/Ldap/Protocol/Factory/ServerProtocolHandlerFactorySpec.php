@@ -33,7 +33,7 @@ use PhpSpec\ObjectBehavior;
 
 class ServerProtocolHandlerFactorySpec extends ObjectBehavior
 {
-    public function let(HandlerFactoryInterface $handlerFactory)
+    public function let(HandlerFactoryInterface $handlerFactory): void
     {
         $this->beConstructedWith(
             $handlerFactory,
@@ -41,22 +41,22 @@ class ServerProtocolHandlerFactorySpec extends ObjectBehavior
         );
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerProtocolHandlerFactory::class);
     }
 
-    public function it_should_get_a_start_tls_hanlder()
+    public function it_should_get_a_start_tls_hanlder(): void
     {
         $this->get(Operations::extended(ExtendedRequest::OID_START_TLS), new ControlBag())->shouldBeLike(new ServerStartTlsHandler());
     }
 
-    public function it_should_get_a_whoami_handler()
+    public function it_should_get_a_whoami_handler(): void
     {
         $this->get(Operations::whoami(), new ControlBag())->shouldBeLike(new ServerWhoAmIHandler());
     }
 
-    public function it_should_get_a_search_handler()
+    public function it_should_get_a_search_handler(): void
     {
         $this->get(Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'), new ControlBag())->shouldBeLike(new ServerSearchHandler());
     }
@@ -64,7 +64,7 @@ class ServerProtocolHandlerFactorySpec extends ObjectBehavior
     public function it_should_get_a_paging_handler_when_supported(
         HandlerFactoryInterface $handlerFactory,
         PagingHandlerInterface $pagingHandler
-    ) {
+    ): void {
         $controls = new ControlBag(new PagingControl(10));
 
         $handlerFactory->makePagingHandler()
@@ -74,7 +74,7 @@ class ServerProtocolHandlerFactorySpec extends ObjectBehavior
         $this->get(Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'), $controls)->shouldBeAnInstanceOf(ServerPagingHandler::class);
     }
 
-    public function it_should_get_a_paging_unsupported_handler_when_no_paging_handler_exists(HandlerFactoryInterface $handlerFactory)
+    public function it_should_get_a_paging_unsupported_handler_when_no_paging_handler_exists(HandlerFactoryInterface $handlerFactory): void
     {
         $controls = new ControlBag(new PagingControl(10));
 
@@ -85,17 +85,17 @@ class ServerProtocolHandlerFactorySpec extends ObjectBehavior
         $this->get(Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'), $controls)->shouldBeAnInstanceOf(ServerPagingUnsupportedHandler::class);
     }
 
-    public function it_should_get_a_root_dse_handler()
+    public function it_should_get_a_root_dse_handler(): void
     {
         $this->get(Operations::read(''), new ControlBag())->shouldBeLike(new ServerRootDseHandler());
     }
 
-    public function it_should_get_an_unbind_handler()
+    public function it_should_get_an_unbind_handler(): void
     {
         $this->get(Operations::unbind(), new ControlBag())->shouldBeLike(new ServerUnbindHandler());
     }
 
-    public function it_should_get_the_dispatch_handler_for_common_requests()
+    public function it_should_get_the_dispatch_handler_for_common_requests(): void
     {
         $this->get(Operations::add(Entry::fromArray('cn=foo')), new ControlBag())->shouldBeLike(new ServerDispatchHandler());
         $this->get(Operations::delete('cn=foo'), new ControlBag())->shouldBeLike(new ServerDispatchHandler());

@@ -31,24 +31,24 @@ class ProxyHandlerSpec extends ObjectBehavior
     public function let(
         LdapClient $client,
         RequestContext $context
-    ) {
+    ): void {
         $context->controls()->willReturn(new ControlBag());
         $context->token()->willReturn(new BindToken('foo', 'bar'));
 
         $this->beConstructedWith($client);
     }
 
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(ProxyHandler::class);
     }
 
-    public function it_should_implement_request_handler_interface()
+    public function it_should_implement_request_handler_interface(): void
     {
         $this->shouldImplement(RequestHandlerInterface::class);
     }
 
-    public function it_should_implement_root_dse_handler_interface()
+    public function it_should_implement_root_dse_handler_interface(): void
     {
         $this->shouldImplement(RootDseHandlerInterface::class);
     }
@@ -57,7 +57,7 @@ class ProxyHandlerSpec extends ObjectBehavior
         LdapClient $client,
         RequestContext $context,
         SearchRequest $request
-    ) {
+    ): void {
         $rootDse = new Entry('');
         $client->search($request, Argument::any())
             ->shouldBeCalled()
@@ -70,7 +70,7 @@ class ProxyHandlerSpec extends ObjectBehavior
         LdapClient $client,
         RequestContext $context,
         SearchRequest $request
-    ) {
+    ): void {
         $client->search($request, Argument::any())
             ->shouldBeCalled()
             ->willReturn(new Entries());

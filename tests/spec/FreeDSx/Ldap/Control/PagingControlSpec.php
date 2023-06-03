@@ -19,35 +19,35 @@ use PhpSpec\ObjectBehavior;
 
 class PagingControlSpec extends ObjectBehavior
 {
-    public function it_is_initializable()
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(PagingControl::class);
     }
-    public function let()
+    public function let(): void
     {
         $this->beConstructedWith(0, 'foo');
     }
 
-    public function it_should_default_to_an_empty_cookie_on_construction()
+    public function it_should_default_to_an_empty_cookie_on_construction(): void
     {
         $this->beConstructedWith(10);
 
         $this->getCookie()->shouldBeEqualTo('');
     }
 
-    public function it_should_set_the_size()
+    public function it_should_set_the_size(): void
     {
         $this->getSize(0);
         $this->setSize(1)->getSize()->shouldBeEqualTo(1);
     }
 
-    public function it_should_set_the_cookie()
+    public function it_should_set_the_cookie(): void
     {
         $this->getCookie()->shouldBeEqualTo('foo');
         $this->setCookie('bar')->getCookie()->shouldBeEqualTo('bar');
     }
 
-    public function it_should_generate_correct_asn1()
+    public function it_should_generate_correct_asn1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -61,7 +61,7 @@ class PagingControlSpec extends ObjectBehavior
         ));
     }
 
-    public function it_should_be_constructed_from_asn1()
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
 
