@@ -35,15 +35,9 @@ use Prophecy\Argument;
 
 class ClientSaslBindHandlerSpec extends ObjectBehavior
 {
-    /**
-     * @var LdapMessageResponse
-     */
-    protected $saslChallenge;
+    private LdapMessageResponse $saslChallenge;
 
-    /**
-     * @var LdapMessageResponse
-     */
-    protected $saslComplete;
+    private LdapMessageResponse $saslComplete;
 
     public function let(Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue, ClientProtocolHandler $protocolHandler): void
     {
