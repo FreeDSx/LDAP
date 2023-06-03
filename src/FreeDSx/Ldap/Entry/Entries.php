@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -14,6 +16,7 @@ namespace FreeDSx\Ldap\Entry;
 use ArrayIterator;
 use Countable;
 use IteratorAggregate;
+use Stringable;
 use Traversable;
 use function array_merge;
 use function array_search;
@@ -82,10 +85,10 @@ class Entries implements Countable, IteratorAggregate
     /**
      * Get an entry from the collection by its DN.
      */
-    public function get(string $dn): ?Entry
+    public function get(Stringable|string $dn): ?Entry
     {
         foreach ($this->entries as $entry) {
-            if ($entry->getDn()->toString() === $dn) {
+            if ($entry->getDn()->toString() === (string) $dn) {
                 return $entry;
             }
         }

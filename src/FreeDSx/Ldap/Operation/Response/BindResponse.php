@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -40,7 +42,7 @@ class BindResponse extends LdapResult
         $this->saslCreds = $saslCreds;
         parent::__construct(
             $result->getResultCode(),
-            $result->getDn(),
+            $result->getDn()->toString(),
             $result->getDiagnosticMessage(),
             ...$result->getReferrals()
         );

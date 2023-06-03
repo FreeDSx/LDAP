@@ -76,6 +76,24 @@ class EntrySpec extends ObjectBehavior
         ]);
     }
 
+    public function it_should_be_constructed_from_an_array_using_fromArray_when_not_all_data_are_strings(): void
+    {
+        $this->beConstructedThrough('fromArray', ['cn=foobar,dc=example,dc=local', [
+            'cn' => 'foobar',
+            'telephoneNumber' => [123, 456],
+            'is_bad_idea' => true,
+        ]]);
+
+        $this->getDn()
+            ->shouldBeLike(new Dn('cn=foobar,dc=example,dc=local'));
+        $this->getAttributes()
+            ->shouldBeLike([
+                new Attribute('cn', 'foobar'),
+                new Attribute('telephoneNumber', '123', '456'),
+                new Attribute('is_bad_idea', '1')
+            ]);
+    }
+
     public function it_should_get_the_entry_as_an_associative_array()
     {
         $this->toArray()->shouldBeEqualTo([

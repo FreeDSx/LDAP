@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -122,15 +124,21 @@ class ExtendedResponse extends LdapResult
     /**
      * @return array{0: ?string, 1: ?string}
      */
-    protected static function parseExtendedResponse(AbstractType $type): array
+    private static function parseExtendedResponse(AbstractType $type): array
     {
         $info = [0 => null, 1 => null];
 
         foreach ($type->getChildren() as $child) {
             if ($child->getTagNumber() === 10) {
-                $info[0] = $child->getValue();
+                $value = $child->getValue();
+                $info[0] = $value !== null
+                    ? (string) $value
+                    : null;
             } elseif ($child->getTagNumber() === 11) {
-                $info[1] = $child->getValue();
+                $value = $child->getValue();
+                $info[1] = $value !== null
+                    ? (string) $value
+                    : null;
             }
         }
 

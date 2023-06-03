@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -80,7 +82,7 @@ class PolicyHintsControl extends Control
         if (!$isEnabled instanceof IntegerType) {
             throw new ProtocolException('A PolicyHints control value sequence 0 must be an integer type.');
         }
-        $control = new static($isEnabled->getValue());
+        $control = new static((bool) $isEnabled->getValue());
 
         return self::mergeControlData(
             $control,

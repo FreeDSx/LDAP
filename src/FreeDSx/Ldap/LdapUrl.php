@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -77,7 +79,7 @@ class LdapUrl implements Stringable
     {
         $this->dn = $dn === null
             ? $dn
-            : new Dn($dn);
+            : new Dn((string) $dn);
 
         return $this;
     }
@@ -207,7 +209,10 @@ class LdapUrl implements Stringable
             $url .= ':' . $this->port;
         }
 
-        return $url . '/' . self::encode($this->dn) . $this->getQueryString();
+        return $url
+            . '/'
+            . ($this->dn !== null ? self::encode($this->dn->toString()) : '')
+            . $this->getQueryString();
     }
 
     public function __toString(): string

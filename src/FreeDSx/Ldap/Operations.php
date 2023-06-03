@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -35,6 +37,7 @@ use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
+use Stringable;
 
 /**
  * Provides a set of factory methods to help quickly construct different operations/requests.
@@ -109,12 +112,12 @@ class Operations
      * A comparison operation to check if an entry has an attribute with a certain value.
      */
     public static function compare(
-        string $dn,
+        Stringable|string $dn,
         string $attributeName,
         string $value
     ): CompareRequest {
         return new CompareRequest(
-            dn: $dn,
+            dn: (string) $dn,
             filter: Filters::equal(
                 attribute: $attributeName,
                 value: $value,
@@ -147,11 +150,11 @@ class Operations
      * Perform modification(s) on an LDAP entry.
      */
     public static function modify(
-        string $dn,
+        Stringable|string $dn,
         Change ...$changes,
     ): ModifyRequest {
         return new ModifyRequest(
-            $dn,
+            (string) $dn,
             ...$changes
         );
     }
@@ -162,16 +165,16 @@ class Operations
      * @throws UnexpectedValueException
      */
     public static function move(
-        string $dn,
-        string $newParentDn,
+        Stringable|string $dn,
+        Stringable|string $newParentDn,
     ): ModifyDnRequest {
-        $dnObj = new Dn($dn);
+        $dnObj = new Dn((string) $dn);
 
         return new ModifyDnRequest(
-            dn: $dn,
+            dn: (string) $dn,
             newRdn: $dnObj->getRdn()->toString(),
             deleteOldRdn: true,
-            newParentDn: $newParentDn,
+            newParentDn: (string) $newParentDn,
         );
     }
 
@@ -202,12 +205,12 @@ class Operations
      * Rename an LDAP entry by modifying its RDN.
      */
     public static function rename(
-        string|Dn $dn,
-        string|Rdn $rdn,
+        Stringable|string|Dn $dn,
+        Stringable|string|Rdn $rdn,
         bool $deleteOldRdn = true
     ): ModifyDnRequest {
         return new ModifyDnRequest(
-            dn: $dn,
+            dn: $dn ,
             newRdn: $rdn,
             deleteOldRdn: $deleteOldRdn,
         );

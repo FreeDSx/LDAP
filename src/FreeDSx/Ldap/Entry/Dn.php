@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -118,10 +120,10 @@ class Dn implements IteratorAggregate, Countable, Stringable
         return ($this->pieces === null) ? [] : $this->pieces;
     }
 
-    public static function isValid(string $dn): bool
+    public static function isValid(Stringable|string $dn): bool
     {
         try {
-            (new self($dn))->toArray();
+            (new self((string) $dn))->toArray();
 
             return true;
         } catch (UnexpectedValueException | InvalidArgumentException $e) {

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -345,7 +347,7 @@ class SearchRequest implements RequestInterface
         }
 
         return Asn1::application(self::APP_TAG, Asn1::sequence(
-            Asn1::octetString($this->baseDn),
+            Asn1::octetString($this->baseDn->toString()),
             Asn1::enumerated($this->scope),
             Asn1::enumerated($this->derefAliases),
             Asn1::integer($this->sizeLimit),

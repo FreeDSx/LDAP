@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -30,7 +32,7 @@ class SearchResponse extends LdapResult
         $this->entries = $entries;
         parent::__construct(
             $result->resultCode,
-            $result->dn,
+            $result->dn->toString(),
             $result->diagnosticMessage,
             ...$result->referrals
         );
