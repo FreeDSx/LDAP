@@ -207,7 +207,7 @@ class LdapServerTest extends ServerTestCase
         $rootDse = $this->ldapClient()->read();
 
         $this->assertNotNull($rootDse);
-        $this->assertEquals(
+        $this->assertSame(
             [
                 'namingContexts' => [
                     'dc=FreeDSx,dc=local',
@@ -283,7 +283,7 @@ class LdapServerTest extends ServerTestCase
         $this->authenticate();
         $output = $this->ldapClient()->whoami();
 
-        $this->assertEquals('dn:cn=user,dc=foo,dc=bar', $output);
+        $this->assertSame('dn:cn=user,dc=foo,dc=bar', $output);
     }
 
     public function testWhoAmIWhenNotAuthenticated(): void
