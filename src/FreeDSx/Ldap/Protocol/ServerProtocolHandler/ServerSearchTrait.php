@@ -49,7 +49,7 @@ trait ServerSearchTrait
 
         $messages[] = new LdapMessageResponse(
             $message->getMessageId(),
-            new SearchResultDone(ResultCode::SUCCESS),
+            new SearchResultDone( $entries->count() ? ResultCode::SUCCESS : ResultCode::NO_SUCH_OBJECT ),
             ...$controls
         );
 
