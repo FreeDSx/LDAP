@@ -54,7 +54,7 @@ class LdapClientTest extends LdapTestCase
             BindResponse::class,
             $response
         );
-        $this->assertEquals(
+        $this->assertSame(
             0,
             $response->getResultCode()
         );
@@ -69,7 +69,7 @@ class LdapClientTest extends LdapTestCase
             BindResponse::class,
             $response
         );
-        $this->assertEquals(
+        $this->assertSame(
             0,
             $response->getResultCode()
         );
@@ -84,7 +84,7 @@ class LdapClientTest extends LdapTestCase
             BindResponse::class,
             $response
         );
-        $this->assertEquals(
+        $this->assertSame(
             0,
             $response->getResultCode()
         );
@@ -105,7 +105,7 @@ class LdapClientTest extends LdapTestCase
             BindResponse::class,
             $response
         );
-        $this->assertEquals(
+        $this->assertSame(
             0,
             $response->getResultCode()
         );
@@ -123,7 +123,7 @@ class LdapClientTest extends LdapTestCase
             BindResponse::class,
             $response
         );
-        $this->assertEquals(
+        $this->assertSame(
             0,
             $response->getResultCode()
         );
@@ -184,7 +184,7 @@ class LdapClientTest extends LdapTestCase
             AddResponse::class,
             $response
         );
-        $this->assertEquals(
+        $this->assertSame(
             0,
             $response->getResultCode()
         );
@@ -197,7 +197,7 @@ class LdapClientTest extends LdapTestCase
             array_keys($attributes)
         );
 
-        $this->assertEquals(
+        $this->assertSame(
             $attributes,
             $entry->toArray()
         );
@@ -224,11 +224,11 @@ class LdapClientTest extends LdapTestCase
             Entry::class,
             $entry
         );
-        $this->assertEquals(
+        $this->assertSame(
             strtolower($entry->getDn()->toString()),
             strtolower('cn=Carmelina Esposito,ou=Product Testing,ou=FreeDSx-Test,dc=example,dc=com')
         );
-        $this->assertEquals(
+        $this->assertSame(
             $entry->toArray(),
             $attributes
         );
@@ -245,7 +245,7 @@ class LdapClientTest extends LdapTestCase
             DeleteResponse::class,
             $response
         );
-        $this->assertEquals(
+        $this->assertSame(
             0,
             $response->getResultCode()
         );
@@ -266,7 +266,7 @@ class LdapClientTest extends LdapTestCase
             ->getResponse();
 
         $this->assertInstanceOf(ModifyResponse::class, $response);
-        $this->assertEquals(0, $response->getResultCode());
+        $this->assertSame(0, $response->getResultCode());
         $this->assertEmpty($entry->changes()->toArray());
 
         $modified = $this->client->readOrFail(
@@ -278,7 +278,7 @@ class LdapClientTest extends LdapTestCase
                 'title',
             ]
         );
-        $this->assertEquals(
+        $this->assertSame(
             [
                 'mobile' => ['+1 555 555-5555'],
                 'title' => ['Head Payroll Dude']
@@ -308,7 +308,7 @@ class LdapClientTest extends LdapTestCase
             Entry::class,
             $entry
         );
-        $this->assertEquals(
+        $this->assertSame(
             ['Arleen Sevigny-Foo'],
             $entry->get('cn')?->getValues()
         );
@@ -376,7 +376,7 @@ class LdapClientTest extends LdapTestCase
             Entries::class,
             $entries
         );
-        $this->assertEquals(
+        $this->assertSame(
             843,
             $entries->count()
         );
@@ -395,13 +395,13 @@ class LdapClientTest extends LdapTestCase
             Entries::class,
             $entries
         );
-        $this->assertEquals(
+        $this->assertSame(
             100,
             $entries->count()
         );
 
         foreach ($entries->toArray() as $entry) {
-            $this->assertEquals(
+            $this->assertSame(
                 strtolower('ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com'),
                 strtolower((string) $entry->getDn()->getParent()?->toString())
             );

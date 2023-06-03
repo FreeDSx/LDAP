@@ -50,7 +50,7 @@ class RangeRetrievalTest extends LdapTestCase
             'member'
         );
 
-        $this->assertEquals(
+        $this->assertSame(
             10001,
             count($result->getValues())
         );

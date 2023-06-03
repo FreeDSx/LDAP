@@ -60,7 +60,7 @@ class PagingTest extends LdapTestCase
     {
         $entries = $this->paging->getEntries();
 
-        $this->assertEquals(
+        $this->assertSame(
             1000,
             $entries->count()
         );
@@ -69,7 +69,7 @@ class PagingTest extends LdapTestCase
             $entries->add(...$this->paging->getEntries());
         }
 
-        $this->assertEquals(
+        $this->assertSame(
             10001,
             $entries->count()
         );
@@ -79,7 +79,7 @@ class PagingTest extends LdapTestCase
     {
         $entries = $this->paging->getEntries(100);
 
-        $this->assertEquals(
+        $this->assertSame(
             100,
             $entries->count()
         );

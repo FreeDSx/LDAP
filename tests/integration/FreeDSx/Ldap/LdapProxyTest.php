@@ -58,7 +58,7 @@ class LdapProxyTest extends ServerTestCase
 
         $entries = $paging->getEntries();
 
-        $this->assertEquals(
+        $this->assertSame(
             1000,
             $entries->count()
         );
@@ -67,7 +67,7 @@ class LdapProxyTest extends ServerTestCase
             $entries->add(...$paging->getEntries());
         }
 
-        $this->assertEquals(
+        $this->assertSame(
             10001,
             $entries->count()
         );
