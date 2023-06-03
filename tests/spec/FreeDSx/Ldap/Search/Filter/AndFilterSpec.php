@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -57,7 +59,7 @@ class AndFilterSpec extends ObjectBehavior
     {
         $this->get()->shouldBeLike([
            Filters::equal('foo', 'bar'),
-           Filters::gte('foo', 2)
+           Filters::gte('foo', '2')
         ]);
     }
 
