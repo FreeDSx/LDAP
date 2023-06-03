@@ -47,7 +47,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     /**
      * @var array<string, mixed>
      */
-    protected array $options;
+    private array $options;
 
     /**
      * @var ChildProcess[]
