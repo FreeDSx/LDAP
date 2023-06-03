@@ -222,7 +222,12 @@ class LdapUrlSpec extends ObjectBehavior
     public function it_should_set_the_attributes(): void
     {
         $this->getAttributes()->shouldBeEqualTo([]);
-        $this->setAttributes('foo', 'bar')->getAttributes()->shouldBeLike([new Attribute('foo'), new Attribute('bar')]);
+        $this->setAttributes('foo', 'bar')
+            ->getAttributes()
+            ->shouldBeLike([
+                new Attribute('foo'),
+                new Attribute('bar')
+            ]);
     }
 
     public function it_should_set_the_host(): void
@@ -234,17 +239,28 @@ class LdapUrlSpec extends ObjectBehavior
     public function it_should_set_whether_or_not_ssl_is_used(): void
     {
         $this->getUseSsl()->shouldBeEqualTo(false);
-        $this->setUseSsl(true)->getUseSsl()->shouldBeEqualTo(true);
+        $this->setUseSsl(true)
+            ->getUseSsl()
+            ->shouldBeEqualTo(true);
     }
 
     public function it_should_throw_an_error_if_the_scheme_is_not_ldap(): void
     {
-        $this->shouldThrow(UrlParseException::class)->during('parse', ['https://foo/?']);
-        $this->shouldThrow(UrlParseException::class)->during('parse', ['https:///?']);
+        $this->shouldThrow(UrlParseException::class)->during(
+            'parse',
+            ['https://foo/?']
+        );
+        $this->shouldThrow(UrlParseException::class)->during(
+            'parse',
+            ['https:///?']
+        );
     }
 
     public function it_should_throw_an_error_on_a_malformed_url(): void
     {
-        $this->shouldThrow(UrlParseException::class)->during('parse', ['ldap']);
+        $this->shouldThrow(UrlParseException::class)->during(
+            'parse',
+            ['ldap']
+        );
     }
 }
