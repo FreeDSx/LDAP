@@ -38,12 +38,24 @@ class ControlsSpec extends ObjectBehavior
 
     public function it_should_create_a_paging_control(): void
     {
-        $this->paging(100)->shouldBeLike(new PagingControl(100, ''));
+        $this->paging(100)
+            ->shouldBeLike(new PagingControl(
+                100,
+                ''
+            ));
     }
 
     public function it_should_create_a_vlv_offset_control(): void
     {
-        $this->vlv(10, 12)->shouldBeLike(new VlvControl(10, 12, 1, 0));
+        $this->vlv(
+            10,
+            12
+        )->shouldBeLike(new VlvControl(
+            10,
+            12,
+            1,
+            0
+        ));
     }
 
     public function it_should_create_a_vlv_filter_control(): void
