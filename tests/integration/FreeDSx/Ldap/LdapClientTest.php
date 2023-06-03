@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -22,13 +24,11 @@ use FreeDSx\Ldap\Operation\Response\ModifyDnResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyResponse;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
+use Throwable;
 
 class LdapClientTest extends LdapTestCase
 {
-    /**
-     * @var LdapClient
-     */
-    protected $client;
+    private LdapClient $client;
 
     public function setUp(): void
     {
@@ -39,36 +39,58 @@ class LdapClientTest extends LdapTestCase
     {
         try {
             @$this->client->unbind();
-        } catch (\Exception|\Throwable $exception) {
+        } catch (Throwable) {
         }
     }
 
-    public function testUsernamePasswordBind()
+    public function testUsernamePasswordBind(): void
     {
-        $response = $this->client->bind($_ENV['LDAP_USERNAME'], $_ENV['LDAP_PASSWORD'])->getResponse();
+        $response = $this->client->bind(
+            $_ENV['LDAP_USERNAME'],
+            $_ENV['LDAP_PASSWORD']
+        )->getResponse();
 
-        $this->assertInstanceOf(BindResponse::class, $response);
-        $this->assertEquals(0, $response->getResultCode());
+        $this->assertInstanceOf(
+            BindResponse::class,
+            $response
+        );
+        $this->assertEquals(
+            0,
+            $response->getResultCode()
+        );
     }
 
-    public function testAnonymousBind()
+    public function testAnonymousBind(): void
     {
-        $response = $this->client->send(Operations::bindAnonymously())->getResponse();
+        $response = $this->client->send(Operations::bindAnonymously())
+            ?->getResponse();
 
-        $this->assertInstanceOf(BindResponse::class, $response);
-        $this->assertEquals(0, $response->getResultCode());
+        $this->assertInstanceOf(
+            BindResponse::class,
+            $response
+        );
+        $this->assertEquals(
+            0,
+            $response->getResultCode()
+        );
     }
 
-    public function testSaslBindWithAutoSelectingTheMechanism()
+    public function testSaslBindWithAutoSelectingTheMechanism(): void
     {
         $response = $this->client->bindSasl($this->getSaslOptions());
         $response = $response->getResponse();
 
-        $this->assertInstanceOf(BindResponse::class, $response);
-        $this->assertEquals(0, $response->getResultCode());
+        $this->assertInstanceOf(
+            BindResponse::class,
+            $response
+        );
+        $this->assertEquals(
+            0,
+            $response->getResultCode()
+        );
     }
 
-    public function testSaslBindWithCramMD5()
+    public function testSaslBindWithCramMD5(): void
     {
         if ($this->isActiveDirectory()) {
             $this->markTestSkipped('CRAM-MD5 not supported on AD.');
@@ -79,11 +101,17 @@ class LdapClientTest extends LdapTestCase
         );
         $response = $response->getResponse();
 
-        $this->assertInstanceOf(BindResponse::class, $response);
-        $this->assertEquals(0, $response->getResultCode());
+        $this->assertInstanceOf(
+            BindResponse::class,
+            $response
+        );
+        $this->assertEquals(
+            0,
+            $response->getResultCode()
+        );
     }
 
-    public function testSaslBindWithDigestMD5()
+    public function testSaslBindWithDigestMD5(): void
     {
         $response = $this->client->bindSasl(
             $this->getSaslOptions(),
@@ -91,11 +119,16 @@ class LdapClientTest extends LdapTestCase
         );
         $response = $response->getResponse();
 
-        $this->assertInstanceOf(BindResponse::class, $response);
-        $this->assertEquals(0, $response->getResultCode());
+        $this->assertInstanceOf(
+            BindResponse::class,
+            $response
+        );
+        $this->assertEquals(
+            0, $response->getResultCode()
+        );
     }
 
-    public function testSaslBindWithAnIntegritySecurityLayerIsFunctional()
+    public function testSaslBindWithAnIntegritySecurityLayerIsFunctional(): void
     {
         $this->client->bindSasl(
             array_merge($this->getSaslOptions(), ['use_integrity' => true]),
@@ -103,21 +136,32 @@ class LdapClientTest extends LdapTestCase
         );
         $entry = $this->client->read('', ['supportedSaslMechanisms']);
 
-        $this->assertInstanceOf(Entry::class, $entry);
+        $this->assertInstanceOf(
+            Entry::class,
+            $entry
+        );
     }
 
-    public function testCompareOperation()
+    public function testCompareOperation(): void
     {
         $this->bindClient($this->client);
 
-        $success = $this->client->compare('cn=Birgit Pankhurst,ou=Janitorial,ou=FreeDSx-Test,dc=example,dc=com', 'cn', 'Birgit Pankhurst');
-        $failure = $this->client->compare('cn=Birgit Pankhurst,ou=Janitorial,ou=FreeDSx-Test,dc=example,dc=com', 'cn', 'foo');
+        $success = $this->client->compare(
+            'cn=Birgit Pankhurst,ou=Janitorial,ou=FreeDSx-Test,dc=example,dc=com',
+            'cn',
+            'Birgit Pankhurst'
+        );
+        $failure = $this->client->compare(
+            'cn=Birgit Pankhurst,ou=Janitorial,ou=FreeDSx-Test,dc=example,dc=com',
+            'cn',
+            'foo'
+        );
 
         $this->assertTrue($success);
         $this->assertFalse($failure);
     }
 
-    public function testCreateOperation()
+    public function testCreateOperation(): void
     {
         $this->bindClient($this->client);
 
@@ -130,18 +174,35 @@ class LdapClientTest extends LdapTestCase
             'givenName' => ['Foo'],
         ];
 
-        $response = $this->client->create(Entry::fromArray('cn=Foo,ou=FreeDSx-Test,dc=example,dc=com', $attributes))->getResponse();
-        $this->assertInstanceOf(AddResponse::class, $response);
-        $this->assertEquals(0, $response->getResultCode());
+        $response = $this->client->create(Entry::fromArray(
+            'cn=Foo,ou=FreeDSx-Test,dc=example,dc=com',
+            $attributes
+        ))->getResponse();
+
+        $this->assertInstanceOf(
+            AddResponse::class,
+            $response
+        );
+        $this->assertEquals(
+            0,
+            $response->getResultCode()
+        );
 
         # Testing across AD / OpenLDAP. Ignore the ObjectClass differences...
         unset($attributes['objectClass']);
 
-        $entry = $this->client->read('cn=Foo,ou=FreeDSx-Test,dc=example,dc=com', array_keys($attributes));
-        $this->assertEquals($attributes, $entry->toArray());
+        $entry = $this->client->readOrFail(
+            'cn=Foo,ou=FreeDSx-Test,dc=example,dc=com',
+            array_keys($attributes)
+        );
+
+        $this->assertEquals(
+            $attributes,
+            $entry->toArray()
+        );
     }
 
-    public function testReadOperation()
+    public function testReadOperation(): void
     {
         $this->bindClient($this->client);
 
@@ -153,23 +214,43 @@ class LdapClientTest extends LdapTestCase
             'l' => ['San Jose'],
             'postalAddress' => ['Product Testing$San Jose'],
         ];
-        $entry = $this->client->read('cn=Carmelina Esposito,ou=Product Testing,ou=FreeDSx-Test,dc=example,dc=com', array_keys($attributes));
+        $entry = $this->client->read(
+            'cn=Carmelina Esposito,ou=Product Testing,ou=FreeDSx-Test,dc=example,dc=com',
+            array_keys($attributes)
+        );
 
-        $this->assertInstanceOf(Entry::class, $entry);
-        $this->assertEquals(strtolower($entry->getDn()->toString()), strtolower('cn=Carmelina Esposito,ou=Product Testing,ou=FreeDSx-Test,dc=example,dc=com'));
-        $this->assertEquals($entry->toArray(), $attributes);
+        $this->assertInstanceOf(
+            Entry::class,
+            $entry
+        );
+        $this->assertEquals(
+            strtolower($entry->getDn()->toString()),
+            strtolower('cn=Carmelina Esposito,ou=Product Testing,ou=FreeDSx-Test,dc=example,dc=com')
+        );
+        $this->assertEquals(
+            $entry->toArray(),
+            $attributes
+        );
     }
 
-    public function testDeleteOperation()
+    public function testDeleteOperation(): void
     {
         $this->bindClient($this->client);
 
-        $response = $this->client->delete('cn=Foo,ou=FreeDSx-Test,dc=example,dc=com')->getResponse();
-        $this->assertInstanceOf(DeleteResponse::class, $response);
-        $this->assertEquals(0, $response->getResultCode());
+        $response = $this->client->delete('cn=Foo,ou=FreeDSx-Test,dc=example,dc=com')
+            ->getResponse();
+
+        $this->assertInstanceOf(
+            DeleteResponse::class,
+            $response
+        );
+        $this->assertEquals(
+            0,
+            $response->getResultCode()
+        );
     }
 
-    public function testModifyOperation()
+    public function testModifyOperation(): void
     {
         $this->bindClient($this->client);
 
@@ -180,51 +261,98 @@ class LdapClientTest extends LdapTestCase
         $entry->remove('homePhone', '+1 510 991-4348');
         $entry->set('title', 'Head Payroll Dude');
 
-        $response = $this->client->update($entry)->getResponse();
+        $response = $this->client->update($entry)
+            ->getResponse();
+
         $this->assertInstanceOf(ModifyResponse::class, $response);
         $this->assertEquals(0, $response->getResultCode());
         $this->assertEmpty($entry->changes()->toArray());
 
-        $modified = $this->client->read('cn=Kathrine Erbach,ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com', [
-            'facsimileTelephoneNumber',
-            'mobile',
-            'homePhone',
-            'title',
-        ]);
-        $this->assertEquals(['mobile' => ['+1 555 555-5555'], 'title' => ['Head Payroll Dude']], $modified->toArray());
+        $modified = $this->client->readOrFail(
+            'cn=Kathrine Erbach,ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com',
+            [
+                'facsimileTelephoneNumber',
+                'mobile',
+                'homePhone',
+                'title',
+            ]
+        );
+        $this->assertEquals(
+            [
+                'mobile' => ['+1 555 555-5555'],
+                'title' => ['Head Payroll Dude']
+            ],
+            $modified->toArray()
+        );
     }
 
-    public function testRenameOperation()
+    public function testRenameOperation(): void
     {
         $this->bindClient($this->client);
 
-        $result = $this->client->rename('cn=Arleen Sevigny,ou=Janitorial,ou=FreeDSx-Test,dc=example,dc=com', 'cn=Arleen Sevigny-Foo');
-        $entry = $this->client->read('cn=Arleen Sevigny-Foo,ou=Janitorial,ou=FreeDSx-Test,dc=example,dc=com', ['cn']);
+        $result = $this->client->rename(
+            'cn=Arleen Sevigny,ou=Janitorial,ou=FreeDSx-Test,dc=example,dc=com',
+            'cn=Arleen Sevigny-Foo'
+        );
+        $entry = $this->client->readOrFail(
+            'cn=Arleen Sevigny-Foo,ou=Janitorial,ou=FreeDSx-Test,dc=example,dc=com',
+            ['cn']
+        );
 
-        $this->assertInstanceOf(ModifyDnResponse::class, $result->getResponse());
-        $this->assertInstanceOf(Entry::class, $entry);
-        $this->assertEquals(['Arleen Sevigny-Foo'], $entry->get('cn')->getValues());
+        $this->assertInstanceOf(
+            ModifyDnResponse::class,
+            $result->getResponse()
+        );
+        $this->assertInstanceOf(
+            Entry::class,
+            $entry
+        );
+        $this->assertEquals(
+            ['Arleen Sevigny-Foo'],
+            $entry->get('cn')?->getValues()
+        );
     }
 
-    public function testRenameWithoutDeleteOperation()
+    public function testRenameWithoutDeleteOperation(): void
     {
         if ($this->isActiveDirectory()) {
             $this->markTestSkipped('Rename without delete not supported in Active Directory.');
         }
         $this->bindClient($this->client);
 
-        $result = $this->client->rename('cn=Farouk Langdon,ou=Administrative,ou=FreeDSx-Test,dc=example,dc=com', 'cn=Farouk Langdon-Bar', false);
-        $entry = $this->client->read('cn=Farouk Langdon-Bar,ou=Administrative,ou=FreeDSx-Test,dc=example,dc=com', ['cn']);
+        $result = $this->client->rename(
+            'cn=Farouk Langdon,ou=Administrative,ou=FreeDSx-Test,dc=example,dc=com',
+            'cn=Farouk Langdon-Bar',
+            false
+        );
+        $entry = $this->client->read(
+            'cn=Farouk Langdon-Bar,ou=Administrative,ou=FreeDSx-Test,dc=example,dc=com',
+            ['cn']
+        );
 
-        $this->assertInstanceOf(ModifyDnResponse::class, $result->getResponse());
-        $this->assertInstanceOf(Entry::class, $entry);
-        $this->assertContains('Farouk Langdon', $entry->get('cn')->getValues());
-        $this->assertContains('Farouk Langdon-Bar', $entry->get('cn')->getValues());
+        $this->assertInstanceOf(
+            ModifyDnResponse::class,
+            $result->getResponse()
+        );
+        $this->assertInstanceOf(
+            Entry::class,
+            $entry
+        );
+        $this->assertContains(
+            'Farouk Langdon',
+            (array) $entry->get('cn')?->getValues()
+        );
+        $this->assertContains(
+            'Farouk Langdon-Bar',
+            (array) $entry->get('cn')?->getValues()
+        );
     }
 
-    public function testMoveOperation()
+    public function testMoveOperation(): void
     {
         $this->markTestSkipped('Rename without delete not supported in Active Directory.');
+
+        /*
         $this->bindClient($this->client);
 
         $result = $this->client->move('cn=Minne Schmelzel,ou=Janitorial,ou=FreeDSx-Test,dc=example,dc=com', 'ou=Administrative,ou=FreeDSx-Test,dc=example,dc=com');
@@ -232,55 +360,84 @@ class LdapClientTest extends LdapTestCase
 
         $this->assertInstanceOf(ModifyDnResponse::class, $result->getResponse());
         $this->assertInstanceOf(Entry::class, $entry);
+        */
     }
 
-    public function testSubSearchOperation()
+    public function testSubSearchOperation(): void
     {
         $this->bindClient($this->client);
 
-        $entries = $this->client->search(Operations::search(Filters::raw('(&(objectClass=inetOrgPerson)(cn=A*))')));
-        $this->assertInstanceOf(Entries::class, $entries);
-        $this->assertEquals(843, $entries->count());
+        $entries = $this->client->search(Operations::search(
+            Filters::raw('(&(objectClass=inetOrgPerson)(cn=A*))')
+        ));
+
+        $this->assertInstanceOf(
+            Entries::class,
+            $entries
+        );
+        $this->assertEquals(
+            843,
+            $entries->count()
+        );
     }
 
-    public function testListSearchOperation()
+    public function testListSearchOperation(): void
     {
         $this->bindClient($this->client);
 
-        $entries = $this->client->search(Operations::list(Filters::raw('(&(objectClass=inetOrgPerson)(cn=A*))'), 'ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com'));
-        $this->assertInstanceOf(Entries::class, $entries);
-        $this->assertEquals(100, $entries->count());
+        $entries = $this->client->search(Operations::list(
+            Filters::raw('(&(objectClass=inetOrgPerson)(cn=A*))'),
+            'ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com'
+        ));
 
-        /** @var Entry $entry */
-        foreach ($entries as $entry) {
-            $this->assertEquals(strtolower('ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com'), strtolower($entry->getDn()->getParent()->toString()));
+        $this->assertInstanceOf(
+            Entries::class,
+            $entries
+        );
+        $this->assertEquals(
+            100,
+            $entries->count()
+        );
+
+        foreach ($entries->toArray() as $entry) {
+            $this->assertEquals(
+                strtolower('ou=Payroll,ou=FreeDSx-Test,dc=example,dc=com'),
+                strtolower((string) $entry->getDn()->getParent()?->toString())
+            );
         }
     }
 
-    public function testWhoAmI()
+    public function testWhoAmI(): void
     {
         $this->bindClient($this->client);
 
-        $this->assertMatchesRegularExpression('/^(dn|u):.*/', $this->client->whoami());
+        $this->assertMatchesRegularExpression(
+            '/^(dn|u):.*/',
+            (string) $this->client->whoami()
+        );
     }
 
-    public function testSetOptionsDisconnectsIfRequested()
+    public function testSetOptionsDisconnectsIfRequested(): void
     {
         $this->bindClient($this->client);
-        $this->client->setOptions([], true);
+
+        $this->client->setOptions(
+            options: [],
+            forceDisconnect: true,
+        );
 
         $this->assertFalse($this->client->isConnected());
     }
 
-    public function testStartTls()
+    public function testStartTls(): void
     {
         $this->client = $this->getClient();
         $this->client->startTls();
 
-        $this->assertTrue(true);
+        $this->assertTrue($this->client->isConnected());
     }
 
-    public function testStartTlsFailure()
+    public function testStartTlsFailure(): void
     {
         $this->client = $this->getClient(['servers' => 'foo.com']);
 
@@ -288,23 +445,29 @@ class LdapClientTest extends LdapTestCase
         @$this->client->startTls();
     }
 
-    public function testStartTlsIgnoreCertValidation()
+    public function testStartTlsIgnoreCertValidation(): void
     {
-        $this->client = $this->getClient(['servers' => 'foo.com', 'ssl_validate_cert' => false]);
+        $this->client = $this->getClient([
+            'servers' => 'foo.com',
+            'ssl_validate_cert' => false,
+        ]);
 
         $this->client->startTls();
-        $this->assertTrue(true);
+        $this->assertTrue($this->client->isConnected());
     }
 
-    public function testUseSsl()
+    public function testUseSsl(): void
     {
-        $this->client = $this->getClient(['use_ssl' => true, 'port' => 636]);
+        $this->client = $this->getClient([
+            'use_ssl' => true,
+            'port' => 636
+        ]);
         $this->client->read('');
 
-        $this->assertTrue(true);
+        $this->assertTrue($this->client->isConnected());
     }
 
-    public function testItCanWorkOverUnixSocket()
+    public function testItCanWorkOverUnixSocket(): void
     {
         if ($this->isActiveDirectory()) {
             $this->markTestSkipped('Connecting via a unix socket only tested on OpenLDAP.');
@@ -318,15 +481,20 @@ class LdapClientTest extends LdapTestCase
         $this->assertNotNull($entry);
     }
 
-    public function testUseSslFailure()
+    public function testUseSslFailure(): void
     {
-        $this->client = $this->getClient(['servers' => 'foo.com', 'use_ssl' => true, 'port' => 636]);
+        $this->client = $this->getClient([
+            'servers' => 'foo.com',
+            'use_ssl' => true,
+            'port' => 636
+        ]);
 
         $this->expectException(ConnectionException::class);
+
         $this->client->read('');
     }
 
-    public function testUseSslIgnoreCertValidation()
+    public function testUseSslIgnoreCertValidation(): void
     {
         $this->client = $this->getClient([
             'servers' => 'foo.com',
@@ -336,7 +504,8 @@ class LdapClientTest extends LdapTestCase
         ]);
 
         $this->client->read('');
-        $this->assertTrue(true);
+
+        $this->assertTrue($this->client->isConnected());
     }
 
     protected function getSaslOptions(): array

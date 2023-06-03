@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is part of the FreeDSx LDAP package.
  *
@@ -17,60 +19,75 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Search\Paging;
 use integration\FreeDSx\Ldap\LdapTestCase;
+use Throwable;
 
 class PagingTest extends LdapTestCase
 {
-    /**
-     * @var Paging
-     */
-    protected $paging;
+    private Paging $paging;
 
-    /**
-     * @var SearchRequest
-     */
-    protected $search;
+    private SearchRequest $search;
 
-    /**
-     * @var LdapClient
-     */
-    protected $client;
+    private LdapClient $client;
 
     protected function setUp(): void
     {
         $this->client = $this->getClient();
         $this->bindClient($this->client);
 
-        $this->search = Operations::search(Filters::equal('objectClass', 'inetOrgPerson'), 'cn');
-        $this->paging = new Paging($this->client, $this->search);
+        $this->search = Operations::search(
+            Filters::equal(
+                'objectClass',
+                'inetOrgPerson'
+            ),
+            'cn'
+        );
+
+        $this->paging = new Paging(
+            $this->client,
+            $this->search
+        );
     }
 
     protected function tearDown(): void
     {
         try {
             $this->client->unbind();
-        } catch (\Exception|\Throwable $e) {
+        } catch (Throwable) {
         }
     }
 
-    public function testPagingAll()
+    public function testPagingAll(): void
     {
         $entries = $this->paging->getEntries();
-        $this->assertEquals(1000, $entries->count());
+
+        $this->assertEquals(
+            1000,
+            $entries->count()
+        );
 
         while ($this->paging->hasEntries()) {
             $entries->add(...$this->paging->getEntries());
         }
 
-        $this->assertEquals(10001, $entries->count());
+        $this->assertEquals(
+            10001,
+            $entries->count()
+        );
     }
 
-    public function testPagingSpecificSize()
+    public function testPagingSpecificSize(): void
     {
         $entries = $this->paging->getEntries(100);
-        $this->assertEquals(100, $entries->count());
+
+        $this->assertEquals(
+            100,
+            $entries->count()
+        );
+
         $this->assertTrue($this->paging->hasEntries());
 
         $this->paging->end();
+
         $this->assertFalse($this->paging->hasEntries());
     }
 }
