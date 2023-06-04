@@ -146,9 +146,9 @@ class PasswordModifyRequest extends ExtendedRequest
         }
 
         return new static(
-            $userIdentity !== null ? $userIdentity->getValue() : null,
-            $oldPasswd !== null ? $oldPasswd->getValue() : null,
-            $newPasswd !== null ? $newPasswd->getValue() : null
+            $userIdentity?->getValue(),
+            $oldPasswd?->getValue(),
+            $newPasswd?->getValue()
         );
     }
 }

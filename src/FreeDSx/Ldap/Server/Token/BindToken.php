@@ -46,9 +46,6 @@ class BindToken implements TokenInterface
         return $this->password;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getVersion(): int
     {
         return $this->version;

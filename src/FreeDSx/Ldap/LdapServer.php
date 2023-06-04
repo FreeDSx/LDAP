@@ -161,7 +161,7 @@ class LdapServer
      * @param array<string, mixed> $serverOptions Any additional server options for the LDAP server.
      */
     public static function makeProxy(
-        $servers,
+        array|string $servers,
         array $clientOptions = [],
         array $serverOptions = []
     ): LdapServer {

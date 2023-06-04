@@ -173,7 +173,7 @@ class Attribute implements IteratorAggregate, Countable, Stringable
     }
 
     /**
-     * Gets the options within the AttributeDescription (semi-colon separated list of options).
+     * Gets the options within the AttributeDescription (semicolon separated list of options).
      */
     public function getOptions(): Options
     {

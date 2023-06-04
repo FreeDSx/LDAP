@@ -149,7 +149,6 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                     if (!$child instanceof IncompleteType) {
                         throw new ProtocolException('The ASN1 structure for the controls is malformed.');
                     }
-                    /** @var SequenceOfType $child */
                     $child = (new LdapEncoder())->complete(
                         $child,
                         AbstractType::TAG_TYPE_SEQUENCE

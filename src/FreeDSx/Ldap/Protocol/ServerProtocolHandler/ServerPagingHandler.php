@@ -164,7 +164,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
     {
         try {
             return random_bytes(16);
-        } catch (Throwable $e) {
+        } catch (Throwable) {
             throw new OperationException(
                 'Internal server error.',
                 ResultCode::OPERATIONS_ERROR

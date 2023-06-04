@@ -137,7 +137,7 @@ class RangeRetrieval
                 $attribute->getName()
             ));
         }
-        if (($range = $this->getRangeOption($attrResult)) === null) {
+        if ($this->getRangeOption($attrResult) === null) {
             throw new RuntimeException(sprintf(
                 'No ranged option received for attribute "%s" on "%s".',
                 $attribute->getName(),

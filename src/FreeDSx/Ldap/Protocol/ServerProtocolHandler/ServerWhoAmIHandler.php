@@ -49,7 +49,7 @@ class ServerWhoAmIHandler implements ServerProtocolHandlerInterface
             try {
                 (new Dn($userId))->toArray();
                 $userId = 'dn:' . $userId;
-            } catch (Exception $e) {
+            } catch (Exception) {
                 $userId = 'u:' . $userId;
             }
         }

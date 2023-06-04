@@ -50,7 +50,7 @@ class Options implements Countable, IteratorAggregate, Stringable
     public function set(string|Option ...$options): self
     {
         $this->options = [];
-        foreach ($options as $i => $option) {
+        foreach ($options as $option) {
             if ($option instanceof Option) {
                 $this->options[] = $option;
             } else {
