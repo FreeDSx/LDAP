@@ -13,9 +13,11 @@ namespace spec\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
@@ -51,9 +53,47 @@ class ServerSearchHandlerSpec extends ObjectBehavior
         $queue->sendMessage(
             $resultEntry1,
             $resultEntry2,
-            new LdapMessageResponse(2, new SearchResultDone(0))
+            new LdapMessageResponse(2, new SearchResultDone(0, 'dc=foo,dc=bar'))
         )->shouldBeCalled();
 
         $this->handleRequest($search, $token, $handler, $queue, []);
+    }
+
+    public function it_should_send_a_SearchResultDone_with_an_operation_exception_thrown_from_the_handler(
+        ServerQueue $queue,
+        RequestHandlerInterface $handler,
+        TokenInterface $token
+    ): void {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::equal(
+                'foo',
+                'bar'
+            )))->base('dc=foo,dc=bar')
+        );
+
+        $handler->search(Argument::any(), Argument::any())
+            ->willThrow(new OperationException(
+                "Fail",
+                ResultCode::OPERATIONS_ERROR
+            ));
+
+        $queue->sendMessage(new LdapMessageResponse(
+            2,
+            new SearchResultDone(
+                ResultCode::OPERATIONS_ERROR,
+                'dc=foo,dc=bar',
+                "Fail"
+            )
+        ))->shouldBeCalled()
+            ->willReturn($queue);
+
+        $this->handleRequest(
+            $search,
+            $token,
+            $handler,
+            $queue,
+            []
+        );
     }
 }

@@ -11,6 +11,7 @@
 
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestContext;
@@ -42,13 +43,24 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
         );
         $request = $this->getSearchRequestFromMessage($message);
 
-        $entries = $dispatcher->search(
-            $context,
-            $request
-        );
+        try {
+            $searchResult = SearchResult::makeSuccessResult(
+                $dispatcher->search(
+                    $context,
+                    $request
+                ),
+                (string) $request->getBaseDn()
+            );
+        } catch (OperationException $e) {
+            $searchResult = SearchResult::makeErrorResult(
+                $e->getCode(),
+                (string) $request->getBaseDn(),
+                $e->getMessage()
+            );
+        }
 
         $this->sendEntriesToClient(
-            $entries,
+            $searchResult,
             $message,
             $queue
         );
