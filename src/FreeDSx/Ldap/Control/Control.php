@@ -167,12 +167,12 @@ class Control implements ProtocolElementInterface, Stringable
 
     /**
      * @template T of Control
-     * @param T $control
-     * @return T
+     * @phpstan-param T $control
+     * @phpstan-return T
      * @throws ProtocolException
      */
     protected static function mergeControlData(
-        $control,
+        Control $control,
         AbstractType $type
     ): Control {
         if (!($type instanceof SequenceType && count($type->getChildren()) <= 3)) {

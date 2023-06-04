@@ -342,7 +342,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     private function runChildProcessThenExit(
         Socket $socket,
         int $pid
-    ): void {
+    ): never {
         $context = ['pid' => $pid];
         $this->isMainProcess = false;
         $serverProtocolHandler = new ServerProtocolHandler(

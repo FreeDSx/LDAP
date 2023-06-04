@@ -29,9 +29,9 @@ class FilterParser
 {
     private const MATCHING_RULE = '/^([a-zA-Z0-9\.]+)?(\:dn)?(\:([a-zA-Z0-9\.]+))?$/';
 
-    private string $filter = '';
+    private string $filter;
 
-    private int $length = 0;
+    private int $length;
 
     private int $depth = 0;
 
@@ -206,7 +206,7 @@ class FilterParser
             $pos = false;
             try {
                 $pos = $this->nextClosingParenthesis($startAt);
-            } catch (FilterParseException $e) {
+            } catch (FilterParseException) {
             }
             if ($pos !== false) {
                 throw new FilterParseException(sprintf('The ")" at char %s has no matching parenthesis', $pos));

@@ -126,7 +126,7 @@ class Dn implements IteratorAggregate, Countable, Stringable
             (new self((string) $dn))->toArray();
 
             return true;
-        } catch (UnexpectedValueException | InvalidArgumentException $e) {
+        } catch (UnexpectedValueException | InvalidArgumentException) {
             return false;
         }
     }

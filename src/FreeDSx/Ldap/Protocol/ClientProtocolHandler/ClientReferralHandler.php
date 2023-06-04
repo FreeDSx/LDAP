@@ -134,7 +134,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
                     referral: $referral,
                     bind: null,
                 );
-            } catch (SkipReferralException $e) {
+            } catch (SkipReferralException) {
                 continue;
             }
             $options = $this->options;
@@ -167,7 +167,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
                     ...$messageTo->controls()->toArray()
                 );
                 # Skip referrals that fail due to connection issues and not other issues
-            } catch (ConnectionException $e) {
+            } catch (ConnectionException) {
                 continue;
                 # If the referral encountered other referrals but exhausted them, continue to the next one.
             } catch (OperationException $e) {

@@ -28,7 +28,7 @@ class ReferralContext implements Countable
     /**
      * @var LdapUrl[]
      */
-    private array $referrals = [];
+    private array $referrals;
 
     public function __construct(LdapUrl ...$referrals)
     {

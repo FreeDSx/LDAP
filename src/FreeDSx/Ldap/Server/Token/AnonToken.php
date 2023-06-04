@@ -32,9 +32,6 @@ class AnonToken implements TokenInterface
         $this->version = $version;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getUsername(): ?string
     {
         return $this->username;
@@ -45,9 +42,6 @@ class AnonToken implements TokenInterface
         return null;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getVersion(): int
     {
         return $this->version;
