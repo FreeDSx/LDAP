@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
@@ -71,25 +72,44 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $messageRequest = new LdapMessageRequest(1, new SimpleBindRequest('foo', 'bar'));
         $messageFrom = new LdapMessageResponse(1, new BindResponse(new LdapResult(0)));
 
-        $options = [];
-        $this->handleResponse($messageRequest, $messageFrom, $queue, $options)->shouldBeEqualTo($messageFrom);
+        $this->handleResponse(
+            $messageRequest,
+            $messageFrom,
+            $queue,
+            new ClientOptions()
+        )->shouldBeEqualTo($messageFrom);
     }
 
     public function it_should_handle_a_response_with_non_error_codes(ClientQueue $queue): void
     {
-        $options = [];
+        $options = new ClientOptions();
         $messageRequest = new LdapMessageRequest(1, new CompareRequest('foo', new EqualityFilter('foo', 'bar')));
         $messageFrom = new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_FALSE));
 
-        $this->handleResponse($messageRequest, $messageFrom, $queue, $options)->shouldBeEqualTo($messageFrom);
+        $this->handleResponse(
+            $messageRequest,
+            $messageFrom,
+            $queue,
+            $options
+        )->shouldBeEqualTo($messageFrom);
 
         $messageFrom = new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_TRUE));
 
-        $this->handleResponse($messageRequest, $messageFrom, $queue, $options)->shouldBeEqualTo($messageFrom);
+        $this->handleResponse(
+            $messageRequest,
+            $messageFrom,
+            $queue,
+            $options
+        )->shouldBeEqualTo($messageFrom);
 
         $messageFrom = new LdapMessageResponse(1, new CompareResponse(ResultCode::REFERRAL));
 
-        $this->handleResponse($messageRequest, $messageFrom, $queue, $options)->shouldBeEqualTo($messageFrom);
+        $this->handleResponse(
+            $messageRequest,
+            $messageFrom,
+            $queue,
+            $options
+        )->shouldBeEqualTo($messageFrom);
     }
 
     public function it_should_throw_an_operation_exception_on_errors(ClientQueue $queue): void
@@ -97,8 +117,12 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $messageRequest = new LdapMessageRequest(1, new CompareRequest('foo', new EqualityFilter('foo', 'bar')));
         $messageFrom = new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_FALSE));
 
-        $options = [];
-        $this->handleResponse($messageRequest, $messageFrom, $queue, $options)->shouldBeEqualTo($messageFrom);
+        $this->handleResponse(
+            $messageRequest,
+            $messageFrom,
+            $queue,
+            new ClientOptions()
+        )->shouldBeEqualTo($messageFrom);
     }
 
     public function it_should_throw_a_specific_bind_exception_for_a_bind_response(ClientQueue $queue): void
@@ -106,7 +130,17 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $messageRequest = new LdapMessageRequest(1, new SimpleBindRequest('foo', 'bar'));
         $messageFrom = new LdapMessageResponse(1, new BindResponse(new LdapResult(ResultCode::INVALID_CREDENTIALS, 'foo', 'message')));
 
-        $options = [];
-        $this->shouldThrow(new BindException('Unable to bind to LDAP. message', ResultCode::INVALID_CREDENTIALS))->during('handleResponse', [$messageRequest, $messageFrom, $queue, $options]);
+        $this->shouldThrow(new BindException(
+            'Unable to bind to LDAP. message',
+            ResultCode::INVALID_CREDENTIALS
+        ))->during(
+            'handleResponse',
+            [
+                $messageRequest,
+                $messageFrom,
+                $queue,
+                new ClientOptions(),
+            ]
+        );
     }
 }

@@ -36,6 +36,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Exception\ConnectionException;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
@@ -62,7 +63,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->beConstructedWith(
             $queue,
             $handlerFactory,
-            [],
+            new ServerOptions(),
             $protocolHandlerFactory,
             $bindHandlerFactory
         );
@@ -101,7 +102,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $bindHandler->handleBind(Argument::any(), Argument::any(), Argument::any(), Argument::any())->willReturn(
+        $bindHandler->handleBind(Argument::any(), Argument::any(), Argument::any())->willReturn(
             new BindToken('foo', 'bar')
         );
         $protocolHandler->handleRequest(Argument::any(), Argument::any(), Argument::any(), Argument::any(), Argument::any())
@@ -196,7 +197,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $bindHandler->handleBind(Argument::any(), Argument::any(), Argument::any(), Argument::any())
+        $bindHandler->handleBind(Argument::any(), Argument::any(), Argument::any())
             ->shouldBeCalledOnce()
             ->willReturn(new BindToken('foo@bar', 'bar'));
         $protocolHandler->handleRequest(Argument::any(), Argument::any(), Argument::any(), Argument::any(), Argument::any())
@@ -214,7 +215,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $bindHandler->handleBind(Argument::any(), Argument::any(), Argument::any(), Argument::any())
+        $bindHandler->handleBind(Argument::any(), Argument::any(), Argument::any())
             ->willReturn(new BindToken('foo@bar', 'bar'));
 
         $protocolHandler->handleRequest(Argument::any(), Argument::any(), Argument::any(), Argument::any(), Argument::any())

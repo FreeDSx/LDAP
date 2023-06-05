@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSearchHandler;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\ServerOptions;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
@@ -58,7 +59,7 @@ class ServerSearchHandlerSpec extends ObjectBehavior
             new LdapMessageResponse(2, new SearchResultDone(0, 'dc=foo,dc=bar'))
         )->shouldBeCalled();
 
-        $this->handleRequest($search, $token, $handler, $queue, []);
+        $this->handleRequest($search, $token, $handler, $queue, new ServerOptions());
     }
 
     public function it_should_send_a_SearchResultDone_with_an_operation_exception_thrown_from_the_handler(
@@ -95,7 +96,7 @@ class ServerSearchHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            []
+            new ServerOptions()
         );
     }
 }

@@ -37,11 +37,14 @@ class ServerAuthorization
 
     private TokenInterface $token;
 
-    public function __construct(TokenInterface $token = null, array $options = [])
-    {
-        $this->token = $token ?? new AnonToken();
-        $this->isAuthRequired = !isset($options['require_authentication']) || $options['require_authentication'];
-        $this->isAnonymousAllowed = isset($options['allow_anonymous']) && $options['allow_anonymous'];
+    public function __construct(
+        TokenInterface $token = new AnonToken(),
+        bool $isAnonymousAllowed = false,
+        bool $isAuthRequired = true,
+    ) {
+        $this->token = $token;
+        $this->isAuthRequired = $isAuthRequired;
+        $this->isAnonymousAllowed = $isAnonymousAllowed;
     }
 
     /**

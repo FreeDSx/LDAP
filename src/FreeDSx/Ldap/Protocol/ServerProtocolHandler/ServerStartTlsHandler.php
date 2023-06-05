@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Exception\ConnectionException;
 use function extension_loaded;
 
@@ -52,10 +53,10 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
         RequestHandlerInterface $dispatcher,
         ServerQueue $queue,
-        array $options
+        ServerOptions $options
     ): void {
         # If we don't have a SSL cert or the OpenSSL extension is not available, then we can do nothing...
-        if (!isset($options['ssl_cert']) || !self::$hasOpenssl) {
+        if ($options->getSslCert() === null || !self::$hasOpenssl) {
             $queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
                 new LdapResult(ResultCode::PROTOCOL_ERROR),
                 ExtendedRequest::OID_START_TLS

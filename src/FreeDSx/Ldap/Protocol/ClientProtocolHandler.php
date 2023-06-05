@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Entry;
@@ -51,7 +52,7 @@ class ClientProtocolHandler
 
     private ?ClientQueue $queue;
 
-    private array $options;
+    private ClientOptions $options;
 
     private ControlBag $controls;
 
@@ -60,13 +61,13 @@ class ClientProtocolHandler
     private ?Entry $rootDse = null;
 
     public function __construct(
-        array $options,
+        ClientOptions $options,
         ClientQueue $queue = null,
         SocketPool $pool = null,
         ClientProtocolHandlerFactory $clientProtocolHandlerFactory = null
     ) {
         $this->options = $options;
-        $this->pool = $pool ?? new SocketPool($options);
+        $this->pool = $pool ?? new SocketPool($this->options->toArray());
         $this->protocolHandlerFactory = $clientProtocolHandlerFactory ?? new ClientProtocolHandlerFactory();
         $this->controls = new ControlBag();
         $this->queue = $queue;

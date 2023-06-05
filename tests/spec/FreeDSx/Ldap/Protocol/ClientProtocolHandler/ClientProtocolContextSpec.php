@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
@@ -26,7 +27,13 @@ class ClientProtocolContextSpec extends ObjectBehavior
 {
     public function let(ClientQueue $queue, ClientProtocolHandler $protocolHandler): void
     {
-        $this->beConstructedWith(new DeleteRequest('foo'), [], $protocolHandler, $queue, ['foo']);
+        $this->beConstructedWith(
+            new DeleteRequest('foo'),
+            [],
+            $protocolHandler,
+            $queue,
+            new ClientOptions()
+        );
     }
 
     public function it_is_initializable(): void
@@ -64,7 +71,7 @@ class ClientProtocolContextSpec extends ObjectBehavior
 
     public function it_should_get_the_options(): void
     {
-        $this->getOptions()->shouldBeEqualTo(['foo']);
+        $this->getOptions()->shouldBeLike(new ClientOptions());
     }
 
     public function it_should_get_the_queue(ClientQueue $queue): void

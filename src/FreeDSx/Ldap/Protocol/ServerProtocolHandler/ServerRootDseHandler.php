@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\ServerOptions;
 use function count;
 
 /**
@@ -53,33 +54,33 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
         RequestHandlerInterface $dispatcher,
         ServerQueue $queue,
-        array $options
+        ServerOptions $options
     ): void {
         $entry = Entry::fromArray('', [
-            'namingContexts' => $options['dse_naming_contexts'] ?? '',
+            'namingContexts' => $options->getDseNamingContexts(),
             'supportedExtension' => [
                 ExtendedRequest::OID_WHOAMI,
             ],
             'supportedLDAPVersion' => ['3'],
-            'vendorName' => $options['dse_vendor_name'] ?? '',
+            'vendorName' => $options->getDseVendorName(),
         ]);
-        if (isset($options['ssl_cert'])) {
+        if ($options->getSslCert()) {
             $entry->add(
                 'supportedExtension',
                 ExtendedRequest::OID_START_TLS
             );
         }
-        if (isset($options['paging_handler'])) {
+        if ($options->getPagingHandler()) {
             $entry->add(
                 'supportedControl',
                 Control::OID_PAGING
             );
         }
-        if (isset($options['vendor_version'])) {
-            $entry->set('vendorVersion', $options['vendor_version']);
+        if ($options->getDseVendorVersion()) {
+            $entry->set('vendorVersion', (string) $options->getDseVendorVersion());
         }
-        if (isset($options['alt_server'])) {
-            $entry->set('altServer', $options['alt_server']);
+        if ($options->getDseAlServer()) {
+            $entry->set('altServer', (string) $options->getDseAlServer());
         }
 
         /** @var SearchRequest $request */

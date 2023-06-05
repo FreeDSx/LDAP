@@ -31,7 +31,7 @@ final class ClientOptions
     
     private bool $sslValidateCert = true;
     
-    private ?bool $sslAllowSelfSigned = null;
+    private bool $sslAllowSelfSigned = false;
     
     private ?string $sslCaCert = null;
     
@@ -161,12 +161,12 @@ final class ClientOptions
         return $this;
     }
 
-    public function getSslAllowSelfSigned(): ?bool
+    public function isSslAllowSelfSigned(): bool
     {
         return $this->sslAllowSelfSigned;
     }
 
-    public function setSslAllowSelfSigned(?bool $sslAllowSelfSigned): self
+    public function setSslAllowSelfSigned(bool $sslAllowSelfSigned): self
     {
         $this->sslAllowSelfSigned = $sslAllowSelfSigned;
 
@@ -257,6 +257,29 @@ final class ClientOptions
 
         return $this;
     }
-    
-    
+
+    /**
+     * @return array{version: int, servers: string[], port: int, base_dn: ?string, page_size: int, use_ssl: bool, ssl_validate_cert: bool, ssl_allow_self_signed: bool, ssl_ca_cert: ?string, ssl_peer_name: ?string, timeout_connect: int, timeout_read: int, referral: string, referral_chaser: ?ReferralChaserInterface, referral_limit: int}
+     */
+    public function toArray(): array
+    {
+        return [
+            'version' => $this->getVersion(),
+            'servers' => $this->getServers(),
+            'port' => $this->getPort(),
+            'transport' => $this->getTransport(),
+            'base_dn' => $this->getBaseDn(),
+            'page_size' => $this->getPageSize(),
+            'use_ssl' => $this->isUseSsl(),
+            'ssl_validate_cert' => $this->isSslValidateCert(),
+            'ssl_allow_self_signed' => $this->isSslAllowSelfSigned(),
+            'ssl_ca_cert' => $this->getSslCaCert(),
+            'ssl_peer_name' => $this->getSslPeerName(),
+            'timeout_connect' => $this->getTimeoutConnect(),
+            'timeout_read' => $this->getTimeoutRead(),
+            'referral' => $this->getReferral(),
+            'referral_chaser' => $this->getReferralChaser(),
+            'referral_limit' => $this->getReferralLimit(),
+        ];
+    }
 }

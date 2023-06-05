@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace integration\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ConnectionException;
@@ -423,7 +424,7 @@ class LdapClientTest extends LdapTestCase
         $this->bindClient($this->client);
 
         $this->client->setOptions(
-            options: [],
+            options: new ClientOptions(),
             forceDisconnect: true,
         );
 
@@ -440,7 +441,10 @@ class LdapClientTest extends LdapTestCase
 
     public function testStartTlsFailure(): void
     {
-        $this->client = $this->getClient(['servers' => 'foo.com']);
+        $this->client = $this->getClient(
+            $this->makeOptions()
+                ->setServers(['foo.com'])
+        );
 
         $this->expectException(ConnectionException::class);
         @$this->client->startTls();
@@ -448,10 +452,11 @@ class LdapClientTest extends LdapTestCase
 
     public function testStartTlsIgnoreCertValidation(): void
     {
-        $this->client = $this->getClient([
-            'servers' => 'foo.com',
-            'ssl_validate_cert' => false,
-        ]);
+        $this->client = $this->getClient(
+            $this->makeOptions()
+                ->setServers(['foo.com'])
+                ->setSslValidateCert(false)
+        );
 
         $this->client->startTls();
         $this->assertTrue($this->client->isConnected());
@@ -459,10 +464,11 @@ class LdapClientTest extends LdapTestCase
 
     public function testUseSsl(): void
     {
-        $this->client = $this->getClient([
-            'use_ssl' => true,
-            'port' => 636
-        ]);
+        $this->client = $this->getClient(
+            $this->makeOptions()
+                ->setUseSsl(true)
+                ->setPort(636)
+        );
         $this->client->read('');
 
         $this->assertTrue($this->client->isConnected());
@@ -473,10 +479,11 @@ class LdapClientTest extends LdapTestCase
         if ($this->isActiveDirectory()) {
             $this->markTestSkipped('Connecting via a unix socket only tested on OpenLDAP.');
         }
-        $this->client = $this->getClient([
-            'transport' => 'unix',
-            'servers' => '/var/run/slapd/ldapi',
-        ]);
+        $this->client = $this->getClient(
+            $this->makeOptions()
+                ->setTransport('unix')
+                ->setServers(['/var/run/slapd/ldapi'])
+        );
         $entry = $this->client->read('');
 
         $this->assertNotNull($entry);
@@ -484,11 +491,12 @@ class LdapClientTest extends LdapTestCase
 
     public function testUseSslFailure(): void
     {
-        $this->client = $this->getClient([
-            'servers' => 'foo.com',
-            'use_ssl' => true,
-            'port' => 636
-        ]);
+        $this->client = $this->getClient(
+            $this->makeOptions()
+                ->setServers(['foo.com'])
+                ->setUseSsl(true)
+                ->setPort(636)
+        );
 
         $this->expectException(ConnectionException::class);
 
@@ -497,12 +505,13 @@ class LdapClientTest extends LdapTestCase
 
     public function testUseSslIgnoreCertValidation(): void
     {
-        $this->client = $this->getClient([
-            'servers' => 'foo.com',
-            'ssl_validate_cert' => false,
-            'use_ssl' => true,
-            'port' => 636,
-        ]);
+        $this->client = $this->getClient(
+            $this->makeOptions()
+                ->setServers(['foo.com'])
+                ->setSslValidateCert(false)
+                ->setUseSsl(true)
+                ->setPort(636)
+        );
 
         $this->client->read('');
 

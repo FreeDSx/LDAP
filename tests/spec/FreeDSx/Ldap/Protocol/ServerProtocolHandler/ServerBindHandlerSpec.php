@@ -45,7 +45,7 @@ class ServerBindHandlerSpec extends ObjectBehavior
             new LdapResult(0)
         )))->shouldBeCalled()->willReturn($queue);
 
-        $this->handleBind($bind, $dispatcher, $queue, [])->shouldBeLike(
+        $this->handleBind($bind, $dispatcher, $queue)->shouldBeLike(
             new BindToken('foo@bar', 'bar')
         );
     }
@@ -62,7 +62,7 @@ class ServerBindHandlerSpec extends ObjectBehavior
         $this->shouldThrow(new OperationException('Invalid credentials.', ResultCode::INVALID_CREDENTIALS))
             ->during(
                 'handleBind',
-                [$bind, $dispatcher, $queue, []]
+                [$bind, $dispatcher, $queue]
             );
     }
 
@@ -75,7 +75,7 @@ class ServerBindHandlerSpec extends ObjectBehavior
         $this->shouldThrow(OperationException::class)
             ->during(
                 'handleBind',
-                [$bind, $dispatcher, $queue, []]
+                [$bind, $dispatcher, $queue]
             );
     }
 }

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
@@ -54,7 +55,7 @@ class ClientExtendedOperationHandlerSpec extends ObjectBehavior
             new LdapMessageRequest(1, new ExtendedRequest('foo', 'bar')),
             $response,
             $queue,
-            []
+            new ClientOptions(),
         )->shouldBeEqualTo($response);
     }
 

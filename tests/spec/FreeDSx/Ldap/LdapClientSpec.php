@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -405,9 +406,11 @@ class LdapClientSpec extends ObjectBehavior
             );
     }
 
-    public function it_should_get_the_options(): void
+    public function it_should_get_the_default_options(): void
     {
-        $this->getOptions()->shouldBeEqualTo([
+        $this->getOptions()
+            ->toArray()
+            ->shouldBeEqualTo([
             'version' => 3,
             'servers' => [],
             'port' => 389,
@@ -416,7 +419,7 @@ class LdapClientSpec extends ObjectBehavior
             'page_size' => 1000,
             'use_ssl' => false,
             'ssl_validate_cert' => true,
-            'ssl_allow_self_signed' => null,
+            'ssl_allow_self_signed' => false,
             'ssl_ca_cert' => null,
             'ssl_peer_name' => null,
             'timeout_connect' => 3,
@@ -429,20 +432,15 @@ class LdapClientSpec extends ObjectBehavior
 
     public function it_should_set_the_options(): void
     {
-        $this->setOptions([
-            'servers' => [
-                'bar',
+        $options = (new ClientOptions())
+            ->setServers([
                 'foo',
-            ]
-        ]);
+                'bar',
+            ]);
+
+        $this->setOptions($options);
 
         $this->getOptions()
-            ->shouldHaveKeyWithValue(
-                'servers',
-                [
-                    'bar',
-                    'foo',
-                ]
-            );
+            ->shouldBeEqualTo($options);
     }
 }

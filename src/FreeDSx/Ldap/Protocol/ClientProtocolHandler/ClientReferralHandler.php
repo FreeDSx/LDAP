@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\FilterParseException;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -42,10 +43,9 @@ use function count;
  */
 class ClientReferralHandler implements ResponseHandlerInterface
 {
-    /**
-     * @var array<string, mixed>
-     */
-    private array $options = [];
+    private ClientOptions $options;
+
+    private ?ReferralContext $referralContext = null;
 
     /**
      * {@inheritDoc}
@@ -57,11 +57,11 @@ class ClientReferralHandler implements ResponseHandlerInterface
         LdapMessageRequest $messageTo,
         LdapMessageResponse $messageFrom,
         ClientQueue $queue,
-        array $options
+        ClientOptions $options
     ): ?LdapMessageResponse {
         $this->options = $options;
         $result = $messageFrom->getResponse();
-        switch ($this->options['referral']) {
+        switch ($this->options->getReferral()) {
             case 'throw':
                 $message = $result instanceof LdapResult
                     ? $result->getDiagnosticMessage()
@@ -79,7 +79,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
             default:
                 throw new RuntimeException(sprintf(
                     'The referral option "%s" is invalid.',
-                    $this->options['referral']
+                    $this->options->getReferral()
                 ));
         }
     }
@@ -93,43 +93,37 @@ class ClientReferralHandler implements ResponseHandlerInterface
         LdapMessageRequest $messageTo,
         LdapMessageResponse $messageFrom
     ): ?LdapMessageResponse {
-        $referralChaser = $this->options['referral_chaser'];
-        if (!($referralChaser === null || $referralChaser instanceof ReferralChaserInterface)) {
-            throw new RuntimeException(sprintf(
-                'The referral_chaser must implement "%s" or be null.',
-                ReferralChaserInterface::class
-            ));
-        }
-        if (!$messageFrom->getResponse() instanceof LdapResult || count($messageFrom->getResponse()->getReferrals()) === 0) {
+        $referralChaser = $this->getReferralChaser();
+
+        $response = $messageFrom->getResponse();
+        $referrals = $this->getReferralsFromResponse($messageFrom);
+        if (!$response instanceof LdapResult || count($referrals) === 0) {
             throw new OperationException(
                 'Encountered a referral request, but no referrals were supplied.',
                 ResultCode::REFERRAL
             );
         }
 
-        # Initialize a referral context to track the referrals we have already visited as well as count.
-        if (!isset($this->options['_referral_context'])) {
-            $this->options['_referral_context'] = new ReferralContext();
-        }
+        $referralContext = $this->getReferralContext();
 
-        foreach ($messageFrom->getResponse()->getReferrals() as $referral) {
+        foreach ($referrals as $referral) {
             # We must skip referrals we have already visited to avoid a referral loop
-            if ($this->options['_referral_context']->hasReferral($referral)) {
+            if ($referralContext->hasReferral($referral)) {
                 continue;
             }
 
-            $this->options['_referral_context']->addReferral($referral);
-            if ($this->options['_referral_context']->count() > $this->options['referral_limit']) {
+            $referralContext->addReferral($referral);
+            if ($referralContext->count() > $this->options->getReferralLimit()) {
                 throw new OperationException(sprintf(
                     'The referral limit of %s has been reached.',
-                    $this->options['referral_limit']
+                    $this->options->getReferralLimit()
                 ));
             }
 
             $bind = null;
             try {
                 # @todo Remove the bind parameter from the interface in a future release.
-                $bind = $referralChaser?->chase(
+                $bind = $referralChaser->chase(
                     request: $messageTo,
                     referral: $referral,
                     bind: null,
@@ -137,12 +131,14 @@ class ClientReferralHandler implements ResponseHandlerInterface
             } catch (SkipReferralException) {
                 continue;
             }
-            $options = $this->options;
-            $options['servers'] = $referral->getHost() !== null
-                ? [$referral->getHost()]
-                : [];
-            $options['port'] = $referral->getPort() ?? 389;
-            $options['use_ssl'] = $referral->getUseSsl();
+            $options = clone $this->options;
+            $options->setServers(
+                $referral->getHost() !== null
+                    ? [$referral->getHost()]
+                    : []
+            );
+            $options->setPort($referral->getPort() ?? 389);
+            $options->setUseSsl($referral->getUseSsl());
 
             # Each referral could potentially modify different aspects of the request, depending on the URL. Clone it
             # here, merge the options, then use that request to send to LDAP. This makes sure we don't accidentally mix
@@ -151,7 +147,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
             $this->mergeReferralOptions($request, $referral);
 
             try {
-                $client = $referralChaser !== null ? $referralChaser->client($options) : new LdapClient($options);
+                $client = $referralChaser->client($options);
 
                 # If we have a referral on a bind request, then do not bind initially.
                 #
@@ -182,7 +178,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
         # If we have exhausted all referrals consider it an operation exception.
         throw new OperationException(sprintf(
             'All referral attempts have been exhausted. %s',
-            $messageFrom->getResponse()->getDiagnosticMessage()
+            $response->getDiagnosticMessage()
         ), ResultCode::REFERRAL);
     }
 
@@ -212,5 +208,34 @@ class ClientReferralHandler implements ResponseHandlerInterface
         if ($referral->getFilter() !== null && $request instanceof SearchRequest) {
             $request->setFilter(Filters::raw($referral->getFilter()));
         }
+    }
+
+    /**
+     * @return LdapUrl[]
+     */
+    private function getReferralsFromResponse(LdapMessageResponse $messageFrom): array
+    {
+        $response = $messageFrom->getResponse();
+
+        return !$response instanceof LdapResult
+            ? []
+            : $response->getReferrals();
+    }
+
+    private function getReferralChaser(): ReferralChaserInterface
+    {
+        return $this->options->getReferralChaser() ?? throw new RuntimeException(
+            'No referral chaser was provided.'
+        );
+    }
+
+    private function getReferralContext(): ReferralContext
+    {
+        # Initialize a referral context to track the referrals we have already visited as well as count.
+        if ($this->referralContext === null) {
+            $this->referralContext = new ReferralContext();
+        }
+
+        return $this->referralContext;
     }
 }

@@ -15,11 +15,12 @@ namespace FreeDSx\Ldap\Server\ServerRunner;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\LoggerTrait;
+use FreeDSx\Ldap\Server\LoggerTrait;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\ChildProcess;
 use FreeDSx\Ldap\Server\RequestHandler\HandlerFactory;
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
 
@@ -44,10 +45,7 @@ class PcntlServerRunner implements ServerRunnerInterface
 
     private SocketServer $server;
 
-    /**
-     * @var array<string, mixed>
-     */
-    private array $options;
+    private ServerOptions $options;
 
     /**
      * @var ChildProcess[]
@@ -73,10 +71,9 @@ class PcntlServerRunner implements ServerRunnerInterface
     private array $defaultContext = [];
 
     /**
-     * @param array<string, mixed> $options
      * @throws RuntimeException
      */
-    public function __construct(array $options = [])
+    public function __construct(ServerOptions $options)
     {
         if (!extension_loaded('pcntl')) {
             throw new RuntimeException('The PCNTL extension is needed to fork incoming requests, which is only available on Linux.');

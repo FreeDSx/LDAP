@@ -96,13 +96,14 @@ class ServerTestCase extends LdapTestCase
             $servers = '/var/run/ldap.socket';
         }
 
-        $this->client = $this->getClient([
-            'port' => 3389,
-            'transport' => $transport,
-            'servers' => $servers,
-            'ssl_validate_cert' => false,
-            'use_ssl' => $useSsl,
-        ]);
+        $this->client = $this->getClient(
+            $this->makeOptions()
+                ->setPort(3389)
+                ->setTransport($transport)
+                ->setServers((array) $servers)
+                ->setSslValidateCert(false)
+                ->setUseSsl($useSsl)
+        );
     }
 
     protected function stopServer(): void

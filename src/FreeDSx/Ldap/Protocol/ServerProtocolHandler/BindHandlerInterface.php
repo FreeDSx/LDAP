@@ -29,13 +29,11 @@ interface BindHandlerInterface
     /**
      * Returns a token indicating the outcome of a bind request.
      *
-     * @param array<string, mixed> $options
      * @throws OperationException
      */
     public function handleBind(
         LdapMessageRequest $message,
         RequestHandlerInterface $dispatcher,
-        ServerQueue $queue,
-        array $options
+        ServerQueue $queue
     ): TokenInterface;
 }

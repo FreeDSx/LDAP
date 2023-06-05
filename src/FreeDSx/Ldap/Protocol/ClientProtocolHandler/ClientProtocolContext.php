@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
@@ -36,14 +37,11 @@ use FreeDSx\Sasl\Exception\SaslException;
 class ClientProtocolContext
 {
     /**
-     * @var array<string, mixed>
-     */
-    private array $options;
-
-    /**
      * @var Control[]
      */
     private array $controls;
+
+    private ClientOptions $options;
 
     private ClientProtocolHandler $protocolHandler;
 
@@ -58,7 +56,7 @@ class ClientProtocolContext
         array $controls,
         ClientProtocolHandler $protocolHandler,
         ClientQueue $queue,
-        array $options
+        ClientOptions $options
     ) {
         $this->request = $request;
         $this->controls = $controls;
@@ -90,7 +88,7 @@ class ClientProtocolContext
         return $this->clientQueue;
     }
 
-    public function getOptions(): array
+    public function getOptions(): ClientOptions
     {
         return $this->options;
     }

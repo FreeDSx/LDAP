@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace integration\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapClient;
 use PHPUnit\Framework\TestCase;
 use Throwable;
@@ -21,22 +22,22 @@ class LdapTestCase extends TestCase
 {
     protected static ?bool $isActiveDirectory = null;
 
-    /**
-     * @param array<string, mixed> $options
-     */
-    protected function getClient(array $options = []): LdapClient
+    protected function makeOptions(): ClientOptions
     {
-        return new LdapClient(array_merge(
-            [
-                'servers' => $_ENV['LDAP_SERVER'],
-                'port' => $_ENV['LDAP_PORT'],
-                'ssl_ca_cert' => $_ENV['LDAP_CA_CERT'] === ''
+        return (new ClientOptions())
+            ->setBaseDn((string) $_ENV['LDAP_BASE_DN'])
+            ->setServers([(string) $_ENV['LDAP_SERVER']])
+            ->setSslCaCert(
+                $_ENV['LDAP_CA_CERT'] === ''
                     ? __DIR__ . '/../../../resources/cert/ca.crt'
-                    : $_ENV['LDAP_CA_CERT'],
-                'base_dn' => $_ENV['LDAP_BASE_DN'],
-            ],
-            $options,
-        ));
+                    : (string) $_ENV['LDAP_CA_CERT']
+            )
+            ->setBaseDn((string) $_ENV['LDAP_BASE_DN']);
+    }
+
+    protected function getClient(?ClientOptions $options = null): LdapClient
+    {
+        return new LdapClient($options ?? $this->makeOptions());
     }
 
     protected function bindClient(LdapClient $client): void

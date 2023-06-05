@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerStartTlsHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\ServerOptions;
 use PhpSpec\ObjectBehavior;
 
 class ServerStartTlsHandlerSpec extends ObjectBehavior
@@ -46,7 +47,14 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
         ))->shouldBeCalled();
 
         $startTls = new LdapMessageRequest(1, new ExtendedRequest(ExtendedRequest::OID_START_TLS));
-        $this->handleRequest($startTls, $token, $dispatcher, $queue, ['ssl_cert' => 'foo']);
+        $this->handleRequest(
+            $startTls,
+            $token,
+            $dispatcher,
+            $queue,
+            (new ServerOptions())
+                ->setSslCert('foo')
+        );
     }
 
     public function it_should_send_back_an_error_if_the_queue_is_already_encrypted(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher): void
@@ -63,7 +71,14 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
         ))->shouldBeCalled();
 
         $startTls = new LdapMessageRequest(1, new ExtendedRequest(ExtendedRequest::OID_START_TLS));
-        $this->handleRequest($startTls, $token, $dispatcher, $queue, ['ssl_cert' => 'foo']);
+        $this->handleRequest(
+            $startTls,
+            $token,
+            $dispatcher,
+            $queue,
+            (new ServerOptions())
+                ->setSslCert('foo')
+        );
     }
 
     public function it_should_send_back_an_error_if_encryption_is_not_supported(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher): void
@@ -80,6 +95,12 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
         ))->shouldBeCalled();
 
         $startTls = new LdapMessageRequest(1, new ExtendedRequest(ExtendedRequest::OID_START_TLS));
-        $this->handleRequest($startTls, $token, $dispatcher, $queue, []);
+        $this->handleRequest(
+            $startTls,
+            $token,
+            $dispatcher,
+            $queue,
+            new ServerOptions()
+        );
     }
 }

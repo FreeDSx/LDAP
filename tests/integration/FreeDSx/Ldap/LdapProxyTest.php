@@ -64,7 +64,7 @@ class LdapProxyTest extends ServerTestCase
         );
 
         while ($paging->hasEntries()) {
-            $entries->add(...$paging->getEntries());
+            $entries->add(...$paging->getEntries()->toArray());
         }
 
         $this->assertSame(

@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingUnsupportedHandler;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\ServerOptions;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
@@ -80,7 +81,7 @@ class ServerPagingUnsupportedHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            []
+            new ServerOptions()
         );
     }
 
@@ -103,7 +104,7 @@ class ServerPagingUnsupportedHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            []
+            new ServerOptions()
         ]);
     }
 
@@ -145,7 +146,7 @@ class ServerPagingUnsupportedHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            []
+            new ServerOptions()
         );
     }
 }

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -43,7 +44,7 @@ class ClientStartTlsHandlerSpec extends ObjectBehavior
         $response = new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(0), ExtendedRequest::OID_START_TLS));
 
         $queue->encrypt()->shouldBeCalledOnce()->willReturn($queue);
-        $this->handleResponse($startTls, $response, $queue, [])->shouldBeAnInstanceOf(LdapMessageResponse::class);
+        $this->handleResponse($startTls, $response, $queue, new ClientOptions())->shouldBeAnInstanceOf(LdapMessageResponse::class);
     }
 
     public function it_should_throw_an_exception_if_the_message_response_is_unsuccessful(ClientQueue $queue): void
@@ -52,6 +53,6 @@ class ClientStartTlsHandlerSpec extends ObjectBehavior
         $response = new LdapMessageResponse(1, new ExtendedResponse(new LdapResult(ResultCode::UNAVAILABLE_CRITICAL_EXTENSION), ExtendedRequest::OID_START_TLS));
 
         $queue->encrypt(true)->shouldNotBeCalled();
-        $this->shouldThrow(ConnectionException::class)->during('handleResponse', [$startTls, $response, $queue, []]);
+        $this->shouldThrow(ConnectionException::class)->during('handleResponse', [$startTls, $response, $queue, new ClientOptions()]);
     }
 }
