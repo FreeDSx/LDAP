@@ -80,16 +80,51 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
             $token
         );
         $pagingRequest = $this->findOrMakePagingRequest($message);
+        $searchRequest = $this->getSearchRequestFromMessage($message);
 
-        $response = $this->handlePaging(
-            $context,
-            $pagingRequest,
-            $message
-        );
+        $response = null;
+        $controls = [];
+        try {
+            $response = $this->handlePaging(
+                $context,
+                $pagingRequest,
+                $message
+            );
+            $searchResult = SearchResult::makeSuccessResult(
+                $response->getEntries(),
+                (string) $searchRequest->getBaseDn()
+            );
+            $controls[] = new PagingControl(
+                $response->getRemaining(),
+                $response->isComplete()
+                    ? ''
+                    : $pagingRequest->getNextCookie()
+            );
+        } catch (OperationException $e) {
+            $searchResult = SearchResult::makeErrorResult(
+                $e->getCode(),
+                (string) $searchRequest->getBaseDn(),
+                $e->getMessage()
+            );
+            $controls[] = new PagingControl(
+                0,
+                ''
+            );
+        }
 
         $pagingRequest->markProcessed();
 
-        if ($response->isComplete()) {
+        /**
+         * Per Section 3 of RFC 2696:
+         *
+         *     If, for any reason, the server cannot resume a paged search operation
+         *     for a client, then it SHOULD return the appropriate error in a
+         *     searchResultDone entry. If this occurs, both client and server should
+         *     assume the paged result set is closed and no longer resumable.
+         *
+         * If a search result is anything other than success, we remove the paging request.
+         */
+        if (($response && $response->isComplete()) || $searchResult->getResultCode() !== ResultCode::SUCCESS) {
             $this->requestHistory->pagingRequest()
                 ->remove($pagingRequest);
             $this->pagingHandler->remove(
@@ -99,13 +134,10 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         }
 
         $this->sendEntriesToClient(
-            $response->getEntries(),
+            $searchResult,
             $message,
             $queue,
-            new PagingControl(
-                $response->getRemaining(),
-                $response->isComplete() ? '' : $pagingRequest->getNextCookie()
-            )
+            ...$controls
         );
     }
 

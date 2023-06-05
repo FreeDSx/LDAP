@@ -18,7 +18,9 @@ use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
@@ -191,7 +193,7 @@ class ServerPagingHandlerSpec extends ObjectBehavior
         );
     }
 
-    public function it_throws_an_exception_if_the_old_and_new_paging_requests_are_different(
+    public function it_sends_a_result_code_error_in_SearchResultDone_if_the_old_and_new_paging_requests_are_different(
         ServerQueue $queue,
         RequestHandlerInterface $handler,
         TokenInterface $token,
@@ -207,15 +209,29 @@ class ServerPagingHandlerSpec extends ObjectBehavior
         $pagingHandler->page(Argument::any(), Argument::any())
             ->shouldNotBeCalled();
         $pagingHandler->remove(Argument::any(), Argument::any())
-            ->shouldNotBeCalled();
+            ->shouldBeCalled();
 
-        $this->shouldThrow(new OperationException("The search request and controls must be identical between paging requests."))->during('handleRequest', [
+        $queue->sendMessage(new LdapMessageResponse(
+            $message->getMessageId(),
+            new SearchResultDone(
+                ResultCode::OPERATIONS_ERROR,
+                'dc=foo,dc=bar',
+                "The search request and controls must be identical between paging requests."
+            ),
+            ...[new PagingControl(
+                0,
+                ''
+            )]
+        ))->shouldBeCalled()
+            ->willReturn($queue);
+
+        $this->handleRequest(
             $message,
             $token,
             $handler,
             $queue,
             []
-        ]);
+        );
     }
 
     public function it_throws_an_exception_if_the_paging_cookie_does_not_exist(

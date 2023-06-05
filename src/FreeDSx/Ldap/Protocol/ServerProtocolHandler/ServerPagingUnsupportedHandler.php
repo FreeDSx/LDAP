@@ -60,13 +60,24 @@ class ServerPagingUnsupportedHandler implements ServerProtocolHandlerInterface
             );
         }
 
-        $entries = $dispatcher->search(
-            $context,
-            $request
-        );
+        try {
+            $searchResult = SearchResult::makeSuccessResult(
+                $dispatcher->search(
+                    $context,
+                    $request
+                ),
+                (string) $request->getBaseDn()
+            );
+        } catch (OperationException $e) {
+            $searchResult = SearchResult::makeErrorResult(
+                $e->getCode(),
+                (string) $request->getBaseDn(),
+                $e->getMessage()
+            );
+        }
 
         $this->sendEntriesToClient(
-            $entries,
+            $searchResult,
             $message,
             $queue
         );

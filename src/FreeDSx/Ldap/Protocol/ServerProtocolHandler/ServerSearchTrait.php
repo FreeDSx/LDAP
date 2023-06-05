@@ -27,18 +27,19 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 trait ServerSearchTrait
 {
     /**
-     * @param Entries $entries
+     * @param SearchResult $searchResult
      * @param LdapMessageRequest $message
      * @param ServerQueue $queue
      * @return void
      */
     private function sendEntriesToClient(
-        Entries $entries,
+        SearchResult $searchResult,
         LdapMessageRequest $message,
         ServerQueue $queue,
         Control ...$controls
     ): void {
         $messages = [];
+        $entries = $searchResult->getEntries();
 
         foreach ($entries->toArray() as $entry) {
             $messages[] = new LdapMessageResponse(
@@ -49,7 +50,11 @@ trait ServerSearchTrait
 
         $messages[] = new LdapMessageResponse(
             $message->getMessageId(),
-            new SearchResultDone(ResultCode::SUCCESS),
+            new SearchResultDone(
+                $searchResult->getResultCode(),
+                $searchResult->getBaseDn(),
+                $searchResult->getDiagnosticMessage()
+            ),
             ...$controls
         );
 

@@ -66,7 +66,10 @@ class ServerPagingUnsupportedHandlerSpec extends ObjectBehavior
             $resultEntry2,
             new LdapMessageResponse(
                 2,
-                new SearchResultDone(0)
+                new SearchResultDone(
+                    0,
+                    'dc=foo,dc=bar'
+                )
             )
         )->shouldBeCalled();
 
@@ -100,5 +103,47 @@ class ServerPagingUnsupportedHandlerSpec extends ObjectBehavior
             $queue,
             []
         ]);
+    }
+
+    public function it_should_send_a_SearchResultDone_with_an_operation_exception_thrown_from_the_handler(
+        ServerQueue $queue,
+        RequestHandlerInterface $handler,
+        TokenInterface $token
+    ): void {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::equal(
+                'foo',
+                'bar'
+            )))->base('dc=foo,dc=bar'),
+            new PagingControl(
+                10,
+                ''
+            )
+        );
+
+        $handler->search(Argument::any(), Argument::any())
+            ->willThrow(new OperationException(
+                "Fail",
+                ResultCode::OPERATIONS_ERROR
+            ));
+
+        $queue->sendMessage(new LdapMessageResponse(
+            2,
+            new SearchResultDone(
+                ResultCode::OPERATIONS_ERROR,
+                'dc=foo,dc=bar',
+                "Fail"
+            )
+        ))->shouldBeCalled()
+            ->willReturn($queue);
+
+        $this->handleRequest(
+            $search,
+            $token,
+            $handler,
+            $queue,
+            []
+        );
     }
 }
