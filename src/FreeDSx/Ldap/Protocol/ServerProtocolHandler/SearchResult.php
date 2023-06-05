@@ -19,25 +19,13 @@ use FreeDSx\Ldap\Operation\ResultCode;
 
 final class SearchResult
 {
-    /**
-     * @var Entries
-     */
-    private $entries;
+    private Entries $entries;
 
-    /**
-     * @var string
-     */
-    private $baseDn;
+    private string $baseDn;
 
-    /**
-     * @var int
-     */
-    private $resultCode;
+    private int $resultCode;
 
-    /**
-     * @var string
-     */
-    private $diagnosticMessage;
+    private string $diagnosticMessage;
 
     private function __construct(
         Entries $entries,
