@@ -181,7 +181,7 @@ class LdapResult implements ResponseInterface
     }
 
     /**
-     * @return array{0: mixed, 1: mixed, 2: mixed, 3: list<LdapUrl>}
+     * @return array{0: int, 1: string, 2: string, 3: LdapUrl[]}
      * @throws ProtocolException
      * @throws EncoderException
      */
@@ -205,7 +205,7 @@ class LdapResult implements ResponseInterface
                     $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
                     foreach ($child->getChildren() as $ldapUrl) {
                         try {
-                            $referrals[] = LdapUrl::parse($ldapUrl->getValue());
+                            $referrals[] = LdapUrl::parse((string) $ldapUrl->getValue());
                         } catch (UrlParseException $e) {
                             throw new ProtocolException($e->getMessage());
                         }

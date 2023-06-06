@@ -29,7 +29,7 @@ use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 class ExtendedResponseFactory
 {
     /**
-     * @var array<string, string>
+     * @var array<string, class-string>
      */
     private static array $map = [
         ExtendedRequest::OID_PWD_MODIFY => PasswordModifyResponse::class,
@@ -57,7 +57,20 @@ class ExtendedResponseFactory
             ));
         }
 
-        return call_user_func($responseConstruct, $asn1);
+        $response = call_user_func(
+            $responseConstruct,
+            $asn1
+        );
+
+        if (!$response instanceof ExtendedResponse) {
+            throw new RuntimeException(sprintf(
+                'Expected an instance of %s, but received: %s',
+                ExtendedResponse::class,
+                is_object($response) ? $response::class : gettype($response)
+            ));
+        }
+
+        return $response;
     }
 
     /**

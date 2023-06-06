@@ -75,14 +75,14 @@ class SearchResultEntry implements ResponseInterface
                 }
 
                 $attributes[] = new Attribute(
-                    $partialAttribute->getChild(0)?->getValue(),
+                    (string) $partialAttribute->getChild(0)?->getValue(),
                     ...$values
                 );
             }
         }
 
         return new self(new Entry(
-            new Dn($dn->getValue()),
+            new Dn((string) $dn->getValue()),
             ...$attributes
         ));
     }

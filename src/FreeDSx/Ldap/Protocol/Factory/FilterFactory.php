@@ -37,7 +37,7 @@ use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 class FilterFactory
 {
     /**
-     * @var array<string>
+     * @var array<int, class-string>
      */
     private static array $map = [
         0 => AndFilter::class,
@@ -73,7 +73,20 @@ class FilterFactory
             ));
         }
 
-        return call_user_func($filterConstruct, $type);
+        $filter = call_user_func(
+            $filterConstruct,
+            $type
+        );
+
+        if (!$filter instanceof FilterInterface) {
+            throw new RuntimeException(sprintf(
+                'Expected an instance of %s, but received: %s',
+                FilterInterface::class,
+                is_object($filter) ? $filter::class : gettype($filter)
+            ));
+        }
+
+        return $filter;
     }
 
     public static function has(int $filterType): bool
