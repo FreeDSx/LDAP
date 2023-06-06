@@ -15,27 +15,38 @@ contains helpers for searching that are covered in other docs.
 ## Connecting and Binding
 
 ```php
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Exception\BindException;
 
-# Construct the LDAP client with an array of options...
-$ldap = new LdapClient([
+# Construct the LDAP client with an options object...
+
+$ldapOptions = (new ClientOptions)
     # The base_dn as the default for all searches (if not explicitly defined)
-    'base_dn' => 'dc=domain,dc=local',
-    # An array of servers to try to connect to
-    'servers' => ['dc01', 'dc02'],
-]);
+    ->setBaseDn('dc=domain,dc=local')
+     # An array of servers to try to connect to
+    ->setServers(['dc01', 'dc02']);
+
+$ldap = new LdapClient($ldapOptions);
 
 # Bind to LDAP with a username and password.
 try {
-    $ldap->bind('user@domain.local', '12345');
+    $ldap->bind(
+        username: 'user@domain.local',
+        password: '12345',
+    );
 } catch (BindException $e) {
-   echo sprintf('Error (%s): %s', $e->getCode(), $e->getMessage());
-   exit;
+   echo sprintf(
+       'Error (%s): %s',
+       $e->getCode(),
+       $e->getMessage(),
+   );
+
+   exit 1;
 }
 ```
 
-Note that the above binds to LDAP without first encrypting your connection. You should issue a StartTLS via `startTls()`
+Note that the above binds to LDAP without first encrypting your connection. You should issue a StartTLS via `LdapClient::startTls()`
 prior to binding to LDAP. See below for details. 
 
 ## Encrypting Your Connection
@@ -43,9 +54,12 @@ prior to binding to LDAP. See below for details.
 To encrypt your connection using TLS you must issue a StartTLS after constructing your client:
 
 ```php
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapClient;
 
-$ldap = new LdapClient(['servers' => ['dc01.domain.local']]);
+$ldap = new LdapClient(
+    (new ClientOptions)->setServers(['dc01.domain.local'])
+);
 
 # Issue a StartTLS before doing anything else
 $ldap->startTls();
@@ -55,14 +69,25 @@ To validate your certificate you will need to pass the path to a trusted certifi
 option when constructing the client:
 
 ```php
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapClient;
 
 # Pass a path of a trusted CA certificate for validation:
-$ldap = new LdapClient(['servers' => ['dc01.domain.local'], 'ssl_ca_cert' => '/path/to/cert.pem']);
+$ldap = new LdapClient(
+    (new ClientOptions)
+        ->setServers(['dc01.domain.local'])
+        ->setSslCaCert('/path/to/cert.pem')
+);
+
 $ldap->startTls();
 
 # Connect via TLS but disable security certificate checking (useful for troubleshooting):
-$ldap = new LdapClient(['servers' => ['dc01.domain.local'], 'ssl_validate_cert' => false]);
+$ldap = new LdapClient(
+    (new ClientOptions)
+        ->setServers(['dc01.domain.local'])
+        ->setSslValidateCert(false)
+);
+
 $ldap->startTls();
 ```
 
@@ -151,6 +176,6 @@ When your LDAP client class is destroyed and the destructor is called it will se
 is a polite way to tell the LDAP server that you are disconnecting from it. You can also unbind your client manually:
 
 ```php
-# Sends a unbind request to the server and terminates the TCP connection
+# Sends an unbind request to the server and terminates the TCP connection
 $ldap->unbind();
 ```

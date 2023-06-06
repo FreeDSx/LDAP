@@ -38,17 +38,17 @@ no real extensibility if you aren't defining your own handlers.
 The proxy server can be constructed as follows:
 
 ```php
+use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
 
 $server = LdapServer::makeProxy(
     // The LDAP server to proxy connections to...
-    'ldap.example.com',
+    servers: 'ldap.example.com',
     // Any additional LdapClient options for the proxy...
-    [],
+    clientOptions: new ClientOptions(),
     // Any additional LdapServer options. In this case, run over port 3389
-    [
-        'port' => 3389,
-    ]
+    serverOptions: (new ServerOptions)->setPort(3389),
 );
 
 $server->run();
@@ -110,10 +110,14 @@ class LdapProxyHandler extends ProxyRequestHandler
      */
     public function __construct()
     {
-        $this->options = [
-            'servers' => ['dc1.domain.local', 'dc2.domain.local'],
-            'base_dn' => 'dc=domain,dc=local',
-        ];
+        parent::__construct(
+            (new ClientOptions)
+                ->setServers([
+                    'dc1.domain.local',
+                    'dc2.domain.local',
+                 ])
+                 ->setBaseDn('dc=domain,dc=local')
+        );
     }
 }
 ```
@@ -121,10 +125,13 @@ class LdapProxyHandler extends ProxyRequestHandler
 2. Create the server and run it with the request handler above: 
 
 ```php
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
 use Foo\LdapProxyHandler;
 
-$server = new LdapServer([ 'request_handler' => LdapProxyHandler::class ]);
+$server = new LdapServer(
+    (new ServerOptions)->setRequestHandler(new LdapProxyHandler())
+);
 $server->run();
 ```
 
@@ -189,11 +196,13 @@ class LdapRequestHandler extends GenericRequestHandler
 2. Create the server and run it with the request handler above: 
 
 ```php
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
 use Foo\LdapRequestHandler;
 
-$server = new LdapServer([ 'request_handler' => LdapRequestHandler::class ]);
-$server->run();
+$server = new LdapServer(
+    (new ServerOptions)->setRequestHandler(new LdapRequestHandler())
+);
 ```
 
 ## Handling the RootDSE
@@ -208,7 +217,7 @@ An example of using it to proxy RootDSE requests to a different LDAP server...
 ```php
 namespace Foo;
 
-use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\ClientOptions;use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 
@@ -219,16 +228,26 @@ class RootDseProxyHandler extends ProxyRequestHandler implements RootDseHandlerI
      */
     public function __construct()
     {
-        $this->options = [
-            'servers' => ['dc1.domain.local', 'dc2.domain.local'],
-            'base_dn' => 'dc=domain,dc=local',
-        ];
+        parent::__construct(
+            (new ClientOptions)
+                ->setServers([
+                    'dc1.domain.local',
+                     'dc2.domain.local',
+                 ])
+                 ->setBaseDn('dc=domain,dc=local')
+        );
     }
     
-    public function rootDse(RequestContext $context, SearchRequest $request, Entry $rootDse): Entry
-    {
+    public function rootDse(
+        RequestContext $context,
+        SearchRequest $request,
+        Entry $rootDse
+    ): Entry {
         return $this->ldap()
-            ->search($request, ...$context->controls()->toArray())
+            ->search(
+                $request,
+                ...$context->controls()->toArray()
+            )
             ->first();
     }
 }
@@ -237,10 +256,14 @@ class RootDseProxyHandler extends ProxyRequestHandler implements RootDseHandlerI
 2. Use the implemented class when instantiating the LDAP server:
 
 ```php
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
 use Foo\RootDseProxyHandler;
 
-$server = new LdapServer(['rootdse_handler' => RootDseProxyHandler::class]);
+$server = new LdapServer(
+    (new ServerOptions)->setRootDseHandler(new RootDseProxyHandler())
+);
+
 $server->run();
 ```
 
@@ -333,11 +356,14 @@ class MyPagingHandler implements PagingHandlerInterface
 2. Use the implemented class when instantiating the LDAP server:
 
 ```php
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
 use Foo\MyPagingHandler;
 
-$server = new LdapServer();
-$server->usePagingHandler(new MyPagingHandler());
+$server = new LdapServer(
+    (new ServerOptions)->setPagingHandler(new MyPagingHandler())
+);
+
 $server->run();
 ```
 
@@ -350,16 +376,18 @@ request will not be supported.
 Adding the generated certs and keys on construction:
 
 ```php
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
 
-$server = new LdapServer([
+$options = (new ServerOptions)
     # The key can also be bundled in this cert
-    'ssl_cert' => '/path/to/cert.pem',
+    ->setSslCert('/path/to/cert.pem')
     # The key for the cert. Not needed if bundled above.
-    'ssl_cert_key' => '/path/to/cert.key',
+    ->setSslCertKey('/path/to/cert.key')
     # The password/passphrase to read the key (if required)
-    'ssl_cert_passphrase' => 'This-Is-My-Secret-Password',
-]);
+    ->setSslCertPassphrase('This-Is-My-Secret-Password');
+
+$server = new LdapServer($options);
 
 $server->run();
 ```

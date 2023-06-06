@@ -79,8 +79,8 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
         if ($options->getDseVendorVersion()) {
             $entry->set('vendorVersion', (string) $options->getDseVendorVersion());
         }
-        if ($options->getDseAlServer()) {
-            $entry->set('altServer', (string) $options->getDseAlServer());
+        if ($options->getDseAltServer()) {
+            $entry->set('altServer', (string) $options->getDseAltServer());
         }
 
         /** @var SearchRequest $request */

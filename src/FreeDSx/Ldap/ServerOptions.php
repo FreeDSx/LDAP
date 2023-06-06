@@ -42,7 +42,7 @@ final class ServerOptions
 
     private ?string $sslCertPassphrase = null;
     
-    private ?string $dseAlServer = null;
+    private ?string $dseAltServer = null;
 
     /**
      * @var string[]
@@ -193,14 +193,14 @@ final class ServerOptions
         return $this;
     }
 
-    public function getDseAlServer(): ?string
+    public function getDseAltServer(): ?string
     {
-        return $this->dseAlServer;
+        return $this->dseAltServer;
     }
 
-    public function setDseAlServer(?string $dseAlServer): self
+    public function setDseAltServer(?string $dseAlServer): self
     {
-        $this->dseAlServer = $dseAlServer;
+        $this->dseAltServer = $dseAlServer;
 
         return $this;
     }
@@ -313,7 +313,7 @@ final class ServerOptions
             'ssl_cert' => $this->getSslCert(),
             'ssl_cert_key' => $this->getSslCertKey(),
             'ssl_cert_passphrase' => $this->getSslCertPassphrase(),
-            'dse_alt_server' => $this->getDseAlServer(),
+            'dse_alt_server' => $this->getDseAltServer(),
             'dse_naming_contexts' => $this->getDseNamingContexts(),
             'dse_vendor_name' => $this->getDseVendorName(),
             'dse_vendor_version' => $this->getDseVendorVersion(),
