@@ -10,12 +10,14 @@ using the client methods.
 An example of letting it auto-detect a mechanism:
 
 ```php
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapClient;
 
-$ldap = new LdapClient([
-    'servers' => 'ldap.example.com',
-    'base_dn' => 'dc=example,dc=local'
-]);
+$ldap = new LdapClient(
+    (new ClientOptions)
+        ->setServers(['ldap.example.com'])
+        ->setBaseDn('dc=example,dc=local')
+);
 
 # Bind using SASL, let it automatically detect an available supported mechanism.
 # The first parameter to bindSasl is an array of options for SASL to use.
@@ -28,12 +30,14 @@ $ldap->bindSasl([
 An example of specifying a mechanism:
 
 ```php
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapClient;
 
-$ldap = new LdapClient([
-    'servers' => 'ldap.example.com',
-    'base_dn' => 'dc=example,dc=local'
-]);
+$ldap = new LdapClient(
+    (new ClientOptions)
+        ->setServers(['ldap.example.com'])
+        ->setBaseDn('dc=example,dc=local')
+);
 
 # Use the second parameter of bindSasl to specify a mechanism.
 $ldap->bindSasl([
@@ -48,13 +52,13 @@ $ldap->bindSasl([
 
 The following table details mechanisms / options that are recognized when doing a SASL bind:
 
-|                  | `DIGEST-MD5`  | `CRAM-MD5` | `PLAIN` | `ANONYMOUS` |
-| ---------------- | :-----------: | :--------: | :-----: | :---------: |
-| `username`       | X             | X          | X       | X           |
-| `password`       | X             | X          | X       |             |
-| `use_integrity`  | X             |            |         |             |
-| `trace`          |               |            |         | X           |
-| `host`           | X             |            |         |             |
+|                 | `DIGEST-MD5` | `CRAM-MD5` | `PLAIN` | `ANONYMOUS` |
+|-----------------|:------------:|:----------:|:-------:|:-----------:|
+| `username`      |      X       |     X      |    X    |      X      |
+| `password`      |      X       |     X      |    X    |             |
+| `use_integrity` |      X       |            |         |             |
+| `trace`         |              |            |         |      X      |
+| `host`          |      X       |            |         |             |
 
 ## Options
 

@@ -39,24 +39,29 @@ composer require freedsx/ldap
 Use the LdapClient class and the helper classes:
 
 ```php
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 
-$ldap = new LdapClient([
-    # Servers are tried in order until one connects
-    'servers' => ['dc1', 'dc2'],
-    # The base_dn is used as the default for searches
-    'base_dn' => 'dc=example,dc=local'
-]);
+$ldap = new LdapClient(
+    (new ClientOptions)
+        # Servers are tried in order until one connects
+        ->setServers( ['dc1', 'dc2'])
+        # The base_dn is used as the default for searches
+        ->setBaseDn('dc=example,dc=local')
+);
 
 # Encrypt the connection prior to binding
 $ldap->startTls();
 
 # Bind to LDAP with a specific user.
-$ldap->bind('user@example.local', '12345');
+$ldap->bind(
+    username: 'user@example.local',
+    password: '12345'
+);
 
-# Build up a LDAP filter using the helper methods
+# Build up an LDAP filter using the helper methods
 $filter = Filters::and(
     Filters::equal('objectClass', 'user'),
     Filters::startsWith('cn', 'S'),
@@ -64,17 +69,24 @@ $filter = Filters::and(
     Filters::raw('(telephoneNumber=*)')
 );
 # Create a search operation to be used based on the above filter
-$search = Operations::search($filter, 'cn');
+$search = Operations::search(
+    $filter,
+    'cn'
+);
 
 # Create a paged search, 100 results at a time
-$paging = $ldap->paging($search, 100);
+$paging = $ldap->paging(
+    $search,
+    100
+);
 
 while ($paging->hasEntries()) {
     $entries = $paging->getEntries();
+
     var_dump(count($entries));
     
     foreach ($entries as $entry) {
-        echo "Entry: ".$entry->getDn().PHP_EOL;
+        echo "Entry: " . $entry->getDn() . PHP_EOL;
     }
 }
 ```
@@ -101,7 +113,11 @@ $entry = (new Entry('cn=foo,dc=domain,dc=local'))
 try {
     $ldap->create($entry);
 } catch (OperationException $e) {
-    echo sprintf('Error adding entry (%s): %s', $e->getCode(), $e->getMessage()).PHP_EOL;
+    echo sprintf(
+        'Error adding entry (%s): %s',
+        $e->getCode(),
+        $e->getMessage(),
+    ) . PHP_EOL;
 }
 ```
 
@@ -113,10 +129,9 @@ try {
 $entry = $ldap->read('cn=foo,dc=domain,dc=local');
 
 # Entry will be null if it doesn't exist
-if ($entry) {
-    echo $entry.PHP_EOL;
-    var_dump($entry->toArray());
-}
+echo $entry . PHP_EOL;
+
+var_dump($entry?->toArray());
 ```
 
 ## Update
@@ -129,24 +144,37 @@ $entry = $ldap->read('cn=foo,dc=domain,dc=local');
 
 # Add a value to an attribute
 if (!$entry->get('telephoneNumber')) {
-    $entry->add('telephoneNumber', '555-5555');
+    $entry->add(
+        'telephoneNumber',
+        '555-5555',
+    );
 }
 # Remove any values an attribute may have
 if ($entry->has('title')) {
     $entry->reset('title');
 }
-# Delete a specific value for an attribute
-if ($entry->get('ipPhone')->has('12345')) {
-    $entry->delete('ipPhone', '12345');
+# Delete a specific value for an attribute if it actually exists.
+if ($entry->get('ipPhone')?->has('12345')) {
+    $entry->delete(
+        'ipPhone',
+        '12345',
+    );
 }
 # Set a value for an attribute. This replaces any value it may, or may not, have.
-$entry->set('description', 'Employee');
+$entry->set(
+    'description',
+    'Employee',
+);
 
 # Send the built up changes back to LDAP to update the entry via the LDAP client update method.
 try {
     $ldap->update($entry);
 } catch (OperationException $e) {
-    echo sprintf('Error modifying entry (%s): %s', $e->getCode(), $e->getMessage()).PHP_EOL;;
+    echo sprintf(
+        'Error modifying entry (%s): %s',
+        $e->getCode(),
+        $e->getMessage(),
+    ) . PHP_EOL;
 }
 ```
 
@@ -164,7 +192,11 @@ if ($entry) {
     try {
         $ldap->delete($entry);
     } catch (OperationException $e) {
-        echo sprintf('Error deleting entry (%s): %s', $e->getCode(), $e->getMessage()).PHP_EOL;;
+        echo sprintf(
+            'Error deleting entry (%s): %s',
+            $e->getCode(),
+            $e->getMessage()
+        ) . PHP_EOL;;
     }
 }
 ```

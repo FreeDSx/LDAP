@@ -47,18 +47,6 @@ final class ClientOptions
     
     private int $referralLimit = 10;
 
-    /**
-     * A helper method designed to ease migration from array options to the new options object.
-     *
-     * @param array<string, mixed> $options
-     */
-    public static function fromArray(array $options): self
-    {
-        $instance = new self();
-        
-        return $instance;
-    }
-
     public function getVersion(): int
     {
         return $this->version;
