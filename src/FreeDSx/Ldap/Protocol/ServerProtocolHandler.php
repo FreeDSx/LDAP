@@ -18,7 +18,7 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\LoggerTrait;
+use FreeDSx\Ldap\Server\LoggerTrait;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Exception\ConnectionException;
 use Throwable;
 use function array_merge;
@@ -42,18 +43,7 @@ class ServerProtocolHandler
 {
     use LoggerTrait;
 
-    /**
-     * @var array<string, mixed>
-     */
-    private array $options = [
-        'allow_anonymous' => false,
-        'require_authentication' => true,
-        'request_handler' => null,
-        'dse_alt_server' => null,
-        'dse_naming_contexts' => 'dc=FreeDSx,dc=local',
-        'dse_vendor_name' => 'FreeDSx',
-        'dse_vendor_version' => null,
-    ];
+    private ServerOptions $options;
 
     private ServerQueue $queue;
 
@@ -72,28 +62,28 @@ class ServerProtocolHandler
 
     private ServerBindHandlerFactory $bindHandlerFactory;
 
-    /**
-     * @param array<string, mixed> $options
-     */
     public function __construct(
         ServerQueue $queue,
         HandlerFactoryInterface $handlerFactory,
-        array $options = [],
+        ServerOptions $options,
         ServerProtocolHandlerFactory $protocolHandlerFactory = null,
-        ServerBindHandlerFactory $bindHandlerFactory = null,
+        ServerBindHandlerFactory $bindHandlerFactory = new ServerBindHandlerFactory(),
         ServerAuthorization $authorizer = null,
-        ResponseFactory $responseFactory = null
+        ResponseFactory $responseFactory = new ResponseFactory()
     ) {
         $this->queue = $queue;
         $this->handlerFactory = $handlerFactory;
-        $this->options = array_merge($this->options, $options);
-        $this->authorizer = $authorizer ?? new ServerAuthorization(null, $this->options);
-        $this->protocolHandlerFactory = $protocolHandlerFactory ?? new ServerProtocolHandlerFactory(
-            $handlerFactory,
-            new RequestHistory()
+        $this->options = $options;
+        $this->authorizer = $authorizer ?? new ServerAuthorization(
+            isAnonymousAllowed: $options->isAllowAnonymous(),
+            isAuthRequired: $options->isRequireAuthentication(),
         );
-        $this->bindHandlerFactory = $bindHandlerFactory ?? new ServerBindHandlerFactory();
-        $this->responseFactory = $responseFactory ?? new ResponseFactory();
+        $this->protocolHandlerFactory = $protocolHandlerFactory ?? new ServerProtocolHandlerFactory(
+            handlerFactory: $handlerFactory,
+            requestHistory: new RequestHistory(),
+        );
+        $this->bindHandlerFactory = $bindHandlerFactory;
+        $this->responseFactory = $responseFactory;
     }
 
     /**
@@ -267,8 +257,7 @@ class ServerProtocolHandler
         return $this->bindHandlerFactory->get($message->getRequest())->handleBind(
             $message,
             $this->handlerFactory->makeRequestHandler(),
-            $this->queue,
-            $this->options
+            $this->queue
         );
     }
 

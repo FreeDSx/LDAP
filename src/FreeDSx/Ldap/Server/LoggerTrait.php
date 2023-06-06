@@ -11,10 +11,10 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap;
+namespace FreeDSx\Ldap\Server;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
-use Psr\Log\LoggerInterface;
+use FreeDSx\Ldap\ServerOptions;
 use Psr\Log\LogLevel;
 
 /**
@@ -24,6 +24,8 @@ use Psr\Log\LogLevel;
  */
 trait LoggerTrait
 {
+    private ServerOptions $options;
+
     /**
      * Logs a message and then throws a runtime exception.
      *
@@ -80,12 +82,10 @@ trait LoggerTrait
         string $message,
         array $context = []
     ): void {
-        if (isset($this->options['logger']) && $this->options['logger'] instanceof LoggerInterface) {
-            $this->options['logger']->log(
-                level: $level,
-                message: $message,
-                context: $context,
-            );
-        }
+        $this->options->getLogger()?->log(
+            level: $level,
+            message: $message,
+            context: $context,
+        );
     }
 }

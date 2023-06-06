@@ -83,7 +83,7 @@ class ServerAuthorizationSpec extends ObjectBehavior
 
     public function it_should_not_require_authentication_if_it_has_been_explicitly_disabled(): void
     {
-        $this->beConstructedWith(null, ['require_authentication' => false]);
+        $this->beConstructedWith(new AnonToken(), false, false);
 
         $this->isAuthenticationRequired(Operations::read('cn=bar'))->shouldBeEqualTo(false);
         $this->isAuthenticationRequired(Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'))->shouldBeEqualTo(false);
@@ -104,7 +104,7 @@ class ServerAuthorizationSpec extends ObjectBehavior
 
     public function it_should_respect_the_option_for_whether_anon_binds_are_allowed(): void
     {
-        $this->beConstructedWith(null, ['allow_anonymous' => true]);
+        $this->beConstructedWith(new AnonToken(), true);
 
         $this->isAuthenticationTypeSupported(Operations::bindAnonymously())->shouldBeEqualTo(true);
     }

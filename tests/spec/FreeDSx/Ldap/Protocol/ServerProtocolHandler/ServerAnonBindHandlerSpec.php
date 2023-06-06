@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerAnonBindHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\AnonToken;
+use FreeDSx\Ldap\ServerOptions;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
@@ -44,7 +45,7 @@ class ServerAnonBindHandlerSpec extends ObjectBehavior
 
         $this->shouldThrow(OperationException::class)->during(
             'handleBind',
-            [$bind, $dispatcher, $queue, []]
+            [$bind, $dispatcher, $queue]
         );
     }
 
@@ -59,7 +60,7 @@ class ServerAnonBindHandlerSpec extends ObjectBehavior
             new LdapResult(0)
         )))->shouldBeCalled()->willReturn($queue);
 
-        $this->handleBind($bind, $dispatcher, $queue, [])->shouldBeLike(
+        $this->handleBind($bind, $dispatcher, $queue)->shouldBeLike(
             new AnonToken('foo')
         );
     }

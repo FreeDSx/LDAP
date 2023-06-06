@@ -52,39 +52,13 @@ class LdapClient
 
     public const REFERRAL_THROW = 'throw';
 
-    /**
-     * @var array<string, mixed>
-     */
-    private array $options = [
-        'version' => 3,
-        'servers' => [],
-        'port' => 389,
-        'transport' => 'tcp',
-        'base_dn' => null,
-        'page_size' => 1000,
-        'use_ssl' => false,
-        'ssl_validate_cert' => true,
-        'ssl_allow_self_signed' => null,
-        'ssl_ca_cert' => null,
-        'ssl_peer_name' => null,
-        'timeout_connect' => 3,
-        'timeout_read' => 10,
-        'referral' => 'throw',
-        'referral_chaser' => null,
-        'referral_limit' => 10,
-    ];
+    private ClientOptions $options;
 
     private ?ClientProtocolHandler $handler = null;
 
-    /**
-     * @param array<string, mixed> $options
-     */
-    public function __construct(array $options = [])
+    public function __construct(ClientOptions $options = new ClientOptions())
     {
-        $this->options = array_merge(
-            $this->options,
-            $options,
-        );
+        $this->options = $options;
     }
 
     /**
@@ -98,7 +72,7 @@ class LdapClient
     ): LdapMessageResponse {
         return $this->sendAndReceive(
             Operations::bind($username, $password)
-                ->setVersion($this->options['version'])
+                ->setVersion($this->options->getVersion())
         );
     }
 
@@ -117,7 +91,7 @@ class LdapClient
     ): LdapMessageResponse {
         return $this->sendAndReceive(
             Operations::bindSasl($options, $mechanism)
-                ->setVersion($this->options['version'])
+                ->setVersion($this->options->getVersion())
         );
     }
 
@@ -312,7 +286,7 @@ class LdapClient
         return new Paging(
             client: $this,
             search: $search,
-            size: $size ?? (int) $this->options['page_size']
+            size: $size ?? $this->options->getPageSize()
         );
     }
 
@@ -446,10 +420,8 @@ class LdapClient
 
     /**
      * Get the options currently set.
-     *
-     * @return array<string, mixed>
      */
-    public function getOptions(): array
+    public function getOptions(): ClientOptions
     {
         return $this->options;
     }
@@ -458,18 +430,14 @@ class LdapClient
      * Merge a set of options. Depending on what you are changing, you many want to set the $forceDisconnect param to
      * true, which forces the client to disconnect. After which you would have to manually bind again.
      *
-     * @param array<string, mixed> $options The set of options to merge in.
      * @param bool $forceDisconnect Whether the client should disconnect; forcing a manual re-connect / bind. This is
      *                              false by default.
      */
     public function setOptions(
-        array $options,
+        ClientOptions $options,
         bool $forceDisconnect = false
     ): self {
-        $this->options = array_merge(
-            $this->options,
-            $options
-        );
+        $this->options = $options;
         if ($forceDisconnect) {
             $this->unbindIfConnected();
         }

@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\RequestHandler;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
+use FreeDSx\Ldap\ServerOptions;
 use Throwable;
 
 /**
@@ -31,15 +32,9 @@ class HandlerFactory implements HandlerFactoryInterface
 
     private ?PagingHandlerInterface $pagingHandler = null;
 
-    /**
-     * @var array<string, mixed>
-     */
-    private array $options;
+    private ServerOptions $options;
 
-    /**
-     * @param array<string, mixed> $options
-     */
-    public function __construct(array $options)
+    public function __construct(ServerOptions $options)
     {
         $this->options = $options;
     }
@@ -50,20 +45,7 @@ class HandlerFactory implements HandlerFactoryInterface
     public function makeRequestHandler(): RequestHandlerInterface
     {
         if (!$this->requestHandler) {
-            $requestHandler = !isset($this->options['request_handler'])
-                ? new GenericRequestHandler()
-                : $this->makeOrReturnInstanceOf(
-                    'request_handler',
-                    RequestHandlerInterface::class
-                );
-            if (!$requestHandler instanceof RequestHandlerInterface) {
-                throw new RuntimeException(sprintf(
-                    'Expected an instance of %s, got: %s',
-                    RequestHandlerInterface::class,
-                    get_class($requestHandler)
-                ));
-            }
-            $this->requestHandler = $requestHandler;
+            $this->requestHandler = $this->options->getRequestHandler() ?? new GenericRequestHandler();
         }
 
         return $this->requestHandler;
@@ -85,17 +67,7 @@ class HandlerFactory implements HandlerFactoryInterface
         if ($this->rootdseHandler) {
             return $this->rootdseHandler;
         }
-
-        if (isset($this->options['rootdse_handler'])) {
-            $handler = $this->makeOrReturnInstanceOf(
-                'rootdse_handler',
-                RootDseHandlerInterface::class
-            );
-        }
-
-        if ($handler instanceof RootDseHandlerInterface) {
-            $this->rootdseHandler = $handler;
-        }
+        $this->rootdseHandler = $this->options->getRootDseHandler();
 
         return $this->rootdseHandler;
     }
@@ -108,72 +80,8 @@ class HandlerFactory implements HandlerFactoryInterface
         if ($this->pagingHandler) {
             return $this->pagingHandler;
         }
-
-        $handler = null;
-        if (isset($this->options['paging_handler'])) {
-            $handler = $this->makeOrReturnInstanceOf(
-                'paging_handler',
-                PagingHandlerInterface::class
-            );
-        }
-
-        if ($handler !== null && !$handler instanceof PagingHandlerInterface) {
-            throw new RuntimeException(sprintf(
-                'Expected an instance of %s, got: %s',
-                PagingHandlerInterface::class,
-                get_class($handler)
-            ));
-        }
-        $this->pagingHandler = $handler;
+        $this->pagingHandler = $this->options->getPagingHandler();
 
         return $this->pagingHandler;
-    }
-
-    /**
-     * @param class-string $class
-     */
-    private function makeOrReturnInstanceOf(
-        string $optionName,
-        string $class
-    ): object {
-        if (!isset($this->options[$optionName])) {
-            throw new RuntimeException(sprintf(
-                'Option "%s" must be an instance of or fully qualified class-name implementing "%s".',
-                $optionName,
-                $class
-            ));
-        }
-
-        $objOrString = $this->options[$optionName];
-        if (!(is_object($objOrString) || is_string($objOrString))) {
-            throw new RuntimeException(sprintf(
-                'Option "%s" must be an instance of or fully qualified class-name implementing "%s".',
-                $optionName,
-                $class
-            ));
-        }
-
-        if (is_object($objOrString) && is_subclass_of($objOrString, $class)) {
-            return $objOrString;
-        }
-
-        if (is_string($objOrString) && is_subclass_of($objOrString, $class)) {
-            try {
-                return new $objOrString();
-            } catch (Throwable $e) {
-                throw new RuntimeException(sprintf(
-                    'Unable to instantiate class "%s" for option "%s": %s',
-                    $objOrString,
-                    $optionName,
-                    $e->getMessage()
-                ), $e->getCode(), $e);
-            }
-        }
-
-        throw new RuntimeException(sprintf(
-            'Option "%s" must be an instance of or fully qualified class-name implementing "%s".',
-            $optionName,
-            $class
-        ));
     }
 }

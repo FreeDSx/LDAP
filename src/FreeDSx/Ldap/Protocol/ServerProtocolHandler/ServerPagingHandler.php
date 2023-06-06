@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\ServerOptions;
 use Throwable;
 
 /**
@@ -66,7 +67,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
         RequestHandlerInterface $dispatcher,
         ServerQueue $queue,
-        array $options
+        ServerOptions $options
     ): void {
         $context = new RequestContext(
             $message->controls(),

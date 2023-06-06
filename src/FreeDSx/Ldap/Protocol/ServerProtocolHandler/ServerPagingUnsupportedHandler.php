@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Determines whether we can page results if no paging handler is defined.
@@ -38,7 +39,7 @@ class ServerPagingUnsupportedHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
         RequestHandlerInterface $dispatcher,
         ServerQueue $queue,
-        array $options
+        ServerOptions $options
     ): void {
         $context = new RequestContext(
             $message->controls(),

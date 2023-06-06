@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
@@ -28,12 +29,12 @@ interface ResponseHandlerInterface
     /**
      * Pass the message response to the handler specific to it.
      *
-     * @param array<string, mixed> $options
+     * @param ClientOptions $options
      */
     public function handleResponse(
         LdapMessageRequest $messageTo,
         LdapMessageResponse $messageFrom,
         ClientQueue $queue,
-        array $options
+        ClientOptions $options
     ): ?LdapMessageResponse;
 }

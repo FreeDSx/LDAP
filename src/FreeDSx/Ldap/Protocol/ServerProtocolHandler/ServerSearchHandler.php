@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Handles search request logic.
@@ -37,7 +38,7 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
         RequestHandlerInterface $dispatcher,
         ServerQueue $queue,
-        array $options
+        ServerOptions $options
     ): void {
         $context = new RequestContext(
             $message->controls(),

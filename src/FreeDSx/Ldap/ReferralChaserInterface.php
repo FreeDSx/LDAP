@@ -39,9 +39,7 @@ interface ReferralChaserInterface
     ): ?BindRequest;
 
     /**
-     * Construct the LdapClient with the options you want, and perform other tasks (such as StartTLS)
-     *
-     * @param array<string, mixed> $options
+     * Construct the LdapClient with the options you want, and perform other tasks (such as StartTLS).
      */
-    public function client(array $options): LdapClient;
+    public function client(ClientOptions $options): LdapClient;
 }

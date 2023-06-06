@@ -34,6 +34,7 @@ use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\ServerOptions;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
@@ -100,7 +101,7 @@ class ServerPagingHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            []
+            new ServerOptions()
         );
     }
 
@@ -151,7 +152,7 @@ class ServerPagingHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            []
+            new ServerOptions()
         );
     }
 
@@ -188,7 +189,7 @@ class ServerPagingHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            []
+            new ServerOptions()
         );
     }
 
@@ -229,7 +230,7 @@ class ServerPagingHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            []
+            new ServerOptions()
         );
     }
 
@@ -249,7 +250,7 @@ class ServerPagingHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            []
+            new ServerOptions()
         ]);
     }
 

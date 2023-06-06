@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -47,7 +48,7 @@ class ClientSearchHandler extends ClientBasicHandler
         /** @var SearchRequest $request */
         $request = $context->getRequest();
         if ($request->getBaseDn() === null) {
-            $request->setBaseDn($context->getOptions()['base_dn'] ?? null);
+            $request->setBaseDn($context->getOptions()->getBaseDn() ?? null);
         }
 
         return parent::handleRequest($context);
@@ -62,10 +63,10 @@ class ClientSearchHandler extends ClientBasicHandler
      * @throws ConnectionException
      */
     public function handleResponse(
-        LdapMessageRequest $messageTo,
+        LdapMessageRequest  $messageTo,
         LdapMessageResponse $messageFrom,
         ClientQueue $queue,
-        array $options,
+        ClientOptions $options,
     ): ?LdapMessageResponse {
         $entries = [];
 

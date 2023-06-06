@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Handles anonymous bind requests.
@@ -39,8 +40,7 @@ class ServerAnonBindHandler extends ServerBindHandler
     public function handleBind(
         LdapMessageRequest $message,
         RequestHandlerInterface $dispatcher,
-        ServerQueue $queue,
-        array $options
+        ServerQueue $queue
     ): TokenInterface {
         $request = $message->getRequest();
         if (!$request instanceof AnonBindRequest) {

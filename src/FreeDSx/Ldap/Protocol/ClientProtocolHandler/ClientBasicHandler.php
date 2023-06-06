@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -68,7 +69,7 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
         LdapMessageRequest $messageTo,
         LdapMessageResponse $messageFrom,
         ClientQueue $queue,
-        array $options
+        ClientOptions $options
     ): ?LdapMessageResponse {
         $result = $messageFrom->getResponse();
 

@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\ServerOptions;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
@@ -72,14 +73,17 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            ['dse_vendor_name' => 'Foo', 'dse_naming_contexts' => ['dc=Foo,dc=Bar']]
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar')
         );
     }
 
     public function it_should_send_back_a_RootDSE_with_paging_support_if_the_paging_handler_is_set(
         ServerQueue $queue,
         RequestHandlerInterface $handler,
-        TokenInterface $token
+        TokenInterface $token,
+        PagingHandlerInterface $pagingHandler,
     ): void {
         $search = new LdapMessageRequest(
             1,
@@ -103,11 +107,10 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            [
-                'paging_handler' => PagingHandlerInterface::class,
-                'dse_vendor_name' => 'Foo',
-                'dse_naming_contexts' => ['dc=Foo,dc=Bar'],
-            ]
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar')
+                ->setPagingHandler($pagingHandler->getWrappedObject())
         );
     }
 
@@ -148,7 +151,9 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            ['dse_vendor_name' => 'Foo', 'dse_naming_contexts' => ['dc=Foo,dc=Bar']]
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar')
         );
     }
 
@@ -180,7 +185,9 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            ['dse_vendor_name' => 'Foo', 'dse_naming_contexts' => ['dc=Foo,dc=Bar']]
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar')
         );
     }
 
@@ -215,7 +222,9 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            ['dse_vendor_name' => 'Foo', 'dse_naming_contexts' => ['dc=Foo,dc=Bar']]
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar')
         );
     }
 }

@@ -16,6 +16,7 @@ use FreeDSx\Ldap\Server\Paging\PagingResponse;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
+use FreeDSx\Ldap\ServerOptions;
 
 require __DIR__ . '/../../vendor/autoload.php';
 
@@ -200,18 +201,20 @@ if ($transport === 'ssl') {
     $useSsl = true;
 }
 
-$server = new LdapServer([
-    'request_handler' => LdapServerRequestHandler::class,
-    'port' => 3389,
-    'transport' => $transport,
-    'ssl_cert' => $sslCert,
-    'ssl_cert_key' => $sslKey,
-    'use_ssl' => $useSsl,
-]);
-
-if ($handler === 'paging') {
-    $server->usePagingHandler(new LdapServerPagingHandler());
-}
+$server = new LdapServer(
+    (new ServerOptions())
+        ->setRequestHandler(new LdapServerRequestHandler())
+        ->setPort(3389)
+        ->setTransport($transport)
+        ->setSslCert($sslCert)
+        ->setSslCertKey($sslKey)
+        ->setUseSsl($useSsl)
+        ->setPagingHandler(
+            $handler === 'paging'
+                ? new LdapServerPagingHandler()
+                : null
+        )
+);
 
 echo "server starting..." . PHP_EOL;
 

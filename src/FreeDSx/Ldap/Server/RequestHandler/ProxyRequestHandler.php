@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\RequestHandler;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -38,10 +39,12 @@ class ProxyRequestHandler implements RequestHandlerInterface
 {
     protected ?LdapClient $ldap = null;
 
-    /**
-     * @var array<string, mixed>
-     */
-    protected array $options = [];
+    protected ClientOptions $options;
+
+    public function __construct(ClientOptions $options = new ClientOptions())
+    {
+        $this->options = $options;
+    }
 
     /**
      * @inheritDoc
