@@ -59,7 +59,7 @@ class SearchResultReference implements ResponseInterface
 
         foreach ($type->getChildren() as $referral) {
             try {
-                $referrals[] = LdapUrl::parse($referral->getValue());
+                $referrals[] = LdapUrl::parse((string) $referral->getValue());
             } catch (UrlParseException $e) {
                 throw new ProtocolException($e->getMessage());
             }

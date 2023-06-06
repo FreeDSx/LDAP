@@ -63,6 +63,9 @@
     "analyse": [
       "phpstan analyse"
     ],
+    "analyse-tests": [
+      "phpstan analyse -c phpstan.tests.neon"
+    ],
     "cs-fix": [
       "phpcbf --standard=ruleset.xml --extensions=php --tab-width=4 -sp src",
       "ecs --fix"

@@ -74,8 +74,8 @@ class IntermediateResponse implements ResponseInterface
         }
 
         return new self(
-            $name,
-            $value
+            $name === null ? null : (string) $name,
+            $value === null ? null : (string) $value
         );
     }
 

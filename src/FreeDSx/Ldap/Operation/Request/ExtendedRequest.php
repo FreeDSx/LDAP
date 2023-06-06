@@ -141,7 +141,7 @@ class ExtendedRequest implements RequestInterface
 
     /**
      * @throws ProtocolException
-     * @return array{0: mixed, 1: mixed|null}
+     * @return array{0: string, 1: null|string}
      */
     protected static function parseAsn1ExtendedRequest(AbstractType $type): array
     {

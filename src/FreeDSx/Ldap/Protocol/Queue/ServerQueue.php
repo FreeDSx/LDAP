@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Protocol\Queue;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Exception\PartialPduException;
+use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
@@ -69,6 +70,12 @@ class ServerQueue extends LdapQueue
      */
     protected function constructMessage(Message $message, ?int $id = null): LdapMessageRequest
     {
-        return LdapMessageRequest::fromAsn1($message->getMessage());
+        $type = $message->getMessage();
+
+        if (!$type instanceof AbstractType) {
+            throw new ProtocolException('The message received is invalid.');
+        }
+
+        return LdapMessageRequest::fromAsn1($type);
     }
 }
