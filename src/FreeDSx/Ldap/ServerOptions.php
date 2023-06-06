@@ -61,18 +61,6 @@ final class ServerOptions
     
     private ?LoggerInterface $logger = null;
 
-    /**
-     * A helper method designed to ease migration from array options to the new options object.
-     *
-     * @param array<string, mixed> $options
-     */
-    public static function fromArray(array $options): self
-    {
-        $instance = new self();
-
-        return $instance;
-    }
-
     public function getIp(): string
     {
         return $this->ip;
