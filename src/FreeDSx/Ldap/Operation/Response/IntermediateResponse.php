@@ -17,6 +17,7 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
 
 /**
  * RFC 4511, 4.13.
@@ -29,11 +30,15 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class IntermediateResponse implements ResponseInterface
 {
+    public const OID_SYNC_INFO = '1.3.6.1.4.1.4203.1.9.1.4';
+
     protected const TAG_NUMBER = 25;
 
     private ?string $responseName;
 
     private ?string $responseValue;
+
+    private ?AbstractType $responseValueToEncode = null;
 
     public function __construct(
         ?string $responseName,
@@ -41,6 +46,11 @@ class IntermediateResponse implements ResponseInterface
     ) {
         $this->responseName = $responseName;
         $this->responseValue = $responseValue;
+    }
+
+    protected function setResponseValueToEncode(AbstractType $valueToEncode): void
+    {
+        $this->responseValueToEncode = $valueToEncode;
     }
 
     public function getName(): ?string
@@ -73,10 +83,28 @@ class IntermediateResponse implements ResponseInterface
             }
         }
 
-        return new self(
+        $response = new self(
             $name === null ? null : (string) $name,
             $value === null ? null : (string) $value
         );
+
+        if ($response->getName() === self::OID_SYNC_INFO) {
+            $response = SyncInfoMessage::fromAsn1($type);
+        }
+
+        return $response;
+    }
+
+    private static function isNotValidResponseName(AbstractType $responseName): bool
+    {
+        return $responseName->getTagNumber() !== 0
+            || $responseName->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC;
+    }
+
+    private static function isNotValidResponseValue(AbstractType $responseValue): bool
+    {
+        return $responseValue->getTagNumber() !== 1
+            || $responseValue->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC;
     }
 
     /**
@@ -92,16 +120,60 @@ class IntermediateResponse implements ResponseInterface
                 type: Asn1::octetString($this->responseName),
             ));
         }
-        if ($this->responseValue !== null) {
-            $response->addChild(Asn1::context(
-                tagNumber: 1,
-                type: Asn1::octetString($this->responseValue),
-            ));
+
+        $value = $this->responseValue;
+        if ($this->responseValueToEncode !== null) {
+            $encoder = new LdapEncoder();
+            $value = $encoder->encode($this->responseValueToEncode);
         }
+
+        $response->addChild(Asn1::context(
+            tagNumber: 1,
+            type: Asn1::octetString((string) $value),
+        ));
 
         return Asn1::application(
             tagNumber: self::TAG_NUMBER,
             type: $response,
         );
+    }
+
+    /**
+     * @param array<int, array<int, int|class-string>> $tagMap
+     * @throws ProtocolException
+     */
+    protected static function decodeEncodedValue(
+        AbstractType $type,
+        array $tagMap
+    ): AbstractType {
+        $responseValue = $type->getChild(1);
+
+        if ($responseValue == null || self::isNotValidResponseValue($responseValue)) {
+            throw new ProtocolException(
+                'The intermediate response either contains no value or is not an octet string.'
+            );
+        }
+
+        return (new LdapEncoder())
+            ->decode(
+                $responseValue->getValue(),
+                $tagMap
+            );
+    }
+
+    /**
+     * @throws ProtocolException
+     */
+    protected static function decodeResponseName(AbstractType $type): string
+    {
+        $responseName = $type->getChild(0);
+
+        if ($responseName === null || self::isNotValidResponseName($responseName)) {
+            throw new ProtocolException(
+                'Expected a responseName value with a tag of 0 and a context specific class type.'
+            );
+        }
+
+        return $responseName->getValue();
     }
 }

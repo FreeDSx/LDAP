@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Control\SubentriesControl;
 use FreeDSx\Ldap\Control\Vlv\VlvControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
@@ -171,6 +172,21 @@ class ControlsSpec extends ObjectBehavior
         $this::showRecycled()
             ->shouldBeLike(new Control(
                 Control::OID_SHOW_RECYCLED,
+                true
+            ));
+    }
+
+    function it_should_create_a_subentries_control(): void
+    {
+        $this::subentries()
+            ->shouldBeLike(new SubentriesControl(true));
+    }
+
+    function it_should_create_a_manageDsaIt_control(): void
+    {
+        $this::manageDsaIt()
+            ->shouldBeLike(new Control(
+                Control::OID_MANAGE_DSA_IT,
                 true
             ));
     }
