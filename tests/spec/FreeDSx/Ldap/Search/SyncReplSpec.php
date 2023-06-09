@@ -18,7 +18,7 @@ use PhpSpec\ObjectBehavior;
 
 class SyncReplSpec extends ObjectBehavior
 {
-    function it_is_initializable(): void
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(SyncRepl::class);
     }

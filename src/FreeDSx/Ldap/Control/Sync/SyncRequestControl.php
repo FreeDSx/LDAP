@@ -69,7 +69,7 @@ class SyncRequestControl extends Control
         );
     }
 
-    public function getMode() : int
+    public function getMode(): int
     {
         return $this->mode;
     }
@@ -105,7 +105,7 @@ class SyncRequestControl extends Control
         return $this;
     }
 
-    public function getSyncHandler() : ?SyncHandlerInterface
+    public function getSyncHandler(): ?SyncHandlerInterface
     {
         return $this->syncHandler;
     }

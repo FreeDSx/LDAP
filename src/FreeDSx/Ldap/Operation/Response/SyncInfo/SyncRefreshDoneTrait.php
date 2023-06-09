@@ -35,7 +35,7 @@ trait SyncRefreshDoneTrait
         parent::__construct($cookie);
     }
 
-    public function getRefreshDone() : bool
+    public function getRefreshDone(): bool
     {
         return $this->refreshDone;
     }

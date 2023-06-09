@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Search;
 
 use FreeDSx\Ldap\Control\ControlBag;
-use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
@@ -48,6 +47,13 @@ final class SyncRepl
             Filters::present('objectClass')
         );
         $this->controls = new ControlBag();
+    }
+
+    public function usingSearchRequest(SearchRequest $searchRequest): self
+    {
+        $this->searchRequest = $searchRequest;
+
+        return $this;
     }
 
     /**

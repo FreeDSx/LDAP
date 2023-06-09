@@ -15,19 +15,20 @@ namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\ClientOptions;
-use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
-use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
+use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
+use FreeDSx\Ldap\Search\Result\EntryResult;
+use FreeDSx\Ldap\Search\Result\ReferralResult;
 use FreeDSx\Socket\Exception\ConnectionException;
 
 /**
@@ -63,31 +64,37 @@ class ClientSearchHandler extends ClientBasicHandler
      * @throws ConnectionException
      */
     public function handleResponse(
-        LdapMessageRequest  $messageTo,
+        LdapMessageRequest $messageTo,
         LdapMessageResponse $messageFrom,
         ClientQueue $queue,
         ClientOptions $options,
     ): ?LdapMessageResponse {
-        $entries = [];
+        $entryResults = [];
+        $referralResults = [];
 
         while (!($messageFrom->getResponse() instanceof SearchResultDone)) {
             $response = $messageFrom->getResponse();
+
             if ($response instanceof SearchResultEntry) {
-                $entry = $response->getEntry();
-                $entries[] = $entry;
+                $entryResults[] = new EntryResult($messageFrom);
+            } elseif ($response instanceof SearchResultReference) {
+                $referralResults[] = new ReferralResult($messageFrom);
             }
+
             $messageFrom = $queue->getMessage($messageTo->getMessageId());
         }
 
         $ldapResult = $messageFrom->getResponse();
-        if (!$ldapResult instanceof LdapResult) {
-            throw new OperationException('The final search result is malformed.');
-        }
 
         $finalResponse = new LdapMessageResponse(
             $messageFrom->getMessageId(),
-            new SearchResponse($ldapResult, new Entries(...$entries)),
-            ...$messageFrom->controls()->toArray()
+            new SearchResponse(
+                $ldapResult,
+                $entryResults,
+                $referralResults,
+            ),
+            ...$messageFrom->controls()
+                ->toArray()
         );
 
         return parent::handleResponse(

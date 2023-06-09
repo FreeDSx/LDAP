@@ -20,7 +20,6 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Exception\SkipReferralException;
-use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\BindRequest;

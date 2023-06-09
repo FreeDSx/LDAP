@@ -75,7 +75,7 @@ class SyncResponse extends LdapResult
     /**
      * @return SyncResult[]|null
      */
-    public function getInitialContent() : ?array
+    public function getInitialContent(): ?array
     {
         return $this->initial;
     }
@@ -83,7 +83,7 @@ class SyncResponse extends LdapResult
     /**
      * @return SyncResult[]|null
      */
-    public function getPersistStage() : ?array
+    public function getPersistStage(): ?array
     {
         return $this->persist;
     }
@@ -91,7 +91,7 @@ class SyncResponse extends LdapResult
     /**
      * @return SyncResult[]|null
      */
-    public function getDeletedPhase() : ?array
+    public function getDeletedPhase(): ?array
     {
         return $this->deleted;
     }
@@ -99,12 +99,12 @@ class SyncResponse extends LdapResult
     /**
      * @return SyncResult[]|null
      */
-    public function getPresentPhase() : ?array
+    public function getPresentPhase(): ?array
     {
         return $this->present;
     }
 
-    public function getCookie() : string
+    public function getCookie(): string
     {
         return $this->cookie;
     }

@@ -21,41 +21,43 @@ use PhpSpec\ObjectBehavior;
 
 class SyncDoneControlSpec extends ObjectBehavior
 {
-    function let(): void
+    public function let(): void
     {
         $this->beConstructedWith('omnomnom', false);
     }
 
-    function it_is_initializable(): void
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(SyncDoneControl::class);
     }
 
-    function it_should_get_refresh_deletes(): void
+    public function it_should_get_refresh_deletes(): void
     {
         $this->getRefreshDeletes()->shouldBeEqualTo(false);
     }
 
-    function it_should_get_the_cookie(): void
+    public function it_should_get_the_cookie(): void
     {
         $this->getCookie()->shouldBeEqualTo('omnomnom');
     }
 
-    function it_should_generate_correct_asn1(): void
+    public function it_should_generate_correct_asn1(): void
     {
         $encoder = new LdapEncoder();
 
         $this->toAsn1()->shouldBeLike(Asn1::sequence(
             Asn1::octetString(Control::OID_SYNC_DONE),
             Asn1::boolean(true),
-            Asn1::octetString($encoder->encode(Asn1::sequence(
-                Asn1::octetString('omnomnom'),
-                Asn1::boolean(false)
-            ))
-        )));
+            Asn1::octetString(
+                $encoder->encode(Asn1::sequence(
+                    Asn1::octetString('omnomnom'),
+                    Asn1::boolean(false)
+                ))
+            )
+        ));
     }
 
-    function it_should_be_constructed_from_asn1(): void
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
 

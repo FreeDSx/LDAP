@@ -17,7 +17,6 @@ use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
@@ -35,9 +34,12 @@ use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
+use spec\FreeDSx\Ldap\TestFactoryTrait;
 
 class ClientSearchHandlerSpec extends ObjectBehavior
 {
+    use TestFactoryTrait;
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientSearchHandler::class);
@@ -137,12 +139,16 @@ class ClientSearchHandlerSpec extends ObjectBehavior
             $queue,
             new ClientOptions()
         )->shouldBeLike(
-            new LdapMessageResponse(1, new SearchResponse(new LdapResult(0, 'cn=foo', 'bar'), new Entries(
-                new Entry('bar'),
-                new Entry('foo'),
-                new Entry('foo'),
-                new Entry('foo')
-            )))
+            $this::makeSearchResponseFromEntries(
+                entries: new Entries(
+                    new Entry('bar'),
+                    new Entry('foo'),
+                    new Entry('foo'),
+                    new Entry('foo'),
+                ),
+                dn: 'cn=foo',
+                diagnostic: 'bar',
+            )
         );
     }
 

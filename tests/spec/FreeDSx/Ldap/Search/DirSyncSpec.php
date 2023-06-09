@@ -19,31 +19,32 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapClient;
-use FreeDSx\Ldap\Operation\LdapResult;
-use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\DirSync;
 use FreeDSx\Ldap\Search\Filters;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
+use spec\FreeDSx\Ldap\TestFactoryTrait;
 
 class DirSyncSpec extends ObjectBehavior
 {
+    use TestFactoryTrait;
+
     private LdapMessageResponse $initialResponse;
 
     private LdapMessageResponse $secondResponse;
 
     public function let(LdapClient $client): void
     {
-        $this->initialResponse = new LdapMessageResponse(
-            0,
-            new SearchResponse(new LdapResult(0), new Entries()),
-            new DirSyncResponseControl(1, 0, 'foo')
+        $this->initialResponse = $this::makeSearchResponseFromEntries(
+            entries: new Entries(),
+            messageId: 0,
+            controls: [new DirSyncResponseControl(1, 0, 'foo')],
         );
-        $this->secondResponse = new LdapMessageResponse(
-            1,
-            new SearchResponse(new LdapResult(0), new Entries()),
-            new DirSyncResponseControl(0, 0, 'bar')
+        $this->secondResponse = $this::makeSearchResponseFromEntries(
+            entries: new Entries(),
+            messageId: 1,
+            controls: [new DirSyncResponseControl(0, 0, 'fbar')],
         );
 
         $client->send(Argument::that(function ($search) {

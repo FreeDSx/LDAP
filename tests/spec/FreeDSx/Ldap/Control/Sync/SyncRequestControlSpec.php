@@ -21,32 +21,32 @@ use PhpSpec\ObjectBehavior;
 
 class SyncRequestControlSpec extends ObjectBehavior
 {
-    function let(): void
+    public function let(): void
     {
         $this->beConstructedWith(1, 'omnomnom');
     }
 
-    function it_is_initializable(): void
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(SyncRequestControl::class);
     }
 
-    function it_should_get_the_mode(): void
+    public function it_should_get_the_mode(): void
     {
         $this->getMode()->shouldBeEqualTo(1);
     }
 
-    function it_should_get_the_reload_hint(): void
+    public function it_should_get_the_reload_hint(): void
     {
         $this->getReloadHint()->shouldBeEqualTo(false);
     }
 
-    function it_should_get_the_cookie(): void
+    public function it_should_get_the_cookie(): void
     {
         $this->getCookie()->shouldBeEqualTo('omnomnom');
     }
 
-    function it_should_generate_correct_asn1(): void
+    public function it_should_generate_correct_asn1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -61,7 +61,7 @@ class SyncRequestControlSpec extends ObjectBehavior
         ));
     }
 
-    function it_should_be_constructed_from_asn1(): void
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
 

@@ -29,7 +29,6 @@ use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyDnResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyResponse;
-use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
@@ -44,6 +43,8 @@ use Prophecy\Argument;
 
 class LdapClientSpec extends ObjectBehavior
 {
+    use TestFactoryTrait;
+
     public function let(ClientProtocolHandler $handler): void
     {
         $handler->isConnected()
@@ -90,16 +91,11 @@ class LdapClientSpec extends ObjectBehavior
         ));
 
         $handler->send($search)->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(
-                1,
-                new SearchResponse(
-                    new LdapResult(
-                        0,
-                        ''
-                    ),
-                    new Entries(Entry::create('dc=foo,dc=bar'))
-                )
-            ));
+            ->willReturn(
+                $this::makeSearchResponseFromEntries(new Entries(
+                    Entry::create('dc=foo,dc=bar')
+                ))
+            );
 
         $this->search($search)
             ->shouldBeLike(new Entries(Entry::create('dc=foo,dc=bar')));
@@ -318,13 +314,7 @@ class LdapClientSpec extends ObjectBehavior
         $entry = new Entry('cn=foo,dc=local');
         $handler->send(Operations::read('cn=foo,dc=local'))
             ->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(
-                1,
-                new SearchResponse(
-                    new LdapResult(ResultCode::SUCCESS),
-                    new Entries($entry)
-                )
-            ));
+            ->willReturn($this::makeSearchResponseFromEntries(new Entries($entry)));
 
         $this->read($entry->getDn()->toString())
             ->shouldBeEqualTo($entry);
@@ -335,13 +325,7 @@ class LdapClientSpec extends ObjectBehavior
         $entry = new Entry('');
         $handler->send(Operations::read(''))
             ->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(
-                1,
-                new SearchResponse(
-                    new LdapResult(ResultCode::SUCCESS),
-                    new Entries($entry)
-                )
-            ));
+            ->willReturn($this::makeSearchResponseFromEntries(new Entries($entry)));
 
         $this->read()
             ->shouldBeEqualTo($entry);
@@ -376,13 +360,7 @@ class LdapClientSpec extends ObjectBehavior
     {
         $entry = new Entry('cn=foo,dc=local');
         $handler->send(Operations::read('cn=foo,dc=local'))->shouldBeCalled()
-            ->willReturn(new LdapMessageResponse(
-                1,
-                new SearchResponse(
-                    new LdapResult(ResultCode::SUCCESS),
-                    new Entries($entry)
-                )
-            ));
+            ->willReturn($this::makeSearchResponseFromEntries(new Entries($entry)));
 
         $this->readOrFail($entry->getDn()->toString())
             ->shouldBeEqualTo($entry);

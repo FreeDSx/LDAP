@@ -12,27 +12,27 @@ use PhpSpec\ObjectBehavior;
 
 class SubentriesControlSpec extends ObjectBehavior
 {
-    function it_is_initializable(): void
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(SubentriesControl::class);
     }
 
-    function it_should_have_a_default_visibility_of_true(): void
+    public function it_should_have_a_default_visibility_of_true(): void
     {
         $this->getIsVisible()->shouldBeEqualTo(true);
     }
 
-    function it_should_set_the_visibility(): void
+    public function it_should_set_the_visibility(): void
     {
         $this->setIsVisible(false)->getIsVisible()->shouldBeEqualTo(false);
     }
 
-    function it_should_have_the_subentries_oid(): void
+    public function it_should_have_the_subentries_oid(): void
     {
         $this->getTypeOid()->shouldBeEqualTo(Control::OID_SUBENTRIES);
     }
 
-    function it_should_generate_correct_asn1(): void
+    public function it_should_generate_correct_asn1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -43,7 +43,7 @@ class SubentriesControlSpec extends ObjectBehavior
         ));
     }
 
-    function it_should_be_constructed_from_asn1(): void
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
 

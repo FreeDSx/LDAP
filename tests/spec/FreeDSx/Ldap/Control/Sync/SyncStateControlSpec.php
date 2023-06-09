@@ -21,32 +21,32 @@ use PhpSpec\ObjectBehavior;
 
 class SyncStateControlSpec extends ObjectBehavior
 {
-    function let(): void
+    public function let(): void
     {
         $this->beConstructedWith(0, 'foo', 'omnomnom');
     }
 
-    function it_is_initializable(): void
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(SyncStateControl::class);
     }
 
-    function it_should_get_the_state(): void
+    public function it_should_get_the_state(): void
     {
         $this->getState()->shouldBeEqualTo(0);
     }
 
-    function it_should_get_the_entry_uuid(): void
+    public function it_should_get_the_entry_uuid(): void
     {
         $this->getEntryUuid()->shouldBeEqualTo('foo');
     }
 
-    function it_should_get_the_cookie(): void
+    public function it_should_get_the_cookie(): void
     {
         $this->getCookie()->shouldBeEqualTo('omnomnom');
     }
 
-    function it_should_generate_correct_asn1(): void
+    public function it_should_generate_correct_asn1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -61,7 +61,7 @@ class SyncStateControlSpec extends ObjectBehavior
         ));
     }
 
-    function it_should_be_constructed_from_asn1(): void
+    public function it_should_be_constructed_from_asn1(): void
     {
         $encoder = new LdapEncoder();
 

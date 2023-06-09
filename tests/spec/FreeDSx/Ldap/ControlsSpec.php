@@ -176,13 +176,13 @@ class ControlsSpec extends ObjectBehavior
             ));
     }
 
-    function it_should_create_a_subentries_control(): void
+    public function it_should_create_a_subentries_control(): void
     {
         $this::subentries()
             ->shouldBeLike(new SubentriesControl(true));
     }
 
-    function it_should_create_a_manageDsaIt_control(): void
+    public function it_should_create_a_manageDsaIt_control(): void
     {
         $this::manageDsaIt()
             ->shouldBeLike(new Control(

@@ -21,27 +21,27 @@ use PhpSpec\ObjectBehavior;
 
 class SyncNewCookieSpec extends ObjectBehavior
 {
-    function let(): void
+    public function let(): void
     {
         $this->beConstructedWith('omnomnom');
     }
 
-    function it_is_initializable(): void
+    public function it_is_initializable(): void
     {
         $this->shouldHaveType(SyncNewCookie::class);
     }
 
-    function it_should_get_the_cookie(): void
+    public function it_should_get_the_cookie(): void
     {
         $this->getCookie()->shouldBeEqualTo('omnomnom');
     }
 
-    function it_should_have_the_correct_response_name(): void
+    public function it_should_have_the_correct_response_name(): void
     {
         $this->getName()->shouldBeEqualTo(IntermediateResponse::OID_SYNC_INFO);
     }
 
-    function it_should_be_constructed_from_ASN1(): void
+    public function it_should_be_constructed_from_ASN1(): void
     {
         $encoder = new LdapEncoder();
 
@@ -51,7 +51,7 @@ class SyncNewCookieSpec extends ObjectBehavior
         )))->shouldBeLike(new SyncNewCookie('omnomnom'));
     }
 
-    function it_should_generate_correct_ASN1(): void
+    public function it_should_generate_correct_ASN1(): void
     {
         $encoder = new LdapEncoder();
 

@@ -98,7 +98,7 @@ class ClientSyncProtocolHandler
         );
     }
 
-    private function initialContent() : array
+    private function initialContent(): array
     {
         $results = [];
         $isDone = false;
@@ -194,7 +194,6 @@ class ClientSyncProtocolHandler
                     $syncNewCookie = $response;
                     $this->syncRequest->setCookie($syncNewCookie->getCookie());
                 } elseif ($response instanceof SyncIdSet) {
-
                 } else {
                     if ($response instanceof SearchResultEntry) {
                         $syncResults[] = new SyncResult(
@@ -218,13 +217,13 @@ class ClientSyncProtocolHandler
         return $syncResults;
     }
 
-    private function isInitialPollRequest() : bool
+    private function isInitialPollRequest(): bool
     {
         return empty($this->syncRequest->getCookie())
             && $this->syncRequest->getMode() === SyncRequestControl::MODE_REFRESH_ONLY;
     }
 
-    private function isContentUpdatePoll() : bool
+    private function isContentUpdatePoll(): bool
     {
         return !empty($this->syncRequest->getCookie());
     }

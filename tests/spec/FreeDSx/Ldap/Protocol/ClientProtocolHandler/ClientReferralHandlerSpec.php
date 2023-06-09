@@ -131,7 +131,8 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         $this->shouldThrow(new OperationException(
             'All referral attempts have been exhausted. ',
             ResultCode::REFERRAL
-        ))->during('handleResponse',
+        ))->during(
+            'handleResponse',
             [
                 new LdapMessageRequest(
                     2,

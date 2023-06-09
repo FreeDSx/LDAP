@@ -58,7 +58,7 @@ class SyncIdSet extends SyncInfoMessage
         parent::__construct($cookie);
     }
 
-    public function getRefreshDeletes() : ?bool
+    public function getRefreshDeletes(): ?bool
     {
         return $this->refreshDeletes;
     }
@@ -66,7 +66,7 @@ class SyncIdSet extends SyncInfoMessage
     /**
      * @return string[]
      */
-    public function getEntryUuids() : array
+    public function getEntryUuids(): array
     {
         return $this->entryUuids;
     }

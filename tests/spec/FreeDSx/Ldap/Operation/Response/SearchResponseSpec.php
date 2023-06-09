@@ -19,13 +19,33 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
+use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Search\Result\EntryResult;
 use PhpSpec\ObjectBehavior;
 
 class SearchResponseSpec extends ObjectBehavior
 {
     public function let(): void
     {
-        $this->beConstructedWith(new LdapResult(0, 'dc=foo,dc=bar', 'foo', new LdapUrl('foo')), new Entries(...[Entry::create('foo'), Entry::create('bar')]));
+        $this->beConstructedWith(
+            new LdapResult(
+                0,
+                'dc=foo,dc=bar',
+                'foo',
+                new LdapUrl('foo')
+            ),
+            [
+                new EntryResult(new LdapMessageResponse(
+                    1,
+                    new SearchResultEntry(Entry::create('foo'))
+                )),
+                new EntryResult(new LdapMessageResponse(
+                    1,
+                    new SearchResultEntry(Entry::create('bar'))
+                )),
+            ],
+        );
     }
 
     public function it_is_initializable(): void

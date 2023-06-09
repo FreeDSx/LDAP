@@ -71,17 +71,17 @@ class SyncStateControl extends Control
         parent::__construct(self::OID_SYNC_STATE);
     }
 
-    public function getState() : int
+    public function getState(): int
     {
         return $this->state;
     }
 
-    public function getCookie() :?string
+    public function getCookie(): ?string
     {
         return $this->cookie;
     }
 
-    public function getEntryUuid() : string
+    public function getEntryUuid(): string
     {
         return $this->entryUuid;
     }
@@ -90,7 +90,7 @@ class SyncStateControl extends Control
      * By default, the protocol returns the binary representation of the entryUUID. This decodes that to the normal UUID
      * string representation that most are familiar with.
      */
-    public function decodedUuid() : string
+    public function decodedUuid(): string
     {
         if ($this->decodedUuid === null) {
             $hex = bin2hex($this->entryUuid);
@@ -126,7 +126,7 @@ class SyncStateControl extends Control
     /**
      * Whether this is for an entry that has been deleted.
      */
-    public function isDelete() : bool
+    public function isDelete(): bool
     {
         return $this->state === self::STATE_PRESENT;
     }
@@ -134,7 +134,7 @@ class SyncStateControl extends Control
     /**
      * Whether this is for an entry that has been modified.
      */
-    public function isModify() : bool
+    public function isModify(): bool
     {
         return $this->state === self::STATE_MODIFY;
     }

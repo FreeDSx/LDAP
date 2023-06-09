@@ -18,24 +18,39 @@ use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
-use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Operation\Response\SearchResponse;
-use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\Paging;
 use PhpSpec\ObjectBehavior;
+use spec\FreeDSx\Ldap\TestFactoryTrait;
 
 class PagingSpec extends ObjectBehavior
 {
+    use TestFactoryTrait;
+
     public function let(LdapClient $client, SearchRequest $search): void
     {
-        $client->sendAndReceive($search, new PagingControl(1000, ''))->willReturn(new LdapMessageResponse(
-            1,
-            new SearchResponse(new LdapResult(0, '', ''), new Entries(Entry::create('foo'), Entry::create('bar'))),
-            new PagingControl(100, 'foo')
-        ));
+        $client->sendAndReceive(
+            $search,
+            new PagingControl(
+                1000,
+                ''
+            )
+        )
+        ->willReturn(
+            $this::makeSearchResponseFromEntries(
+                entries: new Entries(
+                    Entry::create('foo'),
+                    Entry::create('bar'),
+                ),
+                controls: [new PagingControl(100, 'foo')]
+            )
+        );
 
-        $this->beConstructedWith($client, $search, 1000);
+        $this->beConstructedWith(
+            $client,
+            $search,
+            1000
+        );
     }
 
     public function it_is_initializable(): void
@@ -57,10 +72,8 @@ class PagingSpec extends ObjectBehavior
     public function it_should_return_false_for_entries_when_the_cookie_is_empty($client, $search): void
     {
         $client->sendAndReceive($search, new PagingControl(100, ''))->willReturn(
-            new LdapMessageResponse(
-                1,
-                new SearchResponse(new LdapResult(0, '', ''), new Entries()),
-                new PagingControl(0, '')
+            $this::makeSearchResponseFromEntries(
+                controls: [new PagingControl(0, '')]
             )
         );
         $this->getEntries(100);
@@ -70,11 +83,11 @@ class PagingSpec extends ObjectBehavior
 
     public function it_should_abort_a_paging_operation_if_end_is_called($client, $search): void
     {
-        $client->sendAndReceive($search, new PagingControl(0, 'foo'))->shouldBeCalled()->willReturn(new LdapMessageResponse(
-            1,
-            new SearchResponse(new LdapResult(0, '', ''), new Entries()),
-            new PagingControl(0, 'foo')
-        ));
+        $client->sendAndReceive($search, new PagingControl(0, 'foo'))->shouldBeCalled()->willReturn(
+            $this::makeSearchResponseFromEntries(
+                controls: [new PagingControl(0, 'foo')]
+            )
+        );
 
         $this->getEntries();
         $this->end();
@@ -99,16 +112,14 @@ class PagingSpec extends ObjectBehavior
         $newClient->sendAndReceive(
             $searchRequest,
             (new PagingControl(1000, ''))->setCriticality(false)
-        )->willReturn(new LdapMessageResponse(
-            1,
-            new SearchResponse(
-                new LdapResult(0, '', ''),
-                new Entries(
+        )->willReturn(
+            $this::makeSearchResponseFromEntries(
+                entries: new Entries(
                     Entry::create('foo'),
                     Entry::create('bar')
-                )
+                ),
             )
-        ));
+        );
         $this->beConstructedWith(
             $newClient,
             $searchRequest,
@@ -127,16 +138,14 @@ class PagingSpec extends ObjectBehavior
         $newClient->sendAndReceive(
             $searchRequest,
             (new PagingControl(1000, ''))->setCriticality(true)
-        )->willReturn(new LdapMessageResponse(
-            1,
-            new SearchResponse(
-                new LdapResult(0, '', ''),
-                new Entries(
+        )->willReturn(
+            $this::makeSearchResponseFromEntries(
+                entries: new Entries(
                     Entry::create('foo'),
                     Entry::create('bar')
                 )
             )
-        ));
+        );
         $this->beConstructedWith(
             $newClient,
             $searchRequest,

@@ -13,10 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\RequestHandler;
 
-use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\ServerOptions;
-use Throwable;
 
 /**
  * This is used by the server protocol handler to instantiate the possible user-land LDAP handlers (ie. handlers exposed

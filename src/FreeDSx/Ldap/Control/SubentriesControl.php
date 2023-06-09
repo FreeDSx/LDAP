@@ -40,7 +40,7 @@ class SubentriesControl extends Control
         );
     }
 
-    public function getIsVisible() : bool
+    public function getIsVisible(): bool
     {
         return $this->isVisible;
     }
