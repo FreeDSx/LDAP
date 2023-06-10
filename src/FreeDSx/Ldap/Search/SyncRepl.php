@@ -61,7 +61,7 @@ final class SyncRepl
      */
     public function initialPoll(): SyncResponse
     {
-        $message = $this->client->send(
+        $message = $this->client->sendAndReceive(
             $this->searchRequest,
             Controls::syncRequest(),
             Controls::manageDsaIt(),
@@ -76,7 +76,7 @@ final class SyncRepl
      */
     public function updatePoll(): SyncResponse
     {
-        $message = $this->client->send(
+        $message = $this->client->sendAndReceive(
             $this->searchRequest,
             Controls::syncRequest($this->cookie),
             Controls::manageDsaIt(),

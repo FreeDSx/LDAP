@@ -181,7 +181,7 @@ class Controls
      * and subentries which are within scope. Non-visible entries or subentries are not returned in response to the
      * request.
      */
-    public static function subentries(bool $visible = true)
+    public static function subentries(bool $visible = true): SubentriesControl
     {
         return new SubentriesControl($visible);
     }

@@ -40,7 +40,7 @@ class SyncResult
      * @param $result SyncIdSet|Entry|LdapUrl[]
      */
     public function __construct(
-        $result,
+        SyncIdSet|Entry|array $result,
         ?SyncStateControl $syncStateControl = null
     ) {
         $this->result = $result;
