@@ -26,6 +26,8 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use FreeDSx\Ldap\Search\Handler\EntryHandlerInterface;
+use FreeDSx\Ldap\Search\Handler\ReferralHandlerInterface;
 use function array_map;
 
 /**
@@ -105,6 +107,10 @@ class SearchRequest implements RequestInterface
      * @var Attribute[]
      */
     private array $attributes = [];
+
+    private ?EntryHandlerInterface $entryHandler = null;
+
+    private ?ReferralHandlerInterface $referralHandler = null;
 
     public function __construct(
         FilterInterface $filter,
@@ -278,6 +284,30 @@ class SearchRequest implements RequestInterface
     public function setFilter(FilterInterface $filter): self
     {
         $this->filter = $filter;
+
+        return $this;
+    }
+
+    public function getEntryHandler(): ?EntryHandlerInterface
+    {
+        return $this->entryHandler;
+    }
+
+    public function useEntryHandler(?EntryHandlerInterface $entryHandler): self
+    {
+        $this->entryHandler = $entryHandler;
+
+        return $this;
+    }
+
+    public function getReferralHandler(): ?ReferralHandlerInterface
+    {
+        return $this->referralHandler;
+    }
+
+    public function useReferralHandler(?ReferralHandlerInterface $referralHandler): self
+    {
+        $this->referralHandler = $referralHandler;
 
         return $this;
     }

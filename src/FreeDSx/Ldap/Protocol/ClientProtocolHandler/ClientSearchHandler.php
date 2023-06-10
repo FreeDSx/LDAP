@@ -27,6 +27,8 @@ use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
+use FreeDSx\Ldap\Search\Handler\EntryHandlerInterface;
+use FreeDSx\Ldap\Search\Handler\ReferralHandlerInterface;
 use FreeDSx\Ldap\Search\Result\EntryResult;
 use FreeDSx\Ldap\Search\Result\ReferralResult;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -69,6 +71,63 @@ class ClientSearchHandler extends ClientBasicHandler
         ClientQueue $queue,
         ClientOptions $options,
     ): ?LdapMessageResponse {
+        /** @var SearchRequest $searchRequest */
+        $searchRequest = $messageTo->getRequest();
+
+        $entryHandler = $searchRequest->getEntryHandler();
+        $referralHandler = $searchRequest->getReferralHandler();
+
+        if ($entryHandler || $referralHandler) {
+            $finalResponse = $this->searchWithHandlers(
+                $messageFrom,
+                $messageTo,
+                $entryHandler,
+                $referralHandler,
+                $queue,
+            );
+        } else {
+            $finalResponse = $this->searchWithoutHandlers(
+                $messageFrom,
+                $messageTo,
+                $queue,
+            );
+        }
+
+        return parent::handleResponse(
+            $messageTo,
+            $finalResponse,
+            $queue,
+            $options
+        );
+    }
+
+    private function searchWithHandlers(
+        LdapMessageResponse $messageFrom,
+        LdapMessageRequest $messageTo,
+        ?EntryHandlerInterface $entryHandler,
+        ?ReferralHandlerInterface $referralHandler,
+        ClientQueue $queue,
+    ): LdapMessageResponse {
+        while (!$messageFrom->getResponse() instanceof SearchResultDone) {
+            $response = $messageFrom->getResponse();
+
+            if ($response instanceof SearchResultEntry) {
+                $entryHandler?->handleEntry(new EntryResult($messageFrom));
+            } elseif ($response instanceof SearchResultReference) {
+                $referralHandler?->handleReferral(new ReferralResult($messageFrom));
+            }
+
+            $messageFrom = $queue->getMessage($messageTo->getMessageId());
+        }
+
+        return $messageFrom;
+    }
+
+    private function searchWithoutHandlers(
+        LdapMessageResponse $messageFrom,
+        LdapMessageRequest $messageTo,
+        ClientQueue $queue,
+    ): LdapMessageResponse {
         $entryResults = [];
         $referralResults = [];
 
@@ -86,7 +145,7 @@ class ClientSearchHandler extends ClientBasicHandler
 
         $ldapResult = $messageFrom->getResponse();
 
-        $finalResponse = new LdapMessageResponse(
+        return new LdapMessageResponse(
             $messageFrom->getMessageId(),
             new SearchResponse(
                 $ldapResult,
@@ -94,14 +153,7 @@ class ClientSearchHandler extends ClientBasicHandler
                 $referralResults,
             ),
             ...$messageFrom->controls()
-                ->toArray()
-        );
-
-        return parent::handleResponse(
-            $messageTo,
-            $finalResponse,
-            $queue,
-            $options
+            ->toArray()
         );
     }
 }
