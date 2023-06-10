@@ -137,7 +137,7 @@ class SyncRequestControl extends Control
     public static function fromAsn1(AbstractType $type): static
     {
         $sync = self::decodeEncodedValue($type);
-        if (!$sync instanceof SequenceType || count($sync->getChildren()) >= 3) {
+        if (!$sync instanceof SequenceType || count($sync->getChildren()) > 3) {
             throw new ProtocolException(
                 'Expected a sequence type with 2 or less values for a sync request control value.'
             );

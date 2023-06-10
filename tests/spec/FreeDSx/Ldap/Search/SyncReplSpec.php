@@ -13,11 +13,17 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap\Search;
 
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Search\SyncRepl;
 use PhpSpec\ObjectBehavior;
 
 class SyncReplSpec extends ObjectBehavior
 {
+    public function let(LdapClient $client): void
+    {
+        $this->beConstructedWith($client);
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(SyncRepl::class);

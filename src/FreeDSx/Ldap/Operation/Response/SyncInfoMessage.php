@@ -71,8 +71,9 @@ abstract class SyncInfoMessage extends IntermediateResponse
         if ($value === null) {
             throw new ProtocolException('The SyncInfoMessage must have a value.');
         }
+        $decodedValue = self::decodeEncodedValue($type);
 
-        return match ($value->getTagNumber()) {
+        return match ($decodedValue->getTagNumber()) {
             0 => SyncNewCookie::fromAsn1($type),
             1 => SyncRefreshDelete::fromAsn1($type),
             2 => SyncRefreshPresent::fromAsn1($type),

@@ -83,13 +83,13 @@ class IntermediateResponse implements ResponseInterface
             }
         }
 
-        $response = new self(
-            $name === null ? null : (string) $name,
-            $value === null ? null : (string) $value
-        );
-
-        if ($response->getName() === self::OID_SYNC_INFO) {
+        if ($name === self::OID_SYNC_INFO) {
             $response = SyncInfoMessage::fromAsn1($type);
+        } else {
+            $response = new self(
+                $name === null ? null : (string)$name,
+                $value === null ? null : (string)$value
+            );
         }
 
         return $response;
@@ -144,7 +144,7 @@ class IntermediateResponse implements ResponseInterface
      */
     protected static function decodeEncodedValue(
         AbstractType $type,
-        array $tagMap
+        array $tagMap = []
     ): AbstractType {
         $responseValue = $type->getChild(1);
 

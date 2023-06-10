@@ -14,9 +14,9 @@ declare(strict_types=1);
 namespace spec\FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Ldap\ClientOptions;
-use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
@@ -124,12 +124,25 @@ class ClientSearchHandlerSpec extends ObjectBehavior
         $messageTo = new LdapMessageRequest(1, new SearchRequest(new EqualityFilter('foo', 'bar')));
         $response = new LdapMessageResponse(1, new SearchResultEntry(new Entry('bar')));
 
+        $entries = [
+            new SearchResultEntry(new Entry('foo')),
+            new SearchResultEntry(new Entry('foo')),
+            new SearchResultEntry(new Entry('foo')),
+        ];
+        $referrals = [
+            new SearchResultReference(new LdapUrl('ldap://foo')),
+        ];
+
         $queue->getMessage(1)->willReturn(
-            new LdapMessageResponse(1, new SearchResultEntry(new Entry('foo'))),
-            new LdapMessageResponse(1, new SearchResultEntry(new Entry('foo'))),
-            new LdapMessageResponse(1, new SearchResultReference()),
-            new LdapMessageResponse(1, new SearchResultEntry(new Entry('foo'))),
-            new LdapMessageResponse(1, new SearchResultDone(0, 'cn=foo', 'bar'))
+            new LdapMessageResponse(1, $entries[0]),
+            new LdapMessageResponse(1, $entries[1]),
+            new LdapMessageResponse(1, $referrals[0]),
+            new LdapMessageResponse(1, $entries[2]),
+            new LdapMessageResponse(1, new SearchResultDone(
+                0,
+                'cn=foo',
+                'bar'
+            ))
         );
 
         $queue->getMessage(1)->shouldBeCalledTimes(5);
@@ -140,14 +153,13 @@ class ClientSearchHandlerSpec extends ObjectBehavior
             new ClientOptions()
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
-                entries: new Entries(
-                    new Entry('bar'),
-                    new Entry('foo'),
-                    new Entry('foo'),
-                    new Entry('foo'),
-                ),
                 dn: 'cn=foo',
                 diagnostic: 'bar',
+                searchEntryResults: [
+                    new SearchResultEntry(new Entry('bar')),
+                    ...$entries,
+                ],
+                searchReferralResults: $referrals,
             )
         );
     }

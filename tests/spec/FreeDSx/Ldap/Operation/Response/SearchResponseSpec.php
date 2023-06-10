@@ -20,8 +20,10 @@ use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
+use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\Result\EntryResult;
+use FreeDSx\Ldap\Search\Result\ReferralResult;
 use PhpSpec\ObjectBehavior;
 
 class SearchResponseSpec extends ObjectBehavior
@@ -45,6 +47,12 @@ class SearchResponseSpec extends ObjectBehavior
                     new SearchResultEntry(Entry::create('bar'))
                 )),
             ],
+            [
+                new ReferralResult(new LdapMessageResponse(
+                    1,
+                    new SearchResultReference(new LdapUrl('ldap://foo'))
+                )),
+            ]
         );
     }
 
