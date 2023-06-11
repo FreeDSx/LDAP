@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\Request\SyncRequest;
 use FreeDSx\Ldap\Operation\Response\CompareResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
@@ -326,9 +327,12 @@ class LdapClient
     /**
      * A helper for performing a ReplSync / directory synchronization as described in RFC4533.
      */
-    public function syncRepl(): SyncRepl
+    public function syncRepl(SyncRequest $syncRequest): SyncRepl
     {
-        return new SyncRepl($this);
+        return new SyncRepl(
+            $this,
+            $syncRequest,
+        );
     }
 
     /**

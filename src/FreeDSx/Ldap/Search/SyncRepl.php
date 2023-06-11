@@ -13,14 +13,13 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Search;
 
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
-use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\Request\SyncRequest;
 use FreeDSx\Ldap\Operation\Response\SyncResponse;
-use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 
 /**
  * A helper class for an LDAP Content Synchronization Operation, described by RFC 4533.
@@ -30,7 +29,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
  */
 final class SyncRepl
 {
-    private SearchRequest $searchRequest;
+    private SyncRequest $syncRequest;
 
     private LdapClient $client;
 
@@ -40,18 +39,16 @@ final class SyncRepl
 
     public function __construct(
         LdapClient $client,
-        ?SearchRequest $searchRequest = null
+        SyncRequest $syncRequest
     ) {
         $this->client = $client;
-        $this->searchRequest = $searchRequest ?? Operations::search(
-            Filters::present('objectClass')
-        );
+        $this->syncRequest = $syncRequest;
         $this->controls = new ControlBag();
     }
 
-    public function usingSearchRequest(SearchRequest $searchRequest): self
+    public function usingSyncRequest(SyncRequest $syncRequest): self
     {
-        $this->searchRequest = $searchRequest;
+        $this->syncRequest = $syncRequest;
 
         return $this;
     }
@@ -61,14 +58,10 @@ final class SyncRepl
      */
     public function initialPoll(): SyncResponse
     {
-        $message = $this->client->sendAndReceive(
-            $this->searchRequest,
+        return $this->getResponseAndUpdateCookie(
             Controls::syncRequest(),
-            Controls::manageDsaIt(),
-            ...$this->controls->toArray()
+            Controls::manageDsaIt()
         );
-
-        return $this->getResponseAndUpdateCookie($message);
     }
 
     /**
@@ -76,14 +69,10 @@ final class SyncRepl
      */
     public function updatePoll(): SyncResponse
     {
-        $message = $this->client->sendAndReceive(
-            $this->searchRequest,
+        return $this->getResponseAndUpdateCookie(
             Controls::syncRequest($this->cookie),
             Controls::manageDsaIt(),
-            ...$this->controls->toArray()
         );
-
-        return $this->getResponseAndUpdateCookie($message);
     }
 
     public function controls(): ControlBag
@@ -106,8 +95,14 @@ final class SyncRepl
     /**
      * @throws ProtocolException
      */
-    private function getResponseAndUpdateCookie(LdapMessageResponse $messageResponse): SyncResponse
+    private function getResponseAndUpdateCookie(Control ...$controls): SyncResponse
     {
+        $messageResponse = $this->client->sendAndReceive(
+            $this->syncRequest,
+            ...$controls,
+            ...$this->controls->toArray(),
+        );
+
         $response = $messageResponse->getResponse();
         if (!$response instanceof SyncResponse) {
             throw new ProtocolException(sprintf(
