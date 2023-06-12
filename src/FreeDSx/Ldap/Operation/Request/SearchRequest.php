@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Operation\Request;
 
+use Closure;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\BooleanType;
@@ -26,8 +27,6 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
-use FreeDSx\Ldap\Search\Handler\EntryHandlerInterface;
-use FreeDSx\Ldap\Search\Handler\ReferralHandlerInterface;
 use function array_map;
 
 /**
@@ -108,9 +107,9 @@ class SearchRequest implements RequestInterface
      */
     private array $attributes = [];
 
-    private ?EntryHandlerInterface $entryHandler = null;
+    private ?Closure $entryHandler = null;
 
-    private ?ReferralHandlerInterface $referralHandler = null;
+    private ?Closure $referralHandler = null;
 
     public function __construct(
         FilterInterface $filter,
@@ -288,24 +287,24 @@ class SearchRequest implements RequestInterface
         return $this;
     }
 
-    public function getEntryHandler(): ?EntryHandlerInterface
+    public function getEntryHandler(): ?Closure
     {
         return $this->entryHandler;
     }
 
-    public function useEntryHandler(?EntryHandlerInterface $entryHandler): self
+    public function useEntryHandler(?Closure $entryHandler): self
     {
         $this->entryHandler = $entryHandler;
 
         return $this;
     }
 
-    public function getReferralHandler(): ?ReferralHandlerInterface
+    public function getReferralHandler(): ?Closure
     {
         return $this->referralHandler;
     }
 
-    public function useReferralHandler(?ReferralHandlerInterface $referralHandler): self
+    public function useReferralHandler(?Closure $referralHandler): self
     {
         $this->referralHandler = $referralHandler;
 

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use Closure;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\BindException;
@@ -103,18 +104,18 @@ class ClientSearchHandler extends ClientBasicHandler
 
     private function searchWithHandlers(
         LdapMessageResponse $messageFrom,
-        LdapMessageRequest $messageTo,
-        ?EntryHandlerInterface $entryHandler,
-        ?ReferralHandlerInterface $referralHandler,
+        LdapMessageRequest  $messageTo,
+        ?Closure $entryHandler,
+        ?Closure $referralHandler,
         ClientQueue $queue,
     ): LdapMessageResponse {
         while (!$messageFrom->getResponse() instanceof SearchResultDone) {
             $response = $messageFrom->getResponse();
 
-            if ($response instanceof SearchResultEntry) {
-                $entryHandler?->handleEntry(new EntryResult($messageFrom));
-            } elseif ($response instanceof SearchResultReference) {
-                $referralHandler?->handleReferral(new ReferralResult($messageFrom));
+            if ($response instanceof SearchResultEntry && $entryHandler) {
+                $entryHandler(new EntryResult($messageFrom));
+            } elseif ($response instanceof SearchResultReference && $referralHandler) {
+                $referralHandler(new ReferralResult($messageFrom));
             }
 
             $messageFrom = $queue->getMessage($messageTo->getMessageId());
