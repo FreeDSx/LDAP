@@ -11,12 +11,12 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace spec\FreeDSx\Ldap\Search;
+namespace spec\FreeDSx\Ldap\Sync;
 
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\SyncHandlerInterface;
-use FreeDSx\Ldap\Search\SyncRepl;
+use FreeDSx\Ldap\Sync\SyncRepl;
 use PhpSpec\ObjectBehavior;
 
 class SyncReplSpec extends ObjectBehavior

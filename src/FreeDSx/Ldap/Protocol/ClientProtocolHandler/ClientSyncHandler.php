@@ -30,11 +30,17 @@ use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncNewCookie;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshDelete;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshPresent;
+use FreeDSx\Ldap\Operation\Response\SyncInfoMessage;
 use FreeDSx\Ldap\Operation\Response\SyncResponse;
 use FreeDSx\Ldap\Operation\Response\SyncResult;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
+use FreeDSx\Ldap\Search\Result\EntryResult;
+use FreeDSx\Ldap\Search\Result\ReferralResult;
+use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
+use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
+use FreeDSx\Ldap\Sync\Result\SyncReferralResult;
 use FreeDSx\Ldap\Search\SyncHandlerInterface;
 
 class ClientSyncHandler extends ClientBasicHandler
@@ -153,23 +159,24 @@ class ClientSyncHandler extends ClientBasicHandler
             $syncResult = null;
 
             if ($response instanceof SearchResultEntry) {
-                $syncResult = new SyncResult(
-                    $response->getEntry(),
-                    $this->getSyncStateControl($message)
+                $syncResult = new SyncEntryResult(
+                    new EntryResult($message)
                 );
             } elseif ($response instanceof SearchResultReference) {
-                $syncResult = new SyncResult(
-                    $response->getReferrals(),
-                    $this->getSyncStateControl($message)
+                $syncResult = new SyncReferralResult(
+                    new ReferralResult($message)
                 );
             } elseif ($response instanceof SearchResultDone) {
                 $isDone = true;
             } else {
-                throw new ProtocolException('Unexpected message encountered during initial content sync.');
+                throw new ProtocolException(
+                    'Unexpected message encountered during initial content sync.'
+                );
             }
 
             if ($syncResult && $this->syncHandler) {
-                $this->syncHandler->initialPoll($syncResult);
+                // need to change a bunch of this logic...
+                // $this->syncHandler->initialPoll($syncResult);
             } elseif ($syncResult) {
                 $results[] = $syncResult;
             }
@@ -227,33 +234,31 @@ class ClientSyncHandler extends ClientBasicHandler
                 $this->lastResponse = $message;
                 $response = $message->getResponse();
 
-                if ($response instanceof SyncRefreshDelete) {
-                    $syncInfoDelete = $response;
-                    $syncRequest->setCookie($syncInfoDelete->getCookie());
-                    $queue->sendMessage($messageTo);
-                } elseif ($response instanceof SyncRefreshPresent) {
-                    $syncInfoPresent = $response;
-                    $syncRequest->setCookie($syncInfoPresent->getCookie());
-                    $queue->sendMessage($messageTo);
-                } elseif ($response instanceof SyncNewCookie) {
-                    $syncNewCookie = $response;
-                    $syncRequest->setCookie($syncNewCookie->getCookie());
-                } elseif ($response instanceof SyncIdSet) {
-                } else {
-                    if ($response instanceof SearchResultEntry) {
-                        $syncResults[] = new SyncResult(
-                            $response->getEntry(),
-                            $this->getSyncStateControl($message)
-                        );
-                    } elseif ($response instanceof SearchResultReference) {
-                        $syncResults[] = new SyncResult(
-                            $response->getReferrals(),
-                            $this->getSyncStateControl($message)
-                        );
-                    } elseif ($response instanceof SearchResultDone) {
-                        $isDone = true;
-                        break;
-                    }
+                if ($response instanceof SyncInfoMessage) {
+                    $this->processSyncInfo(
+                        $queue,
+                        $messageTo,
+                        $message,
+                        $response,
+                        $syncRequest,
+                    );
+
+                    continue;
+                }
+
+                if ($response instanceof SearchResultEntry) {
+                    $syncResults[] = new SyncResult(
+                        $response->getEntry(),
+                        $this->getSyncStateControl($message)
+                    );
+                } elseif ($response instanceof SearchResultReference) {
+                    $syncResults[] = new SyncResult(
+                        $response->getReferrals(),
+                        $this->getSyncStateControl($message)
+                    );
+                } elseif ($response instanceof SearchResultDone) {
+                    $isDone = true;
+                    break;
                 }
             }
         } while (!$isDone);
@@ -274,20 +279,14 @@ class ClientSyncHandler extends ClientBasicHandler
 
     private function getSyncStateControl(LdapMessageResponse $response): ?SyncStateControl
     {
-        $syncState = $response->controls()->get(Control::OID_SYNC_STATE);
-
-        return $syncState instanceof SyncStateControl
-            ? $syncState
-            : null;
+        return $response->controls()
+            ->getByClass(SyncStateControl::class);
     }
 
     private function getSyncDoneControl(LdapMessageResponse $response): ?SyncDoneControl
     {
-        $syncDone = $response->controls()->get(Control::OID_SYNC_DONE);
-
-        return $syncDone instanceof SyncDoneControl
-            ? $syncDone
-            : null;
+        return $response->controls()
+            ->getByClass(SyncDoneControl::class);
     }
 
     private function getLdapResult(LdapMessageResponse $response): LdapResult
@@ -302,5 +301,29 @@ class ClientSyncHandler extends ClientBasicHandler
         }
 
         return $result;
+    }
+
+    private function processSyncInfo(
+        ClientQueue $queue,
+        LdapMessageRequest $messageTo,
+        LdapMessageResponse $messageFrom,
+        SyncInfoMessage $response,
+        SyncRequestControl $syncRequest,
+    ): void {
+        if ($response instanceof SyncRefreshDelete) {
+            $syncInfoDelete = $response;
+            $syncRequest->setCookie($syncInfoDelete->getCookie());
+            $queue->sendMessage($messageTo);
+        } elseif ($response instanceof SyncRefreshPresent) {
+            $syncInfoPresent = $response;
+            $syncRequest->setCookie($syncInfoPresent->getCookie());
+            $queue->sendMessage($messageTo);
+        } elseif ($response instanceof SyncNewCookie) {
+            $syncNewCookie = $response;
+            $syncRequest->setCookie($syncNewCookie->getCookie());
+        } elseif ($response instanceof SyncIdSet) {
+            $syncResult = new SyncIdSetResult($messageFrom);
+            // need to implement handling for this...
+        }
     }
 }

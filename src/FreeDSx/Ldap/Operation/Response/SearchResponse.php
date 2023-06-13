@@ -24,7 +24,7 @@ use FreeDSx\Ldap\Search\Result\ReferralResult;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class SearchResponse extends LdapResult
+class SearchResponse extends SearchResultDone
 {
     /**
      * @var EntryResult[]

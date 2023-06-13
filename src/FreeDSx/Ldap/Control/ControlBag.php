@@ -21,6 +21,7 @@ use function array_search;
 use function count;
 use function in_array;
 use function is_string;
+use function is_subclass_of;
 
 /**
  * Represents a set of controls.
@@ -64,6 +65,24 @@ class ControlBag implements IteratorAggregate, Countable
     {
         foreach ($this->controls as $control) {
             if ($oid === $control->getTypeOid()) {
+                return $control;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get a control object by the string OID type. If none is found it will return null. Can check first with has.
+     *
+     * @template T of Control
+     * @param class-string<T> $control_class
+     * @return T|null
+     */
+    public function getByClass(string $control_class)
+    {
+        foreach ($this->controls as $control) {
+            if (is_subclass_of($control, $control_class)) {
                 return $control;
             }
         }

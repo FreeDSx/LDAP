@@ -21,17 +21,13 @@ use function implode;
  */
 final class ReferralResult implements Countable, IteratorAggregate, Stringable
 {
-    private LdapMessageResponse $response;
-
     /**
      * @var null|LdapUrl[]
      */
     private ?array $referrals = null;
 
-    public function __construct(LdapMessageResponse $response)
-    {
-        $this->response = $response;
-    }
+    public function __construct(private readonly LdapMessageResponse $response)
+    {}
 
     /**
      * The raw message response returned from the server, which contains any controls

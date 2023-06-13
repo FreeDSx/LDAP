@@ -54,6 +54,8 @@ use function array_map;
  */
 class SearchRequest implements RequestInterface
 {
+    use IntermediateResponseHandlerTrait;
+
     /**
      * Searches a scope of a single object (IE. a specific DN)
      */

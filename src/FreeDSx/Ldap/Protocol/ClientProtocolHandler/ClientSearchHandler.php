@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
-use Closure;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\BindException;
@@ -21,6 +20,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\Response\IntermediateResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
@@ -28,8 +28,6 @@ use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
-use FreeDSx\Ldap\Search\Handler\EntryHandlerInterface;
-use FreeDSx\Ldap\Search\Handler\ReferralHandlerInterface;
 use FreeDSx\Ldap\Search\Result\EntryResult;
 use FreeDSx\Ldap\Search\Result\ReferralResult;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -72,27 +70,11 @@ class ClientSearchHandler extends ClientBasicHandler
         ClientQueue $queue,
         ClientOptions $options,
     ): ?LdapMessageResponse {
-        /** @var SearchRequest $searchRequest */
-        $searchRequest = $messageTo->getRequest();
-
-        $entryHandler = $searchRequest->getEntryHandler();
-        $referralHandler = $searchRequest->getReferralHandler();
-
-        if ($entryHandler || $referralHandler) {
-            $finalResponse = $this->searchWithHandlers(
-                $messageFrom,
-                $messageTo,
-                $entryHandler,
-                $referralHandler,
-                $queue,
-            );
-        } else {
-            $finalResponse = $this->searchWithoutHandlers(
-                $messageFrom,
-                $messageTo,
-                $queue,
-            );
-        }
+        $finalResponse = $this->search(
+            $messageFrom,
+            $messageTo,
+            $queue,
+        );
 
         return parent::handleResponse(
             $messageTo,
@@ -102,54 +84,48 @@ class ClientSearchHandler extends ClientBasicHandler
         );
     }
 
-    private function searchWithHandlers(
+    private function search(
         LdapMessageResponse $messageFrom,
         LdapMessageRequest  $messageTo,
-        ?Closure $entryHandler,
-        ?Closure $referralHandler,
         ClientQueue $queue,
     ): LdapMessageResponse {
-        while (!$messageFrom->getResponse() instanceof SearchResultDone) {
-            $response = $messageFrom->getResponse();
+        /** @var SearchRequest $searchRequest */
+        $searchRequest = $messageTo->getRequest();
 
-            if ($response instanceof SearchResultEntry && $entryHandler) {
-                $entryHandler(new EntryResult($messageFrom));
-            } elseif ($response instanceof SearchResultReference && $referralHandler) {
-                $referralHandler(new ReferralResult($messageFrom));
-            }
-
-            $messageFrom = $queue->getMessage($messageTo->getMessageId());
-        }
-
-        return $messageFrom;
-    }
-
-    private function searchWithoutHandlers(
-        LdapMessageResponse $messageFrom,
-        LdapMessageRequest $messageTo,
-        ClientQueue $queue,
-    ): LdapMessageResponse {
         $entryResults = [];
         $referralResults = [];
 
-        while (!($messageFrom->getResponse() instanceof SearchResultDone)) {
+        $entryHandler = $searchRequest->getEntryHandler() ??
+            function(EntryResult $result) use (&$entryResults): void {
+                $entryResults[] = $result;
+            };
+        $referralHandler = $searchRequest->getReferralHandler() ??
+            function(ReferralResult $result) use (&$referralResults): void {
+                $referralResults[] = $result;
+            };
+        $intermediateHandler = $searchRequest->getIntermediateResponseHandler();
+
+        while (!$messageFrom->getResponse() instanceof SearchResultDone) {
             $response = $messageFrom->getResponse();
 
             if ($response instanceof SearchResultEntry) {
-                $entryResults[] = new EntryResult($messageFrom);
+                $entryHandler(new EntryResult($messageFrom));
             } elseif ($response instanceof SearchResultReference) {
-                $referralResults[] = new ReferralResult($messageFrom);
+                $referralHandler(new ReferralResult($messageFrom));
+            } elseif ($response instanceof IntermediateResponse && $intermediateHandler) {
+                $intermediateHandler($messageFrom);
             }
 
             $messageFrom = $queue->getMessage($messageTo->getMessageId());
         }
 
-        $ldapResult = $messageFrom->getResponse();
-
+        // This is just to use less logic to account whether a handler was used / no search results were returned.
+        // This just returns the search result done wrapped in a SearchResponse. The SearchResponse extends
+        // SearchResultDone.
         return new LdapMessageResponse(
             $messageFrom->getMessageId(),
             new SearchResponse(
-                $ldapResult,
+                $messageFrom->getResponse(),
                 $entryResults,
                 $referralResults,
             ),
