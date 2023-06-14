@@ -38,7 +38,6 @@ use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Search\SyncHandlerInterface;
 use Stringable;
 
 /**
@@ -235,12 +234,10 @@ class Operations
      * Sync with LDAP (via method RFC-4533 / SyncRepl) with a given filter, scope, etc to retrieve a set of entries.
      */
     public static function sync(
-        SyncHandlerInterface $syncHandler,
         ?FilterInterface $filter = null,
         Attribute|string ...$attributes,
-    ): SearchRequest {
+    ): SyncRequest {
         return new SyncRequest(
-            $syncHandler,
             $filter ?? Filters::present('objectClass'),
             ...$attributes
         );

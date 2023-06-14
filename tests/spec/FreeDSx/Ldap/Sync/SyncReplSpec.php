@@ -21,14 +21,9 @@ use PhpSpec\ObjectBehavior;
 
 class SyncReplSpec extends ObjectBehavior
 {
-    public function let(
-        LdapClient $client,
-        SyncHandlerInterface $syncHandler,
-    ): void {
-        $this->beConstructedWith(
-            $client,
-            Operations::sync($syncHandler->getWrappedObject())
-        );
+    public function let(LdapClient $client,): void
+    {
+        $this->beConstructedWith($client,);
     }
 
     public function it_is_initializable(): void

@@ -10,24 +10,12 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 
 trait SyncResultTrait
 {
-    private int $syncStage;
-
     private ?SyncStateControl $syncState = null;
 
     /**
      * The raw LDAP Message response for the sync.
      */
     abstract public function getMessage(): LdapMessageResponse;
-
-    /**
-     * The stage of the sync process for this result. This is one of:
-     *
-     *   -
-     */
-    public function getSyncStage(): int
-    {
-        return $this->syncStage;
-    }
 
     /**
      * The state of the sync result. This is one of:

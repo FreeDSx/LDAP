@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SyncRequest;
 use FreeDSx\Ldap\Operation\Response\SyncResponse;
+use FreeDSx\Ldap\Operations;
 
 /**
  * A helper class for an LDAP Content Synchronization Operation, described by RFC 4533.
@@ -39,10 +40,10 @@ final class SyncRepl
 
     public function __construct(
         LdapClient $client,
-        SyncRequest $syncRequest
+        ?SyncRequest $syncRequest = null
     ) {
         $this->client = $client;
-        $this->syncRequest = $syncRequest;
+        $this->syncRequest = $syncRequest ?? Operations::sync();
         $this->controls = new ControlBag();
     }
 

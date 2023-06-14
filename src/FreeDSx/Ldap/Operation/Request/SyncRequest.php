@@ -4,29 +4,21 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Operation\Request;
 
-use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Search\Filter\FilterInterface;
-use FreeDSx\Ldap\Search\SyncHandlerInterface;
+use Closure;
 
 class SyncRequest extends SearchRequest
 {
-    private SyncHandlerInterface $syncHandler;
+    private ?Closure $syncIdSetHandler;
 
-    public function __construct(
-        SyncHandlerInterface $syncHandler,
-        FilterInterface $filter,
-        string|Attribute ...$attributes
-    ) {
-        $this->syncHandler = $syncHandler;
+    public function useSyncIdSetHandler(?Closure $syncIdSetHandler): self
+    {
+        $this->syncIdSetHandler = $syncIdSetHandler;
 
-        parent::__construct(
-            $filter,
-            ...$attributes
-        );
+        return $this;
     }
 
-    public function getSyncHandler(): SyncHandlerInterface
+    public function getSyncIdSetHandler(): ?Closure
     {
-        return $this->syncHandler;
+        return $this->syncIdSetHandler;
     }
 }

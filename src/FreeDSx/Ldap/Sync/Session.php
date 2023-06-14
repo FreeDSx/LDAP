@@ -2,7 +2,7 @@
 
 namespace FreeDSx\Ldap\Sync;
 
-final class Phase
+final class Session
 {
     public const INITIAL_CONTENT = 0;
 
@@ -15,13 +15,13 @@ final class Phase
     public const PERSIST = 4;
 
     public function __construct(
-        private readonly int $phase,
-        private readonly bool $isComplete,
+        private int $phase,
+        private ?string $cookie,
     )
     {}
 
     /**
-     * The phase currently in progress. One of:
+     * The phase currently in progress for the sync session. One of:
      *
      *   - {@see self::INITIAL_CONTENT}
      *   - {@see self::CONTENT_UPDATE}
@@ -36,10 +36,30 @@ final class Phase
     }
 
     /**
-     * Whether the current phase is complete.
+     * The cookie that represents this sync session.
      */
-    public function isComplete(): bool
+    public function getCookie(): ?string
     {
-        return $this->isComplete;
+        return $this->cookie;
+    }
+
+    /**
+     * @internal
+     */
+    public function updatePhase(int $phase): self
+    {
+        $this->phase = $phase;
+
+        return $this;
+    }
+
+    /**
+     * @internal
+     */
+    public function updateCookie(?string $cookie): self
+    {
+        $this->cookie = $cookie;
+
+        return $this;
     }
 }
