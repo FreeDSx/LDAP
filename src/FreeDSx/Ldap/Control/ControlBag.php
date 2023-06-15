@@ -82,7 +82,7 @@ class ControlBag implements IteratorAggregate, Countable
     public function getByClass(string $control_class)
     {
         foreach ($this->controls as $control) {
-            if (is_subclass_of($control, $control_class)) {
+            if ($control instanceof $control_class) {
                 return $control;
             }
         }

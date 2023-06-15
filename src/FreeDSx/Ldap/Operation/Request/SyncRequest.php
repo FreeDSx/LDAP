@@ -8,7 +8,7 @@ use Closure;
 
 class SyncRequest extends SearchRequest
 {
-    private ?Closure $syncIdSetHandler;
+    private ?Closure $syncIdSetHandler = null;
 
     public function useSyncIdSetHandler(?Closure $syncIdSetHandler): self
     {
