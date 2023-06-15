@@ -15,11 +15,10 @@ namespace FreeDSx\Ldap\Sync;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
-use FreeDSx\Ldap\Controls;
+use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SyncRequest;
-use FreeDSx\Ldap\Operation\Response\SyncResponse;
 use FreeDSx\Ldap\Operations;
 
 /**
@@ -54,28 +53,6 @@ final class SyncRepl
         return $this;
     }
 
-    /**
-     * @throws ProtocolException
-     */
-    public function initialPoll(): SyncResponse
-    {
-        return $this->getResponseAndUpdateCookie(
-            Controls::syncRequest(),
-            Controls::manageDsaIt()
-        );
-    }
-
-    /**
-     * @throws ProtocolException
-     */
-    public function updatePoll(): SyncResponse
-    {
-        return $this->getResponseAndUpdateCookie(
-            Controls::syncRequest($this->cookie),
-            Controls::manageDsaIt(),
-        );
-    }
-
     public function controls(): ControlBag
     {
         return $this->controls;
@@ -93,10 +70,12 @@ final class SyncRepl
         return $this->cookie;
     }
 
-    /**
-     * @throws ProtocolException
-     */
-    private function getResponseAndUpdateCookie(Control ...$controls): SyncResponse
+    public function sync(): void
+    {
+        $this->getResponseAndUpdateCookie();
+    }
+
+    private function getResponseAndUpdateCookie(Control ...$controls): void
     {
         $messageResponse = $this->client->sendAndReceive(
             $this->syncRequest,
@@ -104,15 +83,16 @@ final class SyncRepl
             ...$this->controls->toArray(),
         );
 
-        $response = $messageResponse->getResponse();
-        if (!$response instanceof SyncResponse) {
+        $searchDone = $messageResponse->controls()
+            ->getByClass(SyncDoneControl::class);
+
+        if ($searchDone === null) {
             throw new ProtocolException(sprintf(
-                'Expected a SyncResponse, got: %s',
-                get_class($response)
+                'Expected a "%s" control, but none was received.',
+                SyncDoneControl::class,
             ));
         }
-        $this->cookie = $response->getCookie();
 
-        return $response;
+        $this->cookie = $searchDone->getCookie();
     }
 }

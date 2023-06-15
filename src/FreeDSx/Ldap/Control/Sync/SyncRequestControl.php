@@ -21,7 +21,6 @@ use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Search\SyncHandlerInterface;
 use function count;
 
 /**
@@ -52,8 +51,6 @@ class SyncRequestControl extends Control
     private ?string $cookie;
 
     private bool $reloadHint;
-
-    private ?SyncHandlerInterface $syncHandler = null;
 
     public function __construct(
         int $mode = self::MODE_REFRESH_ONLY,
@@ -101,18 +98,6 @@ class SyncRequestControl extends Control
     public function setReloadHint(bool $reloadHint): self
     {
         $this->reloadHint = $reloadHint;
-
-        return $this;
-    }
-
-    public function getSyncHandler(): ?SyncHandlerInterface
-    {
-        return $this->syncHandler;
-    }
-
-    public function setSyncHandler(?SyncHandlerInterface $handler): self
-    {
-        $this->syncHandler = $handler;
 
         return $this;
     }
