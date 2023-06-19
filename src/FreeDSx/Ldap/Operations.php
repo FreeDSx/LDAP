@@ -231,14 +231,14 @@ class Operations
     }
 
     /**
-     * Sync with LDAP (via method RFC-4533 / SyncRepl) with a given filter, scope, etc to retrieve a set of entries.
+     * Sync with LDAP (via method RFC-4533 / SyncRepl) with a given filter, scope, etc. to retrieve a set of entries.
      */
     public static function sync(
         ?FilterInterface $filter = null,
         Attribute|string ...$attributes,
     ): SyncRequest {
         return new SyncRequest(
-            $filter ?? Filters::present('objectClass'),
+            $filter,
             ...$attributes
         );
     }

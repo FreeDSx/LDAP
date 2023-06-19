@@ -15,6 +15,7 @@ namespace spec\FreeDSx\Ldap\Control;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use PhpSpec\ObjectBehavior;
 
 class ControlBagSpec extends ObjectBehavior
@@ -103,5 +104,19 @@ class ControlBagSpec extends ObjectBehavior
         $this->reset();
 
         $this->toArray()->shouldBeEqualTo([]);
+    }
+
+    public function it_should_get_a_control_by_its_class_name(): void
+    {
+        $this->add(new SyncRequestControl());
+
+        $this->getByClass(SyncRequestControl::class)
+            ->shouldBeAnInstanceOf(SyncRequestControl::class);
+    }
+
+    public function it_should_return_null_if_a_control_by_its_class_name_does_not_exist(): void
+    {
+        $this->getByClass(SyncRequestControl::class)
+            ->shouldBeNull();
     }
 }

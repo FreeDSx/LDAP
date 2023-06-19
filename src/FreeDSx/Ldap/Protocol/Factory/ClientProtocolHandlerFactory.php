@@ -30,7 +30,9 @@ class ClientProtocolHandlerFactory
 {
     public function forRequest(Request\RequestInterface $request): RequestHandlerInterface
     {
-        if ($request instanceof Request\SearchRequest) {
+        if ($request instanceof Request\SyncRequest) {
+            return new ClientProtocolHandler\ClientSyncHandler();
+        } elseif ($request instanceof Request\SearchRequest) {
             return new ClientProtocolHandler\ClientSearchHandler();
         } elseif ($request instanceof Request\UnbindRequest) {
             return new ClientProtocolHandler\ClientUnbindHandler();

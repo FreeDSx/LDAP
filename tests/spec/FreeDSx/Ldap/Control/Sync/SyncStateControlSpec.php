@@ -46,6 +46,38 @@ class SyncStateControlSpec extends ObjectBehavior
         $this->getCookie()->shouldBeEqualTo('omnomnom');
     }
 
+    public function it_should_tell_if_it_is_for_a_present_state(): void
+    {
+        $this->beConstructedWith(SyncStateControl::STATE_PRESENT, 'foo');
+
+        $this->isPresent()
+            ->shouldBeEqualTo(true);
+    }
+
+    public function it_should_tell_if_it_is_for_a_add_state(): void
+    {
+        $this->beConstructedWith(SyncStateControl::STATE_ADD, 'foo');
+
+        $this->isAdd()
+            ->shouldBeEqualTo(true);
+    }
+
+    public function it_should_tell_if_it_is_for_a_modify_state(): void
+    {
+    $this->beConstructedWith(SyncStateControl::STATE_MODIFY, 'foo');
+
+        $this->isModify()
+            ->shouldBeEqualTo(true);
+    }
+
+    public function it_should_tell_if_it_is_for_a_delete_state(): void
+    {
+        $this->beConstructedWith(SyncStateControl::STATE_DELETE, 'foo');
+
+        $this->isDelete()
+            ->shouldBeEqualTo(true);
+    }
+
     public function it_should_generate_correct_asn1(): void
     {
         $encoder = new LdapEncoder();

@@ -21,6 +21,7 @@ use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
+use FreeDSx\Ldap\Operation\Request\SyncRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\AddResponse;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
@@ -38,6 +39,7 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Search\Paging;
 use FreeDSx\Ldap\Search\RangeRetrieval;
 use FreeDSx\Ldap\Search\Vlv;
+use FreeDSx\Ldap\Sync\SyncRepl;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
@@ -420,5 +422,19 @@ class LdapClientSpec extends ObjectBehavior
 
         $this->getOptions()
             ->shouldBeEqualTo($options);
+    }
+
+    public function it_should_construct_a_syncrepl_helper(): void
+    {
+        $syncRequest = Operations::sync(Filters::present('foo'));
+
+        $this->syncRepl($syncRequest)
+            ->shouldBeLike(new SyncRepl(
+                $this->getWrappedObject(),
+                $syncRequest
+            ));
+
+        $this->syncRepl()
+            ->shouldBeLike(new SyncRepl($this->getWrappedObject()));
     }
 }

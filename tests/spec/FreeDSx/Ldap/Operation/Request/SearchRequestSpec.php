@@ -19,6 +19,8 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Search\Result\EntryResult;
+use FreeDSx\Ldap\Search\Result\ReferralResult;
 use PhpSpec\ObjectBehavior;
 
 class SearchRequestSpec extends ObjectBehavior
@@ -96,6 +98,26 @@ class SearchRequestSpec extends ObjectBehavior
         $this->useSubtreeScope()->getScope()->shouldBeEqualTo(SearchRequest::SCOPE_WHOLE_SUBTREE);
         $this->useBaseScope()->getScope()->shouldBeEqualTo(SearchRequest::SCOPE_BASE_OBJECT);
         $this->useSingleLevelScope()->getScope()->shouldBeEqualTo(SearchRequest::SCOPE_SINGLE_LEVEL);
+    }
+
+    public function it_should_set_and_get_an_entry_handler(): void
+    {
+        $handler = fn(EntryResult $result) => $result->getEntry();
+
+        $this->useEntryHandler($handler)
+            ->shouldReturn($this);
+        $this->getEntryHandler()
+            ->shouldReturn($handler);
+    }
+
+    public function it_should_set_and_get_a_referral_handler(): void
+    {
+        $handler = fn(ReferralResult $result) => $result->getReferrals();
+
+        $this->useReferralHandler($handler)
+            ->shouldReturn($this);
+        $this->getReferralHandler()
+            ->shouldReturn($handler);
     }
 
     public function it_should_generate_correct_asn1(): void

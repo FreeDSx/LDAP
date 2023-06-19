@@ -76,4 +76,30 @@ class SearchResponseSpec extends ObjectBehavior
            Entry::create('bar')
         ]));
     }
+
+    public function it_should_get_the_referral_results(): void
+    {
+        $this->getReferralResults()
+            ->shouldBeLike([
+                new ReferralResult(new LdapMessageResponse(
+                    1,
+                    new SearchResultReference(new LdapUrl('ldap://foo'))
+                )),
+            ]);
+    }
+
+    public function it_should_get_the_entry_results(): void
+    {
+        $this->getEntryResults()
+            ->shouldBeLike([
+                new EntryResult(new LdapMessageResponse(
+                    1,
+                    new SearchResultEntry(Entry::create('foo'))
+                )),
+                new EntryResult(new LdapMessageResponse(
+                    1,
+                    new SearchResultEntry(Entry::create('bar'))
+                )),
+            ]);
+    }
 }

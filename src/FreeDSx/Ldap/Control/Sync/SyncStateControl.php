@@ -128,7 +128,7 @@ class SyncStateControl extends Control
      */
     public function isDelete(): bool
     {
-        return $this->state === self::STATE_PRESENT;
+        return $this->state === self::STATE_DELETE;
     }
 
     /**
