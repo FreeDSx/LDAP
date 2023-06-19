@@ -137,16 +137,28 @@ final class SyncRepl
         return $this->cookie;
     }
 
-    public function useRefreshOnlyMode(): self
+    public function refreshOnly(): self
     {
         $this->mode = SyncRequestControl::MODE_REFRESH_ONLY;
 
         return $this;
     }
 
-    public function useRefreshAndPersistMode(): self
+    public function refreshAndPersist(): self
     {
         $this->mode = SyncRequestControl::MODE_REFRESH_AND_PERSIST;
+
+        return $this;
+    }
+
+    public function noTimeout(): self
+    {
+        $this->client->setOptions(
+            options: $this->client
+                ->getOptions()
+                ->setTimeoutRead(-1),
+            forceDisconnect: true,
+        );
 
         return $this;
     }

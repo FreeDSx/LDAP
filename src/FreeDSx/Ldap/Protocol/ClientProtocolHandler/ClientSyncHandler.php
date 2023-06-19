@@ -99,16 +99,16 @@ class ClientSyncHandler extends ClientBasicHandler
             ->getByClass(SyncRequestControl::class) ?? throw new RuntimeException(sprintf(
             'Expected a "%s", but there is none.',
             SyncRequestControl::class,
-        ));;
+        ));
 
         if ($this->isContentUpdatePoll()) {
-            $syncStage = Session::CONTENT_UPDATE;
+            $syncStage = Session::STAGE_PERSIST;
         } else {
-            $syncStage = Session::INITIAL_CONTENT;
+            $syncStage = Session::STAGE_REFRESH;
         }
 
         $this->session = new Session(
-            phase: $syncStage,
+            stage: $syncStage,
             cookie: $this->syncRequestControl->getCookie(),
         );
 
@@ -138,7 +138,8 @@ class ClientSyncHandler extends ClientBasicHandler
 
         call_user_func(
             $this->syncEntryHandler,
-            new SyncEntryResult($entryResult)
+            new SyncEntryResult($entryResult),
+            $this->session,
         );
     }
 
@@ -150,7 +151,8 @@ class ClientSyncHandler extends ClientBasicHandler
 
         call_user_func(
             $this->syncReferralHandler,
-            new SyncReferralResult($referralResult)
+            new SyncReferralResult($referralResult),
+            $this->session,
         );
     }
 
@@ -161,12 +163,12 @@ class ClientSyncHandler extends ClientBasicHandler
         if ($response instanceof SyncRefreshDelete) {
             $this->syncRequestControl->setCookie($response->getCookie());
             $this->session
-                ->updatePhase(Session::REFRESH)
+                ->updatePhase(Session::PHASE_DELETE)
                 ->updateCookie($response->getCookie());
         } elseif ($response instanceof SyncRefreshPresent) {
             $this->syncRequestControl->setCookie($response->getCookie());
             $this->session
-                ->updatePhase(Session::REFRESH)
+                ->updatePhase(Session::PHASE_PRESENT)
                 ->updateCookie($response->getCookie());
         } elseif ($response instanceof SyncNewCookie) {
             $this->session->updateCookie($response->getCookie());
@@ -198,4 +200,3 @@ class ClientSyncHandler extends ClientBasicHandler
         return $result->getResultCode() === ResultCode::SYNCHRONIZATION_REFRESH_REQUIRED;
     }
 }
-
