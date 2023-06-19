@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Sync;
 
 use Closure;
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
@@ -31,17 +32,15 @@ use FreeDSx\Ldap\Search\Filter\FilterInterface;
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  * @see https://tools.ietf.org/html/rfc4533
  */
-final class SyncRepl
+class SyncRepl
 {
     private SyncRequest $syncRequest;
 
     private LdapClient $client;
 
-    private ?string $cookie = null;
-
-    private int $mode = SyncRequestControl::MODE_REFRESH_ONLY;
-
     private ControlBag $controls;
+
+    private ?string $cookie = null;
 
     public function __construct(
         LdapClient $client,
@@ -108,6 +107,10 @@ final class SyncRepl
         return $this;
     }
 
+    /**
+     * Set the cookie to use as part of the sync operation. This should be a cookie from a previous sync. To retrieve the
+     * cookie during the sync use {@see Session::getCookie()} from the Sync session in the handlers.
+     */
     public function useCookie(?string $cookie): self
     {
         $this->cookie = $cookie;
@@ -115,6 +118,9 @@ final class SyncRepl
         return $this;
     }
 
+    /**
+     * Any additional controls to get sent as part of the sync process.
+     */
     public function controls(): ControlBag
     {
         return $this->controls;
@@ -137,38 +143,46 @@ final class SyncRepl
         return $this->cookie;
     }
 
-    public function refreshOnly(): self
+    /**
+     * In a listen based sync, the server sends updates of entries that are changed after the initial refresh content is
+     * determined. The sync continues indefinitely until the connection is terminated or the sync is canceled.
+     *
+     * **Note**: The LdapClient should be instantiated with no timeout via {@see ClientOptions::setTimeoutRead(-1)}. Otherwise, the listen operation will terminate due to a network timeout.
+     */
+    public function listen(Closure $entryHandler = null): void
     {
-        $this->mode = SyncRequestControl::MODE_REFRESH_ONLY;
-
-        return $this;
-    }
-
-    public function refreshAndPersist(): self
-    {
-        $this->mode = SyncRequestControl::MODE_REFRESH_AND_PERSIST;
-
-        return $this;
-    }
-
-    public function noTimeout(): self
-    {
-        $this->client->setOptions(
-            options: $this->client
-                ->getOptions()
-                ->setTimeoutRead(-1),
-            forceDisconnect: true,
+        $this->sync(
+            mode: SyncRequestControl::MODE_REFRESH_AND_PERSIST,
+            entryHandler: $entryHandler,
         );
-
-        return $this;
     }
 
-    public function sync(): void
+    /**
+     * A poll based sync gets any initial content / updates and then ends.
+     *
+     * If a cookie is provided, then it is a poll for content update. If no cookie is provided, then it is a poll for
+     * content update. To provide a cookie from a previous poll {@see self::useCookie()}.
+     */
+    public function poll(Closure $entryHandler = null): void
     {
+        $this->sync(
+            mode: SyncRequestControl::MODE_REFRESH_ONLY,
+            entryHandler: $entryHandler,
+        );
+    }
+
+    private function sync(
+        int $mode,
+        ?Closure $entryHandler,
+    ): void {
+        if ($entryHandler) {
+            $this->useEntryHandler($entryHandler);
+        }
+
         $this->getResponseAndUpdateCookie(
             Controls::syncRequest(
                 $this->cookie,
-                $this->mode,
+                $mode,
             ),
             Controls::manageDsaIt()
         );
