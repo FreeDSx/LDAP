@@ -25,14 +25,14 @@ class SyncRequest extends SearchRequest
         );
     }
 
-    public function useSyncIdSetHandler(?Closure $syncIdSetHandler): self
+    public function useIdSetHandler(?Closure $syncIdSetHandler): self
     {
         $this->syncIdSetHandler = $syncIdSetHandler;
 
         return $this;
     }
 
-    public function getSyncIdSetHandler(): ?Closure
+    public function getIdSetHandler(): ?Closure
     {
         return $this->syncIdSetHandler;
     }

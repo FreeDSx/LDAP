@@ -20,9 +20,9 @@ class SyncRequestSpec extends ObjectBehavior
     {
         $handler = fn(SyncIdSetResult $result) => $result->getEntryUuids();
 
-        $this->useSyncIdSetHandler($handler)
+        $this->useIdSetHandler($handler)
             ->shouldBeEqualTo($this);
-        $this->getSyncIdSetHandler()
+        $this->getIdSetHandler()
             ->shouldBeEqualTo($handler);
     }
 }

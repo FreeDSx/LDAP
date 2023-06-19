@@ -118,7 +118,7 @@ class ClientSyncHandler extends ClientBasicHandler
         // We override these with our own, so save them here for now.
         $this->syncEntryHandler = $searchRequest->getEntryHandler();
         $this->syncReferralHandler = $searchRequest->getReferralHandler();
-        $this->syncIdSetHandler = $searchRequest->getSyncIdSetHandler();
+        $this->syncIdSetHandler = $searchRequest->getIdSetHandler();
 
         $searchRequest->useEntryHandler($this->processSyncEntry(...));
         $searchRequest->useReferralHandler($this->processSyncReferral(...));

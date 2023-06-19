@@ -70,7 +70,7 @@ class SyncRepl
      */
     public function useReferralHandler(Closure $handler): self
     {
-        $this->syncRequest->useEntryHandler($handler);
+        $this->syncRequest->useReferralHandler($handler);
 
         return $this;
     }
@@ -85,12 +85,12 @@ class SyncRepl
      */
     public function useIdSetHandler(Closure $handler): self
     {
-        $this->syncRequest->useEntryHandler($handler);
+        $this->syncRequest->useIdSetHandler($handler);
 
         return $this;
     }
 
-    public function useSyncRequest(SyncRequest $syncRequest): self
+    public function useRequest(SyncRequest $syncRequest): self
     {
         $this->syncRequest = $syncRequest;
 
@@ -196,16 +196,16 @@ class SyncRepl
             ...$this->controls->toArray(),
         );
 
-        $searchDone = $messageResponse->controls()
+        $syncDone = $messageResponse->controls()
             ->getByClass(SyncDoneControl::class);
 
-        if ($searchDone === null) {
+        if ($syncDone === null) {
             throw new ProtocolException(sprintf(
                 'Expected a "%s" control, but none was received.',
                 SyncDoneControl::class,
             ));
         }
 
-        $this->cookie = $searchDone->getCookie();
+        $this->cookie = $syncDone->getCookie();
     }
 }
