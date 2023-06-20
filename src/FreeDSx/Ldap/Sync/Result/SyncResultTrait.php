@@ -49,6 +49,15 @@ trait SyncResultTrait
             ->getCookie();
     }
 
+    /**
+     * Get the UUID of the entry for this sync result.
+     */
+    public function getEntryUuid(): string
+    {
+        return $this->getSyncStateControl()
+            ->getEntryUuid();
+    }
+
     private function getSyncStateControl(): SyncStateControl
     {
         if ($this->syncState !== null) {
