@@ -13,8 +13,6 @@ class SyncRequest extends SearchRequest
 {
     private ?Closure $syncIdSetHandler = null;
 
-    private ?Closure $phaseChangeHandler = null;
-
     public function __construct(
         ?FilterInterface $filter = null,
         string|Attribute ...$attributes
@@ -35,17 +33,5 @@ class SyncRequest extends SearchRequest
     public function getIdSetHandler(): ?Closure
     {
         return $this->syncIdSetHandler;
-    }
-
-    public function usePhaseChangeHandler(?Closure $phaseChangeHandler): self
-    {
-        $this->phaseChangeHandler = $phaseChangeHandler;
-
-        return $this;
-    }
-
-    public function getPhaseChangeHandler(): ?Closure
-    {
-        return $this->phaseChangeHandler;
     }
 }
