@@ -57,23 +57,9 @@ class SyncDoneControl extends Control
         return $this->cookie;
     }
 
-    public function setCookie(?string $cookie): self
-    {
-        $this->cookie = $cookie;
-
-        return $this;
-    }
-
     public function getRefreshDeletes(): bool
     {
         return $this->refreshDeletes;
-    }
-
-    public function setRefreshDeletes(bool $refreshDeletes): self
-    {
-        $this->refreshDeletes = $refreshDeletes;
-
-        return $this;
     }
 
     /**
