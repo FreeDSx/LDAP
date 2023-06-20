@@ -202,9 +202,12 @@ class ClientSyncHandler extends ClientBasicHandler
             $this->session->updateCookie($response->getCookie());
             $this->syncRequestControl->setCookie($response->getCookie());
         } elseif ($response instanceof SyncIdSet && $this->syncIdSetHandler) {
+            $this->session->updateCookie($response->getCookie());
+            $this->syncRequestControl->setCookie($response->getCookie());
             call_user_func(
                 $this->syncIdSetHandler,
                 new SyncIdSetResult($messageFrom),
+                $this->session,
             );
         }
     }
