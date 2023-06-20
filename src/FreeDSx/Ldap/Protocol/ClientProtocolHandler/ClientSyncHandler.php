@@ -40,15 +40,17 @@ class ClientSyncHandler extends ClientBasicHandler
 {
     use ClientSearchTrait;
 
+    private ?SyncRequest $syncRequest = null;
+
     private SyncRequestControl $syncRequestControl;
 
     private Session $session;
 
-    private ?Closure $syncEntryHandler;
+    private ?Closure $syncEntryHandler = null;
 
-    private ?Closure $syncReferralHandler;
+    private ?Closure $syncReferralHandler = null;
 
-    private ?Closure $syncIdSetHandler;
+    private ?Closure $syncIdSetHandler = null;
 
     /**
      * {@inheritDoc}
@@ -75,18 +77,22 @@ class ClientSyncHandler extends ClientBasicHandler
     ): ?LdapMessageResponse {
         $this->initializeSync($messageTo);
 
-        do {
-            $searchDone = self::search(
-                $messageFrom,
-                $messageTo,
-                $queue,
-            );
-            if ($this->isRefreshRequired($searchDone)) {
-                $this->syncRequestControl->setCookie(null);
-            }
-        } while (!$this->isSyncComplete($searchDone));
+        try {
+            do {
+                $searchDone = self::search(
+                    $messageFrom,
+                    $messageTo,
+                    $queue,
+                );
+                if ($this->isRefreshRequired($searchDone)) {
+                    $this->syncRequestControl->setCookie(null);
+                }
+            } while (!$this->isSyncComplete($searchDone));
 
-        return $searchDone;
+            return $searchDone;
+        } finally {
+            $this->resetRequestHandlers();
+        }
     }
 
 
@@ -114,6 +120,7 @@ class ClientSyncHandler extends ClientBasicHandler
 
         /** @var SyncRequest $searchRequest */
         $searchRequest = $messageTo->getRequest();
+        $this->syncRequest = $searchRequest;
 
         // We override these with our own, so save them here for now.
         $this->syncEntryHandler = $searchRequest->getEntryHandler();
@@ -123,6 +130,27 @@ class ClientSyncHandler extends ClientBasicHandler
         $searchRequest->useEntryHandler($this->processSyncEntry(...));
         $searchRequest->useReferralHandler($this->processSyncReferral(...));
         $searchRequest->useIntermediateResponseHandler($this->processIntermediateResponse(...));
+    }
+
+    /**
+     * We wrap the handlers with our own at the start of the sync process. This cleans it up so the request has the
+     * original handlers at the end of the process again.
+     */
+    private function resetRequestHandlers(): void
+    {
+        if ($this->syncRequest === null) {
+            return;
+        }
+
+        if ($this->syncEntryHandler !== null) {
+            $this->syncRequest->useEntryHandler($this->syncEntryHandler);
+        }
+        if ($this->syncReferralHandler !== null) {
+            $this->syncRequest->useReferralHandler($this->syncReferralHandler);
+        }
+        if ($this->syncIdSetHandler !== null) {
+            $this->syncRequest->useIdSetHandler($this->syncIdSetHandler);
+        }
     }
 
     private function isContentUpdatePoll(): bool
