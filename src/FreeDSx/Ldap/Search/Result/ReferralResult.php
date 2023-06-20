@@ -36,7 +36,8 @@ final class ReferralResult implements Countable, IteratorAggregate, Stringable
     private ?array $referrals = null;
 
     public function __construct(private readonly LdapMessageResponse $response)
-    {}
+    {
+    }
 
     /**
      * The raw message response returned from the server, which contains any controls

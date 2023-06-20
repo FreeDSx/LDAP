@@ -64,7 +64,7 @@ class SyncStateControlSpec extends ObjectBehavior
 
     public function it_should_tell_if_it_is_for_a_modify_state(): void
     {
-    $this->beConstructedWith(SyncStateControl::STATE_MODIFY, 'foo');
+        $this->beConstructedWith(SyncStateControl::STATE_MODIFY, 'foo');
 
         $this->isModify()
             ->shouldBeEqualTo(true);

@@ -16,7 +16,6 @@ namespace spec\FreeDSx\Ldap\Sync;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
-use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SyncRequest;
@@ -161,10 +160,10 @@ class SyncReplSpec extends ObjectBehavior
 
     public function it_should_use_the_entry_handler_specified(LdapClient $client): void
     {
-        $handler = fn(SyncEntryResult $result) => $result->getEntry();
+        $handler = fn (SyncEntryResult $result) => $result->getEntry();
 
         $client->sendAndReceive(
-            Argument::that(function (SyncRequest $request) use ($handler) : bool {
+            Argument::that(function (SyncRequest $request) use ($handler): bool {
                 return $request->getEntryHandler() === $handler;
             }),
             Argument::any(),
@@ -181,12 +180,12 @@ class SyncReplSpec extends ObjectBehavior
 
     public function it_should_use_the_referral_handler_specified(LdapClient $client): void
     {
-        $handler = fn(SyncReferralResult $result) => $result->getReferrals();
+        $handler = fn (SyncReferralResult $result) => $result->getReferrals();
 
         $this->useReferralHandler($handler);
 
         $client->sendAndReceive(
-            Argument::that(function (SyncRequest $request) use ($handler) : bool {
+            Argument::that(function (SyncRequest $request) use ($handler): bool {
                 return $request->getReferralHandler() === $handler;
             }),
             Argument::any(),
@@ -203,12 +202,12 @@ class SyncReplSpec extends ObjectBehavior
 
     public function it_should_use_the_idSet_handler_specified(LdapClient $client): void
     {
-        $handler = fn(SyncIdSetResult $result) => $result->getEntryUuids();
+        $handler = fn (SyncIdSetResult $result) => $result->getEntryUuids();
 
         $this->useIdSetHandler($handler);
 
         $client->sendAndReceive(
-            Argument::that(function (SyncRequest $request) use ($handler) : bool {
+            Argument::that(function (SyncRequest $request) use ($handler): bool {
                 return $request->getIdSetHandler() === $handler;
             }),
             Argument::any(),

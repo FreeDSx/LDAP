@@ -29,7 +29,7 @@ trait ClientSearchTrait
 {
     private static function search(
         LdapMessageResponse $messageFrom,
-        LdapMessageRequest  $messageTo,
+        LdapMessageRequest $messageTo,
         ClientQueue $queue,
     ): LdapMessageResponse {
         /** @var SearchRequest $searchRequest */
@@ -39,11 +39,11 @@ trait ClientSearchTrait
         $referralResults = [];
 
         $entryHandler = $searchRequest->getEntryHandler() ??
-            function(EntryResult $result) use (&$entryResults): void {
+            function (EntryResult $result) use (&$entryResults): void {
                 $entryResults[] = $result;
             };
         $referralHandler = $searchRequest->getReferralHandler() ??
-            function(ReferralResult $result) use (&$referralResults): void {
+            function (ReferralResult $result) use (&$referralResults): void {
                 $referralResults[] = $result;
             };
         $intermediateHandler = $searchRequest->getIntermediateResponseHandler();

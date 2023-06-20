@@ -22,7 +22,6 @@ use PhpSpec\ObjectBehavior;
 
 class SyncReferralResultSpec extends ObjectBehavior
 {
-
     public function let(): void
     {
         $this->beConstructedWith(new ReferralResult(

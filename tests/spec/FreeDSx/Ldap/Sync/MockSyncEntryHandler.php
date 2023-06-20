@@ -26,5 +26,6 @@ class MockSyncEntryHandler
     public function __invoke(
         SyncEntryResult $syncEntryResult,
         Session $session
-    ): void {}
+    ): void {
+    }
 }

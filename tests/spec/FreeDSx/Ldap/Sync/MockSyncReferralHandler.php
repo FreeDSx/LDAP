@@ -26,5 +26,6 @@ class MockSyncReferralHandler
     public function __invoke(
         SyncReferralResult $result,
         Session $session,
-    ): void {}
+    ): void {
+    }
 }

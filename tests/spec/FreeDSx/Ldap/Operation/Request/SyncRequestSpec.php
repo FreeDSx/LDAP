@@ -18,7 +18,7 @@ class SyncRequestSpec extends ObjectBehavior
 
     public function it_should_set_and_get_the_setId_handler(): void
     {
-        $handler = fn(SyncIdSetResult $result) => $result->getEntryUuids();
+        $handler = fn (SyncIdSetResult $result) => $result->getEntryUuids();
 
         $this->useIdSetHandler($handler)
             ->shouldBeEqualTo($this);

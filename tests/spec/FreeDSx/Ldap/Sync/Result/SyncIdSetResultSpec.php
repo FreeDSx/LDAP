@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap\Sync\Result;
 
-use FreeDSx\Ldap\Control\Sync\SyncStateControl;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use PhpSpec\ObjectBehavior;

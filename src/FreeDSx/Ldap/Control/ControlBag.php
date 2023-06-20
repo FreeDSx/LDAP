@@ -21,7 +21,6 @@ use function array_search;
 use function count;
 use function in_array;
 use function is_string;
-use function is_subclass_of;
 
 /**
  * Represents a set of controls.

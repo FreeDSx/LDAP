@@ -26,5 +26,6 @@ class MockSyncIdSetHandler
     public function __invoke(
         SyncIdSetResult $result,
         Session $session,
-    ): void {}
+    ): void {
+    }
 }

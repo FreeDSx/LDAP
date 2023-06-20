@@ -31,10 +31,10 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Search\Result\EntryResult;
 use FreeDSx\Ldap\Search\Result\ReferralResult;
-use FreeDSx\Ldap\Sync\Session;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Result\SyncReferralResult;
+use FreeDSx\Ldap\Sync\Session;
 
 class ClientSyncHandler extends ClientBasicHandler
 {
@@ -103,9 +103,9 @@ class ClientSyncHandler extends ClientBasicHandler
     {
         $this->syncRequestControl = $messageTo->controls()
             ->getByClass(SyncRequestControl::class) ?? throw new RuntimeException(sprintf(
-            'Expected a "%s", but there is none.',
-            SyncRequestControl::class,
-        ));
+                'Expected a "%s", but there is none.',
+                SyncRequestControl::class,
+            ));
 
         if ($this->isContentUpdatePoll()) {
             $syncStage = Session::STAGE_PERSIST;

@@ -22,7 +22,8 @@ class SyncEntryResult
     use SyncResultTrait;
 
     public function __construct(private readonly EntryResult $entryResult)
-    {}
+    {
+    }
 
     public function getMessage(): LdapMessageResponse
     {

@@ -39,10 +39,10 @@ use FreeDSx\Ldap\Sync\Result\SyncReferralResult;
 use FreeDSx\Ldap\Sync\Session;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
+use spec\FreeDSx\Ldap\Sync\MockSyncEntryHandler;
 use spec\FreeDSx\Ldap\Sync\MockSyncIdSetHandler;
 use spec\FreeDSx\Ldap\Sync\MockSyncReferralHandler;
 use spec\FreeDSx\Ldap\TestFactoryTrait;
-use spec\FreeDSx\Ldap\Sync\MockSyncEntryHandler;
 
 class ClientSyncHandlerSpec extends ObjectBehavior
 {
@@ -150,7 +150,7 @@ class ClientSyncHandlerSpec extends ObjectBehavior
         );
     }
 
-    public function it_should_throw_an_exception_if_a_sync_request_control_was_not_provided(ClientQueue $queue,): void
+    public function it_should_throw_an_exception_if_a_sync_request_control_was_not_provided(ClientQueue $queue, ): void
     {
         $this->shouldThrow(new RuntimeException(sprintf(
             'Expected a "%s", but there is none.',
@@ -209,7 +209,7 @@ class ClientSyncHandlerSpec extends ObjectBehavior
 
         $syncEntryHandler->__invoke(
             Argument::that(function (SyncEntryResult $result) use ($response) {
-                    return $result->getMessage() === $response;
+                return $result->getMessage() === $response;
             }),
             Argument::type(Session::class),
         )->shouldBeCalledOnce();

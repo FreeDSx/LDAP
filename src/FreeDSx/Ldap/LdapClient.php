@@ -36,8 +36,8 @@ use FreeDSx\Ldap\Search\DirSync;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Paging;
 use FreeDSx\Ldap\Search\RangeRetrieval;
-use FreeDSx\Ldap\Sync\SyncRepl;
 use FreeDSx\Ldap\Search\Vlv;
+use FreeDSx\Ldap\Sync\SyncRepl;
 use FreeDSx\Sasl\Exception\SaslException;
 use Stringable;
 

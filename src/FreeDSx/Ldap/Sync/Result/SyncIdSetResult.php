@@ -27,7 +27,8 @@ class SyncIdSetResult implements Countable, IteratorAggregate
     private ?SyncIdSet $idSet = null;
 
     public function __construct(private readonly LdapMessageResponse $message)
-    {}
+    {
+    }
 
     public function getMessage(): LdapMessageResponse
     {

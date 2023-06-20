@@ -27,7 +27,9 @@ final class Session
         private int $stage,
         private ?string $cookie,
         private ?int $phase = null,
-    ) {}
+    )
+    {
+    }
 
     /**
      * The cookie that represents this sync session.

@@ -69,7 +69,7 @@ class SyncIdSetSpec extends ObjectBehavior
         )))->shouldBeLike(new SyncIdSet(['foo', 'bar'], false, 'omnomnom'));
     }
 
-    function it_should_be_constructed_through_the_intermediate_response_factory_methd(): void
+    public function it_should_be_constructed_through_the_intermediate_response_factory_methd(): void
     {
         $encoder = new LdapEncoder();
 

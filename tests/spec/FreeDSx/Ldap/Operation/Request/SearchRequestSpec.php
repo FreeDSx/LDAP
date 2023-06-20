@@ -102,7 +102,7 @@ class SearchRequestSpec extends ObjectBehavior
 
     public function it_should_set_and_get_an_entry_handler(): void
     {
-        $handler = fn(EntryResult $result) => $result->getEntry();
+        $handler = fn (EntryResult $result) => $result->getEntry();
 
         $this->useEntryHandler($handler)
             ->shouldReturn($this);
@@ -112,7 +112,7 @@ class SearchRequestSpec extends ObjectBehavior
 
     public function it_should_set_and_get_a_referral_handler(): void
     {
-        $handler = fn(ReferralResult $result) => $result->getReferrals();
+        $handler = fn (ReferralResult $result) => $result->getReferrals();
 
         $this->useReferralHandler($handler)
             ->shouldReturn($this);
