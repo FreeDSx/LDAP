@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap\Sync\Result;
 
+use FreeDSx\Ldap\Exception\UnexpectedValueException;
+use FreeDSx\Ldap\LdapUrl;
+use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use PhpSpec\ObjectBehavior;
@@ -105,5 +108,23 @@ class SyncIdSetResultSpec extends ObjectBehavior
             ->shouldBeEqualTo(true);
         $this->isDeleted()
             ->shouldBeEqualTo(false);
+    }
+
+    public function it_must_have_a_SearchEntryResponse(): void
+    {
+        $this->beConstructedWith(
+            new LdapMessageResponse(
+                1,
+                new SearchResultReference(
+                    new LdapUrl('foo')
+                ),
+            )
+        );
+
+        $this->shouldThrow(new UnexpectedValueException(sprintf(
+            'Expected an instance of "%s", but got "%s".',
+            SyncIdSet::class,
+            SearchResultReference::class,
+        )))->during('getEntryUuids');
     }
 }

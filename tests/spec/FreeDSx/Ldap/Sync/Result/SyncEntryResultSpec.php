@@ -15,6 +15,7 @@ namespace spec\FreeDSx\Ldap\Sync\Result;
 
 use FreeDSx\Ldap\Control\Sync\SyncStateControl;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\Result\EntryResult;
@@ -85,5 +86,18 @@ class SyncEntryResultSpec extends ObjectBehavior
                     'bar'
                 )
             ));
+    }
+
+    public function it_should_thrown_an_error_if_there_is_no_sync_state_control(): void
+    {
+        $this->beConstructedWith(new EntryResult(
+            new LdapMessageResponse(
+                1,
+                new SearchResultEntry(new Entry('cn=foo')),
+            )
+        ));
+
+        $this->shouldThrow(new RuntimeException('Expected a SyncStateControl, but none was found.'))
+            ->during('getState');
     }
 }

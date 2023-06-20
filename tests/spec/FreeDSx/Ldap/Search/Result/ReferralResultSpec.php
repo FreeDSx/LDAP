@@ -13,7 +13,10 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap\Search\Result;
 
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\UnexpectedValueException;
 use FreeDSx\Ldap\LdapUrl;
+use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use PhpSpec\ObjectBehavior;
@@ -60,5 +63,23 @@ class ReferralResultSpec extends ObjectBehavior
     {
         $this->__toString()
             ->shouldBeEqualTo('ldap://foo/');
+    }
+
+    public function it_must_have_a_SearchReferenceResponse(): void
+    {
+        $this->beConstructedWith(
+            new LdapMessageResponse(
+                1,
+                new SearchResultEntry(
+                    new Entry('cn=foo')
+                ),
+            )
+        );
+
+        $this->shouldThrow(new UnexpectedValueException(sprintf(
+            'Expected an instance of "%s", but got "%s".',
+            SearchResultReference::class,
+            SearchResultEntry::class,
+        )))->during('getReferrals');
     }
 }

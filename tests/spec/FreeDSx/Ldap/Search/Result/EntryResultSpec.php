@@ -14,7 +14,10 @@ declare(strict_types=1);
 namespace spec\FreeDSx\Ldap\Search\Result;
 
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\UnexpectedValueException;
+use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
+use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use PhpSpec\ObjectBehavior;
 
@@ -55,5 +58,23 @@ class EntryResultSpec extends ObjectBehavior
     {
         $this->__toString()
             ->shouldBeEqualTo('cn=foo');
+    }
+
+    public function it_must_have_a_SearchEntryResponse(): void
+    {
+        $this->beConstructedWith(
+            new LdapMessageResponse(
+                1,
+                new SearchResultReference(
+                    new LdapUrl('foo')
+                ),
+            )
+        );
+
+        $this->shouldThrow(new UnexpectedValueException(sprintf(
+            'Expected an instance of "%s", but got "%s".',
+            SearchResultEntry::class,
+            SearchResultReference::class,
+        )))->during('getEntry');
     }
 }

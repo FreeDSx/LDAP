@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Sync\Result;
 
 use ArrayIterator;
 use Countable;
-use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Exception\UnexpectedValueException;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use IteratorAggregate;
@@ -72,8 +72,8 @@ class SyncIdSetResult implements Countable, IteratorAggregate
         $idSet = $this->message->getResponse();
 
         if (!$idSet instanceof SyncIdSet) {
-            throw new RuntimeException(sprintf(
-                'Expected an instance of "%s", but get "%s".',
+            throw new UnexpectedValueException(sprintf(
+                'Expected an instance of "%s", but got "%s".',
                 SyncIdSet::class,
                 get_class($idSet),
             ));
