@@ -10,12 +10,9 @@ use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\Result\EntryResult;
 use PhpSpec\ObjectBehavior;
-use spec\FreeDSx\Ldap\TestFactoryTrait;
 
 class SyncEntryResultSpec extends ObjectBehavior
 {
-    use TestFactoryTrait;
-
     public function let(): void
     {
         $this->beConstructedWith(new EntryResult(
