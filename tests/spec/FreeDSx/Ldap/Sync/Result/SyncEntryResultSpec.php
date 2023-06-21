@@ -74,6 +74,79 @@ class SyncEntryResultSpec extends ObjectBehavior
             ->shouldBeEqualTo(false);
     }
 
+
+    public function it_should_tell_if_it_is_for_a_present_state(): void
+    {
+        $this->beConstructedWith(new EntryResult(
+            new LdapMessageResponse(
+                1,
+                new SearchResultEntry(new Entry('cn=foo')),
+                new SyncStateControl(
+                    SyncStateControl::STATE_PRESENT,
+                    'foo',
+                    'bar'
+                )
+            )
+        ));
+
+        $this->isPresent()
+            ->shouldBeEqualTo(true);
+    }
+
+    public function it_should_tell_if_it_is_for_a_add_state(): void
+    {
+        $this->beConstructedWith(new EntryResult(
+            new LdapMessageResponse(
+                1,
+                new SearchResultEntry(new Entry('cn=foo')),
+                new SyncStateControl(
+                    SyncStateControl::STATE_ADD,
+                    'foo',
+                    'bar'
+                )
+            )
+        ));
+
+        $this->isAdd()
+            ->shouldBeEqualTo(true);
+    }
+
+    public function it_should_tell_if_it_is_for_a_modify_state(): void
+    {
+        $this->beConstructedWith(new EntryResult(
+            new LdapMessageResponse(
+                1,
+                new SearchResultEntry(new Entry('cn=foo')),
+                new SyncStateControl(
+                    SyncStateControl::STATE_MODIFY,
+                    'foo',
+                    'bar'
+                )
+            )
+        ));
+
+        $this->isModify()
+            ->shouldBeEqualTo(true);
+    }
+
+    public function it_should_tell_if_it_is_for_a_delete_state(): void
+    {
+        $this->beConstructedWith(new EntryResult(
+            new LdapMessageResponse(
+                1,
+                new SearchResultEntry(new Entry('cn=foo')),
+                new SyncStateControl(
+                    SyncStateControl::STATE_DELETE,
+                    'foo',
+                    'bar'
+                )
+            )
+        ));
+
+        $this->isDelete()
+            ->shouldBeEqualTo(true);
+    }
+
     public function it_should_get_the_raw_message(): void
     {
         $this->getMessage()

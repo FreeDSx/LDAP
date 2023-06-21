@@ -50,6 +50,42 @@ trait SyncResultTrait
     }
 
     /**
+     * Is this for an entry that was added?
+     */
+    public function isAdd(): bool
+    {
+        return $this->getSyncStateControl()
+            ->isAdd();
+    }
+
+    /**
+     * Is this for an entry that was deleted?
+     */
+    public function isDelete(): bool
+    {
+        return $this->getSyncStateControl()
+            ->isDelete();
+    }
+
+    /**
+     * Is this for an entry that was modified?
+     */
+    public function isModify(): bool
+    {
+        return $this->getSyncStateControl()
+            ->isModify();
+    }
+
+    /**
+     * Is this for an entry that is still present / has not changed?
+     */
+    public function isPresent(): bool
+    {
+        return $this->getSyncStateControl()
+            ->isPresent();
+    }
+
+    /**
      * Get the cookie associated with this sync session / sync state.
      */
     public function getCookie(): ?string
