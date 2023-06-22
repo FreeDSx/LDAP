@@ -52,6 +52,18 @@ class SyncRepl
     }
 
     /**
+     * Define a closure that handles cookie updates.
+     *
+     * **Note**: The cookie might not actually be updated if nothing changes between syncs.
+     */
+    public function useCookieHandler(Closure $handler): self
+    {
+        $this->syncRequest->useCookieHandler($handler);
+
+        return $this;
+    }
+
+    /**
      * Define a closure that handles normal entries received during the sync process.
      *
      * Note: If you do not define a closure, they will be ignored by the sync.
@@ -135,15 +147,6 @@ class SyncRepl
     }
 
     /**
-     * The cookie related to this sync session. It is updated as the sync is preformed. It can be saved / re-used in
-     * future sync operations.
-     */
-    public function getCookie(): ?string
-    {
-        return $this->cookie;
-    }
-
-    /**
      * In a listen based sync, the server sends updates of entries that are changed after the initial refresh content is
      * determined. The sync continues indefinitely until the connection is terminated or the sync is canceled.
      *
@@ -205,7 +208,5 @@ class SyncRepl
                 SyncDoneControl::class,
             ));
         }
-
-        $this->cookie = $syncDone->getCookie();
     }
 }

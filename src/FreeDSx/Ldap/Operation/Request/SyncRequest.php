@@ -13,6 +13,8 @@ class SyncRequest extends SearchRequest
 {
     private ?Closure $syncIdSetHandler = null;
 
+    private ?Closure $cookieHandler = null;
+
     public function __construct(
         ?FilterInterface $filter = null,
         string|Attribute ...$attributes
@@ -33,5 +35,17 @@ class SyncRequest extends SearchRequest
     public function getIdSetHandler(): ?Closure
     {
         return $this->syncIdSetHandler;
+    }
+
+    public function useCookieHandler(?Closure $cookieUpdateHandler): self
+    {
+        $this->cookieHandler = $cookieUpdateHandler;
+
+        return $this;
+    }
+
+    public function getCookieHandler(): ?Closure
+    {
+        return $this->cookieHandler;
     }
 }

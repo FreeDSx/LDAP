@@ -40,7 +40,7 @@ class ClientSyncHandler extends ClientBasicHandler
 {
     use ClientSearchTrait;
 
-    private ?SyncRequest $syncRequest = null;
+    private SyncRequest $syncRequest;
 
     private SyncRequestControl $syncRequestControl;
 
@@ -51,6 +51,8 @@ class ClientSyncHandler extends ClientBasicHandler
     private ?Closure $syncReferralHandler = null;
 
     private ?Closure $syncIdSetHandler = null;
+
+    private ?Closure $cookieHandler = null;
 
     /**
      * {@inheritDoc}
@@ -79,13 +81,28 @@ class ClientSyncHandler extends ClientBasicHandler
 
         try {
             do {
+                $this->syncRequestControl->setCookie($this->session->getCookie());
                 $searchDone = self::search(
                     $messageFrom,
                     $messageTo,
                     $queue,
                 );
+                // @todo This should be a configurable option or a specific exception...
                 if ($this->isRefreshRequired($searchDone)) {
-                    $this->syncRequestControl->setCookie(null);
+                    // We need to regenerate a search request / response with a new cookie...
+                    $this->syncRequestControl->setCookie(
+                        $searchDone
+                            ->controls()
+                            ->getByClass(SyncDoneControl::class)
+                            ?->getCookie()
+                    );
+                    $messageTo = new LdapMessageRequest(
+                        $queue->generateId(),
+                        $this->syncRequest,
+                        ...$messageFrom->controls()->toArray()
+                    );
+                    $messageFrom = $queue->sendMessage($messageTo)
+                        ->getMessage($messageTo->getMessageId());
                 }
             } while (!$this->isSyncComplete($searchDone));
 
@@ -95,12 +112,14 @@ class ClientSyncHandler extends ClientBasicHandler
         }
     }
 
-
     /**
      * We need to set up / verify the initial sync session and message handlers before starting the overall sync process.
      */
     private function initializeSync(LdapMessageRequest $messageTo): void
     {
+        /** @var SyncRequest $searchRequest */
+        $searchRequest = $messageTo->getRequest();
+        $this->syncRequest = $searchRequest;
         $this->syncRequestControl = $messageTo->controls()
             ->getByClass(SyncRequestControl::class) ?? throw new RuntimeException(sprintf(
                 'Expected a "%s", but there is none.',
@@ -118,18 +137,15 @@ class ClientSyncHandler extends ClientBasicHandler
             cookie: $this->syncRequestControl->getCookie(),
         );
 
-        /** @var SyncRequest $searchRequest */
-        $searchRequest = $messageTo->getRequest();
-        $this->syncRequest = $searchRequest;
-
         // We override these with our own, so save them here for now.
-        $this->syncEntryHandler = $searchRequest->getEntryHandler();
-        $this->syncReferralHandler = $searchRequest->getReferralHandler();
-        $this->syncIdSetHandler = $searchRequest->getIdSetHandler();
+        $this->syncEntryHandler = $this->syncRequest->getEntryHandler();
+        $this->syncReferralHandler = $this->syncRequest->getReferralHandler();
+        $this->syncIdSetHandler = $this->syncRequest->getIdSetHandler();
+        $this->cookieHandler = $this->syncRequest->getCookieHandler();
 
-        $searchRequest->useEntryHandler($this->processSyncEntry(...));
-        $searchRequest->useReferralHandler($this->processSyncReferral(...));
-        $searchRequest->useIntermediateResponseHandler($this->processIntermediateResponse(...));
+        $this->syncRequest->useEntryHandler($this->processSyncEntry(...));
+        $this->syncRequest->useReferralHandler($this->processSyncReferral(...));
+        $this->syncRequest->useIntermediateResponseHandler($this->processIntermediateResponse(...));
     }
 
     /**
@@ -138,10 +154,6 @@ class ClientSyncHandler extends ClientBasicHandler
      */
     private function resetRequestHandlers(): void
     {
-        if ($this->syncRequest === null) {
-            return;
-        }
-
         if ($this->syncEntryHandler !== null) {
             $this->syncRequest->useEntryHandler($this->syncEntryHandler);
         }
@@ -155,7 +167,7 @@ class ClientSyncHandler extends ClientBasicHandler
 
     private function isContentUpdatePoll(): bool
     {
-        return !empty($this->syncRequestControl->getCookie());
+        return $this->syncRequestControl->getCookie() !== null;
     }
 
     private function processSyncEntry(EntryResult $entryResult): void
@@ -189,26 +201,23 @@ class ClientSyncHandler extends ClientBasicHandler
         $response = $messageFrom->getResponse();
 
         if ($response instanceof SyncRefreshDelete) {
-            $this->syncRequestControl->setCookie($response->getCookie());
-            $this->session
-                ->updatePhase(Session::PHASE_DELETE)
-                ->updateCookie($response->getCookie());
+            $this->updateCookie($response->getCookie());
+            $this->session->updatePhase(Session::PHASE_DELETE);
         } elseif ($response instanceof SyncRefreshPresent) {
-            $this->syncRequestControl->setCookie($response->getCookie());
-            $this->session
-                ->updatePhase(Session::PHASE_PRESENT)
-                ->updateCookie($response->getCookie());
+            $this->updateCookie($response->getCookie());
+            $this->session->updatePhase(Session::PHASE_PRESENT);
         } elseif ($response instanceof SyncNewCookie) {
-            $this->session->updateCookie($response->getCookie());
-            $this->syncRequestControl->setCookie($response->getCookie());
-        } elseif ($response instanceof SyncIdSet && $this->syncIdSetHandler) {
-            $this->session->updateCookie($response->getCookie());
-            $this->syncRequestControl->setCookie($response->getCookie());
-            call_user_func(
-                $this->syncIdSetHandler,
-                new SyncIdSetResult($messageFrom),
-                $this->session,
-            );
+            $this->updateCookie($response->getCookie());
+        } elseif ($response instanceof SyncIdSet) {
+            $this->updateCookie($response->getCookie());
+
+            if ($this->syncIdSetHandler instanceof Closure) {
+                call_user_func(
+                    $this->syncIdSetHandler,
+                    new SyncIdSetResult($messageFrom),
+                    $this->session,
+                );
+            }
         }
     }
 
@@ -219,8 +228,12 @@ class ClientSyncHandler extends ClientBasicHandler
         $syncDone = $response->controls()
             ->getByClass(SyncDoneControl::class);
 
-        return $syncDone === null
-            || $result->getResultCode() === ResultCode::SUCCESS;
+        if ($syncDone === null) {
+            return true;
+        }
+        $this->updateCookie($syncDone->getCookie());
+
+        return $result->getResultCode() === ResultCode::SUCCESS;
     }
 
     private function isRefreshRequired(LdapMessageResponse $response): bool
@@ -229,5 +242,26 @@ class ClientSyncHandler extends ClientBasicHandler
         $result = $response->getResponse();
 
         return $result->getResultCode() === ResultCode::SYNCHRONIZATION_REFRESH_REQUIRED;
+    }
+
+    /**
+     * Update the cookie in all the spots if it was actually returned and different from what we already have saved.
+     * Some controls / requests will return the cookie, but they are not required to actually provide a value.
+     */
+    private function updateCookie(?string $cookie): void
+    {
+        if ($cookie === null || $this->session->getCookie() === $cookie) {
+            return;
+        }
+
+        $this->syncRequestControl->setCookie($cookie);
+        $this->session->updateCookie($cookie);
+
+        if ($this->cookieHandler !== null) {
+            call_user_func(
+                $this->cookieHandler,
+                $cookie
+            );
+        }
     }
 }
