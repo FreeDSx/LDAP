@@ -50,7 +50,7 @@ trait SyncResultTrait
     }
 
     /**
-     * Is this for an entry that was added?
+     * {@see SyncStateControl::isAdd()}
      */
     public function isAdd(): bool
     {
@@ -59,7 +59,7 @@ trait SyncResultTrait
     }
 
     /**
-     * Is this for an entry that was deleted?
+     * {@see SyncStateControl::isDelete()}
      */
     public function isDelete(): bool
     {
@@ -68,7 +68,7 @@ trait SyncResultTrait
     }
 
     /**
-     * Is this for an entry that was modified?
+     * {@see SyncStateControl::isModify()}
      */
     public function isModify(): bool
     {
@@ -77,7 +77,7 @@ trait SyncResultTrait
     }
 
     /**
-     * Is this for an entry that is still present / has not changed?
+     * {@see SyncStateControl::isPresent()}
      */
     public function isPresent(): bool
     {

@@ -108,7 +108,20 @@ class SyncStateControl extends Control
     }
 
     /**
-     * Whether this is for adding an new entry.
+     * Whether this is for adding an entry.
+     *
+     * **NOTE**: An "add" in this context may also mean that it was just modified / moved. It's probably safest to just
+     *           treat this as an upsert operation on the target replication end.
+     *
+     * Description from the RFC:
+     *
+     *    Where DIT updates cause an entry to be added to the content, the
+     *    server provides a SearchResultEntry Message that represents the entry
+     *    as it appears in the content.  The message SHALL include a Sync State
+     *    Control with state of add, an entryUUID containing the entry's UUID,
+     *    and an optional cookie.
+     *
+     * The same logic applies to referrals.
      */
     public function isAdd(): bool
     {
@@ -116,7 +129,20 @@ class SyncStateControl extends Control
     }
 
     /**
-     * Whether this is for an entry still present (ie. unchanged)
+     * Whether this is for an entry still present (ie. unchanged).
+     *
+     *   For each entry that has not been changed since
+     *   the previous Sync Operation, an empty SearchResultEntry is returned
+     *   whose objectName reflects the entry's current DN, whose attributes
+     *   field is empty, and whose Sync State Control consists of state
+     *   present, an entryUUID containing the UUID of the entry, and no
+     *   cookie.
+     *
+     *   For each reference that has not been changed since the
+     *   previous Sync Operation, an empty SearchResultReference containing an
+     *   empty SEQUENCE OF LDAPURL is returned with a Sync State Control
+     *   consisting of state present, an entryUUID containing the UUID of the
+     *   entry, and no cookie.
      */
     public function isPresent(): bool
     {
@@ -125,6 +151,15 @@ class SyncStateControl extends Control
 
     /**
      * Whether this is for an entry that has been deleted.
+     *
+     * Description from the RFC:
+     *
+     *    Where DIT updates cause an entry to be deleted from the content, the
+     *    server provides a SearchResultEntry Message with no attributes.  The
+     *    message SHALL include a Sync State Control with state of delete, an
+     *    entryUUID containing the entry's UUID, and an optional cookie.
+     *
+     * The same logic applies to referrals.
      */
     public function isDelete(): bool
     {
@@ -133,6 +168,16 @@ class SyncStateControl extends Control
 
     /**
      * Whether this is for an entry that has been modified.
+     *
+     * Description from the RFC:
+     *
+     *   Where DIT updates cause an entry to be modified within the content,
+     *   the server provides a SearchResultEntry Message that represents the
+     *   entry as it appears in the content.  The message SHALL include a Sync
+     *   State Control with state of modify, an entryUUID containing the
+     *   entry's UUID, and an optional cookie.
+     *
+     * The same logic applies to referrals.
      */
     public function isModify(): bool
     {
