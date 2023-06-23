@@ -126,14 +126,8 @@ class ClientSyncHandler extends ClientBasicHandler
                 SyncRequestControl::class,
             ));
 
-        if ($this->isContentUpdatePoll()) {
-            $syncStage = Session::STAGE_PERSIST;
-        } else {
-            $syncStage = Session::STAGE_REFRESH;
-        }
-
         $this->session = new Session(
-            stage: $syncStage,
+            mode: $this->syncRequestControl->getMode(),
             cookie: $this->syncRequestControl->getCookie(),
         );
 
@@ -163,11 +157,6 @@ class ClientSyncHandler extends ClientBasicHandler
         if ($this->syncIdSetHandler !== null) {
             $this->syncRequest->useIdSetHandler($this->syncIdSetHandler);
         }
-    }
-
-    private function isContentUpdatePoll(): bool
-    {
-        return $this->syncRequestControl->getCookie() !== null;
     }
 
     private function processSyncEntry(EntryResult $entryResult): void

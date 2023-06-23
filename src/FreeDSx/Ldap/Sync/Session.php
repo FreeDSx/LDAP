@@ -13,18 +13,20 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Sync;
 
+use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
+
 final class Session
 {
     public const PHASE_DELETE = 0;
 
     public const PHASE_PRESENT = 1;
 
-    public const STAGE_REFRESH = 0;
+    public const MODE_POLL = SyncRequestControl::MODE_REFRESH_ONLY;
 
-    public const STAGE_PERSIST = 1;
+    public const MODE_LISTEN = SyncRequestControl::MODE_REFRESH_AND_PERSIST;
 
     public function __construct(
-        private int $stage,
+        private readonly int $mode,
         private ?string $cookie,
         private ?int $phase = null,
     )
@@ -52,27 +54,16 @@ final class Session
         return $this->phase;
     }
 
-    public function isPhasePresent(): bool
+    /**
+     * The mode of the session. One of:
+     *
+     *   - {@see self::MODE_POLL}
+     *   - {@see self::MODE_LISTEN}
+     */
+    public function getMode(): int
     {
-        return $this->phase === self::PHASE_PRESENT;
+        return $this->mode;
     }
-
-    public function isPhaseDelete(): bool
-    {
-        return $this->phase === self::PHASE_DELETE;
-    }
-
-
-    public function isRefreshing(): bool
-    {
-        return $this->stage === self::STAGE_REFRESH;
-    }
-
-    public function isPersisting(): bool
-    {
-        return $this->stage === self::STAGE_PERSIST;
-    }
-
 
     /**
      * @internal
@@ -80,16 +71,6 @@ final class Session
     public function updatePhase(?int $phase): self
     {
         $this->phase = $phase;
-
-        return $this;
-    }
-
-    /**
-     * @internal
-     */
-    public function updateStage(int $stage): self
-    {
-        $this->stage = $stage;
 
         return $this;
     }

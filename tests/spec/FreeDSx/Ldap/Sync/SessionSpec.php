@@ -21,23 +21,9 @@ class SessionSpec extends ObjectBehavior
     public function let(): void
     {
         $this->beConstructedWith(
-            Session::STAGE_REFRESH,
+            Session::MODE_POLL,
             null
         );
-    }
-
-    public function it_should_get_if_it_is_refreshing(): void
-    {
-        $this->isRefreshing()
-            ->shouldBeEqualTo(true);
-    }
-
-    public function it_should_get_if_it_is_persisting(): void
-    {
-        $this->updateStage(Session::STAGE_PERSIST);
-
-        $this->isPersisting()
-            ->shouldBeEqualTo(true);
     }
 
     public function it_should_get_the_phase_when_it_is_not_set(): void
