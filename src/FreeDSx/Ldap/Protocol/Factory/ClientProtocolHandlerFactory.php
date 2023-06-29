@@ -30,7 +30,9 @@ class ClientProtocolHandlerFactory
 {
     public function forRequest(Request\RequestInterface $request): RequestHandlerInterface
     {
-        if ($request instanceof Request\SearchRequest) {
+        if ($request instanceof Request\SyncRequest) {
+            return new ClientProtocolHandler\ClientSyncHandler();
+        } elseif ($request instanceof Request\SearchRequest) {
             return new ClientProtocolHandler\ClientSearchHandler();
         } elseif ($request instanceof Request\UnbindRequest) {
             return new ClientProtocolHandler\ClientUnbindHandler();
@@ -46,7 +48,11 @@ class ClientProtocolHandlerFactory
         Response\ResponseInterface $response
     ): ResponseHandlerInterface {
         if ($response instanceof Response\SearchResultDone || $response instanceof Response\SearchResultEntry || $response instanceof Response\SearchResultReference) {
-            return new ClientProtocolHandler\ClientSearchHandler();
+            return $request instanceof Request\SyncRequest
+                ? new ClientProtocolHandler\ClientSyncHandler()
+                : new ClientProtocolHandler\ClientSearchHandler();
+        } elseif ($response instanceof  Response\SyncInfoMessage) {
+            return new ClientProtocolHandler\ClientSyncHandler();
         } elseif ($response instanceof Operation\LdapResult && $response->getResultCode() === ResultCode::REFERRAL) {
             return new ClientProtocolHandler\ClientReferralHandler();
         } elseif ($request instanceof Request\ExtendedRequest && $request->getName() === Request\ExtendedRequest::OID_START_TLS) {

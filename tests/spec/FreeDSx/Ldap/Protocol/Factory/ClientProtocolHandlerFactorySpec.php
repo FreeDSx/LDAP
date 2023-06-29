@@ -18,11 +18,13 @@ use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
+use FreeDSx\Ldap\Operation\Request\SyncRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
+use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshDelete;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientBasicHandler;
@@ -31,6 +33,7 @@ use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientReferralHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSaslBindHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSearchHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientStartTlsHandler;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSyncHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientUnbindHandler;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use PhpSpec\ObjectBehavior;
@@ -97,5 +100,27 @@ class ClientProtocolHandlerFactorySpec extends ObjectBehavior
         $this->forRequest(new SaslBindRequest('DIGEST-MD5'))->shouldBeAnInstanceOf(
             ClientSaslBindHandler::class
         );
+    }
+
+    public function it_should_get_a_sync_handler_for_a_request(): void
+    {
+        $this->forRequest(new SyncRequest())
+            ->shouldBeAnInstanceOf(ClientSyncHandler::class);
+    }
+
+    public function it_should_get_a_sync_handler_for_a_response(): void
+    {
+        $this->forResponse(
+            new SyncRequest(),
+            new SearchResultDone(0)
+        )->shouldBeAnInstanceOf(ClientSyncHandler::class);
+    }
+
+    public function it_should_get_a_sync_handler_for_an_sync_info_response(): void
+    {
+        $this->forResponse(
+            new SyncRequest(),
+            new SyncRefreshDelete(),
+        )->shouldBeAnInstanceOf(ClientSyncHandler::class);
     }
 }

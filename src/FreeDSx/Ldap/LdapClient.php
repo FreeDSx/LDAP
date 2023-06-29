@@ -36,6 +36,7 @@ use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Paging;
 use FreeDSx\Ldap\Search\RangeRetrieval;
 use FreeDSx\Ldap\Search\Vlv;
+use FreeDSx\Ldap\Sync\SyncRepl;
 use FreeDSx\Sasl\Exception\SaslException;
 use Stringable;
 
@@ -319,6 +320,17 @@ class LdapClient
             $rootNc,
             $filter,
             ...$attributes
+        );
+    }
+
+    /**
+     * A helper for performing a SyncRepl / directory synchronization as described in RFC4533.
+     */
+    public function syncRepl(?FilterInterface $filter = null): SyncRepl
+    {
+        return new SyncRepl(
+            $this,
+            $filter,
         );
     }
 

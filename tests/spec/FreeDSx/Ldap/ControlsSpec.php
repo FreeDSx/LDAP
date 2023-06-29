@@ -23,6 +23,8 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Control\SubentriesControl;
+use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Control\Vlv\VlvControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
@@ -173,5 +175,34 @@ class ControlsSpec extends ObjectBehavior
                 Control::OID_SHOW_RECYCLED,
                 true
             ));
+    }
+
+    public function it_should_create_a_subentries_control(): void
+    {
+        $this::subentries()
+            ->shouldBeLike(new SubentriesControl(true));
+    }
+
+    public function it_should_create_a_manageDsaIt_control(): void
+    {
+        $this::manageDsaIt()
+            ->shouldBeLike(new Control(
+                Control::OID_MANAGE_DSA_IT,
+                true
+            ));
+    }
+
+    public function it_should_get_a_sync_request_control(): void
+    {
+        $this::syncRequest()
+            ->shouldBeLike(new SyncRequestControl());
+
+        $this::syncRequest(
+            'foo',
+            SyncRequestControl::MODE_REFRESH_AND_PERSIST
+        )->shouldBeLike(new SyncRequestControl(
+            SyncRequestControl::MODE_REFRESH_AND_PERSIST,
+            'foo',
+        ));
     }
 }

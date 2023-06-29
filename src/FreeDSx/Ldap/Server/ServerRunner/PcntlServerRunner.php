@@ -15,10 +15,10 @@ namespace FreeDSx\Ldap\Server\ServerRunner;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Server\LoggerTrait;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\ChildProcess;
+use FreeDSx\Ldap\Server\LoggerTrait;
 use FreeDSx\Ldap\Server\RequestHandler\HandlerFactory;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Socket;

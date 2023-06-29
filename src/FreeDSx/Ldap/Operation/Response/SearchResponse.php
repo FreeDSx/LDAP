@@ -14,22 +14,42 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\LdapResult;
+use FreeDSx\Ldap\Search\Result\EntryResult;
+use FreeDSx\Ldap\Search\Result\ReferralResult;
 
 /**
  * This response encapsulates the entries returned from the search overall, along with the LDAP result at the end.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class SearchResponse extends LdapResult
+class SearchResponse extends SearchResultDone
 {
-    private Entries $entries;
+    /**
+     * @var EntryResult[]
+     */
+    private array $entryResults;
 
+    /**
+     * @var ReferralResult[]
+     */
+    private array $referralResults;
+
+    private ?Entries $entries = null;
+
+    /**
+     * @param EntryResult[] $entryResults
+     * @param ReferralResult[] $referralResults
+     */
     public function __construct(
         LdapResult $result,
-        Entries $entries
+        array $entryResults = [],
+        array $referralResults = [],
     ) {
-        $this->entries = $entries;
+        $this->entryResults = $entryResults;
+        $this->referralResults = $referralResults;
+
         parent::__construct(
             $result->resultCode,
             $result->dn->toString(),
@@ -38,8 +58,46 @@ class SearchResponse extends LdapResult
         );
     }
 
+    /**
+     * Returns the {@see Entry} objects associated with this result set.
+     */
     public function getEntries(): Entries
     {
+        if ($this->entries !== null) {
+            return $this->entries;
+        }
+        $entries = [];
+
+        foreach ($this->entryResults as $entryResult) {
+            $entries[] = $entryResult->getEntry();
+        }
+
+        $this->entries = new Entries(...$entries);
+
         return $this->entries;
+    }
+
+    /**
+     * Return the {@see EntryResult} objects associated with this result set.
+     *
+     * The {@see EntryResult} contains the full LDAP message response, which includes the controls and result code.
+     *
+     * @return EntryResult[]
+     */
+    public function getEntryResults(): array
+    {
+        return $this->entryResults;
+    }
+
+    /**
+     * Return the {@see ReferralResult} objects associated with this result set.
+     *
+     * The {@see ReferralResult} contains the full LDAP message response, which includes the controls and result code.
+     *
+     * @return ReferralResult[]
+     */
+    public function getReferralResults(): array
+    {
+        return $this->referralResults;
     }
 }

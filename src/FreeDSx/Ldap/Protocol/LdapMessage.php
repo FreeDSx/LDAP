@@ -163,6 +163,9 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
                             Control\Control::OID_SORTING_RESPONSE => Control\Sorting\SortingResponseControl::fromAsn1($control),
                             Control\Control::OID_VLV_RESPONSE => Control\Vlv\VlvResponseControl::fromAsn1($control),
                             Control\Control::OID_DIR_SYNC => Control\Ad\DirSyncResponseControl::fromAsn1($control),
+                            Control\Control::OID_SYNC_STATE => Control\Sync\SyncStateControl::fromAsn1($control),
+                            Control\Control::OID_SYNC_REQUEST => Control\Sync\SyncRequestControl::fromAsn1($control),
+                            Control\Control::OID_SYNC_DONE => Control\Sync\SyncDoneControl::fromAsn1($control),
                             default => Control\Control::fromAsn1($control),
                         };
                     }

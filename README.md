@@ -3,12 +3,13 @@ FreeDSx LDAP is a pure PHP LDAP library. It has no requirement on the core PHP L
 most client functionality described in [RFC 4511](https://tools.ietf.org/html/rfc4511) and some very limited LDAP server
 functionality. It also implements some other client features from various RFCs:
 
-* Paging Control Support ([RFC 2696](https://tools.ietf.org/html/rfc2696))
+* Paging Control Support ([RFC 2696](https://datatracker.ietf.org/doc/rfc2696/))
 * VLV Control Support ([draft-ietf-ldapext-ldapv3-vlv-09](https://www.ietf.org/archive/id/draft-ietf-ldapext-ldapv3-vlv-09.txt))
-* Server Side Sort Control ([RFC 2891](https://tools.ietf.org/html/rfc2891))
-* Password Modify Request ([RFC 3062](https://tools.ietf.org/html/rfc3062))
-* String Representation of Search Filters ([RFC 4515](https://tools.ietf.org/search/rfc4515))
-* SASL authentication / integrity layer support for certain mechanisms ([RFC 4513](https://tools.ietf.org/search/rfc4513))
+* Server Side Sort Control ([RFC 2891](https://datatracker.ietf.org/doc/rfc2891/))
+* Password Modify Request ([RFC 3062](https://datatracker.ietf.org/doc/rfc3062/))
+* String Representation of Search Filters ([RFC 4515](https://datatracker.ietf.org/doc/rfc4515/))
+* SASL authentication / integrity layer support for certain mechanisms ([RFC 4513](https://datatracker.ietf.org/doc/rfc4513/))
+* Directory Synchronization via SyncRepl or DirSync ([RFC 4533](https://datatracker.ietf.org/doc/rfc4533/) and [draft-armijo-ldap-dirsync-01](https://www.ietf.org/archive/id/draft-armijo-ldap-dirsync-01.txt))
 
 It supports encryption of the LDAP connection through TLS via the OpenSSL extension if available.
 
@@ -24,6 +25,7 @@ It supports encryption of the LDAP connection through TLS via the OpenSSL extens
   * [Searching and Filters](/docs/Client/Searching-and-Filters.md)
   * [Range Retrieval](/docs/Client/Range-Retrieval.md)
   * [DirSync](/docs/Client/DirSync.md)
+  * [SyncRepl](/docs/Client/SyncRepl.md)
 * [LDAP Server](/docs/Server)
   * [Configuration](/docs/Server/Configuration.md)
   * [General Usage](/docs/Server/General-Usage.md)

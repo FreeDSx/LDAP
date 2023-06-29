@@ -64,6 +64,7 @@ slapadd -F ${SLAPD_CONF} -b "cn=config" -l ${RESOURCE_PATH}/ldif/conf.ldif
 slapadd -F ${SLAPD_CONF} -b "cn=config" -l ${RESOURCE_PATH}/ldif/modules.ldif
 slapadd -F ${SLAPD_CONF} -b "cn=config" -l ${RESOURCE_PATH}/ldif/memberof.ldif
 slapadd -F ${SLAPD_CONF} -b "cn=config" -l ${RESOURCE_PATH}/ldif/vlv.ldif
+slapadd -F ${SLAPD_CONF} -b "cn=config" -l ${RESOURCE_PATH}/ldif/syncrepl.ldif
 
 # Add the base...
 slapadd -F ${SLAPD_CONF} <<EOM

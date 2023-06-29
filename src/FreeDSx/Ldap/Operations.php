@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
+use FreeDSx\Ldap\Operation\Request\SyncRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
@@ -224,6 +225,19 @@ class Operations
         Attribute|string ...$attributes,
     ): SearchRequest {
         return new SearchRequest(
+            $filter,
+            ...$attributes
+        );
+    }
+
+    /**
+     * Sync with LDAP (via method RFC-4533 / SyncRepl) with a given filter, scope, etc. to retrieve a set of entries.
+     */
+    public static function sync(
+        ?FilterInterface $filter = null,
+        Attribute|string ...$attributes,
+    ): SyncRequest {
+        return new SyncRequest(
             $filter,
             ...$attributes
         );

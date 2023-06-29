@@ -72,6 +72,24 @@ class ControlBag implements IteratorAggregate, Countable
     }
 
     /**
+     * Get a control object by the string OID type. If none is found it will return null. Can check first with has.
+     *
+     * @template T of Control
+     * @param class-string<T> $control_class
+     * @return T|null
+     */
+    public function getByClass(string $control_class)
+    {
+        foreach ($this->controls as $control) {
+            if ($control instanceof $control_class) {
+                return $control;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Add more controls.
      */
     public function add(Control ...$controls): self

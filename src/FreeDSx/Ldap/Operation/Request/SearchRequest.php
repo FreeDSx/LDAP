@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Operation\Request;
 
+use Closure;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\BooleanType;
@@ -53,6 +54,8 @@ use function array_map;
  */
 class SearchRequest implements RequestInterface
 {
+    use IntermediateResponseHandlerTrait;
+
     /**
      * Searches a scope of a single object (IE. a specific DN)
      */
@@ -105,6 +108,10 @@ class SearchRequest implements RequestInterface
      * @var Attribute[]
      */
     private array $attributes = [];
+
+    private ?Closure $entryHandler = null;
+
+    private ?Closure $referralHandler = null;
 
     public function __construct(
         FilterInterface $filter,
@@ -278,6 +285,36 @@ class SearchRequest implements RequestInterface
     public function setFilter(FilterInterface $filter): self
     {
         $this->filter = $filter;
+
+        return $this;
+    }
+
+    public function getEntryHandler(): ?Closure
+    {
+        return $this->entryHandler;
+    }
+
+    /**
+     * Define a closure to process entry results as they are received from a search.
+     */
+    public function useEntryHandler(?Closure $entryHandler): self
+    {
+        $this->entryHandler = $entryHandler;
+
+        return $this;
+    }
+
+    public function getReferralHandler(): ?Closure
+    {
+        return $this->referralHandler;
+    }
+
+    /**
+     * Define a closure to process referral results as they are received from a search.
+     */
+    public function useReferralHandler(?Closure $referralHandler): self
+    {
+        $this->referralHandler = $referralHandler;
 
         return $this;
     }

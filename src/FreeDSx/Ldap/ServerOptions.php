@@ -21,27 +21,27 @@ use Psr\Log\LoggerInterface;
 final class ServerOptions
 {
     private string $ip = '0.0.0.0';
-    
+
     private int $port = 389;
-    
+
     private string $unixSocket = '/var/run/ldap.socket';
-    
+
     private string $transport = 'tcp';
-    
+
     private int $idleTimeout = 600;
-    
+
     private bool $requireAuthentication = true;
-    
+
     private bool $allowAnonymous = false;
-    
+
     private bool $useSsl = false;
-    
+
     private ?string $sslCert = null;
 
     private ?string $sslCertKey = null;
 
     private ?string $sslCertPassphrase = null;
-    
+
     private ?string $dseAltServer = null;
 
     /**
@@ -50,15 +50,15 @@ final class ServerOptions
     private array $dseNamingContexts = ['dc=FreeDSx,dc=local'];
 
     private string $dseVendorName = 'FreeDSx';
-    
+
     private ?string $dseVendorVersion = null;
 
     private ?RequestHandlerInterface $requestHandler = null;
-    
+
     private ?RootDseHandlerInterface $rootDseHandler = null;
-    
+
     private ?PagingHandlerInterface $pagingHandler = null;
-    
+
     private ?LoggerInterface $logger = null;
 
     public function getIp(): string
@@ -264,7 +264,7 @@ final class ServerOptions
     public function setRootDseHandler(?RootDseHandlerInterface $rootDseHandler): self
     {
         $this->rootDseHandler = $rootDseHandler;
-        
+
         return $this;
     }
 
@@ -276,7 +276,7 @@ final class ServerOptions
     public function setPagingHandler(?PagingHandlerInterface $pagingHandler): self
     {
         $this->pagingHandler = $pagingHandler;
-        
+
         return $this;
     }
 
@@ -288,7 +288,7 @@ final class ServerOptions
     public function setLogger(?LoggerInterface $logger): self
     {
         $this->logger = $logger;
-        
+
         return $this;
     }
 

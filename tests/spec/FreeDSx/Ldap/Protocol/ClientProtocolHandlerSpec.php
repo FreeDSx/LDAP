@@ -19,13 +19,11 @@ use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
-use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
-use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
@@ -37,9 +35,12 @@ use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Socket\SocketPool;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
+use spec\FreeDSx\Ldap\TestFactoryTrait;
 
 class ClientProtocolHandlerSpec extends ObjectBehavior
 {
+    use TestFactoryTrait;
+
     public function let(
         SocketPool $pool,
         ClientQueue $queue,
@@ -145,7 +146,7 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
     public function it_should_fetch_the_root_dse(RequestHandlerInterface $requestHandler, ResponseHandlerInterface $responseHandler, ClientQueue $queue): void
     {
         $request = Operations::read('', 'supportedSaslMechanisms', 'supportedControl', 'supportedLDAPVersion');
-        $messageResponse = new LdapMessageResponse(1, new SearchResponse(new LdapResult(0), new Entries(new Entry(new Dn('')))));
+        $messageResponse = $this::makeSearchResponseFromEntries(new Entries(new Entry(new Dn(''))));
         $messageRequest = new LdapMessageRequest(1, $request);
 
         $requestHandler->handleRequest(Argument::that(function (ClientProtocolHandler\ClientProtocolContext $context) use ($request) {

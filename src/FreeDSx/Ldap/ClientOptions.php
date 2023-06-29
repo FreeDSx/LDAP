@@ -16,35 +16,35 @@ namespace FreeDSx\Ldap;
 final class ClientOptions
 {
     private int $version = 3;
-    
+
     private array $servers = [];
-    
+
     private int $port = 389;
-    
+
     private string $transport = 'tcp';
-    
+
     private ?string $baseDn = null;
-    
+
     private int $pageSize = 1000;
-    
+
     private bool $useSsl = false;
-    
+
     private bool $sslValidateCert = true;
-    
+
     private bool $sslAllowSelfSigned = false;
-    
+
     private ?string $sslCaCert = null;
-    
+
     private ?string $sslPeerName = null;
-    
+
     private int $timeoutConnect = 3;
-    
+
     private int $timeoutRead = 10;
-    
+
     private string $referral = 'throw';
-    
+
     private ?ReferralChaserInterface $referralChaser = null;
-    
+
     private int $referralLimit = 10;
 
     public function getVersion(): int

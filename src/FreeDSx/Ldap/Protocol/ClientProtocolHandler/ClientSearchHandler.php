@@ -13,22 +13,11 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
-use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\ClientOptions;
-use FreeDSx\Ldap\Entry\Entries;
-use FreeDSx\Ldap\Exception\BindException;
-use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
-use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Operation\Response\SearchResponse;
-use FreeDSx\Ldap\Operation\Response\SearchResultDone;
-use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
-use FreeDSx\Socket\Exception\ConnectionException;
 
 /**
  * Logic for handling search operations.
@@ -37,11 +26,10 @@ use FreeDSx\Socket\Exception\ConnectionException;
  */
 class ClientSearchHandler extends ClientBasicHandler
 {
+    use ClientSearchTrait;
+
     /**
-     * @throws EncoderException
-     * @throws ProtocolException
-     * @throws UnsolicitedNotificationException
-     * @throws ConnectionException
+     * {@inheritDoc}
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
@@ -56,38 +44,17 @@ class ClientSearchHandler extends ClientBasicHandler
 
     /**
      * {@inheritDoc}
-     * @throws OperationException
-     * @throws BindException
-     * @throws ProtocolException
-     * @throws UnsolicitedNotificationException
-     * @throws ConnectionException
      */
     public function handleResponse(
-        LdapMessageRequest  $messageTo,
+        LdapMessageRequest $messageTo,
         LdapMessageResponse $messageFrom,
         ClientQueue $queue,
         ClientOptions $options,
     ): ?LdapMessageResponse {
-        $entries = [];
-
-        while (!($messageFrom->getResponse() instanceof SearchResultDone)) {
-            $response = $messageFrom->getResponse();
-            if ($response instanceof SearchResultEntry) {
-                $entry = $response->getEntry();
-                $entries[] = $entry;
-            }
-            $messageFrom = $queue->getMessage($messageTo->getMessageId());
-        }
-
-        $ldapResult = $messageFrom->getResponse();
-        if (!$ldapResult instanceof LdapResult) {
-            throw new OperationException('The final search result is malformed.');
-        }
-
-        $finalResponse = new LdapMessageResponse(
-            $messageFrom->getMessageId(),
-            new SearchResponse($ldapResult, new Entries(...$entries)),
-            ...$messageFrom->controls()->toArray()
+        $finalResponse = $this->search(
+            $messageFrom,
+            $messageTo,
+            $queue,
         );
 
         return parent::handleResponse(
