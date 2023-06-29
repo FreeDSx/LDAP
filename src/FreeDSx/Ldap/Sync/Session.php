@@ -29,8 +29,7 @@ final class Session
         private readonly int $mode,
         private ?string $cookie,
         private ?int $phase = null,
-    )
-    {
+    ) {
     }
 
     /**

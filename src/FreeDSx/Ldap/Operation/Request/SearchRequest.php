@@ -294,6 +294,9 @@ class SearchRequest implements RequestInterface
         return $this->entryHandler;
     }
 
+    /**
+     * Define a closure to process entry results as they are received from a search.
+     */
     public function useEntryHandler(?Closure $entryHandler): self
     {
         $this->entryHandler = $entryHandler;
@@ -306,6 +309,9 @@ class SearchRequest implements RequestInterface
         return $this->referralHandler;
     }
 
+    /**
+     * Define a closure to process referral results as they are received from a search.
+     */
     public function useReferralHandler(?Closure $referralHandler): self
     {
         $this->referralHandler = $referralHandler;
