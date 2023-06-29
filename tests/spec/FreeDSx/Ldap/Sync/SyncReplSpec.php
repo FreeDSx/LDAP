@@ -97,26 +97,6 @@ class SyncReplSpec extends ObjectBehavior
         $this->poll();
     }
 
-    public function it_should_use_a_sync_request_if_specified(LdapClient $client): void
-    {
-        $syncRequest = new SyncRequest(Filters::present('foo'));
-
-        $this->useRequest($syncRequest);
-
-        $client->sendAndReceive(
-            Argument::exact($syncRequest),
-            Argument::any(),
-            Argument::any(),
-        )->shouldBeCalledOnce()
-            ->willReturn(new LdapMessageResponse(
-                1,
-                new SearchResultDone(0),
-                new SyncDoneControl('foo')
-            ));
-
-        $this->poll();
-    }
-
     public function it_should_use_added_controls_if_specified(LdapClient $client): void
     {
         $control = new Control('foo');

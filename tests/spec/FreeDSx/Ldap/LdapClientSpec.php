@@ -425,7 +425,7 @@ class LdapClientSpec extends ObjectBehavior
 
     public function it_should_construct_a_syncrepl_helper(): void
     {
-        $syncRequest = Operations::sync(Filters::present('foo'));
+        $syncRequest = Filters::present('foo');
 
         $this->syncRepl($syncRequest)
             ->shouldBeLike(new SyncRepl(

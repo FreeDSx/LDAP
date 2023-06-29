@@ -327,11 +327,11 @@ class LdapClient
     /**
      * A helper for performing a ReplSync / directory synchronization as described in RFC4533.
      */
-    public function syncRepl(?SyncRequest $syncRequest = null): SyncRepl
+    public function syncRepl(?FilterInterface $filter = null): SyncRepl
     {
         return new SyncRepl(
             $this,
-            $syncRequest,
+            $filter,
         );
     }
 

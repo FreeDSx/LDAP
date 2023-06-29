@@ -44,10 +44,10 @@ class SyncRepl
 
     public function __construct(
         LdapClient $client,
-        ?SyncRequest $syncRequest = null
+        ?FilterInterface $filter = null
     ) {
         $this->client = $client;
-        $this->syncRequest = $syncRequest ?? Operations::sync();
+        $this->syncRequest = Operations::sync($filter);
         $this->controls = new ControlBag();
     }
 
@@ -102,13 +102,6 @@ class SyncRepl
         return $this;
     }
 
-    public function useRequest(SyncRequest $syncRequest): self
-    {
-        $this->syncRequest = $syncRequest;
-
-        return $this;
-    }
-
     /**
      * A convenience method to set the filter to use for this sync. This can also be set using {@see self::request()}.
      */
@@ -120,8 +113,8 @@ class SyncRepl
     }
 
     /**
-     * Set the cookie to use as part of the sync operation. This should be a cookie from a previous sync. To retrieve the
-     * cookie during the sync use {@see Session::getCookie()} from the Sync session in the handlers.
+     * Set the cookie to use as part of the sync operation. This should be a cookie from a previous sync. To retrieve
+     * the cookie during the sync use {@see Session::getCookie()} from the Sync session in the handlers.
      */
     public function useCookie(?string $cookie): self
     {
@@ -150,7 +143,8 @@ class SyncRepl
      * In a listen based sync, the server sends updates of entries that are changed after the initial refresh content is
      * determined. The sync continues indefinitely until the connection is terminated or the sync is canceled.
      *
-     * **Note**: The LdapClient should be instantiated with no timeout via {@see ClientOptions::setTimeoutRead(-1)}. Otherwise, the listen operation will terminate due to a network timeout.
+     * **Note**: The LdapClient should be instantiated with no timeout via {@see ClientOptions::setTimeoutRead(-1)}.
+     *           Otherwise, the listen operation will terminate due to a network timeout.
      */
     public function listen(Closure $entryHandler = null): void
     {
