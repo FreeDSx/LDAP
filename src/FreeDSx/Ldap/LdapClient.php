@@ -325,7 +325,7 @@ class LdapClient
     }
 
     /**
-     * A helper for performing a ReplSync / directory synchronization as described in RFC4533.
+     * A helper for performing a SyncRepl / directory synchronization as described in RFC4533.
      */
     public function syncRepl(?FilterInterface $filter = null): SyncRepl
     {
