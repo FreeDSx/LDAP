@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Operation\Response\ModifyDnResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyResponse;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Search\Result\EntryResult;
 use Throwable;
 
 class LdapClientTest extends LdapTestCase
@@ -363,6 +364,22 @@ class LdapClientTest extends LdapTestCase
         $this->assertInstanceOf(ModifyDnResponse::class, $result->getResponse());
         $this->assertInstanceOf(Entry::class, $entry);
         */
+    }
+
+    public function testSearchOperationWithEntryHandler(): void
+    {
+        $this->bindClient($this->client);
+
+        $entries = new Entries();
+        $op = Operations::search(Filters::raw('(&(objectClass=inetOrgPerson)(cn=A*))'))
+            ->useEntryHandler(fn (EntryResult $result) => $entries->add($result->getEntry()));
+
+        $this->client->search($op);
+
+        $this->assertSame(
+            843,
+            $entries->count()
+        );
     }
 
     public function testSubSearchOperation(): void

@@ -13,11 +13,13 @@ declare(strict_types=1);
 
 namespace integration\FreeDSx\Ldap\Search;
 
+use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Search\Paging;
+use FreeDSx\Ldap\Search\Result\EntryResult;
 use integration\FreeDSx\Ldap\LdapTestCase;
 use Throwable;
 
@@ -67,6 +69,31 @@ class PagingTest extends LdapTestCase
 
         while ($this->paging->hasEntries()) {
             $entries->add(...$this->paging->getEntries());
+        }
+
+        $this->assertSame(
+            10001,
+            $entries->count()
+        );
+    }
+
+    public function testPagingAllWhenEntryHandlerIsUsed(): void
+    {
+        $entries = new Entries();
+
+        $operation = Operations::search(
+            Filters::equal(
+                'objectClass',
+                'inetOrgPerson'
+            ),
+            'cn'
+        );
+        $operation->useEntryHandler(fn(EntryResult $result)=> $entries->add($result->getEntry()));
+
+        $this->paging = $this->client->paging($operation);
+
+        while ($this->paging->hasEntries()) {
+            $this->paging->getEntries();
         }
 
         $this->assertSame(
