@@ -4,6 +4,7 @@
   * [Read Search](#read-search)
   * [List Search](#list-search)
   * [Subtree Search](#subtree-search)
+* [Entry Handler Searches](#entry-handler-searches) 
 * [Sorting](#sorting)
 * [Paging](#paging)
   * [Paging Criticality](#paging-criticality)
@@ -89,6 +90,39 @@ if ($entry) {
     echo $entry->getDn().PHP_EOL;
     var_dump($entry->toArray());
 }
+```
+
+
+## Entry Handler Searches
+
+When you make a search for many entries, the client by default will not return until all entries are retrieved. If
+you are searching for a large amount of entries, this can be slow / inefficient. To process entries as they are received
+by the client, you can define an entry handler for the search (Which can be any `\Closure`):
+
+
+```php
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Search\Result\EntryResult;
+use FreeDSx\Ldap\Search\Filters;
+
+$operation = Operations::search(
+    Filters::equal('objectClass', 'user'),
+    'cn',
+);
+
+# Add a closure that will process the entries as they arrive during the search.
+$operation->useEntryHandler(function (EntryResult $result) {
+    $entry = $result->getEntry();
+
+    echo sprintf(
+        'DN: %s, CN: %s',
+        $entry->getDn()->toString(),
+        $entry->get('cn')
+    ) . PHP_EOL;
+});
+
+# Execute the search, let the handler do the work
+$ldap->search($operation);
 ```
 
 ## Sorting
