@@ -26,16 +26,6 @@ use FreeDSx\Ldap\Search\Result\ReferralResult;
  */
 class SearchResponse extends SearchResultDone
 {
-    /**
-     * @var EntryResult[]
-     */
-    private array $entryResults;
-
-    /**
-     * @var ReferralResult[]
-     */
-    private array $referralResults;
-
     private ?Entries $entries = null;
 
     /**
@@ -44,12 +34,9 @@ class SearchResponse extends SearchResultDone
      */
     public function __construct(
         LdapResult $result,
-        array $entryResults = [],
-        array $referralResults = [],
+        private readonly array $entryResults = [],
+        private readonly array $referralResults = [],
     ) {
-        $this->entryResults = $entryResults;
-        $this->referralResults = $referralResults;
-
         parent::__construct(
             $result->resultCode,
             $result->dn->toString(),

@@ -78,20 +78,11 @@ class Control implements ProtocolElementInterface, Stringable
 
     public const OID_VLV_RESPONSE = '2.16.840.1.113730.3.4.10';
 
-    protected string $controlType;
-
-    protected bool $criticality;
-
-    protected AbstractType|ProtocolElementInterface|string|null $controlValue;
-
     public function __construct(
-        string $controlType,
-        bool $criticality = false,
-        AbstractType|ProtocolElementInterface|string|null $controlValue = null
+        protected string $controlType,
+        protected bool $criticality = false,
+        protected AbstractType|ProtocolElementInterface|string|null $controlValue = null
     ) {
-        $this->controlType = $controlType;
-        $this->criticality = $criticality;
-        $this->controlValue = $controlValue;
     }
 
     public function setTypeOid(string $oid): static

@@ -69,15 +69,12 @@ use function count;
  */
 abstract class LdapMessage implements ProtocolElementInterface, PduInterface
 {
-    private int $messageId;
-
     private ControlBag $controls;
 
     public function __construct(
-        int $messageId,
+        private readonly int $messageId,
         Control\Control ...$controls
     ) {
-        $this->messageId = $messageId;
         $this->controls = new ControlBag(...$controls);
     }
 

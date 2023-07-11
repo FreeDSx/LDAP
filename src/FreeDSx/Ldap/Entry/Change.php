@@ -37,16 +37,13 @@ class Change
      */
     public const TYPE_REPLACE = 2;
 
-    private int $modType;
-
     private Attribute $attribute;
 
     public function __construct(
-        int $modType,
+        private int $modType,
         Attribute|string $attribute,
         string ...$values
     ) {
-        $this->modType = $modType;
         $this->attribute = $attribute instanceof Attribute
             ? $attribute
             : new Attribute($attribute, ...$values);

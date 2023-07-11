@@ -53,13 +53,10 @@ class LdapClient
 
     public const REFERRAL_THROW = 'throw';
 
-    private ClientOptions $options;
-
     private ?ClientProtocolHandler $handler = null;
 
-    public function __construct(ClientOptions $options = new ClientOptions())
+    public function __construct(private ClientOptions $options = new ClientOptions())
     {
-        $this->options = $options;
     }
 
     /**

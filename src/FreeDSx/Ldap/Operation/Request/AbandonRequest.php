@@ -29,11 +29,8 @@ class AbandonRequest implements RequestInterface
 {
     protected const APP_TAG = 16;
 
-    private int $messageID;
-
-    public function __construct(int $messageID)
+    public function __construct(private int $messageID)
     {
-        $this->messageID = $messageID;
     }
 
     public function setMessageId(int $messageID): self

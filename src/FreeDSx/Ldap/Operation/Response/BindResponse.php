@@ -33,13 +33,10 @@ class BindResponse extends LdapResult
 {
     protected int $tagNumber = 1;
 
-    private ?string $saslCreds;
-
     public function __construct(
         LdapResult $result,
-        ?string $saslCreds = null
+        private readonly ?string $saslCreds = null
     ) {
-        $this->saslCreds = $saslCreds;
         parent::__construct(
             $result->getResultCode(),
             $result->getDn()->toString(),

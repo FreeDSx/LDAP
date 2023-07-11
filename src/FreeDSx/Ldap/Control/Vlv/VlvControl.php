@@ -39,25 +39,16 @@ class VlvControl extends Control
 {
     use VlvTrait;
 
-    private int $after;
-
-    private int $before;
-
-    private ?GreaterThanOrEqualFilter $filter;
-
     public function __construct(
-        int $before,
-        int $after,
+        private int $before,
+        private int $after,
         ?int $offset = null,
         ?int $count = null,
-        GreaterThanOrEqualFilter $filter = null,
+        private ?GreaterThanOrEqualFilter $filter = null,
         ?string $contextId = null
     ) {
-        $this->before = $before;
-        $this->after = $after;
         $this->offset = $offset;
         $this->count = $count;
-        $this->filter = $filter;
         $this->contextId = $contextId;
         parent::__construct(self::OID_VLV);
     }

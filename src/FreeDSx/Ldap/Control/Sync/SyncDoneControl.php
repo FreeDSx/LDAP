@@ -35,17 +35,10 @@ use function count;
  */
 class SyncDoneControl extends Control
 {
-    private ?string $cookie;
-
-    private bool $refreshDeletes;
-
     public function __construct(
-        ?string $cookie = null,
-        bool $refreshDeletes = false,
+        private readonly ?string $cookie = null,
+        private readonly bool $refreshDeletes = false,
     ) {
-        $this->cookie = $cookie;
-        $this->refreshDeletes = $refreshDeletes;
-
         parent::__construct(
             self::OID_SYNC_DONE,
             true

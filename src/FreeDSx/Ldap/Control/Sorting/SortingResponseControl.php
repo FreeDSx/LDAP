@@ -53,16 +53,10 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class SortingResponseControl extends Control
 {
-    private int $result;
-
-    private ?string $attribute;
-
     public function __construct(
-        int $result,
-        ?string $attribute = null
+        private readonly int $result,
+        private readonly ?string $attribute = null
     ) {
-        $this->result = $result;
-        $this->attribute = $attribute;
         parent::__construct(self::OID_SORTING_RESPONSE);
     }
 

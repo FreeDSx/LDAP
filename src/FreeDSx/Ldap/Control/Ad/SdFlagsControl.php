@@ -49,11 +49,8 @@ class SdFlagsControl extends Control
      */
     public const SACL_SECURITY_INFORMATION = 8;
 
-    private int $flags;
-
-    public function __construct(int $flags)
+    public function __construct(private int $flags)
     {
-        $this->flags = $flags;
         parent::__construct(self::OID_SD_FLAGS);
     }
 

@@ -61,7 +61,7 @@
       "phpunit"
     ],
     "analyse": [
-      "phpstan analyse"
+      "phpstan --memory-limit=-1 analyse"
     ],
     "analyse-tests": [
       "phpstan analyse -c phpstan.tests.neon"

@@ -34,14 +34,10 @@ class LdapServer
 {
     use LoggerTrait;
 
-    private ?ServerRunnerInterface $runner;
-
     public function __construct(
-        ServerOptions $options = new ServerOptions(),
-        ?ServerRunnerInterface $serverRunner = null
+        private readonly ServerOptions $options = new ServerOptions(),
+        private ?ServerRunnerInterface $runner = null
     ) {
-        $this->options = $options;
-        $this->runner = $serverRunner;
     }
 
     /**

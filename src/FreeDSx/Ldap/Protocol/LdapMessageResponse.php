@@ -26,14 +26,11 @@ use FreeDSx\Ldap\Operation\Response\ResponseInterface;
  */
 class LdapMessageResponse extends LdapMessage
 {
-    private ResponseInterface $response;
-
     public function __construct(
         int $messageId,
-        ResponseInterface $response,
+        private ResponseInterface $response,
         Control ...$controls
     ) {
-        $this->response = $response;
         parent::__construct(
             $messageId,
             ...$controls

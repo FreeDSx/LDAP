@@ -37,16 +37,13 @@ class ClientQueue extends LdapQueue
 {
     private bool $shouldReconnect = false;
 
-    private SocketPool $socketPool;
-
     /**
      * @throws ConnectionException
      */
     public function __construct(
-        SocketPool $socketPool,
+        private readonly SocketPool $socketPool,
         EncoderInterface $encoder = null
     ) {
-        $this->socketPool = $socketPool;
         parent::__construct(
             $socketPool->connect(),
             $encoder

@@ -43,21 +43,15 @@ class Rdn implements Stringable
         '>' => '\\3e',
     ];
 
-    private string $name;
-
-    private string $value;
-
     /**
      * @var Rdn[]
      */
     private array $additional = [];
 
     public function __construct(
-        string $name,
-        string $value
+        private readonly string $name,
+        private readonly string $value
     ) {
-        $this->name = $name;
-        $this->value = $value;
     }
 
     public function getName(): string

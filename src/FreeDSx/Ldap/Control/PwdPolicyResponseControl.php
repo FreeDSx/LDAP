@@ -44,20 +44,11 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
  */
 class PwdPolicyResponseControl extends Control
 {
-    private ?int $timeBeforeExpiration;
-
-    private ?int $graceAuthRemaining;
-
-    private ?int $error;
-
     public function __construct(
-        ?int $timeBeforeExpiration = null,
-        ?int $graceAuthRemaining = null,
-        ?int $error = null
+        private readonly ?int $timeBeforeExpiration = null,
+        private readonly ?int $graceAuthRemaining = null,
+        private readonly ?int $error = null
     ) {
-        $this->timeBeforeExpiration = $timeBeforeExpiration;
-        $this->graceAuthRemaining = $graceAuthRemaining;
-        $this->error = $error;
         parent::__construct(self::OID_PWD_POLICY);
     }
 
