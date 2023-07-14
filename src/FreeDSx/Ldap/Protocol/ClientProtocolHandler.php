@@ -48,29 +48,23 @@ class ClientProtocolHandler
         'supportedLDAPVersion',
     ];
 
-    private SocketPool $pool;
-
-    private ?ClientQueue $queue;
-
-    private ClientOptions $options;
-
     private ControlBag $controls;
+
+    private SocketPool $pool;
 
     private ClientProtocolHandlerFactory $protocolHandlerFactory;
 
     private ?Entry $rootDse = null;
 
     public function __construct(
-        ClientOptions $options,
-        ClientQueue $queue = null,
-        SocketPool $pool = null,
-        ClientProtocolHandlerFactory $clientProtocolHandlerFactory = null
+        private readonly ClientOptions $options,
+        private ?ClientQueue $queue = null,
+        ?SocketPool $pool = null,
+        ?ClientProtocolHandlerFactory $protocolHandlerFactory = null
     ) {
-        $this->options = $options;
         $this->pool = $pool ?? new SocketPool($this->options->toArray());
-        $this->protocolHandlerFactory = $clientProtocolHandlerFactory ?? new ClientProtocolHandlerFactory();
+        $this->protocolHandlerFactory = $protocolHandlerFactory ?? new ClientProtocolHandlerFactory();
         $this->controls = new ControlBag();
-        $this->queue = $queue;
     }
 
     public function controls(): ControlBag

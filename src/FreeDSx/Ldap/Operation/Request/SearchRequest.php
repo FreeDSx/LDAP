@@ -102,8 +102,6 @@ class SearchRequest implements RequestInterface
 
     private bool $attributesOnly = false;
 
-    private FilterInterface $filter;
-
     /**
      * @var Attribute[]
      */
@@ -114,10 +112,9 @@ class SearchRequest implements RequestInterface
     private ?Closure $referralHandler = null;
 
     public function __construct(
-        FilterInterface $filter,
+        private FilterInterface $filter,
         Attribute|string ...$attributes
     ) {
-        $this->filter = $filter;
         $this->setAttributes(...$attributes);
     }
 

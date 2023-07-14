@@ -25,15 +25,8 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class SubentriesControl extends Control
 {
-    private bool $isVisible;
-
-    /**
-     * @param bool $isVisible
-     */
-    public function __construct(bool $isVisible = true)
+    public function __construct(private bool $isVisible = true)
     {
-        $this->isVisible = $isVisible;
-
         parent::__construct(
             self::OID_SUBENTRIES,
             true

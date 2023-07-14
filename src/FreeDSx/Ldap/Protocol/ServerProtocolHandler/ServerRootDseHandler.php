@@ -38,11 +38,8 @@ use function count;
  */
 class ServerRootDseHandler implements ServerProtocolHandlerInterface
 {
-    private ?RootDseHandlerInterface $rootDseHandler;
-
-    public function __construct(?RootDseHandlerInterface $rootDseHandler = null)
+    public function __construct(private ?RootDseHandlerInterface $rootDseHandler = null)
     {
-        $this->rootDseHandler = $rootDseHandler;
     }
 
     /**

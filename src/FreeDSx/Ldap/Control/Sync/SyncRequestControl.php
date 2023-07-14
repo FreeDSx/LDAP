@@ -46,20 +46,11 @@ class SyncRequestControl extends Control
 
     public const MODE_REFRESH_AND_PERSIST = 3;
 
-    private int $mode;
-
-    private ?string $cookie;
-
-    private bool $reloadHint;
-
     public function __construct(
-        int $mode = self::MODE_REFRESH_ONLY,
-        ?string $cookie = null,
-        bool $reloadHint = false
+        private int $mode = self::MODE_REFRESH_ONLY,
+        private ?string $cookie = null,
+        private bool $reloadHint = false
     ) {
-        $this->mode = $mode;
-        $this->cookie = $cookie;
-        $this->reloadHint = $reloadHint;
         parent::__construct(
             self::OID_SYNC_REQUEST,
             true

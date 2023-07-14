@@ -52,22 +52,13 @@ class SyncStateControl extends Control
 
     public const STATE_DELETE = 3;
 
-    private int $state;
-
-    private ?string $cookie;
-
-    private string $entryUuid;
-
     private ?string $decodedUuid = null;
 
     public function __construct(
-        int $state,
-        string $entryUuid,
-        ?string $cookie = null
+        private readonly int $state,
+        private readonly string $entryUuid,
+        private readonly ?string $cookie = null
     ) {
-        $this->state = $state;
-        $this->cookie = $cookie;
-        $this->entryUuid = $entryUuid;
         parent::__construct(self::OID_SYNC_STATE);
     }
 

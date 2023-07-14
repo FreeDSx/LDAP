@@ -33,13 +33,10 @@ use function preg_split;
  */
 class Dn implements IteratorAggregate, Countable, Stringable
 {
-    private string $dn;
-
     private ?array $pieces = null;
 
-    public function __construct(string $dn)
+    public function __construct(private readonly string $dn)
     {
-        $this->dn = $dn;
     }
 
     /**

@@ -32,20 +32,11 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class PasswordModifyRequest extends ExtendedRequest
 {
-    private ?string $userIdentity;
-
-    private ?string $oldPassword;
-
-    private ?string $newPassword;
-
     public function __construct(
-        ?string $userIdentity = null,
-        ?string $oldPassword = null,
-        ?string $newPassword = null
+        private ?string $userIdentity = null,
+        private ?string $oldPassword = null,
+        private ?string $newPassword = null
     ) {
-        $this->userIdentity = $userIdentity;
-        $this->oldPassword = $oldPassword;
-        $this->newPassword = $newPassword;
         parent::__construct(self::OID_PWD_MODIFY);
     }
 

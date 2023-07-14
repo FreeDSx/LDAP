@@ -52,11 +52,8 @@ class AddRequest implements RequestInterface
 {
     protected const APP_TAG = 8;
 
-    private Entry $entry;
-
-    public function __construct(Entry $entry)
+    public function __construct(private Entry $entry)
     {
-        $this->entry = $entry;
     }
 
     public function getEntry(): Entry

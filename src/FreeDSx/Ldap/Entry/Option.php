@@ -27,13 +27,10 @@ class Option implements Stringable
 {
     protected const MATCH_RANGE = '/range=(\d+)-(.*)/';
 
-    private string $option;
-
     private ?string $lcOption = null;
 
-    public function __construct(string $option)
+    public function __construct(private readonly string $option)
     {
-        $this->option = $option;
     }
 
     public function isLanguageTag(): bool

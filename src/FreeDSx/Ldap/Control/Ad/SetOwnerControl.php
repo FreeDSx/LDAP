@@ -31,9 +31,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class SetOwnerControl extends Control
 {
-    private string $sid;
-
-    public function __construct(string $sid)
+    public function __construct(private string $sid)
     {
         $this->sid = $sid;
         parent::__construct(

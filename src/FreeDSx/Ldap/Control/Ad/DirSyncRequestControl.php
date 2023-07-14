@@ -62,20 +62,11 @@ class DirSyncRequestControl extends Control
      */
     public const FLAG_INCREMENTAL_VALUES = -0x80000000;
 
-    private int $flags;
-
-    private int $maxBytes;
-
-    private string $cookie;
-
     public function __construct(
-        int $flags = self::FLAG_INCREMENTAL_VALUES,
-        string $cookie = '',
-        int $maxBytes = 2147483647
+        private int $flags = self::FLAG_INCREMENTAL_VALUES,
+        private string $cookie = '',
+        private int $maxBytes = 2147483647
     ) {
-        $this->flags = $flags;
-        $this->maxBytes = $maxBytes;
-        $this->cookie = $cookie;
         parent::__construct(
             self::OID_DIR_SYNC,
             true

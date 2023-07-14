@@ -23,7 +23,8 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
- * Represents an Expected Entry Count control. Defined in MS-ADTS 3.1.1.3.4.1.33. The control value request definition is:
+ * Represents an Expected Entry Count control. Defined in MS-ADTS 3.1.1.3.4.1.33. The control value request definition
+ * is:
  *
  *  ExpectedEntryCountRequestValue ::= SEQUENCE {
  *      searchEntriesMin    INTEGER
@@ -35,16 +36,10 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class ExpectedEntryCountControl extends Control
 {
-    private int $minimum;
-
-    private int $maximum;
-
     public function __construct(
-        int $min,
-        int $max
+        private int $min,
+        private int $max,
     ) {
-        $this->minimum = $min;
-        $this->maximum = $max;
         parent::__construct(
             self::OID_EXPECTED_ENTRY_COUNT,
             true
@@ -53,24 +48,24 @@ class ExpectedEntryCountControl extends Control
 
     public function getMaximum(): int
     {
-        return $this->maximum;
+        return $this->max;
     }
 
     public function setMaximum(int $max): self
     {
-        $this->maximum = $max;
+        $this->max = $max;
 
         return $this;
     }
 
     public function getMinimum(): int
     {
-        return $this->minimum;
+        return $this->min;
     }
 
     public function setMinimum(int $min): self
     {
-        $this->minimum = $min;
+        $this->min = $min;
 
         return $this;
     }
@@ -111,8 +106,8 @@ class ExpectedEntryCountControl extends Control
     public function toAsn1(): AbstractType
     {
         $this->controlValue = Asn1::sequence(
-            Asn1::integer($this->minimum),
-            Asn1::integer($this->maximum)
+            Asn1::integer($this->min),
+            Asn1::integer($this->max)
         );
 
         return parent::toAsn1();

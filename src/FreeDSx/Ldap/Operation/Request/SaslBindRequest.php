@@ -34,24 +34,15 @@ use FreeDSx\Ldap\Exception\BindException;
  */
 class SaslBindRequest extends BindRequest
 {
-    private string $mechanism;
-
-    private ?string $credentials;
-
     /**
-     * @var array<string, mixed>
+     * @param array<string, mixed> $options
      */
-    private array $options;
-
     public function __construct(
-        string $mechanism,
-        ?string $credentials = null,
-        array $options = []
+        private string $mechanism,
+        private readonly ?string $credentials = null,
+        private readonly array $options = []
     ) {
         $this->username = '';
-        $this->mechanism = $mechanism;
-        $this->credentials = $credentials;
-        $this->options = $options;
     }
 
     public function getMechanism(): string

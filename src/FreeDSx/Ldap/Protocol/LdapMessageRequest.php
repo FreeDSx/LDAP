@@ -25,14 +25,11 @@ use FreeDSx\Ldap\Operation\Request\RequestInterface;
  */
 class LdapMessageRequest extends LdapMessage
 {
-    private RequestInterface $request;
-
     public function __construct(
         int $messageId,
-        RequestInterface $request,
+        private readonly RequestInterface $request,
         Control ...$controls
     ) {
-        $this->request = $request;
         parent::__construct(
             $messageId,
             ...$controls

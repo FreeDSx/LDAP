@@ -43,37 +43,24 @@ class ServerProtocolHandler
 {
     use LoggerTrait;
 
-    private ServerOptions $options;
-
-    private ServerQueue $queue;
-
     /**
      * @var int[]
      */
     private array $messageIds = [];
 
-    private HandlerFactoryInterface $handlerFactory;
-
     private ServerAuthorization $authorizer;
 
     private ServerProtocolHandlerFactory $protocolHandlerFactory;
 
-    private ResponseFactory $responseFactory;
-
-    private ServerBindHandlerFactory $bindHandlerFactory;
-
     public function __construct(
-        ServerQueue $queue,
-        HandlerFactoryInterface $handlerFactory,
-        ServerOptions $options,
+        private readonly ServerQueue $queue,
+        private readonly HandlerFactoryInterface $handlerFactory,
+        private readonly ServerOptions $options,
         ServerProtocolHandlerFactory $protocolHandlerFactory = null,
-        ServerBindHandlerFactory $bindHandlerFactory = new ServerBindHandlerFactory(),
         ServerAuthorization $authorizer = null,
-        ResponseFactory $responseFactory = new ResponseFactory()
+        private readonly ServerBindHandlerFactory $bindHandlerFactory = new ServerBindHandlerFactory(),
+        private readonly ResponseFactory $responseFactory = new ResponseFactory()
     ) {
-        $this->queue = $queue;
-        $this->handlerFactory = $handlerFactory;
-        $this->options = $options;
         $this->authorizer = $authorizer ?? new ServerAuthorization(
             isAnonymousAllowed: $options->isAllowAnonymous(),
             isAuthRequired: $options->isRequireAuthentication(),
@@ -82,8 +69,6 @@ class ServerProtocolHandler
             handlerFactory: $handlerFactory,
             requestHistory: new RequestHistory(),
         );
-        $this->bindHandlerFactory = $bindHandlerFactory;
-        $this->responseFactory = $responseFactory;
     }
 
     /**

@@ -38,14 +38,11 @@ class CompareRequest implements RequestInterface, DnRequestInterface
 
     private Dn $dn;
 
-    private EqualityFilter $filter;
-
     public function __construct(
         Dn|string $dn,
-        EqualityFilter $filter
+        private EqualityFilter $filter
     ) {
         $this->setDn($dn);
-        $this->filter = $filter;
     }
 
     public function getDn(): Dn

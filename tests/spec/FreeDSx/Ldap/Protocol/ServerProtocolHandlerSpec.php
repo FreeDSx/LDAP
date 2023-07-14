@@ -65,7 +65,8 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             $handlerFactory,
             new ServerOptions(),
             $protocolHandlerFactory,
-            $bindHandlerFactory
+            null,
+            $bindHandlerFactory,
         );
     }
 

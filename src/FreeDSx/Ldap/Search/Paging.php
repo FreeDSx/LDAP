@@ -32,24 +32,15 @@ class Paging
 {
     private ?PagingControl $control = null;
 
-    private LdapClient $client;
-
-    private int $size;
-
-    private SearchRequest $search;
-
     private bool $ended = false;
 
     private bool $isCritical = false;
 
     public function __construct(
-        LdapClient $client,
-        SearchRequest $search,
-        int $size = 1000,
+        private LdapClient $client,
+        private SearchRequest $search,
+        private int $size = 1000,
     ) {
-        $this->search = $search;
-        $this->client = $client;
-        $this->size = $size;
     }
 
     /**

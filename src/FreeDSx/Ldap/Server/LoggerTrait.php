@@ -24,7 +24,7 @@ use Psr\Log\LogLevel;
  */
 trait LoggerTrait
 {
-    private ServerOptions $options;
+    private readonly ServerOptions $options;
 
     /**
      * Logs a message and then throws a runtime exception.

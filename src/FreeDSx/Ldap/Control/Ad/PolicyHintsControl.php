@@ -34,11 +34,8 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class PolicyHintsControl extends Control
 {
-    private bool $isEnabled;
-
-    public function __construct(bool $isEnabled = true)
+    public function __construct(private bool $isEnabled = true)
     {
-        $this->isEnabled = $isEnabled;
         parent::__construct(
             self::OID_POLICY_HINTS,
             true

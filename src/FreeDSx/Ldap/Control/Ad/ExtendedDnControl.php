@@ -31,11 +31,8 @@ use function count;
  */
 class ExtendedDnControl extends Control
 {
-    private bool $useHexFormat;
-
-    public function __construct(bool $useHexFormat = false)
+    public function __construct(private bool $useHexFormat = false)
     {
-        $this->useHexFormat = $useHexFormat;
         parent::__construct(self::OID_EXTENDED_DN);
     }
 

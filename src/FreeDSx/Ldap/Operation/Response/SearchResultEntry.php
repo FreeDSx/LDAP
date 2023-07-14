@@ -38,11 +38,8 @@ class SearchResultEntry implements ResponseInterface
 {
     protected const TAG_NUMBER = 4;
 
-    private Entry $entry;
-
-    public function __construct(Entry $entry)
+    public function __construct(private readonly Entry $entry)
     {
-        $this->entry = $entry;
     }
 
     public function getEntry(): Entry

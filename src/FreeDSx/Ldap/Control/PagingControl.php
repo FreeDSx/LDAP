@@ -35,16 +35,10 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class PagingControl extends Control
 {
-    private string $cookie;
-
-    private int $size;
-
     public function __construct(
-        int $size,
-        string $cookie = ''
+        private int $size,
+        private string $cookie = ''
     ) {
-        $this->size = $size;
-        $this->cookie = $cookie;
         parent::__construct(self::OID_PAGING);
     }
 

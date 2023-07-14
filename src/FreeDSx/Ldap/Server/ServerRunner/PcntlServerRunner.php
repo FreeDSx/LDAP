@@ -45,8 +45,6 @@ class PcntlServerRunner implements ServerRunnerInterface
 
     private SocketServer $server;
 
-    private ServerOptions $options;
-
     /**
      * @var ChildProcess[]
      */
@@ -73,12 +71,13 @@ class PcntlServerRunner implements ServerRunnerInterface
     /**
      * @throws RuntimeException
      */
-    public function __construct(ServerOptions $options)
+    public function __construct(private readonly ServerOptions $options)
     {
         if (!extension_loaded('pcntl')) {
-            throw new RuntimeException('The PCNTL extension is needed to fork incoming requests, which is only available on Linux.');
+            throw new RuntimeException(
+                'The PCNTL extension is needed to fork incoming requests, which is only available on Linux.'
+            );
         }
-        $this->options = $options;
 
         // posix_kill needs this...we cannot clean up child processes without it on shutdown...
         $this->isPosixExtLoaded = extension_loaded('posix');

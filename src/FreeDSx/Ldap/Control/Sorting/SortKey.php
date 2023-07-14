@@ -20,20 +20,11 @@ namespace FreeDSx\Ldap\Control\Sorting;
  */
 class SortKey
 {
-    private string $attribute;
-
-    private ?string $orderingRule;
-
-    private bool $useReverseOrder;
-
     public function __construct(
-        string $attribute,
-        bool $useReverseOrder = false,
-        ?string $orderingRule = null
+        private string $attribute,
+        private bool $useReverseOrder = false,
+        private ?string $orderingRule = null
     ) {
-        $this->attribute = $attribute;
-        $this->orderingRule = $orderingRule;
-        $this->useReverseOrder = $useReverseOrder;
     }
 
     public function getAttribute(): string

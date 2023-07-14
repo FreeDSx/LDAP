@@ -45,20 +45,17 @@ class ModifyDnRequest implements RequestInterface, DnRequestInterface
 
     private Rdn $newRdn;
 
-    private bool $deleteOldRdn;
-
     private ?Dn $newParentDn;
 
     public function __construct(
         Dn|Stringable|string $dn,
         Rdn|Stringable|string $newRdn,
-        bool $deleteOldRdn,
+        private bool $deleteOldRdn,
         Dn|Stringable|string|null $newParentDn = null,
     ) {
         $this->setDn($dn);
         $this->setNewRdn($newRdn);
         $this->setNewParentDn($newParentDn);
-        $this->deleteOldRdn = $deleteOldRdn;
     }
 
     public function getDn(): Dn

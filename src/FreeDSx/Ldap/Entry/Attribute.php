@@ -45,8 +45,6 @@ class Attribute implements IteratorAggregate, Countable, Stringable
         "\x00" => '\00',
     ];
 
-    private string $attribute;
-
     private ?string $lcAttribute = null;
 
     /**
@@ -57,10 +55,9 @@ class Attribute implements IteratorAggregate, Countable, Stringable
     private ?Options $options = null;
 
     public function __construct(
-        string $attribute,
+        private string $attribute,
         string ...$values
     ) {
-        $this->attribute = $attribute;
         $this->values = $values;
     }
 

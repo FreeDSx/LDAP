@@ -34,15 +34,7 @@ use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
  */
 class Vlv
 {
-    private LdapClient $client;
-
-    private SearchRequest $search;
-
     private ?VlvResponseControl $control = null;
-
-    private int $before;
-
-    private int $after;
 
     private int $offset = 1;
 
@@ -53,17 +45,15 @@ class Vlv
     private bool $asPercentage = false;
 
     public function __construct(
-        LdapClient $client,
-        SearchRequest $search,
+        private LdapClient $client,
+        private SearchRequest $search,
         SortingControl|SortKey|string $sort,
-        int $after = 100,
-        int $before = 0
+        private int $after = 100,
+        private int $before = 0
     ) {
-        $this->client = $client;
-        $this->search = $search;
-        $this->sort = $sort instanceof SortingControl ? $sort : Controls::sort($sort);
-        $this->before = $before;
-        $this->after = $after;
+        $this->sort = $sort instanceof SortingControl
+            ? $sort
+            : Controls::sort($sort);
     }
 
     /**

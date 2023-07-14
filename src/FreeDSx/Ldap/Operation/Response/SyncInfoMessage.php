@@ -45,12 +45,8 @@ use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshPresent;
  */
 abstract class SyncInfoMessage extends IntermediateResponse
 {
-    protected ?string $cookie;
-
-    public function __construct(?string $cookie = null)
+    public function __construct(protected ?string $cookie = null)
     {
-        $this->cookie = $cookie;
-
         parent::__construct(
             self::OID_SYNC_INFO,
             null

@@ -31,20 +31,11 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 class ServerAuthorization
 {
-    private bool $isAuthRequired;
-
-    private bool $isAnonymousAllowed;
-
-    private TokenInterface $token;
-
     public function __construct(
-        TokenInterface $token = new AnonToken(),
-        bool $isAnonymousAllowed = false,
-        bool $isAuthRequired = true,
+        private TokenInterface $token = new AnonToken(),
+        private readonly bool $isAnonymousAllowed = false,
+        private readonly bool $isAuthRequired = true,
     ) {
-        $this->token = $token;
-        $this->isAuthRequired = $isAuthRequired;
-        $this->isAnonymousAllowed = $isAnonymousAllowed;
     }
 
     /**

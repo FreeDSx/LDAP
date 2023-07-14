@@ -51,17 +51,14 @@ class VlvResponseControl extends Control
 {
     use VlvTrait;
 
-    private int $result;
-
     public function __construct(
         int $offset,
         int $count,
-        int $result,
+        private readonly int $result,
         ?string $contextId = null,
     ) {
         $this->offset = $offset;
         $this->count = $count;
-        $this->result = $result;
         $this->contextId = $contextId;
         parent::__construct(self::OID_VLV_RESPONSE);
     }

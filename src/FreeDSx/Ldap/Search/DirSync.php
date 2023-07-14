@@ -39,8 +39,6 @@ class DirSync
 
     private SearchRequest $search;
 
-    private ?string $namingContext;
-
     private bool $incrementalValues = true;
 
     private bool $objectSecurity = false;
@@ -49,18 +47,14 @@ class DirSync
 
     private ?string $defaultRootNc = null;
 
-    private LdapClient $client;
-
     private DirSyncRequestControl $dirSyncRequest;
 
     public function __construct(
-        LdapClient $client,
-        ?string $namingContext = null,
+        private readonly LdapClient $client,
+        private ?string $namingContext = null,
         ?FilterInterface $filter = null,
         Attribute|string ...$attributes
     ) {
-        $this->client = $client;
-        $this->namingContext = $namingContext;
         $this->dirSyncRequest = Controls::dirSync();
         $this->search = new SearchRequest(
             $filter ?? Filters::present('objectClass'),

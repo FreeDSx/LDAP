@@ -37,20 +37,11 @@ use FreeDSx\Ldap\Exception\ProtocolException;
  */
 class DirSyncResponseControl extends Control
 {
-    private int $moreResults;
-
-    private int $unused;
-
-    private string $cookie;
-
     public function __construct(
-        int $moreResults,
-        int $unused = 0,
-        string $cookie = ''
+        private readonly int $moreResults,
+        private readonly int $unused = 0,
+        private readonly string $cookie = ''
     ) {
-        $this->moreResults = $moreResults;
-        $this->unused = $unused;
-        $this->cookie = $cookie;
         parent::__construct(self::OID_DIR_SYNC);
     }
 

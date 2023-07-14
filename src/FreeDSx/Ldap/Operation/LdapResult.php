@@ -90,11 +90,7 @@ class LdapResult implements ResponseInterface
 {
     protected int $tagNumber;
 
-    protected int $resultCode;
-
     protected Dn $dn;
-
-    protected string $diagnosticMessage;
 
     /**
      * @var LdapUrl[]
@@ -102,14 +98,12 @@ class LdapResult implements ResponseInterface
     protected array $referrals = [];
 
     public function __construct(
-        int $resultCode,
+        protected int $resultCode,
         Stringable|string $dn = '',
-        string $diagnosticMessage = '',
+        protected string $diagnosticMessage = '',
         LdapUrl ...$referrals
     ) {
-        $this->resultCode = $resultCode;
         $this->dn = new Dn((string) $dn);
-        $this->diagnosticMessage = $diagnosticMessage;
         $this->referrals = $referrals;
     }
 
