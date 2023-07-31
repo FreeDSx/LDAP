@@ -38,10 +38,10 @@ class SearchResponse extends SearchResultDone
         private readonly array $referralResults = [],
     ) {
         parent::__construct(
-            $result->resultCode,
-            $result->dn->toString(),
-            $result->diagnosticMessage,
-            ...$result->referrals
+            $result->getResultCode(),
+            $result->getDn()->toString(),
+            $result->getDiagnosticMessage(),
+            ...$result->getReferrals()
         );
     }
 

@@ -4,7 +4,8 @@
   * [Read Search](#read-search)
   * [List Search](#list-search)
   * [Subtree Search](#subtree-search)
-* [Entry Handler Searches](#entry-handler-searches) 
+* [Entry Handler Searches](#entry-handler-searches)
+* [Cancelling a Search](#cancelling-a-search)
 * [Sorting](#sorting)
 * [Paging](#paging)
   * [Paging Criticality](#paging-criticality)
@@ -123,6 +124,43 @@ $operation->useEntryHandler(function (EntryResult $result) {
 
 # Execute the search, let the handler do the work
 $ldap->search($operation);
+```
+
+## Cancelling a Search
+
+Cancelling a search provides a way to tell the server to stop sending responses and end the operation. This is only
+possible with a search when using [entry handlers](#entry-handler-searches). It's also worth considering using [paging](#paging)
+instead of resorting to canceling searches. To cancel a search you can throw a `CancelRequestException` during an [entry handler](#entry-handler-searches)
+to indicate that the search should stop.
+
+**Note**: Cancelling a search is dependent on the server supporting the cancellation of an operation. Additionally, the server
+may have already responded with all entries and it may be too late to cancel said operation. In this case, an `OperationException`
+will be thrown.
+
+```php
+use FreeDSx\Ldap\Exception\CancelRequestException;
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Operation\Response\SearchResponse;
+use FreeDSx\Ldap\Search\Result\EntryResult;
+use FreeDSx\Ldap\Search\Filters;
+
+$operation = Operations::search(
+    Filters::equal('objectClass', 'user'),
+    'cn',
+);
+
+# Add a closure that will process the entries as they arrive during the search.
+$operation->useEntryHandler(function (EntryResult $result) {
+    $entry = $result->getEntry();
+
+    // Add some conditional logic for why to cancel here...
+    // ...
+    // Throwing this exception will initiate the cancellation process.
+    throw new CancelRequestException();
+});
+
+/** @var SearchResponse $response */
+$response = $ldap->sendAndReceive($operation);
 ```
 
 ## Sorting

@@ -222,7 +222,8 @@ class ClientSyncHandler extends ClientBasicHandler
         }
         $this->updateCookie($syncDone->getCookie());
 
-        return $result->getResultCode() === ResultCode::SUCCESS;
+        return $result->getResultCode() === ResultCode::SUCCESS
+            || $result->getResultCode() === ResultCode::CANCELED;
     }
 
     private function isRefreshRequired(LdapMessageResponse $response): bool

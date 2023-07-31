@@ -17,6 +17,7 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\UnexpectedValueException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Result\EntryResult;
@@ -117,7 +118,21 @@ class SearchRequestSpec extends ObjectBehavior
         $this->useReferralHandler($handler)
             ->shouldReturn($this);
         $this->getReferralHandler()
-            ->shouldReturn($handler);
+            ->shouldBe($handler);
+    }
+
+    public function it_should_set_and_get_the_cancel_strategy(): void
+    {
+        $this->useCancelStrategy(SearchRequest::CANCEL_CONTINUE);
+
+        $this->getCancelStrategy()
+            ->shouldBe(SearchRequest::CANCEL_CONTINUE);
+    }
+
+    public function it_should_not_allow_invalid_cancel_stragegies(): void
+    {
+        $this->shouldThrow(UnexpectedValueException::class)
+            ->during('useCancelStrategy', ['foo']);
     }
 
     public function it_should_generate_correct_asn1(): void

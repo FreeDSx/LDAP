@@ -15,6 +15,7 @@ helper class in this library for performing a SyncRepl request more easily.
     * [The IdSet Handler](#the-idset-handler)
     * [The Referral Handler](#the-referral-handler)
     * [The Cookie Handler](#the-cookie-handler)
+* [Cancelling a Sync](#cancelling-a-sync)
 * [SyncRepl Class Methods](#syncrepl-class-methods)
     * [useFilter](#usefilter)
     * [useCookie](#usecookie)
@@ -161,6 +162,31 @@ the sync session cookie. If you wish to restart this sync session at some later 
 the changed cookie somewhere and reload it before starting the sync again.
 
 For more details, see [useCookieHandler](#usecookiehandler) and [useCookie](#usecookie).
+
+
+# Cancelling a Sync
+
+Cancelling a sync provides a way to tell the server to gracefully end the sync operation. To initiate the cancellation
+process, you must throw a `CancelRequestException` within one of the [sync handlers](#sync-handlers).
+
+**Note**: By default, the handlers will not receive any further messages once a cancellation is issued. To continue to
+receive messages until the server processes the cancellation, you can call `useContinueOnCancel()` on the SyncRepl client.
+
+```php
+use FreeDSx\Ldap\Exception\CancelRequestException;
+use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
+
+$ldap
+    ->syncRepl()
+    ->listen(function(SyncEntryResult $result) {
+        $entry = $result->getEntry();
+        $uuid = $result->getEntryUuid();
+        
+        // Add some logic for when this should be thrown...
+        // But this will initiate a cancellation.
+        throw new CancelRequestException();
+    });
+```
 
 # SyncRepl Class Methods
 

@@ -7,8 +7,8 @@ namespace spec\FreeDSx\Ldap;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\LdapUrl;
-use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
+use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -66,7 +66,7 @@ trait TestFactoryTrait
         return new LdapMessageResponse(
             $messageId,
             new SearchResponse(
-                new LdapResult(
+                new SearchResultDone(
                     $resultCode,
                     $dn,
                     $diagnostic,

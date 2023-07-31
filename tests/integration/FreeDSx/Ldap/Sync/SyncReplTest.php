@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace integration\FreeDSx\Ldap\Sync;
 
+use FreeDSx\Ldap\Exception\CancelRequestException;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use integration\FreeDSx\Ldap\LdapTestCase;
 
@@ -32,6 +33,28 @@ class SyncReplTest extends LdapTestCase
         $this->assertGreaterThan(
             0,
             $entries,
+        );
+    }
+
+    public function testItCanCancelTheSync(): void
+    {
+        $client = $this->getClient();
+        $this->bindClient($client);
+
+        $count = 0;
+        $client
+            ->syncRepl()
+            ->listen(function () use (&$count): void {
+                if ($count === 10) {
+                    throw new CancelRequestException();
+                }
+                $count++;
+            });
+
+        $this->assertSame(
+            10,
+            $count,
+            'It stopped on the 10th result.'
         );
     }
 }

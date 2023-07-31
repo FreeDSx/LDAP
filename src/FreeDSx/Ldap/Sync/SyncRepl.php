@@ -15,13 +15,11 @@ namespace FreeDSx\Ldap\Sync;
 
 use Closure;
 use FreeDSx\Ldap\ClientOptions;
-use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
-use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Controls;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SyncRequest;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
@@ -49,6 +47,18 @@ class SyncRepl
         $this->client = $client;
         $this->syncRequest = Operations::sync($filter);
         $this->controls = new ControlBag();
+    }
+
+    /**
+     * Use the "continue" cancel strategy. When this is enabled, sync handlers will continue to receive any messages
+     * from the point of cancellation until the server acknowledges the cancellation. By default these messages would be
+     * discarded.
+     */
+    public function useContinueOnCancel(): self
+    {
+        $this->syncRequest->useCancelStrategy(SearchRequest::CANCEL_CONTINUE);
+
+        return $this;
     }
 
     /**
@@ -176,31 +186,14 @@ class SyncRepl
             $this->useEntryHandler($entryHandler);
         }
 
-        $this->getResponseAndUpdateCookie(
+        $this->client->sendAndReceive(
+            $this->syncRequest,
             Controls::syncRequest(
                 $this->cookie,
                 $mode,
             ),
-            Controls::manageDsaIt()
-        );
-    }
-
-    private function getResponseAndUpdateCookie(Control ...$controls): void
-    {
-        $messageResponse = $this->client->sendAndReceive(
-            $this->syncRequest,
-            ...$controls,
+            Controls::manageDsaIt(),
             ...$this->controls->toArray(),
         );
-
-        $syncDone = $messageResponse->controls()
-            ->getByClass(SyncDoneControl::class);
-
-        if ($syncDone === null) {
-            throw new ProtocolException(sprintf(
-                'Expected a "%s" control, but none was received.',
-                SyncDoneControl::class,
-            ));
-        }
     }
 }
