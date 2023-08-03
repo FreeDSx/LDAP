@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Exception\UnexpectedValueException;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use function array_map;
@@ -55,6 +56,17 @@ use function array_map;
 class SearchRequest implements RequestInterface
 {
     use IntermediateResponseHandlerTrait;
+
+    /**
+     * Subsequent search messages received after the cancellation are ignored as soon as the cancel request is made.
+     */
+    public const CANCEL_STOP = 'stop';
+
+    /**
+     * Subsequent search messages received after the cancellation continue to process until the server cancels
+     * the request.
+     */
+    public const CANCEL_CONTINUE = 'continue';
 
     /**
      * Searches a scope of a single object (IE. a specific DN)
@@ -110,6 +122,11 @@ class SearchRequest implements RequestInterface
     private ?Closure $entryHandler = null;
 
     private ?Closure $referralHandler = null;
+
+    /**
+     * @phpstan-var 'continue'|'stop'
+     */
+    private string $cancelStrategy = self::CANCEL_STOP;
 
     public function __construct(
         private FilterInterface $filter,
@@ -317,6 +334,36 @@ class SearchRequest implements RequestInterface
     }
 
     /**
+     * @phpstan-param 'continue'|'stop' $strategy
+     */
+    public function useCancelStrategy(string $strategy): self
+    {
+        if ($strategy !== self::CANCEL_STOP && $strategy!== self::CANCEL_CONTINUE) {
+            throw new UnexpectedValueException(sprintf(
+                'The cancel strategy must be one of: %s',
+                implode(
+                    ', ',
+                    [
+                        self::CANCEL_CONTINUE,
+                        self::CANCEL_STOP,
+                    ]
+                )
+            ));
+        }
+        $this->cancelStrategy = $strategy;
+
+        return $this;
+    }
+
+    /**
+     * @phpstan-return 'continue'|'stop'
+     */
+    public function getCancelStrategy(): string
+    {
+        return $this->cancelStrategy;
+    }
+
+    /**
      * {@inheritDoc}
      *
      * @throws RuntimeException
@@ -340,8 +387,7 @@ class SearchRequest implements RequestInterface
         }
         $filter = FilterFactory::get($filter);
 
-        if (
-            !($baseDn instanceof OctetStringType
+        if (!($baseDn instanceof OctetStringType
             && $scope instanceof EnumeratedType
             && $deref instanceof EnumeratedType
             && $sizeLimit instanceof IntegerType

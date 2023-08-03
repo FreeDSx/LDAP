@@ -16,8 +16,8 @@ namespace spec\FreeDSx\Ldap\Sync;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SyncRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -202,23 +202,12 @@ class SyncReplSpec extends ObjectBehavior
         $this->poll();
     }
 
-    public function it_should_throw_an_exception_if_a_sync_done_control_is_not_returned(LdapClient $client): void
+    public function it_should_use_the_continue_strategy_if_specified(): void
     {
-        $client->sendAndReceive(
-            Argument::any(),
-            Argument::any(),
-            Argument::any(),
-        )->shouldBeCalledOnce()
-            ->willReturn(new LdapMessageResponse(
-                1,
-                new SearchResultDone(0)
-            ));
+        $this->useContinueOnCancel();
 
-        $this->shouldThrow(
-            new ProtocolException(sprintf(
-                'Expected a "%s" control, but none was received.',
-                SyncDoneControl::class,
-            ))
-        )->during('poll');
+        $this->request()
+            ->getCancelStrategy()
+            ->shouldBe(SearchRequest::CANCEL_CONTINUE);
     }
 }

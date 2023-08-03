@@ -16,13 +16,16 @@ namespace integration\FreeDSx\Ldap;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\CancelRequestException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\AddResponse;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyDnResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyResponse;
+use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Search\Result\EntryResult;
@@ -379,6 +382,33 @@ class LdapClientTest extends LdapTestCase
         $this->assertSame(
             843,
             $entries->count()
+        );
+    }
+
+    public function testTheSearchCanBeCanceled(): void
+    {
+        $this->bindClient($this->client);
+
+        $entriesProcessed = 0;
+        $op = Operations::search(Filters::raw('(&(objectClass=inetOrgPerson)(cn=A*))'))
+            ->useCancelStrategy(SearchRequest::CANCEL_CONTINUE)
+            ->useEntryHandler(function () use (&$entriesProcessed) {
+                $entriesProcessed++;
+
+                throw new CancelRequestException();
+            });
+
+        /** @var SearchResponse $response */
+        $response = $this->client->sendAndReceive($op)->getResponse();
+
+        $this->assertLessThan(
+            843,
+            $entriesProcessed,
+            'A cancelation should not process all search results.'
+        );
+        $this->assertCount(
+            0,
+            $response->getEntries()->toArray(),
         );
     }
 

@@ -44,6 +44,7 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
         ResultCode::COMPARE_TRUE,
         ResultCode::REFERRAL,
         ResultCode::SASL_BIND_IN_PROGRESS,
+        ResultCode::CANCELED,
     ];
 
     /**
