@@ -76,7 +76,6 @@ class ClientBasicHandlerSpec extends ObjectBehavior
             $messageRequest,
             $messageFrom,
             $queue,
-            new ClientOptions()
         )->shouldBeEqualTo($messageFrom);
     }
 
@@ -89,8 +88,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             $messageRequest,
             $messageFrom,
-            $queue,
-            $options
+            $queue
         )->shouldBeEqualTo($messageFrom);
 
         $messageFrom = new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_TRUE));
@@ -98,8 +96,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             $messageRequest,
             $messageFrom,
-            $queue,
-            $options
+            $queue
         )->shouldBeEqualTo($messageFrom);
 
         $messageFrom = new LdapMessageResponse(1, new CompareResponse(ResultCode::REFERRAL));
@@ -107,8 +104,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             $messageRequest,
             $messageFrom,
-            $queue,
-            $options
+            $queue
         )->shouldBeEqualTo($messageFrom);
     }
 
@@ -121,7 +117,6 @@ class ClientBasicHandlerSpec extends ObjectBehavior
             $messageRequest,
             $messageFrom,
             $queue,
-            new ClientOptions()
         )->shouldBeEqualTo($messageFrom);
     }
 

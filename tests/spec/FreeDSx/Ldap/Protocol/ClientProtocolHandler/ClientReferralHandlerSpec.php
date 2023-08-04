@@ -36,6 +36,11 @@ use Prophecy\Argument;
 
 class ClientReferralHandlerSpec extends ObjectBehavior
 {
+    public function let(): void
+    {
+        $this->beConstructedWith(new ClientOptions());
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientReferralHandler::class);
@@ -43,6 +48,11 @@ class ClientReferralHandlerSpec extends ObjectBehavior
 
     public function it_should_throw_an_exception_on_referrals(ClientQueue $queue): void
     {
+        $this->beConstructedWith(
+            (new ClientOptions())
+                ->setReferral('throw')
+        );
+
         $response = new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', 'foo', new LdapUrl('foo')));
         $request = new LdapMessageRequest(1, new DeleteRequest('cn=foo'));
 
@@ -53,7 +63,6 @@ class ClientReferralHandlerSpec extends ObjectBehavior
                     $request,
                     $response,
                     $queue,
-                    (new ClientOptions())->setReferral('throw')
                 ]
             );
     }
@@ -63,6 +72,13 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         ClientQueue $queue,
         LdapClient $ldapClient
     ): void {
+        $this->beConstructedWith(
+            (new ClientOptions())
+                ->setReferral('follow')
+                ->setReferralLimit(10)
+                ->setReferralChaser($chaser->getWrappedObject())
+        );
+
         $chaser->client(Argument::any())->willReturn($ldapClient);
         $bind = new SimpleBindRequest('foo', 'bar');
         $chaser->chase(Argument::any(), Argument::any(), Argument::any())->willReturn($bind);
@@ -74,11 +90,7 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             new LdapMessageRequest(2, new DeleteRequest('foo')),
             new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', '', new LdapUrl('foo'))),
-            $queue,
-            (new ClientOptions())
-                ->setReferral('follow')
-                ->setReferralLimit(10)
-                ->setReferralChaser($chaser->getWrappedObject())
+            $queue
         )->shouldBeLike($message);
     }
 
@@ -90,6 +102,8 @@ class ClientReferralHandlerSpec extends ObjectBehavior
             ->setReferral('follow')
             ->setReferralLimit(-1)
             ->setReferralChaser($chaser->getWrappedObject());
+
+        $this->beConstructedWith($clientOptions);
 
         $chaser->client(Argument::any())
             ->willReturn(new LdapClient($clientOptions));
@@ -128,6 +142,13 @@ class ClientReferralHandlerSpec extends ObjectBehavior
             Argument::any(),
         )->willThrow(new SkipReferralException());
 
+        $this->beConstructedWith(
+            (new ClientOptions())
+                ->setReferral('follow')
+                ->setReferralLimit(10)
+                ->setReferralChaser($chaser->getWrappedObject())
+        );
+
         $this->shouldThrow(new OperationException(
             'All referral attempts have been exhausted. ',
             ResultCode::REFERRAL
@@ -148,10 +169,6 @@ class ClientReferralHandlerSpec extends ObjectBehavior
                     )
                 ),
                 $queue,
-                (new ClientOptions())
-                    ->setReferral('follow')
-                    ->setReferralLimit(10)
-                    ->setReferralChaser($chaser->getWrappedObject())
             ]
         );
     }
@@ -161,6 +178,13 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         ClientQueue $queue,
         LdapClient $ldapClient
     ): void {
+        $this->beConstructedWith(
+            (new ClientOptions())
+                ->setReferral('follow')
+                ->setReferralLimit(10)
+                ->setReferralChaser($chaser->getWrappedObject())
+        );
+
         $chaser->client(Argument::any())->willReturn($ldapClient);
         $bind = new SimpleBindRequest('foo', 'bar');
 
@@ -176,11 +200,7 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             new LdapMessageRequest(1, new DeleteRequest('foo')),
             new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', '', new LdapUrl('foo'))),
-            $queue,
-            (new ClientOptions())
-                ->setReferral('follow')
-                ->setReferralLimit(10)
-                ->setReferralChaser($chaser->getWrappedObject())
+            $queue
         )->shouldBeLike($message);
     }
 
@@ -189,6 +209,13 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         ClientQueue $queue,
         LdapClient $ldapClient
     ): void {
+        $this->beConstructedWith(
+            (new ClientOptions())
+                ->setReferral('follow')
+                ->setReferralLimit(10)
+                ->setReferralChaser($chaser->getWrappedObject())
+        );
+
         $chaser->client(Argument::any())->willReturn($ldapClient);
         $bind = new SimpleBindRequest('foo', 'bar');
         $chaser->chase(Argument::any(), Argument::any(), Argument::any())->willReturn($bind);
@@ -202,11 +229,7 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             new LdapMessageRequest(1, new DeleteRequest('foo')),
             new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', '', new LdapUrl('foo'))),
-            $queue,
-            (new ClientOptions())
-                ->setReferral('follow')
-                ->setReferralLimit(10)
-                ->setReferralChaser($chaser->getWrappedObject())
+            $queue
         )->shouldBeLike($message);
     }
 
@@ -215,6 +238,13 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         ClientQueue $queue,
         LdapClient $ldapClient
     ): void {
+        $this->beConstructedWith(
+            (new ClientOptions())
+                ->setReferral('follow')
+                ->setReferralLimit(10)
+                ->setReferralChaser($chaser->getWrappedObject())
+        );
+
         $chaser->client(Argument::any())->willReturn($ldapClient);
         $chaser->chase(Argument::any(), Argument::any(), Argument::any())->willReturn(new SimpleBindRequest('foo', 'bar'));
         $ldapClient->send(Argument::any())->shouldBeCalledTimes(1);
@@ -225,11 +255,7 @@ class ClientReferralHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             new LdapMessageRequest(1, new SimpleBindRequest('foo', 'bar')),
             new LdapMessageResponse(1, new BindResponse(new LdapResult(ResultCode::REFERRAL, '', '', new LdapUrl('foo')))),
-            $queue,
-            (new ClientOptions())
-                ->setReferral('follow')
-                ->setReferralLimit(10)
-                ->setReferralChaser($chaser->getWrappedObject())
+            $queue
         )->shouldBeLike($message);
     }
 }

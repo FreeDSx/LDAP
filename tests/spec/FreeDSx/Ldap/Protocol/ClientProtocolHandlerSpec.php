@@ -48,15 +48,24 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         ResponseHandlerInterface $responseHandler,
         RequestHandlerInterface $requestHandler
     ): void {
-        $protocolHandlerFactory->forResponse(Argument::any(), Argument::any())->willReturn($responseHandler);
-        $protocolHandlerFactory->forRequest(Argument::any())->willReturn($requestHandler);
-        $queue->generateId()->willReturn(1);
+        $protocolHandlerFactory
+            ->forResponse(
+                Argument::any(),
+                Argument::any()
+            )->willReturn($responseHandler);
+
+        $protocolHandlerFactory
+            ->forRequest(Argument::any())
+            ->willReturn($requestHandler);
+
+        $queue->generateId()
+            ->willReturn(1);
 
         $this->beConstructedWith(
             new ClientOptions(),
-            $queue,
             $pool,
-            $protocolHandlerFactory
+            $protocolHandlerFactory,
+            $queue,
         );
     }
 
@@ -94,7 +103,6 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
             $messageRequest,
             $messageResponse,
             $queue,
-            new ClientOptions()
         )->shouldBeCalledOnce()
             ->willReturn($messageResponse);
 
@@ -114,7 +122,6 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
             Argument::any(),
             Argument::any(),
             Argument::any(),
-            Argument::any()
         )->shouldNotBeCalled();
 
         $this->send($request)->shouldBeEqualTo(null);
@@ -136,7 +143,6 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
             $messageRequest,
             $messageResponse,
             $queue,
-            new ClientOptions()
         )->shouldBeCalledOnce()
             ->willThrow(new \FreeDSx\Socket\Exception\ConnectionException('foo'));
 
@@ -157,7 +163,6 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
             $messageRequest,
             $messageResponse,
             $queue,
-            new ClientOptions()
         )->shouldBeCalledOnce()
             ->willReturn($messageResponse);
 

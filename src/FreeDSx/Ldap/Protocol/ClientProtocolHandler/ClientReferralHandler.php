@@ -42,9 +42,11 @@ use function count;
  */
 class ClientReferralHandler implements ResponseHandlerInterface
 {
-    private ClientOptions $options;
-
     private ?ReferralContext $referralContext = null;
+
+    public function __construct(private readonly ClientOptions $options)
+    {
+    }
 
     /**
      * {@inheritDoc}
@@ -55,10 +57,8 @@ class ClientReferralHandler implements ResponseHandlerInterface
     public function handleResponse(
         LdapMessageRequest $messageTo,
         LdapMessageResponse $messageFrom,
-        ClientQueue $queue,
-        ClientOptions $options
+        ClientQueue $queue
     ): ?LdapMessageResponse {
-        $this->options = $options;
         $result = $messageFrom->getResponse();
         switch ($this->options->getReferral()) {
             case 'throw':

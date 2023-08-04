@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use Closure;
-use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Exception\RuntimeException;
@@ -75,7 +74,6 @@ class ClientSyncHandler extends ClientBasicHandler
         LdapMessageRequest $messageTo,
         LdapMessageResponse $messageFrom,
         ClientQueue $queue,
-        ClientOptions $options,
     ): ?LdapMessageResponse {
         $this->initializeSync($messageTo);
 

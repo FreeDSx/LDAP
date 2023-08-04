@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap\Protocol\Factory;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -40,6 +41,11 @@ use PhpSpec\ObjectBehavior;
 
 class ClientProtocolHandlerFactorySpec extends ObjectBehavior
 {
+    public function let(): void
+    {
+        $this->beConstructedWith(new ClientOptions());
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientProtocolHandlerFactory::class);

@@ -55,7 +55,6 @@ class ClientExtendedOperationHandlerSpec extends ObjectBehavior
             new LdapMessageRequest(1, new ExtendedRequest('foo', 'bar')),
             $response,
             $queue,
-            new ClientOptions(),
         )->shouldBeEqualTo($response);
     }
 

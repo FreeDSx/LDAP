@@ -114,7 +114,6 @@ class ClientSearchHandlerSpec extends ObjectBehavior
             $messageTo,
             $response,
             $queue,
-            new ClientOptions()
         )->getResponse()
             ->shouldBeAnInstanceOf(SearchResponse::class);
     }
@@ -150,7 +149,6 @@ class ClientSearchHandlerSpec extends ObjectBehavior
             $messageTo,
             $response,
             $queue,
-            new ClientOptions()
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
                 dn: 'cn=foo',

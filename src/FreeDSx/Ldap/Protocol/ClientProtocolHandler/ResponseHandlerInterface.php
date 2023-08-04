@@ -29,12 +29,10 @@ interface ResponseHandlerInterface
     /**
      * Pass the message response to the handler specific to it.
      *
-     * @param ClientOptions $options
      */
     public function handleResponse(
         LdapMessageRequest $messageTo,
         LdapMessageResponse $messageFrom,
-        ClientQueue $queue,
-        ClientOptions $options
+        ClientQueue $queue
     ): ?LdapMessageResponse;
 }

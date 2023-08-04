@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\Factory;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Operation;
 use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Operation\Response;
@@ -28,6 +29,10 @@ use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
  */
 class ClientProtocolHandlerFactory
 {
+    public function __construct(private readonly ClientOptions $clientOptions)
+    {
+    }
+
     public function forRequest(Request\RequestInterface $request): RequestHandlerInterface
     {
         if ($request instanceof Request\SyncRequest) {
@@ -54,7 +59,7 @@ class ClientProtocolHandlerFactory
         } elseif ($response instanceof  Response\SyncInfoMessage) {
             return new ClientProtocolHandler\ClientSyncHandler();
         } elseif ($response instanceof Operation\LdapResult && $response->getResultCode() === ResultCode::REFERRAL) {
-            return new ClientProtocolHandler\ClientReferralHandler();
+            return new ClientProtocolHandler\ClientReferralHandler($this->clientOptions);
         } elseif ($request instanceof Request\ExtendedRequest && $request->getName() === Request\ExtendedRequest::OID_START_TLS) {
             return new ClientProtocolHandler\ClientStartTlsHandler();
         } elseif ($response instanceof Response\ExtendedResponse) {

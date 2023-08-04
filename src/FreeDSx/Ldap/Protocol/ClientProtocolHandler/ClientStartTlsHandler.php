@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
-use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -36,8 +35,7 @@ class ClientStartTlsHandler implements ResponseHandlerInterface
     public function handleResponse(
         LdapMessageRequest $messageTo,
         LdapMessageResponse $messageFrom,
-        ClientQueue $queue,
-        ClientOptions $options
+        ClientQueue $queue
     ): ?LdapMessageResponse {
         /** @var ExtendedResponse $response */
         $response = $messageFrom->getResponse();

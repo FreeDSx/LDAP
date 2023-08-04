@@ -54,8 +54,8 @@ class ClientProtocolHandler
         private readonly ClientOptions $options,
         private readonly SocketPool $pool,
         private readonly ClientProtocolHandlerFactory $protocolHandlerFactory,
-        private readonly ControlBag $controls = new ControlBag(),
         private ?ClientQueue $queue = null,
+        private readonly ControlBag $controls = new ControlBag(),
     ) {
     }
 
@@ -137,8 +137,7 @@ class ClientProtocolHandler
                 )->handleResponse(
                     $messageTo,
                     $messageFrom,
-                    $this->queue(),
-                    $this->options
+                    $this->queue()
                 );
             }
 

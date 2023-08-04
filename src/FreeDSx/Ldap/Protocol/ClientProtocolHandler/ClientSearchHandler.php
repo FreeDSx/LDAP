@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
-use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -49,7 +48,6 @@ class ClientSearchHandler extends ClientBasicHandler
         LdapMessageRequest $messageTo,
         LdapMessageResponse $messageFrom,
         ClientQueue $queue,
-        ClientOptions $options,
     ): ?LdapMessageResponse {
         $finalResponse = $this->search(
             $messageFrom,
@@ -60,8 +58,7 @@ class ClientSearchHandler extends ClientBasicHandler
         return parent::handleResponse(
             $messageTo,
             $finalResponse,
-            $queue,
-            $options
+            $queue
         );
     }
 }

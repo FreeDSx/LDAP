@@ -138,7 +138,6 @@ class ClientSyncHandlerSpec extends ObjectBehavior
             $messageTo,
             $response,
             $queue,
-            new ClientOptions()
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
                 dn: 'cn=foo',
@@ -218,7 +217,6 @@ class ClientSyncHandlerSpec extends ObjectBehavior
             $messageTo,
             $response,
             $queue,
-            new ClientOptions()
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
                 dn: 'cn=foo',
@@ -268,7 +266,6 @@ class ClientSyncHandlerSpec extends ObjectBehavior
             $messageTo,
             $response,
             $queue,
-            new ClientOptions()
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
                 dn: 'cn=foo',
@@ -326,7 +323,6 @@ class ClientSyncHandlerSpec extends ObjectBehavior
             $messageTo,
             $response,
             $queue,
-            new ClientOptions()
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
                 dn: 'cn=foo',
