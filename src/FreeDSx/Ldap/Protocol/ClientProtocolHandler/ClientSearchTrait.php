@@ -51,7 +51,6 @@ trait ClientSearchTrait
         /** @var SearchRequest $searchRequest */
         $searchRequest = $messageTo->getRequest();
 
-        $cancelled = null;
         $entryResults = [];
         $referralResults = [];
 
