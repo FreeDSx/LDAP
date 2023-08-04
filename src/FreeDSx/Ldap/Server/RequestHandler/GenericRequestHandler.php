@@ -44,7 +44,8 @@ class GenericRequestHandler implements RequestHandlerInterface
 
     public function bind(
         string $username,
-        string $password
+        #[\SensitiveParameter]
+        string $password,
     ): bool {
         return false;
     }

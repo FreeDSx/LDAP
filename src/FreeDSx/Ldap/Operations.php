@@ -68,6 +68,7 @@ class Operations
      */
     public static function bind(
         string $username,
+        #[\SensitiveParameter]
         string $password,
     ): SimpleBindRequest {
         return new SimpleBindRequest(

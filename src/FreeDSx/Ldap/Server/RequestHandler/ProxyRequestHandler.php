@@ -51,7 +51,8 @@ class ProxyRequestHandler implements RequestHandlerInterface
      */
     public function bind(
         string $username,
-        string $password
+        #[\SensitiveParameter]
+        string $password,
     ): bool {
         try {
             return (bool) $this->ldap()->bind($username, $password);

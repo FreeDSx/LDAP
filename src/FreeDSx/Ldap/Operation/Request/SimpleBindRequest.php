@@ -34,6 +34,7 @@ class SimpleBindRequest extends BindRequest
 
     public function __construct(
         string $username,
+        #[\SensitiveParameter]
         string $password,
         int $version = 3
     ) {
