@@ -66,7 +66,8 @@ class LdapClient
      */
     public function bind(
         string $username,
-        string $password
+        #[\SensitiveParameter]
+        string $password,
     ): LdapMessageResponse {
         return $this->sendAndReceive(
             Operations::bind($username, $password)
@@ -84,6 +85,7 @@ class LdapClient
      * @throws SaslException
      */
     public function bindSasl(
+        #[\SensitiveParameter]
         array $options = [],
         string $mechanism = ''
     ): LdapMessageResponse {
