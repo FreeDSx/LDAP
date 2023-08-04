@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace spec\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -46,12 +47,21 @@ class LdapClientSpec extends ObjectBehavior
 {
     use TestFactoryTrait;
 
-    public function let(ClientProtocolHandler $handler): void
-    {
+    public function let(
+        ClientProtocolHandler $handler,
+        Container $mockContainer,
+    ): void {
+        $mockContainer
+            ->get(ClientProtocolHandler::class)
+            ->willReturn($handler);
+
         $handler->isConnected()
             ->willReturn(false);
 
-        $this->setProtocolHandler($handler);
+        $this->beConstructedWith(
+            new ClientOptions(),
+            $mockContainer,
+        );
     }
 
     public function it_is_initializable(): void

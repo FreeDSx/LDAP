@@ -55,8 +55,13 @@ class LdapClient
 
     private ?ClientProtocolHandler $handler = null;
 
-    public function __construct(private ClientOptions $options = new ClientOptions())
-    {
+    private Container $container;
+
+    public function __construct(
+        private ClientOptions $options = new ClientOptions(),
+        ?Container $container = null,
+    ) {
+        $this->container = $container ?? new Container($this->options);
     }
 
     /**
@@ -426,7 +431,9 @@ class LdapClient
      */
     public function controls(): ControlBag
     {
-        return $this->handler()->controls();
+        return $this
+            ->handler()
+            ->controls();
     }
 
     /**
@@ -456,13 +463,6 @@ class LdapClient
         return $this;
     }
 
-    public function setProtocolHandler(ClientProtocolHandler $handler = null): self
-    {
-        $this->handler = $handler;
-
-        return $this;
-    }
-
     /**
      * A simple check to determine if this client has an established connection to a server.
      */
@@ -485,7 +485,7 @@ class LdapClient
     private function handler(): ClientProtocolHandler
     {
         if ($this->handler === null) {
-            $this->handler = new Protocol\ClientProtocolHandler($this->options);
+            $this->handler = $this->container->get(ClientProtocolHandler::class);
         }
 
         return $this->handler;
