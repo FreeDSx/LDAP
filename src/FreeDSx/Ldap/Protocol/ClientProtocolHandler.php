@@ -138,7 +138,6 @@ class ClientProtocolHandler
                 )->handleResponse(
                     $messageTo,
                     $messageFrom,
-                    $this->queue()
                 );
             }
 

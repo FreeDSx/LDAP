@@ -112,7 +112,10 @@ class Container
 
     private function makeClientProtocolHandlerFactory(): ClientProtocolHandlerFactory
     {
-        return new ClientProtocolHandlerFactory($this->clientOptions);
+        return new ClientProtocolHandlerFactory(
+            clientOptions: $this->clientOptions,
+            queueInstantiator: $this->get(ClientQueueInstantiator::class),
+        );
     }
 
     private function makePcntlServerRunner(): PcntlServerRunner

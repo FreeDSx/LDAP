@@ -37,13 +37,24 @@ use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientStartTlsHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSyncHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientUnbindHandler;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use PhpSpec\ObjectBehavior;
 
 class ClientProtocolHandlerFactorySpec extends ObjectBehavior
 {
-    public function let(): void
-    {
-        $this->beConstructedWith(new ClientOptions());
+    public function let(
+        ClientQueueInstantiator $queueInstantiator,
+        ClientQueue $queue,
+    ): void {
+        $queueInstantiator
+            ->make()
+            ->willReturn($queue);
+
+        $this->beConstructedWith(
+            new ClientOptions(),
+            $queueInstantiator,
+        );
     }
 
     public function it_is_initializable(): void

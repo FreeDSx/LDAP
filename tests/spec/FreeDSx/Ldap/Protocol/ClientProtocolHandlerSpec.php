@@ -105,7 +105,6 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         $responseHandler->handleResponse(
             $messageRequest,
             $messageResponse,
-            $queue,
         )->shouldBeCalledOnce()
             ->willReturn($messageResponse);
 
@@ -122,7 +121,6 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         }))->shouldBeCalledOnce()
             ->willReturn(null);
         $responseHandler->handleResponse(
-            Argument::any(),
             Argument::any(),
             Argument::any(),
         )->shouldNotBeCalled();
@@ -145,7 +143,6 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         $responseHandler->handleResponse(
             $messageRequest,
             $messageResponse,
-            $queue,
         )->shouldBeCalledOnce()
             ->willThrow(new \FreeDSx\Socket\Exception\ConnectionException('foo'));
 
@@ -165,7 +162,6 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
         $responseHandler->handleResponse(
             $messageRequest,
             $messageResponse,
-            $queue,
         )->shouldBeCalledOnce()
             ->willReturn($messageResponse);
 

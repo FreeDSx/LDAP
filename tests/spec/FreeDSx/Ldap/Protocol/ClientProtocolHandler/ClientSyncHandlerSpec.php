@@ -48,6 +48,11 @@ class ClientSyncHandlerSpec extends ObjectBehavior
 {
     use TestFactoryTrait;
 
+    public function let(ClientQueue $queue): void
+    {
+        $this->beConstructedWith($queue);
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientSyncHandler::class);
@@ -137,7 +142,6 @@ class ClientSyncHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             $messageTo,
             $response,
-            $queue,
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
                 dn: 'cn=foo',
@@ -216,7 +220,6 @@ class ClientSyncHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             $messageTo,
             $response,
-            $queue,
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
                 dn: 'cn=foo',
@@ -265,7 +268,6 @@ class ClientSyncHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             $messageTo,
             $response,
-            $queue,
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
                 dn: 'cn=foo',
@@ -322,7 +324,6 @@ class ClientSyncHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             $messageTo,
             $response,
-            $queue,
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
                 dn: 'cn=foo',

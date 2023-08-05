@@ -27,6 +27,10 @@ use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
  */
 class ClientStartTlsHandler implements ResponseHandlerInterface
 {
+    public function __construct(private readonly ClientQueue $queue)
+    {
+    }
+
     /**
      * {@inheritDoc}
      * @throws ConnectionException
@@ -34,8 +38,7 @@ class ClientStartTlsHandler implements ResponseHandlerInterface
      */
     public function handleResponse(
         LdapMessageRequest $messageTo,
-        LdapMessageResponse $messageFrom,
-        ClientQueue $queue
+        LdapMessageResponse $messageFrom
     ): ?LdapMessageResponse {
         /** @var ExtendedResponse $response */
         $response = $messageFrom->getResponse();
@@ -46,7 +49,7 @@ class ClientStartTlsHandler implements ResponseHandlerInterface
                 $response->getDiagnosticMessage()
             ));
         }
-        $queue->encrypt();
+        $this->queue->encrypt();
 
         return $messageFrom;
     }

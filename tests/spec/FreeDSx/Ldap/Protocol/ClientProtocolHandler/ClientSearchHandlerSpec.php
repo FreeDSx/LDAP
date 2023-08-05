@@ -40,6 +40,11 @@ class ClientSearchHandlerSpec extends ObjectBehavior
 {
     use TestFactoryTrait;
 
+    public function let(ClientQueue $queue): void
+    {
+        $this->beConstructedWith($queue);
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientSearchHandler::class);
@@ -113,7 +118,6 @@ class ClientSearchHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             $messageTo,
             $response,
-            $queue,
         )->getResponse()
             ->shouldBeAnInstanceOf(SearchResponse::class);
     }
@@ -148,7 +152,6 @@ class ClientSearchHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             $messageTo,
             $response,
-            $queue,
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
                 dn: 'cn=foo',

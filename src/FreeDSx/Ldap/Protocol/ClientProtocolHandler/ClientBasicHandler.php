@@ -67,8 +67,7 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
      */
     public function handleResponse(
         LdapMessageRequest $messageTo,
-        LdapMessageResponse $messageFrom,
-        ClientQueue $queue
+        LdapMessageResponse $messageFrom
     ): ?LdapMessageResponse {
         $result = $messageFrom->getResponse();
 

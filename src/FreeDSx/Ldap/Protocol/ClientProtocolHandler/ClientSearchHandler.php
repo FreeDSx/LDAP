@@ -27,6 +27,10 @@ class ClientSearchHandler extends ClientBasicHandler
 {
     use ClientSearchTrait;
 
+    public function __construct(private readonly ClientQueue $queue)
+    {
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -47,18 +51,16 @@ class ClientSearchHandler extends ClientBasicHandler
     public function handleResponse(
         LdapMessageRequest $messageTo,
         LdapMessageResponse $messageFrom,
-        ClientQueue $queue,
     ): ?LdapMessageResponse {
         $finalResponse = $this->search(
             $messageFrom,
             $messageTo,
-            $queue,
+            $this->queue,
         );
 
         return parent::handleResponse(
             $messageTo,
-            $finalResponse,
-            $queue
+            $finalResponse
         );
     }
 }

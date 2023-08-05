@@ -89,8 +89,7 @@ class ClientReferralHandlerSpec extends ObjectBehavior
 
         $this->handleResponse(
             new LdapMessageRequest(2, new DeleteRequest('foo')),
-            new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', '', new LdapUrl('foo'))),
-            $queue
+            new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', '', new LdapUrl('foo')))
         )->shouldBeLike($message);
     }
 
@@ -199,8 +198,7 @@ class ClientReferralHandlerSpec extends ObjectBehavior
 
         $this->handleResponse(
             new LdapMessageRequest(1, new DeleteRequest('foo')),
-            new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', '', new LdapUrl('foo'))),
-            $queue
+            new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', '', new LdapUrl('foo')))
         )->shouldBeLike($message);
     }
 
@@ -228,8 +226,7 @@ class ClientReferralHandlerSpec extends ObjectBehavior
 
         $this->handleResponse(
             new LdapMessageRequest(1, new DeleteRequest('foo')),
-            new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', '', new LdapUrl('foo'))),
-            $queue
+            new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', '', new LdapUrl('foo')))
         )->shouldBeLike($message);
     }
 
@@ -254,8 +251,7 @@ class ClientReferralHandlerSpec extends ObjectBehavior
 
         $this->handleResponse(
             new LdapMessageRequest(1, new SimpleBindRequest('foo', 'bar')),
-            new LdapMessageResponse(1, new BindResponse(new LdapResult(ResultCode::REFERRAL, '', '', new LdapUrl('foo')))),
-            $queue
+            new LdapMessageResponse(1, new BindResponse(new LdapResult(ResultCode::REFERRAL, '', '', new LdapUrl('foo'))))
         )->shouldBeLike($message);
     }
 }
