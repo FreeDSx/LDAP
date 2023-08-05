@@ -56,9 +56,8 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
      * @throws ConnectionException
      * @throws EncoderException
      */
-    public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
+    public function handleRequest(LdapMessageRequest $message): ?LdapMessageResponse
     {
-        $message = $context->messageToSend();
         $this->queue->sendMessage($message);
 
         return $this->queue->getMessage($message->getMessageId());

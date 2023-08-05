@@ -64,15 +64,15 @@ class ClientSyncHandler extends ClientBasicHandler
     /**
      * {@inheritDoc}
      */
-    public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
+    public function handleRequest(LdapMessageRequest $message): ?LdapMessageResponse
     {
         /** @var SearchRequest $request */
-        $request = $context->getRequest();
+        $request = $message->getRequest();
         if ($request->getBaseDn() === null) {
             $request->setBaseDn($this->options->getBaseDn() ?? null);
         }
 
-        return parent::handleRequest($context);
+        return parent::handleRequest($message);
     }
 
     /**

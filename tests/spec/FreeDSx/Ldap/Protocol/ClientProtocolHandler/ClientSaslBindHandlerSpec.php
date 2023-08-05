@@ -19,14 +19,13 @@ use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
-use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientProtocolContext;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSaslBindHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapper\SaslMessageWrapper;
+use FreeDSx\Ldap\Protocol\RootDseLoader;
 use FreeDSx\Sasl\Challenge\ChallengeInterface;
 use FreeDSx\Sasl\Mechanism\MechanismInterface;
 use FreeDSx\Sasl\Sasl;
@@ -43,15 +42,24 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
 
     public function let(
         Sasl $sasl,
-        ClientProtocolContext $context,
         ClientQueue $queue,
+        RootDseLoader $rootDseLoader,
     ): void {
-        $queue->sendMessage(Argument::any())->willReturn($queue);
-        $context->getControls()->willReturn([]);
-        $context->getRootDse()->willReturn(Entry::fromArray('', [
-            'supportedSaslMechanisms' => ['DIGEST-MD5', 'CRAM-MD5'],
-        ]));
-        $queue->generateId()->willReturn(2, 3, 4, 5, 6);
+        $queue
+            ->sendMessage(Argument::any())
+            ->willReturn($queue);
+
+        $rootDseLoader
+            ->load()
+            ->willReturn(
+                Entry::fromArray(
+                    '',
+                    ['supportedSaslMechanisms' => ['DIGEST-MD5', 'CRAM-MD5'],]
+                )
+            );
+        $queue
+            ->generateId()
+            ->willReturn(2, 3, 4, 5, 6);
 
         $this->saslChallenge = new LdapMessageResponse(
             1,
@@ -64,6 +72,7 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
 
         $this->beConstructedWith(
             $queue,
+            $rootDseLoader,
             $sasl,
         );
     }
@@ -78,12 +87,15 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
         $this->shouldBeAnInstanceOf(RequestHandlerInterface::class);
     }
 
-    public function it_should_handle_a_sasl_bind_request(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue): void
-    {
+    public function it_should_handle_a_sasl_bind_request(
+        ChallengeInterface $challenge,
+        MechanismInterface $mech,
+        Sasl $sasl,
+        ClientQueue $queue,
+        RootDseLoader $rootDseLoader,
+    ): void {
         $saslBind = Operations::bindSasl(['username' => 'foo', 'password' => 'bar']);
-        $context->getRequest()->willReturn($saslBind);
-        $context->messageToSend()->willReturn(new LdapMessageRequest(1, $saslBind));
-
+        $messageRequest = new LdapMessageRequest(1, $saslBind);
 
         $queue->getMessage(1)->willReturn($this->saslChallenge);
         $queue->getMessage(2)->willReturn($this->saslComplete);
@@ -101,21 +113,27 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
             (new SaslContext())->setResponse('foo')->setIsComplete(true)
         );
 
-        $context->getRootDse(true)->willReturn(
-            Entry::fromArray('', [
-                'supportedSaslMechanisms' => ['DIGEST-MD5', 'CRAM-MD5'],
-            ])
-        );
+        $rootDseLoader
+            ->load(true)
+            ->willReturn(
+                Entry::fromArray('', [
+                    'supportedSaslMechanisms' => ['DIGEST-MD5', 'CRAM-MD5'],
+                ])
+            );
 
-        $this->handleRequest($context)->shouldBeEqualTo($this->saslComplete);
+        $this->handleRequest($messageRequest)
+            ->shouldBeEqualTo($this->saslComplete);
     }
 
-    public function it_should_detect_a_downgrade_attack(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue): void
-    {
+    public function it_should_detect_a_downgrade_attack(
+        ChallengeInterface $challenge,
+        MechanismInterface $mech,
+        Sasl $sasl,
+        ClientQueue $queue,
+        RootDseLoader $rootDseLoader,
+    ): void {
         $saslBind = Operations::bindSasl(['username' => 'foo', 'password' => 'bar']);
-        $context->getRequest()->willReturn($saslBind);
-        $context->messageToSend()->willReturn(new LdapMessageRequest(1, $saslBind));
-
+        $messageRequest = new LdapMessageRequest(1, $saslBind);
 
         $queue->getMessage(1)->willReturn($this->saslChallenge);
         $queue->getMessage(2)->willReturn($this->saslComplete);
@@ -133,26 +151,37 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
             (new SaslContext())->setResponse('foo')->setIsComplete(true)
         );
 
-        $context->getRootDse()->willReturn(
-            Entry::fromArray('', [
-                'supportedSaslMechanisms' => ['PLAIN'],
-            ])
-        );
-        $context->getRootDse(true)->willReturn(
-            Entry::fromArray('', [
-                'supportedSaslMechanisms' => ['DIGEST-MD5', 'CRAM-MD5'],
-            ])
-        );
+        $rootDseLoader
+            ->load()
+            ->willReturn(
+                Entry::fromArray('', [
+                    'supportedSaslMechanisms' => ['PLAIN'],
+                ])
+            );
+        $rootDseLoader
+            ->load(true)
+            ->willReturn(
+                Entry::fromArray('', [
+                    'supportedSaslMechanisms' => ['DIGEST-MD5', 'CRAM-MD5'],
+                ])
+            );
 
-        $this->shouldThrow(new BindException('Possible SASL downgrade attack detected. The advertised SASL mechanisms have changed.'))
-            ->during('handleRequest', [$context]);
+        $this->shouldThrow(
+            new BindException(
+                'Possible SASL downgrade attack detected. The advertised SASL mechanisms have changed.'
+            )
+        )->during('handleRequest', [$messageRequest]);
     }
 
-    public function it_should_not_query_the_rootdse_if_the_mechanism_was_explicitly_specified(ChallengeInterface $challenge, MechanismInterface $mech, Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue): void
-    {
+    public function it_should_not_query_the_rootdse_if_the_mechanism_was_explicitly_specified(
+        ChallengeInterface $challenge,
+        MechanismInterface $mech,
+        Sasl $sasl,
+        ClientQueue $queue,
+        RootDseLoader $rootDseLoader,
+    ): void {
         $saslBind = Operations::bindSasl(['username' => 'foo', 'password' => 'bar'], 'DIGEST-MD5');
-        $context->getRequest()->willReturn($saslBind);
-        $context->messageToSend()->willReturn(new LdapMessageRequest(1, $saslBind));
+        $messageRequest = new LdapMessageRequest(1, $saslBind);
 
         $queue->getMessage(1)->willReturn($this->saslChallenge);
         $queue->getMessage(2)->willReturn($this->saslComplete);
@@ -170,8 +199,12 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
             (new SaslContext())->setResponse('foo')->setIsComplete(true)
         );
 
-        $context->getRootDse(Argument::any())->shouldNotBeCalled();
-        $this->handleRequest($context)->shouldBeEqualTo($this->saslComplete);
+        $rootDseLoader
+            ->load(Argument::any())
+            ->shouldNotBeCalled();
+
+        $this->handleRequest($messageRequest)
+            ->shouldBeEqualTo($this->saslComplete);
     }
 
     public function it_should_set_the_set_the_security_layer_on_the_queue_if_one_was_negotiated(
@@ -179,12 +212,10 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
         ChallengeInterface $challenge,
         MechanismInterface $mech,
         Sasl $sasl,
-        ClientProtocolContext $context,
         ClientQueue $queue
     ): void {
         $saslBind = Operations::bindSasl(['username' => 'foo', 'password' => 'bar'], 'DIGEST-MD5');
-        $context->getRequest()->willReturn($saslBind);
-        $context->messageToSend()->willReturn(new LdapMessageRequest(1, $saslBind));
+        $messageRequest = new LdapMessageRequest(1, $saslBind);
 
         $queue->getMessage(1)->willReturn($this->saslChallenge);
         $queue->getMessage(2)->willReturn($this->saslComplete);
@@ -207,6 +238,8 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
         $mech->securityLayer()->shouldBeCalled()->willReturn($securityLayer);
 
         $queue->setMessageWrapper(Argument::type(SaslMessageWrapper::class))->shouldBeCalled()->willReturn($queue);
-        $this->handleRequest($context)->shouldBeEqualTo($this->saslComplete);
+
+        $this->handleRequest($messageRequest)
+            ->shouldBeEqualTo($this->saslComplete);
     }
 }

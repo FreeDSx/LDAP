@@ -14,10 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -26,9 +24,6 @@ use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
-use FreeDSx\Ldap\Operation\Response\SearchResponse;
-use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientProtocolContext;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
@@ -42,15 +37,7 @@ use FreeDSx\Socket\Exception\ConnectionException as SocketException;
  */
 class ClientProtocolHandler
 {
-    public const ROOTDSE_ATTRIBUTES = [
-        'supportedSaslMechanisms',
-        'supportedControl',
-        'supportedLDAPVersion',
-    ];
-
     private ?ClientQueue $queue = null;
-
-    private ?Entry $rootDse = null;
 
     public function __construct(
         private readonly ClientQueueInstantiator $clientQueueInstantiator,
@@ -62,43 +49,6 @@ class ClientProtocolHandler
     public function controls(): ControlBag
     {
         return $this->controls;
-    }
-
-    /**
-     * Make a single search request to fetch the RootDSE. Handle the various errors that could occur.
-     *
-     * @throws ConnectionException
-     * @throws OperationException
-     * @throws SocketException
-     * @throws UnsolicitedNotificationException
-     * @throws EncoderException
-     * @throws BindException
-     * @throws ProtocolException
-     * @throws ReferralException
-     * @throws SaslException
-     */
-    public function fetchRootDse(bool $reload = false): Entry
-    {
-        if ($reload === false && $this->rootDse !== null) {
-            return $this->rootDse;
-        }
-        $message = $this->send(Operations::read('', ...self::ROOTDSE_ATTRIBUTES));
-        if ($message === null) {
-            throw new OperationException('Expected a search response for the RootDSE. None received.');
-        }
-
-        $searchResponse = $message->getResponse();
-        if (!$searchResponse instanceof SearchResponse) {
-            throw new OperationException('Expected a search response for the RootDSE. None received.');
-        }
-
-        $entry = $searchResponse->getEntries()->first();
-        if ($entry === null) {
-            throw new OperationException('Expected a single entry for the RootDSE. None received.');
-        }
-        $this->rootDse = $entry;
-
-        return $entry;
     }
 
     /**
@@ -117,18 +67,16 @@ class ClientProtocolHandler
         Control ...$controls
     ): ?LdapMessageResponse {
         try {
-            $context = new ClientProtocolContext(
-                request: $request,
-                controls: $controls,
-                protocolHandler: $this,
-                queue: $this->queue(),
+            $messageTo = new LdapMessageRequest(
+                $this->queue()->generateId(),
+                $request,
+                ...$this->controls->toArray(),
+                ...$controls,
             );
-
             $messageFrom = $this->protocolHandlerFactory
                 ->forRequest($request)
-                ->handleRequest($context);
+                ->handleRequest($messageTo);
 
-            $messageTo = $context->messageToSend();
             if ($messageFrom !== null) {
                 $messageFrom = $this->protocolHandlerFactory->forResponse(
                     $messageTo->getRequest(),

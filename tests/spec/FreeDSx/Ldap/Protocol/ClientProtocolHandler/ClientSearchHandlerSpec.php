@@ -24,7 +24,6 @@ use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientProtocolContext;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSearchHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
@@ -64,7 +63,6 @@ class ClientSearchHandlerSpec extends ObjectBehavior
     }
 
     public function it_should_send_a_request_and_get_a_response(
-        ClientProtocolContext $context,
         ClientQueue $queue,
         LdapMessageResponse $response
     ): void {
@@ -74,14 +72,11 @@ class ClientSearchHandlerSpec extends ObjectBehavior
         $queue->sendMessage($message)->shouldBeCalledOnce();
         $queue->getMessage(1)->shouldBeCalledOnce()->willReturn($response);
 
-        $context->getRequest()->willReturn($request);
-        $context->messageToSend()->willReturn($message);
-
-        $this->handleRequest($context)->shouldBeEqualTo($response);
+        $this->handleRequest($message)
+            ->shouldBeEqualTo($response);
     }
 
     public function it_should_set_a_default_DN_for_a_request_that_has_none(
-        ClientProtocolContext $context,
         LdapMessageResponse $response,
         ClientQueue $queue,
         LdapMessageRequest $message,
@@ -99,13 +94,10 @@ class ClientSearchHandlerSpec extends ObjectBehavior
         $message->getRequest()->willReturn($request);
         $request->getBaseDn()->willReturn(null);
 
-        $context->messageToSend()->willReturn($message);
-        $context->getRequest()->willReturn($request);
-
         $request->setBaseDn('cn=foo')
             ->shouldBeCalledOnce();
 
-        $this->handleRequest($context);
+        $this->handleRequest($message);
     }
 
     public function it_should_not_keep_getting_messages_when_the_first_result_is_search_done(ClientQueue $queue): void

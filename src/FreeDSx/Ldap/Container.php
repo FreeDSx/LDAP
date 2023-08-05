@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
+use FreeDSx\Ldap\Protocol\RootDseLoader;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Socket\SocketPool;
 
@@ -39,13 +40,22 @@ class Container
     public function __construct(
         ?ClientOptions $clientOptions = null,
         ?ServerOptions $serverOptions = null,
+        private readonly ?LdapClient $client = null,
     ) {
         if ($clientOptions) {
             $this->clientOptions = $clientOptions;
-            $this->registerClientClasses();
         }
         if ($serverOptions) {
             $this->serverOptions = $serverOptions;
+        }
+
+        if ($this->client) {
+            $this->instances[$this->client::class] = $this->client;
+        }
+        if ($clientOptions) {
+            $this->registerClientClasses();
+        }
+        if ($serverOptions) {
             $this->registerServerClasses();
         }
     }
@@ -73,17 +83,13 @@ class Container
         return $this->instances[$className];
     }
 
-    public function hasInstance(string $className): bool
-    {
-        return isset($this->instances[$className]);
-    }
-
     private function registerClientClasses(): void
     {
         $this->instanceFactory[ClientProtocolHandler::class] = $this->makeClientProtocolHandler(...);
         $this->instanceFactory[SocketPool::class] = $this->makeSocketPool(...);
         $this->instanceFactory[ClientProtocolHandlerFactory::class] = $this->makeClientProtocolHandlerFactory(...);
         $this->instanceFactory[ClientQueueInstantiator::class] = $this->makeClientQueueInstantiator(...);
+        $this->instanceFactory[RootDseLoader::class] = $this->makeRootDseLoader(...);
     }
 
     private function registerServerClasses(): void
@@ -114,7 +120,19 @@ class Container
         return new ClientProtocolHandlerFactory(
             clientOptions: $this->clientOptions,
             queueInstantiator: $this->get(ClientQueueInstantiator::class),
+            rootDseLoader: $this->get(RootDseLoader::class),
         );
+    }
+
+    private function makeRootDseLoader(): RootDseLoader
+    {
+        if ($this->client === null) {
+            throw new RuntimeException(
+                'Unable to instantiate the RootDseLoader without a LdapClient instance.'
+            );
+        }
+
+        return new RootDseLoader($this->get($this->client::class));
     }
 
     private function makePcntlServerRunner(): PcntlServerRunner

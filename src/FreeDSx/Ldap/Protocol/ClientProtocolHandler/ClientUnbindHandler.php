@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -36,10 +37,8 @@ class ClientUnbindHandler implements RequestHandlerInterface
      * @throws EncoderException
      * @throws ConnectionException
      */
-    public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
+    public function handleRequest(LdapMessageRequest $message): ?LdapMessageResponse
     {
-        $message = $context->messageToSend();
-
         $this->queue->sendMessage($message);
         $this->queue->close();
 

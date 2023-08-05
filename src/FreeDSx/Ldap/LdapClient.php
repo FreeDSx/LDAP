@@ -61,7 +61,10 @@ class LdapClient
         private ClientOptions $options = new ClientOptions(),
         ?Container $container = null,
     ) {
-        $this->container = $container ?? new Container($this->options);
+        $this->container = $container ?? new Container(
+            clientOptions: $this->options,
+            client: $this,
+        );
     }
 
     /**

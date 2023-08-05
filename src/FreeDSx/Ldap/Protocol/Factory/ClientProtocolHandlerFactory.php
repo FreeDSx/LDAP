@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
+use FreeDSx\Ldap\Protocol\RootDseLoader;
 
 /**
  * Retrieves the correct handler for a specific client protocol request / response.
@@ -34,6 +35,7 @@ class ClientProtocolHandlerFactory
     public function __construct(
         private readonly ClientOptions $clientOptions,
         private readonly ClientQueueInstantiator $queueInstantiator,
+        private readonly RootDseLoader $rootDseLoader,
     ) {
     }
 
@@ -52,7 +54,10 @@ class ClientProtocolHandlerFactory
         } elseif ($request instanceof Request\UnbindRequest) {
             return new ClientProtocolHandler\ClientUnbindHandler($this->queue());
         } elseif ($request instanceof Request\SaslBindRequest) {
-            return new ClientProtocolHandler\ClientSaslBindHandler($this->queue());
+            return new ClientProtocolHandler\ClientSaslBindHandler(
+                $this->queue(),
+                $this->rootDseLoader,
+            );
         } else {
             return new ClientProtocolHandler\ClientBasicHandler($this->queue());
         }

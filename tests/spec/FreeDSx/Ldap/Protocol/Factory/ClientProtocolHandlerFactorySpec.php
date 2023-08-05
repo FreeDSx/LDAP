@@ -39,6 +39,7 @@ use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientUnbindHandler;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
+use FreeDSx\Ldap\Protocol\RootDseLoader;
 use PhpSpec\ObjectBehavior;
 
 class ClientProtocolHandlerFactorySpec extends ObjectBehavior
@@ -46,6 +47,7 @@ class ClientProtocolHandlerFactorySpec extends ObjectBehavior
     public function let(
         ClientQueueInstantiator $queueInstantiator,
         ClientQueue $queue,
+        RootDseLoader $rootDseLoader,
     ): void {
         $queueInstantiator
             ->make()
@@ -54,6 +56,7 @@ class ClientProtocolHandlerFactorySpec extends ObjectBehavior
         $this->beConstructedWith(
             new ClientOptions(),
             $queueInstantiator,
+            $rootDseLoader,
         );
     }
 

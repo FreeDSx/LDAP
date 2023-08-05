@@ -26,7 +26,6 @@ use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
-use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientProtocolContext;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSyncHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
@@ -73,7 +72,6 @@ class ClientSyncHandlerSpec extends ObjectBehavior
     }
 
     public function it_should_set_a_default_DN_for_a_request_that_has_none(
-        ClientProtocolContext $context,
         LdapMessageResponse $response,
         ClientQueue $queue,
         LdapMessageRequest $message,
@@ -92,13 +90,10 @@ class ClientSyncHandlerSpec extends ObjectBehavior
         $message->getRequest()->willReturn($request);
         $request->getBaseDn()->willReturn(null);
 
-        $context->messageToSend()->willReturn($message);
-        $context->getRequest()->willReturn($request);
-
         $request->setBaseDn('cn=foo')
             ->shouldBeCalledOnce();
 
-        $this->handleRequest($context);
+        $this->handleRequest($message);
     }
 
 
