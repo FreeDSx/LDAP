@@ -30,9 +30,14 @@ use Prophecy\Argument;
 
 class ClientExtendedOperationHandlerSpec extends ObjectBehavior
 {
-    public function let(ExtendedResponseFactory $responseFactory): void
-    {
-        $this->beConstructedWith($responseFactory);
+    public function let(
+        ClientQueue $queue,
+        ExtendedResponseFactory $responseFactory
+    ): void {
+        $this->beConstructedWith(
+            $queue,
+            $responseFactory
+        );
     }
 
     public function it_is_initializable(): void
@@ -71,7 +76,7 @@ class ClientExtendedOperationHandlerSpec extends ObjectBehavior
 
         $context->getRequest()->willReturn($request);
         $context->messageToSend()->willReturn($extendedRequest);
-        $context->getQueue()->willReturn($queue);
+
         $this->handleRequest($context)->getResponse()->shouldBeAnInstanceOf(PasswordModifyResponse::class);
     }
 }

@@ -23,6 +23,11 @@ use PhpSpec\ObjectBehavior;
 
 class ClientUnbindHandlerSpec extends ObjectBehavior
 {
+    public function let(ClientQueue $queue): void
+    {
+        $this->beConstructedWith($queue);
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientUnbindHandler::class);
@@ -33,14 +38,15 @@ class ClientUnbindHandlerSpec extends ObjectBehavior
         $this->shouldBeAnInstanceOf(RequestHandlerInterface::class);
     }
 
-    public function it_should_send_the_message_and_close_the_queue(ClientProtocolContext $context, ClientQueue $queue): void
-    {
+    public function it_should_send_the_message_and_close_the_queue(
+        ClientProtocolContext $context,
+        ClientQueue $queue
+    ): void {
         $unbind = new LdapMessageRequest(1, new UnbindRequest());
         $queue->sendMessage($unbind)->shouldBeCalledOnce();
         $queue->close()->shouldBeCalledOnce();
 
         $context->messageToSend()->willReturn($unbind);
-        $context->getQueue()->willReturn($queue);
 
         $this->handleRequest($context)->shouldBeNull();
     }

@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap\Protocol;
 
-use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
@@ -66,7 +65,6 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
             ->willReturn(1);
 
         $this->beConstructedWith(
-            new ClientOptions(),
             $clientQueueInstantiator,
             $protocolHandlerFactory,
         );

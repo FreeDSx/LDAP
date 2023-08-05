@@ -41,11 +41,13 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
 
     private LdapMessageResponse $saslComplete;
 
-    public function let(Sasl $sasl, ClientProtocolContext $context, ClientQueue $queue, ClientProtocolHandler $protocolHandler): void
-    {
+    public function let(
+        Sasl $sasl,
+        ClientProtocolContext $context,
+        ClientQueue $queue,
+    ): void {
         $queue->sendMessage(Argument::any())->willReturn($queue);
         $context->getControls()->willReturn([]);
-        $context->getQueue()->willReturn($queue);
         $context->getRootDse()->willReturn(Entry::fromArray('', [
             'supportedSaslMechanisms' => ['DIGEST-MD5', 'CRAM-MD5'],
         ]));
@@ -60,7 +62,10 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
             new BindResponse(new LdapResult(ResultCode::SUCCESS), 'foo')
         );
 
-        $this->beConstructedWith($sasl);
+        $this->beConstructedWith(
+            $queue,
+            $sasl,
+        );
     }
 
     public function it_is_initializable(): void

@@ -37,6 +37,11 @@ use Prophecy\Argument;
 
 class ClientBasicHandlerSpec extends ObjectBehavior
 {
+    public function let(ClientQueue $queue): void
+    {
+        $this->beConstructedWith($queue);
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientBasicHandler::class);
@@ -52,10 +57,11 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $this->shouldBeAnInstanceOf(RequestHandlerInterface::class);
     }
 
-    public function it_should_handle_a_request_and_return_a_response(ClientProtocolContext $context, ClientQueue $queue, ClientProtocolHandler $protocolHandler): void
-    {
+    public function it_should_handle_a_request_and_return_a_response(
+        ClientProtocolContext $context,
+        ClientQueue $queue,
+    ): void {
         $context->messageToSend()->willReturn(new LdapMessageRequest(1, new DeleteRequest('cn=foo')));
-        $context->getQueue()->willReturn($queue);
 
         $queue->sendMessage(Argument::type(LdapMessageRequest::class))->shouldBeCalledOnce();
         $queue->getMessage(1)->willReturn(
@@ -78,9 +84,8 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         )->shouldBeEqualTo($messageFrom);
     }
 
-    public function it_should_handle_a_response_with_non_error_codes(ClientQueue $queue): void
+    public function it_should_handle_a_response_with_non_error_codes(): void
     {
-        $options = new ClientOptions();
         $messageRequest = new LdapMessageRequest(1, new CompareRequest('foo', new EqualityFilter('foo', 'bar')));
         $messageFrom = new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_FALSE));
 
@@ -104,7 +109,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         )->shouldBeEqualTo($messageFrom);
     }
 
-    public function it_should_throw_an_operation_exception_on_errors(ClientQueue $queue): void
+    public function it_should_throw_an_operation_exception_on_errors(): void
     {
         $messageRequest = new LdapMessageRequest(1, new CompareRequest('foo', new EqualityFilter('foo', 'bar')));
         $messageFrom = new LdapMessageResponse(1, new CompareResponse(ResultCode::COMPARE_FALSE));
@@ -115,7 +120,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         )->shouldBeEqualTo($messageFrom);
     }
 
-    public function it_should_throw_a_specific_bind_exception_for_a_bind_response(ClientQueue $queue): void
+    public function it_should_throw_a_specific_bind_exception_for_a_bind_response(): void
     {
         $messageRequest = new LdapMessageRequest(1, new SimpleBindRequest('foo', 'bar'));
         $messageFrom = new LdapMessageResponse(1, new BindResponse(new LdapResult(ResultCode::INVALID_CREDENTIALS, 'foo', 'message')));
@@ -128,8 +133,6 @@ class ClientBasicHandlerSpec extends ObjectBehavior
             [
                 $messageRequest,
                 $messageFrom,
-                $queue,
-                new ClientOptions(),
             ]
         );
     }

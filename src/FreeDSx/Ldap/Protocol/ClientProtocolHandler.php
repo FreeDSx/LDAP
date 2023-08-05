@@ -53,7 +53,6 @@ class ClientProtocolHandler
     private ?Entry $rootDse = null;
 
     public function __construct(
-        private readonly ClientOptions $options,
         private readonly ClientQueueInstantiator $clientQueueInstantiator,
         private readonly ClientProtocolHandlerFactory $protocolHandlerFactory,
         private readonly ControlBag $controls = new ControlBag(),
@@ -123,7 +122,6 @@ class ClientProtocolHandler
                 controls: $controls,
                 protocolHandler: $this,
                 queue: $this->queue(),
-                options: $this->options,
             );
 
             $messageFrom = $this->protocolHandlerFactory

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use Closure;
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Exception\RuntimeException;
@@ -53,8 +54,11 @@ class ClientSyncHandler extends ClientBasicHandler
 
     private ?Closure $cookieHandler = null;
 
-    public function __construct(private readonly ClientQueue $queue)
-    {
+    public function __construct(
+        private readonly ClientQueue $queue,
+        private readonly ClientOptions $options,
+    ) {
+        parent::__construct($this->queue);
     }
 
     /**
@@ -65,7 +69,7 @@ class ClientSyncHandler extends ClientBasicHandler
         /** @var SearchRequest $request */
         $request = $context->getRequest();
         if ($request->getBaseDn() === null) {
-            $request->setBaseDn($context->getOptions()->getBaseDn() ?? null);
+            $request->setBaseDn($this->options->getBaseDn() ?? null);
         }
 
         return parent::handleRequest($context);

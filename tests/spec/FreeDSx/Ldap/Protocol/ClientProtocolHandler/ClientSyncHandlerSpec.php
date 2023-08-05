@@ -50,7 +50,10 @@ class ClientSyncHandlerSpec extends ObjectBehavior
 
     public function let(ClientQueue $queue): void
     {
-        $this->beConstructedWith($queue);
+        $this->beConstructedWith(
+            $queue,
+            new ClientOptions(),
+        );
     }
 
     public function it_is_initializable(): void
@@ -76,6 +79,12 @@ class ClientSyncHandlerSpec extends ObjectBehavior
         LdapMessageRequest $message,
         SyncRequest $request
     ): void {
+        $this->beConstructedWith(
+            $queue,
+            (new ClientOptions())
+                ->setBaseDn('cn=foo')
+        );
+
         $queue->getMessage(1)->shouldBeCalled()->willReturn($response);
         $queue->sendMessage($message)->shouldBeCalledOnce();
 
@@ -85,11 +94,6 @@ class ClientSyncHandlerSpec extends ObjectBehavior
 
         $context->messageToSend()->willReturn($message);
         $context->getRequest()->willReturn($request);
-        $context->getQueue()->willReturn($queue);
-        $context->getOptions()->willReturn(
-            (new ClientOptions())
-                ->setBaseDn('cn=foo')
-        );
 
         $request->setBaseDn('cn=foo')
             ->shouldBeCalledOnce();

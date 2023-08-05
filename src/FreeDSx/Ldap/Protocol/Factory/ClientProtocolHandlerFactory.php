@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 
 /**
@@ -39,15 +40,21 @@ class ClientProtocolHandlerFactory
     public function forRequest(Request\RequestInterface $request): RequestHandlerInterface
     {
         if ($request instanceof Request\SyncRequest) {
-            return new ClientProtocolHandler\ClientSyncHandler($this->queueInstantiator->make());
+            return new ClientProtocolHandler\ClientSyncHandler(
+                queue: $this->queue(),
+                options: $this->clientOptions,
+            );
         } elseif ($request instanceof Request\SearchRequest) {
-            return new ClientProtocolHandler\ClientSearchHandler($this->queueInstantiator->make());
+            return new ClientProtocolHandler\ClientSearchHandler(
+                queue: $this->queue(),
+                options: $this->clientOptions,
+            );
         } elseif ($request instanceof Request\UnbindRequest) {
-            return new ClientProtocolHandler\ClientUnbindHandler();
+            return new ClientProtocolHandler\ClientUnbindHandler($this->queue());
         } elseif ($request instanceof Request\SaslBindRequest) {
-            return new ClientProtocolHandler\ClientSaslBindHandler();
+            return new ClientProtocolHandler\ClientSaslBindHandler($this->queue());
         } else {
-            return new ClientProtocolHandler\ClientBasicHandler();
+            return new ClientProtocolHandler\ClientBasicHandler($this->queue());
         }
     }
 
@@ -57,18 +64,32 @@ class ClientProtocolHandlerFactory
     ): ResponseHandlerInterface {
         if ($response instanceof Response\SearchResultDone || $response instanceof Response\SearchResultEntry || $response instanceof Response\SearchResultReference) {
             return $request instanceof Request\SyncRequest
-                ? new ClientProtocolHandler\ClientSyncHandler($this->queueInstantiator->make())
-                : new ClientProtocolHandler\ClientSearchHandler($this->queueInstantiator->make());
+                ? new ClientProtocolHandler\ClientSyncHandler(
+                    queue: $this->queue(),
+                    options: $this->clientOptions,
+                )
+                : new ClientProtocolHandler\ClientSearchHandler(
+                    queue: $this->queue(),
+                    options: $this->clientOptions,
+                );
         } elseif ($response instanceof  Response\SyncInfoMessage) {
-            return new ClientProtocolHandler\ClientSyncHandler($this->queueInstantiator->make());
+            return new ClientProtocolHandler\ClientSyncHandler(
+                queue: $this->queue(),
+                options: $this->clientOptions,
+            );
         } elseif ($response instanceof Operation\LdapResult && $response->getResultCode() === ResultCode::REFERRAL) {
             return new ClientProtocolHandler\ClientReferralHandler($this->clientOptions);
         } elseif ($request instanceof Request\ExtendedRequest && $request->getName() === Request\ExtendedRequest::OID_START_TLS) {
-            return new ClientProtocolHandler\ClientStartTlsHandler($this->queueInstantiator->make());
+            return new ClientProtocolHandler\ClientStartTlsHandler($this->queue());
         } elseif ($response instanceof Response\ExtendedResponse) {
-            return new ClientProtocolHandler\ClientExtendedOperationHandler();
+            return new ClientProtocolHandler\ClientExtendedOperationHandler($this->queue());
         } else {
-            return new ClientProtocolHandler\ClientBasicHandler();
+            return new ClientProtocolHandler\ClientBasicHandler($this->queue());
         }
+    }
+    
+    private function queue(): ClientQueue
+    {
+        return $this->queueInstantiator->make();
     }
 }

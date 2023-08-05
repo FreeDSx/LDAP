@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -27,8 +28,11 @@ class ClientSearchHandler extends ClientBasicHandler
 {
     use ClientSearchTrait;
 
-    public function __construct(private readonly ClientQueue $queue)
-    {
+    public function __construct(
+        private readonly ClientQueue $queue,
+        private readonly ClientOptions $options,
+    ) {
+        parent::__construct($this->queue);
     }
 
     /**
@@ -39,7 +43,7 @@ class ClientSearchHandler extends ClientBasicHandler
         /** @var SearchRequest $request */
         $request = $context->getRequest();
         if ($request->getBaseDn() === null) {
-            $request->setBaseDn($context->getOptions()->getBaseDn() ?? null);
+            $request->setBaseDn($this->options->getBaseDn() ?? null);
         }
 
         return parent::handleRequest($context);

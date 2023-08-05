@@ -68,14 +68,4 @@ class ClientProtocolContextSpec extends ObjectBehavior
     {
         $this->getControls()->shouldBeEqualTo([]);
     }
-
-    public function it_should_get_the_options(): void
-    {
-        $this->getOptions()->shouldBeLike(new ClientOptions());
-    }
-
-    public function it_should_get_the_queue(ClientQueue $queue): void
-    {
-        $this->getQueue()->shouldBeEqualTo($queue);
-    }
 }

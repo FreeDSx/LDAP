@@ -42,7 +42,10 @@ class ClientSearchHandlerSpec extends ObjectBehavior
 
     public function let(ClientQueue $queue): void
     {
-        $this->beConstructedWith($queue);
+        $this->beConstructedWith(
+            $queue,
+            new ClientOptions(),
+        );
     }
 
     public function it_is_initializable(): void
@@ -73,8 +76,6 @@ class ClientSearchHandlerSpec extends ObjectBehavior
 
         $context->getRequest()->willReturn($request);
         $context->messageToSend()->willReturn($message);
-        $context->getQueue()->willReturn($queue);
-        $context->getOptions()->willReturn(new ClientOptions());
 
         $this->handleRequest($context)->shouldBeEqualTo($response);
     }
@@ -86,6 +87,11 @@ class ClientSearchHandlerSpec extends ObjectBehavior
         LdapMessageRequest $message,
         SearchRequest $request
     ): void {
+        $this->beConstructedWith(
+            $queue,
+            (new ClientOptions())
+                ->setBaseDn('cn=foo')
+        );
         $queue->getMessage(1)->shouldBeCalled()->willReturn($response);
         $queue->sendMessage($message)->shouldBeCalledOnce();
 
@@ -95,11 +101,6 @@ class ClientSearchHandlerSpec extends ObjectBehavior
 
         $context->messageToSend()->willReturn($message);
         $context->getRequest()->willReturn($request);
-        $context->getQueue()->willReturn($queue);
-        $context->getOptions()->willReturn(
-            (new ClientOptions())
-            ->setBaseDn('cn=foo')
-        );
 
         $request->setBaseDn('cn=foo')
             ->shouldBeCalledOnce();

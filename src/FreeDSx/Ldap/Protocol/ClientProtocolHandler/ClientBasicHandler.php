@@ -34,6 +34,10 @@ use function in_array;
  */
 class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInterface
 {
+    public function __construct(private readonly ClientQueue $queue)
+    {
+    }
+
     /**
      * RFC 4511, A.1. These are considered result codes that do not indicate an error condition.
      */
@@ -54,11 +58,10 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
      */
     public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
     {
-        $queue = $context->getQueue();
         $message = $context->messageToSend();
-        $queue->sendMessage($message);
+        $this->queue->sendMessage($message);
 
-        return $queue->getMessage($message->getMessageId());
+        return $this->queue->getMessage($message->getMessageId());
     }
 
     /**

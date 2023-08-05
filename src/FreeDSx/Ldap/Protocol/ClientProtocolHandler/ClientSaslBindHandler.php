@@ -49,8 +49,10 @@ class ClientSaslBindHandler implements RequestHandlerInterface
 
     private Sasl $sasl;
 
-    public function __construct(?Sasl $sasl = null)
-    {
+    public function __construct(
+        private readonly ClientQueue $queue,
+        ?Sasl $sasl = null
+    ) {
         $this->sasl = $sasl ?? new Sasl();
     }
 
@@ -77,11 +79,10 @@ class ClientSaslBindHandler implements RequestHandlerInterface
         $detectDowngrade = ($request->getMechanism() === '');
         $mech = $this->selectSaslMech($request, $context);
 
-        $queue = $context->getQueue();
         $message = $context->messageToSend();
-        $queue->sendMessage($message);
+        $this->queue->sendMessage($message);
 
-        $response = $queue->getMessage($message->getMessageId());
+        $response = $this->queue->getMessage($message->getMessageId());
         $saslResponse = $response->getResponse();
         if (!$saslResponse instanceof BindResponse) {
             throw new ProtocolException(sprintf(
@@ -92,7 +93,12 @@ class ClientSaslBindHandler implements RequestHandlerInterface
         if ($saslResponse->getResultCode() !== ResultCode::SASL_BIND_IN_PROGRESS) {
             return $response;
         }
-        $response = $this->processSaslChallenge($request, $queue, $saslResponse, $mech);
+        $response = $this->processSaslChallenge(
+            $request,
+            $this->queue,
+            $saslResponse,
+            $mech
+        );
         if (
             $detectDowngrade
             && $response->getResponse() instanceof BindResponse
