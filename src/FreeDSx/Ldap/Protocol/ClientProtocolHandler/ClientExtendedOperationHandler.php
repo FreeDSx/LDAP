@@ -20,7 +20,9 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Socket\Exception\ConnectionException;
 use ReflectionClass;
 use ReflectionException;
@@ -34,9 +36,13 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
 {
     private ExtendedResponseFactory $extendedResponseFactory;
 
-    public function __construct(ExtendedResponseFactory $extendedResponseFactory = null)
-    {
+    public function __construct(
+        ClientQueue $queue,
+        ExtendedResponseFactory $extendedResponseFactory = null
+    ) {
         $this->extendedResponseFactory = $extendedResponseFactory ?? new ExtendedResponseFactory();
+
+        parent::__construct($queue);
     }
 
     /**
@@ -48,12 +54,12 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
      * @throws ReflectionException
      * @throws RuntimeException
      */
-    public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
+    public function handleRequest(LdapMessageRequest $message): ?LdapMessageResponse
     {
-        $messageFrom = parent::handleRequest($context);
+        $messageFrom = parent::handleRequest($message);
 
         /** @var ExtendedRequest $request */
-        $request = $context->getRequest();
+        $request = $message->getRequest();
         if (!$this->extendedResponseFactory->has($request->getName())) {
             return $messageFrom;
         }

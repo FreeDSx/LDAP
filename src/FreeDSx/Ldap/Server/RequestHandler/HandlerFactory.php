@@ -30,11 +30,8 @@ class HandlerFactory implements HandlerFactoryInterface
 
     private ?PagingHandlerInterface $pagingHandler = null;
 
-    private ServerOptions $options;
-
-    public function __construct(ServerOptions $options)
+    public function __construct(private readonly ServerOptions $options)
     {
-        $this->options = $options;
     }
 
     /**

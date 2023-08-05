@@ -13,21 +13,19 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
-use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\BindException;
-use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Exception\ReferralException;
-use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapper\SaslMessageWrapper;
+use FreeDSx\Ldap\Protocol\RootDseLoader;
 use FreeDSx\Sasl\Exception\SaslException;
 use FreeDSx\Sasl\Mechanism\MechanismInterface;
 use FreeDSx\Sasl\Sasl;
@@ -47,41 +45,33 @@ class ClientSaslBindHandler implements RequestHandlerInterface
      */
     private array $controls = [];
 
-    private Sasl $sasl;
-
-    public function __construct(?Sasl $sasl = null)
-    {
-        $this->sasl = $sasl ?? new Sasl();
+    public function __construct(
+        private readonly ClientQueue $queue,
+        private readonly RootDseLoader $rootDseLoader,
+        private readonly Sasl $sasl = new Sasl(),
+    ) {
     }
 
     /**
      * {@@inheritDoc}
      *
      * @throws BindException
-     * @throws ProtocolException
-     * @throws EncoderException
-     * @throws ConnectionException
      * @throws OperationException
-     * @throws ReferralException
-     * @throws UnsolicitedNotificationException
      * @throws SaslException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
-    public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
+    public function handleRequest(LdapMessageRequest $message): ?LdapMessageResponse
     {
         /** @var SaslBindRequest $request */
-        $request = $context->getRequest();
-        $this->controls = $context->getControls();
+        $request = $message->getRequest();
+        $this->controls = $message->controls()->toArray();
 
         # If we are selecting a mechanism from the RootDSE, we must check for a downgrade afterwards.
         $detectDowngrade = ($request->getMechanism() === '');
-        $mech = $this->selectSaslMech($request, $context);
+        $mech = $this->selectSaslMech($request);
 
-        $queue = $context->getQueue();
-        $message = $context->messageToSend();
-        $queue->sendMessage($message);
+        $this->queue->sendMessage($message);
 
-        $response = $queue->getMessage($message->getMessageId());
+        $response = $this->queue->getMessage($message->getMessageId());
         $saslResponse = $response->getResponse();
         if (!$saslResponse instanceof BindResponse) {
             throw new ProtocolException(sprintf(
@@ -92,32 +82,28 @@ class ClientSaslBindHandler implements RequestHandlerInterface
         if ($saslResponse->getResultCode() !== ResultCode::SASL_BIND_IN_PROGRESS) {
             return $response;
         }
-        $response = $this->processSaslChallenge($request, $queue, $saslResponse, $mech);
+        $response = $this->processSaslChallenge(
+            $request,
+            $this->queue,
+            $saslResponse,
+            $mech
+        );
         if (
             $detectDowngrade
             && $response->getResponse() instanceof BindResponse
             && $response->getResponse()->getResultCode() === ResultCode::SUCCESS
         ) {
-            $this->checkDowngradeAttempt($context);
+            $this->checkDowngradeAttempt();
         }
 
         return $response;
     }
 
     /**
-     * @throws BindException
-     * @throws ProtocolException
-     * @throws EncoderException
-     * @throws ConnectionException
-     * @throws OperationException
-     * @throws ReferralException
-     * @throws UnsolicitedNotificationException
      * @throws SaslException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     private function selectSaslMech(
         SaslBindRequest $request,
-        ClientProtocolContext $context
     ): MechanismInterface {
         if ($request->getMechanism() !== '') {
             $mech = $this->sasl->get($request->getMechanism());
@@ -125,7 +111,7 @@ class ClientSaslBindHandler implements RequestHandlerInterface
 
             return $mech;
         }
-        $rootDse = $context->getRootDse();
+        $rootDse = $this->rootDseLoader->load();
         $availableMechs = $rootDse->get('supportedSaslMechanisms');
         $availableMechs = $availableMechs === null ? [] : $availableMechs->getValues();
         $mech = $this->sasl->select($availableMechs, $request->getOptions());
@@ -136,11 +122,7 @@ class ClientSaslBindHandler implements RequestHandlerInterface
 
     /**
      * @throws BindException
-     * @throws ProtocolException
-     * @throws EncoderException
-     * @throws UnsolicitedNotificationException
      * @throws SaslException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
     private function processSaslChallenge(
         SaslBindRequest $request,
@@ -174,12 +156,6 @@ class ClientSaslBindHandler implements RequestHandlerInterface
         return $response;
     }
 
-    /**
-     * @throws ProtocolException
-     * @throws EncoderException
-     * @throws UnsolicitedNotificationException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
-     */
     private function sendRequestGetResponse(
         SaslBindRequest $request,
         ClientQueue $queue
@@ -207,19 +183,12 @@ class ClientSaslBindHandler implements RequestHandlerInterface
 
     /**
      * @throws BindException
-     * @throws ProtocolException
-     * @throws EncoderException
-     * @throws ConnectionException
      * @throws OperationException
-     * @throws ReferralException
-     * @throws UnsolicitedNotificationException
-     * @throws SaslException
-     * @throws \FreeDSx\Socket\Exception\ConnectionException
      */
-    private function checkDowngradeAttempt(ClientProtocolContext $context): void
+    private function checkDowngradeAttempt(): void
     {
-        $priorRootDse = $context->getRootDse();
-        $rootDse = $context->getRootDse(reload: true);
+        $priorRootDse = $this->rootDseLoader->load();
+        $rootDse = $this->rootDseLoader->load(reload: true);
 
         $mechs = $rootDse->get('supportedSaslMechanisms');
         $priorMechs = $priorRootDse->get('supportedSaslMechanisms');

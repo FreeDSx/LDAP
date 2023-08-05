@@ -13,27 +13,18 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol;
 
-use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Control\ControlBag;
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
-use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
-use FreeDSx\Ldap\Operation\Response\SearchResponse;
-use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientProtocolContext;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
-use FreeDSx\Sasl\Exception\SaslException;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Socket\Exception\ConnectionException as SocketException;
-use FreeDSx\Socket\SocketPool;
 
 /**
  * Handles client specific protocol communication details.
@@ -42,102 +33,37 @@ use FreeDSx\Socket\SocketPool;
  */
 class ClientProtocolHandler
 {
-    public const ROOTDSE_ATTRIBUTES = [
-        'supportedSaslMechanisms',
-        'supportedControl',
-        'supportedLDAPVersion',
-    ];
-
-    private ControlBag $controls;
-
-    private SocketPool $pool;
-
-    private ClientProtocolHandlerFactory $protocolHandlerFactory;
-
-    private ?Entry $rootDse = null;
+    private ?ClientQueue $queue = null;
 
     public function __construct(
         private readonly ClientOptions $options,
-        private ?ClientQueue $queue = null,
-        ?SocketPool $pool = null,
-        ?ClientProtocolHandlerFactory $protocolHandlerFactory = null
+        private readonly ClientQueueInstantiator $clientQueueInstantiator,
+        private readonly ClientProtocolHandlerFactory $protocolHandlerFactory,
     ) {
-        $this->pool = $pool ?? new SocketPool($this->options->toArray());
-        $this->protocolHandlerFactory = $protocolHandlerFactory ?? new ClientProtocolHandlerFactory();
-        $this->controls = new ControlBag();
-    }
-
-    public function controls(): ControlBag
-    {
-        return $this->controls;
-    }
-
-    /**
-     * Make a single search request to fetch the RootDSE. Handle the various errors that could occur.
-     *
-     * @throws ConnectionException
-     * @throws OperationException
-     * @throws SocketException
-     * @throws UnsolicitedNotificationException
-     * @throws EncoderException
-     * @throws BindException
-     * @throws ProtocolException
-     * @throws ReferralException
-     * @throws SaslException
-     */
-    public function fetchRootDse(bool $reload = false): Entry
-    {
-        if ($reload === false && $this->rootDse !== null) {
-            return $this->rootDse;
-        }
-        $message = $this->send(Operations::read('', ...self::ROOTDSE_ATTRIBUTES));
-        if ($message === null) {
-            throw new OperationException('Expected a search response for the RootDSE. None received.');
-        }
-
-        $searchResponse = $message->getResponse();
-        if (!$searchResponse instanceof SearchResponse) {
-            throw new OperationException('Expected a search response for the RootDSE. None received.');
-        }
-
-        $entry = $searchResponse->getEntries()->first();
-        if ($entry === null) {
-            throw new OperationException('Expected a single entry for the RootDSE. None received.');
-        }
-        $this->rootDse = $entry;
-
-        return $entry;
     }
 
     /**
      * @throws ConnectionException
      * @throws OperationException
-     * @throws SocketException
      * @throws UnsolicitedNotificationException
-     * @throws EncoderException
      * @throws BindException
-     * @throws ProtocolException
      * @throws ReferralException
-     * @throws SaslException
      */
     public function send(
         RequestInterface $request,
         Control ...$controls
     ): ?LdapMessageResponse {
         try {
-            $context = new ClientProtocolContext(
-                request: $request,
-                controls: $controls,
-                protocolHandler: $this,
-                queue: $this->queue(),
-                options: $this->options,
+            $messageTo = new LdapMessageRequest(
+                $this->queue()->generateId(),
+                $request,
+                ...$this->options->getControls()->toArray(),
+                ...$controls,
             );
-
             $messageFrom = $this->protocolHandlerFactory
                 ->forRequest($request)
-                ->handleRequest($context);
+                ->handleRequest($messageTo);
 
-            $messageTo = $context->messageToSend();
             if ($messageFrom !== null) {
                 $messageFrom = $this->protocolHandlerFactory->forResponse(
                     $messageTo->getRequest(),
@@ -145,18 +71,20 @@ class ClientProtocolHandler
                 )->handleResponse(
                     $messageTo,
                     $messageFrom,
-                    $this->queue(),
-                    $this->options
                 );
             }
 
             return $messageFrom;
         } catch (UnsolicitedNotificationException $exception) {
-            if ($exception->getOid() === ExtendedResponse::OID_NOTICE_OF_DISCONNECTION) {
+            if ($exception->isNoticeOfDisconnection()) {
                 $this->queue()->close();
+
                 throw new ConnectionException(
-                    sprintf('The remote server has disconnected the session. %s', $exception->getMessage()),
-                    $exception->getCode()
+                    sprintf(
+                        'The remote server has disconnected the session. %s',
+                        $exception->getMessage(),
+                    ),
+                    $exception->getCode(),
                 );
             }
 
@@ -170,18 +98,13 @@ class ClientProtocolHandler
         }
     }
 
-    public function isConnected(): bool
-    {
-        return ($this->queue !== null && $this->queue->isConnected());
-    }
-
     /**
      * @throws SocketException
      */
     private function queue(): ClientQueue
     {
         if ($this->queue === null) {
-            $this->queue = new ClientQueue($this->pool);
+            $this->queue = $this->clientQueueInstantiator->make();
         }
 
         return $this->queue;

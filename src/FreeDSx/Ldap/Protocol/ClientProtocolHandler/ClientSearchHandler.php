@@ -28,18 +28,25 @@ class ClientSearchHandler extends ClientBasicHandler
 {
     use ClientSearchTrait;
 
+    public function __construct(
+        private readonly ClientQueue $queue,
+        private readonly ClientOptions $options,
+    ) {
+        parent::__construct($this->queue);
+    }
+
     /**
      * {@inheritDoc}
      */
-    public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
+    public function handleRequest(LdapMessageRequest $message): ?LdapMessageResponse
     {
         /** @var SearchRequest $request */
-        $request = $context->getRequest();
+        $request = $message->getRequest();
         if ($request->getBaseDn() === null) {
-            $request->setBaseDn($context->getOptions()->getBaseDn() ?? null);
+            $request->setBaseDn($this->options->getBaseDn() ?? null);
         }
 
-        return parent::handleRequest($context);
+        return parent::handleRequest($message);
     }
 
     /**
@@ -48,20 +55,16 @@ class ClientSearchHandler extends ClientBasicHandler
     public function handleResponse(
         LdapMessageRequest $messageTo,
         LdapMessageResponse $messageFrom,
-        ClientQueue $queue,
-        ClientOptions $options,
     ): ?LdapMessageResponse {
         $finalResponse = $this->search(
             $messageFrom,
             $messageTo,
-            $queue,
+            $this->queue,
         );
 
         return parent::handleResponse(
             $messageTo,
-            $finalResponse,
-            $queue,
-            $options
+            $finalResponse
         );
     }
 }

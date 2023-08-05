@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -35,6 +34,10 @@ use function in_array;
  */
 class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInterface
 {
+    public function __construct(private readonly ClientQueue $queue)
+    {
+    }
+
     /**
      * RFC 4511, A.1. These are considered result codes that do not indicate an error condition.
      */
@@ -53,13 +56,11 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
      * @throws ConnectionException
      * @throws EncoderException
      */
-    public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
+    public function handleRequest(LdapMessageRequest $message): ?LdapMessageResponse
     {
-        $queue = $context->getQueue();
-        $message = $context->messageToSend();
-        $queue->sendMessage($message);
+        $this->queue->sendMessage($message);
 
-        return $queue->getMessage($message->getMessageId());
+        return $this->queue->getMessage($message->getMessageId());
     }
 
     /**
@@ -68,9 +69,7 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
      */
     public function handleResponse(
         LdapMessageRequest $messageTo,
-        LdapMessageResponse $messageFrom,
-        ClientQueue $queue,
-        ClientOptions $options
+        LdapMessageResponse $messageFrom
     ): ?LdapMessageResponse {
         $result = $messageFrom->getResponse();
 

@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Attribute;
@@ -31,6 +30,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Ldap\Search\DirSync;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Paging;
@@ -55,8 +55,16 @@ class LdapClient
 
     private ?ClientProtocolHandler $handler = null;
 
-    public function __construct(private ClientOptions $options = new ClientOptions())
-    {
+    private Container $container;
+
+    public function __construct(
+        private ClientOptions $options = new ClientOptions(),
+        ?Container $container = null,
+    ) {
+        $this->container = $container ?? new Container(
+            clientOptions: $this->options,
+            client: $this,
+        );
     }
 
     /**
@@ -177,8 +185,7 @@ class LdapClient
         $entryObj = $this->search(
             Operations::read($entry, ...$attributes),
             ...$controls
-        )
-            ->first();
+        )->first();
 
         if ($entryObj === null) {
             throw new OperationException(sprintf(
@@ -421,15 +428,6 @@ class LdapClient
     }
 
     /**
-     * Access to add/set/remove/reset the controls to be used for each request. If you want request specific controls in
-     * addition to these, then pass them as a parameter to the send() method.
-     */
-    public function controls(): ControlBag
-    {
-        return $this->handler()->controls();
-    }
-
-    /**
      * Get the options currently set.
      */
     public function getOptions(): ClientOptions
@@ -456,19 +454,19 @@ class LdapClient
         return $this;
     }
 
-    public function setProtocolHandler(ClientProtocolHandler $handler = null): self
-    {
-        $this->handler = $handler;
-
-        return $this;
-    }
-
     /**
      * A simple check to determine if this client has an established connection to a server.
      */
     public function isConnected(): bool
     {
-        return ($this->handler !== null && $this->handler->isConnected());
+        // This handler check is due to a bug in the test suite and deconstruct calls... *sigh*
+        if ($this->handler === null) {
+            return false;
+        }
+
+        return $this->container
+            ->get(ClientQueueInstantiator::class)
+            ->isInstantiatedAndConnected();
     }
 
     /**
@@ -485,7 +483,7 @@ class LdapClient
     private function handler(): ClientProtocolHandler
     {
         if ($this->handler === null) {
-            $this->handler = new Protocol\ClientProtocolHandler($this->options);
+            $this->handler = $this->container->get(ClientProtocolHandler::class);
         }
 
         return $this->handler;
@@ -497,7 +495,7 @@ class LdapClient
      */
     private function unbindIfConnected(): void
     {
-        if ($this->handler !== null && $this->handler->isConnected()) {
+        if ($this->isConnected()) {
             $this->unbind();
         }
     }

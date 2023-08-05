@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace spec\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -33,6 +34,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Ldap\Search\DirSync;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Search\Paging;
@@ -46,17 +48,27 @@ class LdapClientSpec extends ObjectBehavior
 {
     use TestFactoryTrait;
 
-    public function let(ClientProtocolHandler $handler): void
-    {
-        $handler->isConnected()
+    public function let(
+        ClientProtocolHandler $handler,
+        Container $mockContainer,
+        ClientQueueInstantiator $queueInstantiator,
+    ): void {
+        $mockContainer
+            ->get(ClientProtocolHandler::class)
+            ->willReturn($handler);
+
+        $mockContainer
+            ->get(ClientQueueInstantiator::class)
+            ->willReturn($queueInstantiator);
+
+        $queueInstantiator
+            ->isInstantiatedAndConnected()
             ->willReturn(false);
 
-        $this->setProtocolHandler($handler);
-    }
-
-    public function it_is_initializable(): void
-    {
-        $this->shouldHaveType(LdapClient::class);
+        $this->beConstructedWith(
+            new ClientOptions(),
+            $mockContainer,
+        );
     }
 
     public function it_should_send_a_message_and_throw_an_exception_if_no_response_is_received_on_sendAndReceive(ClientProtocolHandler $handler): void
@@ -354,7 +366,10 @@ class LdapClientSpec extends ObjectBehavior
         $handler->send(Operations::read('cn=foo,dc=local'))->shouldBeCalled()
             ->willThrow($exception);
 
-        $this->shouldThrow($exception)->during('readOrFail', [$entry]);
+        $this->getOptions();
+
+        $this->shouldThrow($exception)
+            ->during('readOrFail', [$entry]);
     }
 
     public function it_should_return_an_entry_on_a_readOrFail_if_it_exists(ClientProtocolHandler $handler): void

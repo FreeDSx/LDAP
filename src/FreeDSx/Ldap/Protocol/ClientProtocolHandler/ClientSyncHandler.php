@@ -54,18 +54,25 @@ class ClientSyncHandler extends ClientBasicHandler
 
     private ?Closure $cookieHandler = null;
 
+    public function __construct(
+        private readonly ClientQueue $queue,
+        private readonly ClientOptions $options,
+    ) {
+        parent::__construct($this->queue);
+    }
+
     /**
      * {@inheritDoc}
      */
-    public function handleRequest(ClientProtocolContext $context): ?LdapMessageResponse
+    public function handleRequest(LdapMessageRequest $message): ?LdapMessageResponse
     {
         /** @var SearchRequest $request */
-        $request = $context->getRequest();
+        $request = $message->getRequest();
         if ($request->getBaseDn() === null) {
-            $request->setBaseDn($context->getOptions()->getBaseDn() ?? null);
+            $request->setBaseDn($this->options->getBaseDn() ?? null);
         }
 
-        return parent::handleRequest($context);
+        return parent::handleRequest($message);
     }
 
     /**
@@ -74,8 +81,6 @@ class ClientSyncHandler extends ClientBasicHandler
     public function handleResponse(
         LdapMessageRequest $messageTo,
         LdapMessageResponse $messageFrom,
-        ClientQueue $queue,
-        ClientOptions $options,
     ): ?LdapMessageResponse {
         $this->initializeSync($messageTo);
 
@@ -85,7 +90,7 @@ class ClientSyncHandler extends ClientBasicHandler
                 $searchDone = self::search(
                     $messageFrom,
                     $messageTo,
-                    $queue,
+                    $this->queue,
                 );
                 // @todo This should be a configurable option or a specific exception...
                 if ($this->isRefreshRequired($searchDone)) {
@@ -97,11 +102,11 @@ class ClientSyncHandler extends ClientBasicHandler
                             ?->getCookie()
                     );
                     $messageTo = new LdapMessageRequest(
-                        $queue->generateId(),
+                        $this->queue->generateId(),
                         $this->syncRequest,
                         ...$messageFrom->controls()->toArray()
                     );
-                    $messageFrom = $queue->sendMessage($messageTo)
+                    $messageFrom = $this->queue->sendMessage($messageTo)
                         ->getMessage($messageTo->getMessageId());
                 }
             } while (!$this->isSyncComplete($searchDone));

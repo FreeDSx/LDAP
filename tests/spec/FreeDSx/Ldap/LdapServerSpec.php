@@ -19,6 +19,7 @@ use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyHandler;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyPagingHandler;
+use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
@@ -129,7 +130,16 @@ class LdapServerSpec extends ObjectBehavior
         $server->useRootDseHandler($proxyRequestHandler);
         $server->usePagingHandler(new ProxyPagingHandler($client));
 
-        $this::makeProxy('localhost')
-            ->shouldBeLike($server);
+        $proxyOptions = $this::makeProxy('localhost')
+            ->getOptions();
+
+        $proxyOptions->getPagingHandler()
+            ->shouldBeAnInstanceOf(ProxyPagingHandler::class);
+        $proxyOptions
+            ->getRequestHandler()
+            ->shouldBeAnInstanceOf(ProxyRequestHandler::class);
+        $proxyOptions
+            ->getRootDseHandler()
+            ->shouldBeAnInstanceOf(ProxyRequestHandler::class);
     }
 }

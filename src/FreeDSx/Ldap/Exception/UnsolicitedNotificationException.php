@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Exception;
 
+use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use Throwable;
 
 /**
@@ -44,5 +45,10 @@ class UnsolicitedNotificationException extends ProtocolException
     public function getOid(): string
     {
         return $this->oid;
+    }
+
+    public function isNoticeOfDisconnection(): bool
+    {
+        return $this->getOid() === ExtendedResponse::OID_NOTICE_OF_DISCONNECTION;
     }
 }

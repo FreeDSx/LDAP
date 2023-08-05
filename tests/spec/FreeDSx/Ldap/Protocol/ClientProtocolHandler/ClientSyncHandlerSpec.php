@@ -26,7 +26,6 @@ use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
-use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientProtocolContext;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSyncHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ResponseHandlerInterface;
@@ -48,6 +47,14 @@ class ClientSyncHandlerSpec extends ObjectBehavior
 {
     use TestFactoryTrait;
 
+    public function let(ClientQueue $queue): void
+    {
+        $this->beConstructedWith(
+            $queue,
+            new ClientOptions(),
+        );
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientSyncHandler::class);
@@ -65,12 +72,17 @@ class ClientSyncHandlerSpec extends ObjectBehavior
     }
 
     public function it_should_set_a_default_DN_for_a_request_that_has_none(
-        ClientProtocolContext $context,
         LdapMessageResponse $response,
         ClientQueue $queue,
         LdapMessageRequest $message,
         SyncRequest $request
     ): void {
+        $this->beConstructedWith(
+            $queue,
+            (new ClientOptions())
+                ->setBaseDn('cn=foo')
+        );
+
         $queue->getMessage(1)->shouldBeCalled()->willReturn($response);
         $queue->sendMessage($message)->shouldBeCalledOnce();
 
@@ -78,18 +90,10 @@ class ClientSyncHandlerSpec extends ObjectBehavior
         $message->getRequest()->willReturn($request);
         $request->getBaseDn()->willReturn(null);
 
-        $context->messageToSend()->willReturn($message);
-        $context->getRequest()->willReturn($request);
-        $context->getQueue()->willReturn($queue);
-        $context->getOptions()->willReturn(
-            (new ClientOptions())
-                ->setBaseDn('cn=foo')
-        );
-
         $request->setBaseDn('cn=foo')
             ->shouldBeCalledOnce();
 
-        $this->handleRequest($context);
+        $this->handleRequest($message);
     }
 
 
@@ -137,8 +141,6 @@ class ClientSyncHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             $messageTo,
             $response,
-            $queue,
-            new ClientOptions()
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
                 dn: 'cn=foo',
@@ -217,8 +219,6 @@ class ClientSyncHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             $messageTo,
             $response,
-            $queue,
-            new ClientOptions()
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
                 dn: 'cn=foo',
@@ -267,8 +267,6 @@ class ClientSyncHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             $messageTo,
             $response,
-            $queue,
-            new ClientOptions()
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
                 dn: 'cn=foo',
@@ -325,8 +323,6 @@ class ClientSyncHandlerSpec extends ObjectBehavior
         $this->handleResponse(
             $messageTo,
             $response,
-            $queue,
-            new ClientOptions()
         )->shouldBeLike(
             $this::makeSearchResponseFromEntries(
                 dn: 'cn=foo',

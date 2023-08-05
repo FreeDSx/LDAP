@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap\Protocol\Factory;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -36,10 +37,29 @@ use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientStartTlsHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSyncHandler;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientUnbindHandler;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
+use FreeDSx\Ldap\Protocol\RootDseLoader;
 use PhpSpec\ObjectBehavior;
 
 class ClientProtocolHandlerFactorySpec extends ObjectBehavior
 {
+    public function let(
+        ClientQueueInstantiator $queueInstantiator,
+        ClientQueue $queue,
+        RootDseLoader $rootDseLoader,
+    ): void {
+        $queueInstantiator
+            ->make()
+            ->willReturn($queue);
+
+        $this->beConstructedWith(
+            new ClientOptions(),
+            $queueInstantiator,
+            $rootDseLoader,
+        );
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ClientProtocolHandlerFactory::class);
