@@ -31,9 +31,9 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientProtocolContext;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Sasl\Exception\SaslException;
 use FreeDSx\Socket\Exception\ConnectionException as SocketException;
-use FreeDSx\Socket\SocketPool;
 
 /**
  * Handles client specific protocol communication details.
@@ -48,13 +48,14 @@ class ClientProtocolHandler
         'supportedLDAPVersion',
     ];
 
+    private ?ClientQueue $queue = null;
+
     private ?Entry $rootDse = null;
 
     public function __construct(
         private readonly ClientOptions $options,
-        private readonly SocketPool $pool,
+        private readonly ClientQueueInstantiator $clientQueueInstantiator,
         private readonly ClientProtocolHandlerFactory $protocolHandlerFactory,
-        private ?ClientQueue $queue = null,
         private readonly ControlBag $controls = new ControlBag(),
     ) {
     }
@@ -172,7 +173,7 @@ class ClientProtocolHandler
     private function queue(): ClientQueue
     {
         if ($this->queue === null) {
-            $this->queue = new ClientQueue($this->pool);
+            $this->queue = $this->clientQueueInstantiator->make();
         }
 
         return $this->queue;

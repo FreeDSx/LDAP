@@ -32,7 +32,7 @@ use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
-use FreeDSx\Socket\SocketPool;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 use spec\FreeDSx\Ldap\TestFactoryTrait;
@@ -42,8 +42,8 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
     use TestFactoryTrait;
 
     public function let(
-        SocketPool $pool,
         ClientQueue $queue,
+        ClientQueueInstantiator $clientQueueInstantiator,
         ClientProtocolHandlerFactory $protocolHandlerFactory,
         ResponseHandlerInterface $responseHandler,
         RequestHandlerInterface $requestHandler
@@ -58,14 +58,17 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
             ->forRequest(Argument::any())
             ->willReturn($requestHandler);
 
+        $clientQueueInstantiator
+            ->make()
+            ->willReturn($queue);
+
         $queue->generateId()
             ->willReturn(1);
 
         $this->beConstructedWith(
             new ClientOptions(),
-            $pool,
+            $clientQueueInstantiator,
             $protocolHandlerFactory,
-            $queue,
         );
     }
 

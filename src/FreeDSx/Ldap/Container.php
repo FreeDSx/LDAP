@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Socket\SocketPool;
 
@@ -82,6 +83,7 @@ class Container
         $this->instanceFactory[ClientProtocolHandler::class] = $this->makeClientProtocolHandler(...);
         $this->instanceFactory[SocketPool::class] = $this->makeSocketPool(...);
         $this->instanceFactory[ClientProtocolHandlerFactory::class] = $this->makeClientProtocolHandlerFactory(...);
+        $this->instanceFactory[ClientQueueInstantiator::class] = $this->makeClientQueueInstantiator(...);
     }
 
     private function registerServerClasses(): void
@@ -93,9 +95,14 @@ class Container
     {
         return new ClientProtocolHandler(
             options: $this->clientOptions,
-            pool: $this->get(SocketPool::class),
+            clientQueueInstantiator: $this->get(ClientQueueInstantiator::class),
             protocolHandlerFactory: $this->get(ClientProtocolHandlerFactory::class),
         );
+    }
+
+    private function makeClientQueueInstantiator(): ClientQueueInstantiator
+    {
+        return new ClientQueueInstantiator($this->get(SocketPool::class));
     }
 
     private function makeSocketPool(): SocketPool
