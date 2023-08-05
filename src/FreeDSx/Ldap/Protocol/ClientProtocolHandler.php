@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -40,15 +40,10 @@ class ClientProtocolHandler
     private ?ClientQueue $queue = null;
 
     public function __construct(
+        private readonly ClientOptions $options,
         private readonly ClientQueueInstantiator $clientQueueInstantiator,
         private readonly ClientProtocolHandlerFactory $protocolHandlerFactory,
-        private readonly ControlBag $controls = new ControlBag(),
     ) {
-    }
-
-    public function controls(): ControlBag
-    {
-        return $this->controls;
     }
 
     /**
@@ -70,7 +65,7 @@ class ClientProtocolHandler
             $messageTo = new LdapMessageRequest(
                 $this->queue()->generateId(),
                 $request,
-                ...$this->controls->toArray(),
+                ...$this->options->getControls()->toArray(),
                 ...$controls,
             );
             $messageFrom = $this->protocolHandlerFactory

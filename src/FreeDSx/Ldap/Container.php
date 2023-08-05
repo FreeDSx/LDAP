@@ -100,6 +100,7 @@ class Container
     private function makeClientProtocolHandler(): ClientProtocolHandler
     {
         return new ClientProtocolHandler(
+            options: $this->clientOptions,
             clientQueueInstantiator: $this->get(ClientQueueInstantiator::class),
             protocolHandlerFactory: $this->get(ClientProtocolHandlerFactory::class),
         );

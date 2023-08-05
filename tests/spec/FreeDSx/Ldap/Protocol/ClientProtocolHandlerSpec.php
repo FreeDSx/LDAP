@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap\Protocol;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
@@ -60,6 +61,7 @@ class ClientProtocolHandlerSpec extends ObjectBehavior
             ->willReturn(1);
 
         $this->beConstructedWith(
+            new ClientOptions(),
             $clientQueueInstantiator,
             $protocolHandlerFactory,
         );

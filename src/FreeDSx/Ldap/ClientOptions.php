@@ -13,11 +13,13 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Control\ControlBag;
+
 final class ClientOptions
 {
     private int $version = 3;
 
-    private array $servers = [];
+    private array $servers;
 
     private int $port = 389;
 
@@ -46,6 +48,34 @@ final class ClientOptions
     private ?ReferralChaserInterface $referralChaser = null;
 
     private int $referralLimit = 10;
+
+    /**
+     * @param string[] $servers
+     */
+    public function __construct(
+        array $servers = [],
+        private ControlBag $controls = new ControlBag(),
+    ) {
+        $this->servers = $servers;
+    }
+
+    /**
+     * These controls are used globally in all requests.
+     */
+    public function getControls(): ControlBag
+    {
+        return $this->controls;
+    }
+
+    /**
+     * Set global controls that will be used for every message sent.
+     */
+    public function setControls(ControlBag $controls): self
+    {
+        $this->controls = $controls;
+
+        return $this;
+    }
 
     public function getVersion(): int
     {
