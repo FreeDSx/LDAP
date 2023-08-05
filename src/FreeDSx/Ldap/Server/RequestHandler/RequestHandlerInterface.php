@@ -36,49 +36,70 @@ interface RequestHandlerInterface
      *
      * @throws OperationException
      */
-    public function add(RequestContext $context, AddRequest $add): void;
+    public function add(
+        RequestContext $context,
+        AddRequest $add,
+    ): void;
 
     /**
      * A compare request. This should return true or false for whether the compare matches or not.
      *
      * @throws OperationException
      */
-    public function compare(RequestContext $context, CompareRequest $compare): bool;
+    public function compare(
+        RequestContext $context,
+        CompareRequest $compare,
+    ): bool;
 
     /**
      * A delete request.
      *
      * @throws OperationException
      */
-    public function delete(RequestContext $context, DeleteRequest $delete): void;
+    public function delete(
+        RequestContext $context,
+        DeleteRequest $delete,
+    ): void;
 
     /**
      * An extended operation request.
      *
      * @throws OperationException
      */
-    public function extended(RequestContext $context, ExtendedRequest $extended): void;
+    public function extended(
+        RequestContext $context,
+        ExtendedRequest $extended,
+    ): void;
 
     /**
      * A request to modify an entry.
      *
      * @throws OperationException
      */
-    public function modify(RequestContext $context, ModifyRequest $modify): void;
+    public function modify(
+        RequestContext $context,
+        ModifyRequest $modify,
+    ): void;
 
     /**
      * A request to modify the DN of an entry.
      *
      * @throws OperationException
      */
-    public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn): void;
+    public function modifyDn(
+        RequestContext $context,
+        ModifyDnRequest $modifyDn,
+    ): void;
 
     /**
      * A search request. This should return an entries collection object.
      *
      * @throws OperationException
      */
-    public function search(RequestContext $context, SearchRequest $search): Entries;
+    public function search(
+        RequestContext $context,
+        SearchRequest $search,
+    ): Entries;
 
     /**
      * A simple username/password bind. It should simply return true or false for whether the username and password is
@@ -87,5 +108,9 @@ interface RequestHandlerInterface
      *
      * @throws OperationException
      */
-    public function bind(string $username, string $password): bool;
+    public function bind(
+        string $username,
+        #[\SensitiveParameter]
+        string $password,
+    ): bool;
 }
