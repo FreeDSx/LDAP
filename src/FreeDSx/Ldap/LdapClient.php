@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Attribute;
@@ -31,6 +30,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Ldap\Search\DirSync;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Paging;
@@ -185,8 +185,7 @@ class LdapClient
         $entryObj = $this->search(
             Operations::read($entry, ...$attributes),
             ...$controls
-        )
-            ->first();
+        )->first();
 
         if ($entryObj === null) {
             throw new OperationException(sprintf(
@@ -460,7 +459,14 @@ class LdapClient
      */
     public function isConnected(): bool
     {
-        return ($this->handler !== null && $this->handler->isConnected());
+        // This handler check is due to a bug in the test suite and deconstruct calls... *sigh*
+        if ($this->handler === null) {
+            return false;
+        }
+
+        return $this->container
+            ->get(ClientQueueInstantiator::class)
+            ->isInstantiatedAndConnected();
     }
 
     /**
@@ -489,7 +495,7 @@ class LdapClient
      */
     private function unbindIfConnected(): void
     {
-        if ($this->handler !== null && $this->handler->isConnected()) {
+        if ($this->isConnected()) {
             $this->unbind();
         }
     }

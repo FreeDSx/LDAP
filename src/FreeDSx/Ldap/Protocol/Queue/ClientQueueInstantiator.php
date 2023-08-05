@@ -28,4 +28,14 @@ class ClientQueueInstantiator
 
         return $this->clientQueue;
     }
+
+    /**
+     * This allows us to check if the queue has been instantiated and connected, as for some operations we do not want
+     * to bother we if we never connected in the first place.
+     */
+    public function isInstantiatedAndConnected(): bool
+    {
+        return $this->clientQueue !== null
+            && $this->clientQueue->isConnected();
+    }
 }
