@@ -1,6 +1,16 @@
 CHANGELOG
 =========
 
+1.0.0 (2023-xx-xx)
+------------------
+* Updated the minimum version of PHP to version 8.1.
+* All classes now use "strict_types=1". This internal change should not impact external usage.
+* Client and server options arrays have been replaced by ClientOptions and ServerOptions classes.
+* Added client side support for RFC4533 (SyncRepl) style directory synchronization.
+* Added entry handler processing of searches. This allows immediate processing of entries via anonymous functions.
+* Added the ability to cancel search or sync requests when using entry handler processing for searches.
+* Added support for the SensitiveParameter attribute to mask bind related credentials from stack traces.
+
 0.8.0 (2022-05-21)
 ------------------
 * Properly handle and reap child processes in the LDAP server.
