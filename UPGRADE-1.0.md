@@ -62,3 +62,50 @@ $ldap = new LdapServer(
         ->setPort(33389)
 );
 ```
+
+Proxy Server Options
+--------------------
+
+When instantiating an `LdapServer` instance with `LdapServer::makeProxy()`, options are now an options object instead
+of an associative array.
+
+**Before**:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+
+$server = LdapServer::makeProxy(
+    // The LDAP server to proxy connections to...
+    'ldap.example.com',
+    // Any additional LdapClient options for the proxy...
+    [
+         // Perhaps the server to proxy is on some non-standard port?
+        'port' => 3389,
+    ],
+    // Any additional LdapServer options. In this case, also run this server over port 3389
+    [
+        'port' => 3389,
+    ]
+);
+```
+
+**After**:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\ServerOptions;
+
+$server = LdapServer::makeProxy(
+    // The LDAP server to proxy connections to...
+    'ldap.example.com',
+    // Any additional LdapClient options for the proxy...
+    (new ClientOptions)
+        // Perhaps the server to proxy is on some non-standard port?
+        ->setPort(3389)
+    ,
+    // Any additional LdapServer options. In this case, also run this server over port 3389
+    (new ServerOptions)
+        ->setPort(3389)
+);
+```
