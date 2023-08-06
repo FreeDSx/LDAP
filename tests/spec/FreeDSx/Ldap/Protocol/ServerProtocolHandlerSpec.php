@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
@@ -40,12 +41,14 @@ use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Exception\ConnectionException;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
+use Psr\Log\LoggerInterface;
 
 class ServerProtocolHandlerSpec extends ObjectBehavior
 {
     public function let(
         ServerQueue $queue,
         ServerProtocolHandlerFactory $protocolHandlerFactory,
+        LoggerInterface $logger,
         HandlerFactoryInterface $handlerFactory,
         ServerBindHandlerFactory $bindHandlerFactory,
         RequestHandlerInterface $dispatcher,
@@ -63,9 +66,9 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->beConstructedWith(
             $queue,
             $handlerFactory,
-            new ServerOptions(),
+            $logger,
             $protocolHandlerFactory,
-            null,
+            new ServerAuthorization(new ServerOptions()),
             $bindHandlerFactory,
         );
     }
@@ -207,8 +210,11 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    public function it_should_handle_operation_errors_thrown_from_the_request_handlers(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler): void
-    {
+    public function it_should_handle_operation_errors_thrown_from_the_request_handlers(
+        ServerQueue $queue,
+        ServerProtocolHandler\BindHandlerInterface $bindHandler,
+        ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler,
+    ): void {
         $queue->isConnected()->willReturn(true, false);
         $queue->getMessage()->willReturn(
             new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar')),

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
@@ -28,11 +29,10 @@ class ContainerSpec extends ObjectBehavior
     {
         $client = new LdapClient();
 
-        $this->beConstructedWith(
-            $client->getOptions(),
-            null,
-            $client,
-        );
+        $this->beConstructedWith([
+            LdapClient::class => $client,
+            ClientOptions::class => $client->getOptions(),
+        ]);
     }
 
     public function it_is_initializable(): void

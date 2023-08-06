@@ -34,8 +34,9 @@ class LdapServerSpec extends ObjectBehavior
     public function let(ServerRunnerInterface $serverRunner): void
     {
         $this->beConstructedWith(
-            (new ServerOptions())->setPort(33389),
-            $serverRunner
+            (new ServerOptions())
+                ->setPort(33389)
+                ->setServerRunner($serverRunner->getWrappedObject())
         );
     }
 

@@ -20,10 +20,16 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Token\AnonToken;
+use FreeDSx\Ldap\ServerOptions;
 use PhpSpec\ObjectBehavior;
 
 class ServerAuthorizationSpec extends ObjectBehavior
 {
+    public function let(): void
+    {
+        $this->beConstructedWith(new ServerOptions());
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerAuthorization::class);
@@ -83,7 +89,12 @@ class ServerAuthorizationSpec extends ObjectBehavior
 
     public function it_should_not_require_authentication_if_it_has_been_explicitly_disabled(): void
     {
-        $this->beConstructedWith(new AnonToken(), false, false);
+        $this->beConstructedWith(
+            (new ServerOptions)
+                ->setAllowAnonymous(false)
+                ->setRequireAuthentication(false),
+            new AnonToken()
+        );
 
         $this->isAuthenticationRequired(Operations::read('cn=bar'))->shouldBeEqualTo(false);
         $this->isAuthenticationRequired(Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'))->shouldBeEqualTo(false);
@@ -104,7 +115,11 @@ class ServerAuthorizationSpec extends ObjectBehavior
 
     public function it_should_respect_the_option_for_whether_anon_binds_are_allowed(): void
     {
-        $this->beConstructedWith(new AnonToken(), true);
+        $this->beConstructedWith(
+            (new ServerOptions)
+                ->setAllowAnonymous(true),
+            new AnonToken()
+        );
 
         $this->isAuthenticationTypeSupported(Operations::bindAnonymously())->shouldBeEqualTo(true);
     }

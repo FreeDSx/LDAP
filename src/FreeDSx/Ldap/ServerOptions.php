@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
+use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use Psr\Log\LoggerInterface;
 
 final class ServerOptions
@@ -60,6 +61,8 @@ final class ServerOptions
     private ?PagingHandlerInterface $pagingHandler = null;
 
     private ?LoggerInterface $logger = null;
+
+    private ?ServerRunnerInterface $serverRunner = null;
 
     public function getIp(): string
     {
@@ -290,6 +293,18 @@ final class ServerOptions
         $this->logger = $logger;
 
         return $this;
+    }
+
+    public function setServerRunner(ServerRunnerInterface $serverRunner): self
+    {
+        $this->serverRunner = $serverRunner;
+
+        return $this;
+    }
+
+    public function getServerRunner(): ?ServerRunnerInterface
+    {
+        return $this->serverRunner;
     }
 
     /**

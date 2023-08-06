@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Abstracts out some of the server authorization logic.
@@ -32,9 +33,8 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 class ServerAuthorization
 {
     public function __construct(
+        private readonly ServerOptions $options,
         private TokenInterface $token = new AnonToken(),
-        private readonly bool $isAnonymousAllowed = false,
-        private readonly bool $isAuthRequired = true,
     ) {
     }
 
@@ -43,7 +43,7 @@ class ServerAuthorization
      */
     public function isAuthenticationRequired(RequestInterface $request): bool
     {
-        if ($this->isAuthRequired === false) {
+        if ($this->options->isRequireAuthentication() === false) {
             return  false;
         }
 
@@ -68,7 +68,7 @@ class ServerAuthorization
     public function isAuthenticationTypeSupported(RequestInterface $request): bool
     {
         if ($request instanceof AnonBindRequest) {
-            return $this->isAnonymousAllowed;
+            return $this->options->isAllowAnonymous();
         }
 
         return $request instanceof SimpleBindRequest;
@@ -88,7 +88,7 @@ class ServerAuthorization
      */
     public function isAuthenticated(): bool
     {
-        if ($this->isAuthRequired === false) {
+        if ($this->options->isRequireAuthentication() === false) {
             return true;
         }
 

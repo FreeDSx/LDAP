@@ -15,14 +15,13 @@ namespace FreeDSx\Ldap\Server\ServerRunner;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\ChildProcess;
 use FreeDSx\Ldap\Server\LoggerTrait;
-use FreeDSx\Ldap\Server\RequestHandler\HandlerFactory;
-use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
+use Psr\Log\LoggerInterface;
 
 /**
  * Uses PNCTL to fork incoming requests and send them to the server protocol handler.
@@ -71,8 +70,10 @@ class PcntlServerRunner implements ServerRunnerInterface
     /**
      * @throws RuntimeException
      */
-    public function __construct(private readonly ServerOptions $options)
-    {
+    public function __construct(
+        private readonly ServerProtocolFactory $serverProtocolFactory,
+        private readonly ?LoggerInterface $logger,
+    ) {
         if (!extension_loaded('pcntl')) {
             throw new RuntimeException(
                 'The PCNTL extension is needed to fork incoming requests, which is only available on Linux.'
@@ -341,11 +342,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     ): never {
         $context = ['pid' => $pid];
         $this->isMainProcess = false;
-        $serverProtocolHandler = new ServerProtocolHandler(
-            new ServerQueue($socket),
-            new HandlerFactory($this->options),
-            $this->options
-        );
+        $serverProtocolHandler = $this->serverProtocolFactory->make($socket);
 
         $this->installChildSignalHandlers(
             $serverProtocolHandler,
