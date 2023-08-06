@@ -28,6 +28,11 @@ use PhpSpec\ObjectBehavior;
 
 class ServerStartTlsHandlerSpec extends ObjectBehavior
 {
+    public function let(): void
+    {
+        $this->beConstructedWith(new ServerOptions());
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerStartTlsHandler::class);
@@ -35,6 +40,11 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
 
     public function it_should_handle_a_start_tls_request(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher): void
     {
+        $this->beConstructedWith(
+            (new ServerOptions())
+                ->setSslCert('foo')
+        );
+
         $queue->isEncrypted()->willReturn(false);
 
         $queue->encrypt()->shouldBeCalled()->willReturn($queue);
@@ -52,13 +62,16 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
             $token,
             $dispatcher,
             $queue,
-            (new ServerOptions())
-                ->setSslCert('foo')
         );
     }
 
     public function it_should_send_back_an_error_if_the_queue_is_already_encrypted(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher): void
     {
+        $this->beConstructedWith(
+            (new ServerOptions())
+                ->setSslCert('foo')
+        );
+
         $queue->isEncrypted()->willReturn(true);
 
         $queue->encrypt()->shouldNotBeCalled();
@@ -76,8 +89,6 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
             $token,
             $dispatcher,
             $queue,
-            (new ServerOptions())
-                ->setSslCert('foo')
         );
     }
 
@@ -100,7 +111,6 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
             $token,
             $dispatcher,
             $queue,
-            new ServerOptions()
         );
     }
 }

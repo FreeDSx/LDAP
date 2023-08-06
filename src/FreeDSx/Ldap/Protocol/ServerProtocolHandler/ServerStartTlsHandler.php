@@ -36,7 +36,7 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
 {
     private static ?bool $hasOpenssl = null;
 
-    public function __construct()
+    public function __construct(private readonly ServerOptions $options)
     {
         if (self::$hasOpenssl === null) {
             $this::$hasOpenssl = extension_loaded('openssl');
@@ -52,11 +52,10 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
         LdapMessageRequest $message,
         TokenInterface $token,
         RequestHandlerInterface $dispatcher,
-        ServerQueue $queue,
-        ServerOptions $options
+        ServerQueue $queue
     ): void {
         # If we don't have a SSL cert or the OpenSSL extension is not available, then we can do nothing...
-        if ($options->getSslCert() === null || !self::$hasOpenssl) {
+        if ($this->options->getSslCert() === null || !self::$hasOpenssl) {
             $queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
                 new LdapResult(ResultCode::PROTOCOL_ERROR),
                 ExtendedRequest::OID_START_TLS

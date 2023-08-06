@@ -38,7 +38,10 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
 {
     public function let(): void
     {
-        $this->beConstructedWith(null);
+        $this->beConstructedWith(
+            new ServerOptions(),
+            null
+        );
     }
 
     public function it_is_initializable(): void
@@ -51,6 +54,12 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         RequestHandlerInterface $handler,
         TokenInterface $token
     ): void {
+        $this->beConstructedWith(
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar')
+        );
+
         $search = new LdapMessageRequest(
             1,
             (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope()
@@ -73,9 +82,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            (new ServerOptions())
-                ->setDseVendorName('Foo')
-                ->setDseNamingContexts('dc=Foo,dc=Bar')
         );
     }
 
@@ -85,6 +91,13 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         TokenInterface $token,
         PagingHandlerInterface $pagingHandler,
     ): void {
+        $this->beConstructedWith(
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar')
+                ->setPagingHandler($pagingHandler->getWrappedObject())
+        );
+
         $search = new LdapMessageRequest(
             1,
             (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope()
@@ -107,10 +120,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            (new ServerOptions())
-                ->setDseVendorName('Foo')
-                ->setDseNamingContexts('dc=Foo,dc=Bar')
-                ->setPagingHandler($pagingHandler->getWrappedObject())
         );
     }
 
@@ -120,7 +129,12 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         TokenInterface $token,
         RootDseHandlerInterface $rootDseHandler
     ): void {
-        $this->beConstructedWith($rootDseHandler);
+        $this->beConstructedWith(
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar'),
+            $rootDseHandler,
+        );
 
         $searchReqeust = (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope();
         $search = new LdapMessageRequest(
@@ -151,9 +165,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            (new ServerOptions())
-                ->setDseVendorName('Foo')
-                ->setDseNamingContexts('dc=Foo,dc=Bar')
         );
     }
 
@@ -162,6 +173,12 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         RequestHandlerInterface $handler,
         TokenInterface $token
     ): void {
+        $this->beConstructedWith(
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar')
+        );
+
         $search = new LdapMessageRequest(
             1,
             (new SearchRequest(Filters::present('objectClass')))
@@ -185,9 +202,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            (new ServerOptions())
-                ->setDseVendorName('Foo')
-                ->setDseNamingContexts('dc=Foo,dc=Bar')
         );
     }
 
@@ -196,6 +210,12 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         RequestHandlerInterface $handler,
         TokenInterface $token
     ): void {
+        $this->beConstructedWith(
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar')
+        );
+
         $search = new LdapMessageRequest(
             1,
             (new SearchRequest(Filters::present('objectClass')))
@@ -222,9 +242,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            (new ServerOptions())
-                ->setDseVendorName('Foo')
-                ->setDseNamingContexts('dc=Foo,dc=Bar')
         );
     }
 }

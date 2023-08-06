@@ -61,9 +61,10 @@ class ServerTestCase extends LdapTestCase
         }
 
         throw new Exception(sprintf(
-            'The expected output (%s) was not received after %d seconds.',
+            'The expected output (%s) was not received after %d seconds. Received: %s',
             $marker,
-            $i
+            $i,
+            PHP_EOL . $this->subject->getErrorOutput()
         ));
     }
 

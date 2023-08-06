@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerProtocolHandlerInterface;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\RequestHistory;
+use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Determines the correct handler for the request.
@@ -31,16 +32,11 @@ use FreeDSx\Ldap\Server\RequestHistory;
  */
 class ServerProtocolHandlerFactory
 {
-    private HandlerFactoryInterface $handlerFactory;
-
-    private RequestHistory $requestHistory;
-
     public function __construct(
-        HandlerFactoryInterface $handlerFactory,
-        RequestHistory $requestHistory
+        private readonly HandlerFactoryInterface $handlerFactory,
+        private readonly ServerOptions $options,
+        private readonly RequestHistory $requestHistory,
     ) {
-        $this->handlerFactory = $handlerFactory;
-        $this->requestHistory = $requestHistory;
     }
 
     public function get(
@@ -50,7 +46,7 @@ class ServerProtocolHandlerFactory
         if ($request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_WHOAMI) {
             return new ServerProtocolHandler\ServerWhoAmIHandler();
         } elseif ($request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_START_TLS) {
-            return new ServerProtocolHandler\ServerStartTlsHandler();
+            return new ServerProtocolHandler\ServerStartTlsHandler($this->options);
         } elseif ($this->isRootDseSearch($request)) {
             return $this->getRootDseHandler();
         } elseif ($this->isPagingSearch($request, $controls)) {
@@ -86,7 +82,10 @@ class ServerProtocolHandlerFactory
     {
         $rootDseHandler = $this->handlerFactory->makeRootDseHandler();
 
-        return new ServerProtocolHandler\ServerRootDseHandler($rootDseHandler);
+        return new ServerProtocolHandler\ServerRootDseHandler(
+            $this->options,
+            $rootDseHandler,
+        );
     }
 
     private function getPagingHandler(): ServerProtocolHandlerInterface

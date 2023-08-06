@@ -17,15 +17,14 @@ use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
-use FreeDSx\Ldap\Server\RequestHandler\HandlerFactory;
 use FreeDSx\Socket\Socket;
 use Psr\Log\LoggerInterface;
 
 class ServerProtocolFactory
 {
     public function __construct(
-        private readonly HandlerFactory $handlerFactory,
-        private readonly LoggerInterface $logger,
+        private readonly HandlerFactoryInterface $handlerFactory,
+        private readonly ?LoggerInterface $logger,
         private readonly ServerProtocolHandlerFactory $serverProtocolHandlerFactory,
         private readonly ServerAuthorization $serverAuthorization,
     ) {

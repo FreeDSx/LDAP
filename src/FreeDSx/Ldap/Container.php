@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Server\RequestHandler\HandlerFactory;
 use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
+use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Socket\SocketPool;
 
@@ -145,8 +146,8 @@ class Container
             factory: $this->makeServerProtocolFactory(...),
         );
         $this->registerFactory(
-            className: PcntlServerRunner::class,
-            factory: $this->makePcntlServerRunner(...),
+            className: ServerRunnerInterface::class,
+            factory: $this->makeServerRunner(...),
         );
         $this->registerFactory(
             className: ServerAuthorization::class,
@@ -197,8 +198,10 @@ class Container
     private function makeServerProtocolFactory(): ServerProtocolFactory
     {
         return new ServerProtocolFactory(
-            $this->get(HandlerFactory::class),
-            $this->get(ServerOptions::class),
+            handlerFactory: $this->get(HandlerFactoryInterface::class),
+            logger: $this->get(ServerOptions::class)->getLogger(),
+            serverProtocolHandlerFactory: $this->get(ServerProtocolHandlerFactory::class),
+            serverAuthorization: $this->get(ServerAuthorization::class),
         );
     }
 
@@ -207,11 +210,11 @@ class Container
         return new HandlerFactory($this->get(ServerOptions::class));
     }
 
-    private function makePcntlServerRunner(): PcntlServerRunner
+    private function makeServerRunner(): ServerRunnerInterface
     {
         return new PcntlServerRunner(
-            $this->get(ServerProtocolFactory::class),
-            $this->get(ServerOptions::class)->getLogger(),
+            serverProtocolFactory: $this->get(ServerProtocolFactory::class),
+            logger: $this->get(ServerOptions::class)->getLogger(),
         );
     }
 
@@ -220,8 +223,8 @@ class Container
         $serverOptions = $this->get(ServerOptions::class);
 
         return new SocketServerFactory(
-            $serverOptions,
-            $serverOptions->getLogger(),
+            options: $serverOptions,
+            logger: $serverOptions->getLogger(),
         );
     }
 
@@ -233,8 +236,9 @@ class Container
     private function makeServerProtocolHandlerFactory(): ServerProtocolHandlerFactory
     {
         return new ServerProtocolHandlerFactory(
-            $this->get(HandlerFactoryInterface::class),
-            new RequestHistory()
+            handlerFactory: $this->get(HandlerFactoryInterface::class),
+            options: $this->get(ServerOptions::class),
+            requestHistory: new RequestHistory(),
         );
     }
 }

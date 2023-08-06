@@ -170,8 +170,7 @@ class ServerProtocolHandler
                 $message,
                 $this->authorizer->getToken(),
                 $this->handlerFactory->makeRequestHandler(),
-                $this->queue,
-                $this->options
+                $this->queue
             );
         # Authentication is required, but they have not authenticated...
         } else {

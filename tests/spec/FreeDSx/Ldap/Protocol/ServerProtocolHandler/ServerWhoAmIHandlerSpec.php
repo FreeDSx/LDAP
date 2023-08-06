@@ -23,7 +23,6 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerWhoAmIHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
-use FreeDSx\Ldap\ServerOptions;
 use PhpSpec\ObjectBehavior;
 
 class ServerWhoAmIHandlerSpec extends ObjectBehavior
@@ -47,7 +46,6 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
             new BindToken('cn=foo,dc=foo,dc=bar', '12345'),
             $handler,
             $queue,
-            new ServerOptions()
         );
     }
 
@@ -65,7 +63,6 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
             new BindToken('foo@bar.local', '12345'),
             $handler,
             $queue,
-            new ServerOptions()
         );
     }
 
@@ -84,7 +81,6 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
             new AnonToken(),
             $handler,
             $queue,
-            new ServerOptions()
         );
     }
 }

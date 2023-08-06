@@ -101,7 +101,6 @@ class ServerPagingHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            new ServerOptions()
         );
     }
 
@@ -152,7 +151,6 @@ class ServerPagingHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            new ServerOptions()
         );
     }
 
@@ -189,7 +187,6 @@ class ServerPagingHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            new ServerOptions()
         );
     }
 
@@ -230,7 +227,6 @@ class ServerPagingHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            new ServerOptions()
         );
     }
 

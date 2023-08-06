@@ -31,6 +31,7 @@ use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHistory;
+use FreeDSx\Ldap\ServerOptions;
 use PhpSpec\ObjectBehavior;
 
 class ServerProtocolHandlerFactorySpec extends ObjectBehavior
@@ -39,6 +40,7 @@ class ServerProtocolHandlerFactorySpec extends ObjectBehavior
     {
         $this->beConstructedWith(
             $handlerFactory,
+            new ServerOptions(),
             new RequestHistory()
         );
     }
@@ -50,7 +52,8 @@ class ServerProtocolHandlerFactorySpec extends ObjectBehavior
 
     public function it_should_get_a_start_tls_hanlder(): void
     {
-        $this->get(Operations::extended(ExtendedRequest::OID_START_TLS), new ControlBag())->shouldBeLike(new ServerStartTlsHandler());
+        $this->get(Operations::extended(ExtendedRequest::OID_START_TLS), new ControlBag())
+            ->shouldBeLike(new ServerStartTlsHandler(new ServerOptions()));
     }
 
     public function it_should_get_a_whoami_handler(): void
@@ -89,7 +92,8 @@ class ServerProtocolHandlerFactorySpec extends ObjectBehavior
 
     public function it_should_get_a_root_dse_handler(): void
     {
-        $this->get(Operations::read(''), new ControlBag())->shouldBeLike(new ServerRootDseHandler());
+        $this->get(Operations::read(''), new ControlBag())
+            ->shouldBeLike(new ServerRootDseHandler(new ServerOptions()));
     }
 
     public function it_should_get_an_unbind_handler(): void

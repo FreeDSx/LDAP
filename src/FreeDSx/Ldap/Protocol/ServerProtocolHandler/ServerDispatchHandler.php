@@ -22,7 +22,6 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Handles generic requests that can be sent to the user supplied dispatcher / handler.
@@ -40,8 +39,7 @@ class ServerDispatchHandler extends BaseServerHandler implements ServerProtocolH
         LdapMessageRequest $message,
         TokenInterface $token,
         RequestHandlerInterface $dispatcher,
-        ServerQueue $queue,
-        ServerOptions $options
+        ServerQueue $queue
     ): void {
         $context = new RequestContext($message->controls(), $token);
         $request = $message->getRequest();

@@ -24,7 +24,6 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Handles a whoami request.
@@ -41,8 +40,7 @@ class ServerWhoAmIHandler implements ServerProtocolHandlerInterface
         LdapMessageRequest $message,
         TokenInterface $token,
         RequestHandlerInterface $dispatcher,
-        ServerQueue $queue,
-        ServerOptions $options
+        ServerQueue $queue
     ): void {
         $userId = $token->getUsername();
 

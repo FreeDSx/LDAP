@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Exception\ConnectionException;
 
 /**
@@ -32,7 +31,6 @@ interface ServerProtocolHandlerInterface
     /**
      * Handle protocol actions specific to the request received.
      *
-     * @param ServerOptions $options
      * @throws OperationException
      * @throws ConnectionException
      */
@@ -41,6 +39,5 @@ interface ServerProtocolHandlerInterface
         TokenInterface $token,
         RequestHandlerInterface $dispatcher,
         ServerQueue $queue,
-        ServerOptions $options
     ): void;
 }

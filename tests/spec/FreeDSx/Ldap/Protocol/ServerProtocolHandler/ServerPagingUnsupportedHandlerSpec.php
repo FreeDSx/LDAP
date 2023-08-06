@@ -81,7 +81,6 @@ class ServerPagingUnsupportedHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            new ServerOptions()
         );
     }
 
@@ -146,7 +145,6 @@ class ServerPagingUnsupportedHandlerSpec extends ObjectBehavior
             $token,
             $handler,
             $queue,
-            new ServerOptions()
         );
     }
 }

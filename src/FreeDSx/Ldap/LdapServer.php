@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
-use FreeDSx\Ldap\Server\LoggerTrait;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyHandler;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyPagingHandler;
@@ -31,8 +30,6 @@ use Psr\Log\LoggerInterface;
  */
 class LdapServer
 {
-    use LoggerTrait;
-
     private Container $container;
 
     public function __construct(
