@@ -13,31 +13,39 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server;
 
+use FreeDSx\Ldap\Protocol\Factory\ServerBindHandlerFactory;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Socket;
-use Psr\Log\LoggerInterface;
 
 class ServerProtocolFactory
 {
     public function __construct(
         private readonly HandlerFactoryInterface $handlerFactory,
-        private readonly ?LoggerInterface $logger,
-        private readonly ServerProtocolHandlerFactory $serverProtocolHandlerFactory,
+        private readonly ServerOptions $options,
         private readonly ServerAuthorization $serverAuthorization,
     ) {
     }
 
     public function make(Socket $socket): ServerProtocolHandler
     {
+        $serverQueue = new ServerQueue($socket);
+
         return new ServerProtocolHandler(
-            queue: new ServerQueue($socket),
+            queue: $serverQueue,
             handlerFactory: $this->handlerFactory,
-            logger: $this->logger,
-            protocolHandlerFactory:$this->serverProtocolHandlerFactory,
+            logger: $this->options->getLogger(),
+            protocolHandlerFactory: new ServerProtocolHandlerFactory(
+                handlerFactory: $this->handlerFactory,
+                options: $this->options,
+                requestHistory: new RequestHistory(),
+                queue: $serverQueue,
+            ),
             authorizer: $this->serverAuthorization,
+            bindHandlerFactory: new ServerBindHandlerFactory($serverQueue),
         );
     }
 }

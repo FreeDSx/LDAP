@@ -36,10 +36,11 @@ use Prophecy\Argument;
 
 class ServerRootDseHandlerSpec extends ObjectBehavior
 {
-    public function let(): void
+    public function let(ServerQueue $queue): void
     {
         $this->beConstructedWith(
             new ServerOptions(),
+            $queue,
             null
         );
     }
@@ -57,7 +58,8 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $this->beConstructedWith(
             (new ServerOptions())
                 ->setDseVendorName('Foo')
-                ->setDseNamingContexts('dc=Foo,dc=Bar')
+                ->setDseNamingContexts('dc=Foo,dc=Bar'),
+            $queue,
         );
 
         $search = new LdapMessageRequest(
@@ -81,7 +83,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $search,
             $token,
             $handler,
-            $queue,
         );
     }
 
@@ -95,7 +96,8 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             (new ServerOptions())
                 ->setDseVendorName('Foo')
                 ->setDseNamingContexts('dc=Foo,dc=Bar')
-                ->setPagingHandler($pagingHandler->getWrappedObject())
+                ->setPagingHandler($pagingHandler->getWrappedObject()),
+            $queue,
         );
 
         $search = new LdapMessageRequest(
@@ -119,7 +121,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $search,
             $token,
             $handler,
-            $queue,
         );
     }
 
@@ -133,6 +134,7 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             (new ServerOptions())
                 ->setDseVendorName('Foo')
                 ->setDseNamingContexts('dc=Foo,dc=Bar'),
+            $queue,
             $rootDseHandler,
         );
 
@@ -164,7 +166,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $search,
             $token,
             $handler,
-            $queue,
         );
     }
 
@@ -176,7 +177,8 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $this->beConstructedWith(
             (new ServerOptions())
                 ->setDseVendorName('Foo')
-                ->setDseNamingContexts('dc=Foo,dc=Bar')
+                ->setDseNamingContexts('dc=Foo,dc=Bar'),
+            $queue,
         );
 
         $search = new LdapMessageRequest(
@@ -201,7 +203,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $search,
             $token,
             $handler,
-            $queue,
         );
     }
 
@@ -213,7 +214,8 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $this->beConstructedWith(
             (new ServerOptions())
                 ->setDseVendorName('Foo')
-                ->setDseNamingContexts('dc=Foo,dc=Bar')
+                ->setDseNamingContexts('dc=Foo,dc=Bar'),
+            $queue,
         );
 
         $search = new LdapMessageRequest(
@@ -241,7 +243,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
             $search,
             $token,
             $handler,
-            $queue,
         );
     }
 }

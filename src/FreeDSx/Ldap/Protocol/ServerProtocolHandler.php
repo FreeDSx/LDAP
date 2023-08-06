@@ -53,7 +53,7 @@ class ServerProtocolHandler
         private readonly ?LoggerInterface $logger,
         private readonly ServerProtocolHandlerFactory $protocolHandlerFactory,
         private readonly ServerAuthorization $authorizer,
-        private readonly ServerBindHandlerFactory $bindHandlerFactory = new ServerBindHandlerFactory(),
+        private readonly ServerBindHandlerFactory $bindHandlerFactory,
         private readonly ResponseFactory $responseFactory = new ResponseFactory()
     ) {
     }
@@ -169,8 +169,7 @@ class ServerProtocolHandler
             $handler->handleRequest(
                 $message,
                 $this->authorizer->getToken(),
-                $this->handlerFactory->makeRequestHandler(),
-                $this->queue
+                $this->handlerFactory->makeRequestHandler()
             );
         # Authentication is required, but they have not authenticated...
         } else {

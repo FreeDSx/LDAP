@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
@@ -31,6 +32,11 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 class ServerBindHandler extends BaseServerHandler implements BindHandlerInterface
 {
+    public function __construct(private readonly ServerQueue $queue)
+    {
+        parent::__construct();
+    }
+
     /**
      * {@inheritDoc}
      * @throws RuntimeException
@@ -52,7 +58,7 @@ class ServerBindHandler extends BaseServerHandler implements BindHandlerInterfac
 
         $this->validateVersion($request);
         $token = $this->simpleBind($dispatcher, $request);
-        $queue->sendMessage($this->responseFactory->getStandardResponse($message));
+        $this->queue->sendMessage($this->responseFactory->getStandardResponse($message));
 
         return $token;
     }

@@ -28,9 +28,12 @@ use PhpSpec\ObjectBehavior;
 
 class ServerStartTlsHandlerSpec extends ObjectBehavior
 {
-    public function let(): void
+    public function let(ServerQueue $queue): void
     {
-        $this->beConstructedWith(new ServerOptions());
+        $this->beConstructedWith(
+            new ServerOptions(),
+            $queue,
+        );
     }
 
     public function it_is_initializable(): void
@@ -38,11 +41,15 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
         $this->shouldHaveType(ServerStartTlsHandler::class);
     }
 
-    public function it_should_handle_a_start_tls_request(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher): void
-    {
+    public function it_should_handle_a_start_tls_request(
+        ServerQueue $queue,
+        TokenInterface $token,
+        RequestHandlerInterface $dispatcher
+    ): void {
         $this->beConstructedWith(
             (new ServerOptions())
-                ->setSslCert('foo')
+                ->setSslCert('foo'),
+            $queue,
         );
 
         $queue->isEncrypted()->willReturn(false);
@@ -61,15 +68,18 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
             $startTls,
             $token,
             $dispatcher,
-            $queue,
         );
     }
 
-    public function it_should_send_back_an_error_if_the_queue_is_already_encrypted(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher): void
-    {
+    public function it_should_send_back_an_error_if_the_queue_is_already_encrypted(
+        ServerQueue $queue,
+        TokenInterface $token,
+        RequestHandlerInterface $dispatcher
+    ): void {
         $this->beConstructedWith(
             (new ServerOptions())
-                ->setSslCert('foo')
+                ->setSslCert('foo'),
+            $queue,
         );
 
         $queue->isEncrypted()->willReturn(true);
@@ -88,7 +98,6 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
             $startTls,
             $token,
             $dispatcher,
-            $queue,
         );
     }
 
@@ -110,7 +119,6 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
             $startTls,
             $token,
             $dispatcher,
-            $queue,
         );
     }
 }

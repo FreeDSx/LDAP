@@ -38,6 +38,8 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
     public function let(ServerQueue $queue): void
     {
         $queue->sendMessage(Argument::any())->willReturn($queue);
+
+        $this->beConstructedWith($queue);
     }
 
     public function it_is_initializable(): void
@@ -50,7 +52,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $add = new LdapMessageRequest(1, new AddRequest(Entry::create('cn=foo,dc=bar')));
 
         $handler->add(Argument::any(), $add->getRequest())->shouldBeCalled();
-        $this->handleRequest($add, $token, $handler, $queue);
+        $this->handleRequest($add, $token, $handler);
     }
 
     public function it_should_send_a_delete_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
@@ -58,7 +60,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $delete = new LdapMessageRequest(1, new DeleteRequest('cn=foo,dc=bar'));
 
         $handler->delete(Argument::any(), $delete->getRequest())->shouldBeCalled();
-        $this->handleRequest($delete, $token, $handler, $queue);
+        $this->handleRequest($delete, $token, $handler);
     }
 
     public function it_should_send_a_modify_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
@@ -66,7 +68,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $modify = new LdapMessageRequest(1, new ModifyRequest('cn=foo,dc=bar', Change::add('foo', 'bar')));
 
         $handler->modify(Argument::any(), $modify->getRequest())->shouldBeCalled();
-        $this->handleRequest($modify, $token, $handler, $queue);
+        $this->handleRequest($modify, $token, $handler);
     }
 
     public function it_should_send_a_modify_dn_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
@@ -74,7 +76,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $modifyDn = new LdapMessageRequest(1, new ModifyDnRequest('cn=foo,dc=bar', 'cn=bar', true));
 
         $handler->modifyDn(Argument::any(), $modifyDn->getRequest())->shouldBeCalled();
-        $this->handleRequest($modifyDn, $token, $handler, $queue);
+        $this->handleRequest($modifyDn, $token, $handler);
     }
 
     public function it_should_send_an_extended_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
@@ -82,7 +84,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $ext = new LdapMessageRequest(1, new ExtendedRequest('foo', 'bar'));
 
         $handler->extended(Argument::any(), $ext->getRequest())->shouldBeCalled();
-        $this->handleRequest($ext, $token, $handler, $queue);
+        $this->handleRequest($ext, $token, $handler);
     }
 
     public function it_should_send_a_compare_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
@@ -90,7 +92,7 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $compare = new LdapMessageRequest(1, new CompareRequest('cn=foo,dc=bar', Filters::equal('foo', 'bar')));
 
         $handler->compare(Argument::any(), $compare->getRequest())->shouldBeCalled()->willReturn(true);
-        $this->handleRequest($compare, $token, $handler, $queue);
+        $this->handleRequest($compare, $token, $handler);
     }
 
     public function it_should_throw_an_operation_exception_if_the_request_is_unsupported(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void

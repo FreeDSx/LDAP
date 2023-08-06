@@ -42,11 +42,14 @@ class ServerPagingHandlerSpec extends ObjectBehavior
 {
     private RequestHistory $requestHistory;
 
-    public function let(PagingHandlerInterface $pagingHandler): void
-    {
+    public function let(
+        ServerQueue $queue,
+        PagingHandlerInterface $pagingHandler
+    ): void {
         $this->requestHistory = new RequestHistory();
 
         $this->beConstructedWith(
+            $queue,
             $pagingHandler,
             $this->requestHistory
         );
@@ -100,7 +103,6 @@ class ServerPagingHandlerSpec extends ObjectBehavior
             $message,
             $token,
             $handler,
-            $queue,
         );
     }
 
@@ -150,7 +152,6 @@ class ServerPagingHandlerSpec extends ObjectBehavior
             $message,
             $token,
             $handler,
-            $queue,
         );
     }
 
@@ -186,7 +187,6 @@ class ServerPagingHandlerSpec extends ObjectBehavior
             $message,
             $token,
             $handler,
-            $queue,
         );
     }
 
@@ -226,7 +226,6 @@ class ServerPagingHandlerSpec extends ObjectBehavior
             $message,
             $token,
             $handler,
-            $queue,
         );
     }
 

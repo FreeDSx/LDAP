@@ -109,7 +109,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $bindHandler->handleBind(Argument::any(), Argument::any(), Argument::any())->willReturn(
             new BindToken('foo', 'bar')
         );
-        $protocolHandler->handleRequest(Argument::any(), Argument::any(), Argument::any(), Argument::any())
+        $protocolHandler->handleRequest(Argument::any(), Argument::any(), Argument::any())
             ->shouldNotBeCalled();
 
         $queue->sendMessage(new LdapMessageResponse(
@@ -144,7 +144,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             )
         ))->shouldBeCalled()->willReturn($queue);
 
-        $protocolHandler->handleRequest(Argument::any(), Argument::any(), Argument::any(), Argument::any())
+        $protocolHandler->handleRequest(Argument::any(), Argument::any(), Argument::any())
             ->shouldNotBeCalled();
 
         $this->handle();
@@ -204,7 +204,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $bindHandler->handleBind(Argument::any(), Argument::any(), Argument::any())
             ->shouldBeCalledOnce()
             ->willReturn(new BindToken('foo@bar', 'bar'));
-        $protocolHandler->handleRequest(Argument::any(), Argument::any(), Argument::any(), Argument::any())
+        $protocolHandler->handleRequest(Argument::any(), Argument::any(), Argument::any())
             ->shouldNotBeCalled();
 
         $this->handle();
@@ -225,7 +225,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $bindHandler->handleBind(Argument::any(), Argument::any(), Argument::any())
             ->willReturn(new BindToken('foo@bar', 'bar'));
 
-        $protocolHandler->handleRequest(Argument::any(), Argument::any(), Argument::any(), Argument::any())
+        $protocolHandler->handleRequest(Argument::any(), Argument::any(), Argument::any())
             ->shouldBeCalled()
             ->willThrow(new OperationException('Foo.', ResultCode::CONFIDENTIALITY_REQUIRED));
 

@@ -32,6 +32,11 @@ use Prophecy\Argument;
 
 class ServerSearchHandlerSpec extends ObjectBehavior
 {
+    public function let(ServerQueue $queue): void
+    {
+        $this->beConstructedWith($queue);
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerSearchHandler::class);
@@ -58,7 +63,7 @@ class ServerSearchHandlerSpec extends ObjectBehavior
             new LdapMessageResponse(2, new SearchResultDone(0, 'dc=foo,dc=bar'))
         )->shouldBeCalled();
 
-        $this->handleRequest($search, $token, $handler, $queue);
+        $this->handleRequest($search, $token, $handler);
     }
 
     public function it_should_send_a_SearchResultDone_with_an_operation_exception_thrown_from_the_handler(
@@ -94,7 +99,6 @@ class ServerSearchHandlerSpec extends ObjectBehavior
             $search,
             $token,
             $handler,
-            $queue,
         );
     }
 }

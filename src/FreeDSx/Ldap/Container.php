@@ -22,7 +22,6 @@ use FreeDSx\Ldap\Protocol\RootDseLoader;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\RequestHandler\HandlerFactory;
-use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
@@ -153,10 +152,6 @@ class Container
             className: ServerAuthorization::class,
             factory: $this->makeServerAuthorizer(...),
         );
-        $this->registerFactory(
-            className: ServerProtocolHandlerFactory::class,
-            factory: $this->makeServerProtocolHandlerFactory(...),
-        );
     }
 
     private function makeClientProtocolHandler(): ClientProtocolHandler
@@ -199,8 +194,7 @@ class Container
     {
         return new ServerProtocolFactory(
             handlerFactory: $this->get(HandlerFactoryInterface::class),
-            logger: $this->get(ServerOptions::class)->getLogger(),
-            serverProtocolHandlerFactory: $this->get(ServerProtocolHandlerFactory::class),
+            options: $this->get(ServerOptions::class),
             serverAuthorization: $this->get(ServerAuthorization::class),
         );
     }
@@ -231,14 +225,5 @@ class Container
     private function makeServerAuthorizer(): ServerAuthorization
     {
         return new ServerAuthorization($this->get(ServerOptions::class));
-    }
-
-    private function makeServerProtocolHandlerFactory(): ServerProtocolHandlerFactory
-    {
-        return new ServerProtocolHandlerFactory(
-            handlerFactory: $this->get(HandlerFactoryInterface::class),
-            options: $this->get(ServerOptions::class),
-            requestHistory: new RequestHistory(),
-        );
     }
 }

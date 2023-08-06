@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingUnsupportedHandler;
@@ -36,12 +37,15 @@ use PhpSpec\ObjectBehavior;
 
 class ServerProtocolHandlerFactorySpec extends ObjectBehavior
 {
-    public function let(HandlerFactoryInterface $handlerFactory): void
-    {
+    public function let(
+        HandlerFactoryInterface $handlerFactory,
+        ServerQueue $queue,
+    ): void {
         $this->beConstructedWith(
             $handlerFactory,
             new ServerOptions(),
-            new RequestHistory()
+            new RequestHistory(),
+            $queue,
         );
     }
 
@@ -50,20 +54,22 @@ class ServerProtocolHandlerFactorySpec extends ObjectBehavior
         $this->shouldHaveType(ServerProtocolHandlerFactory::class);
     }
 
-    public function it_should_get_a_start_tls_hanlder(): void
+    public function it_should_get_a_start_tls_hanlder(ServerQueue $queue): void
     {
         $this->get(Operations::extended(ExtendedRequest::OID_START_TLS), new ControlBag())
-            ->shouldBeLike(new ServerStartTlsHandler(new ServerOptions()));
+            ->shouldBeAnInstanceOf(ServerStartTlsHandler::class);
     }
 
-    public function it_should_get_a_whoami_handler(): void
+    public function it_should_get_a_whoami_handler(ServerQueue $queue): void
     {
-        $this->get(Operations::whoami(), new ControlBag())->shouldBeLike(new ServerWhoAmIHandler());
+        $this->get(Operations::whoami(), new ControlBag())
+            ->shouldBeAnInstanceOf(ServerWhoAmIHandler::class);
     }
 
-    public function it_should_get_a_search_handler(): void
+    public function it_should_get_a_search_handler(ServerQueue $queue): void
     {
-        $this->get(Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'), new ControlBag())->shouldBeLike(new ServerSearchHandler());
+        $this->get(Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'), new ControlBag())
+            ->shouldBeAnInstanceOf(ServerSearchHandler::class);
     }
 
     public function it_should_get_a_paging_handler_when_supported(
@@ -90,24 +96,31 @@ class ServerProtocolHandlerFactorySpec extends ObjectBehavior
         $this->get(Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'), $controls)->shouldBeAnInstanceOf(ServerPagingUnsupportedHandler::class);
     }
 
-    public function it_should_get_a_root_dse_handler(): void
+    public function it_should_get_a_root_dse_handler(ServerQueue $queue): void
     {
         $this->get(Operations::read(''), new ControlBag())
-            ->shouldBeLike(new ServerRootDseHandler(new ServerOptions()));
+            ->shouldBeAnInstanceOf(ServerRootDseHandler::class);
     }
 
-    public function it_should_get_an_unbind_handler(): void
+    public function it_should_get_an_unbind_handler(ServerQueue $queue): void
     {
-        $this->get(Operations::unbind(), new ControlBag())->shouldBeLike(new ServerUnbindHandler());
+        $this->get(Operations::unbind(), new ControlBag())
+            ->shouldBeAnInstanceOf(ServerUnbindHandler::class);
     }
 
-    public function it_should_get_the_dispatch_handler_for_common_requests(): void
+    public function it_should_get_the_dispatch_handler_for_common_requests(ServerQueue $queue): void
     {
-        $this->get(Operations::add(Entry::fromArray('cn=foo')), new ControlBag())->shouldBeLike(new ServerDispatchHandler());
-        $this->get(Operations::delete('cn=foo'), new ControlBag())->shouldBeLike(new ServerDispatchHandler());
-        $this->get(Operations::compare('cn=foo', 'foo', 'bar'), new ControlBag())->shouldBeLike(new ServerDispatchHandler());
-        $this->get(Operations::modify('cn=foo'), new ControlBag())->shouldBeLike(new ServerDispatchHandler());
-        $this->get(Operations::move('cn=foo', 'foo=bar'), new ControlBag())->shouldBeLike(new ServerDispatchHandler());
-        $this->get(Operations::rename('cn=foo', 'cn=foo'), new ControlBag())->shouldBeLike(new ServerDispatchHandler());
+        $this->get(Operations::add(Entry::fromArray('cn=foo')), new ControlBag())
+            ->shouldBeAnInstanceOf(ServerDispatchHandler::class);
+        $this->get(Operations::delete('cn=foo'), new ControlBag())
+            ->shouldBeAnInstanceOf(ServerDispatchHandler::class);
+        $this->get(Operations::compare('cn=foo', 'foo', 'bar'), new ControlBag())
+            ->shouldBeAnInstanceOf(ServerDispatchHandler::class);
+        $this->get(Operations::modify('cn=foo'), new ControlBag())
+            ->shouldBeAnInstanceOf(ServerDispatchHandler::class);
+        $this->get(Operations::move('cn=foo', 'foo=bar'), new ControlBag())
+            ->shouldBeAnInstanceOf(ServerDispatchHandler::class);
+        $this->get(Operations::rename('cn=foo', 'cn=foo'), new ControlBag())
+            ->shouldBeAnInstanceOf(ServerDispatchHandler::class);
     }
 }

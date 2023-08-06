@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\BindHandlerInterface;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerAnonBindHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerBindHandler;
@@ -29,6 +30,10 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerBindHandler;
  */
 class ServerBindHandlerFactory
 {
+    public function __construct(private readonly ServerQueue $queue)
+    {
+    }
+
     /**
      * Get the bind handler specific to the request.
      *
@@ -37,9 +42,9 @@ class ServerBindHandlerFactory
     public function get(RequestInterface $request): BindHandlerInterface
     {
         if ($request instanceof SimpleBindRequest) {
-            return new ServerBindHandler();
+            return new ServerBindHandler($this->queue);
         } elseif ($request instanceof AnonBindRequest) {
-            return new ServerAnonBindHandler();
+            return new ServerAnonBindHandler($this->queue);
         } else {
             throw new OperationException(
                 'The authentication type requested is not supported.',

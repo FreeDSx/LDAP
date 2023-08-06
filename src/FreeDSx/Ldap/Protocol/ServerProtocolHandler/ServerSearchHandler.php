@@ -29,14 +29,17 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
 {
     use ServerSearchTrait;
 
+    public function __construct(private readonly ServerQueue $queue)
+    {
+    }
+
     /**
      * @inheritDoc
      */
     public function handleRequest(
         LdapMessageRequest $message,
         TokenInterface $token,
-        RequestHandlerInterface $dispatcher,
-        ServerQueue $queue
+        RequestHandlerInterface $dispatcher
     ): void {
         $context = new RequestContext(
             $message->controls(),
@@ -63,7 +66,7 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
         $this->sendEntriesToClient(
             $searchResult,
             $message,
-            $queue
+            $this->queue
         );
     }
 }

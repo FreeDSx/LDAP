@@ -40,6 +40,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
 {
     public function __construct(
         private readonly ServerOptions $options,
+        private readonly ServerQueue $queue,
         private readonly ?RootDseHandlerInterface $rootDseHandler = null
     ) {
     }
@@ -51,8 +52,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
     public function handleRequest(
         LdapMessageRequest $message,
         TokenInterface $token,
-        RequestHandlerInterface $dispatcher,
-        ServerQueue $queue
+        RequestHandlerInterface $dispatcher
     ): void {
         $entry = Entry::fromArray('', [
             'namingContexts' => $this->options->getDseNamingContexts(),
@@ -93,7 +93,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
             );
         }
 
-        $queue->sendMessage(
+        $this->queue->sendMessage(
             new LdapMessageResponse(
                 $message->getMessageId(),
                 new SearchResultEntry($entry)

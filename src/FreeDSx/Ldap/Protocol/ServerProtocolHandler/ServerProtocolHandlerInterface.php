@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
-use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -38,6 +37,5 @@ interface ServerProtocolHandlerInterface
         LdapMessageRequest $message,
         TokenInterface $token,
         RequestHandlerInterface $dispatcher,
-        ServerQueue $queue,
     ): void;
 }

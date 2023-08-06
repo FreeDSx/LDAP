@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerProtocolHandlerInterface;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
@@ -36,6 +37,7 @@ class ServerProtocolHandlerFactory
         private readonly HandlerFactoryInterface $handlerFactory,
         private readonly ServerOptions $options,
         private readonly RequestHistory $requestHistory,
+        private readonly ServerQueue $queue,
     ) {
     }
 
@@ -44,19 +46,22 @@ class ServerProtocolHandlerFactory
         ControlBag $controls
     ): ServerProtocolHandlerInterface {
         if ($request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_WHOAMI) {
-            return new ServerProtocolHandler\ServerWhoAmIHandler();
+            return new ServerProtocolHandler\ServerWhoAmIHandler($this->queue);
         } elseif ($request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_START_TLS) {
-            return new ServerProtocolHandler\ServerStartTlsHandler($this->options);
+            return new ServerProtocolHandler\ServerStartTlsHandler(
+                options: $this->options,
+                queue: $this->queue,
+            );
         } elseif ($this->isRootDseSearch($request)) {
             return $this->getRootDseHandler();
         } elseif ($this->isPagingSearch($request, $controls)) {
             return $this->getPagingHandler();
         } elseif ($request instanceof SearchRequest) {
-            return new ServerProtocolHandler\ServerSearchHandler();
+            return new ServerProtocolHandler\ServerSearchHandler($this->queue);
         } elseif ($request instanceof UnbindRequest) {
-            return new ServerProtocolHandler\ServerUnbindHandler();
+            return new ServerProtocolHandler\ServerUnbindHandler($this->queue);
         } else {
-            return new ServerProtocolHandler\ServerDispatchHandler();
+            return new ServerProtocolHandler\ServerDispatchHandler($this->queue);
         }
     }
 
@@ -83,8 +88,9 @@ class ServerProtocolHandlerFactory
         $rootDseHandler = $this->handlerFactory->makeRootDseHandler();
 
         return new ServerProtocolHandler\ServerRootDseHandler(
-            $this->options,
-            $rootDseHandler,
+            options: $this->options,
+            queue: $this->queue,
+            rootDseHandler: $rootDseHandler,
         );
     }
 
@@ -93,12 +99,13 @@ class ServerProtocolHandlerFactory
         $pagingHandler = $this->handlerFactory->makePagingHandler();
 
         if (!$pagingHandler) {
-            return new ServerProtocolHandler\ServerPagingUnsupportedHandler();
+            return new ServerProtocolHandler\ServerPagingUnsupportedHandler($this->queue);
         }
 
         return new ServerProtocolHandler\ServerPagingHandler(
-            $pagingHandler,
-            $this->requestHistory
+            queue: $this->queue,
+            pagingHandler: $pagingHandler,
+            requestHistory: $this->requestHistory,
         );
     }
 }

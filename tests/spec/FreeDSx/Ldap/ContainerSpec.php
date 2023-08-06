@@ -119,10 +119,4 @@ class ContainerSpec extends ObjectBehavior
         $this->get(SocketServerFactory::class)
             ->shouldBeAnInstanceOf(SocketServerFactory::class);
     }
-
-    public function it_should_make_the_ServerProtocolHandlerFactory(): void
-    {
-        $this->get(ServerProtocolHandlerFactory::class)
-            ->shouldBeAnInstanceOf(ServerProtocolHandlerFactory::class);
-    }
 }

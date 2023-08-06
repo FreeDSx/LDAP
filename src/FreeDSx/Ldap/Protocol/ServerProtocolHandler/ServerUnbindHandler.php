@@ -25,15 +25,18 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 class ServerUnbindHandler implements ServerProtocolHandlerInterface
 {
+    public function __construct(private readonly ServerQueue $queue)
+    {
+    }
+
     /**
      * {@inheritDoc}
      */
     public function handleRequest(
         LdapMessageRequest $message,
         TokenInterface $token,
-        RequestHandlerInterface $dispatcher,
-        ServerQueue $queue
+        RequestHandlerInterface $dispatcher
     ): void {
-        $queue->close();
+        $this->queue->close();
     }
 }

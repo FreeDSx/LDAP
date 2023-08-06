@@ -24,17 +24,25 @@ use Prophecy\Argument;
 
 class ServerUnbindHandlerSpec extends ObjectBehavior
 {
+    public function let(ServerQueue $queue): void
+    {
+        $this->beConstructedWith($queue);
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerUnbindHandler::class);
     }
 
-    public function it_should_handle_an_unbind_request(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher): void
-    {
+    public function it_should_handle_an_unbind_request(
+        ServerQueue $queue,
+        TokenInterface $token,
+        RequestHandlerInterface $dispatcher
+    ): void {
         $queue->close()->shouldBeCalled();
         $queue->sendMessage(Argument::any())->shouldNotBeCalled();
 
         $unbind = new LdapMessageRequest(1, new UnbindRequest());
-        $this->handleRequest($unbind, $token, $dispatcher, $queue);
+        $this->handleRequest($unbind, $token, $dispatcher);
     }
 }

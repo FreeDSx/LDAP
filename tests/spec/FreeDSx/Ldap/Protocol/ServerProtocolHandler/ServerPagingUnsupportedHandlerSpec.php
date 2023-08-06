@@ -34,6 +34,11 @@ use Prophecy\Argument;
 
 class ServerPagingUnsupportedHandlerSpec extends ObjectBehavior
 {
+    public function let(ServerQueue $queue): void
+    {
+        $this->beConstructedWith($queue);
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerPagingUnsupportedHandler::class);
@@ -80,7 +85,6 @@ class ServerPagingUnsupportedHandlerSpec extends ObjectBehavior
             $search,
             $token,
             $handler,
-            $queue,
         );
     }
 
@@ -144,7 +148,6 @@ class ServerPagingUnsupportedHandlerSpec extends ObjectBehavior
             $search,
             $token,
             $handler,
-            $queue,
         );
     }
 }

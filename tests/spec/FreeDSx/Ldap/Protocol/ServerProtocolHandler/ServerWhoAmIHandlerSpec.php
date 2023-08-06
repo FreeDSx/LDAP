@@ -27,6 +27,10 @@ use PhpSpec\ObjectBehavior;
 
 class ServerWhoAmIHandlerSpec extends ObjectBehavior
 {
+    public function let(ServerQueue $queue): void
+    {
+        $this->beConstructedWith($queue);
+    }
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerWhoAmIHandler::class);
@@ -45,7 +49,6 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
             $request,
             new BindToken('cn=foo,dc=foo,dc=bar', '12345'),
             $handler,
-            $queue,
         );
     }
 
@@ -62,7 +65,6 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
             $request,
             new BindToken('foo@bar.local', '12345'),
             $handler,
-            $queue,
         );
     }
 
@@ -80,7 +82,6 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
             $request,
             new AnonToken(),
             $handler,
-            $queue,
         );
     }
 }

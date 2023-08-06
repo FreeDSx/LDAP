@@ -41,20 +41,12 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
 {
     use ServerSearchTrait;
 
-    private PagingHandlerInterface $pagingHandler;
-
-    private RequestHistory $requestHistory;
-
-    private PagingRequestComparator $requestComparator;
-
     public function __construct(
-        PagingHandlerInterface $pagingHandler,
-        RequestHistory $requestHistory,
-        ?PagingRequestComparator $requestComparator = null
+        private readonly ServerQueue $queue,
+        private readonly PagingHandlerInterface $pagingHandler,
+        private readonly RequestHistory $requestHistory,
+        private readonly PagingRequestComparator $requestComparator = new PagingRequestComparator(),
     ) {
-        $this->pagingHandler = $pagingHandler;
-        $this->requestHistory = $requestHistory;
-        $this->requestComparator = $requestComparator ?? new PagingRequestComparator();
     }
 
     /**
@@ -64,8 +56,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
     public function handleRequest(
         LdapMessageRequest $message,
         TokenInterface $token,
-        RequestHandlerInterface $dispatcher,
-        ServerQueue $queue
+        RequestHandlerInterface $dispatcher
     ): void {
         $context = new RequestContext(
             $message->controls(),
@@ -128,7 +119,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $this->sendEntriesToClient(
             $searchResult,
             $message,
-            $queue,
+            $this->queue,
             ...$controls
         );
     }
