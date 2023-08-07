@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
@@ -116,7 +115,7 @@ class ServerProtocolHandlerFactorySpec extends ObjectBehavior
             ->shouldBeAnInstanceOf(ServerUnbindHandler::class);
     }
 
-    public function it_should_get_the_dispatch_handler_for_common_requests(HandlerFactoryInterface $handlerFactory,): void
+    public function it_should_get_the_dispatch_handler_for_common_requests(HandlerFactoryInterface $handlerFactory, ): void
     {
         $handlerFactory->makeRequestHandler()
             ->willReturn(new GenericRequestHandler());

@@ -90,7 +90,7 @@ class ServerAuthorizationSpec extends ObjectBehavior
     public function it_should_not_require_authentication_if_it_has_been_explicitly_disabled(): void
     {
         $this->beConstructedWith(
-            (new ServerOptions)
+            (new ServerOptions())
                 ->setAllowAnonymous(false)
                 ->setRequireAuthentication(false),
             new AnonToken()
@@ -116,7 +116,7 @@ class ServerAuthorizationSpec extends ObjectBehavior
     public function it_should_respect_the_option_for_whether_anon_binds_are_allowed(): void
     {
         $this->beConstructedWith(
-            (new ServerOptions)
+            (new ServerOptions())
                 ->setAllowAnonymous(true),
             new AnonToken()
         );

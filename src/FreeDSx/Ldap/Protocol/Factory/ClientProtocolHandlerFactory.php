@@ -92,7 +92,7 @@ class ClientProtocolHandlerFactory
             return new ClientProtocolHandler\ClientBasicHandler($this->queue());
         }
     }
-    
+
     private function queue(): ClientQueue
     {
         return $this->queueInstantiator->make();

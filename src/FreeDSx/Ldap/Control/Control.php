@@ -81,7 +81,7 @@ class Control implements ProtocolElementInterface, Stringable
     public function __construct(
         protected string $controlType,
         protected bool $criticality = false,
-        protected AbstractType|ProtocolElementInterface|string|null $controlValue = null
+        protected AbstractType | ProtocolElementInterface | string | null $controlValue = null
     ) {
     }
 

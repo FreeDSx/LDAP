@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\BindException;
+use SensitiveParameter;
 
 /**
  * Represents a simple bind request consisting of a username (dn, etc) and a password.
@@ -34,7 +35,7 @@ class SimpleBindRequest extends BindRequest
 
     public function __construct(
         string $username,
-        #[\SensitiveParameter]
+        #[SensitiveParameter]
         string $password,
         int $version = 3
     ) {

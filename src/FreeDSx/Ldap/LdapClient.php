@@ -38,6 +38,7 @@ use FreeDSx\Ldap\Search\RangeRetrieval;
 use FreeDSx\Ldap\Search\Vlv;
 use FreeDSx\Ldap\Sync\SyncRepl;
 use FreeDSx\Sasl\Exception\SaslException;
+use SensitiveParameter;
 use Stringable;
 
 /**
@@ -74,7 +75,7 @@ class LdapClient
      */
     public function bind(
         string $username,
-        #[\SensitiveParameter]
+        #[SensitiveParameter]
         string $password,
     ): LdapMessageResponse {
         return $this->sendAndReceive(
@@ -93,7 +94,7 @@ class LdapClient
      * @throws SaslException
      */
     public function bindSasl(
-        #[\SensitiveParameter]
+        #[SensitiveParameter]
         array $options = [],
         string $mechanism = ''
     ): LdapMessageResponse {

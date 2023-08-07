@@ -88,7 +88,7 @@ class PagingTest extends LdapTestCase
             ),
             'cn'
         );
-        $operation->useEntryHandler(fn(EntryResult $result)=> $entries->add($result->getEntry()));
+        $operation->useEntryHandler(fn (EntryResult $result) => $entries->add($result->getEntry()));
 
         $this->paging = $this->client->paging($operation);
 

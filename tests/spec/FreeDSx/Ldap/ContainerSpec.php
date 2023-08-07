@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
-use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Ldap\Protocol\RootDseLoader;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;

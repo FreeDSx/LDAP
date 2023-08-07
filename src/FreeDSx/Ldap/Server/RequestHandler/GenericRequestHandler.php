@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Server\RequestContext;
+use SensitiveParameter;
 
 /**
  * This allows the LDAP server to run, but rejects everything. You can extend and selectively override specific request
@@ -44,7 +45,7 @@ class GenericRequestHandler implements RequestHandlerInterface
 
     public function bind(
         string $username,
-        #[\SensitiveParameter]
+        #[SensitiveParameter]
         string $password,
     ): bool {
         return false;

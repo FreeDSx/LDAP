@@ -54,7 +54,7 @@ class ClientSaslBindHandlerSpec extends ObjectBehavior
             ->willReturn(
                 Entry::fromArray(
                     '',
-                    ['supportedSaslMechanisms' => ['DIGEST-MD5', 'CRAM-MD5'],]
+                    ['supportedSaslMechanisms' => ['DIGEST-MD5', 'CRAM-MD5'], ]
                 )
             );
         $queue
