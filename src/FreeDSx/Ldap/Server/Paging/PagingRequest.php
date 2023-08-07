@@ -26,37 +26,22 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
  */
 final class PagingRequest
 {
-    private PagingControl $control;
-
-    private SearchRequest $request;
-
-    private ControlBag $controls;
-
     private int $iteration = 1;
 
-    private string $nextCookie;
-
     private ?DateTimeInterface $lastProcessed = null;
-
-    private DateTimeInterface|DateTime $created;
 
     private string $uniqueId;
 
     private bool $hasProcessed = false;
 
     public function __construct(
-        PagingControl $control,
-        SearchRequest $request,
-        ControlBag $controls,
-        string $nextCookie,
-        ?DateTimeInterface $created = null,
+        private PagingControl $control,
+        private readonly SearchRequest $request,
+        private readonly ControlBag $controls,
+        private string $nextCookie,
+        private readonly DateTimeInterface $created = new DateTime(),
         ?string $uniqueId = null
     ) {
-        $this->control = $control;
-        $this->request = $request;
-        $this->controls = $controls;
-        $this->nextCookie = $nextCookie;
-        $this->created = $created ?? new DateTime();
         $this->uniqueId = $uniqueId ?? random_bytes(16);
     }
 

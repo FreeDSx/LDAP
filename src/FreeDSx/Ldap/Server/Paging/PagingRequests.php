@@ -23,16 +23,10 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 final class PagingRequests
 {
     /**
-     * @var PagingRequest[]
+     * @param PagingRequest[] $requests
      */
-    private array $requests;
-
-    /**
-     * @param PagingRequest[] $pagingRequests
-     */
-    public function __construct(array $pagingRequests = [])
+    public function __construct(private array $requests = [])
     {
-        $this->requests = $pagingRequests;
     }
 
     public function add(PagingRequest $request): void
