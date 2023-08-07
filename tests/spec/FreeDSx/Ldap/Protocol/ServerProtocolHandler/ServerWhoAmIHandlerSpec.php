@@ -36,7 +36,7 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
         $this->shouldHaveType(ServerWhoAmIHandler::class);
     }
 
-    public function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_DN_name(ServerQueue $queue, RequestHandlerInterface $handler): void
+    public function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_DN_name(ServerQueue $queue): void
     {
         $request = new LdapMessageRequest(2, new ExtendedRequest(ExtendedRequest::OID_WHOAMI));
 
@@ -48,11 +48,10 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $request,
             new BindToken('cn=foo,dc=foo,dc=bar', '12345'),
-            $handler,
         );
     }
 
-    public function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_non_DN_name(ServerQueue $queue, RequestHandlerInterface $handler): void
+    public function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_non_DN_name(ServerQueue $queue): void
     {
         $request = new LdapMessageRequest(2, new ExtendedRequest(ExtendedRequest::OID_WHOAMI));
 
@@ -64,11 +63,10 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $request,
             new BindToken('foo@bar.local', '12345'),
-            $handler,
         );
     }
 
-    public function it_should_handle_a_who_am_i_when_there_is_no_token_yet(ServerQueue $queue, RequestHandlerInterface $handler): void
+    public function it_should_handle_a_who_am_i_when_there_is_no_token_yet(ServerQueue $queue): void
     {
         $request = new LdapMessageRequest(2, new ExtendedRequest(ExtendedRequest::OID_WHOAMI));
 
@@ -81,7 +79,6 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $request,
             new AnonToken(),
-            $handler,
         );
     }
 }

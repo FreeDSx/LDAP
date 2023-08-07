@@ -29,8 +29,10 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
 {
     use ServerSearchTrait;
 
-    public function __construct(private readonly ServerQueue $queue)
-    {
+    public function __construct(
+        private readonly ServerQueue $queue,
+        private readonly RequestHandlerInterface $dispatcher,
+    ) {
     }
 
     /**
@@ -38,8 +40,7 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
      */
     public function handleRequest(
         LdapMessageRequest $message,
-        TokenInterface $token,
-        RequestHandlerInterface $dispatcher
+        TokenInterface $token
     ): void {
         $context = new RequestContext(
             $message->controls(),
@@ -49,7 +50,7 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
 
         try {
             $searchResult = SearchResult::makeSuccessResult(
-                $dispatcher->search(
+                $this->dispatcher->search(
                     $context,
                     $request
                 ),

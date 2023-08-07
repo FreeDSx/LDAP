@@ -17,7 +17,6 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestContext;
@@ -31,8 +30,10 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 class ServerDispatchHandler extends BaseServerHandler implements ServerProtocolHandlerInterface
 {
-    public function __construct(private readonly ServerQueue $queue)
-    {
+    public function __construct(
+        private readonly ServerQueue $queue,
+        private readonly RequestHandlerInterface $dispatcher,
+    ) {
         parent::__construct();
     }
 
@@ -43,24 +44,23 @@ class ServerDispatchHandler extends BaseServerHandler implements ServerProtocolH
      */
     public function handleRequest(
         LdapMessageRequest $message,
-        TokenInterface $token,
-        RequestHandlerInterface $dispatcher
+        TokenInterface $token
     ): void {
         $context = new RequestContext($message->controls(), $token);
         $request = $message->getRequest();
 
         if ($request instanceof Request\AddRequest) {
-            $dispatcher->add($context, $request);
+            $this->dispatcher->add($context, $request);
         } elseif ($request instanceof Request\CompareRequest) {
-            $dispatcher->compare($context, $request);
+            $this->dispatcher->compare($context, $request);
         } elseif ($request instanceof Request\DeleteRequest) {
-            $dispatcher->delete($context, $request);
+            $this->dispatcher->delete($context, $request);
         } elseif ($request instanceof Request\ModifyDnRequest) {
-            $dispatcher->modifyDn($context, $request);
+            $this->dispatcher->modifyDn($context, $request);
         } elseif ($request instanceof Request\ModifyRequest) {
-            $dispatcher->modify($context, $request);
+            $this->dispatcher->modify($context, $request);
         } elseif ($request instanceof Request\ExtendedRequest) {
-            $dispatcher->extended($context, $request);
+            $this->dispatcher->extended($context, $request);
         } else {
             throw new OperationException(
                 'The requested operation is not supported.',

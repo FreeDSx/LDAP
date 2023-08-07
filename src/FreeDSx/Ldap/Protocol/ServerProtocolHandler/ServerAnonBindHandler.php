@@ -17,7 +17,6 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
-use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;

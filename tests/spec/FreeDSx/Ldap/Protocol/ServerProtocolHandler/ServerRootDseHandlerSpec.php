@@ -52,7 +52,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
 
     public function it_should_send_back_a_RootDSE(
         ServerQueue $queue,
-        RequestHandlerInterface $handler,
         TokenInterface $token
     ): void {
         $this->beConstructedWith(
@@ -82,7 +81,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $search,
             $token,
-            $handler,
         );
     }
 
@@ -120,13 +118,11 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $search,
             $token,
-            $handler,
         );
     }
 
     public function it_should_send_a_request_to_the_dispatcher_if_it_implements_a_rootdse_aware_interface(
         ServerQueue $queue,
-        RequestHandlerInterface $handler,
         TokenInterface $token,
         RootDseHandlerInterface $rootDseHandler
     ): void {
@@ -165,13 +161,11 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $search,
             $token,
-            $handler,
         );
     }
 
     public function it_should_only_return_attribute_names_from_the_RootDSE_if_requested(
         ServerQueue $queue,
-        RequestHandlerInterface $handler,
         TokenInterface $token
     ): void {
         $this->beConstructedWith(
@@ -202,13 +196,11 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $search,
             $token,
-            $handler,
         );
     }
 
     public function it_should_only_return_specific_attributes_from_the_RootDSE_if_requested(
         ServerQueue $queue,
-        RequestHandlerInterface $handler,
         TokenInterface $token
     ): void {
         $this->beConstructedWith(
@@ -242,7 +234,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $search,
             $token,
-            $handler,
         );
     }
 }

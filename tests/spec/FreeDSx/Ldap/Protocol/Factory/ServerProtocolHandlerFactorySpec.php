@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\ClientProtocolHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
@@ -30,6 +31,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnbindHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerWhoAmIHandler;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
+use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\ServerOptions;
@@ -66,8 +68,11 @@ class ServerProtocolHandlerFactorySpec extends ObjectBehavior
             ->shouldBeAnInstanceOf(ServerWhoAmIHandler::class);
     }
 
-    public function it_should_get_a_search_handler(ServerQueue $queue): void
+    public function it_should_get_a_search_handler(HandlerFactoryInterface $handlerFactory): void
     {
+        $handlerFactory->makeRequestHandler()
+            ->willReturn(new GenericRequestHandler());
+
         $this->get(Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'), new ControlBag())
             ->shouldBeAnInstanceOf(ServerSearchHandler::class);
     }
@@ -93,6 +98,9 @@ class ServerProtocolHandlerFactorySpec extends ObjectBehavior
             ->shouldBeCalled()
             ->willReturn(null);
 
+        $handlerFactory->makeRequestHandler()
+            ->willReturn(new GenericRequestHandler());
+
         $this->get(Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'), $controls)->shouldBeAnInstanceOf(ServerPagingUnsupportedHandler::class);
     }
 
@@ -108,8 +116,11 @@ class ServerProtocolHandlerFactorySpec extends ObjectBehavior
             ->shouldBeAnInstanceOf(ServerUnbindHandler::class);
     }
 
-    public function it_should_get_the_dispatch_handler_for_common_requests(ServerQueue $queue): void
+    public function it_should_get_the_dispatch_handler_for_common_requests(HandlerFactoryInterface $handlerFactory,): void
     {
+        $handlerFactory->makeRequestHandler()
+            ->willReturn(new GenericRequestHandler());
+
         $this->get(Operations::add(Entry::fromArray('cn=foo')), new ControlBag())
             ->shouldBeAnInstanceOf(ServerDispatchHandler::class);
         $this->get(Operations::delete('cn=foo'), new ControlBag())

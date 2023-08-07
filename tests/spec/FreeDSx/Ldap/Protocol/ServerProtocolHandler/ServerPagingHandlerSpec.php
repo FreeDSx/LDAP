@@ -102,7 +102,6 @@ class ServerPagingHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $message,
             $token,
-            $handler,
         );
     }
 
@@ -151,7 +150,6 @@ class ServerPagingHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $message,
             $token,
-            $handler,
         );
     }
 
@@ -186,7 +184,6 @@ class ServerPagingHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $message,
             $token,
-            $handler,
         );
     }
 
@@ -225,7 +222,6 @@ class ServerPagingHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $message,
             $token,
-            $handler,
         );
     }
 

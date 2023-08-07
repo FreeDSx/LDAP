@@ -30,8 +30,10 @@ class ServerPagingUnsupportedHandler implements ServerProtocolHandlerInterface
 {
     use ServerSearchTrait;
 
-    public function __construct(private readonly ServerQueue $queue)
-    {
+    public function __construct(
+        private readonly ServerQueue $queue,
+        private readonly RequestHandlerInterface $dispatcher,
+    ) {
     }
 
     /**
@@ -39,8 +41,7 @@ class ServerPagingUnsupportedHandler implements ServerProtocolHandlerInterface
      */
     public function handleRequest(
         LdapMessageRequest $message,
-        TokenInterface $token,
-        RequestHandlerInterface $dispatcher
+        TokenInterface $token
     ): void {
         $context = new RequestContext(
             $message->controls(),
@@ -66,7 +67,7 @@ class ServerPagingUnsupportedHandler implements ServerProtocolHandlerInterface
 
         try {
             $searchResult = SearchResult::makeSuccessResult(
-                $dispatcher->search(
+                $this->dispatcher->search(
                     $context,
                     $request
                 ),

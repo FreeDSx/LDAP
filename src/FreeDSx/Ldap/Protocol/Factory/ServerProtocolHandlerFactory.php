@@ -57,11 +57,17 @@ class ServerProtocolHandlerFactory
         } elseif ($this->isPagingSearch($request, $controls)) {
             return $this->getPagingHandler();
         } elseif ($request instanceof SearchRequest) {
-            return new ServerProtocolHandler\ServerSearchHandler($this->queue);
+            return new ServerProtocolHandler\ServerSearchHandler(
+                queue: $this->queue,
+                dispatcher: $this->handlerFactory->makeRequestHandler(),
+            );
         } elseif ($request instanceof UnbindRequest) {
             return new ServerProtocolHandler\ServerUnbindHandler($this->queue);
         } else {
-            return new ServerProtocolHandler\ServerDispatchHandler($this->queue);
+            return new ServerProtocolHandler\ServerDispatchHandler(
+                queue: $this->queue,
+                dispatcher: $this->handlerFactory->makeRequestHandler(),
+            );
         }
     }
 
@@ -99,7 +105,10 @@ class ServerProtocolHandlerFactory
         $pagingHandler = $this->handlerFactory->makePagingHandler();
 
         if (!$pagingHandler) {
-            return new ServerProtocolHandler\ServerPagingUnsupportedHandler($this->queue);
+            return new ServerProtocolHandler\ServerPagingUnsupportedHandler(
+                queue: $this->queue,
+                dispatcher: $this->handlerFactory->makeRequestHandler(),
+            );
         }
 
         return new ServerProtocolHandler\ServerPagingHandler(

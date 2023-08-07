@@ -21,7 +21,6 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -52,8 +51,7 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
      */
     public function handleRequest(
         LdapMessageRequest $message,
-        TokenInterface $token,
-        RequestHandlerInterface $dispatcher
+        TokenInterface $token
     ): void {
         # If we don't have a SSL cert or the OpenSSL extension is not available, then we can do nothing...
         if ($this->options->getSslCert() === null || !self::$hasOpenssl) {

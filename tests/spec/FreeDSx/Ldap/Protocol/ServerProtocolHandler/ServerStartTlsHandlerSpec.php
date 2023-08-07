@@ -44,7 +44,6 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
     public function it_should_handle_a_start_tls_request(
         ServerQueue $queue,
         TokenInterface $token,
-        RequestHandlerInterface $dispatcher
     ): void {
         $this->beConstructedWith(
             (new ServerOptions())
@@ -67,14 +66,12 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $startTls,
             $token,
-            $dispatcher,
         );
     }
 
     public function it_should_send_back_an_error_if_the_queue_is_already_encrypted(
         ServerQueue $queue,
         TokenInterface $token,
-        RequestHandlerInterface $dispatcher
     ): void {
         $this->beConstructedWith(
             (new ServerOptions())
@@ -97,12 +94,13 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $startTls,
             $token,
-            $dispatcher,
         );
     }
 
-    public function it_should_send_back_an_error_if_encryption_is_not_supported(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher): void
-    {
+    public function it_should_send_back_an_error_if_encryption_is_not_supported(
+        ServerQueue $queue,
+        TokenInterface $token
+    ): void {
         $queue->isEncrypted()->willReturn(false);
 
         $queue->encrypt()->shouldNotBeCalled();
@@ -118,7 +116,6 @@ class ServerStartTlsHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $startTls,
             $token,
-            $dispatcher,
         );
     }
 }

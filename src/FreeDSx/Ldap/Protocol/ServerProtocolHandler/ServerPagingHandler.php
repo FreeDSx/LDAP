@@ -27,7 +27,6 @@ use FreeDSx\Ldap\Server\Paging\PagingRequestComparator;
 use FreeDSx\Ldap\Server\Paging\PagingResponse;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use Throwable;
@@ -55,8 +54,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
      */
     public function handleRequest(
         LdapMessageRequest $message,
-        TokenInterface $token,
-        RequestHandlerInterface $dispatcher
+        TokenInterface $token
     ): void {
         $context = new RequestContext(
             $message->controls(),
