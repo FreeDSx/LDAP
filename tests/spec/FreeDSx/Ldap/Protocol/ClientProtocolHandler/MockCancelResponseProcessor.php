@@ -22,7 +22,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
  */
 class MockCancelResponseProcessor
 {
-    public function __invoke(LdapMessageResponse $messageResponse,): void
+    public function __invoke(LdapMessageResponse $messageResponse): void
     {
     }
 }

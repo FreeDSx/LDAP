@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\ServerOptions;
+use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 
 /**
@@ -24,7 +24,7 @@ use Psr\Log\LogLevel;
  */
 trait LoggerTrait
 {
-    private readonly ServerOptions $options;
+    private readonly ?LoggerInterface $logger;
 
     /**
      * Logs a message and then throws a runtime exception.
@@ -82,7 +82,7 @@ trait LoggerTrait
         string $message,
         array $context = []
     ): void {
-        $this->options->getLogger()?->log(
+        $this->logger?->log(
             level: $level,
             message: $message,
             context: $context,

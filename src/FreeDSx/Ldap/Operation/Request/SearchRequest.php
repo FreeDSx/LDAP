@@ -338,7 +338,7 @@ class SearchRequest implements RequestInterface
      */
     public function useCancelStrategy(string $strategy): self
     {
-        if ($strategy !== self::CANCEL_STOP && $strategy!== self::CANCEL_CONTINUE) {
+        if ($strategy !== self::CANCEL_STOP && $strategy !== self::CANCEL_CONTINUE) {
             throw new UnexpectedValueException(sprintf(
                 'The cancel strategy must be one of: %s',
                 implode(
@@ -387,7 +387,8 @@ class SearchRequest implements RequestInterface
         }
         $filter = FilterFactory::get($filter);
 
-        if (!($baseDn instanceof OctetStringType
+        if (
+            !($baseDn instanceof OctetStringType
             && $scope instanceof EnumeratedType
             && $deref instanceof EnumeratedType
             && $sizeLimit instanceof IntegerType

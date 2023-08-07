@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Token;
 
+use SensitiveParameter;
+
 /**
  * Represents a username/password token that is bound and authorized.
  *
@@ -28,7 +30,7 @@ class BindToken implements TokenInterface
 
     public function __construct(
         string $username,
-        #[\SensitiveParameter]
+        #[SensitiveParameter]
         string $password,
         int $version = 3
     ) {

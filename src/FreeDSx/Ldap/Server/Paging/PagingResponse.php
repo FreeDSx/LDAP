@@ -22,20 +22,11 @@ use FreeDSx\Ldap\Entry\Entries;
  */
 final class PagingResponse
 {
-    private Entries $entries;
-
-    private int $remaining;
-
-    private bool $isComplete;
-
     public function __construct(
-        Entries $entries,
-        bool $isComplete = false,
-        int $remaining = 0
+        private readonly Entries $entries,
+        private readonly bool $isComplete = false,
+        private readonly int $remaining = 0
     ) {
-        $this->entries = $entries;
-        $this->isComplete = $isComplete;
-        $this->remaining = $remaining;
     }
 
     public function getEntries(): Entries

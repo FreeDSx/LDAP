@@ -36,7 +36,7 @@ class RequestCanceler
         private readonly string $strategy = SearchRequest::CANCEL_STOP,
         ?Closure $messageProcessor = null,
     ) {
-        $this->messageProcessor = $messageProcessor ?? fn() => null;
+        $this->messageProcessor = $messageProcessor ?? fn () => null;
     }
 
     /**

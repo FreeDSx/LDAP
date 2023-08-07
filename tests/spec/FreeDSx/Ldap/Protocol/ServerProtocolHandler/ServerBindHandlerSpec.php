@@ -29,6 +29,11 @@ use Prophecy\Argument;
 
 class ServerBindHandlerSpec extends ObjectBehavior
 {
+    public function let(ServerQueue $queue): void
+    {
+        $this->beConstructedWith($queue);
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerBindHandler::class);

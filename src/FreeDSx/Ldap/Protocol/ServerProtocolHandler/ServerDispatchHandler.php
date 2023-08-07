@@ -22,7 +22,6 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Handles generic requests that can be sent to the user supplied dispatcher / handler.
@@ -31,6 +30,13 @@ use FreeDSx\Ldap\ServerOptions;
  */
 class ServerDispatchHandler extends BaseServerHandler implements ServerProtocolHandlerInterface
 {
+    public function __construct(
+        private readonly ServerQueue $queue,
+        private readonly RequestHandlerInterface $dispatcher,
+    ) {
+        parent::__construct();
+    }
+
     /**
      * {@inheritDoc}
      * @throws OperationException
@@ -38,26 +44,23 @@ class ServerDispatchHandler extends BaseServerHandler implements ServerProtocolH
      */
     public function handleRequest(
         LdapMessageRequest $message,
-        TokenInterface $token,
-        RequestHandlerInterface $dispatcher,
-        ServerQueue $queue,
-        ServerOptions $options
+        TokenInterface $token
     ): void {
         $context = new RequestContext($message->controls(), $token);
         $request = $message->getRequest();
 
         if ($request instanceof Request\AddRequest) {
-            $dispatcher->add($context, $request);
+            $this->dispatcher->add($context, $request);
         } elseif ($request instanceof Request\CompareRequest) {
-            $dispatcher->compare($context, $request);
+            $this->dispatcher->compare($context, $request);
         } elseif ($request instanceof Request\DeleteRequest) {
-            $dispatcher->delete($context, $request);
+            $this->dispatcher->delete($context, $request);
         } elseif ($request instanceof Request\ModifyDnRequest) {
-            $dispatcher->modifyDn($context, $request);
+            $this->dispatcher->modifyDn($context, $request);
         } elseif ($request instanceof Request\ModifyRequest) {
-            $dispatcher->modify($context, $request);
+            $this->dispatcher->modify($context, $request);
         } elseif ($request instanceof Request\ExtendedRequest) {
-            $dispatcher->extended($context, $request);
+            $this->dispatcher->extended($context, $request);
         } else {
             throw new OperationException(
                 'The requested operation is not supported.',
@@ -65,6 +68,6 @@ class ServerDispatchHandler extends BaseServerHandler implements ServerProtocolH
             );
         }
 
-        $queue->sendMessage($this->responseFactory->getStandardResponse($message));
+        $this->queue->sendMessage($this->responseFactory->getStandardResponse($message));
     }
 }

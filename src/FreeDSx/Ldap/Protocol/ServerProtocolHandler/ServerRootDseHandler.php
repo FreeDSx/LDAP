@@ -25,7 +25,6 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestContext;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
@@ -38,8 +37,11 @@ use function count;
  */
 class ServerRootDseHandler implements ServerProtocolHandlerInterface
 {
-    public function __construct(private ?RootDseHandlerInterface $rootDseHandler = null)
-    {
+    public function __construct(
+        private readonly ServerOptions $options,
+        private readonly ServerQueue $queue,
+        private readonly ?RootDseHandlerInterface $rootDseHandler = null
+    ) {
     }
 
     /**
@@ -48,36 +50,33 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
      */
     public function handleRequest(
         LdapMessageRequest $message,
-        TokenInterface $token,
-        RequestHandlerInterface $dispatcher,
-        ServerQueue $queue,
-        ServerOptions $options
+        TokenInterface $token
     ): void {
         $entry = Entry::fromArray('', [
-            'namingContexts' => $options->getDseNamingContexts(),
+            'namingContexts' => $this->options->getDseNamingContexts(),
             'supportedExtension' => [
                 ExtendedRequest::OID_WHOAMI,
             ],
             'supportedLDAPVersion' => ['3'],
-            'vendorName' => $options->getDseVendorName(),
+            'vendorName' => $this->options->getDseVendorName(),
         ]);
-        if ($options->getSslCert()) {
+        if ($this->options->getSslCert()) {
             $entry->add(
                 'supportedExtension',
                 ExtendedRequest::OID_START_TLS
             );
         }
-        if ($options->getPagingHandler()) {
+        if ($this->options->getPagingHandler()) {
             $entry->add(
                 'supportedControl',
                 Control::OID_PAGING
             );
         }
-        if ($options->getDseVendorVersion()) {
-            $entry->set('vendorVersion', (string) $options->getDseVendorVersion());
+        if ($this->options->getDseVendorVersion()) {
+            $entry->set('vendorVersion', (string) $this->options->getDseVendorVersion());
         }
-        if ($options->getDseAltServer()) {
-            $entry->set('altServer', (string) $options->getDseAltServer());
+        if ($this->options->getDseAltServer()) {
+            $entry->set('altServer', (string) $this->options->getDseAltServer());
         }
 
         /** @var SearchRequest $request */
@@ -92,7 +91,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
             );
         }
 
-        $queue->sendMessage(
+        $this->queue->sendMessage(
             new LdapMessageResponse(
                 $message->getMessageId(),
                 new SearchResultEntry($entry)

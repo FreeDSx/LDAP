@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace spec\FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
-use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
@@ -55,7 +54,7 @@ class ClientBasicHandlerSpec extends ObjectBehavior
         $this->shouldBeAnInstanceOf(RequestHandlerInterface::class);
     }
 
-    public function it_should_handle_a_request_and_return_a_response(ClientQueue $queue,): void
+    public function it_should_handle_a_request_and_return_a_response(ClientQueue $queue, ): void
     {
         $queue->sendMessage(Argument::type(LdapMessageRequest::class))->shouldBeCalledOnce();
         $queue->getMessage(1)->willReturn(

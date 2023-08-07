@@ -19,10 +19,12 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerProtocolHandlerInterface;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\RequestHistory;
+use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Determines the correct handler for the request.
@@ -31,16 +33,12 @@ use FreeDSx\Ldap\Server\RequestHistory;
  */
 class ServerProtocolHandlerFactory
 {
-    private HandlerFactoryInterface $handlerFactory;
-
-    private RequestHistory $requestHistory;
-
     public function __construct(
-        HandlerFactoryInterface $handlerFactory,
-        RequestHistory $requestHistory
+        private readonly HandlerFactoryInterface $handlerFactory,
+        private readonly ServerOptions $options,
+        private readonly RequestHistory $requestHistory,
+        private readonly ServerQueue $queue,
     ) {
-        $this->handlerFactory = $handlerFactory;
-        $this->requestHistory = $requestHistory;
     }
 
     public function get(
@@ -48,19 +46,28 @@ class ServerProtocolHandlerFactory
         ControlBag $controls
     ): ServerProtocolHandlerInterface {
         if ($request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_WHOAMI) {
-            return new ServerProtocolHandler\ServerWhoAmIHandler();
+            return new ServerProtocolHandler\ServerWhoAmIHandler($this->queue);
         } elseif ($request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_START_TLS) {
-            return new ServerProtocolHandler\ServerStartTlsHandler();
+            return new ServerProtocolHandler\ServerStartTlsHandler(
+                options: $this->options,
+                queue: $this->queue,
+            );
         } elseif ($this->isRootDseSearch($request)) {
             return $this->getRootDseHandler();
         } elseif ($this->isPagingSearch($request, $controls)) {
             return $this->getPagingHandler();
         } elseif ($request instanceof SearchRequest) {
-            return new ServerProtocolHandler\ServerSearchHandler();
+            return new ServerProtocolHandler\ServerSearchHandler(
+                queue: $this->queue,
+                dispatcher: $this->handlerFactory->makeRequestHandler(),
+            );
         } elseif ($request instanceof UnbindRequest) {
-            return new ServerProtocolHandler\ServerUnbindHandler();
+            return new ServerProtocolHandler\ServerUnbindHandler($this->queue);
         } else {
-            return new ServerProtocolHandler\ServerDispatchHandler();
+            return new ServerProtocolHandler\ServerDispatchHandler(
+                queue: $this->queue,
+                dispatcher: $this->handlerFactory->makeRequestHandler(),
+            );
         }
     }
 
@@ -86,7 +93,11 @@ class ServerProtocolHandlerFactory
     {
         $rootDseHandler = $this->handlerFactory->makeRootDseHandler();
 
-        return new ServerProtocolHandler\ServerRootDseHandler($rootDseHandler);
+        return new ServerProtocolHandler\ServerRootDseHandler(
+            options: $this->options,
+            queue: $this->queue,
+            rootDseHandler: $rootDseHandler,
+        );
     }
 
     private function getPagingHandler(): ServerProtocolHandlerInterface
@@ -94,12 +105,16 @@ class ServerProtocolHandlerFactory
         $pagingHandler = $this->handlerFactory->makePagingHandler();
 
         if (!$pagingHandler) {
-            return new ServerProtocolHandler\ServerPagingUnsupportedHandler();
+            return new ServerProtocolHandler\ServerPagingUnsupportedHandler(
+                queue: $this->queue,
+                dispatcher: $this->handlerFactory->makeRequestHandler(),
+            );
         }
 
         return new ServerProtocolHandler\ServerPagingHandler(
-            $pagingHandler,
-            $this->requestHistory
+            queue: $this->queue,
+            pagingHandler: $pagingHandler,
+            requestHistory: $this->requestHistory,
         );
     }
 }

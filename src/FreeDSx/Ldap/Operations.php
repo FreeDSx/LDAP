@@ -38,6 +38,7 @@ use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
+use SensitiveParameter;
 use Stringable;
 
 /**
@@ -68,7 +69,7 @@ class Operations
      */
     public static function bind(
         string $username,
-        #[\SensitiveParameter]
+        #[SensitiveParameter]
         string $password,
     ): SimpleBindRequest {
         return new SimpleBindRequest(

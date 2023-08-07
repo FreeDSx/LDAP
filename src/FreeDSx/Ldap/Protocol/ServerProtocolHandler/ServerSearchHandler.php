@@ -19,7 +19,6 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Handles search request logic.
@@ -30,15 +29,18 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
 {
     use ServerSearchTrait;
 
+    public function __construct(
+        private readonly ServerQueue $queue,
+        private readonly RequestHandlerInterface $dispatcher,
+    ) {
+    }
+
     /**
      * @inheritDoc
      */
     public function handleRequest(
         LdapMessageRequest $message,
-        TokenInterface $token,
-        RequestHandlerInterface $dispatcher,
-        ServerQueue $queue,
-        ServerOptions $options
+        TokenInterface $token
     ): void {
         $context = new RequestContext(
             $message->controls(),
@@ -48,7 +50,7 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
 
         try {
             $searchResult = SearchResult::makeSuccessResult(
-                $dispatcher->search(
+                $this->dispatcher->search(
                     $context,
                     $request
                 ),
@@ -65,7 +67,7 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
         $this->sendEntriesToClient(
             $searchResult,
             $message,
-            $queue
+            $this->queue
         );
     }
 }

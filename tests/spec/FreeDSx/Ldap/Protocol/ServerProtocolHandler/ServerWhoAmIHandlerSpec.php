@@ -20,20 +20,22 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerWhoAmIHandler;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
-use FreeDSx\Ldap\ServerOptions;
 use PhpSpec\ObjectBehavior;
 
 class ServerWhoAmIHandlerSpec extends ObjectBehavior
 {
+    public function let(ServerQueue $queue): void
+    {
+        $this->beConstructedWith($queue);
+    }
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerWhoAmIHandler::class);
     }
 
-    public function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_DN_name(ServerQueue $queue, RequestHandlerInterface $handler): void
+    public function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_DN_name(ServerQueue $queue): void
     {
         $request = new LdapMessageRequest(2, new ExtendedRequest(ExtendedRequest::OID_WHOAMI));
 
@@ -45,13 +47,10 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $request,
             new BindToken('cn=foo,dc=foo,dc=bar', '12345'),
-            $handler,
-            $queue,
-            new ServerOptions()
         );
     }
 
-    public function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_non_DN_name(ServerQueue $queue, RequestHandlerInterface $handler): void
+    public function it_should_handle_a_who_am_i_when_there_is_a_token_with_a_non_DN_name(ServerQueue $queue): void
     {
         $request = new LdapMessageRequest(2, new ExtendedRequest(ExtendedRequest::OID_WHOAMI));
 
@@ -63,13 +62,10 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $request,
             new BindToken('foo@bar.local', '12345'),
-            $handler,
-            $queue,
-            new ServerOptions()
         );
     }
 
-    public function it_should_handle_a_who_am_i_when_there_is_no_token_yet(ServerQueue $queue, RequestHandlerInterface $handler): void
+    public function it_should_handle_a_who_am_i_when_there_is_no_token_yet(ServerQueue $queue): void
     {
         $request = new LdapMessageRequest(2, new ExtendedRequest(ExtendedRequest::OID_WHOAMI));
 
@@ -82,9 +78,6 @@ class ServerWhoAmIHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $request,
             new AnonToken(),
-            $handler,
-            $queue,
-            new ServerOptions()
         );
     }
 }

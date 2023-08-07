@@ -30,6 +30,11 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 class ServerAnonBindHandler extends ServerBindHandler
 {
+    public function __construct(private readonly ServerQueue $queue)
+    {
+        parent::__construct($this->queue);
+    }
+
     /**
      * {@inheritDoc}
      * @throws EncoderException
@@ -50,7 +55,7 @@ class ServerAnonBindHandler extends ServerBindHandler
         }
 
         $this->validateVersion($request);
-        $queue->sendMessage($this->responseFactory->getStandardResponse($message));
+        $this->queue->sendMessage($this->responseFactory->getStandardResponse($message));
 
         return new AnonToken(
             $request->getUsername(),

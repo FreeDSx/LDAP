@@ -31,6 +31,11 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 class ServerBindHandler extends BaseServerHandler implements BindHandlerInterface
 {
+    public function __construct(private readonly ServerQueue $queue)
+    {
+        parent::__construct();
+    }
+
     /**
      * {@inheritDoc}
      * @throws RuntimeException
@@ -52,7 +57,7 @@ class ServerBindHandler extends BaseServerHandler implements BindHandlerInterfac
 
         $this->validateVersion($request);
         $token = $this->simpleBind($dispatcher, $request);
-        $queue->sendMessage($this->responseFactory->getStandardResponse($message));
+        $this->queue->sendMessage($this->responseFactory->getStandardResponse($message));
 
         return $token;
     }

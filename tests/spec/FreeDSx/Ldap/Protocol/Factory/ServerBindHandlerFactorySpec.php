@@ -18,12 +18,18 @@ use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Protocol\Factory\ServerBindHandlerFactory;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerAnonBindHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerBindHandler;
 use PhpSpec\ObjectBehavior;
 
 class ServerBindHandlerFactorySpec extends ObjectBehavior
 {
+    public function let(ServerQueue $queue): void
+    {
+        $this->beConstructedWith($queue);
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerBindHandlerFactory::class);
@@ -31,12 +37,14 @@ class ServerBindHandlerFactorySpec extends ObjectBehavior
 
     public function it_should_get_an_anon_bind_handler(): void
     {
-        $this->get(new AnonBindRequest())->shouldBeLike(new ServerAnonBindHandler());
+        $this->get(new AnonBindRequest())
+            ->shouldBeAnInstanceOf(ServerAnonBindHandler::class);
     }
 
     public function it_should_get_a_simple_bind_handler(): void
     {
-        $this->get(new SimpleBindRequest('foo', 'bar'))->shouldBeLike(new ServerBindHandler());
+        $this->get(new SimpleBindRequest('foo', 'bar'))
+            ->shouldBeAnInstanceOf(ServerBindHandler::class);
     }
 
     public function it_should_throw_an_exception_on_an_unknown_bind_type(BindRequest $request): void

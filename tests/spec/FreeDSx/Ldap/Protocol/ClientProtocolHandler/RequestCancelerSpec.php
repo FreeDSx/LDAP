@@ -20,17 +20,14 @@ use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\CancelRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
-use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
-use PhpParser\Node\Arg;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
-use spec\FreeDSx\Ldap\TestFactoryTrait;
 
 class RequestCancelerSpec extends ObjectBehavior
 {
@@ -54,7 +51,7 @@ class RequestCancelerSpec extends ObjectBehavior
 
         $queue
             ->sendMessage(Argument::that(
-                fn(LdapMessageRequest $request) =>
+                fn (LdapMessageRequest $request) =>
                     $request->getRequest() instanceof CancelRequest
             ))
             ->shouldBeCalledOnce();

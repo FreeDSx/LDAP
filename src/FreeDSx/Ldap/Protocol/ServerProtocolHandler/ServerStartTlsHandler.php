@@ -21,7 +21,6 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -36,8 +35,10 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
 {
     private static ?bool $hasOpenssl = null;
 
-    public function __construct()
-    {
+    public function __construct(
+        private readonly ServerOptions $options,
+        private readonly ServerQueue $queue,
+    ) {
         if (self::$hasOpenssl === null) {
             $this::$hasOpenssl = extension_loaded('openssl');
         }
@@ -50,14 +51,11 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
      */
     public function handleRequest(
         LdapMessageRequest $message,
-        TokenInterface $token,
-        RequestHandlerInterface $dispatcher,
-        ServerQueue $queue,
-        ServerOptions $options
+        TokenInterface $token
     ): void {
         # If we don't have a SSL cert or the OpenSSL extension is not available, then we can do nothing...
-        if ($options->getSslCert() === null || !self::$hasOpenssl) {
-            $queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
+        if ($this->options->getSslCert() === null || !self::$hasOpenssl) {
+            $this->queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
                 new LdapResult(ResultCode::PROTOCOL_ERROR),
                 ExtendedRequest::OID_START_TLS
             )));
@@ -65,8 +63,8 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
             return;
         }
         # If we are already encrypted, then consider this an operations error...
-        if ($queue->isEncrypted()) {
-            $queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
+        if ($this->queue->isEncrypted()) {
+            $this->queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
                 new LdapResult(ResultCode::OPERATIONS_ERROR, '', 'The current LDAP session is already encrypted.'),
                 ExtendedRequest::OID_START_TLS
             )));
@@ -74,10 +72,10 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
             return;
         }
 
-        $queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
+        $this->queue->sendMessage(new LdapMessageResponse($message->getMessageId(), new ExtendedResponse(
             new LdapResult(ResultCode::SUCCESS),
             ExtendedRequest::OID_START_TLS
         )));
-        $queue->encrypt();
+        $this->queue->encrypt();
     }
 }

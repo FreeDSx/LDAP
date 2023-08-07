@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Server\RequestContext;
+use SensitiveParameter;
 
 /**
  * Handler methods for LDAP server requests.
@@ -110,7 +111,7 @@ interface RequestHandlerInterface
      */
     public function bind(
         string $username,
-        #[\SensitiveParameter]
+        #[SensitiveParameter]
         string $password,
     ): bool;
 }

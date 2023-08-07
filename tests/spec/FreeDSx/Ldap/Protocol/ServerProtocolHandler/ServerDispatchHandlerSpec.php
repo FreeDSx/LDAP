@@ -35,9 +35,17 @@ use Prophecy\Argument;
 
 class ServerDispatchHandlerSpec extends ObjectBehavior
 {
-    public function let(ServerQueue $queue): void
-    {
-        $queue->sendMessage(Argument::any())->willReturn($queue);
+    public function let(
+        ServerQueue $queue,
+        RequestHandlerInterface $handler,
+    ): void {
+        $queue->sendMessage(Argument::any())
+            ->willReturn($queue);
+
+        $this->beConstructedWith(
+            $queue,
+            $handler,
+        );
     }
 
     public function it_is_initializable(): void
@@ -45,61 +53,73 @@ class ServerDispatchHandlerSpec extends ObjectBehavior
         $this->shouldHaveType(ServerDispatchHandler::class);
     }
 
-    public function it_should_send_an_add_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
-    {
+    public function it_should_send_an_add_request_to_the_request_handler(
+        RequestHandlerInterface $handler,
+        TokenInterface $token
+    ): void {
         $add = new LdapMessageRequest(1, new AddRequest(Entry::create('cn=foo,dc=bar')));
 
         $handler->add(Argument::any(), $add->getRequest())->shouldBeCalled();
-        $this->handleRequest($add, $token, $handler, $queue, new ServerOptions());
+        $this->handleRequest($add, $token);
     }
 
-    public function it_should_send_a_delete_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
-    {
+    public function it_should_send_a_delete_request_to_the_request_handler(
+        RequestHandlerInterface $handler,
+        TokenInterface $token
+    ): void {
         $delete = new LdapMessageRequest(1, new DeleteRequest('cn=foo,dc=bar'));
 
         $handler->delete(Argument::any(), $delete->getRequest())->shouldBeCalled();
-        $this->handleRequest($delete, $token, $handler, $queue, new ServerOptions());
+        $this->handleRequest($delete, $token);
     }
 
-    public function it_should_send_a_modify_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
-    {
+    public function it_should_send_a_modify_request_to_the_request_handler(
+        RequestHandlerInterface $handler,
+        TokenInterface $token
+    ): void {
         $modify = new LdapMessageRequest(1, new ModifyRequest('cn=foo,dc=bar', Change::add('foo', 'bar')));
 
         $handler->modify(Argument::any(), $modify->getRequest())->shouldBeCalled();
-        $this->handleRequest($modify, $token, $handler, $queue, new ServerOptions());
+        $this->handleRequest($modify, $token);
     }
 
-    public function it_should_send_a_modify_dn_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
-    {
+    public function it_should_send_a_modify_dn_request_to_the_request_handler(
+        RequestHandlerInterface $handler,
+        TokenInterface $token
+    ): void {
         $modifyDn = new LdapMessageRequest(1, new ModifyDnRequest('cn=foo,dc=bar', 'cn=bar', true));
 
         $handler->modifyDn(Argument::any(), $modifyDn->getRequest())->shouldBeCalled();
-        $this->handleRequest($modifyDn, $token, $handler, $queue, new ServerOptions());
+        $this->handleRequest($modifyDn, $token);
     }
 
-    public function it_should_send_an_extended_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
-    {
+    public function it_should_send_an_extended_request_to_the_request_handler(
+        RequestHandlerInterface $handler,
+        TokenInterface $token
+    ): void {
         $ext = new LdapMessageRequest(1, new ExtendedRequest('foo', 'bar'));
 
         $handler->extended(Argument::any(), $ext->getRequest())->shouldBeCalled();
-        $this->handleRequest($ext, $token, $handler, $queue, new ServerOptions());
+        $this->handleRequest($ext, $token);
     }
 
-    public function it_should_send_a_compare_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
-    {
+    public function it_should_send_a_compare_request_to_the_request_handler(
+        RequestHandlerInterface $handler,
+        TokenInterface $token
+    ): void {
         $compare = new LdapMessageRequest(1, new CompareRequest('cn=foo,dc=bar', Filters::equal('foo', 'bar')));
 
         $handler->compare(Argument::any(), $compare->getRequest())->shouldBeCalled()->willReturn(true);
-        $this->handleRequest($compare, $token, $handler, $queue, new ServerOptions());
+        $this->handleRequest($compare, $token);
     }
 
-    public function it_should_throw_an_operation_exception_if_the_request_is_unsupported(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
+    public function it_should_throw_an_operation_exception_if_the_request_is_unsupported(TokenInterface $token): void
     {
         $request = new LdapMessageRequest(2, new AbandonRequest(1));
 
         $this->shouldThrow(OperationException::class)->during(
             'handleRequest',
-            [$request, $token, $handler, $queue, new ServerOptions()]
+            [$request, $token, new ServerOptions()]
         );
     }
 }

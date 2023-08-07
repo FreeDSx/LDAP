@@ -15,9 +15,7 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Handles an un-bind. Which just closes the connection.
@@ -26,16 +24,17 @@ use FreeDSx\Ldap\ServerOptions;
  */
 class ServerUnbindHandler implements ServerProtocolHandlerInterface
 {
+    public function __construct(private readonly ServerQueue $queue)
+    {
+    }
+
     /**
      * {@inheritDoc}
      */
     public function handleRequest(
         LdapMessageRequest $message,
-        TokenInterface $token,
-        RequestHandlerInterface $dispatcher,
-        ServerQueue $queue,
-        ServerOptions $options
+        TokenInterface $token
     ): void {
-        $queue->close();
+        $this->queue->close();
     }
 }

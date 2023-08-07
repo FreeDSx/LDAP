@@ -22,9 +22,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Handles a whoami request.
@@ -33,16 +31,17 @@ use FreeDSx\Ldap\ServerOptions;
  */
 class ServerWhoAmIHandler implements ServerProtocolHandlerInterface
 {
+    public function __construct(private readonly ServerQueue $queue)
+    {
+    }
+
     /**
      * {@inheritDoc}
      * @throws EncoderException
      */
     public function handleRequest(
         LdapMessageRequest $message,
-        TokenInterface $token,
-        RequestHandlerInterface $dispatcher,
-        ServerQueue $queue,
-        ServerOptions $options
+        TokenInterface $token
     ): void {
         $userId = $token->getUsername();
 
@@ -55,7 +54,7 @@ class ServerWhoAmIHandler implements ServerProtocolHandlerInterface
             }
         }
 
-        $queue->sendMessage(new LdapMessageResponse(
+        $this->queue->sendMessage(new LdapMessageResponse(
             $message->getMessageId(),
             new ExtendedResponse(new LdapResult(ResultCode::SUCCESS), null, $userId)
         ));

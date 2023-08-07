@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\RequestContext;
+use SensitiveParameter;
 
 /**
  * Proxies requests to an LDAP server and returns the response. You should extend this to add your own constructor and
@@ -51,7 +52,7 @@ class ProxyRequestHandler implements RequestHandlerInterface
      */
     public function bind(
         string $username,
-        #[\SensitiveParameter]
+        #[SensitiveParameter]
         string $password,
     ): bool {
         try {

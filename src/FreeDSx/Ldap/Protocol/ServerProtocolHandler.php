@@ -26,10 +26,9 @@ use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\LoggerTrait;
-use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Exception\ConnectionException;
+use Psr\Log\LoggerInterface;
 use Throwable;
 use function array_merge;
 use function in_array;
@@ -48,27 +47,15 @@ class ServerProtocolHandler
      */
     private array $messageIds = [];
 
-    private ServerAuthorization $authorizer;
-
-    private ServerProtocolHandlerFactory $protocolHandlerFactory;
-
     public function __construct(
         private readonly ServerQueue $queue,
         private readonly HandlerFactoryInterface $handlerFactory,
-        private readonly ServerOptions $options,
-        ServerProtocolHandlerFactory $protocolHandlerFactory = null,
-        ServerAuthorization $authorizer = null,
-        private readonly ServerBindHandlerFactory $bindHandlerFactory = new ServerBindHandlerFactory(),
+        private readonly ?LoggerInterface $logger,
+        private readonly ServerProtocolHandlerFactory $protocolHandlerFactory,
+        private readonly ServerAuthorization $authorizer,
+        private readonly ServerBindHandlerFactory $bindHandlerFactory,
         private readonly ResponseFactory $responseFactory = new ResponseFactory()
     ) {
-        $this->authorizer = $authorizer ?? new ServerAuthorization(
-            isAnonymousAllowed: $options->isAllowAnonymous(),
-            isAuthRequired: $options->isRequireAuthentication(),
-        );
-        $this->protocolHandlerFactory = $protocolHandlerFactory ?? new ServerProtocolHandlerFactory(
-            handlerFactory: $handlerFactory,
-            requestHistory: new RequestHistory(),
-        );
     }
 
     /**
@@ -182,9 +169,6 @@ class ServerProtocolHandler
             $handler->handleRequest(
                 $message,
                 $this->authorizer->getToken(),
-                $this->handlerFactory->makeRequestHandler(),
-                $this->queue,
-                $this->options
             );
         # Authentication is required, but they have not authenticated...
         } else {

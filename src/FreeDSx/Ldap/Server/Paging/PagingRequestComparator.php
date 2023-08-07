@@ -33,11 +33,8 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
  */
 class PagingRequestComparator
 {
-    private LdapEncoder $encoder;
-
-    public function __construct(LdapEncoder $encoder = null)
+    public function __construct(private readonly LdapEncoder $encoder = new LdapEncoder())
     {
-        $this->encoder = $encoder ?? new LdapEncoder();
     }
 
     /**

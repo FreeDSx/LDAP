@@ -17,25 +17,30 @@ use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnbindHandler;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\ServerOptions;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
 class ServerUnbindHandlerSpec extends ObjectBehavior
 {
+    public function let(ServerQueue $queue): void
+    {
+        $this->beConstructedWith($queue);
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerUnbindHandler::class);
     }
 
-    public function it_should_handle_an_unbind_request(ServerQueue $queue, TokenInterface $token, RequestHandlerInterface $dispatcher): void
-    {
+    public function it_should_handle_an_unbind_request(
+        ServerQueue $queue,
+        TokenInterface $token,
+    ): void {
         $queue->close()->shouldBeCalled();
         $queue->sendMessage(Argument::any())->shouldNotBeCalled();
 
         $unbind = new LdapMessageRequest(1, new UnbindRequest());
-        $this->handleRequest($unbind, $token, $dispatcher, $queue, new ServerOptions());
+        $this->handleRequest($unbind, $token);
     }
 }

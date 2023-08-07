@@ -36,9 +36,13 @@ use Prophecy\Argument;
 
 class ServerRootDseHandlerSpec extends ObjectBehavior
 {
-    public function let(): void
+    public function let(ServerQueue $queue): void
     {
-        $this->beConstructedWith(null);
+        $this->beConstructedWith(
+            new ServerOptions(),
+            $queue,
+            null
+        );
     }
 
     public function it_is_initializable(): void
@@ -48,9 +52,15 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
 
     public function it_should_send_back_a_RootDSE(
         ServerQueue $queue,
-        RequestHandlerInterface $handler,
         TokenInterface $token
     ): void {
+        $this->beConstructedWith(
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar'),
+            $queue,
+        );
+
         $search = new LdapMessageRequest(
             1,
             (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope()
@@ -71,11 +81,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $search,
             $token,
-            $handler,
-            $queue,
-            (new ServerOptions())
-                ->setDseVendorName('Foo')
-                ->setDseNamingContexts('dc=Foo,dc=Bar')
         );
     }
 
@@ -85,6 +90,14 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         TokenInterface $token,
         PagingHandlerInterface $pagingHandler,
     ): void {
+        $this->beConstructedWith(
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar')
+                ->setPagingHandler($pagingHandler->getWrappedObject()),
+            $queue,
+        );
+
         $search = new LdapMessageRequest(
             1,
             (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope()
@@ -105,22 +118,21 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $search,
             $token,
-            $handler,
-            $queue,
-            (new ServerOptions())
-                ->setDseVendorName('Foo')
-                ->setDseNamingContexts('dc=Foo,dc=Bar')
-                ->setPagingHandler($pagingHandler->getWrappedObject())
         );
     }
 
     public function it_should_send_a_request_to_the_dispatcher_if_it_implements_a_rootdse_aware_interface(
         ServerQueue $queue,
-        RequestHandlerInterface $handler,
         TokenInterface $token,
         RootDseHandlerInterface $rootDseHandler
     ): void {
-        $this->beConstructedWith($rootDseHandler);
+        $this->beConstructedWith(
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar'),
+            $queue,
+            $rootDseHandler,
+        );
 
         $searchReqeust = (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope();
         $search = new LdapMessageRequest(
@@ -149,19 +161,20 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $search,
             $token,
-            $handler,
-            $queue,
-            (new ServerOptions())
-                ->setDseVendorName('Foo')
-                ->setDseNamingContexts('dc=Foo,dc=Bar')
         );
     }
 
     public function it_should_only_return_attribute_names_from_the_RootDSE_if_requested(
         ServerQueue $queue,
-        RequestHandlerInterface $handler,
         TokenInterface $token
     ): void {
+        $this->beConstructedWith(
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar'),
+            $queue,
+        );
+
         $search = new LdapMessageRequest(
             1,
             (new SearchRequest(Filters::present('objectClass')))
@@ -183,19 +196,20 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $search,
             $token,
-            $handler,
-            $queue,
-            (new ServerOptions())
-                ->setDseVendorName('Foo')
-                ->setDseNamingContexts('dc=Foo,dc=Bar')
         );
     }
 
     public function it_should_only_return_specific_attributes_from_the_RootDSE_if_requested(
         ServerQueue $queue,
-        RequestHandlerInterface $handler,
         TokenInterface $token
     ): void {
+        $this->beConstructedWith(
+            (new ServerOptions())
+                ->setDseVendorName('Foo')
+                ->setDseNamingContexts('dc=Foo,dc=Bar'),
+            $queue,
+        );
+
         $search = new LdapMessageRequest(
             1,
             (new SearchRequest(Filters::present('objectClass')))
@@ -220,11 +234,6 @@ class ServerRootDseHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $search,
             $token,
-            $handler,
-            $queue,
-            (new ServerOptions())
-                ->setDseVendorName('Foo')
-                ->setDseNamingContexts('dc=Foo,dc=Bar')
         );
     }
 }

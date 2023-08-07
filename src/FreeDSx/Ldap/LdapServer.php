@@ -13,16 +13,14 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
-use FreeDSx\Ldap\Server\LoggerTrait;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyHandler;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyPagingHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
-use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
+use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Socket\Exception\ConnectionException;
-use FreeDSx\Socket\SocketServer;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -32,12 +30,15 @@ use Psr\Log\LoggerInterface;
  */
 class LdapServer
 {
-    use LoggerTrait;
+    private Container $container;
 
     public function __construct(
         private readonly ServerOptions $options = new ServerOptions(),
-        private ?ServerRunnerInterface $runner = null
+        ?Container $container = null,
     ) {
+        $this->container = $container ?? new Container([
+            ServerOptions::class => $this->options,
+        ]);
     }
 
     /**
@@ -47,22 +48,13 @@ class LdapServer
      */
     public function run(): void
     {
-        $isUnixSocket = $this->options->getTransport() === 'unix';
-        $resource = $isUnixSocket
-            ? $this->options->getUnixSocket()
-            : $this->options->getIp();
+        $socketServer = $this->container
+            ->get(SocketServerFactory::class)
+            ->makeAndBind();
 
-        if ($isUnixSocket) {
-            $this->removeExistingSocketIfNeeded($resource);
-        }
+        $runner = $this->options->getServerRunner() ?? $this->container->get(ServerRunnerInterface::class);
 
-        $socketServer = SocketServer::bind(
-            $resource,
-            $this->options->getPort(),
-            $this->options->toArray(),
-        );
-
-        $this->runner()->run($socketServer);
+        $runner->run($socketServer);
     }
 
     /**
@@ -138,35 +130,5 @@ class LdapServer
         $server->usePagingHandler(new ProxyPagingHandler($client));
 
         return $server;
-    }
-
-    private function runner(): ServerRunnerInterface
-    {
-        if (!$this->runner) {
-            $this->runner = new PcntlServerRunner($this->options);
-        }
-
-        return $this->runner;
-    }
-
-    private function removeExistingSocketIfNeeded(string $socket): void
-    {
-        if (!file_exists($socket)) {
-            return;
-        }
-
-        if (!is_writeable($socket)) {
-            $this->logAndThrow(sprintf(
-                'The socket "%s" already exists and is not writeable. To run the LDAP server, you must remove the existing socket.',
-                $socket
-            ));
-        }
-
-        if (!unlink($socket)) {
-            $this->logAndThrow(sprintf(
-                'The existing socket "%s" could not be removed. To run the LDAP server, you must remove the existing socket.',
-                $socket
-            ));
-        }
     }
 }

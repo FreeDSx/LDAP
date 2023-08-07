@@ -27,19 +27,31 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSearchHandler;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\ServerOptions;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
 class ServerSearchHandlerSpec extends ObjectBehavior
 {
+    public function let(
+        ServerQueue $queue,
+        RequestHandlerInterface $handler,
+    ): void {
+        $this->beConstructedWith(
+            $queue,
+            $handler,
+        );
+    }
+
     public function it_is_initializable(): void
     {
         $this->shouldHaveType(ServerSearchHandler::class);
     }
 
-    public function it_should_send_a_search_request_to_the_request_handler(ServerQueue $queue, RequestHandlerInterface $handler, TokenInterface $token): void
-    {
+    public function it_should_send_a_search_request_to_the_request_handler(
+        ServerQueue $queue,
+        RequestHandlerInterface $handler,
+        TokenInterface $token
+    ): void {
         $search = new LdapMessageRequest(
             2,
             (new SearchRequest(Filters::equal('foo', 'bar')))->base('dc=foo,dc=bar')
@@ -59,7 +71,7 @@ class ServerSearchHandlerSpec extends ObjectBehavior
             new LdapMessageResponse(2, new SearchResultDone(0, 'dc=foo,dc=bar'))
         )->shouldBeCalled();
 
-        $this->handleRequest($search, $token, $handler, $queue, new ServerOptions());
+        $this->handleRequest($search, $token);
     }
 
     public function it_should_send_a_SearchResultDone_with_an_operation_exception_thrown_from_the_handler(
@@ -94,9 +106,6 @@ class ServerSearchHandlerSpec extends ObjectBehavior
         $this->handleRequest(
             $search,
             $token,
-            $handler,
-            $queue,
-            new ServerOptions()
         );
     }
 }
