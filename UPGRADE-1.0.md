@@ -146,3 +146,33 @@ $ldap = new LdapServer(
         ->setServerRunner(new MyServerRunner())
 );
 ```
+
+## Using Request Handlers
+
+Previously, you could have set request handlers using the fully qualified class name. These must now be class instances.
+
+**Before**:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use Foo\LdapProxyHandler;
+
+$server = new LdapServer([
+    'request_handler' => LdapProxyHandler::class,
+]);
+$server->run();
+```
+
+**After**:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\ServerOptions;
+use Foo\LdapProxyHandler;
+
+$server = new LdapServer(
+    (new ServerOptions)
+        ->setRequestHandler(new LdapProxyHandler())
+);
+$server->run();
+```
