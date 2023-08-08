@@ -41,14 +41,14 @@ trait EscapeTrait
     /**
      * Replace non-printable ASCII with escaped hex.
      */
-    protected static function escapeNonPrintable(string $value): string
+    private static function escapeNonPrintable(string $value): string
     {
         return (string) preg_replace_callback('/([\x00-\x1F\x7F])/', function ($matches) {
             return '\\' . bin2hex($matches[1]);
         }, $value);
     }
 
-    protected static function shouldNotEscape(string $value): bool
+    private static function shouldNotEscape(string $value): bool
     {
         return (preg_match('/^(\\\\[0-9A-Fa-f]{2})+$/', $value) === 1 || $value === '');
     }

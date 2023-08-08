@@ -31,9 +31,15 @@ use function count;
  */
 class ExtendedDnControl extends Control
 {
-    public function __construct(private bool $useHexFormat = false)
-    {
-        parent::__construct(self::OID_EXTENDED_DN);
+    public function __construct(
+        private bool $useHexFormat = false,
+        string $controlType = self::OID_EXTENDED_DN,
+        bool $criticality = false,
+    ) {
+        parent::__construct(
+            controlType: $controlType,
+            criticality: $criticality,
+        );
     }
 
     public function getUseHexFormat(): bool
@@ -73,11 +79,11 @@ class ExtendedDnControl extends Control
             $useHexFormat = ($useHexFormat->getValue() === 0);
         }
 
-        $control = new static($useHexFormat);
-        $control->controlType = $oid;
-        $control->criticality = $criticality;
-
-        return $control;
+        return new static(
+            $useHexFormat,
+            $oid,
+            $criticality,
+        );
     }
 
     /**

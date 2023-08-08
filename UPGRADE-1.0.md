@@ -1,8 +1,16 @@
 Upgrading from 0.x to 1.0
 =======================
 
-Client Options
---------------
+* [Client Changes](#client-changes)
+    * [Client Options](#client-options)
+* [Server Changes](#server-changes)
+    * [Server Options](#server-options)
+    * [Constructing a Proxy Server](#constructing-a-proxy-server)
+    * [Using a Custom ServerRunner](#using-a-custom-serverrunner)
+
+## Client Changes
+
+### Client Options
 
 When instantiating the `LdapClient`, options are now an options object instead of an associative array.
 
@@ -34,8 +42,9 @@ $ldap = new LdapClient(
 );
 ```
 
-Server Options
---------------
+# Server Changes
+
+## Server Options
 
 When instantiating the `LdapServer`, options are now an options object instead of an associative array.
 
@@ -63,8 +72,7 @@ $ldap = new LdapServer(
 );
 ```
 
-Proxy Server Options
---------------------
+## Constructing a Proxy Server
 
 When instantiating an `LdapServer` instance with `LdapServer::makeProxy()`, options are now an options object instead
 of an associative array.
@@ -108,4 +116,63 @@ $server = LdapServer::makeProxy(
     (new ServerOptions)
         ->setPort(3389)
 );
+```
+
+## Using a Custom ServerRunner
+
+Previously, when constructing a `LdapServer` instance you could pass in a second param with an object implementing `ServerRunnerInterface`.
+This is no longer a param on the constructor, you must set it in the ServerOptions.
+
+**Before**:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use App\MyServerRunner;
+
+$ldap = new LdapServer(
+    [],
+    new MyServerRunner(),
+);
+```
+
+**After**:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\ServerOptions;
+
+$ldap = new LdapServer(
+    (new ServerOptions)
+        ->setServerRunner(new MyServerRunner())
+);
+```
+
+## Using Request Handlers
+
+Previously, you could have set request handlers using the fully qualified class name. These must now be class instances.
+
+**Before**:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use Foo\LdapProxyHandler;
+
+$server = new LdapServer([
+    'request_handler' => LdapProxyHandler::class,
+]);
+$server->run();
+```
+
+**After**:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\ServerOptions;
+use Foo\LdapProxyHandler;
+
+$server = new LdapServer(
+    (new ServerOptions)
+        ->setRequestHandler(new LdapProxyHandler())
+);
+$server->run();
 ```
