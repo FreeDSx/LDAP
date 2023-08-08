@@ -15,6 +15,8 @@ It supports encryption of the LDAP connection through TLS via the OpenSSL extens
 
 # Documentation
 
+**Note**: If you were previously using a version prior to `1.X`, see the [upgrade doc](UPGRADE-1.0.md) for important changes.
+
 * [LDAP Client](/docs/Client)
   * [Configuration](/docs/Client/Configuration.md)
   * [SASL Bind Authentication](/docs/Client/SASL-Bind-Authentication.md)
