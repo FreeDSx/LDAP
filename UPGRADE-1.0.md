@@ -1,8 +1,9 @@
 Upgrading from 0.x to 1.0
 =======================
 
-Client Options
---------------
+## Client Changes
+
+### Client Options
 
 When instantiating the `LdapClient`, options are now an options object instead of an associative array.
 
@@ -34,8 +35,9 @@ $ldap = new LdapClient(
 );
 ```
 
-Server Options
---------------
+# Server Changes
+
+## Server Options
 
 When instantiating the `LdapServer`, options are now an options object instead of an associative array.
 
@@ -63,8 +65,7 @@ $ldap = new LdapServer(
 );
 ```
 
-Proxy Server Options
---------------------
+## Constructing a Proxy Server Options
 
 When instantiating an `LdapServer` instance with `LdapServer::makeProxy()`, options are now an options object instead
 of an associative array.
@@ -107,5 +108,34 @@ $server = LdapServer::makeProxy(
     // Any additional LdapServer options. In this case, also run this server over port 3389
     (new ServerOptions)
         ->setPort(3389)
+);
+```
+
+## Using a ServerRunner
+
+Previously, when constructing a `LdapServer` instance you could pass in a second param with an object implementing `ServerRunnerInterface`.
+This is no longer a param on the constructor, you must set it in the ServerOptions.
+
+**Before**:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use App\MyServerRunner;
+
+$ldap = new LdapServer(
+    [],
+    new MyServerRunner(),
+);
+```
+
+**After**:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\ServerOptions;
+
+$ldap = new LdapServer(
+    (new ServerOptions)
+        ->setServerRunner(new MyServerRunner())
 );
 ```
