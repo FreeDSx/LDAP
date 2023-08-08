@@ -25,7 +25,7 @@ use function strtolower;
  */
 class Option implements Stringable
 {
-    protected const MATCH_RANGE = '/range=(\d+)-(.*)/';
+    private const MATCH_RANGE = '/range=(\d+)-(.*)/';
 
     private ?string $lcOption = null;
 
