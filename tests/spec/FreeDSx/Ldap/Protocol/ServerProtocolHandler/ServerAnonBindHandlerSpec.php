@@ -64,7 +64,7 @@ class ServerAnonBindHandlerSpec extends ObjectBehavior
             new LdapResult(0)
         )))->shouldBeCalled()->willReturn($queue);
 
-        $this->handleBind($bind, $dispatcher)->shouldBeLike(
+        $this->handleBind($bind)->shouldBeLike(
             new AnonToken('foo')
         );
     }

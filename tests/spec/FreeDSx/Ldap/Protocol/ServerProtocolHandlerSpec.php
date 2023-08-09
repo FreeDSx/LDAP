@@ -34,7 +34,6 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
-use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\ServerOptions;
@@ -49,7 +48,6 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         ServerQueue $queue,
         ServerProtocolHandlerFactory $protocolHandlerFactory,
         LoggerInterface $logger,
-        HandlerFactoryInterface $handlerFactory,
         ServerBindHandlerFactory $bindHandlerFactory,
         RequestHandlerInterface $dispatcher,
         ServerProtocolHandler\BindHandlerInterface $bindHandler,
@@ -61,15 +59,13 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $queue->sendMessage(Argument::any())->willReturn($queue);
         $bindHandlerFactory->get(Argument::any())->willReturn($bindHandler);
         $protocolHandlerFactory->get(Argument::any(), Argument::any())->willReturn($protocolHandler);
-        $handlerFactory->makeRequestHandler()->willReturn($dispatcher);
 
         $this->beConstructedWith(
             $queue,
-            $handlerFactory,
-            $logger,
             $protocolHandlerFactory,
             new ServerAuthorization(new ServerOptions()),
             $bindHandlerFactory,
+            $logger,
         );
     }
 
@@ -106,7 +102,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $bindHandler->handleBind(Argument::any(), Argument::any())->willReturn(
+        $bindHandler->handleBind(Argument::any())->willReturn(
             new BindToken('foo', 'bar')
         );
         $protocolHandler->handleRequest(Argument::any(), Argument::any())
@@ -201,7 +197,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $bindHandler->handleBind(Argument::any(), Argument::any())
+        $bindHandler->handleBind(Argument::any())
             ->shouldBeCalledOnce()
             ->willReturn(new BindToken('foo@bar', 'bar'));
         $protocolHandler->handleRequest(Argument::any(), Argument::any())
@@ -222,7 +218,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $bindHandler->handleBind(Argument::any(), Argument::any())
+        $bindHandler->handleBind(Argument::any())
             ->willReturn(new BindToken('foo@bar', 'bar'));
 
         $protocolHandler->handleRequest(Argument::any(), Argument::any())

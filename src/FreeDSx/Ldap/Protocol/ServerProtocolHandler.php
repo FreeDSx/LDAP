@@ -49,11 +49,10 @@ class ServerProtocolHandler
 
     public function __construct(
         private readonly ServerQueue $queue,
-        private readonly HandlerFactoryInterface $handlerFactory,
-        private readonly ?LoggerInterface $logger,
         private readonly ServerProtocolHandlerFactory $protocolHandlerFactory,
         private readonly ServerAuthorization $authorizer,
         private readonly ServerBindHandlerFactory $bindHandlerFactory,
+        private readonly ?LoggerInterface $logger,
         private readonly ResponseFactory $responseFactory = new ResponseFactory()
     ) {
     }
@@ -223,10 +222,9 @@ class ServerProtocolHandler
             );
         }
 
-        return $this->bindHandlerFactory->get($message->getRequest())->handleBind(
-            $message,
-            $this->handlerFactory->makeRequestHandler(),
-        );
+        return $this->bindHandlerFactory
+            ->get($message->getRequest())
+            ->handleBind($message);
     }
 
     /**

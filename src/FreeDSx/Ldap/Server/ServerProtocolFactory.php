@@ -36,8 +36,6 @@ class ServerProtocolFactory
 
         return new ServerProtocolHandler(
             queue: $serverQueue,
-            handlerFactory: $this->handlerFactory,
-            logger: $this->options->getLogger(),
             protocolHandlerFactory: new ServerProtocolHandlerFactory(
                 handlerFactory: $this->handlerFactory,
                 options: $this->options,
@@ -45,7 +43,11 @@ class ServerProtocolFactory
                 queue: $serverQueue,
             ),
             authorizer: $this->serverAuthorization,
-            bindHandlerFactory: new ServerBindHandlerFactory($serverQueue),
+            bindHandlerFactory: new ServerBindHandlerFactory(
+                queue: $serverQueue,
+                handlerFactory: $this->handlerFactory,
+            ),
+            logger: $this->options->getLogger(),
         );
     }
 }

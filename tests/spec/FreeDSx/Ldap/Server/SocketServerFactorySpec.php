@@ -31,7 +31,7 @@ class SocketServerFactorySpec extends ObjectBehavior
         $this->tmpUnixSocketFilePath = stream_get_meta_data($this->tmpUnixSocketResource)['uri'];
 
         $this->beConstructedWith(
-            (new ServerOptions)
+            (new ServerOptions())
                 ->setPort(3390),
             $logger,
         );
@@ -54,7 +54,7 @@ class SocketServerFactorySpec extends ObjectBehavior
             throw new SkippingException('Cannot construct unix based socket on Windows.');
         }
         $this->beConstructedWith(
-            (new ServerOptions)
+            (new ServerOptions())
                 ->setUnixSocket($this->tmpUnixSocketFilePath)
                 ->setTransport('unix'),
             $logger,

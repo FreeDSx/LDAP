@@ -36,7 +36,8 @@ class ServerBindHandler implements BindHandlerInterface
 
     public function __construct(
         private readonly ServerQueue $queue,
-        private readonly ResponseFactory $responseFactory = new ResponseFactory()
+        private readonly RequestHandlerInterface $dispatcher,
+        private readonly ResponseFactory $responseFactory = new ResponseFactory(),
     ) {
     }
 
@@ -45,10 +46,8 @@ class ServerBindHandler implements BindHandlerInterface
      * @throws RuntimeException
      * @throws OperationException
      */
-    public function handleBind(
-        LdapMessageRequest $message,
-        RequestHandlerInterface $dispatcher
-    ): TokenInterface {
+    public function handleBind(LdapMessageRequest $message): TokenInterface
+    {
         /** @var BindRequest $request */
         $request = $message->getRequest();
         if (!$request instanceof SimpleBindRequest) {
@@ -59,7 +58,7 @@ class ServerBindHandler implements BindHandlerInterface
         }
 
         self::validateVersion($request);
-        $token = $this->simpleBind($dispatcher, $request);
+        $token = $this->simpleBind($request);
         $this->queue->sendMessage($this->responseFactory->getStandardResponse($message));
 
         return $token;
@@ -68,11 +67,9 @@ class ServerBindHandler implements BindHandlerInterface
     /**
      * @throws OperationException
      */
-    private function simpleBind(
-        RequestHandlerInterface $dispatcher,
-        SimpleBindRequest $request
-    ): TokenInterface {
-        if (!$dispatcher->bind($request->getUsername(), $request->getPassword())) {
+    private function simpleBind(SimpleBindRequest $request): TokenInterface
+    {
+        if (!$this->dispatcher->bind($request->getUsername(), $request->getPassword())) {
             throw new OperationException(
                 'Invalid credentials.',
                 ResultCode::INVALID_CREDENTIALS

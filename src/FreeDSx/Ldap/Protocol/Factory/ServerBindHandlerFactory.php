@@ -22,6 +22,8 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\BindHandlerInterface;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerAnonBindHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerBindHandler;
+use FreeDSx\Ldap\Server\HandlerFactoryInterface;
+use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 
 /**
  * Determines the correct bind handler for the request.
@@ -30,8 +32,10 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerBindHandler;
  */
 class ServerBindHandlerFactory
 {
-    public function __construct(private readonly ServerQueue $queue)
-    {
+    public function __construct(
+        private readonly ServerQueue $queue,
+        private readonly HandlerFactoryInterface $handlerFactory,
+    ) {
     }
 
     /**
@@ -42,7 +46,10 @@ class ServerBindHandlerFactory
     public function get(RequestInterface $request): BindHandlerInterface
     {
         if ($request instanceof SimpleBindRequest) {
-            return new ServerBindHandler($this->queue);
+            return new ServerBindHandler(
+                queue: $this->queue,
+                dispatcher: $this->handlerFactory->makeRequestHandler(),
+            );
         } elseif ($request instanceof AnonBindRequest) {
             return new ServerAnonBindHandler($this->queue);
         } else {
