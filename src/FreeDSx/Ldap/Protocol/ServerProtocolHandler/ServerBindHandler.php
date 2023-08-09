@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
@@ -29,11 +30,15 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ServerBindHandler extends BaseServerHandler implements BindHandlerInterface
+class ServerBindHandler implements BindHandlerInterface
 {
-    public function __construct(private readonly ServerQueue $queue)
-    {
-        parent::__construct();
+    use BindVersionValidatorTrait;
+
+    public function __construct(
+        private readonly ServerQueue $queue,
+        private readonly RequestHandlerInterface $dispatcher,
+        private readonly ResponseFactory $responseFactory = new ResponseFactory(),
+    ) {
     }
 
     /**
@@ -41,11 +46,8 @@ class ServerBindHandler extends BaseServerHandler implements BindHandlerInterfac
      * @throws RuntimeException
      * @throws OperationException
      */
-    public function handleBind(
-        LdapMessageRequest $message,
-        RequestHandlerInterface $dispatcher,
-        ServerQueue $queue
-    ): TokenInterface {
+    public function handleBind(LdapMessageRequest $message): TokenInterface
+    {
         /** @var BindRequest $request */
         $request = $message->getRequest();
         if (!$request instanceof SimpleBindRequest) {
@@ -55,8 +57,8 @@ class ServerBindHandler extends BaseServerHandler implements BindHandlerInterfac
             ));
         }
 
-        $this->validateVersion($request);
-        $token = $this->simpleBind($dispatcher, $request);
+        self::validateVersion($request);
+        $token = $this->simpleBind($request);
         $this->queue->sendMessage($this->responseFactory->getStandardResponse($message));
 
         return $token;
@@ -65,31 +67,18 @@ class ServerBindHandler extends BaseServerHandler implements BindHandlerInterfac
     /**
      * @throws OperationException
      */
-    protected function validateVersion(BindRequest $request): void
+    private function simpleBind(SimpleBindRequest $request): TokenInterface
     {
-        # Per RFC 4.2, a result code of protocol error must be sent back for unsupported versions.
-        if ($request->getVersion() !== 3) {
-            throw new OperationException(
-                'Only LDAP version 3 is supported.',
-                ResultCode::PROTOCOL_ERROR
-            );
-        }
-    }
-
-    /**
-     * @throws OperationException
-     */
-    private function simpleBind(
-        RequestHandlerInterface $dispatcher,
-        SimpleBindRequest $request
-    ): TokenInterface {
-        if (!$dispatcher->bind($request->getUsername(), $request->getPassword())) {
+        if (!$this->dispatcher->bind($request->getUsername(), $request->getPassword())) {
             throw new OperationException(
                 'Invalid credentials.',
                 ResultCode::INVALID_CREDENTIALS
             );
         }
 
-        return new BindToken($request->getUsername(), $request->getPassword());
+        return new BindToken(
+            $request->getUsername(),
+            $request->getPassword()
+        );
     }
 }

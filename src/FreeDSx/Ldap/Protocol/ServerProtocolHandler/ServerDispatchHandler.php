@@ -17,6 +17,7 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestContext;
@@ -28,13 +29,13 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ServerDispatchHandler extends BaseServerHandler implements ServerProtocolHandlerInterface
+class ServerDispatchHandler implements ServerProtocolHandlerInterface
 {
     public function __construct(
         private readonly ServerQueue $queue,
         private readonly RequestHandlerInterface $dispatcher,
+        private readonly ResponseFactory $responseFactory = new ResponseFactory(),
     ) {
-        parent::__construct();
     }
 
     /**

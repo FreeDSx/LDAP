@@ -17,9 +17,9 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
+use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
@@ -28,11 +28,14 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ServerAnonBindHandler extends ServerBindHandler
+class ServerAnonBindHandler implements BindHandlerInterface
 {
-    public function __construct(private readonly ServerQueue $queue)
-    {
-        parent::__construct($this->queue);
+    use BindVersionValidatorTrait;
+
+    public function __construct(
+        private readonly ServerQueue $queue,
+        private readonly ResponseFactory $responseFactory = new ResponseFactory()
+    ) {
     }
 
     /**
@@ -41,11 +44,8 @@ class ServerAnonBindHandler extends ServerBindHandler
      * @throws OperationException
      * @throws RuntimeException
      */
-    public function handleBind(
-        LdapMessageRequest $message,
-        RequestHandlerInterface $dispatcher,
-        ServerQueue $queue
-    ): TokenInterface {
+    public function handleBind(LdapMessageRequest $message): TokenInterface
+    {
         $request = $message->getRequest();
         if (!$request instanceof AnonBindRequest) {
             throw new RuntimeException(sprintf(
@@ -54,12 +54,12 @@ class ServerAnonBindHandler extends ServerBindHandler
             ));
         }
 
-        $this->validateVersion($request);
+        self::validateVersion($request);
         $this->queue->sendMessage($this->responseFactory->getStandardResponse($message));
 
         return new AnonToken(
             $request->getUsername(),
-            $request->getVersion()
+            $request->getVersion(),
         );
     }
 }

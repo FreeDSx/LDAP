@@ -29,9 +29,14 @@ use Prophecy\Argument;
 
 class ServerBindHandlerSpec extends ObjectBehavior
 {
-    public function let(ServerQueue $queue): void
-    {
-        $this->beConstructedWith($queue);
+    public function let(
+        ServerQueue $queue,
+        RequestHandlerInterface $dispatcher,
+    ): void {
+        $this->beConstructedWith(
+            $queue,
+            $dispatcher,
+        );
     }
 
     public function it_is_initializable(): void
@@ -39,8 +44,10 @@ class ServerBindHandlerSpec extends ObjectBehavior
         $this->shouldHaveType(ServerBindHandler::class);
     }
 
-    public function it_should_return_a_token_on_success(ServerQueue $queue, RequestHandlerInterface $dispatcher): void
-    {
+    public function it_should_return_a_token_on_success(
+        ServerQueue $queue,
+        RequestHandlerInterface $dispatcher,
+    ): void {
         $bind = new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar'));
 
         $dispatcher->bind('foo@bar', 'bar')
@@ -50,13 +57,15 @@ class ServerBindHandlerSpec extends ObjectBehavior
             new LdapResult(0)
         )))->shouldBeCalled()->willReturn($queue);
 
-        $this->handleBind($bind, $dispatcher, $queue)->shouldBeLike(
+        $this->handleBind($bind)->shouldBeLike(
             new BindToken('foo@bar', 'bar')
         );
     }
 
-    public function it_should_throw_an_operations_exception_with_invalid_credentials_if_they_are_wrong(ServerQueue $queue, RequestHandlerInterface $dispatcher): void
-    {
+    public function it_should_throw_an_operations_exception_with_invalid_credentials_if_they_are_wrong(
+        ServerQueue $queue,
+        RequestHandlerInterface $dispatcher,
+    ): void {
         $bind = new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar'));
 
         $dispatcher->bind('foo@bar', 'bar')
@@ -67,11 +76,11 @@ class ServerBindHandlerSpec extends ObjectBehavior
         $this->shouldThrow(new OperationException('Invalid credentials.', ResultCode::INVALID_CREDENTIALS))
             ->during(
                 'handleBind',
-                [$bind, $dispatcher, $queue]
+                [$bind]
             );
     }
 
-    public function it_should_validate_the_version(ServerQueue $queue, RequestHandlerInterface $dispatcher): void
+    public function it_should_validate_the_version(ServerQueue $queue, ): void
     {
         $bind = new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar', 5));
 
@@ -80,7 +89,7 @@ class ServerBindHandlerSpec extends ObjectBehavior
         $this->shouldThrow(OperationException::class)
             ->during(
                 'handleBind',
-                [$bind, $dispatcher, $queue]
+                [$bind]
             );
     }
 }

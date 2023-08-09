@@ -21,13 +21,21 @@ use FreeDSx\Ldap\Protocol\Factory\ServerBindHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerAnonBindHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerBindHandler;
+use FreeDSx\Ldap\Server\HandlerFactoryInterface;
+use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
+use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use PhpSpec\ObjectBehavior;
 
 class ServerBindHandlerFactorySpec extends ObjectBehavior
 {
-    public function let(ServerQueue $queue): void
-    {
-        $this->beConstructedWith($queue);
+    public function let(
+        ServerQueue $queue,
+        HandlerFactoryInterface $handlerFactory,
+    ): void {
+        $this->beConstructedWith(
+            $queue,
+            $handlerFactory,
+        );
     }
 
     public function it_is_initializable(): void
@@ -41,14 +49,19 @@ class ServerBindHandlerFactorySpec extends ObjectBehavior
             ->shouldBeAnInstanceOf(ServerAnonBindHandler::class);
     }
 
-    public function it_should_get_a_simple_bind_handler(): void
+    public function it_should_get_a_simple_bind_handler(HandlerFactoryInterface $handlerFactory): void
     {
+        $handlerFactory
+            ->makeRequestHandler()
+            ->willReturn(new GenericRequestHandler());
+
         $this->get(new SimpleBindRequest('foo', 'bar'))
             ->shouldBeAnInstanceOf(ServerBindHandler::class);
     }
 
     public function it_should_throw_an_exception_on_an_unknown_bind_type(BindRequest $request): void
     {
-        $this->shouldThrow(OperationException::class)->during('get', [$request]);
+        $this->shouldThrow(OperationException::class)
+            ->during('get', [$request]);
     }
 }
