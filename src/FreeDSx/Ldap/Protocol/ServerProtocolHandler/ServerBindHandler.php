@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
@@ -29,11 +30,14 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ServerBindHandler extends BaseServerHandler implements BindHandlerInterface
+class ServerBindHandler implements BindHandlerInterface
 {
-    public function __construct(private readonly ServerQueue $queue)
-    {
-        parent::__construct();
+    use BindVersionValidatorTrait;
+
+    public function __construct(
+        private readonly ServerQueue $queue,
+        private readonly ResponseFactory $responseFactory = new ResponseFactory()
+    ) {
     }
 
     /**
@@ -43,8 +47,7 @@ class ServerBindHandler extends BaseServerHandler implements BindHandlerInterfac
      */
     public function handleBind(
         LdapMessageRequest $message,
-        RequestHandlerInterface $dispatcher,
-        ServerQueue $queue
+        RequestHandlerInterface $dispatcher
     ): TokenInterface {
         /** @var BindRequest $request */
         $request = $message->getRequest();
@@ -55,25 +58,11 @@ class ServerBindHandler extends BaseServerHandler implements BindHandlerInterfac
             ));
         }
 
-        $this->validateVersion($request);
+        self::validateVersion($request);
         $token = $this->simpleBind($dispatcher, $request);
         $this->queue->sendMessage($this->responseFactory->getStandardResponse($message));
 
         return $token;
-    }
-
-    /**
-     * @throws OperationException
-     */
-    protected function validateVersion(BindRequest $request): void
-    {
-        # Per RFC 4.2, a result code of protocol error must be sent back for unsupported versions.
-        if ($request->getVersion() !== 3) {
-            throw new OperationException(
-                'Only LDAP version 3 is supported.',
-                ResultCode::PROTOCOL_ERROR
-            );
-        }
     }
 
     /**
@@ -90,6 +79,9 @@ class ServerBindHandler extends BaseServerHandler implements BindHandlerInterfac
             );
         }
 
-        return new BindToken($request->getUsername(), $request->getPassword());
+        return new BindToken(
+            $request->getUsername(),
+            $request->getPassword()
+        );
     }
 }

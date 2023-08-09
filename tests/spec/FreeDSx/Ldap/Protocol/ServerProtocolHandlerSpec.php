@@ -106,7 +106,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $bindHandler->handleBind(Argument::any(), Argument::any(), Argument::any())->willReturn(
+        $bindHandler->handleBind(Argument::any(), Argument::any())->willReturn(
             new BindToken('foo', 'bar')
         );
         $protocolHandler->handleRequest(Argument::any(), Argument::any())
@@ -201,7 +201,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $bindHandler->handleBind(Argument::any(), Argument::any(), Argument::any())
+        $bindHandler->handleBind(Argument::any(), Argument::any())
             ->shouldBeCalledOnce()
             ->willReturn(new BindToken('foo@bar', 'bar'));
         $protocolHandler->handleRequest(Argument::any(), Argument::any())
@@ -222,7 +222,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $bindHandler->handleBind(Argument::any(), Argument::any(), Argument::any())
+        $bindHandler->handleBind(Argument::any(), Argument::any())
             ->willReturn(new BindToken('foo@bar', 'bar'));
 
         $protocolHandler->handleRequest(Argument::any(), Argument::any())

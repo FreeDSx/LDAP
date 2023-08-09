@@ -92,14 +92,14 @@ class ServerProtocolHandler
                 )
             );
         } catch (EncoderException | ProtocolException) {
-            # Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with a
-            # result code of protocol error.
+            # Per RFC 4511, 4.1.1 if the PDU cannot be parsed or is otherwise malformed a disconnect should be sent with
+            # a result code of protocol error.
             $this->sendNoticeOfDisconnect('The message encoding is malformed.');
             $this->logError(
                 'The client sent a malformed request. Terminating their connection.',
                 $defaultContext
             );
-        } catch (Exception | Throwable $e) {
+        } catch (Throwable $e) {
             $this->logError(
                 'An unexpected exception was caught while handling the client. Terminating their connection.',
                 array_merge(
@@ -226,7 +226,6 @@ class ServerProtocolHandler
         return $this->bindHandlerFactory->get($message->getRequest())->handleBind(
             $message,
             $this->handlerFactory->makeRequestHandler(),
-            $this->queue
         );
     }
 

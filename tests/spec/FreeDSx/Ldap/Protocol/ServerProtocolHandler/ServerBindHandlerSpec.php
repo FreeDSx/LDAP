@@ -50,7 +50,7 @@ class ServerBindHandlerSpec extends ObjectBehavior
             new LdapResult(0)
         )))->shouldBeCalled()->willReturn($queue);
 
-        $this->handleBind($bind, $dispatcher, $queue)->shouldBeLike(
+        $this->handleBind($bind, $dispatcher)->shouldBeLike(
             new BindToken('foo@bar', 'bar')
         );
     }
@@ -80,7 +80,7 @@ class ServerBindHandlerSpec extends ObjectBehavior
         $this->shouldThrow(OperationException::class)
             ->during(
                 'handleBind',
-                [$bind, $dispatcher, $queue]
+                [$bind, $dispatcher]
             );
     }
 }
