@@ -11,13 +11,13 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+namespace FreeDSx\Ldap\Protocol\Bind;
 
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 
-trait BindVersionValidatorTrait
+trait VersionValidatorTrait
 {
     /**
      * @throws OperationException

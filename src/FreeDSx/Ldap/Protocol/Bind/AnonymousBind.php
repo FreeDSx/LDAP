@@ -11,10 +11,8 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+namespace FreeDSx\Ldap\Protocol\Bind;
 
-use FreeDSx\Asn1\Exception\EncoderException;
-use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
@@ -28,9 +26,9 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ServerAnonBindHandler implements BindHandlerInterface
+class AnonymousBind implements BindInterface
 {
-    use BindVersionValidatorTrait;
+    use VersionValidatorTrait;
 
     public function __construct(
         private readonly ServerQueue $queue,
@@ -40,11 +38,8 @@ class ServerAnonBindHandler implements BindHandlerInterface
 
     /**
      * {@inheritDoc}
-     * @throws EncoderException
-     * @throws OperationException
-     * @throws RuntimeException
      */
-    public function handleBind(LdapMessageRequest $message): TokenInterface
+    public function bind(LdapMessageRequest $message): TokenInterface
     {
         $request = $message->getRequest();
         if (!$request instanceof AnonBindRequest) {
@@ -61,5 +56,13 @@ class ServerAnonBindHandler implements BindHandlerInterface
             $request->getUsername(),
             $request->getVersion(),
         );
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function supports(LdapMessageRequest $request): bool
+    {
+        return $request->getRequest() instanceof AnonBindRequest;
     }
 }

@@ -13,7 +13,9 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server;
 
-use FreeDSx\Ldap\Protocol\Factory\ServerBindHandlerFactory;
+use FreeDSx\Ldap\Protocol\Authenticator;
+use FreeDSx\Ldap\Protocol\Bind\AnonymousBind;
+use FreeDSx\Ldap\Protocol\Bind\SimpleBind;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
@@ -43,10 +45,13 @@ class ServerProtocolFactory
                 queue: $serverQueue,
             ),
             authorizer: $this->serverAuthorization,
-            bindHandlerFactory: new ServerBindHandlerFactory(
-                queue: $serverQueue,
-                handlerFactory: $this->handlerFactory,
-            ),
+            authenticator: new Authenticator([
+                new SimpleBind(
+                    queue: $serverQueue,
+                    dispatcher: $this->handlerFactory->makeRequestHandler(),
+                ),
+                new AnonymousBind($serverQueue),
+            ]),
             logger: $this->options->getLogger(),
         );
     }

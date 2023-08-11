@@ -16,6 +16,7 @@ namespace spec\FreeDSx\Ldap\Server;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
+use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Socket;
 use PhpSpec\ObjectBehavior;
@@ -33,8 +34,14 @@ class ServerProtocolFactorySpec extends ObjectBehavior
         );
     }
 
-    public function it_should_malke_a_ServerProtocolInstance(Socket $socket): void
-    {
+    public function it_should_malke_a_ServerProtocolInstance(
+        Socket $socket,
+        HandlerFactoryInterface $handlerFactory,
+    ): void {
+        $handlerFactory
+            ->makeRequestHandler()
+            ->willReturn(new GenericRequestHandler());
+
         $this->make($socket)
             ->shouldBeAnInstanceOf(ServerProtocolHandler::class);
     }

@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+namespace FreeDSx\Ldap\Protocol\Bind;
 
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -22,12 +22,17 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-interface BindHandlerInterface
+interface BindInterface
 {
     /**
      * Returns a token indicating the outcome of a bind request.
      *
      * @throws OperationException
      */
-    public function handleBind(LdapMessageRequest $message): TokenInterface;
+    public function bind(LdapMessageRequest $message): TokenInterface;
+
+    /**
+     * Whether the specific bind request is supported.
+     */
+    public function supports(LdapMessageRequest $request): bool;
 }

@@ -11,23 +11,24 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace spec\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+namespace spec\FreeDSx\Ldap\Protocol\Bind;
 
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\LdapResult;
+use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\Bind\SimpleBind;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerBindHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use PhpSpec\ObjectBehavior;
 use Prophecy\Argument;
 
-class ServerBindHandlerSpec extends ObjectBehavior
+class SimpleBindSpec extends ObjectBehavior
 {
     public function let(
         ServerQueue $queue,
@@ -41,7 +42,7 @@ class ServerBindHandlerSpec extends ObjectBehavior
 
     public function it_is_initializable(): void
     {
-        $this->shouldHaveType(ServerBindHandler::class);
+        $this->shouldHaveType(SimpleBind::class);
     }
 
     public function it_should_return_a_token_on_success(
@@ -57,7 +58,7 @@ class ServerBindHandlerSpec extends ObjectBehavior
             new LdapResult(0)
         )))->shouldBeCalled()->willReturn($queue);
 
-        $this->handleBind($bind)->shouldBeLike(
+        $this->bind($bind)->shouldBeLike(
             new BindToken('foo@bar', 'bar')
         );
     }
@@ -75,12 +76,12 @@ class ServerBindHandlerSpec extends ObjectBehavior
 
         $this->shouldThrow(new OperationException('Invalid credentials.', ResultCode::INVALID_CREDENTIALS))
             ->during(
-                'handleBind',
+                'bind',
                 [$bind]
             );
     }
 
-    public function it_should_validate_the_version(ServerQueue $queue, ): void
+    public function it_should_validate_the_version(ServerQueue $queue): void
     {
         $bind = new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar', 5));
 
@@ -88,8 +89,23 @@ class ServerBindHandlerSpec extends ObjectBehavior
 
         $this->shouldThrow(OperationException::class)
             ->during(
-                'handleBind',
+                'bind',
                 [$bind]
             );
+    }
+
+    public function it_should_only_support_simple_binds(): void
+    {
+        $this->supports(new LdapMessageRequest(
+            1,
+            new AnonBindRequest()
+        ))->shouldBe(false);
+        $this->supports(new LdapMessageRequest(
+            1,
+            new SimpleBindRequest(
+                'foo',
+                'bar',
+            )
+        ))->shouldBe(true);
     }
 }
