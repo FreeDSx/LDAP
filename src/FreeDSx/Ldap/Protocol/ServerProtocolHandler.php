@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol;
 
-use Exception;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -21,10 +20,8 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
-use FreeDSx\Ldap\Protocol\Factory\ServerBindHandlerFactory;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\LoggerTrait;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -51,7 +48,7 @@ class ServerProtocolHandler
         private readonly ServerQueue $queue,
         private readonly ServerProtocolHandlerFactory $protocolHandlerFactory,
         private readonly ServerAuthorization $authorizer,
-        private readonly ServerBindHandlerFactory $bindHandlerFactory,
+        private readonly Authenticator $authenticator,
         private readonly ?LoggerInterface $logger,
         private readonly ResponseFactory $responseFactory = new ResponseFactory()
     ) {
@@ -222,9 +219,7 @@ class ServerProtocolHandler
             );
         }
 
-        return $this->bindHandlerFactory
-            ->get($message->getRequest())
-            ->handleBind($message);
+        return $this->authenticator->bind($message);
     }
 
     /**

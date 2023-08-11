@@ -27,14 +27,13 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyDnResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Protocol\Factory\ServerBindHandlerFactory;
+use FreeDSx\Ldap\Protocol\Authenticator;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -48,23 +47,23 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         ServerQueue $queue,
         ServerProtocolHandlerFactory $protocolHandlerFactory,
         LoggerInterface $logger,
-        ServerBindHandlerFactory $bindHandlerFactory,
-        RequestHandlerInterface $dispatcher,
-        ServerProtocolHandler\BindHandlerInterface $bindHandler,
+        Authenticator $authenticator,
         ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler
     ): void {
         $queue->close()->hasReturnVoid();
         $queue->isConnected()->willReturn(true);
         $queue->isEncrypted()->willReturn(false);
         $queue->sendMessage(Argument::any())->willReturn($queue);
-        $bindHandlerFactory->get(Argument::any())->willReturn($bindHandler);
-        $protocolHandlerFactory->get(Argument::any(), Argument::any())->willReturn($protocolHandler);
+
+        $protocolHandlerFactory
+            ->get(Argument::any(), Argument::any())
+            ->willReturn($protocolHandler);
 
         $this->beConstructedWith(
             $queue,
             $protocolHandlerFactory,
             new ServerAuthorization(new ServerOptions()),
-            $bindHandlerFactory,
+            $authenticator,
             $logger,
         );
     }
@@ -74,8 +73,10 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->shouldHaveType(ServerProtocolHandler::class);
     }
 
-    public function it_should_enforce_anonymous_bind_requirements(ServerQueue $queue, ServerBindHandlerFactory $bindHandlerFactory): void
-    {
+    public function it_should_enforce_anonymous_bind_requirements(
+        ServerQueue $queue,
+        Authenticator $authenticator,
+    ): void {
         $queue->getMessage()->willReturn(
             new LdapMessageRequest(1, new AnonBindRequest('foo')),
             null
@@ -89,20 +90,26 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
                 'The requested authentication type is not supported.'
             ))
         ))->shouldBeCalled();
-        $bindHandlerFactory->get(Argument::any())->shouldNotBeCalled();
+
+        $authenticator
+            ->bind(Argument::any())
+            ->shouldNotBeCalled();
 
         $this->handle();
     }
 
-    public function it_should_not_allow_a_previous_message_ID_from_a_new_request(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler): void
-    {
+    public function it_should_not_allow_a_previous_message_ID_from_a_new_request(
+        ServerQueue $queue,
+        Authenticator $authenticator,
+        ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler
+    ): void {
         $queue->getMessage()->willReturn(
             new LdapMessageRequest(1, new SimpleBindRequest('foo', 'bar')),
             new LdapMessageRequest(1, new ExtendedRequest(ExtendedRequest::OID_WHOAMI)),
             null
         );
 
-        $bindHandler->handleBind(Argument::any())->willReturn(
+        $authenticator->bind(Argument::any())->willReturn(
             new BindToken('foo', 'bar')
         );
         $protocolHandler->handleRequest(Argument::any(), Argument::any())
@@ -190,14 +197,17 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    public function it_should_send_a_bind_request_to_the_bind_request_handler(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler): void
-    {
+    public function it_should_send_a_bind_request_to_the_bind_request_handler(
+        ServerQueue $queue,
+        Authenticator $authenticator,
+        ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler
+    ): void {
         $queue->getMessage()->willReturn(
             new LdapMessageRequest(1, new SimpleBindRequest('foo@bar', 'bar')),
             null
         );
 
-        $bindHandler->handleBind(Argument::any())
+        $authenticator->bind(Argument::any())
             ->shouldBeCalledOnce()
             ->willReturn(new BindToken('foo@bar', 'bar'));
         $protocolHandler->handleRequest(Argument::any(), Argument::any())
@@ -208,7 +218,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
 
     public function it_should_handle_operation_errors_thrown_from_the_request_handlers(
         ServerQueue $queue,
-        ServerProtocolHandler\BindHandlerInterface $bindHandler,
+        Authenticator $authenticator,
         ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler,
     ): void {
         $queue->isConnected()->willReturn(true, false);
@@ -218,7 +228,7 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
             null
         );
 
-        $bindHandler->handleBind(Argument::any())
+        $authenticator->bind(Argument::any())
             ->willReturn(new BindToken('foo@bar', 'bar'));
 
         $protocolHandler->handleRequest(Argument::any(), Argument::any())
@@ -237,13 +247,14 @@ class ServerProtocolHandlerSpec extends ObjectBehavior
         $this->handle();
     }
 
-    public function it_should_send_a_notice_of_disconnect_and_close_the_queue_on_shutdown(ServerQueue $queue, ServerProtocolHandler\BindHandlerInterface $bindHandler, ServerProtocolHandler\ServerProtocolHandlerInterface $protocolHandler): void
+    public function it_should_send_a_notice_of_disconnect_and_close_the_queue_on_shutdown(ServerQueue $queue): void
     {
         $queue->sendMessage(new LdapMessageResponse(0, new ExtendedResponse(
             new LdapResult(ResultCode::UNAVAILABLE, '', 'The server is shutting down.'),
             ExtendedResponse::OID_NOTICE_OF_DISCONNECTION
         )))->shouldBeCalled();
-        $queue->close()->shouldBeCalled();
+        $queue->close()
+            ->shouldBeCalled();
 
         $this->shutdown();
     }

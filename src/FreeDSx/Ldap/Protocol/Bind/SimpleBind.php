@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+namespace FreeDSx\Ldap\Protocol\Bind;
 
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
@@ -30,9 +30,9 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ServerBindHandler implements BindHandlerInterface
+class SimpleBind implements BindInterface
 {
-    use BindVersionValidatorTrait;
+    use VersionValidatorTrait;
 
     public function __construct(
         private readonly ServerQueue $queue,
@@ -43,10 +43,8 @@ class ServerBindHandler implements BindHandlerInterface
 
     /**
      * {@inheritDoc}
-     * @throws RuntimeException
-     * @throws OperationException
      */
-    public function handleBind(LdapMessageRequest $message): TokenInterface
+    public function bind(LdapMessageRequest $message): TokenInterface
     {
         /** @var BindRequest $request */
         $request = $message->getRequest();
@@ -80,5 +78,13 @@ class ServerBindHandler implements BindHandlerInterface
             $request->getUsername(),
             $request->getPassword()
         );
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function supports(LdapMessageRequest $request): bool
+    {
+        return $request->getRequest() instanceof SimpleBindRequest;
     }
 }
