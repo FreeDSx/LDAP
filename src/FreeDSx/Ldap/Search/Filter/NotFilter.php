@@ -26,7 +26,7 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class NotFilter implements FilterInterface
+class NotFilter implements FilterInterface, \Stringable
 {
     protected const CHOICE_TAG = 2;
 

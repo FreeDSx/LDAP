@@ -28,7 +28,7 @@ use function preg_split;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Dn implements IteratorAggregate, Countable
+class Dn implements IteratorAggregate, Countable, \Stringable
 {
     /**
      * @var string

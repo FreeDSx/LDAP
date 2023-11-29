@@ -33,7 +33,7 @@ use function count;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Control implements ProtocolElementInterface
+class Control implements ProtocolElementInterface, \Stringable
 {
     public const OID_DIR_SYNC = '1.2.840.113556.1.4.841';
 
