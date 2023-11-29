@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Search\Filter;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class EqualityFilter implements FilterInterface
+class EqualityFilter implements FilterInterface, Stringable
 {
     use AttributeValueAssertionTrait;
 

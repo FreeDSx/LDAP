@@ -33,7 +33,7 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class MatchingRuleFilter implements FilterInterface
+class MatchingRuleFilter implements FilterInterface, Stringable
 {
     protected const CHOICE_TAG = 9;
 

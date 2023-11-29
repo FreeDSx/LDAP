@@ -23,7 +23,7 @@ use function is_array;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Entry implements IteratorAggregate, Countable
+class Entry implements IteratorAggregate, Countable, Stringable
 {
     /**
      * @var Attribute[]

@@ -23,7 +23,7 @@ use function sort;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Options implements Countable, IteratorAggregate
+class Options implements Countable, IteratorAggregate, Stringable
 {
     /**
      * @var Option[]

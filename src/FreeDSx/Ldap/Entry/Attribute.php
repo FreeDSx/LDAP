@@ -31,7 +31,7 @@ use function strtolower;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Attribute implements IteratorAggregate, Countable
+class Attribute implements IteratorAggregate, Countable, Stringable
 {
     use EscapeTrait;
 
