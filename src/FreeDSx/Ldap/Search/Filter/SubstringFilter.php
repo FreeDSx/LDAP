@@ -35,7 +35,7 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class SubstringFilter implements FilterInterface, Stringable
+class SubstringFilter implements FilterInterface, \Stringable
 {
     use FilterAttributeTrait;
 

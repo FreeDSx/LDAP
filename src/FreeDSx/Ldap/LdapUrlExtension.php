@@ -22,7 +22,7 @@ use function substr;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class LdapUrlExtension implements Stringable
+class LdapUrlExtension implements \Stringable
 {
     use LdapUrlTrait;
 

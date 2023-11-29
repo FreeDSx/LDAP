@@ -19,7 +19,7 @@ use IteratorAggregate;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class OrFilter implements FilterContainerInterface, IteratorAggregate, Countable, Stringable
+class OrFilter implements FilterContainerInterface, IteratorAggregate, Countable, \Stringable
 {
     use FilterContainerTrait;
 

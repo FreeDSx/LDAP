@@ -35,7 +35,7 @@ use function strtolower;
  * @see https://tools.ietf.org/html/rfc4516
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class LdapUrl implements Stringable
+class LdapUrl implements \Stringable
 {
     use LdapUrlTrait;
 

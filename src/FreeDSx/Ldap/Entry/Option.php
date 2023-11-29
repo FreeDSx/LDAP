@@ -21,7 +21,7 @@ use function substr;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class Option implements Stringable
+class Option implements \Stringable
 {
     protected const MATCH_RANGE = '/range=(\d+)-(.*)/';
 

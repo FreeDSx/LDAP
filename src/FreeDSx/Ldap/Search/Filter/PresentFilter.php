@@ -24,7 +24,7 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class PresentFilter implements FilterInterface, Stringable
+class PresentFilter implements FilterInterface, \Stringable
 {
     use FilterAttributeTrait;
 
