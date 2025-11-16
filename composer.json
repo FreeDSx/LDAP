@@ -22,14 +22,14 @@
     "psr/log": "^3"
   },
   "require-dev": {
-    "phpspec/phpspec": "^7.2",
-    "phpunit/phpunit": "^9.6",
+    "phpunit/phpunit": "^10.5",
     "symplify/easy-coding-standard": "^9.4",
-    "friends-of-phpspec/phpspec-code-coverage": "^6.3",
-    "phpstan/phpstan": "^1.11",
+    "phpstan/phpstan": "^2.1",
     "symfony/process": "^5.4",
     "squizlabs/php_codesniffer": "^3.7",
-    "slevomat/coding-standard": "^7.2"
+    "slevomat/coding-standard": "^7.2",
+    "phpstan/phpstan-phpunit": "^2.0",
+    "phpstan/extension-installer": "^1.4"
   },
   "suggest": {
     "ext-openssl": "For SSL/TLS support and some SASL mechanisms.",
@@ -40,13 +40,14 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "integration\\FreeDSx\\Ldap\\": "tests/integration/FreeDSx/Ldap",
-      "spec\\FreeDSx\\Ldap\\": "tests/spec/FreeDSx/Ldap"
+      "Tests\\Integration\\FreeDSx\\Ldap\\": "tests/integration",
+      "Tests\\Unit\\FreeDSx\\Ldap\\": "tests/unit"
     }
   },
   "config": {
     "allow-plugins": {
-      "dealerdirect/phpcodesniffer-composer-installer": true
+      "dealerdirect/phpcodesniffer-composer-installer": true,
+      "phpstan/extension-installer": true
     }
   },
   "scripts": {
@@ -54,17 +55,17 @@
       "phpspec run --no-interaction -c phpspec.cov.yml",
       "phpunit --coverage-clover=coverage-integration.xml"
     ],
-    "test-spec": [
-      "phpspec run --no-interaction"
+    "test-unit": [
+      "phpunit --testsuite unit"
     ],
     "test-integration": [
-      "phpunit"
+      "phpunit --testsuite integration"
     ],
     "analyse": [
       "phpstan --memory-limit=-1 analyse"
     ],
     "analyse-tests": [
-      "phpstan analyse -c phpstan.tests.neon"
+      "phpstan --memory-limit=-1 analyse -c phpstan.tests.neon"
     ],
     "cs-fix": [
       "phpcbf --standard=ruleset.xml --extensions=php --tab-width=4 -sp src",

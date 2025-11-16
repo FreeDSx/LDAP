@@ -39,8 +39,8 @@ jobs:
           key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-
 
-      - name: Run Specs
-        run: composer run-script test-spec
+      - name: Run Unit Tests
+        run: composer run-script test-unit
 
       # Not ideal, but we run as root here because the LDAP server needs access to certs / keys system directories.
       # For tests this seems fine, but in a real scenario this would be bad...

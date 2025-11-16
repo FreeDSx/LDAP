@@ -1,0 +1,73 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * This file is part of the FreeDSx LDAP package.
+ *
+ * (c) Chad Sikorra <Chad.Sikorra@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+namespace Tests\Unit\FreeDSx\Ldap\Protocol\Factory;
+
+use FreeDSx\Asn1\Asn1;
+use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Ldap\LdapUrl;
+use FreeDSx\Ldap\Operation\LdapResult;
+use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
+use FreeDSx\Ldap\Protocol\Factory\ExtendedResponseFactory;
+use FreeDSx\Ldap\Protocol\LdapEncoder;
+use PHPUnit\Framework\TestCase;
+
+final class ExtendedResponseFactoryTest extends TestCase
+{
+    private ExtendedResponseFactory $subject;
+
+    protected function setUp(): void
+    {
+        $this->subject = new ExtendedResponseFactory();
+    }
+
+    public function test_it_should_check_if_a_mapping_exists_for_a_specific_request_oid(): void
+    {
+        self::assertTrue($this->subject->has(ExtendedRequest::OID_PWD_MODIFY));
+        self::assertFalse($this->subject->has('foo'));
+    }
+
+    public function test_it_should_add_a_mapping_for_a_specific_oid(): void
+    {
+        $this->subject->set('foo', PasswordModifyResponse::class);
+
+        self::assertTrue($this->subject->has('foo'));
+    }
+
+    public function test_it_should_get_a_mapping_based_on_an_oid_and_asn1(): void
+    {
+        $encoder = new LdapEncoder();
+
+        self::assertEquals(
+            $this->subject->get(
+                Asn1::application(24, Asn1::sequence(
+                    Asn1::enumerated(0),
+                    Asn1::octetString('dc=foo,dc=bar'),
+                    Asn1::octetString('foo'),
+                    Asn1::context(3, (new IncompleteType(
+                        $encoder->encode(Asn1::octetString('ldap://foo'))
+                        . $encoder->encode(Asn1::octetString('ldap://bar'))
+                    ))->setIsConstructed(true)),
+                    Asn1::context(11, Asn1::octetString($encoder->encode(Asn1::sequence(
+                        Asn1::context(0, Asn1::octetString('bleep-blorp'))
+                    ))))
+                )), ExtendedRequest::OID_PWD_MODIFY
+            ),
+            new PasswordModifyResponse(
+                new LdapResult(0, 'dc=foo,dc=bar', 'foo', new LdapUrl('foo'), new LdapUrl('bar')),
+                'bleep-blorp'
+            )
+        );
+    }
+}

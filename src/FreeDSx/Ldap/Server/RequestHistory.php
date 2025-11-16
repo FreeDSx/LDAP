@@ -59,4 +59,12 @@ final class RequestHistory
     {
         return $this->pagingRequests;
     }
+
+    /**
+     * @return int[]
+     */
+    public function getIds(): array
+    {
+        return $this->ids;
+    }
 }
