@@ -38,7 +38,7 @@ class ClientExtendedOperationHandler extends ClientBasicHandler
 
     public function __construct(
         ClientQueue $queue,
-        ExtendedResponseFactory $extendedResponseFactory = null
+        ?ExtendedResponseFactory $extendedResponseFactory = null
     ) {
         $this->extendedResponseFactory = $extendedResponseFactory ?? new ExtendedResponseFactory();
 

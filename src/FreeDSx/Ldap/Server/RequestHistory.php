@@ -30,7 +30,7 @@ final class RequestHistory
 
     private PagingRequests $pagingRequests;
 
-    public function __construct(PagingRequests $pagingRequests = null)
+    public function __construct(?PagingRequests $pagingRequests = null)
     {
         $this->pagingRequests = $pagingRequests ?? new PagingRequests();
     }

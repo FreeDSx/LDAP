@@ -86,7 +86,7 @@ class RangeRetrieval
      */
     public function hasRanged(
         Entry $entry,
-        Attribute|string $attribute = null
+        Attribute|string|null $attribute = null
     ): bool {
         return $attribute !== null
             ? (bool) $this->getRanged($entry, $attribute)
