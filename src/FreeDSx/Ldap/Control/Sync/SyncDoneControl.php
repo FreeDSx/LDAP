@@ -67,7 +67,7 @@ class SyncDoneControl extends Control
             ));
         }
         $this->controlValue->addChild(Asn1::boolean(
-            $this->refreshDeletes ?? false
+            $this->refreshDeletes
         ));
 
         return parent::toAsn1();
