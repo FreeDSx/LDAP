@@ -52,8 +52,8 @@
   },
   "scripts": {
     "test-coverage": [
-      "phpspec run --no-interaction -c phpspec.cov.yml",
-      "phpunit --coverage-clover=coverage-integration.xml"
+      "phpunit --testsuite unit --coverage-clover=coverage-unit.xml",
+      "phpunit --testsuite integration --coverage-clover=coverage-integration.xml"
     ],
     "test-unit": [
       "phpunit --testsuite unit"
