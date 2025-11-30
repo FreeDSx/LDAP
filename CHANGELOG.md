@@ -1,7 +1,7 @@
 CHANGELOG
 =========
 
-1.0.0 (2023-xx-xx)
+1.0.0 (202x-xx-xx)
 ------------------
 * Updated the minimum version of PHP to version 8.1.
 * All classes now use "strict_types=1". This internal change should not impact external usage.
@@ -10,6 +10,9 @@ CHANGELOG
 * Added entry handler processing of searches. This allows immediate processing of entries via anonymous functions.
 * Added the ability to cancel search or sync requests when using entry handler processing for searches.
 * Added support for the SensitiveParameter attribute to mask bind related credentials from stack traces.
+* Removed various deprecations for PHP >= 8.1 (implicit nullability, return type declarations, etc.).
+* Added PHP 8.3, 8.4, and 8.5 to normal CI runs.
+* Migrated all unit tests from PHPSpec to PHPUnit. 
 
 0.8.0 (2022-05-21)
 ------------------
