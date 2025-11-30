@@ -29,7 +29,7 @@ class LdapTestCase extends TestCase
             ->setServers([(string) $_ENV['LDAP_SERVER']])
             ->setSslCaCert(
                 $_ENV['LDAP_CA_CERT'] === ''
-                    ? __DIR__ . '/../../../resources/cert/ca.crt'
+                    ? __DIR__ . '/../resources/cert/ca.crt'
                     : (string) $_ENV['LDAP_CA_CERT']
             )
             ->setBaseDn((string) $_ENV['LDAP_BASE_DN']);
@@ -56,7 +56,7 @@ class LdapTestCase extends TestCase
             try {
                 self::$isActiveDirectory = $client->readOrFail('')
                     ->has('forestFunctionality');
-            } catch (Throwable $e) {
+            } catch (Throwable) {
                 self::$isActiveDirectory = false;
             } finally {
                 $client->unbind();

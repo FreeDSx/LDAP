@@ -74,7 +74,7 @@ class ServerTestCase extends LdapTestCase
     ): void {
         $processArgs = [
             'php',
-            __DIR__ . '/../../../bin/' . $this->serverMode . '.php',
+            __DIR__ . '/../bin/' . $this->serverMode . '.php',
             $transport,
         ];
 
