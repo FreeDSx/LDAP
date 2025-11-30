@@ -58,6 +58,18 @@ class Vlv
     }
 
     /**
+     * Use a matching rule filter assertion to specify the target entry within a sorted LDAP result set.
+     *
+     * It is used as an alternative to specifying the target by a numerical offset.
+     */
+    public function useFilter(?GreaterThanOrEqualFilter $filter): self
+    {
+        $this->filter = $filter;
+
+        return $this;
+    }
+
+    /**
      * As a percentage the moveTo, moveForward, moveBackward, and position methods work with numbers 0 - 100 and should
      * be interpreted as percentages.
      */

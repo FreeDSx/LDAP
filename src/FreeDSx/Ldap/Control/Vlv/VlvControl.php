@@ -103,7 +103,7 @@ class VlvControl extends Control
         return $this->filter;
     }
 
-    public function setFilter(GreaterThanOrEqualFilter $filter = null): self
+    public function setFilter(?GreaterThanOrEqualFilter $filter = null): self
     {
         $this->filter = $filter;
 

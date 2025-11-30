@@ -320,7 +320,7 @@ class LdapClient
      */
     public function dirSync(
         ?string $rootNc = null,
-        FilterInterface $filter = null,
+        ?FilterInterface $filter = null,
         Attribute|string ...$attributes
     ): DirSync {
         return new DirSync(

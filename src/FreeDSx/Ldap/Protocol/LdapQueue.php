@@ -41,7 +41,7 @@ class LdapQueue extends Asn1MessageQueue
 
     public function __construct(
         Socket $socket,
-        EncoderInterface $encoder = null
+        ?EncoderInterface $encoder = null
     ) {
         parent::__construct(
             $socket,

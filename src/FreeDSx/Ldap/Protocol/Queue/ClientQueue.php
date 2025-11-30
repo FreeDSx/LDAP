@@ -42,7 +42,7 @@ class ClientQueue extends LdapQueue
      */
     public function __construct(
         private readonly SocketPool $socketPool,
-        EncoderInterface $encoder = null
+        ?EncoderInterface $encoder = null
     ) {
         parent::__construct(
             $socketPool->connect(),

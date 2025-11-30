@@ -24,7 +24,7 @@ jobs:
         run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
 
       - name: Install Composer Dependencies
-        run: composer install --no-progress --no-suggest --prefer-dist --optimize-autoloader
+        run: composer install --no-progress --prefer-dist --optimize-autoloader
 
       - name: Cache Dependencies
         uses: actions/cache@v3
@@ -43,11 +43,11 @@ jobs:
           COMPOSER_ALLOW_SUPERUSER: 1
         run: sudo composer run-script --timeout=0 test-coverage
 
-      - name: Upload Spec Coverage to Codecov
+      - name: Upload Unit Coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage.xml
+          file: ./coverage-unit.xml
           name: FreeDSx-LDAP-Unit
 
       - name: Upload Integration Coverage to Codecov

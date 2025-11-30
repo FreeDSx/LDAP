@@ -28,7 +28,7 @@ class UnsolicitedNotificationException extends ProtocolException
     public function __construct(
         string $message = "",
         int $code = 0,
-        Throwable $previous = null,
+        ?Throwable $previous = null,
         string $oid = ""
     ) {
         $this->oid = $oid;

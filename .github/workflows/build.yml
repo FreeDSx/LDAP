@@ -7,7 +7,7 @@ jobs:
       fail-fast: false
       matrix:
         operating-system: [ubuntu-latest, windows-latest]
-        php-versions: ['8.1', '8.2']
+        php-versions: ['8.1', '8.2', '8.3', '8.4', '8.5']
     name: PHP ${{ matrix.php-versions }} Test on ${{ matrix.operating-system }}
     steps:
       - name: Checkout
@@ -30,7 +30,7 @@ jobs:
         run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
 
       - name: Install Composer dependencies
-        run: composer install --no-progress --no-suggest --prefer-dist --optimize-autoloader
+        run: composer install --no-progress --prefer-dist --optimize-autoloader
 
       - name: Cache dependencies
         uses: actions/cache@v3
@@ -39,8 +39,8 @@ jobs:
           key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-
 
-      - name: Run Specs
-        run: composer run-script test-spec
+      - name: Run Unit Tests
+        run: composer run-script test-unit
 
       # Not ideal, but we run as root here because the LDAP server needs access to certs / keys system directories.
       # For tests this seems fine, but in a real scenario this would be bad...

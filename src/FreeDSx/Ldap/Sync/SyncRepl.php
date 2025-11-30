@@ -156,7 +156,7 @@ class SyncRepl
      * **Note**: The LdapClient should be instantiated with no timeout via {@see ClientOptions::setTimeoutRead(-1)}.
      *           Otherwise, the listen operation will terminate due to a network timeout.
      */
-    public function listen(Closure $entryHandler = null): void
+    public function listen(?Closure $entryHandler = null): void
     {
         $this->sync(
             mode: SyncRequestControl::MODE_REFRESH_AND_PERSIST,
@@ -170,7 +170,7 @@ class SyncRepl
      * If a cookie is provided, then it is a poll for content update. If no cookie is provided, then it is a poll for
      * content update. To provide a cookie from a previous poll {@see self::useCookie()}.
      */
-    public function poll(Closure $entryHandler = null): void
+    public function poll(?Closure $entryHandler = null): void
     {
         $this->sync(
             mode: SyncRequestControl::MODE_REFRESH_ONLY,

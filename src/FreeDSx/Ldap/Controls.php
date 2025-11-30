@@ -43,7 +43,7 @@ class Controls
     public static function create(
         string $oid,
         bool $criticality = false,
-        ProtocolElementInterface|AbstractType $value = null
+        ProtocolElementInterface|AbstractType|null $value = null
     ): Control {
         return new Control(
             controlType: $oid,

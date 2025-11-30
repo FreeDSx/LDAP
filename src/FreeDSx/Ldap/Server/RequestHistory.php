@@ -30,7 +30,7 @@ final class RequestHistory
 
     private PagingRequests $pagingRequests;
 
-    public function __construct(PagingRequests $pagingRequests = null)
+    public function __construct(?PagingRequests $pagingRequests = null)
     {
         $this->pagingRequests = $pagingRequests ?? new PagingRequests();
     }
@@ -58,5 +58,13 @@ final class RequestHistory
     public function pagingRequest(): PagingRequests
     {
         return $this->pagingRequests;
+    }
+
+    /**
+     * @return int[]
+     */
+    public function getIds(): array
+    {
+        return $this->ids;
     }
 }

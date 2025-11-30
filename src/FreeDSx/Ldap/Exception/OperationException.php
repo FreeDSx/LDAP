@@ -29,7 +29,7 @@ class OperationException extends Exception
     public function __construct(
         string $message = '',
         int $code = ResultCode::OPERATIONS_ERROR,
-        Throwable $previous = null
+        ?Throwable $previous = null
     ) {
         $message = empty($message)
             ? $this->generateMessage($code)
