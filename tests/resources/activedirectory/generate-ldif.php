@@ -2,7 +2,7 @@
 
 # A simple script to modify the OpenLDAP LDIF data to work with AD so we are working with the same data set.
 
-$data = file_get_contents(__DIR__ . '/../openldap/ldif/data.ldif');
+$data = (string) file_get_contents(__DIR__ . '/../openldap/ldif/data.ldif');
 $ldif = explode("\n", $data);
 foreach ($ldif as $i => $line) {
     if (preg_match('/^userPassword/', $line)) {
@@ -11,7 +11,7 @@ foreach ($ldif as $i => $line) {
 }
 file_put_contents(__DIR__ . '/ldif/data.ldif', implode("\n", $ldif));
 
-$data = file_get_contents(__DIR__ . '/../openldap/ldif/data-group.ldif');
+$data = (string) file_get_contents(__DIR__ . '/../openldap/ldif/data-group.ldif');
 $ldif = explode("\n", $data);
 foreach ($ldif as $i => $line) {
     if (preg_match('/^objectClass/', $line)) {

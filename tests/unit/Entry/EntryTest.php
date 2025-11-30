@@ -217,7 +217,7 @@ class EntryTest extends TestCase
         self::assertNull($this->subject->get('cn', true));
     }
 
-    public function if_should_check_if_it_has_an_attribute_using_a_string()
+    public function if_should_check_if_it_has_an_attribute_using_a_string(): void
     {
         self::assertTrue($this->subject->has('Cn'));
         self::assertFalse($this->subject->has('bleh'));

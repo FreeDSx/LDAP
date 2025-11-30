@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\DirSync;
 use FreeDSx\Ldap\Search\Filters;
+use PHPUnit\Framework\Constraint\Constraint;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Rule\InvocationOrder;
 use PHPUnit\Framework\TestCase;
@@ -265,18 +266,18 @@ final class DirSyncTest extends TestCase
     }
 
     /**
-     * @param mixed ...$arguments
+     * @param Constraint ...$arguments
      */
     private function addSendExpectation(...$arguments): void {
         $this->client
             ->expects($this->once())
             ->method('send')
-            ->with(...$arguments)
+            ->with(...array_values($arguments))
             ->willReturn($this->initialResponse);
     }
 
     /**
-     * @param mixed ...$arguments
+     * @param Constraint ...$arguments
      */
     private function addSendAndOrderExpectation(
         InvocationOrder $order,
@@ -285,7 +286,7 @@ final class DirSyncTest extends TestCase
         $this->client
             ->expects($order)
             ->method('send')
-            ->with(...$arguments)
+            ->with(...array_values($arguments))
             ->willReturn($this->initialResponse);
     }
 }

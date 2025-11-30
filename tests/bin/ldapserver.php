@@ -83,7 +83,10 @@ class LdapServerPagingHandler implements PagingHandlerInterface
 
 class LdapServerRequestHandler extends GenericRequestHandler
 {
-    private $users = [
+    /**
+     * @var array<string, string>
+     */
+    private array $users = [
         'cn=user,dc=foo,dc=bar' => '12345',
     ];
 

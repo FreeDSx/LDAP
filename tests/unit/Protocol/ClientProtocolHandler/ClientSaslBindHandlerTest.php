@@ -249,6 +249,8 @@ final class ClientSaslBindHandlerTest extends TestCase
             ->method('challenge')
             ->will(self::onConsecutiveCalls(
                 (new SaslContext())->setResponse('foo'),
+                // The return types for SaslContext need to be updated.
+                // @phpstan-ignore-next-line
                 (new SaslContext())->setResponse('foo')
                     ->setHasSecurityLayer(true)
                     ->setIsAuthenticated(true)

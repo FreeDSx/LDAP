@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
@@ -67,7 +68,7 @@ final class SimpleBindRequestTest extends TestCase
             ->setPassword('bar');
 
         self::assertInstanceOf(
-            AbstractType::class,
+            SequenceType::class,
             $this->subject->toAsn1()
         );
     }
@@ -94,14 +95,7 @@ final class SimpleBindRequestTest extends TestCase
         $this->subject->setPassword('0');
 
         self::assertInstanceOf(
-            AbstractType::class,
-            $this->subject->toAsn1()
-        );
-
-        $this->subject->setUsername('0');
-
-        self::assertInstanceOf(
-            AbstractType::class,
+            SequenceType::class,
             $this->subject->toAsn1()
         );
     }

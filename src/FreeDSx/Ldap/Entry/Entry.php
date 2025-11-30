@@ -299,7 +299,7 @@ class Entry implements IteratorAggregate, Countable, Stringable
     /**
      * Construct an entry from an associative array.
      *
-     * @param array<string, string|array<string|Stringable>> $attributes
+     * @param array<string, scalar|array<scalar|Stringable>> $attributes
      */
     public static function fromArray(
         Dn|Stringable|string $dn,

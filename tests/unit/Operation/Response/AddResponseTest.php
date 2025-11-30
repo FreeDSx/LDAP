@@ -29,7 +29,7 @@ final class AddResponseTest extends TestCase
         );
     }
 
-    public function test_it_has_the_expected_tag_number()
+    public function test_it_has_the_expected_tag_number(): void
     {
         self::assertSame(
             9,

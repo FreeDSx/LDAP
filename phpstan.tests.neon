@@ -1,4 +1,5 @@
 parameters:
-    level: 3
+    treatPhpDocTypesAsCertain: false
+    level: 10
     paths:
         - %currentWorkingDirectory%/tests

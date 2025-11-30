@@ -76,6 +76,7 @@ final class ServerQueueTest extends TestCase
     public function test_it_should_get_a_request_message(): void
     {
         $this->mockEncoder
+            ->expects($this->once())
             ->method('decode')
             ->willReturn(
                 Asn1::sequence(
@@ -85,10 +86,7 @@ final class ServerQueueTest extends TestCase
                 ),
             );
 
-        self::assertInstanceOf(
-            LdapMessageRequest::class,
-            $this->subject->getMessage(),
-        );
+        $this->subject->getMessage();
     }
 
     public function test_it_should_send_multiple_messages_with_write_and_respect_the_buffer_size(): void
@@ -139,19 +137,18 @@ final class ServerQueueTest extends TestCase
         );
 
         $this->mockEncoder
+            ->expects($this->once())
             ->method('decode')
             ->willReturn($asn1);
 
         $mockWrapper = $this->createMock(MessageWrapperInterface::class);
         $mockWrapper
+            ->expects($this->once())
             ->method('unwrap')
             ->willReturn(new Buffer('bar', 3));
 
         $this->subject->setMessageWrapper($mockWrapper);
 
-        self::assertInstanceOf(
-            LdapMessageRequest::class,
-            $this->subject->getMessage(),
-        );
+        $this->subject->getMessage();
     }
 }

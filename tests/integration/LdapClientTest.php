@@ -51,8 +51,8 @@ class LdapClientTest extends LdapTestCase
     public function testUsernamePasswordBind(): void
     {
         $response = $this->client->bind(
-            $_ENV['LDAP_USERNAME'],
-            $_ENV['LDAP_PASSWORD']
+            (string) getenv('LDAP_USERNAME'),
+            (string) getenv('LDAP_PASSWORD'),
         )->getResponse();
 
         $this->assertInstanceOf(
@@ -309,10 +309,6 @@ class LdapClientTest extends LdapTestCase
             ModifyDnResponse::class,
             $result->getResponse()
         );
-        $this->assertInstanceOf(
-            Entry::class,
-            $entry
-        );
         $this->assertSame(
             ['Arleen Sevigny-Foo'],
             $entry->get('cn')?->getValues()
@@ -420,10 +416,6 @@ class LdapClientTest extends LdapTestCase
             Filters::raw('(&(objectClass=inetOrgPerson)(cn=A*))')
         ));
 
-        $this->assertInstanceOf(
-            Entries::class,
-            $entries
-        );
         $this->assertCount(
             843,
             $entries,
@@ -561,12 +553,15 @@ class LdapClientTest extends LdapTestCase
         $this->assertTrue($this->client->isConnected());
     }
 
+    /**
+     * @return array<string, string>
+     */
     protected function getSaslOptions(): array
     {
         if ($this->isActiveDirectory()) {
             return [
                 'username' => 'admin',
-                'password' => $_ENV['LDAP_PASSWORD'],
+                'password' => (string) getenv('LDAP_PASSWORD'),
                 'host' => 'ADDC3.example.com'
             ];
         } else {
