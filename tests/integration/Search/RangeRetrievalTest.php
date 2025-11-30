@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Search\RangeRetrieval;
 use Tests\Integration\FreeDSx\Ldap\LdapTestCase;
+use Throwable;
 
 class RangeRetrievalTest extends LdapTestCase
 {
@@ -39,7 +40,7 @@ class RangeRetrievalTest extends LdapTestCase
     {
         try {
             $this->client->unbind();
-        } catch (\Exception|\Throwable $e) {
+        } catch (Throwable) {
         }
     }
     

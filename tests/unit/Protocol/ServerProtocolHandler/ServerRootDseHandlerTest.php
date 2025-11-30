@@ -116,7 +116,7 @@ final class ServerRootDseHandlerTest extends TestCase
                     $entry = $search->getEntry();
 
                     return $entry->get('supportedControl')
-                        ->has(Control::OID_PAGING);
+                        ?->has(Control::OID_PAGING) ?? false;
                 }),
                 new LdapMessageResponse(1, new SearchResultDone(0)),
             );
@@ -226,10 +226,10 @@ final class ServerRootDseHandlerTest extends TestCase
                 ->setAttributes('namingcontexts')
         );
 
-        # The reset below is needed, unfortunately, to properly spec due to how the objects change...
+        # The reset below is needed, unfortunately, to properly test due to how the objects change...
         $entry = Entry::create('', ['namingContexts' => 'dc=Foo,dc=Bar', ]);
         $entry->changes()->reset();
-        $entry->get('namingContexts')->equals(new Attribute('foo'));
+        $entry->get('namingContexts')?->equals(new Attribute('foo'));
 
         $this->mockQueue
             ->expects($this->once())

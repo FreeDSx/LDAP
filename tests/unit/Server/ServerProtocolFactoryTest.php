@@ -52,9 +52,6 @@ final class ServerProtocolFactoryTest extends TestCase
             ->method('makeRequestHandler')
             ->willReturn(new GenericRequestHandler());
 
-        self::assertInstanceOf(
-            ServerProtocolHandler::class,
-            $this->subject->make($mockSocket)
-        );
+        $this->subject->make($mockSocket);
     }
 }

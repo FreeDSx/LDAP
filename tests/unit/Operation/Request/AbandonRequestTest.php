@@ -28,11 +28,6 @@ final class AbandonRequestTest extends TestCase
         $this->subject = new AbandonRequest(1);
     }
 
-    public function testItIsInitializable(): void
-    {
-        $this->assertInstanceOf(AbandonRequest::class, $this->subject);
-    }
-
     public function testItShouldGetTheMessageId(): void
     {
         $this->assertEquals(1, $this->subject->getMessageId());

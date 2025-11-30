@@ -31,27 +31,19 @@ use function reset;
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  *
  * @implements IteratorAggregate<Entry>
- * @template T of Entry
  */
 class Entries implements Countable, IteratorAggregate
 {
     /**
-     * @var array<T>
+     * @var array<Entry>
      */
     private array $entries;
 
-    /**
-     * @param T ...$entries
-     */
     public function __construct(Entry ...$entries)
     {
         $this->entries = $entries;
     }
 
-    /**
-     * @param T ...$entries
-     * @return $this
-     */
     public function add(Entry ...$entries): self
     {
         $this->entries = array_merge($this->entries, $entries);
@@ -59,10 +51,6 @@ class Entries implements Countable, IteratorAggregate
         return $this;
     }
 
-    /**
-     * @param T ...$entries
-     * @return $this
-     */
     public function remove(Entry ...$entries): self
     {
         foreach ($entries as $entry) {

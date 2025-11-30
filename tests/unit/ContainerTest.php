@@ -47,6 +47,9 @@ class ContainerTest extends TestCase
         ]);
     }
 
+    /**
+     * @return array<array{class-string}>
+     */
     public static function buildableDependenciesDataProvider(): array
     {
         return [

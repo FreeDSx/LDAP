@@ -76,8 +76,8 @@ class LdapProxyTest extends ServerTestCase
     protected function authenticate(): void
     {
         $this->ldapClient()->bind(
-            $_ENV['LDAP_USERNAME'],
-            $_ENV['LDAP_PASSWORD']
+            (string) getenv('LDAP_USERNAME'),
+            (string) getenv('LDAP_PASSWORD'),
         );
     }
 }

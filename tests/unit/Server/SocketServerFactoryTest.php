@@ -37,7 +37,7 @@ final class SocketServerFactoryTest extends TestCase
     protected function setUp(): void
     {
         $this->tmpUnixSocketResource = $this->makeTempFile();;
-        $this->tmpUnixSocketFilePath = stream_get_meta_data($this->tmpUnixSocketResource)['uri'];
+        $this->tmpUnixSocketFilePath = stream_get_meta_data($this->tmpUnixSocketResource)['uri'] ?? throw new RuntimeException('Unable to get temp file path for unix socket.');
         $this->mockLogger = $this->createMock(LoggerInterface::class);
 
         $this->subject = new SocketServerFactory(
@@ -54,10 +54,9 @@ final class SocketServerFactoryTest extends TestCase
 
     public function test_it_should_make_and_bind_the_socket_server(): void
     {
-        self::assertInstanceOf(
-            SocketServer::class,
-            $this->subject->makeAndBind(),
-        );
+        self::expectNotToPerformAssertions();
+
+        $this->subject->makeAndBind();
     }
 
     public function test_it_should_make_a_unix_based_socket_server(): void
@@ -65,6 +64,7 @@ final class SocketServerFactoryTest extends TestCase
         if (str_starts_with(strtoupper(PHP_OS), 'WIN')) {
             $this->markTestSkipped('Cannot construct unix based socket on Windows.');
         }
+        self::expectNotToPerformAssertions();
 
         $this->subject = new SocketServerFactory(
             (new ServerOptions())
@@ -73,10 +73,7 @@ final class SocketServerFactoryTest extends TestCase
             $this->mockLogger,
         );
 
-        self::assertInstanceOf(
-            SocketServer::class,
-            $this->subject->makeAndBind(),
-        );
+        $this->subject->makeAndBind();
     }
 
     /**

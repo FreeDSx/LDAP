@@ -55,9 +55,8 @@ final class RequestHistoryTest extends TestCase
     public function test_it_should_get_the_paging_requests(): void
     {
 
-        self::assertInstanceOf(
-            PagingRequests::class,
-            $this->subject->pagingRequest()
+        self::assertFalse(
+            $this->subject->pagingRequest()->has('foo')
         );
     }
 }

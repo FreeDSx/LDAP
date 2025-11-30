@@ -33,13 +33,12 @@ class LdapServerTest extends ServerTestCase
 
     public function testItCanBind(): void
     {
-        $response = $this->ldapClient()->bind(
+        $this->ldapClient()->bind(
             'cn=user,dc=foo,dc=bar',
             '12345'
         );
         $output = $this->waitForServerOutput('---bind---');
 
-        $this->assertNotNull($response);
         $this->assertStringContainsString(
             'username => cn=user,dc=foo,dc=bar',
             $output
@@ -69,7 +68,7 @@ class LdapServerTest extends ServerTestCase
     public function testItPerformsAnAdd(): void
     {
         $this->authenticate();
-        $response = $this->ldapClient()->create(Entry::fromArray(
+        $this->ldapClient()->create(Entry::fromArray(
             'cn=meh,dc=foo,dc=bar',
             [
                 'foo' => 'bar',
@@ -77,7 +76,6 @@ class LdapServerTest extends ServerTestCase
         ));
         $output = $this->waitForServerOutput('---add---');
 
-        $this->assertNotNull($response);
         $this->assertStringContainsString(
             'dn => cn=meh,dc=foo,dc=bar',
             $output
@@ -91,10 +89,9 @@ class LdapServerTest extends ServerTestCase
     public function testItPerformsDelete(): void
     {
         $this->authenticate();
-        $response = $this->ldapClient()->delete('cn=meh,dc=foo,dc=bar');
+        $this->ldapClient()->delete('cn=meh,dc=foo,dc=bar');
         $output = $this->waitForServerOutput('---delete---');
 
-        $this->assertNotNull($response);
         $this->assertStringContainsString(
             'dn => cn=meh,dc=foo,dc=bar',
             $output
@@ -119,10 +116,9 @@ class LdapServerTest extends ServerTestCase
         $entry->set('surname', 'LastName');
         $entry->reset('phone');
 
-        $response = $this->ldapClient()->update($entry);
+        $this->ldapClient()->update($entry);
         $output = $this->waitForServerOutput('---modify---');
 
-        $this->assertNotNull($response);
         $this->assertStringContainsString(
             'dn => cn=meh,dc=foo,dc=bar',
             $output
@@ -155,14 +151,13 @@ class LdapServerTest extends ServerTestCase
     {
         $this->authenticate();
 
-        $response = $this->ldapClient()->compare(
+        $this->ldapClient()->compare(
             'cn=meh,dc=foo,dc=bar',
             'foo',
             'bar'
         );
         $output = $this->waitForServerOutput('---compare---');
 
-        $this->assertNotNull($response);
         $this->assertStringContainsString(
             'dn => cn=meh,dc=foo,dc=bar',
             $output
@@ -181,13 +176,12 @@ class LdapServerTest extends ServerTestCase
     {
         $this->authenticate();
 
-        $response = $this->ldapClient()->move(
+        $this->ldapClient()->move(
             'cn=meh,dc=foo,dc=bar',
             'cn=bleh,dc=foo,dc=bar'
         );
         $output = $this->waitForServerOutput('---modify-dn---');
 
-        $this->assertNotNull($response);
         $this->assertStringContainsString(
             'dn => cn=meh,dc=foo,dc=bar',
             $output

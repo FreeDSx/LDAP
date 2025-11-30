@@ -155,46 +155,42 @@ class LdapClientTest extends TestCase
 
     public function test_it_should_construct_a_pager_helper(): void
     {
-        self::assertInstanceOf(
-            Paging::class,
-            $this->subject->paging(Operations::search(
-                Filters::equal(
-                    'foo',
-                    'bar'
-                ))
-            ),
+        self::expectNotToPerformAssertions();
+
+        $this->subject->paging(Operations::search(
+            Filters::equal(
+                'foo',
+                'bar'
+            ))
         );
     }
 
     public function test_it_should_construct_a_vlv_helper(): void
     {
-        self::assertInstanceOf(
-            Vlv::class,
-            $this->subject->vlv(
-                Operations::search(Filters::equal(
-                    'foo',
-                    'bar'
-                )),
-                'cn',
-                100
-            ),
+        self::expectNotToPerformAssertions();
+
+        $this->subject->vlv(
+            Operations::search(Filters::equal(
+                'foo',
+                'bar'
+            )),
+            'cn',
+            100
         );
     }
 
     public function test_it_should_construct_a_dirsync_helper(): void
     {
-        self::assertInstanceOf(
-            DirSync::class,
-            $this->subject->dirSync()
-        );
+        self::expectNotToPerformAssertions();
+
+        $this->subject->dirSync();
     }
 
     public function test_it_should_construct_a_range_retrieval_helper(): void
     {
-        self::assertInstanceOf(
-            RangeRetrieval::class,
-            $this->subject->range(),
-        );
+        self::expectNotToPerformAssertions();
+
+        $this->subject->range();
     }
     
     public function test_it_should_start_tls(): void

@@ -214,6 +214,7 @@ final class SearchRequestTest extends TestCase
     {
         $this->expectException(UnexpectedValueException::class);
 
+        /** @phpstan-ignore-next-line */
         $this->subject->useCancelStrategy('foo');
     }
 

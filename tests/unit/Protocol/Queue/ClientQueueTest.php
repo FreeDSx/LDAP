@@ -104,10 +104,7 @@ final class ClientQueueTest extends TestCase
                 )
             );
 
-        self::assertInstanceOf(
-            LdapMessageResponse::class,
-            $this->subject->getMessage(),
-        );
+        $this->subject->getMessage();
     }
 
     public function test_it_should_throw_an_unsolicited_notification_exception_when_one_is_received(): void
@@ -201,9 +198,6 @@ final class ClientQueueTest extends TestCase
 
         $this->subject->setMessageWrapper($mockWrapper);
 
-        self::assertInstanceOf(
-            LdapMessageResponse::class,
-            $this->subject->getMessage(),
-        );
+        $this->subject->getMessage();
     }
 }

@@ -148,6 +148,9 @@ final class ServerAuthorizationTest extends TestCase
         self::assertFalse($this->subject->isAuthenticationRequest($request));
     }
 
+    /**
+     * @return array<array{RequestInterface}>
+     */
     public static function authExpectedRequestsDataProvider(): array
     {
         return [

@@ -116,8 +116,9 @@ final class RangeRetrievalTest extends TestCase
             ->with(
                 'dc=foo',
                 $this->callback(function ($attr) {
-                    return $attr[0]->getOptions()->first()->getLowRange() == '1501'
-                        && $attr[0]->getOptions()->first()->getHighRange() == '*';
+                    /** @var Attribute[] $attr */
+                    return $attr[0]->getOptions()->first()?->getLowRange() == '1501'
+                        && $attr[0]->getOptions()->first()?->getHighRange() == '*';
                 })
             )
             ->willReturn($entry);
@@ -142,7 +143,8 @@ final class RangeRetrievalTest extends TestCase
             ->with(
                 'dc=foo',
                 $this->callback(function ($attr) {
-                    return $attr[0]->getOptions()->first()->getLowRange() === '1501'
+                    /** @var Attribute[] $attr */
+                    return $attr[0]->getOptions()->first()?->getLowRange() === '1501'
                         && $attr[0]->getOptions()->first()->getHighRange() === '1600';
                 })
             )

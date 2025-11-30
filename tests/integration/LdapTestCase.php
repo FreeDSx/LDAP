@@ -25,14 +25,14 @@ class LdapTestCase extends TestCase
     protected function makeOptions(): ClientOptions
     {
         return (new ClientOptions())
-            ->setBaseDn((string) $_ENV['LDAP_BASE_DN'])
-            ->setServers([(string) $_ENV['LDAP_SERVER']])
+            ->setBaseDn((string) getenv('LDAP_BASE_DN'))
+            ->setServers([(string) getenv('LDAP_SERVER')])
             ->setSslCaCert(
                 $_ENV['LDAP_CA_CERT'] === ''
                     ? __DIR__ . '/../resources/cert/ca.crt'
-                    : (string) $_ENV['LDAP_CA_CERT']
+                    : (string) getenv('LDAP_CA_CERT')
             )
-            ->setBaseDn((string) $_ENV['LDAP_BASE_DN']);
+            ->setBaseDn((string) getenv('LDAP_BASE_DN'));
     }
 
     protected function getClient(?ClientOptions $options = null): LdapClient
@@ -43,8 +43,8 @@ class LdapTestCase extends TestCase
     protected function bindClient(LdapClient $client): void
     {
         $client->bind(
-            $_ENV['LDAP_USERNAME'],
-            $_ENV['LDAP_PASSWORD'],
+            (string) getenv('LDAP_USERNAME'),
+            (string) getenv('LDAP_PASSWORD'),
         );
     }
 
