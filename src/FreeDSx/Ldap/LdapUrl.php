@@ -264,7 +264,7 @@ class LdapUrl implements Stringable
         if ($pieces === false || !isset($pieces['scheme'])) {
             # We are on our own here if it's an empty host, as parse_url will not treat it as valid, though it is valid
             # for LDAP URLs. In the case of an empty host a client should determine what host to connect to.
-            if (preg_match('/^(ldaps?)\:\/\/\/(.*)$/', $url, $matches) === 0) {
+            if (preg_match('/^(ldaps?)\:\/\/\/(.*)$/', $url, $matches) !== 1) {
                 throw new UrlParseException(sprintf('The LDAP URL is malformed: %s', $url));
             }
             $query = null;

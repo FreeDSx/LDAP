@@ -104,7 +104,7 @@ class ClientSyncHandler extends ClientBasicHandler
                     $messageTo = new LdapMessageRequest(
                         $this->queue->generateId(),
                         $this->syncRequest,
-                        ...$messageFrom->controls()->toArray()
+                        ...$messageTo->controls()->toArray()
                     );
                     $messageFrom = $this->queue->sendMessage($messageTo)
                         ->getMessage($messageTo->getMessageId());
@@ -196,10 +196,18 @@ class ClientSyncHandler extends ClientBasicHandler
 
         if ($response instanceof SyncRefreshDelete) {
             $this->updateCookie($response->getCookie());
-            $this->session->updatePhase(Session::PHASE_DELETE);
+            if ($response->getRefreshDone()) {
+                $this->session->updatePhase(null)->markRefreshComplete();
+            } else {
+                $this->session->updatePhase(Session::PHASE_DELETE);
+            }
         } elseif ($response instanceof SyncRefreshPresent) {
             $this->updateCookie($response->getCookie());
-            $this->session->updatePhase(Session::PHASE_PRESENT);
+            if ($response->getRefreshDone()) {
+                $this->session->updatePhase(null)->markRefreshComplete();
+            } else {
+                $this->session->updatePhase(Session::PHASE_PRESENT);
+            }
         } elseif ($response instanceof SyncNewCookie) {
             $this->updateCookie($response->getCookie());
         } elseif ($response instanceof SyncIdSet) {

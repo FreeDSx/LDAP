@@ -29,6 +29,7 @@ final class Session
         private readonly int $mode,
         private ?string $cookie,
         private ?int $phase = null,
+        private bool $refreshComplete = false,
     ) {
     }
 
@@ -65,11 +66,30 @@ final class Session
     }
 
     /**
+     * Whether the initial refresh phase has completed. Once true, any later entries received are persist phase change
+     * notifications rather than initial content.
+     */
+    public function isRefreshComplete(): bool
+    {
+        return $this->refreshComplete;
+    }
+
+    /**
      * @internal
      */
     public function updatePhase(?int $phase): self
     {
         $this->phase = $phase;
+
+        return $this;
+    }
+
+    /**
+     * @internal
+     */
+    public function markRefreshComplete(): self
+    {
+        $this->refreshComplete = true;
 
         return $this;
     }

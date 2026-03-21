@@ -18,13 +18,19 @@ use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Control\Sync\SyncStateControl;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\CancelRequestException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\LdapUrl;
+use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\SyncRequest;
+use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SearchResultReference;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
+use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshDelete;
+use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshPresent;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientSyncHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -32,6 +38,7 @@ use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Result\SyncReferralResult;
+use FreeDSx\Ldap\Sync\Session;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Unit\FreeDSx\Ldap\TestFactoryTrait;
@@ -278,6 +285,164 @@ final class ClientSyncHandlerTest extends TestCase
         );
     }
 
+    public function test_a_refresh_delete_in_progress_sets_phase_delete_and_refresh_is_not_complete(): void
+    {
+        $capturedSession = null;
+        $messageTo = new LdapMessageRequest(
+            1,
+            (new SyncRequest())
+                ->useEntryHandler(function (SyncEntryResult $_result, Session $session) use (&$capturedSession): void {
+                    $capturedSession = $session;
+                }),
+            new SyncRequestControl(),
+        );
+
+        $this->mockQueue
+            ->expects($this->exactly(2))
+            ->method('getMessage')
+            ->with(1)
+            ->willReturnOnConsecutiveCalls(
+                new LdapMessageResponse(
+                    1,
+                    new SearchResultEntry(new Entry('bar')),
+                    new SyncStateControl(SyncStateControl::STATE_ADD, 'foo'),
+                ),
+                new LdapMessageResponse(
+                    1,
+                    new SearchResultDone(0, '', ''),
+                    new SyncDoneControl(),
+                ),
+            );
+
+        $this->subject->handleResponse(
+            $messageTo,
+            new LdapMessageResponse(1, new SyncRefreshDelete(refreshDone: false)),
+        );
+
+        self::assertSame(
+            Session::PHASE_DELETE,
+            $capturedSession?->getPhase()
+        );
+        self::assertFalse($capturedSession->isRefreshComplete());
+    }
+
+    public function test_a_refresh_delete_done_sets_null_phase_and_marks_refresh_complete(): void
+    {
+        $capturedSession = null;
+        $messageTo = new LdapMessageRequest(
+            1,
+            (new SyncRequest())
+                ->useEntryHandler(function (SyncEntryResult $_result, Session $session) use (&$capturedSession): void {
+                    $capturedSession = $session;
+                }),
+            new SyncRequestControl(),
+        );
+
+        $this->mockQueue
+            ->expects($this->exactly(2))
+            ->method('getMessage')
+            ->with(1)
+            ->willReturnOnConsecutiveCalls(
+                new LdapMessageResponse(
+                    1,
+                    new SearchResultEntry(new Entry('bar')),
+                    new SyncStateControl(SyncStateControl::STATE_ADD, 'foo'),
+                ),
+                new LdapMessageResponse(
+                    1,
+                    new SearchResultDone(0, '', ''),
+                    new SyncDoneControl(),
+                ),
+            );
+
+        $this->subject->handleResponse(
+            $messageTo,
+            new LdapMessageResponse(1, new SyncRefreshDelete(refreshDone: true)),
+        );
+
+        self::assertNull($capturedSession?->getPhase());
+        self::assertTrue($capturedSession?->isRefreshComplete());
+    }
+
+    public function test_a_refresh_present_in_progress_sets_phase_present_and_refresh_is_not_complete(): void
+    {
+        $capturedSession = null;
+        $messageTo = new LdapMessageRequest(
+            1,
+            (new SyncRequest())
+                ->useEntryHandler(function (SyncEntryResult $_result, Session $session) use (&$capturedSession): void {
+                    $capturedSession = $session;
+                }),
+            new SyncRequestControl(),
+        );
+
+        $this->mockQueue
+            ->expects($this->exactly(2))
+            ->method('getMessage')
+            ->with(1)
+            ->willReturnOnConsecutiveCalls(
+                new LdapMessageResponse(
+                    1,
+                    new SearchResultEntry(new Entry('bar')),
+                    new SyncStateControl(SyncStateControl::STATE_ADD, 'foo'),
+                ),
+                new LdapMessageResponse(
+                    1,
+                    new SearchResultDone(0, '', ''),
+                    new SyncDoneControl(),
+                ),
+            );
+
+        $this->subject->handleResponse(
+            $messageTo,
+            new LdapMessageResponse(1, new SyncRefreshPresent(refreshDone: false)),
+        );
+
+        self::assertSame(
+            Session::PHASE_PRESENT,
+            $capturedSession?->getPhase()
+        );
+        self::assertFalse($capturedSession->isRefreshComplete());
+    }
+
+    public function test_a_refresh_present_done_sets_null_phase_and_marks_refresh_complete(): void
+    {
+        $capturedSession = null;
+        $messageTo = new LdapMessageRequest(
+            1,
+            (new SyncRequest())
+                ->useEntryHandler(function (SyncEntryResult $_result, Session $session) use (&$capturedSession): void {
+                    $capturedSession = $session;
+                }),
+            new SyncRequestControl(),
+        );
+
+        $this->mockQueue
+            ->expects($this->exactly(2))
+            ->method('getMessage')
+            ->with(1)
+            ->willReturnOnConsecutiveCalls(
+                new LdapMessageResponse(
+                    1,
+                    new SearchResultEntry(new Entry('bar')),
+                    new SyncStateControl(SyncStateControl::STATE_ADD, 'foo'),
+                ),
+                new LdapMessageResponse(
+                    1,
+                    new SearchResultDone(0, '', ''),
+                    new SyncDoneControl(),
+                ),
+            );
+
+        $this->subject->handleResponse(
+            $messageTo,
+            new LdapMessageResponse(1, new SyncRefreshPresent(refreshDone: true)),
+        );
+
+        self::assertNull($capturedSession?->getPhase());
+        self::assertTrue($capturedSession?->isRefreshComplete());
+    }
+
     public function test_it_should_process_a_sync_referral(): void
     {
         $referral = new LdapUrl('bar');
@@ -336,6 +501,58 @@ final class ClientSyncHandlerTest extends TestCase
         self::assertSame(
             [$referral],
             $referralsProcessed,
+        );
+    }
+
+    public function test_the_sync_done_cookie_is_captured_when_a_cancel_is_requested(): void
+    {
+        $syncRequest = new SyncRequest();
+        $syncRequest->useEntryHandler(function (): void {
+            throw new CancelRequestException();
+        });
+
+        $messageTo = new LdapMessageRequest(
+            1,
+            $syncRequest,
+            new SyncRequestControl(),
+        );
+
+        $this->mockQueue
+            ->method('generateId')
+            ->willReturn(2);
+
+        $drainCallCount = 0;
+        $this->mockQueue
+            ->method('getMessage')
+            ->willReturnCallback(
+                function () use (&$drainCallCount): LdapMessageResponse {
+                    $cancelResponse = new LdapMessageResponse(
+                        2,
+                        new ExtendedResponse(new LdapResult(ResultCode::CANCELED)),
+                    );
+                    $searchDone = new LdapMessageResponse(
+                        1,
+                        new SearchResultDone(ResultCode::CANCELED, '', ''),
+                        new SyncDoneControl('final-cookie'),
+                    );
+                    $drainCallCount++;
+
+                    return $drainCallCount === 1 ? $searchDone : $cancelResponse;
+                }
+            );
+
+        $result = $this->subject->handleResponse(
+            $messageTo,
+            new LdapMessageResponse(
+                1,
+                new SearchResultEntry(new Entry('foo')),
+                new SyncStateControl(SyncStateControl::STATE_ADD, 'uuid'),
+            ),
+        );
+
+        self::assertSame(
+            'final-cookie',
+            $result?->controls()->getByClass(SyncDoneControl::class)?->getCookie(),
         );
     }
 }
