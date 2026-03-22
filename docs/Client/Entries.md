@@ -15,9 +15,9 @@ Entries
     * [add](#add)
     * [remove](#remove)
     * [reset](#reset)
-    * [set](#has)
+    * [set](#set)
     * [get](#get)
-    * [has](#set)
+    * [has](#has)
     * [getAttributes](#getattributes)
     * [getDn](#getdn)
     * [changes](#changes)
@@ -131,7 +131,7 @@ try {
 **Note**: You can also set attributes via magic method property access against the entry object.
 
 ```php
-if (!isset($enty->description)) {
+if (!isset($entry->description)) {
     $entry->description = 'Employee';
 }
 $entry->otherIpPhone = ['12345', '67890'];
@@ -201,7 +201,7 @@ try {
 if (!isset($entry->description)) {
     unset($entry->description);
 }
-unset($entry-otherIpPhone);
+unset($entry->otherIpPhone);
 ```
 
 ## Renaming Entries
@@ -302,7 +302,7 @@ Check if an entry has a specific attribute. Optionally pass a boolean true to sp
 must also match.
 
 ```php
-if ($enty->has('description')) {
+if ($entry->has('description')) {
     # do something...
 }
 ```
@@ -310,7 +310,7 @@ if ($enty->has('description')) {
 **Note**: You can also use the magic `isset()` method against the entry object to check this.
 
 ```php
-if (isset($enty->description)) {
+if (isset($entry->description)) {
     # do something...
 }
 ```

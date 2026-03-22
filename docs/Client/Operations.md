@@ -91,7 +91,7 @@ if ($entry->has('title')) {
 }
 # Delete a specific value for an attribute
 if ($entry->get('ipPhone')->has('12345')) {
-    $entry->delete('ipPhone', '12345');
+    $entry->remove('ipPhone', '12345');
 }
 # Set a value for an attribute. This replaces any value it may, or may not, have.
 $entry->set('description', 'Employee');
@@ -109,7 +109,7 @@ try {
 Rename an entry in LDAP, changing its RDN, and catch an operation exception:
 
 ```php
-use FreeDSx\Entry\Rdn;
+use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Exception\OperationException;
 
@@ -149,7 +149,7 @@ use FreeDSx\Ldap\Search\Filters;
 $filter = Filters::and(
     Filters::equal('objectClass', 'user'),
     Filters::startsWith('sn', 'S')
-));
+);
 
 # Pass the filter to the search. Only grab the first name and last name attributes.
 $entries = $ldap->search(Operations::search($filter, 'givenName', 'sn'));

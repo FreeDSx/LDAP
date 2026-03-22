@@ -24,7 +24,7 @@ LDAP Server Configuration
     * [ServerOptions:setSslCertKey](#setsslcertkey)
     * [ServerOptions:setSslCertPassphrase](#setsslcertpassphrase)
 
-The LDAP server is configured through aa `ServerOptions` object. The configuration object is passed to the server
+The LDAP server is configured through a `ServerOptions` object. The configuration object is passed to the server
 on construction:
 
 ```php
@@ -32,7 +32,7 @@ use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
 
 $options = (new ServerOptions)
-  ->setDseAlServer('dc2.local')
+  ->setDseAltServer('dc2.local')
   ->setPort(33389);
   
 $ldap = new LdapServer($options);
