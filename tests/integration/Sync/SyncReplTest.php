@@ -45,7 +45,9 @@ class SyncReplTest extends LdapTestCase
 
         $client
             ->syncRepl()
-            ->poll(fn (SyncEntryResult $result) => array_push($entries, $result));
+            ->poll(function (SyncEntryResult $result) use (&$entries): void {
+                $entries[] = $result;
+            });
 
         $this->assertGreaterThan(0, count($entries));
     }
