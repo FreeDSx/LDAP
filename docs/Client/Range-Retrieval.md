@@ -43,9 +43,9 @@ $allMembers = [];
 $range = $ldap->range();
 
 # Keep looping until has more values returns false...
-while ($range()->hasMoreValues($members)) {
+while ($range->hasMoreValues($members)) {
     # Grabs the next ranged member attribute with a new set of values
-    $members = $range()->getMoreValues($entry, $members);
+    $members = $range->getMoreValues($entry, $members);
     $allMembers = array_merge($allMembers, $members->getValues());
 }
 
@@ -84,9 +84,9 @@ $allMembers = [];
 $range = $ldap->range();
 
 # Keep looping until hasMoreValues() returns false...
-while ($range()->hasMoreValues($members)) {
+while ($range->hasMoreValues($members)) {
     # Grabs the next ranged member attribute with a new set of values
-    $members = $range()->getMoreValues($entry, $members);
+    $members = $range->getMoreValues($entry, $members);
     $allMembers = array_merge($allMembers, $members->getValues());
 }
 

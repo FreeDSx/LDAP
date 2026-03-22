@@ -47,7 +47,7 @@ use FreeDSx\Ldap\Search\Filters;
 $filter = Filters::and(
     Filters::equal('objectClass', 'user'),
     Filters::contains('title', 'Administrator')
-));
+);
 
 # Pass the filter to the search. Only grab the 'cn' attribute.
 $entries = $ldap->search(Operations::search($filter, 'cn'));
@@ -173,7 +173,7 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Controls;
 
-$filter = Filters::and(Filters::equal('objectClass', 'user'), Filters::present('sn')));
+$filter = Filters::and(Filters::equal('objectClass', 'user'), Filters::present('sn'));
 
 # Sort the results by last name
 $entries = $ldap->search(Operations::search($filter, 'sn'), Controls::sort('sn'));
@@ -191,7 +191,7 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 
-$filter = Filters::and(Filters::equal('objectClass', 'user'), Filters::present('sn')));
+$filter = Filters::and(Filters::equal('objectClass', 'user'), Filters::present('sn'));
 
 # Sort the results by last name in descending order
 $sortKey = SortKey::descending('sn');
@@ -308,7 +308,7 @@ $filter = Filters::and(
     Filters::present('telephoneNumber'),
     # Entries without an email address value
     Filters::not(Filters::present('emailAddress'))
-};
+);
 ```
 
 ------------------
