@@ -15,6 +15,7 @@ helper class in this library for performing a SyncRepl request more easily.
     * [The IdSet Handler](#the-idset-handler)
     * [The Referral Handler](#the-referral-handler)
     * [The Cookie Handler](#the-cookie-handler)
+* [The Session Object](#the-session-object)
 * [Cancelling a Sync](#cancelling-a-sync)
 * [SyncRepl Class Methods](#syncrepl-class-methods)
     * [useFilter](#usefilter)
@@ -88,10 +89,15 @@ $ldap
 
 ## The Listen Method
 
-The listen method iterates waits for sync changes in a never-ending search operation. 
+The listen method waits for sync changes in a never-ending search operation.
+
+The handler closure receives a `SyncEntryResult` as its first argument and a `Session` as its optional second argument.
+The `Session` object provides context about the current state of the sync, such as whether the initial refresh phase has
+completed. See [The Session Object](#the-session-object) for more details.
 
 ```php
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
+use FreeDSx\Ldap\Sync\Session;
 
 // Saving the cookie to a file.
 // With the cookie handler, you determine where to save it.
@@ -107,20 +113,27 @@ $ldap
     // The cookie may change at many points during a sync. This handler should react to the new cookie to save it off
     // somewhere to be used in the future.
     ->useCookieHandler(fn (string $cookie) => file_put_contents($cookieFile, $cookie))
-    ->listen(function(SyncEntryResult $result) {
+    ->listen(function(SyncEntryResult $result, Session $session) {
+        // Entries received before isRefreshComplete() are initial content from the refresh phase.
+        // Entries received after isRefreshComplete() are change notifications from the persist phase.
+        if (!$session->isRefreshComplete()) {
+            // Refresh phase: initial content delivery
+            // Do what you wish with the initial data...
+            return;
+        }
+
         $entry = $result->getEntry();
         $uuid = $result->getEntryUuid();
-        
+
+        // Persist phase: change notifications.
         // "Add" here means either it changed **or** was added.
         if ($result->isAdd()) {
-       
+
         // This should represent an entry being modified...but in OpenLDAP, I have not seen this used?
         } elseif ($result->isModify()) {
         // The entry was removed. Note that the entry attributes will be empty in this case.
         // Use the UUID from the result to remove it on the sync side.
         } elseif ($result->isDelete()) {
-        // The entry is present and has not changed.
-        } elseif ($result->isPresent()) {
         }
     });
 ```
@@ -133,10 +146,10 @@ could choose to ignore referrals. However, you should take action on both Entry 
 ## The Entry Handler
 
 The Entry handler should always be defined. It is passed to either the `poll()` or `listen()` method directly, or can optionally
-be passed to the `useEntryHandler()` method. This handler must be a closure that receives a `SyncEntryResult` as the first argument.
-The `SyncEntryResult` represents a single sync entry change.
+be passed to the `useEntryHandler()` method. This handler must be a closure that receives a `SyncEntryResult` as the first
+argument and optionally a `Session` as the second argument. The `SyncEntryResult` represents a single sync entry change.
 
-For more details, see [useEntryHandler](#useentryhandler).
+For more details, see [useEntryHandler](#useentryhandler) and [The Session Object](#the-session-object).
 
 ## The IdSet Handler
 
@@ -163,6 +176,51 @@ the changed cookie somewhere and reload it before starting the sync again.
 
 For more details, see [useCookieHandler](#usecookiehandler) and [useCookie](#usecookie).
 
+
+# The Session Object
+
+The `Session` object is passed as the second argument to the entry handler closure and provides context about the current
+state of the sync operation.
+
+## isRefreshComplete
+
+In `listen()` mode the sync operates in two phases:
+
+1. **Refresh phase** — The server delivers its initial content. Entries here represent the current state of the directory,
+   not necessarily changes.
+2. **Persist phase** — After the refresh completes, the server sends change notifications indefinitely as entries are
+   added, modified, or deleted.
+
+The `isRefreshComplete()` method returns `false` during the refresh phase and `true` once the server has signaled that
+the refresh is done and the persist phase has begun. This is the reliable way to distinguish between the two phases:
+
+```php
+use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
+use FreeDSx\Ldap\Sync\Session;
+
+$ldap
+    ->syncRepl()
+    ->listen(function(SyncEntryResult $result, Session $session) {
+        if (!$session->isRefreshComplete()) {
+            // Still in the refresh phase — skip or handle initial content.
+            return;
+        }
+
+        // Persist phase — this is a real change notification.
+    });
+```
+
+## getPhase
+
+Returns the current sub-phase of the refresh, if the server has explicitly signaled one. This will be one of:
+
+- `Session::PHASE_DELETE` — The server is using the refreshDelete strategy.
+- `Session::PHASE_PRESENT` — The server is using the refreshPresent strategy.
+- `null` — No explicit sub-phase is currently active.
+
+Note that not all servers signal an explicit sub-phase before sending refresh entries (OpenLDAP does not), so
+`getPhase()` returning `null` does not necessarily mean the refresh phase is complete. Use `isRefreshComplete()` instead
+to reliably determine when the persist phase begins.
 
 # Cancelling a Sync
 
@@ -227,19 +285,22 @@ $syncRepl->useCookieHandler(
 ## useEntryHandler
 
 This method takes a closure that reacts to a single entry change / sync. It is basically required if you want to get
-anything useful from the sync.
+anything useful from the sync. The closure receives a `SyncEntryResult` as the first argument and optionally a `Session`
+as the second argument.
 
 ```php
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
-use FreeDSx\Ldap\Control\Sync\SyncStateControl;
+use FreeDSx\Ldap\Sync\Session;
 
-$syncRepl->useEntryHandler(function(SyncEntryResult $result) {
-    // The Entry object associated with this sync change. 
+$syncRepl->useEntryHandler(function(SyncEntryResult $result, Session $session) {
+    // The Entry object associated with this sync change.
     $result->getEntry();
     // The raw result state of the entry. See "SyncStateControl::STATE_*"
     $result->getState();
     // The raw LDAP message for this entry. Can get the result code / controls / etc.
     $result->getMessage();
+    // Whether the initial refresh phase has completed (listen() mode only).
+    $session->isRefreshComplete();
 });
 ```
 
