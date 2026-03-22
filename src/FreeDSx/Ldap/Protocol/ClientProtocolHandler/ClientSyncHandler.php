@@ -101,6 +101,7 @@ class ClientSyncHandler extends ClientBasicHandler
                             ->getByClass(SyncDoneControl::class)
                             ?->getCookie()
                     );
+                    $this->session->resetRefreshState();
                     $messageTo = new LdapMessageRequest(
                         $this->queue->generateId(),
                         $this->syncRequest,
