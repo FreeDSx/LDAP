@@ -97,6 +97,17 @@ final class Session
     /**
      * @internal
      */
+    public function resetRefreshState(): self
+    {
+        $this->phase = null;
+        $this->refreshComplete = false;
+
+        return $this;
+    }
+
+    /**
+     * @internal
+     */
     public function updateCookie(?string $cookie): self
     {
         $this->cookie = $cookie;
