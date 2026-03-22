@@ -58,11 +58,12 @@ class FilterFactory
      */
     public static function get(AbstractType $type): FilterInterface
     {
-        $filterClass = self::$map[$type->getTagNumber()] ?? null;
+        $tagNumber = $type->getTagNumber();
+        $filterClass = $tagNumber !== null ? (self::$map[$tagNumber] ?? null) : null;
         if ($filterClass === null) {
             throw new ProtocolException(sprintf(
                 'The received filter "%s" is not recognized.',
-                $type->getTagNumber()
+                $tagNumber
             ));
         }
         $filterConstruct = $filterClass . '::fromAsn1';

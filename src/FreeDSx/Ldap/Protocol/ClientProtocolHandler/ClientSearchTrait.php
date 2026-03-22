@@ -43,6 +43,8 @@ trait ClientSearchTrait
 
     private ?ExtendedResponse $canceledResponse = null;
 
+    private ?LdapMessageResponse $canceledSearchDone = null;
+
     private function search(
         LdapMessageResponse $messageFrom,
         LdapMessageRequest $messageTo,
@@ -87,14 +89,19 @@ trait ClientSearchTrait
         // This is just to use less logic to account whether a handler was used / no search results were returned.
         // This just returns the search result done wrapped in a SearchResponse. The SearchResponse extends
         // SearchResultDone.
+        //
+        // When a cancel is in progress, prefer the captured SearchResultDone so its controls (e.g. SyncDoneControl)
+        // are preserved on the returned message rather than the entry message that triggered the cancel.
+        $finalMessage = $this->canceledSearchDone ?? $messageFrom;
+
         return new LdapMessageResponse(
-            $messageFrom->getMessageId(),
+            $finalMessage->getMessageId(),
             new SearchResponse(
                 $this->canceledResponse ?? $response,
                 $entryResults,
                 $referralResults,
             ),
-            ...$messageFrom->controls()->toArray()
+            ...$finalMessage->controls()->toArray()
         );
     }
 
@@ -109,6 +116,8 @@ trait ClientSearchTrait
                 ($this->referralHandler)(new ReferralResult($messageFrom));
             } elseif ($response instanceof IntermediateResponse && $this->intermediateHandler) {
                 ($this->intermediateHandler)($messageFrom);
+            } elseif ($response instanceof SearchResultDone) {
+                $this->canceledSearchDone = $messageFrom;
             }
         } catch (CancelRequestException $cancelException) {
             // If the strategy is "continue", we only handle the first cancellation exception.

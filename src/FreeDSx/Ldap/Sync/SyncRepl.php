@@ -168,7 +168,7 @@ class SyncRepl
      * A poll based sync gets any initial content / updates and then ends.
      *
      * If a cookie is provided, then it is a poll for content update. If no cookie is provided, then it is a poll for
-     * content update. To provide a cookie from a previous poll {@see self::useCookie()}.
+     * initial content. To provide a cookie from a previous poll {@see self::useCookie()}.
      */
     public function poll(?Closure $entryHandler = null): void
     {

@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -54,7 +55,11 @@ class RequestCanceler
         do {
             $received = $this->queue->getMessage();
 
-            if ($received->getMessageId() === $idToCancel && $this->strategy === SearchRequest::CANCEL_CONTINUE) {
+            if ($received->getMessageId() !== $idToCancel) {
+                continue;
+            }
+
+            if ($this->strategy === SearchRequest::CANCEL_CONTINUE || $received->getResponse() instanceof SearchResultDone) {
                 ($this->messageProcessor)($received);
             }
         } while ($received->getMessageId() !== $cancelId);
