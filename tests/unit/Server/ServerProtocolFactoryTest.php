@@ -54,4 +54,22 @@ final class ServerProtocolFactoryTest extends TestCase
 
         $this->subject->make($mockSocket);
     }
+
+    public function test_it_includes_sasl_when_mechanisms_are_configured(): void
+    {
+        $mockSocket = $this->createMock(Socket::class);
+
+        $this->mockHandlerFactory
+            ->expects($this->once())
+            ->method('makeRequestHandler')
+            ->willReturn(new GenericRequestHandler());
+
+        $subject = new ServerProtocolFactory(
+            $this->mockHandlerFactory,
+            (new ServerOptions())->setSaslMechanisms(ServerOptions::SASL_PLAIN),
+            $this->mockServerAuthorization,
+        );
+
+        $subject->make($mockSocket);
+    }
 }

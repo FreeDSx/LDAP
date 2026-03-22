@@ -9,6 +9,9 @@ General LDAP Server Usage
 * [Handling the RootDSE](#handling-the-rootdse)
 * [Handling Client Paging Requests](#handling-client-paging-requests)
 * [StartTLS SSL Certificate Support](#starttls-ssl-certificate-support)
+* [SASL Authentication](#sasl-authentication)
+  * [PLAIN Mechanism](#plain-mechanism)
+  * [Challenge-Based Mechanisms (CRAM-MD5, DIGEST-MD5, and SCRAM)](#challenge-based-mechanisms-cram-md5-digest-md5-and-scram)
 
 The LdapServer class is used to run a LDAP server process that accepts client requests and sends back a response. It
 defaults to using a forking method for client requests, which is only available on Linux.
@@ -366,6 +369,147 @@ $server = new LdapServer(
 
 $server->run();
 ```
+
+## SASL Authentication
+
+The server supports SASL (Simple Authentication and Security Layer) bind requests. SASL must be explicitly enabled by
+configuring the mechanisms you want to support via `ServerOptions::setSaslMechanisms()`. The configured mechanisms are
+advertised to clients through the `supportedSaslMechanisms` RootDSE attribute.
+
+```php
+use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\LdapServer;
+
+$server = new LdapServer(
+    (new ServerOptions)
+        ->setSaslMechanisms(
+            ServerOptions::SASL_PLAIN,
+            ServerOptions::SASL_CRAM_MD5,
+            ServerOptions::SASL_SCRAM_SHA_256,
+        )
+        ->setRequestHandler(new MyRequestHandler())
+);
+```
+
+### PLAIN Mechanism
+
+The `PLAIN` mechanism reuses your existing `RequestHandlerInterface::bind()` method. When a client authenticates with
+SASL PLAIN, the server extracts the username and password from the SASL credentials and calls `bind()` exactly as it
+would for a simple bind.
+
+**Note**: PLAIN transmits credentials in cleartext. Only enable it when the connection is protected by TLS (StartTLS
+or `setUseSsl`).
+
+```php
+namespace Foo;
+
+use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
+
+class MyRequestHandler extends GenericRequestHandler
+{
+    public function bind(string $username, string $password): bool
+    {
+        // Called for both simple binds and SASL PLAIN binds.
+        return $username === 'user' && $password === 'secret';
+    }
+}
+```
+
+### Challenge-Based Mechanisms (CRAM-MD5, DIGEST-MD5, and SCRAM)
+
+`CRAM-MD5`, `DIGEST-MD5`, and the `SCRAM-*` family are challenge-response mechanisms. The server issues a challenge to
+the client and verifies the client's response against a digest computed from the user's plaintext password. Because the
+verification is cryptographic, the server must be able to look up the plaintext (or equivalent) password for a given
+username.
+
+To support these mechanisms, your request handler must additionally implement
+`FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface`:
+
+```php
+interface SaslHandlerInterface
+{
+    public function getPassword(
+        string $username,
+        string $mechanism
+    ): ?string;
+}
+```
+
+Return the user's plaintext password for the given username and mechanism, or `null` if the user does not exist or
+should not be permitted to authenticate. Returning `null` results in a generic `invalidCredentials` error — the
+mechanism name and `null`/wrong-password cases are not distinguished in the response to avoid user enumeration.
+
+The `$mechanism` parameter lets you apply per-mechanism policy if needed (e.g. disallow weak mechanisms for certain
+users), but in most cases you can ignore it and return the same password regardless.
+
+Example handler supporting both simple binds and challenge-based SASL:
+
+```php
+namespace Foo;
+
+use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
+use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
+
+class MyRequestHandler extends GenericRequestHandler implements SaslHandlerInterface
+{
+    private array $users = [
+        'alice' => 'her-plaintext-password',
+        'bob'   => 'his-plaintext-password',
+    ];
+
+    // Used for simple binds and SASL PLAIN.
+    public function bind(string $username, string $password): bool
+    {
+        return isset($this->users[$username])
+            && $this->users[$username] === $password;
+    }
+
+    // Used for CRAM-MD5, DIGEST-MD5, and all SCRAM variants.
+    public function getPassword(string $username, string $mechanism): ?string
+    {
+        return $this->users[$username] ?? null;
+    }
+}
+```
+
+Then enable the desired mechanisms on the server:
+
+```php
+use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\LdapServer;
+use Foo\MyRequestHandler;
+
+$server = new LdapServer(
+    (new ServerOptions)
+        ->setSaslMechanisms(
+            ServerOptions::SASL_CRAM_MD5,
+            ServerOptions::SASL_DIGEST_MD5,
+            ServerOptions::SASL_SCRAM_SHA_256,
+        )
+        ->setRequestHandler(new MyRequestHandler())
+);
+
+$server->run();
+```
+
+**SCRAM variants**: The following constants are available for the SCRAM family. `SCRAM-SHA-256` is the recommended
+choice for new deployments ([RFC 7677](https://www.rfc-editor.org/rfc/rfc7677) standardises it as the preferred
+mechanism, citing SHA-1's known weaknesses).
+
+| Constant                             | Mechanism                       |
+|--------------------------------------|---------------------------------|
+| `ServerOptions::SASL_SCRAM_SHA_1`    | `SCRAM-SHA-1`                   |
+| `ServerOptions::SASL_SCRAM_SHA_256`  | `SCRAM-SHA-256` *(recommended)* |
+| `ServerOptions::SASL_SCRAM_SHA_384`  | `SCRAM-SHA-384`                 |
+| `ServerOptions::SASL_SCRAM_SHA_512`  | `SCRAM-SHA-512`                 |
+| `ServerOptions::SASL_SCRAM_SHA3_512` | `SCRAM-SHA3-512`                |
+
+Channel-binding (`-PLUS`) variants of each are also available (e.g. `SASL_SCRAM_SHA_256_PLUS`) for environments where
+TLS channel binding is required.
+
+**Note**: Because `getPassword()` must return the plaintext password, you cannot store passwords as one-way hashes
+(e.g. bcrypt) when supporting CRAM-MD5, DIGEST-MD5, or SCRAM. If one-way hashing is a requirement, use `PLAIN` over
+TLS instead, which allows password verification via `bind()`.
 
 ## StartTLS SSL Certificate Support
 

@@ -23,6 +23,8 @@ LDAP Server Configuration
     * [ServerOptions:setSslCert](#setsslcert)
     * [ServerOptions:setSslCertKey](#setsslcertkey)
     * [ServerOptions:setSslCertPassphrase](#setsslcertpassphrase)
+* [SASL Options](#sasl-options)
+    * [ServerOptions:setSaslMechanisms](#setsaslmechanisms)
 
 The LDAP server is configured through a `ServerOptions` object. The configuration object is passed to the server
 on construction:
@@ -253,3 +255,37 @@ to use an encrypted stream only for communication to the server.
 **Note**: LDAP over SSL, commonly referred to as LDAPS, is not an official LDAP standard. Support is dependent on the client / server specific implementations.
 
 **Default**: `false`
+
+## SASL Options
+
+------------------
+#### setSaslMechanisms
+
+The SASL mechanisms the server should support and advertise to clients via the `supportedSaslMechanisms` RootDSE attribute.
+Use the constants defined on `ServerOptions` to specify mechanisms:
+
+| Constant                         | Mechanism    | Handler Required                                     |
+|----------------------------------|--------------|------------------------------------------------------|
+| `ServerOptions::SASL_PLAIN`      | `PLAIN`      | `RequestHandlerInterface` (existing `bind()` method) |
+| `ServerOptions::SASL_CRAM_MD5`   | `CRAM-MD5`   | `SaslHandlerInterface`                               |
+| `ServerOptions::SASL_DIGEST_MD5` | `DIGEST-MD5` | `SaslHandlerInterface`                               |
+
+```php
+use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\LdapServer;
+
+$server = new LdapServer(
+    (new ServerOptions)
+        ->setSaslMechanisms(
+            ServerOptions::SASL_PLAIN,
+            ServerOptions::SASL_DIGEST_MD5,
+        )
+);
+```
+
+**Note**: The `PLAIN` mechanism transmits credentials in cleartext. It should only be enabled when the connection is
+protected by TLS (via StartTLS or `setUseSsl`).
+
+See [SASL Authentication](General-Usage.md#sasl-authentication) for full usage details.
+
+**Default**: `[]` (SASL disabled)

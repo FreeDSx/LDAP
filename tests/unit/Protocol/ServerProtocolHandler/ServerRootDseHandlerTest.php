@@ -179,6 +179,41 @@ final class ServerRootDseHandlerTest extends TestCase
         );
     }
 
+    public function test_it_should_include_supported_sasl_mechanisms_when_configured(): void
+    {
+        $this->options
+            ->setSaslMechanisms(ServerOptions::SASL_PLAIN, ServerOptions::SASL_CRAM_MD5);
+
+        $search = new LdapMessageRequest(
+            1,
+            (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope()
+        );
+
+        $this->mockQueue
+            ->expects($this->once())
+            ->method('sendMessage')
+            ->with(
+                self::callback(function (LdapMessageResponse $response) {
+                    /** @var SearchResultEntry $search */
+                    $search = $response->getResponse();
+                    $attribute = $search->getEntry()->get('supportedSaslMechanisms');
+
+                    return $attribute !== null
+                        && $attribute->has(ServerOptions::SASL_PLAIN)
+                        && $attribute->has(ServerOptions::SASL_CRAM_MD5);
+                }),
+                new LdapMessageResponse(
+                    1,
+                    new SearchResultDone(0)
+                ),
+            );
+
+        $this->subject->handleRequest(
+            $search,
+            $this->mockToken,
+        );
+    }
+
     public function test_it_should_only_return_attribute_names_from_the_RootDSE_if_requested(): void
     {
         $this->options

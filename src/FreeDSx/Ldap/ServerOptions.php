@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
@@ -21,6 +22,54 @@ use Psr\Log\LoggerInterface;
 
 final class ServerOptions
 {
+    public const SASL_PLAIN = 'PLAIN';
+
+    public const SASL_CRAM_MD5 = 'CRAM-MD5';
+
+    public const SASL_DIGEST_MD5 = 'DIGEST-MD5';
+
+    public const SASL_SCRAM_SHA_1 = 'SCRAM-SHA-1';
+
+    public const SASL_SCRAM_SHA_1_PLUS = 'SCRAM-SHA-1-PLUS';
+
+    public const SASL_SCRAM_SHA_224 = 'SCRAM-SHA-224';
+
+    public const SASL_SCRAM_SHA_224_PLUS = 'SCRAM-SHA-224-PLUS';
+
+    public const SASL_SCRAM_SHA_256 = 'SCRAM-SHA-256';
+
+    public const SASL_SCRAM_SHA_256_PLUS = 'SCRAM-SHA-256-PLUS';
+
+    public const SASL_SCRAM_SHA_384 = 'SCRAM-SHA-384';
+
+    public const SASL_SCRAM_SHA_384_PLUS = 'SCRAM-SHA-384-PLUS';
+
+    public const SASL_SCRAM_SHA_512 = 'SCRAM-SHA-512';
+
+    public const SASL_SCRAM_SHA_512_PLUS = 'SCRAM-SHA-512-PLUS';
+
+    public const SASL_SCRAM_SHA3_512 = 'SCRAM-SHA3-512';
+
+    public const SASL_SCRAM_SHA3_512_PLUS = 'SCRAM-SHA3-512-PLUS';
+
+    private const SUPPORTED_SASL_MECHANISMS = [
+        self::SASL_PLAIN,
+        self::SASL_CRAM_MD5,
+        self::SASL_DIGEST_MD5,
+        self::SASL_SCRAM_SHA_1,
+        self::SASL_SCRAM_SHA_1_PLUS,
+        self::SASL_SCRAM_SHA_224,
+        self::SASL_SCRAM_SHA_224_PLUS,
+        self::SASL_SCRAM_SHA_256,
+        self::SASL_SCRAM_SHA_256_PLUS,
+        self::SASL_SCRAM_SHA_384,
+        self::SASL_SCRAM_SHA_384_PLUS,
+        self::SASL_SCRAM_SHA_512,
+        self::SASL_SCRAM_SHA_512_PLUS,
+        self::SASL_SCRAM_SHA3_512,
+        self::SASL_SCRAM_SHA3_512_PLUS,
+    ];
+
     private string $ip = '0.0.0.0';
 
     private int $port = 389;
@@ -63,6 +112,11 @@ final class ServerOptions
     private ?LoggerInterface $logger = null;
 
     private ?ServerRunnerInterface $serverRunner = null;
+
+    /**
+     * @var string[]
+     */
+    private array $saslMechanisms = [];
 
     public function getIp(): string
     {
@@ -295,6 +349,31 @@ final class ServerOptions
         return $this;
     }
 
+    /**
+     * @return string[]
+     */
+    public function getSaslMechanisms(): array
+    {
+        return $this->saslMechanisms;
+    }
+
+    public function setSaslMechanisms(string ...$mechanisms): self
+    {
+        foreach ($mechanisms as $mechanism) {
+            if (!in_array($mechanism, self::SUPPORTED_SASL_MECHANISMS, true)) {
+                throw new InvalidArgumentException(sprintf(
+                    'The SASL mechanism "%s" is not supported. Supported mechanisms: %s.',
+                    $mechanism,
+                    implode(', ', self::SUPPORTED_SASL_MECHANISMS)
+                ));
+            }
+        }
+
+        $this->saslMechanisms = array_values($mechanisms);
+
+        return $this;
+    }
+
     public function setServerRunner(ServerRunnerInterface $serverRunner): self
     {
         $this->serverRunner = $serverRunner;
@@ -308,7 +387,7 @@ final class ServerOptions
     }
 
     /**
-     * @return array{ip: string, port: int, unix_socket: string, transport: string, idle_timeout: int, require_authentication: bool, allow_anonymous: bool, request_handler: ?RequestHandlerInterface, rootdse_handler: ?RootDseHandlerInterface, paging_handler: ?PagingHandlerInterface, logger: ?LoggerInterface, use_ssl: bool, ssl_cert: ?string, ssl_cert_key: ?string, ssl_cert_passphrase: ?string, dse_alt_server: ?string, dse_naming_contexts: string[], dse_vendor_name: string, dse_vendor_version: ?string}
+     * @return array{ip: string, port: int, unix_socket: string, transport: string, idle_timeout: int, require_authentication: bool, allow_anonymous: bool, request_handler: ?RequestHandlerInterface, rootdse_handler: ?RootDseHandlerInterface, paging_handler: ?PagingHandlerInterface, logger: ?LoggerInterface, use_ssl: bool, ssl_cert: ?string, ssl_cert_key: ?string, ssl_cert_passphrase: ?string, dse_alt_server: ?string, dse_naming_contexts: string[], dse_vendor_name: string, dse_vendor_version: ?string, sasl_mechanisms: string[]}
      */
     public function toArray(): array
     {
@@ -332,6 +411,7 @@ final class ServerOptions
             'dse_naming_contexts' => $this->getDseNamingContexts(),
             'dse_vendor_name' => $this->getDseVendorName(),
             'dse_vendor_version' => $this->getDseVendorVersion(),
+            'sasl_mechanisms' => $this->getSaslMechanisms(),
         ];
     }
 }

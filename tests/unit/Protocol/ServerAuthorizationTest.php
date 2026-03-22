@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use PHPUnit\Framework\TestCase;
 
 final class ServerAuthorizationTest extends TestCase
@@ -131,6 +132,37 @@ final class ServerAuthorizationTest extends TestCase
     {
         self::assertTrue($this->subject->isAuthenticationTypeSupported(
             Operations::bind('foo', 'bar')
+        ));
+    }
+
+    public function test_it_should_not_allow_sasl_bind_when_no_mechanisms_are_configured(): void
+    {
+        self::assertFalse($this->subject->isAuthenticationTypeSupported(
+            new SaslBindRequest(ServerOptions::SASL_PLAIN)
+        ));
+    }
+
+    public function test_it_should_allow_sasl_bind_when_the_mechanism_is_configured(): void
+    {
+        $this->subject = new ServerAuthorization(
+            (new ServerOptions())
+                ->setSaslMechanisms(ServerOptions::SASL_PLAIN),
+        );
+
+        self::assertTrue($this->subject->isAuthenticationTypeSupported(
+            new SaslBindRequest(ServerOptions::SASL_PLAIN)
+        ));
+    }
+
+    public function test_it_should_not_allow_sasl_bind_for_a_mechanism_that_is_not_configured(): void
+    {
+        $this->subject = new ServerAuthorization(
+            (new ServerOptions())
+                ->setSaslMechanisms(ServerOptions::SASL_PLAIN),
+        );
+
+        self::assertFalse($this->subject->isAuthenticationTypeSupported(
+            new SaslBindRequest(ServerOptions::SASL_CRAM_MD5)
         ));
     }
 
