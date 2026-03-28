@@ -13,11 +13,13 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyHandler;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyPagingHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
+use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -45,9 +47,12 @@ class LdapServer
      * Runs the LDAP server. Binds the socket on the request IP/port and sends it to the server runner.
      *
      * @throws ConnectionException
+     * @throws InvalidArgumentException
      */
     public function run(): void
     {
+        $this->validateSaslConfiguration();
+
         $socketServer = $this->container
             ->get(SocketServerFactory::class)
             ->makeAndBind();
@@ -103,6 +108,33 @@ class LdapServer
         $this->options->setLogger($logger);
 
         return $this;
+    }
+
+    /**
+     * Validates that the SASL configuration is consistent before the server starts.
+     *
+     * @throws InvalidArgumentException
+     */
+    private function validateSaslConfiguration(): void
+    {
+        $challengeMechanisms = array_diff(
+            $this->options->getSaslMechanisms(),
+            [ServerOptions::SASL_PLAIN],
+        );
+
+        if (empty($challengeMechanisms)) {
+            return;
+        }
+
+        $handler = $this->options->getRequestHandler();
+
+        if (!$handler instanceof SaslHandlerInterface) {
+            throw new InvalidArgumentException(sprintf(
+                'The SASL mechanism(s) [%s] require the request handler to implement %s.',
+                implode(', ', $challengeMechanisms),
+                SaslHandlerInterface::class,
+            ));
+        }
     }
 
     /**

@@ -52,13 +52,16 @@ $ldap->bindSasl([
 
 The following table details mechanisms / options that are recognized when doing a SASL bind:
 
-|                 | `DIGEST-MD5` | `CRAM-MD5` | `PLAIN` | `ANONYMOUS` |
-|-----------------|:------------:|:----------:|:-------:|:-----------:|
-| `username`      |      X       |     X      |    X    |      X      |
-| `password`      |      X       |     X      |    X    |             |
-| `use_integrity` |      X       |            |         |             |
-| `trace`         |              |            |         |      X      |
-| `host`          |      X       |            |         |             |
+|                 | `DIGEST-MD5` | `CRAM-MD5` | `SCRAM-*` | `PLAIN` | `ANONYMOUS` |
+|-----------------|:------------:|:----------:|:---------:|:-------:|:-----------:|
+| `username`      |      X       |     X      |     X     |    X    |      X      |
+| `password`      |      X       |     X      |     X     |    X    |             |
+| `use_integrity` |      X       |            |           |         |             |
+| `trace`         |              |            |           |         |      X      |
+| `host`          |      X       |            |           |         |             |
+
+`SCRAM-*` refers to the SCRAM family of mechanisms: `SCRAM-SHA-1`, `SCRAM-SHA-256`, `SCRAM-SHA-384`, `SCRAM-SHA-512`,
+`SCRAM-SHA3-512`, and their channel-binding (`-PLUS`) variants. `SCRAM-SHA-256` is recommended for new deployments.
 
 ## Options
 

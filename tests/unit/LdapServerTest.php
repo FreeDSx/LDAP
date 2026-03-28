@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
@@ -22,12 +23,18 @@ use FreeDSx\Ldap\Server\RequestHandler\ProxyPagingHandler;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
+use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\SocketServer;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+
+/**
+ * Combined interface so PHPUnit can mock both at once.
+ */
+interface SaslRequestHandlerInterface extends RequestHandlerInterface, SaslHandlerInterface {}
 
 class LdapServerTest extends TestCase
 {
@@ -135,9 +142,57 @@ class LdapServerTest extends TestCase
                 ],
                 'dse_vendor_name' => "FreeDSx",
                 'dse_vendor_version' => null,
+                'sasl_mechanisms' => [],
             ],
             $this->subject->getOptions()->toArray(),
         );
+    }
+
+    public function test_it_throws_when_challenge_mechanisms_are_configured_without_a_sasl_handler(): void
+    {
+        $this->options->setSaslMechanisms(ServerOptions::SASL_CRAM_MD5);
+
+        self::expectException(InvalidArgumentException::class);
+
+        $this->subject->run();
+    }
+
+    public function test_it_throws_when_challenge_mechanisms_are_configured_with_a_non_sasl_handler(): void
+    {
+        $this->options
+            ->setSaslMechanisms(ServerOptions::SASL_CRAM_MD5)
+            ->setRequestHandler($this->createMock(RequestHandlerInterface::class));
+
+        self::expectException(InvalidArgumentException::class);
+
+        $this->subject->run();
+    }
+
+    public function test_it_does_not_throw_when_challenge_mechanisms_are_configured_with_a_sasl_handler(): void
+    {
+        /** @var RequestHandlerInterface&SaslHandlerInterface&MockObject $mockSaslHandler */
+        $mockSaslHandler = $this->createMock(SaslRequestHandlerInterface::class);
+
+        $this->mockServerRunner->method('run');
+
+        $this->options
+            ->setSaslMechanisms(ServerOptions::SASL_CRAM_MD5)
+            ->setRequestHandler($mockSaslHandler);
+
+        $this->subject->run();
+
+        $this->expectNotToPerformAssertions();
+    }
+
+    public function test_it_does_not_throw_for_plain_mechanism_without_a_sasl_handler(): void
+    {
+        $this->mockServerRunner->method('run');
+
+        $this->options->setSaslMechanisms(ServerOptions::SASL_PLAIN);
+
+        $this->subject->run();
+
+        $this->expectNotToPerformAssertions();
     }
 
     public function test_it_should_make_a_proxy_server(): void

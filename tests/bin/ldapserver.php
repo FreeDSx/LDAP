@@ -16,6 +16,7 @@ use FreeDSx\Ldap\Server\Paging\PagingResponse;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
+use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
 use FreeDSx\Ldap\ServerOptions;
 
 require __DIR__ . '/../../vendor/autoload.php';
@@ -81,7 +82,7 @@ class LdapServerPagingHandler implements PagingHandlerInterface
     }
 }
 
-class LdapServerRequestHandler extends GenericRequestHandler
+class LdapServerRequestHandler extends GenericRequestHandler implements SaslHandlerInterface
 {
     /**
      * @var array<string, string>
@@ -89,6 +90,13 @@ class LdapServerRequestHandler extends GenericRequestHandler
     private array $users = [
         'cn=user,dc=foo,dc=bar' => '12345',
     ];
+
+    public function getPassword(
+        string $username,
+        string $mechanism,
+    ): ?string {
+        return $this->users[$username] ?? null;
+    }
 
     public function bind(string $username, string $password): bool
     {
@@ -204,20 +212,28 @@ if ($transport === 'ssl') {
     $useSsl = true;
 }
 
-$server = new LdapServer(
-    (new ServerOptions())
-        ->setRequestHandler(new LdapServerRequestHandler())
-        ->setPort(3389)
-        ->setTransport($transport)
-        ->setSslCert($sslCert)
-        ->setSslCertKey($sslKey)
-        ->setUseSsl($useSsl)
-        ->setPagingHandler(
-            $handler === 'paging'
-                ? new LdapServerPagingHandler()
-                : null
-        )
-);
+$options = (new ServerOptions())
+    ->setRequestHandler(new LdapServerRequestHandler())
+    ->setPort(3389)
+    ->setTransport($transport)
+    ->setSslCert($sslCert)
+    ->setSslCertKey($sslKey)
+    ->setUseSsl($useSsl)
+    ->setPagingHandler(
+        $handler === 'paging'
+            ? new LdapServerPagingHandler()
+            : null
+    );
+
+if ($handler === 'sasl') {
+    $options->setSaslMechanisms(
+        ServerOptions::SASL_PLAIN,
+        ServerOptions::SASL_CRAM_MD5,
+        ServerOptions::SASL_SCRAM_SHA_256,
+    );
+}
+
+$server = new LdapServer($options);
 
 echo "server starting..." . PHP_EOL;
 

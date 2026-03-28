@@ -97,9 +97,13 @@ abstract class BindRequest implements RequestInterface
         $version = $version->getValue();
         $name = $name->getValue();
 
+        if ($auth->getTagNumber() === 3) {
+            return SaslBindRequest::fromAsn1($auth);
+        }
+
         if ($auth->getTagNumber() !== 0) {
             throw new ProtocolException(sprintf(
-                'Only a simple bind is currently supported, but got: %s',
+                'The auth choice tag %s in the bind request is not supported.',
                 $auth->getTagNumber()
             ));
         }

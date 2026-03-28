@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
+use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
@@ -69,6 +70,11 @@ class ServerAuthorization
     {
         if ($request instanceof AnonBindRequest) {
             return $this->options->isAllowAnonymous();
+        }
+
+        if ($request instanceof SaslBindRequest) {
+            return !empty($this->options->getSaslMechanisms())
+                && in_array($request->getMechanism(), $this->options->getSaslMechanisms(), true);
         }
 
         return $request instanceof SimpleBindRequest;

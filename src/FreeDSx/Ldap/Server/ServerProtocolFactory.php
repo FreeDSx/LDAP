@@ -15,7 +15,9 @@ namespace FreeDSx\Ldap\Server;
 
 use FreeDSx\Ldap\Protocol\Authenticator;
 use FreeDSx\Ldap\Protocol\Bind\AnonymousBind;
+use FreeDSx\Ldap\Protocol\Bind\SaslBind;
 use FreeDSx\Ldap\Protocol\Bind\SimpleBind;
+use FreeDSx\Sasl\Sasl;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
@@ -36,6 +38,26 @@ class ServerProtocolFactory
     {
         $serverQueue = new ServerQueue($socket);
 
+        $requestHandler = $this->handlerFactory->makeRequestHandler();
+
+        $authenticators = [
+            new SimpleBind(
+                queue: $serverQueue,
+                dispatcher: $requestHandler,
+            ),
+            new AnonymousBind($serverQueue),
+        ];
+        $saslMechanisms = $this->options->getSaslMechanisms();
+
+        if (!empty($saslMechanisms)) {
+            $authenticators[] = new SaslBind(
+                queue: $serverQueue,
+                dispatcher: $requestHandler,
+                sasl: new Sasl(['supported' => $saslMechanisms]),
+                mechanisms: $saslMechanisms,
+            );
+        }
+
         return new ServerProtocolHandler(
             queue: $serverQueue,
             protocolHandlerFactory: new ServerProtocolHandlerFactory(
@@ -45,13 +67,7 @@ class ServerProtocolFactory
                 queue: $serverQueue,
             ),
             authorizer: $this->serverAuthorization,
-            authenticator: new Authenticator([
-                new SimpleBind(
-                    queue: $serverQueue,
-                    dispatcher: $this->handlerFactory->makeRequestHandler(),
-                ),
-                new AnonymousBind($serverQueue),
-            ]),
+            authenticator: new Authenticator($authenticators),
             logger: $this->options->getLogger(),
         );
     }
