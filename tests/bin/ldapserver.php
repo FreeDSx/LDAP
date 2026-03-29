@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
 use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
+use FreeDSx\Ldap\Server\RequestHandler\SearchResult;
 use FreeDSx\Ldap\ServerOptions;
 
 require __DIR__ . '/../../vendor/autoload.php';
@@ -175,19 +176,21 @@ class LdapServerRequestHandler extends GenericRequestHandler implements SaslHand
         );
     }
 
-    public function search(RequestContext $context, SearchRequest $search): Entries
+    public function search(RequestContext $context, SearchRequest $search): SearchResult
     {
         $this->logRequest(
             'search',
             "base-dn => {$search->getBaseDn()?->toString()}, filter => {$search->getFilter()->toString()}"
         );
 
-        return new Entries(
-            Entry::fromArray(
-                'cn=user,dc=foo,dc=bar',
-                [
-                    'name' => 'user',
-                ]
+        return SearchResult::make(
+            new Entries(
+                Entry::fromArray(
+                    'cn=user,dc=foo,dc=bar',
+                    [
+                        'name' => 'user',
+                    ]
+                )
             )
         );
     }

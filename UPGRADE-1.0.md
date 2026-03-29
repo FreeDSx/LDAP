@@ -7,6 +7,7 @@ Upgrading from 0.x to 1.0
     * [Server Options](#server-options)
     * [Constructing a Proxy Server](#constructing-a-proxy-server)
     * [Using a Custom ServerRunner](#using-a-custom-serverrunner)
+    * [Request Handler Search Return Type](#request-handler-search-return-type)
 
 ## Client Changes
 
@@ -175,4 +176,37 @@ $server = new LdapServer(
         ->setRequestHandler(new LdapProxyHandler())
 );
 $server->run();
+```
+
+## Request Handler Search Return Type
+
+The `search()` method of `RequestHandlerInterface` now returns `SearchResult` instead of `Entries`. Wrap your returned
+entries in `SearchResult::make()`. The new return type also allows returning response controls and non-success result
+codes (e.g. for partial results).
+
+**Before**:
+
+```php
+use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Server\RequestContext;
+
+public function search(RequestContext $context, SearchRequest $search): Entries
+{
+    return new Entries(/* ... */);
+}
+```
+
+**After**:
+
+```php
+use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Server\RequestContext;
+use FreeDSx\Ldap\Server\RequestHandler\SearchResult;
+
+public function search(RequestContext $context, SearchRequest $search): SearchResult
+{
+    return SearchResult::make(new Entries(/* ... */));
+}
 ```

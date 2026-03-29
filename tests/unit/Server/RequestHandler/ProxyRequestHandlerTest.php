@@ -24,12 +24,16 @@ use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\CompareResponse;
+use FreeDSx\Ldap\Operation\Response\SearchResponse;
+use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Search\Result\EntryResult;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
+use FreeDSx\Ldap\Server\RequestHandler\SearchResult;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -125,15 +129,54 @@ final class ProxyRequestHandlerTest extends TestCase
             Filters::present('objectClass'),
             'cn'
         )->base('dc=foo');
-        $entries = new Entries(Entry::create('dc=foo'));
+        $entry = Entry::create('dc=foo');
+        $entries = new Entries($entry);
 
         $this->mockClient
             ->expects($this->once())
-            ->method('search')
-            ->willReturn($entries);
+            ->method('sendAndReceive')
+            ->with($search)
+            ->willReturn(new LdapMessageResponse(
+                1,
+                new SearchResponse(
+                    new LdapResult(ResultCode::SUCCESS),
+                    [new EntryResult(new LdapMessageResponse(1, new SearchResultEntry($entry)))],
+                )
+            ));
 
         self::assertEquals(
-            $entries,
+            SearchResult::make($entries),
+            $this->subject->search($this->mockContext, $search),
+        );
+    }
+
+    public function test_it_should_pass_through_a_non_success_result_code_from_the_proxied_search(): void
+    {
+        $search = Operations::search(
+            Filters::present('objectClass'),
+            'cn'
+        )->base('dc=foo');
+        $entry = Entry::create('dc=foo');
+        $entries = new Entries($entry);
+
+        $this->mockClient
+            ->expects($this->once())
+            ->method('sendAndReceive')
+            ->with($search)
+            ->willReturn(new LdapMessageResponse(
+                1,
+                new SearchResponse(
+                    new LdapResult(ResultCode::SIZE_LIMIT_EXCEEDED, '', 'Result set truncated.'),
+                    [new EntryResult(new LdapMessageResponse(1, new SearchResultEntry($entry)))],
+                )
+            ));
+
+        self::assertEquals(
+            SearchResult::makeWithResultCode(
+                $entries,
+                ResultCode::SIZE_LIMIT_EXCEEDED,
+                'Result set truncated.',
+            ),
             $this->subject->search($this->mockContext, $search),
         );
     }

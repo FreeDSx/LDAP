@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\RequestHandler;
 
-use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
@@ -110,7 +109,7 @@ class GenericRequestHandler implements RequestHandlerInterface
     public function search(
         RequestContext $context,
         SearchRequest $search
-    ): Entries {
+    ): SearchResult {
         throw new OperationException('The search operation is not supported.');
     }
 }

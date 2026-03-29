@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -26,6 +27,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSearchHandler;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\RequestHandler\SearchResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -67,7 +69,7 @@ final class ServerSearchHandlerTest extends TestCase
             ->expects($this->once())
             ->method('search')
             ->with(self::anything(), $search->getRequest())
-            ->willReturn($entries);
+            ->willReturn(SearchResult::make($entries));
 
         $this->mockQueue
             ->expects($this->once())
@@ -117,6 +119,78 @@ final class ServerSearchHandlerTest extends TestCase
                     "Fail"
                 )
             )));
+
+        $this->subject->handleRequest(
+            $search,
+            $this->mockToken,
+        );
+    }
+
+    public function test_it_should_use_the_result_code_from_a_non_success_handler_result(): void
+    {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::equal('foo', 'bar')))->base('dc=foo,dc=bar')
+        );
+
+        $entries = new Entries(Entry::create('dc=foo,dc=bar', ['cn' => 'foo']));
+        $resultEntry = new LdapMessageResponse(2, new SearchResultEntry(Entry::create('dc=foo,dc=bar', ['cn' => 'foo'])));
+
+        $this->mockRequestHandler
+            ->expects($this->once())
+            ->method('search')
+            ->willReturn(SearchResult::makeWithResultCode(
+                $entries,
+                ResultCode::SIZE_LIMIT_EXCEEDED,
+                'Result set truncated.',
+            ));
+
+        $this->mockQueue
+            ->expects($this->once())
+            ->method('sendMessage')
+            ->with(
+                $resultEntry,
+                new LdapMessageResponse(
+                    2,
+                    new SearchResultDone(
+                        ResultCode::SIZE_LIMIT_EXCEEDED,
+                        'dc=foo,dc=bar',
+                        'Result set truncated.',
+                    ),
+                ),
+            );
+
+        $this->subject->handleRequest(
+            $search,
+            $this->mockToken,
+        );
+    }
+
+    public function test_it_should_pass_response_controls_from_the_handler_result_to_the_client(): void
+    {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::equal('foo', 'bar')))->base('dc=foo,dc=bar')
+        );
+
+        $entries = new Entries();
+        $control = new Control('1.2.3.4');
+
+        $this->mockRequestHandler
+            ->expects($this->once())
+            ->method('search')
+            ->willReturn(SearchResult::make($entries, $control));
+
+        $this->mockQueue
+            ->expects($this->once())
+            ->method('sendMessage')
+            ->with(
+                new LdapMessageResponse(
+                    2,
+                    new SearchResultDone(0, 'dc=foo,dc=bar'),
+                    $control,
+                ),
+            );
 
         $this->subject->handleRequest(
             $search,

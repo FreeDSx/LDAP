@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\RequestHandler;
 
-use FreeDSx\Ldap\Entry\Entries;
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
@@ -94,16 +92,14 @@ interface RequestHandlerInterface
     ): void;
 
     /**
-     * A search request. This should return an entries collection object.
-     *
-     * @return Entries<Entry>
+     * A search request. This should return a SearchResult object.
      *
      * @throws OperationException
      */
     public function search(
         RequestContext $context,
         SearchRequest $search,
-    ): Entries;
+    ): SearchResult;
 
     /**
      * A simple username/password bind. It should simply return true or false for whether the username and password is

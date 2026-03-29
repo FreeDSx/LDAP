@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingUnsupportedHandler;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\RequestHandler\SearchResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -75,7 +76,7 @@ final class ServerPagingUnsupportedHandlerTest extends TestCase
             ->expects($this->once())
             ->method('search')
             ->with(self::anything(), $search->getRequest())
-            ->willReturn($entries);
+            ->willReturn(SearchResult::make($entries));
 
         $this->mockQueue
             ->expects($this->once())
