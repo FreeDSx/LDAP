@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Control\Sync\SyncStateControl;
@@ -501,6 +502,50 @@ final class ClientSyncHandlerTest extends TestCase
         self::assertSame(
             [$referral],
             $referralsProcessed,
+        );
+    }
+
+    /**
+     * OpenLDAP ITS#6138 (https://www.openldap.com/lists/openldap-bugs/200906/msg00012.html):
+     * A race between Cancel and Syncprov can tear down the connection as a side effect of
+     * cancel.c setting o_abandon before o_cancel. When a cancel was already dispatched, treat
+     * a subsequent ConnectionException as a successful cancellation rather than a failure.
+     */
+    public function test_a_connection_exception_after_cancel_is_treated_as_successful_cancellation(): void
+    {
+        $syncRequest = new SyncRequest();
+        $syncRequest->useEntryHandler(function (): void {
+            throw new CancelRequestException();
+        });
+
+        $messageTo = new LdapMessageRequest(
+            1,
+            $syncRequest,
+            new SyncRequestControl(),
+        );
+
+        $this->mockQueue
+            ->method('generateId')
+            ->willReturn(2);
+
+        $this->mockQueue
+            ->method('getMessage')
+            ->willThrowException(new ConnectionException('The connection to the server has been lost.'));
+
+        $result = $this->subject->handleResponse(
+            $messageTo,
+            new LdapMessageResponse(
+                1,
+                new SearchResultEntry(new Entry('foo')),
+                new SyncStateControl(SyncStateControl::STATE_ADD, 'uuid'),
+            ),
+        );
+
+        self::assertInstanceOf(LdapMessageResponse::class, $result);
+        self::assertInstanceOf(SearchResultDone::class, $result->getResponse());
+        self::assertSame(
+            ResultCode::CANCELED,
+            $result->getResponse()->getResultCode()
         );
     }
 

@@ -3,6 +3,7 @@ services:
     build:
       context: ../../..
       dockerfile: tests/resources/openldap/Dockerfile
+    restart: on-failure
     ports:
       - "389:389"
       - "636:636"
