@@ -22,13 +22,28 @@ use FreeDSx\Ldap\Search\Filters;
 
 class LdapServerTest extends ServerTestCase
 {
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+
+        if (!extension_loaded('pcntl')) {
+            return;
+        }
+
+        static::initSharedServer('ldapserver', 'tcp');
+    }
+
+    public static function tearDownAfterClass(): void
+    {
+        parent::tearDownAfterClass();
+        static::tearDownSharedServer();
+    }
+
     public function setUp(): void
     {
         $this->setServerMode('ldapserver');
 
         parent::setUp();
-
-        $this->createServerProcess('tcp');
     }
 
     public function testItCanBind(): void

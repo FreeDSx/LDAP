@@ -39,9 +39,9 @@ class PagingTest extends LdapTestCase
         $this->search = Operations::search(
             Filters::equal(
                 'objectClass',
-                'inetOrgPerson'
+                'organizationalUnit'
             ),
-            'cn'
+            'ou'
         );
 
         $this->paging = new Paging(
@@ -60,19 +60,19 @@ class PagingTest extends LdapTestCase
 
     public function testPagingAll(): void
     {
-        $entries = $this->paging->getEntries();
+        $entries = $this->paging->getEntries(4);
 
         $this->assertCount(
-            1000,
+            4,
             $entries
         );
 
         while ($this->paging->hasEntries()) {
-            $entries->add(...$this->paging->getEntries());
+            $entries->add(...$this->paging->getEntries(4));
         }
 
         $this->assertCount(
-            10001,
+            12,
             $entries
         );
     }
@@ -84,30 +84,30 @@ class PagingTest extends LdapTestCase
         $operation = Operations::search(
             Filters::equal(
                 'objectClass',
-                'inetOrgPerson'
+                'organizationalUnit'
             ),
-            'cn'
+            'ou'
         );
         $operation->useEntryHandler(fn (EntryResult $result) => $entries->add($result->getEntry()));
 
         $this->paging = $this->client->paging($operation);
 
         while ($this->paging->hasEntries()) {
-            $this->paging->getEntries();
+            $this->paging->getEntries(4);
         }
 
         $this->assertCount(
-            10001,
+            12,
             $entries
         );
     }
 
     public function testPagingSpecificSize(): void
     {
-        $entries = $this->paging->getEntries(100);
+        $entries = $this->paging->getEntries(4);
 
         $this->assertCount(
-            100,
+            4,
             $entries
         );
 
