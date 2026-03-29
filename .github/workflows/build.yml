@@ -18,11 +18,51 @@ jobs:
         with:
           php-version: ${{ matrix.php-versions }}
           coverage: xdebug
-          tools: composer:v2.5
+          tools: composer:2.9
 
-      - name: Install OpenLDAP
+      # Linux: OpenLDAP via Docker
+      - name: Create slapd socket directory
         if: runner.os == 'Linux'
-        run: sudo ./tests/resources/openldap/setup.sh
+        run: sudo mkdir -p /var/run/slapd && sudo chmod 777 /var/run/slapd
+
+      - name: Start OpenLDAP
+        if: runner.os == 'Linux'
+        run: docker compose -f tests/resources/openldap/docker-compose.yml up -d --build --wait
+
+      - name: Show OpenLDAP logs on failure
+        if: failure() && runner.os == 'Linux'
+        run: docker compose -f tests/resources/openldap/docker-compose.yml logs --tail=100
+
+      - name: Add foo.com hosts entry
+        if: runner.os == 'Linux'
+        run: echo "127.0.0.1 foo.com" | sudo tee -a /etc/hosts
+
+      # Windows: OpenLDAP natively in WSL1 (WSL2 is unavailable on GitHub-hosted runners —
+      # they are VMs and do not support the nested Hyper-V that WSL2 requires).
+      # WSL1 shares the Windows network stack, so ports bound inside WSL1 are reachable
+      # from Windows as localhost.
+      - name: Setup WSL Ubuntu
+        if: runner.os == 'Windows'
+        uses: Vampire/setup-wsl@v3
+        with:
+          distribution: Ubuntu-22.04
+
+      - name: Install OpenLDAP in WSL
+        if: runner.os == 'Windows'
+        shell: wsl-bash {0}
+        run: |
+          cd "$(wslpath "$GITHUB_WORKSPACE")"
+          sudo bash tests/resources/openldap/setup.sh
+
+      - name: Show slapd logs on failure (Windows)
+        if: failure() && runner.os == 'Windows'
+        shell: wsl-bash {0}
+        run: sudo cat /var/log/syslog | grep slapd || true
+
+      - name: Add foo.com hosts entry (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Add-Content -Path "C:\Windows\System32\drivers\etc\hosts" -Value "127.0.0.1 foo.com"
 
       - name: Get Composer Cache Directory
         id: composer-cache
@@ -42,10 +82,5 @@ jobs:
       - name: Run Unit Tests
         run: composer run-script test-unit
 
-      # Not ideal, but we run as root here because the LDAP server needs access to certs / keys system directories.
-      # For tests this seems fine, but in a real scenario this would be bad...
       - name: Run Integration Tests
-        if: runner.os == 'Linux'
-        env:
-          COMPOSER_ALLOW_SUPERUSER: 1
-        run: sudo composer run-script test-integration
+        run: composer run-script test-integration

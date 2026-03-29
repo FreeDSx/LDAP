@@ -1,0 +1,17 @@
+services:
+  openldap:
+    build:
+      context: ../../..
+      dockerfile: tests/resources/openldap/Dockerfile
+    restart: on-failure
+    ports:
+      - "389:389"
+      - "636:636"
+    volumes:
+      - ../cert:/cert-output
+      - /var/run/slapd:/var/run/slapd
+    healthcheck:
+      test: ["CMD", "ldapwhoami", "-H", "ldap://localhost", "-x"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

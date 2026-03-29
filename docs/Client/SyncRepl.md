@@ -230,6 +230,14 @@ process, you must throw a `CancelRequestException` within one of the [sync handl
 **Note**: By default, the handlers will not receive any further messages once a cancellation is issued. To continue to
 receive messages until the server processes the cancellation, you can call `useContinueOnCancel()` on the SyncRepl client.
 
+> [!WARNING]
+> **OpenLDAP may crash when cancelling a SyncRepl operation.**
+>
+> Due to a known race condition in OpenLDAP ([ITS#6138](https://www.openldap.com/lists/openldap-bugs/200906/msg00012.html)),
+> sending a Cancel during an active SyncRepl session can cause `slapd` to crash. The race occurs because `cancel.c` sets
+> `o_abandon` before `o_cancel`, creating a window where the Syncprov overlay acts on the abandon flag and tears down
+> the connection before the cancel flag is set — an unintended side effect, not RFC 3909-compliant behaviour.
+
 ```php
 use FreeDSx\Ldap\Exception\CancelRequestException;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;

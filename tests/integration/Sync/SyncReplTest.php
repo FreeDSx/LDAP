@@ -23,6 +23,19 @@ class SyncReplTest extends LdapTestCase
 {
     private ?Process $syncWriteProcess = null;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            $this->markTestSkipped('SyncRepl tests require a native Linux slapd instance.');
+        }
+
+        // OpenLDAP ITS#6138: a cancel during SyncRepl can crash slapd. The Docker container is
+        // configured with restart: on-failure, so we wait here for it to recover before each test.
+        $this->waitForServer();
+    }
+
     private ?string $syncSignalFile = null;
 
     public function tearDown(): void
@@ -54,7 +67,9 @@ class SyncReplTest extends LdapTestCase
 
     public function testItCanCancelTheSync(): void
     {
-        $client = $this->getClient();
+        $client = $this->getClient(
+            $this->makeOptions()->setTimeoutRead(180)
+        );
         $this->bindClient($client);
 
         $count = 0;
@@ -136,5 +151,36 @@ class SyncReplTest extends LdapTestCase
         $this->syncWriteProcess = $process;
 
         return $process;
+    }
+
+    private function waitForServer(): void
+    {
+        $server = (string) (getenv('LDAP_SERVER') ?: 'localhost');
+        $port = (int) (getenv('LDAP_PORT') ?: 389);
+
+        for ($i = 0; $i < 30; $i++) {
+            $connection = @fsockopen(
+                $server,
+                $port,
+                $errno,
+                $errstr,
+                1.0
+            );
+
+            if ($connection !== false) {
+                fclose($connection);
+
+                return;
+            }
+
+            sleep(1);
+        }
+
+        $this->fail(sprintf(
+            'LDAP server at %s:%d did not become available within %d seconds.',
+            $server,
+            $port,
+            30,
+        ));
     }
 }

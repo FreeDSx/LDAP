@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Ldap\Operation\Request\SyncRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
@@ -113,6 +114,18 @@ class ClientSyncHandler extends ClientBasicHandler
             } while (!$this->isSyncComplete($searchDone));
 
             return $searchDone;
+        } catch (ConnectionException $e) {
+            if (!$this->wasCancelHandled) {
+                throw $e;
+            }
+            // OpenLDAP ITS#6138 (https://www.openldap.com/lists/openldap-bugs/200906/msg00012.html):
+            // a race between Cancel and Syncprov can tear down the connection as a side effect
+            // of cancel.c setting o_abandon before o_cancel. The cancel was already sent, so
+            // treat the connection loss as a successful cancellation.
+            return new LdapMessageResponse(
+                $messageTo->getMessageId(),
+                new SearchResultDone(ResultCode::CANCELED),
+            );
         } finally {
             $this->resetRequestHandlers();
         }
