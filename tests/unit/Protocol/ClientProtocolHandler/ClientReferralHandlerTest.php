@@ -22,9 +22,12 @@ use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
+use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler\ClientReferralHandler;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -294,6 +297,125 @@ class ClientReferralHandlerTest extends TestCase
                     )
                 )
             )
+        );
+    }
+
+    public function test_it_should_ignore_referrals_and_return_null_when_ignore_is_set(): void
+    {
+        $this->subject = new ClientReferralHandler(
+            $this->options->setReferral('ignore')
+        );
+
+        $response = new LdapMessageResponse(1, new DeleteResponse(ResultCode::REFERRAL, '', 'foo', new LdapUrl('foo')));
+        $request = new LdapMessageRequest(1, new DeleteRequest('cn=foo'));
+
+        self::assertNull(
+            $this->subject->handleResponse($request, $response)
+        );
+    }
+
+    public function test_it_should_map_ldap_url_scope_base_to_scope_base_object(): void
+    {
+        $this->options
+            ->setReferral('follow')
+            ->setReferralLimit(10)
+            ->setReferralChaser($this->mockChaser);
+
+        $referralUrl = new LdapUrl('foo');
+        $referralUrl->setScope(LdapUrl::SCOPE_BASE);
+        $referralUrl->setDn('cn=foo,dc=example,dc=com');
+
+        $this->mockChaser->method('chase')->willReturn(null);
+
+        $sentRequest = null;
+        $this->mockLdapClient
+            ->method('send')
+            ->willReturnCallback(function (SearchRequest $req) use (&$sentRequest) {
+                $sentRequest = $req;
+                return new LdapMessageResponse(2, new SearchResultDone(0));
+            });
+
+        $this->subject->handleResponse(
+            new LdapMessageRequest(1, new SearchRequest(Filters::present('objectClass'))),
+            new LdapMessageResponse(1, new SearchResultDone(ResultCode::REFERRAL, '', '', $referralUrl))
+        );
+
+        self::assertInstanceOf(SearchRequest::class, $sentRequest);
+        self::assertSame(
+            SearchRequest::SCOPE_BASE_OBJECT,
+            $sentRequest->getScope(),
+        );
+    }
+
+    public function test_it_should_map_ldap_url_scope_one_to_scope_single_level(): void
+    {
+        $this->options
+            ->setReferral('follow')
+            ->setReferralLimit(10)
+            ->setReferralChaser($this->mockChaser);
+
+        $referralUrl = new LdapUrl('foo');
+        $referralUrl->setScope(LdapUrl::SCOPE_ONE);
+        $referralUrl->setDn('cn=foo,dc=example,dc=com');
+
+        $this->mockChaser->method('chase')->willReturn(null);
+
+        $sentRequest = null;
+        $this->mockLdapClient
+            ->method('send')
+            ->willReturnCallback(function (SearchRequest $req) use (&$sentRequest) {
+                $sentRequest = $req;
+                return new LdapMessageResponse(2, new SearchResultDone(0));
+            });
+
+        $this->subject->handleResponse(
+            new LdapMessageRequest(1, new SearchRequest(Filters::present('objectClass'))),
+            new LdapMessageResponse(1, new SearchResultDone(ResultCode::REFERRAL, '', '', $referralUrl))
+        );
+
+        self::assertInstanceOf(SearchRequest::class, $sentRequest);
+        self::assertSame(
+            SearchRequest::SCOPE_SINGLE_LEVEL,
+            $sentRequest->getScope(),
+        );
+    }
+
+    public function test_it_should_send_the_modified_cloned_request_with_referral_dn(): void
+    {
+        $this->options
+            ->setReferral('follow')
+            ->setReferralLimit(10)
+            ->setReferralChaser($this->mockChaser);
+
+        $referralUrl = new LdapUrl('foo');
+        $referralUrl->setDn('cn=referral-target,dc=example,dc=com');
+
+        $this->mockChaser->method('chase')->willReturn(null);
+
+        $sentRequest = null;
+        $this->mockLdapClient
+            ->method('send')
+            ->willReturnCallback(function (SearchRequest $req) use (&$sentRequest) {
+                $sentRequest = $req;
+                return new LdapMessageResponse(2, new SearchResultDone(0));
+            });
+
+        $originalRequest = new SearchRequest(Filters::present('objectClass'));
+        $originalRequest->setBaseDn('cn=original,dc=example,dc=com');
+
+        $this->subject->handleResponse(
+            new LdapMessageRequest(1, $originalRequest),
+            new LdapMessageResponse(1, new SearchResultDone(ResultCode::REFERRAL, '', '', $referralUrl))
+        );
+
+        self::assertInstanceOf(SearchRequest::class, $sentRequest);
+        self::assertSame(
+            'cn=referral-target,dc=example,dc=com',
+            (string) $sentRequest->getBaseDn(),
+        );
+        self::assertSame(
+            'cn=original,dc=example,dc=com',
+            (string) $originalRequest->getBaseDn(),
         );
     }
 }

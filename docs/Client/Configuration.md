@@ -112,7 +112,8 @@ The LDAP version to use.
 The referral handling strategy to use. It must be one of:
 
 * `throw`: When a referral is encountered it throws a ReferralException, which contains the referral object(s).
-* `follow`: Referrals will be followed until a result is found or the `ClientOptions::setReferralLimit()` is reached.  
+* `follow`: Referrals will be followed until a result is found or the `ClientOptions::setReferralLimit()` is reached.
+* `ignore`: Referrals are silently ignored and no result is returned.
 
 When you choose to follow referrals, it will bind to the referral destination using your previous bind request (if there
 was one). If you need more control over the bind or what referrals are followed then use the `ClientOptions::setReferralChaser()` option.
