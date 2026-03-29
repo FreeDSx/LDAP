@@ -7,7 +7,7 @@ Upgrading from 0.x to 1.0
     * [Server Options](#server-options)
     * [Constructing a Proxy Server](#constructing-a-proxy-server)
     * [Using a Custom ServerRunner](#using-a-custom-serverrunner)
-    * [Request Handler Search Return Type](#request-handler-search-return-type)
+    * [Migrating from RequestHandlerInterface to LdapBackendInterface](#migrating-from-requesthandlerinterface-to-ldapbackendinterface)
 
 ## Client Changes
 
@@ -148,65 +148,109 @@ $ldap = new LdapServer(
 );
 ```
 
-## Using Request Handlers
+## Migrating from RequestHandlerInterface to LdapBackendInterface
 
-Previously, you could have set request handlers using the fully qualified class name. These must now be class instances.
+`RequestHandlerInterface`, `GenericRequestHandler`, `PagingHandlerInterface`, and related classes have been removed.
+The server now works with a single backend object that implements `LdapBackendInterface` (read-only) or
+`WritableLdapBackendInterface` (read-write). Paging is handled automatically by the framework via PHP generators —
+no separate paging handler is needed.
 
-**Before**:
-
-```php
-use FreeDSx\Ldap\LdapServer;
-use Foo\LdapProxyHandler;
-
-$server = new LdapServer([
-    'request_handler' => LdapProxyHandler::class,
-]);
-$server->run();
-```
-
-**After**:
+**Before** (0.x `RequestHandlerInterface`):
 
 ```php
-use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\ServerOptions;
-use Foo\LdapProxyHandler;
+use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Server\RequestContext;
+use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
+
+class MyHandler extends GenericRequestHandler
+{
+    public function bind(
+        RequestContext $context,
+        string $username,
+        string $password,
+    ): bool {
+        return $username === 'admin' && $password === 'secret';
+    }
+
+    public function search(
+        RequestContext $context,
+        SearchRequest $request,
+    ): Entries {
+        return new Entries();
+    }
+}
 
 $server = new LdapServer(
     (new ServerOptions)
-        ->setRequestHandler(new LdapProxyHandler())
+        ->setRequestHandler(new MyHandler())
 );
-$server->run();
 ```
 
-## Request Handler Search Return Type
-
-The `search()` method of `RequestHandlerInterface` now returns `SearchResult` instead of `Entries`. Wrap your returned
-entries in `SearchResult::make()`. The new return type also allows returning response controls and non-success result
-codes (e.g. for partial results).
-
-**Before**:
+**After** (1.0 `LdapBackendInterface`):
 
 ```php
-use FreeDSx\Ldap\Entry\Entries;
-use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Server\RequestContext;
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\SearchContext;
+use Generator;
 
-public function search(RequestContext $context, SearchRequest $search): Entries
+class MyBackend implements LdapBackendInterface
 {
-    return new Entries(/* ... */);
+    public function search(SearchContext $context): Generator
+    {
+        // Yield matching entries. The framework handles paging automatically.
+        yield from [];
+    }
+
+    public function get(Dn $dn): ?Entry
+    {
+        return null;
+    }
+
+    public function verifyPassword(
+        Dn $dn,
+        string $password,
+    ): bool {
+        return $dn->toString() === 'cn=admin,dc=example,dc=com'
+            && $password === 'secret';
+    }
 }
+
+$server = (new LdapServer())
+    ->useBackend(new MyBackend());
 ```
 
-**After**:
+### Write operations
+
+`add()`, `delete()`, `update()`, and `move()` are now part of `WritableLdapBackendInterface`. Implement that interface
+instead of `LdapBackendInterface` when your backend supports write operations.
+
+### Paging
+
+Paging no longer requires a `PagingHandlerInterface` implementation. Return a `Generator` from `search()` and the
+framework automatically slices it into pages when a client sends a paged search control. The `supportedControl`
+attribute of the RootDSE is populated automatically when a backend is configured.
+
+### Proxy server
+
+`ProxyRequestHandler` has been replaced by `ProxyBackend`. Extend it and provide an `LdapClient` instance:
 
 ```php
-use FreeDSx\Ldap\Entry\Entries;
-use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Server\RequestContext;
-use FreeDSx\Ldap\Server\RequestHandler\SearchResult;
+use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\RequestHandler\ProxyBackend;
 
-public function search(RequestContext $context, SearchRequest $search): SearchResult
-{
-    return SearchResult::make(new Entries(/* ... */));
-}
+$server = (new LdapServer())
+    ->useBackend(new ProxyBackend(
+        (new ClientOptions)->setServers(['ldap.example.com'])
+    ));
+```
+
+Or use the convenience factory (unchanged from 0.x):
+
+```php
+$server = LdapServer::makeProxy('ldap.example.com');
 ```

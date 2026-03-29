@@ -14,10 +14,12 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
-use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use Psr\Log\LoggerInterface;
 
 final class ServerOptions
@@ -103,15 +105,24 @@ final class ServerOptions
 
     private ?string $dseVendorVersion = null;
 
-    private ?RequestHandlerInterface $requestHandler = null;
+    private ?LdapBackendInterface $backend = null;
+
+    private ?PasswordAuthenticatableInterface $passwordAuthenticator = null;
 
     private ?RootDseHandlerInterface $rootDseHandler = null;
 
-    private ?PagingHandlerInterface $pagingHandler = null;
+    /**
+     * @var WriteHandlerInterface[]
+     */
+    private array $writeHandlers = [];
+
+    private ?FilterEvaluatorInterface $filterEvaluator = null;
 
     private ?LoggerInterface $logger = null;
 
     private ?ServerRunnerInterface $serverRunner = null;
+
+    private bool $useSwooleRunner = false;
 
     /**
      * @var string[]
@@ -301,14 +312,26 @@ final class ServerOptions
         return $this;
     }
 
-    public function getRequestHandler(): ?RequestHandlerInterface
+    public function getBackend(): ?LdapBackendInterface
     {
-        return $this->requestHandler;
+        return $this->backend;
     }
 
-    public function setRequestHandler(?RequestHandlerInterface $requestHandler): self
+    public function setBackend(?LdapBackendInterface $backend): self
     {
-        $this->requestHandler = $requestHandler;
+        $this->backend = $backend;
+
+        return $this;
+    }
+
+    public function getPasswordAuthenticator(): ?PasswordAuthenticatableInterface
+    {
+        return $this->passwordAuthenticator;
+    }
+
+    public function setPasswordAuthenticator(?PasswordAuthenticatableInterface $passwordAuthenticator): self
+    {
+        $this->passwordAuthenticator = $passwordAuthenticator;
 
         return $this;
     }
@@ -325,14 +348,29 @@ final class ServerOptions
         return $this;
     }
 
-    public function getPagingHandler(): ?PagingHandlerInterface
+    /**
+     * @return WriteHandlerInterface[]
+     */
+    public function getWriteHandlers(): array
     {
-        return $this->pagingHandler;
+        return $this->writeHandlers;
     }
 
-    public function setPagingHandler(?PagingHandlerInterface $pagingHandler): self
+    public function addWriteHandler(WriteHandlerInterface $handler): self
     {
-        $this->pagingHandler = $pagingHandler;
+        $this->writeHandlers[] = $handler;
+
+        return $this;
+    }
+
+    public function getFilterEvaluator(): ?FilterEvaluatorInterface
+    {
+        return $this->filterEvaluator;
+    }
+
+    public function setFilterEvaluator(?FilterEvaluatorInterface $filterEvaluator): self
+    {
+        $this->filterEvaluator = $filterEvaluator;
 
         return $this;
     }
@@ -386,8 +424,20 @@ final class ServerOptions
         return $this->serverRunner;
     }
 
+    public function setUseSwooleRunner(bool $use): self
+    {
+        $this->useSwooleRunner = $use;
+
+        return $this;
+    }
+
+    public function getUseSwooleRunner(): bool
+    {
+        return $this->useSwooleRunner;
+    }
+
     /**
-     * @return array{ip: string, port: int, unix_socket: string, transport: string, idle_timeout: int, require_authentication: bool, allow_anonymous: bool, request_handler: ?RequestHandlerInterface, rootdse_handler: ?RootDseHandlerInterface, paging_handler: ?PagingHandlerInterface, logger: ?LoggerInterface, use_ssl: bool, ssl_cert: ?string, ssl_cert_key: ?string, ssl_cert_passphrase: ?string, dse_alt_server: ?string, dse_naming_contexts: string[], dse_vendor_name: string, dse_vendor_version: ?string, sasl_mechanisms: string[]}
+     * @return array{ip: string, port: int, unix_socket: string, transport: string, idle_timeout: int, require_authentication: bool, allow_anonymous: bool, backend: ?LdapBackendInterface, rootdse_handler: ?RootDseHandlerInterface, logger: ?LoggerInterface, use_ssl: bool, ssl_cert: ?string, ssl_cert_key: ?string, ssl_cert_passphrase: ?string, dse_alt_server: ?string, dse_naming_contexts: string[], dse_vendor_name: string, dse_vendor_version: ?string, sasl_mechanisms: string[]}
      */
     public function toArray(): array
     {
@@ -399,9 +449,8 @@ final class ServerOptions
             'idle_timeout' => $this->getIdleTimeout(),
             'require_authentication' => $this->isRequireAuthentication(),
             'allow_anonymous' => $this->isAllowAnonymous(),
-            'request_handler' => $this->getRequestHandler(),
+            'backend' => $this->getBackend(),
             'rootdse_handler' => $this->getRootDseHandler(),
-            'paging_handler' => $this->getPagingHandler(),
             'logger' => $this->getLogger(),
             'use_ssl' => $this->isUseSsl(),
             'ssl_cert' => $this->getSslCert(),

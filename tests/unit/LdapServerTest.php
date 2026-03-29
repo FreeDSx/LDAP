@@ -17,11 +17,8 @@ use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyHandler;
-use FreeDSx\Ldap\Server\RequestHandler\ProxyPagingHandler;
-use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
@@ -32,9 +29,9 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 /**
- * Combined interface so PHPUnit can mock both at once.
+ * Combined interface so PHPUnit can mock a backend that also handles SASL.
  */
-interface SaslRequestHandlerInterface extends RequestHandlerInterface, SaslHandlerInterface {}
+interface SaslBackendInterface extends LdapBackendInterface, SaslHandlerInterface {}
 
 class LdapServerTest extends TestCase
 {
@@ -65,16 +62,15 @@ class LdapServerTest extends TestCase
         $this->subject->run();
     }
 
-    public function test_it_should_use_the_request_handler_specified(): void
+    public function test_it_should_use_the_backend_specified(): void
     {
-        $requestHandler = $this->createMock(RequestHandlerInterface::class);
+        $backend = $this->createMock(LdapBackendInterface::class);
 
-        $this->subject->useRequestHandler($requestHandler);
+        $this->subject->useBackend($backend);
 
         self::assertSame(
-            $requestHandler,
-            $this->subject->getOptions()
-                ->getRequestHandler()
+            $backend,
+            $this->subject->getOptions()->getBackend()
         );
     }
 
@@ -86,21 +82,7 @@ class LdapServerTest extends TestCase
 
         self::assertSame(
             $rootDseHandler,
-            $this->subject->getOptions()
-                ->getRootDseHandler()
-        );
-    }
-
-    public function test_it_should_use_the_paging_handler_specified(): void
-    {
-        $pagingHandler = $this->createMock(PagingHandlerInterface::class);
-
-        $this->subject->usePagingHandler($pagingHandler);
-
-        self::assertSame(
-            $pagingHandler,
-            $this->subject->getOptions()
-                ->getPagingHandler()
+            $this->subject->getOptions()->getRootDseHandler()
         );
     }
 
@@ -112,8 +94,7 @@ class LdapServerTest extends TestCase
 
         self::assertSame(
             $logger,
-            $this->subject->getOptions()
-                ->getLogger()
+            $this->subject->getOptions()->getLogger()
         );
     }
 
@@ -121,16 +102,15 @@ class LdapServerTest extends TestCase
     {
         self::assertEquals(
             [
-                'ip' => "0.0.0.0",
+                'ip' => '0.0.0.0',
                 'port' => 33389,
-                'unix_socket' => "/var/run/ldap.socket",
-                'transport' => "tcp",
+                'unix_socket' => '/var/run/ldap.socket',
+                'transport' => 'tcp',
                 'idle_timeout' => 600,
                 'require_authentication' => true,
                 'allow_anonymous' => false,
-                'request_handler' => null,
+                'backend' => null,
                 'rootdse_handler' => null,
-                'paging_handler' => null,
                 'logger' => null,
                 'use_ssl' => false,
                 'ssl_cert' => null,
@@ -138,9 +118,9 @@ class LdapServerTest extends TestCase
                 'ssl_cert_passphrase' => null,
                 'dse_alt_server' => null,
                 'dse_naming_contexts' => [
-                    "dc=FreeDSx,dc=local"
+                    'dc=FreeDSx,dc=local',
                 ],
-                'dse_vendor_name' => "FreeDSx",
+                'dse_vendor_name' => 'FreeDSx',
                 'dse_vendor_version' => null,
                 'sasl_mechanisms' => [],
             ],
@@ -148,7 +128,7 @@ class LdapServerTest extends TestCase
         );
     }
 
-    public function test_it_throws_when_challenge_mechanisms_are_configured_without_a_sasl_handler(): void
+    public function test_it_throws_when_challenge_mechanisms_are_configured_without_a_backend(): void
     {
         $this->options->setSaslMechanisms(ServerOptions::SASL_CRAM_MD5);
 
@@ -157,34 +137,34 @@ class LdapServerTest extends TestCase
         $this->subject->run();
     }
 
-    public function test_it_throws_when_challenge_mechanisms_are_configured_with_a_non_sasl_handler(): void
+    public function test_it_throws_when_challenge_mechanisms_are_configured_with_a_non_sasl_backend(): void
     {
         $this->options
             ->setSaslMechanisms(ServerOptions::SASL_CRAM_MD5)
-            ->setRequestHandler($this->createMock(RequestHandlerInterface::class));
+            ->setBackend($this->createMock(LdapBackendInterface::class));
 
         self::expectException(InvalidArgumentException::class);
 
         $this->subject->run();
     }
 
-    public function test_it_does_not_throw_when_challenge_mechanisms_are_configured_with_a_sasl_handler(): void
+    public function test_it_does_not_throw_when_challenge_mechanisms_are_configured_with_a_sasl_backend(): void
     {
-        /** @var RequestHandlerInterface&SaslHandlerInterface&MockObject $mockSaslHandler */
-        $mockSaslHandler = $this->createMock(SaslRequestHandlerInterface::class);
+        /** @var LdapBackendInterface&SaslHandlerInterface&MockObject $mockSaslBackend */
+        $mockSaslBackend = $this->createMock(SaslBackendInterface::class);
 
         $this->mockServerRunner->method('run');
 
         $this->options
             ->setSaslMechanisms(ServerOptions::SASL_CRAM_MD5)
-            ->setRequestHandler($mockSaslHandler);
+            ->setBackend($mockSaslBackend);
 
         $this->subject->run();
 
         $this->expectNotToPerformAssertions();
     }
 
-    public function test_it_does_not_throw_for_plain_mechanism_without_a_sasl_handler(): void
+    public function test_it_does_not_throw_for_plain_mechanism_without_a_sasl_backend(): void
     {
         $this->mockServerRunner->method('run');
 
@@ -197,30 +177,14 @@ class LdapServerTest extends TestCase
 
     public function test_it_should_make_a_proxy_server(): void
     {
-        $client = new LdapClient(
-            (new ClientOptions())
-                ->setServers(['localhost'])
-        );
-        $serverOptions = new ServerOptions();
-        $proxyRequestHandler = new ProxyHandler($client);
-        $server = new LdapServer($serverOptions);
-        $server->useRequestHandler($proxyRequestHandler);
-        $server->useRootDseHandler($proxyRequestHandler);
-        $server->usePagingHandler(new ProxyPagingHandler($client));
-
-        $proxyOptions = LdapServer::makeProxy('localhost')
-            ->getOptions();
+        $proxyOptions = LdapServer::makeProxy('localhost')->getOptions();
 
         self::assertInstanceOf(
-            ProxyPagingHandler::class,
-            $proxyOptions->getPagingHandler()
+            ProxyHandler::class,
+            $proxyOptions->getBackend()
         );
         self::assertInstanceOf(
-            ProxyRequestHandler::class,
-            $proxyOptions->getRequestHandler()
-        );
-        self::assertInstanceOf(
-            ProxyRequestHandler::class,
+            ProxyHandler::class,
             $proxyOptions->getRootDseHandler(),
         );
     }

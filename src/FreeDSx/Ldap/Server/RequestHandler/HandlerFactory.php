@@ -13,7 +13,16 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\RequestHandler;
 
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
+use FreeDSx\Ldap\Server\Backend\GenericBackend;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\ServerOptions;
 
 /**
@@ -24,12 +33,6 @@ use FreeDSx\Ldap\ServerOptions;
  */
 class HandlerFactory implements HandlerFactoryInterface
 {
-    private ?RequestHandlerInterface $requestHandler = null;
-
-    private ?RootDseHandlerInterface $rootdseHandler = null;
-
-    private ?PagingHandlerInterface $pagingHandler = null;
-
     public function __construct(private readonly ServerOptions $options)
     {
     }
@@ -37,13 +40,17 @@ class HandlerFactory implements HandlerFactoryInterface
     /**
      * @inheritDoc
      */
-    public function makeRequestHandler(): RequestHandlerInterface
+    public function makeBackend(): LdapBackendInterface
     {
-        if (!$this->requestHandler) {
-            $this->requestHandler = $this->options->getRequestHandler() ?? new GenericRequestHandler();
-        }
+        return $this->options->getBackend() ?? new GenericBackend();
+    }
 
-        return $this->requestHandler;
+    /**
+     * @inheritDoc
+     */
+    public function makeFilterEvaluator(): FilterEvaluatorInterface
+    {
+        return $this->options->getFilterEvaluator() ?? new FilterEvaluator();
     }
 
     /**
@@ -51,32 +58,51 @@ class HandlerFactory implements HandlerFactoryInterface
      */
     public function makeRootDseHandler(): ?RootDseHandlerInterface
     {
-        if ($this->rootdseHandler) {
-            return $this->rootdseHandler;
+        $explicit = $this->options->getRootDseHandler();
+        if ($explicit !== null) {
+            return $explicit;
         }
-        $handler = $this->makeRequestHandler();
-        $this->rootdseHandler = $handler instanceof RootDseHandlerInterface
-            ? $handler
-            : null;
 
-        if ($this->rootdseHandler) {
-            return $this->rootdseHandler;
+        $backend = $this->options->getBackend();
+        if ($backend instanceof RootDseHandlerInterface) {
+            return $backend;
         }
-        $this->rootdseHandler = $this->options->getRootDseHandler();
 
-        return $this->rootdseHandler;
+        return null;
     }
 
     /**
      * @inheritDoc
      */
-    public function makePagingHandler(): ?PagingHandlerInterface
+    public function makePasswordAuthenticator(): PasswordAuthenticatableInterface
     {
-        if ($this->pagingHandler) {
-            return $this->pagingHandler;
-        }
-        $this->pagingHandler = $this->options->getPagingHandler();
+        $explicit = $this->options->getPasswordAuthenticator();
 
-        return $this->pagingHandler;
+        if ($explicit !== null) {
+            return $explicit;
+        }
+
+        $backend = $this->makeBackend();
+
+        if ($backend instanceof PasswordAuthenticatableInterface) {
+            return $backend;
+        }
+
+        return new PasswordAuthenticator(new DnBindNameResolver($backend));
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function makeWriteDispatcher(): WriteOperationDispatcher
+    {
+        $handlers = $this->options->getWriteHandlers();
+
+        $backend = $this->options->getBackend();
+        if ($backend instanceof WriteHandlerInterface) {
+            $handlers[] = $backend;
+        }
+
+        return new WriteOperationDispatcher(...$handlers);
     }
 }

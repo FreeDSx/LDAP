@@ -59,14 +59,17 @@ class ServerProtocolHandlerFactory
         } elseif ($request instanceof SearchRequest) {
             return new ServerProtocolHandler\ServerSearchHandler(
                 queue: $this->queue,
-                dispatcher: $this->handlerFactory->makeRequestHandler(),
+                backend: $this->handlerFactory->makeBackend(),
+                filterEvaluator: $this->handlerFactory->makeFilterEvaluator(),
             );
         } elseif ($request instanceof UnbindRequest) {
             return new ServerProtocolHandler\ServerUnbindHandler($this->queue);
         } else {
             return new ServerProtocolHandler\ServerDispatchHandler(
                 queue: $this->queue,
-                dispatcher: $this->handlerFactory->makeRequestHandler(),
+                backend: $this->handlerFactory->makeBackend(),
+                filterEvaluator: $this->handlerFactory->makeFilterEvaluator(),
+                writeDispatcher: $this->handlerFactory->makeWriteDispatcher(),
             );
         }
     }
@@ -102,18 +105,10 @@ class ServerProtocolHandlerFactory
 
     private function getPagingHandler(): ServerProtocolHandlerInterface
     {
-        $pagingHandler = $this->handlerFactory->makePagingHandler();
-
-        if (!$pagingHandler) {
-            return new ServerProtocolHandler\ServerPagingUnsupportedHandler(
-                queue: $this->queue,
-                dispatcher: $this->handlerFactory->makeRequestHandler(),
-            );
-        }
-
         return new ServerProtocolHandler\ServerPagingHandler(
             queue: $this->queue,
-            pagingHandler: $pagingHandler,
+            backend: $this->handlerFactory->makeBackend(),
+            filterEvaluator: $this->handlerFactory->makeFilterEvaluator(),
             requestHistory: $this->requestHistory,
         );
     }

@@ -17,22 +17,25 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\SearchContext;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\Paging\PagingRequestComparator;
 use FreeDSx\Ldap\Server\Paging\PagingResponse;
-use FreeDSx\Ldap\Server\RequestContext;
-use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHistory;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use Generator;
 use Throwable;
 
 /**
- * Handles paging search request logic.
+ * Handles paging search request logic using per-connection generator state.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -42,7 +45,8 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
 
     public function __construct(
         private readonly ServerQueue $queue,
-        private readonly PagingHandlerInterface $pagingHandler,
+        private readonly LdapBackendInterface $backend,
+        private readonly FilterEvaluatorInterface $filterEvaluator,
         private readonly RequestHistory $requestHistory,
         private readonly PagingRequestComparator $requestComparator = new PagingRequestComparator(),
     ) {
@@ -56,21 +60,13 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         LdapMessageRequest $message,
         TokenInterface $token
     ): void {
-        $context = new RequestContext(
-            $message->controls(),
-            $token
-        );
         $pagingRequest = $this->findOrMakePagingRequest($message);
         $searchRequest = $this->getSearchRequestFromMessage($message);
 
         $response = null;
         $controls = [];
         try {
-            $response = $this->handlePaging(
-                $context,
-                $pagingRequest,
-                $message
-            );
+            $response = $this->handlePaging($pagingRequest, $message);
             $searchResult = SearchResult::makeSuccessResult(
                 $response->getEntries(),
                 (string) $searchRequest->getBaseDn()
@@ -87,10 +83,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
                 (string) $searchRequest->getBaseDn(),
                 $e->getMessage()
             );
-            $controls[] = new PagingControl(
-                0,
-                ''
-            );
+            $controls[] = new PagingControl(0, '');
         }
 
         $pagingRequest->markProcessed();
@@ -103,15 +96,12 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
          *     searchResultDone entry. If this occurs, both client and server should
          *     assume the paged result set is closed and no longer resumable.
          *
-         * If a search result is anything other than success, we remove the paging request.
+         * If a search result is anything other than success, or the paging is complete,
+         * remove the paging request and discard the generator.
          */
         if (($response && $response->isComplete()) || $searchResult->getResultCode() !== ResultCode::SUCCESS) {
-            $this->requestHistory->pagingRequest()
-                ->remove($pagingRequest);
-            $this->pagingHandler->remove(
-                $pagingRequest,
-                $context
-            );
+            $this->requestHistory->pagingRequest()->remove($pagingRequest);
+            $this->requestHistory->removePagingGenerator($pagingRequest->getNextCookie());
         }
 
         $this->sendEntriesToClient(
@@ -126,22 +116,41 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
      * @throws OperationException
      */
     private function handlePaging(
-        RequestContext $context,
         PagingRequest $pagingRequest,
         LdapMessageRequest $message
     ): PagingResponse {
         if (!$pagingRequest->isPagingStart()) {
-            return $this->handleExistingCookie(
-                $pagingRequest,
-                $context,
-                $message
-            );
-        } else {
-            return $this->handlePagingStart(
-                $pagingRequest,
-                $context
-            );
+            return $this->handleExistingCookie($pagingRequest, $message);
         }
+
+        return $this->handlePagingStart($pagingRequest);
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function handlePagingStart(PagingRequest $pagingRequest): PagingResponse
+    {
+        $searchRequest = $pagingRequest->getSearchRequest();
+        $context = $this->makeSearchContext($searchRequest);
+        $generator = $this->backend->search($context);
+
+        [$page, $generatorExhausted] = $this->collectFromGenerator(
+            $generator,
+            $pagingRequest->getSize(),
+            $context,
+        );
+
+        $nextCookie = $this->generateCookie();
+        $pagingRequest->updateNextCookie($nextCookie);
+
+        if ($generatorExhausted) {
+            return PagingResponse::makeFinal(new Entries(...$page));
+        }
+
+        $this->requestHistory->storePagingGenerator($nextCookie, $generator);
+
+        return PagingResponse::make(new Entries(...$page), 0);
     }
 
     /**
@@ -149,7 +158,6 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
      */
     private function handleExistingCookie(
         PagingRequest $pagingRequest,
-        RequestContext $context,
         LdapMessageRequest $message
     ): PagingResponse {
         $newPagingRequest = $this->makePagingRequest($message);
@@ -164,32 +172,69 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $pagingRequest->updatePagingControl($this->getPagingControlFromMessage($message));
 
         if ($pagingRequest->isAbandonRequest()) {
-            $response = PagingResponse::makeFinal(new Entries());
-        } else {
-            $response = $this->pagingHandler->page(
-                $pagingRequest,
-                $context
-            );
-            $pagingRequest->updateNextCookie($this->generateCookie());
+            $this->requestHistory->removePagingGenerator($pagingRequest->getNextCookie());
+
+            return PagingResponse::makeFinal(new Entries());
         }
 
-        return $response;
-    }
+        $currentCookie = $pagingRequest->getNextCookie();
+        $generator = $this->requestHistory->getPagingGenerator($currentCookie);
 
-    /**
-     * @todo It would be useful to prefix these by a unique client ID or something else somewhat identifiable.
-     * @throws OperationException
-     */
-    private function generateCookie(): string
-    {
-        try {
-            return random_bytes(16);
-        } catch (Throwable) {
+        if ($generator === null) {
             throw new OperationException(
-                'Internal server error.',
+                'The paging session could not be resumed.',
                 ResultCode::OPERATIONS_ERROR
             );
         }
+
+        $this->requestHistory->removePagingGenerator($currentCookie);
+
+        $searchRequest = $pagingRequest->getSearchRequest();
+        $context = $this->makeSearchContext($searchRequest);
+
+        [$page, $generatorExhausted] = $this->collectFromGenerator(
+            $generator,
+            $pagingRequest->getSize(),
+            $context,
+        );
+
+        $nextCookie = $this->generateCookie();
+        $pagingRequest->updateNextCookie($nextCookie);
+
+        if ($generatorExhausted) {
+            return PagingResponse::makeFinal(new Entries(...$page));
+        }
+
+        $this->requestHistory->storePagingGenerator($nextCookie, $generator);
+
+        return PagingResponse::make(new Entries(...$page), 0);
+    }
+
+    /**
+     * Advances the generator, collecting up to $size entries that pass the filter.
+     * Returns the collected entries and whether the generator is exhausted.
+     *
+     * @return array{Entry[], bool}
+     */
+    private function collectFromGenerator(
+        Generator $generator,
+        int $size,
+        SearchContext $context,
+    ): array {
+        $page = [];
+        $limit = $size > 0 ? $size : PHP_INT_MAX;
+
+        while ($generator->valid() && count($page) < $limit) {
+            $entry = $generator->current();
+
+            if ($entry instanceof Entry && $this->filterEvaluator->evaluate($entry, $context->filter)) {
+                $page[] = $this->applyAttributeFilter($entry, $context->attributes, $context->typesOnly);
+            }
+
+            $generator->next();
+        }
+
+        return [$page, !$generator->valid()];
     }
 
     /**
@@ -220,7 +265,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
 
         $filteredControls = array_filter(
             $message->controls()->toArray(),
-            function (Control $control) {
+            static function (Control $control): bool {
                 return $control->getTypeOid() !== Control::OID_PAGING;
             }
         );
@@ -253,16 +298,15 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
     /**
      * @throws OperationException
      */
-    private function handlePagingStart(
-        PagingRequest $pagingRequest,
-        RequestContext $context
-    ): PagingResponse {
-        $response = $this->pagingHandler->page(
-            $pagingRequest,
-            $context
-        );
-        $pagingRequest->updateNextCookie($this->generateCookie());
-
-        return $response;
+    private function generateCookie(): string
+    {
+        try {
+            return random_bytes(16);
+        } catch (Throwable) {
+            throw new OperationException(
+                'Internal server error.',
+                ResultCode::OPERATIONS_ERROR
+            );
+        }
     }
 }

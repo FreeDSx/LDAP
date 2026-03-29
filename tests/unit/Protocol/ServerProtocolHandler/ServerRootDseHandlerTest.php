@@ -25,8 +25,8 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerRootDseHandler;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\RequestContext;
-use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
@@ -43,14 +43,14 @@ final class ServerRootDseHandlerTest extends TestCase
 
     private ServerOptions $options;
 
-    private PagingHandlerInterface&MockObject $mockPagingHandler;
+    private LdapBackendInterface&MockObject $mockBackend;
 
     private RootDseHandlerInterface&MockObject $mockDseHandler;
 
     protected function setUp(): void
     {
         $this->options = new ServerOptions();
-        $this->mockPagingHandler = $this->createMock(PagingHandlerInterface::class);
+        $this->mockBackend = $this->createMock(LdapBackendInterface::class);
         $this->mockToken = $this->createMock(TokenInterface::class);
         $this->mockQueue = $this->createMock(ServerQueue::class);
         $this->mockDseHandler = $this->createMock(RootDseHandlerInterface::class);
@@ -94,12 +94,12 @@ final class ServerRootDseHandlerTest extends TestCase
         );
     }
 
-    public function test_it_should_send_back_a_RootDSE_with_paging_support_if_the_paging_handler_is_set(): void
+    public function test_it_should_send_back_a_RootDSE_with_paging_support_if_a_backend_is_set(): void
     {
         $this->options
             ->setDseVendorName('Foo')
             ->setDseNamingContexts('dc=Foo,dc=Bar')
-            ->setPagingHandler($this->mockPagingHandler);
+            ->setBackend($this->mockBackend);
 
         $search = new LdapMessageRequest(
             1,
@@ -117,6 +117,40 @@ final class ServerRootDseHandlerTest extends TestCase
 
                     return $entry->get('supportedControl')
                         ?->has(Control::OID_PAGING) ?? false;
+                }),
+                new LdapMessageResponse(1, new SearchResultDone(0)),
+            );
+
+        $this->subject->handleRequest(
+            $search,
+            $this->mockToken,
+        );
+    }
+
+    public function test_it_should_not_advertise_paging_support_if_no_backend_is_set(): void
+    {
+        $this->options
+            ->setDseVendorName('Foo')
+            ->setDseNamingContexts('dc=Foo,dc=Bar');
+
+        $search = new LdapMessageRequest(
+            1,
+            (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope()
+        );
+
+        $this->mockQueue
+            ->expects($this->once())
+            ->method('sendMessage')
+            ->with(
+                self::callback(function (LdapMessageResponse $response) {
+                    /** @var SearchResultEntry $search */
+                    $search = $response->getResponse();
+                    $entry = $search->getEntry();
+
+                    $supportedControl = $entry->get('supportedControl');
+
+                    return $supportedControl === null
+                        || !$supportedControl->has(Control::OID_PAGING);
                 }),
                 new LdapMessageResponse(1, new SearchResultDone(0)),
             );

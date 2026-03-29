@@ -14,14 +14,15 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
-use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyHandler;
-use FreeDSx\Ldap\Server\RequestHandler\ProxyPagingHandler;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\Server\SocketServerFactory;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
 use Psr\Log\LoggerInterface;
 
@@ -71,11 +72,47 @@ class LdapServer
     }
 
     /**
-     * Specify an instance of a request handler to use for incoming LDAP requests.
+     * Specify a backend to use for incoming LDAP requests.
+     *
+     * The backend handles search and optionally write operations (add, delete,
+     * modify, rename) if it implements WritableLdapBackendInterface. Bind
+     * authentication is handled by a PasswordAuthenticatableInterface — either
+     * one registered via usePasswordAuthenticator(), the backend itself if it
+     * implements that interface, or the default PasswordAuthenticator (which
+     * reads the userPassword attribute from entries returned by the backend).
      */
-    public function useRequestHandler(RequestHandlerInterface $requestHandler): self
+    public function useBackend(LdapBackendInterface $backend): self
     {
-        $this->options->setRequestHandler($requestHandler);
+        $this->options->setBackend($backend);
+
+        return $this;
+    }
+
+    /**
+     * Override the password authenticator used for simple bind and SASL PLAIN.
+     *
+     * By default the server constructs a PasswordAuthenticator that reads the
+     * userPassword attribute from entries returned by the backend. Use this
+     * method to supply a custom implementation — for example, to support
+     * additional hash formats or to delegate verification to an external service.
+     */
+    public function usePasswordAuthenticator(PasswordAuthenticatableInterface $authenticator): self
+    {
+        $this->options->setPasswordAuthenticator($authenticator);
+
+        return $this;
+    }
+
+    /**
+     * Register a handler for one or more LDAP write operations.
+     *
+     * Handlers are tried in registration order, before the backend is used as
+     * a fallback. Multiple calls register multiple handlers, allowing each
+     * write operation to be handled by a separate class.
+     */
+    public function useWriteHandler(WriteHandlerInterface $handler): self
+    {
+        $this->options->addWriteHandler($handler);
 
         return $this;
     }
@@ -91,11 +128,12 @@ class LdapServer
     }
 
     /**
-     * Specify an instance of a paging handler to use for paged search requests.
+     * Override the filter evaluator used by the server when applying LDAP filters
+     * to entries returned by the backend's search() generator.
      */
-    public function usePagingHandler(PagingHandlerInterface $pagingHandler): self
+    public function useFilterEvaluator(FilterEvaluatorInterface $evaluator): self
     {
-        $this->options->setPagingHandler($pagingHandler);
+        $this->options->setFilterEvaluator($evaluator);
 
         return $this;
     }
@@ -106,6 +144,19 @@ class LdapServer
     public function useLogger(LoggerInterface $logger): self
     {
         $this->options->setLogger($logger);
+
+        return $this;
+    }
+
+    /**
+     * Configure the server to use the Swoole coroutine runner instead of the default PCNTL process runner.
+     *
+     * Requires the swoole PHP extension. The SwooleServerRunner handles each client connection in its own
+     * coroutine within a single process, making in-memory storage adapters safe to use concurrently.
+     */
+    public function useSwooleRunner(): self
+    {
+        $this->options->setUseSwooleRunner(true);
 
         return $this;
     }
@@ -126,11 +177,11 @@ class LdapServer
             return;
         }
 
-        $handler = $this->options->getRequestHandler();
+        $backend = $this->options->getBackend();
 
-        if (!$handler instanceof SaslHandlerInterface) {
+        if (!$backend instanceof SaslHandlerInterface) {
             throw new InvalidArgumentException(sprintf(
-                'The SASL mechanism(s) [%s] require the request handler to implement %s.',
+                'The SASL mechanism(s) [%s] require the backend to implement %s.',
                 implode(', ', $challengeMechanisms),
                 SaslHandlerInterface::class,
             ));
@@ -155,11 +206,8 @@ class LdapServer
             $clientOptions->setServers((array) $servers)
         );
 
-        $proxyRequestHandler = new ProxyHandler($client);
         $server = new LdapServer($serverOptions);
-        $server->useRequestHandler($proxyRequestHandler);
-        $server->useRootDseHandler($proxyRequestHandler);
-        $server->usePagingHandler(new ProxyPagingHandler($client));
+        $server->useBackend(new ProxyHandler($client));
 
         return $server;
     }

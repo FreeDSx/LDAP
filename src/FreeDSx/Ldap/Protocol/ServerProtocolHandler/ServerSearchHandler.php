@@ -13,13 +13,13 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\RequestContext;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
-use FreeDSx\Ldap\Server\RequestHandler\SearchResult as HandlerSearchResult;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
@@ -33,7 +33,8 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
 
     public function __construct(
         private readonly ServerQueue $queue,
-        private readonly RequestHandlerInterface $dispatcher,
+        private readonly LdapBackendInterface $backend,
+        private readonly FilterEvaluatorInterface $filterEvaluator,
     ) {
     }
 
@@ -44,35 +45,30 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
         LdapMessageRequest $message,
         TokenInterface $token
     ): void {
-        $context = new RequestContext(
-            $message->controls(),
-            $token
-        );
         $request = $this->getSearchRequestFromMessage($message);
 
-        $handlerResult = null;
-
         try {
-            $handlerResult = $this->dispatcher->search($context, $request);
-            $baseDn = (string) $request->getBaseDn();
+            $context = $this->makeSearchContext($request);
+            $filter = $context->filter;
+            $attributes = $context->attributes;
+            $typesOnly = $context->typesOnly;
 
-            $searchResult = $handlerResult->getResultCode() === ResultCode::SUCCESS
-                ? SearchResult::makeSuccessResult(
-                    $handlerResult->getEntries(),
-                    $baseDn,
-                    $handlerResult->getDiagnosticMessage(),
-                )
-                : SearchResult::makeErrorResult(
-                    $handlerResult->getResultCode(),
-                    $baseDn,
-                    $handlerResult->getDiagnosticMessage(),
-                    $handlerResult->getEntries(),
-                );
+            $results = [];
+            foreach ($this->backend->search($context) as $entry) {
+                if ($this->filterEvaluator->evaluate($entry, $filter)) {
+                    $results[] = $this->applyAttributeFilter($entry, $attributes, $typesOnly);
+                }
+            }
+
+            $searchResult = SearchResult::makeSuccessResult(
+                new Entries(...$results),
+                (string) $request->getBaseDn(),
+            );
         } catch (OperationException $e) {
             $searchResult = SearchResult::makeErrorResult(
                 $e->getCode(),
                 (string) $request->getBaseDn(),
-                $e->getMessage()
+                $e->getMessage(),
             );
         }
 
@@ -80,7 +76,6 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
             $searchResult,
             $message,
             $this->queue,
-            ...($handlerResult instanceof HandlerSearchResult ? $handlerResult->getControls() : []),
         );
     }
 }

@@ -3,28 +3,30 @@ General LDAP Server Usage
 
 * [Running the Server](#running-the-server)
 * [Creating a Proxy Server](#creating-a-proxy-server)
-* [Handling Client Requests](#handling-client-requests)
-  * [Proxy Request Handler](#proxy-request-handler)
-  * [Generic Request Handler](#generic-request-handler)
+* [Providing a Backend](#providing-a-backend)
+  * [Read-Only Backend](#read-only-backend)
+  * [Writable Backend](#writable-backend)
+  * [Built-In Storage Adapters](#built-in-storage-adapters)
+    * [InMemoryStorageAdapter](#inmemorystorageadapter)
+    * [JsonFileStorageAdapter](#jsonfilestorageadapter)
+  * [Proxy Backend](#proxy-backend)
+  * [Custom Filter Evaluation](#custom-filter-evaluation)
 * [Handling the RootDSE](#handling-the-rootdse)
-* [Handling Client Paging Requests](#handling-client-paging-requests)
 * [StartTLS SSL Certificate Support](#starttls-ssl-certificate-support)
 * [SASL Authentication](#sasl-authentication)
   * [PLAIN Mechanism](#plain-mechanism)
   * [Challenge-Based Mechanisms (CRAM-MD5, DIGEST-MD5, and SCRAM)](#challenge-based-mechanisms-cram-md5-digest-md5-and-scram)
 
-The LdapServer class is used to run a LDAP server process that accepts client requests and sends back a response. It
-defaults to using a forking method for client requests, which is only available on Linux.
+The LdapServer class runs an LDAP server process that accepts client requests and sends back responses. It defaults to
+using a forking method (PCNTL) for handling client connections, which is only available on Linux.
 
-The LDAP server has no entry database/schema persistence by itself. It is currently up to the implementor to determine 
-how to create / update / delete / search for entries that are requested from the client. See the [Handling Client Requests](#handling-client-requests)
-section for more details.
+The server has no built-in entry persistence. You provide a backend that implements the storage and authentication
+logic for your use case. See the [Providing a Backend](#providing-a-backend) section for details.
 
 ## Running The Server
 
-In its most simple form you can run the LDAP server by constructing the class and calling the `run()` method. This will
-bind to port 389 to accept clients from any IP on the server. It will use the GenericRequestHandler which by default 
-rejects client requests for any operation. 
+In its simplest form you construct the server and call `run()`. Without a backend configured, the server accepts
+connections but rejects all operations with `unwillingToPerform`.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
@@ -32,13 +34,9 @@ use FreeDSx\Ldap\LdapServer;
 $server = (new LdapServer())->run();
 ```
 
-### Creating a Proxy Server
+## Creating a Proxy Server
 
-The LDAP server is capable of acting as a proxy between other LDAP servers through the use of the handlers. There is a
-helper factory method defined on the LdapServer class that makes creating a proxy server very easy. However, it provides
-no real extensibility if you aren't defining your own handlers.
-
-The proxy server can be constructed as follows:
+The server can act as a transparent proxy to another LDAP server via `LdapServer::makeProxy()`:
 
 ```php
 use FreeDSx\Ldap\ClientOptions;
@@ -57,366 +55,352 @@ $server = LdapServer::makeProxy(
 $server->run();
 ```
 
-## Handling Client Requests
+For a customisable proxy, extend `ProxyBackend` directly. See [Proxy Backend](#proxy-backend).
 
-When the server receives a client request it will get sent to the request handler defined for the server. There are only
-a few types of requests not sent to the request handler:
+## Providing a Backend
 
-* WhoAmI
-* StartTLS
-* RootDSE
-* Unbind
-
-All other requests are sent to handler you define. The handler must implement `FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface`.
-The interface has the following methods:
+A backend is a class implementing `LdapBackendInterface` (read-only) or `WritableLdapBackendInterface` (read + write).
+It is registered with `LdapServer::useBackend()`:
 
 ```php
-    public function add(RequestContext $context, AddRequest $add);
+use FreeDSx\Ldap\LdapServer;
 
-    public function compare(RequestContext $context, CompareRequest $compare) : bool;
-    
-    public function delete(RequestContext $context, DeleteRequest $delete);
-
-    public function extended(RequestContext $context, ExtendedRequest $extended);
-
-    public function modify(RequestContext $context, ModifyRequest $modify);
-
-    public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn);
-
-    public function search(RequestContext $context, SearchRequest $search) : SearchResult;
-    
-    public function bind(string $username, string $password) : bool;
+$server = (new LdapServer())->useBackend(new MyBackend());
+$server->run();
 ```
 
-However, there is a generic request handler you can extend to implement only what you want. Or a proxy handler to forward
-requests to a separate LDAP server.
+The framework routes all client LDAP operations — search, bind, add, delete, modify, rename, compare — to the backend.
+Paging is handled automatically: the framework stores a PHP Generator per connection and resumes it for each page
+request. Your `search()` implementation simply yields entries.
 
-### Proxy Request Handler
+### Read-Only Backend
 
-**Note**: If you just want to create an LDAP server that serves as a proxy, see the section on [creating a proxy server](#creating-a-proxy-server).
-
-The proxy request handler simply forwards the LDAP request from the FreeDSx server to a different LDAP server, then sends
-the response back to the client. You should extend the ProxyRequestHandler class and add your own client options to be
-used.
-
-1. Create your own class extending the ProxyRequestHandler:
+`LdapBackendInterface` covers the three operations needed for a read-only server:
 
 ```php
-namespace Foo;
+namespace App;
 
-use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\SearchContext;
+use Generator;
 
-class LdapProxyHandler extends ProxyRequestHandler
+class MyReadOnlyBackend implements LdapBackendInterface
 {
     /**
-     * Set the options for the LdapClient in the constructor.
+     * Yield entries that are candidates for the search. The framework applies
+     * FilterEvaluator as a final pass, so you may pre-filter for efficiency or
+     * yield all entries in scope for simplicity.
      */
+    public function search(SearchContext $context): Generator
+    {
+        // $context->baseDn   — Dn: the search base
+        // $context->scope    — int: SearchRequest::SCOPE_BASE_OBJECT | SCOPE_SINGLE_LEVEL | SCOPE_WHOLE_SUBTREE
+        // $context->filter   — FilterInterface: the requested LDAP filter
+        // $context->attributes — Attribute[]: requested attributes (empty = all)
+        // $context->typesOnly — bool: return only attribute names, not values
+
+        yield Entry::fromArray('cn=Foo,dc=example,dc=com', ['cn' => 'Foo', 'sn' => 'Bar']);
+        yield Entry::fromArray('cn=Bar,dc=example,dc=com', ['cn' => 'Bar', 'sn' => 'Baz']);
+    }
+
+    /**
+     * Return a single entry by DN, or null if it does not exist.
+     * Used for compare operations and internal lookups.
+     */
+    public function get(Dn $dn): ?Entry
+    {
+        // ...
+        return null;
+    }
+
+    /**
+     * Verify a plaintext password for a simple bind request.
+     * Return true if the credentials are valid, false otherwise.
+     */
+    public function verifyPassword(Dn $dn, string $password): bool
+    {
+        return $dn->toString() === 'cn=admin,dc=example,dc=com'
+            && $password === 'secret';
+    }
+}
+```
+
+### Writable Backend
+
+`WritableLdapBackendInterface` extends `LdapBackendInterface` with write operations:
+
+```php
+namespace App;
+
+use FreeDSx\Ldap\Entry\Change;
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Entry\Rdn;
+use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\SearchContext;
+use Generator;
+
+class MyBackend implements WritableLdapBackendInterface
+{
+    public function search(SearchContext $context): Generator
+    {
+        // yield matching entries...
+    }
+
+    public function get(Dn $dn): ?Entry
+    {
+        // ...
+    }
+
+    public function verifyPassword(Dn $dn, string $password): bool
+    {
+        // ...
+    }
+
+    public function add(Entry $entry): void
+    {
+        // Persist the new entry. Throw OperationException(ENTRY_ALREADY_EXISTS) if it exists.
+    }
+
+    public function delete(Dn $dn): void
+    {
+        // Remove the entry. Throw OperationException(NOT_ALLOWED_ON_NON_LEAF) if it has children.
+    }
+
+    /**
+     * @param Change[] $changes
+     */
+    public function update(Dn $dn, array $changes): void
+    {
+        // Apply attribute changes to the entry.
+    }
+
+    public function move(Dn $dn, Rdn $newRdn, bool $deleteOldRdn, ?Dn $newParent): void
+    {
+        // Rename or move the entry (ModifyDN operation).
+    }
+}
+```
+
+### Built-In Storage Adapters
+
+Two adapters are included for common use cases.
+
+#### InMemoryStorageAdapter
+
+An in-memory, array-backed storage adapter. Suitable for:
+
+- **Swoole**: all connections share the same process memory.
+- **PCNTL** with pre-seeded, read-only data: data seeded before `run()` is inherited by all forked child processes.
+
+**Note**: With PCNTL, write operations performed by one child process are not visible to other children.
+
+```php
+use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Storage\Adapter\InMemoryStorageAdapter;
+
+$passwordHash = '{SHA}' . base64_encode(sha1('secret', true));
+
+$adapter = new InMemoryStorageAdapter(
+    new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
+    new Entry(
+        new Dn('cn=admin,dc=example,dc=com'),
+        new Attribute('cn', 'admin'),
+        new Attribute('userPassword', $passwordHash),
+    ),
+);
+
+$server = (new LdapServer())->useBackend($adapter);
+$server->run();
+```
+
+Password verification supports `{SHA}` hashed values stored in the `userPassword` attribute, as well as plaintext
+comparisons. No password scheme is set automatically — the hash format must be present in the stored value.
+
+#### JsonFileStorageAdapter
+
+A file-backed adapter that persists the directory as a JSON file. Safe for PCNTL (write operations are serialised with
+`flock(LOCK_EX)` and the in-memory cache is invalidated via `filemtime` checks).
+
+**Note**: Not suitable for Swoole — the blocking `flock`/`fread` calls will stall the event loop. Use
+`InMemoryStorageAdapter` with Swoole instead.
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Storage\Adapter\JsonFileStorageAdapter;
+
+$adapter = new JsonFileStorageAdapter('/var/lib/myapp/ldap.json');
+
+$server = (new LdapServer())->useBackend($adapter);
+$server->run();
+```
+
+JSON format:
+
+```json
+{
+  "cn=admin,dc=example,dc=com": {
+    "dn": "cn=admin,dc=example,dc=com",
+    "attributes": {
+      "cn": ["admin"],
+      "userPassword": ["{SHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g="]
+    }
+  }
+}
+```
+
+### Proxy Backend
+
+`ProxyBackend` implements `WritableLdapBackendInterface` by forwarding all operations to an upstream LDAP server.
+Extend it to add custom logic:
+
+```php
+namespace App;
+
+use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Server\RequestHandler\ProxyBackend;
+
+class MyProxyBackend extends ProxyBackend
+{
     public function __construct()
     {
         parent::__construct(
             (new ClientOptions)
-                ->setServers([
-                    'dc1.domain.local',
-                    'dc2.domain.local',
-                 ])
-                 ->setBaseDn('dc=domain,dc=local')
+                ->setServers(['dc1.domain.local', 'dc2.domain.local'])
+                ->setBaseDn('dc=domain,dc=local')
         );
     }
 }
 ```
 
-2. Create the server and run it with the request handler above: 
-
 ```php
-use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
-use Foo\LdapProxyHandler;
+use App\MyProxyBackend;
 
-$server = new LdapServer(
-    (new ServerOptions)->setRequestHandler(new LdapProxyHandler())
-);
+$server = (new LdapServer())->useBackend(new MyProxyBackend());
 $server->run();
 ```
 
-### Generic Request Handler
+### Custom Filter Evaluation
 
-The generic request handler implements the needed RequestHandlerInterface, but rejects all request types by default. You
-should extend this class and override the methods for the requests you want to support:
-
-1. Create your own class extending the GenericRequestHandler:
+By default the framework applies a pure-PHP `FilterEvaluator` to entries yielded by `search()` as a correctness
+guarantee. For backends that translate LDAP filters to a native query language (SQL, MongoDB, etc.) and return
+pre-filtered results, you can replace the evaluator:
 
 ```php
-namespace Foo;
+use FreeDSx\Ldap\LdapServer;
+use App\MyBackend;
+use App\MySqlFilterEvaluator;
 
-use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
-use FreeDSx\Ldap\Server\RequestHandler\SearchResult;
+$server = (new LdapServer())
+    ->useBackend(new MyBackend())
+    ->useFilterEvaluator(new MySqlFilterEvaluator());
 
-class LdapRequestHandler extends GenericRequestHandler
-{
-    /**
-     * @var array
-     */
-    protected $users = [
-        'user' => '12345',
-    ];
-
-    /**
-     * Validates the username/password of a simple bind request
-     *
-     * @param string $username
-     * @param string $password
-     * @return bool
-     */
-    public function bind(string $username, string $password): bool
-    {
-        return isset($this->users[$username]) && $this->users[$username] === $password;
-    }
-
-    /**
-     * Override the search request. Return a SearchResult with the entries to send back.
-     *
-     * @param RequestContext $context
-     * @param SearchRequest $search
-     * @return SearchResult
-     */
-    public function search(RequestContext $context, SearchRequest $search): SearchResult
-    {
-        return SearchResult::make(
-            new Entries(
-                Entry::fromArray('cn=Foo,dc=FreeDSx,dc=local', [
-                    'cn' => 'Foo',
-                    'sn' => 'Bar',
-                    'givenName' => 'Foo',
-                ]),
-                Entry::fromArray('cn=Chad,dc=FreeDSx,dc=local', [
-                    'cn' => 'Chad',
-                    'sn' => 'Sikorra',
-                    'givenName' => 'Chad',
-                ])
-            )
-        );
-    }
-}
+$server->run();
 ```
 
-2. Create the server and run it with the request handler above: 
+The custom evaluator must implement `FreeDSx\Ldap\Server\Storage\FilterEvaluatorInterface`:
 
 ```php
-use FreeDSx\Ldap\ServerOptions;
-use FreeDSx\Ldap\LdapServer;
-use Foo\LdapRequestHandler;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use FreeDSx\Ldap\Server\Storage\FilterEvaluatorInterface;
 
-$server = new LdapServer(
-    (new ServerOptions)->setRequestHandler(new LdapRequestHandler())
-);
+class MySqlFilterEvaluator implements FilterEvaluatorInterface
+{
+    public function evaluate(Entry $entry, FilterInterface $filter): bool
+    {
+        // Custom matching logic (e.g. bitwise matching rules for AD compatibility).
+        return true;
+    }
+}
 ```
 
 ## Handling the RootDSE
 
-If you need more control over the RootDSE that gets returned, you can implement the `RootDseHandlerInterface`. This
-allows you to modify / return your own RootDSE in response to a client request for one.
+The server generates a default RootDSE from `ServerOptions` values (`setDseNamingContexts()`, `setDseVendorName()`,
+etc.). For most deployments this is sufficient.
 
-An example of using it to proxy RootDSE requests to a different LDAP server...
+If you need full control — for example to proxy RootDSE requests to an upstream server, or to add custom attributes —
+implement `RootDseHandlerInterface`. Your implementation receives the default-generated entry and returns a (possibly
+modified) entry to send back to the client.
 
-1. Create a class implementing `FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface`:
+The simplest way to proxy RootDSE requests is `ProxyHandler`, which bundles `ProxyBackend` with `RootDseHandlerInterface`
+in one class and is used by `LdapServer::makeProxy()` automatically.
+
+For a custom handler:
 
 ```php
-namespace Foo;
+namespace App;
 
-use FreeDSx\Ldap\ClientOptions;use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 
-class RootDseProxyHandler extends ProxyRequestHandler implements RootDseHandlerInterface
+class MyRootDseHandler implements RootDseHandlerInterface
 {
-    /**
-     * Set the options for the LdapClient in the constructor.
-     */
-    public function __construct()
-    {
-        parent::__construct(
-            (new ClientOptions)
-                ->setServers([
-                    'dc1.domain.local',
-                     'dc2.domain.local',
-                 ])
-                 ->setBaseDn('dc=domain,dc=local')
-        );
-    }
-    
     public function rootDse(
         RequestContext $context,
         SearchRequest $request,
-        Entry $rootDse
+        Entry $rootDse,
     ): Entry {
-        return $this->ldap()
-            ->search(
-                $request,
-                ...$context->controls()->toArray()
-            )
-            ->first();
+        // Modify the default entry or return a completely custom one.
+        $rootDse->set('namingContexts', 'dc=example,dc=com');
+
+        return $rootDse;
     }
 }
 ```
 
-2. Use the implemented class when instantiating the LDAP server:
+Register it with the server:
 
 ```php
-use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
-use Foo\RootDseProxyHandler;
+use App\MyRootDseHandler;
 
-$server = new LdapServer(
-    (new ServerOptions)->setRootDseHandler(new RootDseProxyHandler())
-);
+$server = (new LdapServer())
+    ->useBackend(new MyBackend())
+    ->useRootDseHandler(new MyRootDseHandler());
 
 $server->run();
 ```
 
-The above would pass on a RootDSE request as a proxy and send it back to the client.
-
-## Handling Client Paging Requests
-
-The basic RequestHandlerInterface by default will not support paging requests from clients. To support client paging
-search requests you must create a class that implements `FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface`.
-
-An example of using it to handle a client paging request... 
-
-1. Create a class implementing `FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface`:
-
-```php
-namespace Foo;
-
-use FreeDSx\Ldap\Entry\Entries;
-use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Server\Paging\PagingRequest;
-use FreeDSx\Ldap\Server\Paging\PagingResponse;
-use FreeDSx\Ldap\Server\RequestContext;
-use FreeDSx\Ldap\Server\RequestHandler\ProxyRequestHandler;
-use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
-
-class MyPagingHandler implements PagingHandlerInterface
-{
-    /**
-     * @inheritDoc
-     */
-    public function page(
-        PagingRequest $pagingRequest,
-        RequestContext $context
-    ): PagingResponse {
-        // Every time a client asks for a new "page" of results, this method will be called.
-        
-        // Get the unique ID of the paging request.
-        // This will remain the same across the series of paging requests.
-        $uniqueId = $pagingRequest->getUniqueId();
-        // Get the iteration of the "page" set we are on...
-        $iteration = $pagingRequest->getIteration();
-        // Get the size of the results the client is requesting...
-        $size = $pagingRequest->getSize();
-        // The actual search request...
-        $search = $pagingRequest->getSearchRequest();
-
-        // Perform the logic necessary to build up an Entries object with the results
-        // Just an example. Populate this based on actual search, size, and iteration.
-        $entries = new Entries(
-            Entry::fromArray('cn=Foo,dc=FreeDSx,dc=local', [
-                'cn' => 'Foo',
-                'sn' => 'Bar',
-                'givenName' => 'Foo',
-            ]),
-            Entry::fromArray('cn=Chad,dc=FreeDSx,dc=local', [
-                'cn' => 'Chad',
-                'sn' => 'Sikorra',
-                'givenName' => 'Chad',
-            ])
-        );
-        
-        // Perform actual logic to determine if it is the final result set...
-        $isFinalResponse = false;
-        
-        // ...
- 
-        if ($isFinalResponse) {
-            // If this is the final result in the paging set, make a response indicating as such:
-            return PagingResponse::makeFinal($entries);
-        } else {
-            // If you know an estimate of the remaining entries, pass it as a second param here.
-            return PagingResponse::make($entries);
-        }
-    }
-    
-    /**
-     * @inheritDoc
-     */
-    public function remove(
-        PagingRequest $pagingRequest,
-        RequestContext $context
-    ): void {
-        // This is to indicate that the client is done paging.
-        // Use this to clean up any resources involved in handling the paging request.
-    }
-}
-```
-
-2. Use the implemented class when instantiating the LDAP server:
-
-```php
-use FreeDSx\Ldap\ServerOptions;
-use FreeDSx\Ldap\LdapServer;
-use Foo\MyPagingHandler;
-
-$server = new LdapServer(
-    (new ServerOptions)->setPagingHandler(new MyPagingHandler())
-);
-
-$server->run();
-```
+If your backend class also implements `RootDseHandlerInterface`, you do not need to call `useRootDseHandler()` — the
+framework detects and uses it automatically.
 
 ## SASL Authentication
 
-The server supports SASL (Simple Authentication and Security Layer) bind requests. SASL must be explicitly enabled by
-configuring the mechanisms you want to support via `ServerOptions::setSaslMechanisms()`. The configured mechanisms are
-advertised to clients through the `supportedSaslMechanisms` RootDSE attribute.
+The server supports SASL bind requests. SASL must be explicitly enabled by configuring the mechanisms you want to
+support via `ServerOptions::setSaslMechanisms()`. The configured mechanisms are advertised to clients through the
+`supportedSaslMechanisms` RootDSE attribute.
 
 ```php
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
 
-$server = new LdapServer(
-    (new ServerOptions)
-        ->setSaslMechanisms(
-            ServerOptions::SASL_PLAIN,
-            ServerOptions::SASL_CRAM_MD5,
-            ServerOptions::SASL_SCRAM_SHA_256,
-        )
-        ->setRequestHandler(new MyRequestHandler())
-);
+$server = (new LdapServer(
+    (new ServerOptions)->setSaslMechanisms(
+        ServerOptions::SASL_PLAIN,
+        ServerOptions::SASL_CRAM_MD5,
+        ServerOptions::SASL_SCRAM_SHA_256,
+    )
+))->useBackend(new MyBackend());
 ```
 
 ### PLAIN Mechanism
 
-The `PLAIN` mechanism reuses your existing `RequestHandlerInterface::bind()` method. When a client authenticates with
-SASL PLAIN, the server extracts the username and password from the SASL credentials and calls `bind()` exactly as it
-would for a simple bind.
+The `PLAIN` mechanism reuses your existing `LdapBackendInterface::verifyPassword()` method. When a client
+authenticates with SASL PLAIN, the server extracts the username and password from the SASL credentials and calls
+`verifyPassword()` exactly as it would for a simple bind.
 
 **Note**: PLAIN transmits credentials in cleartext. Only enable it when the connection is protected by TLS (StartTLS
 or `setUseSsl`).
-
-```php
-namespace Foo;
-
-use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
-
-class MyRequestHandler extends GenericRequestHandler
-{
-    public function bind(string $username, string $password): bool
-    {
-        // Called for both simple binds and SASL PLAIN binds.
-        return $username === 'user' && $password === 'secret';
-    }
-}
-```
 
 ### Challenge-Based Mechanisms (CRAM-MD5, DIGEST-MD5, and SCRAM)
 
@@ -425,7 +409,7 @@ the client and verifies the client's response against a digest computed from the
 verification is cryptographic, the server must be able to look up the plaintext (or equivalent) password for a given
 username.
 
-To support these mechanisms, your request handler must additionally implement
+To support these mechanisms, your backend must additionally implement
 `FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface`:
 
 ```php
@@ -433,38 +417,52 @@ interface SaslHandlerInterface
 {
     public function getPassword(
         string $username,
-        string $mechanism
+        string $mechanism,
     ): ?string;
 }
 ```
 
 Return the user's plaintext password for the given username and mechanism, or `null` if the user does not exist or
-should not be permitted to authenticate. Returning `null` results in a generic `invalidCredentials` error — the
-mechanism name and `null`/wrong-password cases are not distinguished in the response to avoid user enumeration.
+should not be permitted to authenticate. Returning `null` results in a generic `invalidCredentials` error.
 
 The `$mechanism` parameter lets you apply per-mechanism policy if needed (e.g. disallow weak mechanisms for certain
 users), but in most cases you can ignore it and return the same password regardless.
 
-Example handler supporting both simple binds and challenge-based SASL:
+Example backend supporting both simple binds and challenge-based SASL:
 
 ```php
-namespace Foo;
+namespace App;
 
-use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\SearchContext;
 use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
+use Generator;
 
-class MyRequestHandler extends GenericRequestHandler implements SaslHandlerInterface
+class MyBackend implements LdapBackendInterface, SaslHandlerInterface
 {
     private array $users = [
         'alice' => 'her-plaintext-password',
         'bob'   => 'his-plaintext-password',
     ];
 
-    // Used for simple binds and SASL PLAIN.
-    public function bind(string $username, string $password): bool
+    public function search(SearchContext $context): Generator
     {
-        return isset($this->users[$username])
-            && $this->users[$username] === $password;
+        // yield entries...
+    }
+
+    public function get(Dn $dn): ?Entry
+    {
+        return null;
+    }
+
+    // Used for simple binds and SASL PLAIN.
+    public function verifyPassword(Dn $dn, string $password): bool
+    {
+        $user = $this->users[$dn->toString()] ?? null;
+
+        return $user !== null && $user === $password;
     }
 
     // Used for CRAM-MD5, DIGEST-MD5, and all SCRAM variants.
@@ -480,17 +478,15 @@ Then enable the desired mechanisms on the server:
 ```php
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
-use Foo\MyRequestHandler;
+use App\MyBackend;
 
-$server = new LdapServer(
-    (new ServerOptions)
-        ->setSaslMechanisms(
-            ServerOptions::SASL_CRAM_MD5,
-            ServerOptions::SASL_DIGEST_MD5,
-            ServerOptions::SASL_SCRAM_SHA_256,
-        )
-        ->setRequestHandler(new MyRequestHandler())
-);
+$server = (new LdapServer(
+    (new ServerOptions)->setSaslMechanisms(
+        ServerOptions::SASL_CRAM_MD5,
+        ServerOptions::SASL_DIGEST_MD5,
+        ServerOptions::SASL_SCRAM_SHA_256,
+    )
+))->useBackend(new MyBackend());
 
 $server->run();
 ```
@@ -512,12 +508,12 @@ TLS channel binding is required.
 
 **Note**: Because `getPassword()` must return the plaintext password, you cannot store passwords as one-way hashes
 (e.g. bcrypt) when supporting CRAM-MD5, DIGEST-MD5, or SCRAM. If one-way hashing is a requirement, use `PLAIN` over
-TLS instead, which allows password verification via `bind()`.
+TLS instead, which allows password verification via `verifyPassword()`.
 
 ## StartTLS SSL Certificate Support
 
 To allow clients to issue a StartTLS command against the LDAP server you need to provide an SSL certificate, key, and
-key passphrase/password (if needed) when constructing the server class. If these are not present then the StartTLS 
+key passphrase/password (if needed) when constructing the server class. If these are not present then the StartTLS
 request will not be supported.
 
 Adding the generated certs and keys on construction:

@@ -33,7 +33,8 @@
   },
   "suggest": {
     "ext-openssl": "For SSL/TLS support and some SASL mechanisms.",
-    "ext-pcntl": "For LDAP server functionality."
+    "ext-pcntl": "For LDAP server functionality.",
+    "ext-swoole": "For the SwooleServerRunner, enabling coroutine-based connection handling with shared in-memory storage."
   },
   "autoload": {
     "psr-4": {"FreeDSx\\Ldap\\": "src/FreeDSx/Ldap"}

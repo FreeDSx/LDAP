@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchangeInput;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Sasl\Challenge\ChallengeInterface;
 use FreeDSx\Sasl\SaslContext;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -33,7 +33,7 @@ final class SaslExchangeTest extends TestCase
 {
     /**
      * Using 'PLAIN' as the mechanism name so that the real MechanismOptionsBuilderFactory
-     * can produce a PlainMechanismOptionsBuilder (which only requires RequestHandlerInterface,
+     * can produce a PlainMechanismOptionsBuilder (which only requires LdapBackendInterface,
      * not SaslHandlerInterface). The mock challenge ignores the option array, so the
      * specific mechanism does not affect the exchange-loop behavior under test.
      */
@@ -54,7 +54,7 @@ final class SaslExchangeTest extends TestCase
             queue: $this->mockQueue,
             responseFactory: new ResponseFactory(),
             optionsBuilderFactory: new MechanismOptionsBuilderFactory(),
-            dispatcher: $this->createMock(RequestHandlerInterface::class),
+            authenticator: $this->createMock(PasswordAuthenticatableInterface::class),
         );
     }
 

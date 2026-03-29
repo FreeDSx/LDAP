@@ -15,6 +15,8 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
+use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -24,6 +26,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Server\Backend\SearchContext;
 
 trait ServerSearchTrait
 {
@@ -84,5 +87,70 @@ trait ServerSearchTrait
         }
 
         return $pagingControl;
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function makeSearchContext(SearchRequest $request): SearchContext
+    {
+        $baseDn = $request->getBaseDn();
+
+        if ($baseDn === null) {
+            throw new OperationException('No base DN provided.', ResultCode::PROTOCOL_ERROR);
+        }
+
+        return new SearchContext(
+            baseDn: $baseDn,
+            scope: $request->getScope(),
+            filter: $request->getFilter(),
+            attributes: $request->getAttributes(),
+            typesOnly: $request->getAttributesOnly(),
+        );
+    }
+
+    /**
+     * Filter the attributes on an entry according to the requested attribute list.
+     *
+     * An empty list means return all attributes. The special value "*" also means
+     * all attributes. "1.1" means return no attributes (just the DN).
+     *
+     * @param Attribute[] $requestedAttrs
+     */
+    private function applyAttributeFilter(
+        Entry $entry,
+        array $requestedAttrs,
+        bool $typesOnly,
+    ): Entry {
+        $names = array_map(
+            static fn(Attribute $a): string => strtolower($a->getDescription()),
+            $requestedAttrs
+        );
+
+        $returnAll = count($names) === 0 || in_array('*', $names, true);
+        $returnNone = count($names) === 1 && $names[0] === '1.1';
+
+        $filteredAttributes = [];
+
+        foreach ($entry->getAttributes() as $attribute) {
+            if ($returnNone) {
+                break;
+            }
+
+            if (!$returnAll && !in_array(strtolower($attribute->getDescription()), $names, true)) {
+                continue;
+            }
+
+            if ($typesOnly) {
+                $filteredAttributes[] = new Attribute($attribute->getName());
+            } else {
+                $filteredAttributes[] = $attribute;
+            }
+        }
+
+        return new Entry(
+            $entry->getDn(),
+            ...$filteredAttributes
+        );
     }
 }

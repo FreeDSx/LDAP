@@ -24,7 +24,7 @@ use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Sasl\SaslContext;
 
 /**
@@ -38,7 +38,7 @@ final class SaslExchange
         private readonly ServerQueue $queue,
         private readonly ResponseFactory $responseFactory,
         private readonly MechanismOptionsBuilderFactory $optionsBuilderFactory,
-        private readonly RequestHandlerInterface $dispatcher,
+        private readonly PasswordAuthenticatableInterface $authenticator,
     ) {
     }
 
@@ -50,7 +50,7 @@ final class SaslExchange
     public function run(SaslExchangeInput $input): SaslExchangeResult
     {
         $mechName = $input->getMechName();
-        $optionsBuilder = $this->optionsBuilderFactory->make($mechName, $this->dispatcher);
+        $optionsBuilder = $this->optionsBuilderFactory->make($mechName, $this->authenticator);
         $challenge = $input->getChallenge();
         $message = $input->getInitialMessage();
         $received = $input->getInitialCredentials();

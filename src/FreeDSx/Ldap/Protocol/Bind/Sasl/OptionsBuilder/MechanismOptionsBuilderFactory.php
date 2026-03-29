@@ -13,9 +13,12 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder;
 
-use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\UsernameExtractor\UsernameFieldExtractor;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\GenericBackend;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
 use FreeDSx\Sasl\Mechanism\CramMD5Mechanism;
 use FreeDSx\Sasl\Mechanism\DigestMD5Mechanism;
@@ -25,28 +28,42 @@ use FreeDSx\Sasl\Mechanism\ScramMechanism;
 /**
  * Creates a single MechanismOptionsBuilderInterface instance for the requested SASL mechanism.
  *
+ * Challenge-based mechanisms (CRAM-MD5, DIGEST-MD5, SCRAM) require the backend to implement
+ * SaslHandlerInterface. An OperationException is thrown if the requirement is not met, so
+ * the client receives a well-formed LDAP error response.
+ *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final class MechanismOptionsBuilderFactory
 {
+    public function __construct(
+        private readonly LdapBackendInterface $backend = new GenericBackend(),
+    ) {
+    }
+
     /**
-     * @throws RuntimeException if no builder is registered for the given mechanism.
+     * @throws OperationException if the mechanism is unsupported or requires SaslHandlerInterface.
      */
     public function make(
         string $mechanism,
-        RequestHandlerInterface $dispatcher,
+        PasswordAuthenticatableInterface $authenticator,
     ): MechanismOptionsBuilderInterface {
         return match (true) {
             $mechanism === PlainMechanism::NAME
-                => new PlainMechanismOptionsBuilder($dispatcher),
-            $mechanism === CramMD5Mechanism::NAME && $dispatcher instanceof SaslHandlerInterface
-                => new CramMD5MechanismOptionsBuilder($dispatcher),
-            $mechanism === DigestMD5Mechanism::NAME && $dispatcher instanceof SaslHandlerInterface
-                => new DigestMD5MechanismOptionsBuilder($dispatcher, new UsernameFieldExtractor()),
-            in_array($mechanism, ScramMechanism::VARIANTS, true) && $dispatcher instanceof SaslHandlerInterface
-                => new ScramMechanismOptionsBuilder($dispatcher),
-            default => throw new RuntimeException(
-                sprintf('No options builder is registered for the SASL mechanism "%s".', $mechanism)
+                => new PlainMechanismOptionsBuilder($authenticator),
+            $mechanism === CramMD5Mechanism::NAME && $this->backend instanceof SaslHandlerInterface
+                => new CramMD5MechanismOptionsBuilder($this->backend),
+            $mechanism === DigestMD5Mechanism::NAME && $this->backend instanceof SaslHandlerInterface
+                => new DigestMD5MechanismOptionsBuilder($this->backend, new UsernameFieldExtractor()),
+            in_array($mechanism, ScramMechanism::VARIANTS, true) && $this->backend instanceof SaslHandlerInterface
+                => new ScramMechanismOptionsBuilder($this->backend),
+            default => throw new OperationException(
+                sprintf(
+                    'The SASL mechanism "%s" requires the request handler to implement %s.',
+                    $mechanism,
+                    SaslHandlerInterface::class,
+                ),
+                ResultCode::OTHER,
             ),
         };
     }

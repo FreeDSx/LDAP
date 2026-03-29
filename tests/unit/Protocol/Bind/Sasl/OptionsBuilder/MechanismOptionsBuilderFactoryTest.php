@@ -13,13 +13,15 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder;
 
-use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\CramMD5MechanismOptionsBuilder;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\DigestMD5MechanismOptionsBuilder;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\PlainMechanismOptionsBuilder;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\ScramMechanismOptionsBuilder;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -27,74 +29,90 @@ use PHPUnit\Framework\TestCase;
 /**
  * Combined interface so PHPUnit can mock both at once.
  */
-interface SaslRequestHandlerInterface extends RequestHandlerInterface, SaslHandlerInterface {}
+interface SaslBackendInterface extends LdapBackendInterface, SaslHandlerInterface {}
 
 final class MechanismOptionsBuilderFactoryTest extends TestCase
 {
-    private MechanismOptionsBuilderFactory $subject;
+    private LdapBackendInterface&MockObject $mockBackend;
 
-    private RequestHandlerInterface&MockObject $mockDispatcher;
+    private SaslBackendInterface&MockObject $mockSaslBackend;
 
-    private SaslRequestHandlerInterface&MockObject $mockSaslDispatcher;
+    private PasswordAuthenticatableInterface&MockObject $mockAuthenticator;
 
     protected function setUp(): void
     {
-        $this->subject = new MechanismOptionsBuilderFactory();
-        $this->mockDispatcher = $this->createMock(RequestHandlerInterface::class);
-        $this->mockSaslDispatcher = $this->createMock(SaslRequestHandlerInterface::class);
+        $this->mockBackend = $this->createMock(LdapBackendInterface::class);
+        $this->mockSaslBackend = $this->createMock(SaslBackendInterface::class);
+        $this->mockAuthenticator = $this->createMock(PasswordAuthenticatableInterface::class);
     }
 
-    public function test_make_plain_with_non_sasl_dispatcher_returns_plain_builder(): void
+    public function test_make_plain_with_non_sasl_backend_returns_plain_builder(): void
     {
+        $subject = new MechanismOptionsBuilderFactory($this->mockBackend);
+
         self::assertInstanceOf(
             PlainMechanismOptionsBuilder::class,
-            $this->subject->make('PLAIN', $this->mockDispatcher)
+            $subject->make('PLAIN', $this->mockAuthenticator)
         );
     }
 
-    public function test_make_plain_with_sasl_dispatcher_returns_plain_builder(): void
+    public function test_make_plain_with_sasl_backend_returns_plain_builder(): void
     {
+        $subject = new MechanismOptionsBuilderFactory($this->mockSaslBackend);
+
         self::assertInstanceOf(
             PlainMechanismOptionsBuilder::class,
-            $this->subject->make('PLAIN', $this->mockSaslDispatcher)
+            $subject->make('PLAIN', $this->mockAuthenticator)
         );
     }
 
-    public function test_make_cram_md5_with_sasl_dispatcher_returns_cram_md5_builder(): void
+    public function test_make_cram_md5_with_sasl_backend_returns_cram_md5_builder(): void
     {
+        $subject = new MechanismOptionsBuilderFactory($this->mockSaslBackend);
+
         self::assertInstanceOf(
             CramMD5MechanismOptionsBuilder::class,
-            $this->subject->make('CRAM-MD5', $this->mockSaslDispatcher)
+            $subject->make('CRAM-MD5', $this->mockAuthenticator)
         );
     }
 
-    public function test_make_digest_md5_with_sasl_dispatcher_returns_digest_md5_builder(): void
+    public function test_make_digest_md5_with_sasl_backend_returns_digest_md5_builder(): void
     {
+        $subject = new MechanismOptionsBuilderFactory($this->mockSaslBackend);
+
         self::assertInstanceOf(
             DigestMD5MechanismOptionsBuilder::class,
-            $this->subject->make('DIGEST-MD5', $this->mockSaslDispatcher)
+            $subject->make('DIGEST-MD5', $this->mockAuthenticator)
         );
     }
 
-    public function test_make_scram_sha256_with_sasl_dispatcher_returns_scram_builder(): void
+    public function test_make_scram_sha256_with_sasl_backend_returns_scram_builder(): void
     {
+        $subject = new MechanismOptionsBuilderFactory($this->mockSaslBackend);
+
         self::assertInstanceOf(
             ScramMechanismOptionsBuilder::class,
-            $this->subject->make('SCRAM-SHA-256', $this->mockSaslDispatcher)
+            $subject->make('SCRAM-SHA-256', $this->mockAuthenticator)
         );
     }
 
-    public function test_make_cram_md5_with_non_sasl_dispatcher_throws(): void
+    public function test_make_cram_md5_with_non_sasl_backend_throws(): void
     {
-        self::expectException(RuntimeException::class);
+        $subject = new MechanismOptionsBuilderFactory($this->mockBackend);
 
-        $this->subject->make('CRAM-MD5', $this->mockDispatcher);
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::OTHER);
+
+        $subject->make('CRAM-MD5', $this->mockAuthenticator);
     }
 
     public function test_make_unknown_mechanism_throws(): void
     {
-        self::expectException(RuntimeException::class);
+        $subject = new MechanismOptionsBuilderFactory($this->mockSaslBackend);
 
-        $this->subject->make('UNKNOWN', $this->mockSaslDispatcher);
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::OTHER);
+
+        $subject->make('UNKNOWN', $this->mockAuthenticator);
     }
 }

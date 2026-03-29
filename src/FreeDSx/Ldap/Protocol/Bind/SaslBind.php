@@ -26,14 +26,12 @@ use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapper\SaslMessageWrapper;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
-use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Sasl\Challenge\ChallengeInterface;
 use FreeDSx\Sasl\Exception\SaslException;
-use FreeDSx\Sasl\Mechanism\PlainMechanism;
 use FreeDSx\Sasl\Sasl;
 
 /**
@@ -52,7 +50,7 @@ class SaslBind implements BindInterface
      */
     public function __construct(
         private readonly ServerQueue $queue,
-        private readonly RequestHandlerInterface $dispatcher,
+        private readonly PasswordAuthenticatableInterface $authenticator,
         private readonly Sasl $sasl = new Sasl(),
         private readonly array $mechanisms = [],
         private readonly ResponseFactory $responseFactory = new ResponseFactory(),
@@ -64,7 +62,7 @@ class SaslBind implements BindInterface
             $this->queue,
             $this->responseFactory,
             $optionsBuilderFactory,
-            $this->dispatcher,
+            $this->authenticator,
         );
     }
 
@@ -129,17 +127,6 @@ class SaslBind implements BindInterface
             throw new OperationException(
                 sprintf('The SASL mechanism "%s" is not supported.', $mechName),
                 ResultCode::AUTH_METHOD_UNSUPPORTED
-            );
-        }
-
-        if ($mechName !== PlainMechanism::NAME && !$this->dispatcher instanceof SaslHandlerInterface) {
-            throw new OperationException(
-                sprintf(
-                    'The SASL mechanism "%s" requires the request handler to implement %s.',
-                    $mechName,
-                    SaslHandlerInterface::class
-                ),
-                ResultCode::OTHER
             );
         }
     }

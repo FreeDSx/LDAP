@@ -2,95 +2,117 @@
 
 declare(strict_types=1);
 
-use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Operation\Request\AddRequest;
-use FreeDSx\Ldap\Operation\Request\CompareRequest;
-use FreeDSx\Ldap\Operation\Request\DeleteRequest;
-use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
-use FreeDSx\Ldap\Operation\Request\ModifyRequest;
-use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Server\Paging\PagingRequest;
-use FreeDSx\Ldap\Server\Paging\PagingResponse;
-use FreeDSx\Ldap\Server\RequestContext;
-use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
-use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\SearchContext;
+use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
+use FreeDSx\Ldap\Server\Backend\Write\WritableBackendTrait;
+use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
-use FreeDSx\Ldap\Server\RequestHandler\SearchResult;
 use FreeDSx\Ldap\ServerOptions;
 
 require __DIR__ . '/../../vendor/autoload.php';
 
-class LdapServerPagingHandler implements PagingHandlerInterface
+class LdapServerBackend implements WritableLdapBackendInterface, SaslHandlerInterface
 {
-    public function page(
-        PagingRequest $pagingRequest,
-        RequestContext $context
-    ): PagingResponse {
-        $i = 0;
+    use WritableBackendTrait;
 
-        $entries = [];
-        while ($i < $pagingRequest->getSize()) {
-            $i++;
-            $entries[] = Entry::fromArray(
-                "cn=foo$i,dc=foo,dc=bar",
-                [
-                    'foo' => (string) $i,
-                    'bar' => (string) $i,
-                ]
-            );
-        }
-        $entries = new Entries(...$entries);
-
-        if ($pagingRequest->getIteration() === 3) {
-            $this->logRequest(
-                'paging',
-                'Final response with ' . $entries->count() . ' entries'
-            );
-
-            return PagingResponse::makeFinal($entries);
-        } else {
-            $this->logRequest(
-                'paging',
-                'Regular response with '
-                . $entries->count() . ' entries, iteration '
-                . $pagingRequest->getIteration()
-            );
-
-            return PagingResponse::make(
-                $entries,
-                ($pagingRequest->getSize() * 3) - ($pagingRequest->getIteration() * $pagingRequest->getSize())
-            );
-        }
-    }
-
-    public function remove(
-        PagingRequest $pagingRequest,
-        RequestContext $context
-    ): void {
-        $this->logRequest(
-            'remove',
-            'On iteration ' . $pagingRequest->getIteration()
-        );
-    }
-
-    private function logRequest(
-        string $type,
-        string $message
-    ): void {
-        echo "---$type--- $message" . PHP_EOL;
-    }
-}
-
-class LdapServerRequestHandler extends GenericRequestHandler implements SaslHandlerInterface
-{
     /**
      * @var array<string, string>
      */
     private array $users = [
         'cn=user,dc=foo,dc=bar' => '12345',
     ];
+
+    public function search(SearchContext $context): Generator
+    {
+        $this->logRequest(
+            'search',
+            "base-dn => {$context->baseDn->toString()}, filter => {$context->filter->toString()}"
+        );
+
+        yield Entry::fromArray(
+            $context->baseDn->toString(),
+            [
+                'objectClass' => 'inetOrgPerson',
+                'cn' => 'user',
+                'name' => 'user',
+                'foo' => 'bar',
+            ]
+        );
+    }
+
+    public function get(Dn $dn): ?Entry
+    {
+        return Entry::fromArray(
+            $dn->toString(),
+            [
+                'foo' => 'bar',
+            ]
+        );
+    }
+
+    public function verifyPassword(
+        Dn $dn,
+        string $password,
+    ): bool {
+        $username = $dn->toString();
+
+        $this->logRequest(
+            'bind',
+            "username => $username, password => $password"
+        );
+
+        return isset($this->users[$username]) && $this->users[$username] === $password;
+    }
+
+    public function add(AddCommand $command): void
+    {
+        $entry = $command->entry;
+        $attrLog = [];
+        foreach ($entry->getAttributes() as $attribute) {
+            $attrLog[] = "{$attribute->getName()} => " . implode(', ', $attribute->getValues());
+        }
+
+        $this->logRequest(
+            'add',
+            "dn => {$entry->getDn()->toString()}, Attributes: " . implode(', ', $attrLog)
+        );
+    }
+
+    public function delete(DeleteCommand $command): void
+    {
+        $this->logRequest('delete', "dn => {$command->dn->toString()}");
+    }
+
+    public function update(UpdateCommand $command): void
+    {
+        $modLog = [];
+        foreach ($command->changes as $change) {
+            $attribute = $change->getAttribute();
+            $modLog[] = "({$change->getType()}){$attribute->getName()} => " . implode(
+                ', ',
+                $attribute->getValues()
+            );
+        }
+
+        $this->logRequest(
+            'modify',
+            "dn => {$command->dn->toString()}, Changes: " . implode(', ', $modLog)
+        );
+    }
+
+    public function move(MoveCommand $command): void
+    {
+        $dnLog = 'ParentDn => ' . $command->newParent?->toString();
+        $dnLog .= ', ParentRdn => ' . $command->newRdn->toString();
+
+        $this->logRequest('modify-dn', "dn => {$command->dn->toString()}, $dnLog");
+    }
 
     public function getPassword(
         string $username,
@@ -99,107 +121,25 @@ class LdapServerRequestHandler extends GenericRequestHandler implements SaslHand
         return $this->users[$username] ?? null;
     }
 
-    public function bind(string $username, string $password): bool
+    private function logRequest(string $type, string $message): void
     {
-        $this->logRequest(
-            'bind',
-            "username => $username, password => $password"
-        );
-
-        return isset($this->users[$username])
-            && $this->users[$username] === $password;
-    }
-
-    public function add(RequestContext $context, AddRequest $add): void
-    {
-        $attrLog = [];
-        foreach ($add->getEntry()->getAttributes() as $attribute) {
-            $attrLog[] = "{$attribute->getName()} => " . implode(
-                ', ',
-                $attribute->getValues()
-            );
-        }
-        $attrLog = implode(', ', $attrLog);
-
-        $this->logRequest(
-            'add',
-            "dn => {$add->getEntry()->getDn()->toString()}, Attributes: {$attrLog}"
-        );
-    }
-
-    public function compare(RequestContext $context, CompareRequest $compare): bool
-    {
-        $filter = $compare->getFilter();
-
-        $this->logRequest(
-            'compare',
-            "dn => {$compare->getDn()->toString()}, Name => {$filter->getAttribute()}, Value => {$filter->getValue()}"
-        );
-
-        return true;
-    }
-
-    public function delete(RequestContext $context, DeleteRequest $delete): void
-    {
-        $this->logRequest(
-            'delete',
-            "dn => {$delete->getDn()->toString()}"
-        );
-    }
-
-    public function modify(RequestContext $context, ModifyRequest $modify): void
-    {
-        $modLog = [];
-        foreach ($modify->getChanges() as $change) {
-            $attribute = $change->getAttribute();
-            $modLog[] = "({$change->getType()}){$attribute->getName()} => " . implode(
-                ', ',
-                $attribute->getValues()
-            );
-        }
-        $modLog = implode(', ', $modLog);
-
-        $this->logRequest(
-            'modify',
-            "dn => {$modify->getDn()->toString()}, Changes: $modLog"
-        );
-    }
-
-    public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn): void
-    {
-        $dnLog = 'ParentDn => ' . $modifyDn->getNewParentDn()?->toString();
-        $dnLog .= ', ParentRdn => ' . $modifyDn->getNewRdn()->toString();
-
-        $this->logRequest(
-            'modify-dn',
-            "dn => {$modifyDn->getDn()->toString()}, $dnLog"
-        );
-    }
-
-    public function search(RequestContext $context, SearchRequest $search): SearchResult
-    {
-        $this->logRequest(
-            'search',
-            "base-dn => {$search->getBaseDn()?->toString()}, filter => {$search->getFilter()->toString()}"
-        );
-
-        return SearchResult::make(
-            new Entries(
-                Entry::fromArray(
-                    'cn=user,dc=foo,dc=bar',
-                    [
-                        'name' => 'user',
-                    ]
-                )
-            )
-        );
-    }
-
-    private function logRequest(
-        string $type,
-        string $message
-    ): void {
         echo "---$type--- $message" . PHP_EOL;
+    }
+}
+
+class LdapServerPagingBackend extends LdapServerBackend
+{
+    public function search(SearchContext $context): Generator
+    {
+        for ($i = 1; $i <= 300; $i++) {
+            yield Entry::fromArray(
+                "cn=foo$i,dc=foo,dc=bar",
+                [
+                    'foo' => (string) $i,
+                    'bar' => (string) $i,
+                ]
+            );
+        }
     }
 }
 
@@ -215,19 +155,17 @@ if ($transport === 'ssl') {
     $useSsl = true;
 }
 
+$backend = $handler === 'paging'
+    ? new LdapServerPagingBackend()
+    : new LdapServerBackend();
+
 $options = (new ServerOptions())
-    ->setRequestHandler(new LdapServerRequestHandler())
     ->setPort(10389)
     ->setTransport($transport)
     ->setUnixSocket(sys_get_temp_dir() . '/ldap.socket')
     ->setSslCert($sslCert)
     ->setSslCertKey($sslKey)
-    ->setUseSsl($useSsl)
-    ->setPagingHandler(
-        $handler === 'paging'
-            ? new LdapServerPagingHandler()
-            : null
-    );
+    ->setUseSsl($useSsl);
 
 if ($handler === 'sasl') {
     $options->setSaslMechanisms(
@@ -237,8 +175,8 @@ if ($handler === 'sasl') {
     );
 }
 
-$server = new LdapServer($options);
+$server = (new LdapServer($options))->useBackend($backend);
 
-echo "server starting..." . PHP_EOL;
+echo 'server starting...' . PHP_EOL;
 
 $server->run();

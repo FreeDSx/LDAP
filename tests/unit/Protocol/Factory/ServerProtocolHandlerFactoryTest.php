@@ -22,17 +22,19 @@ use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingHandler;
-use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingUnsupportedHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerRootDseHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSearchHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerStartTlsHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnbindHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerWhoAmIHandler;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Server\Backend\GenericBackend;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
-use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
-use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHistory;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -49,6 +51,18 @@ final class ServerProtocolHandlerFactoryTest extends TestCase
     {
         $this->mockQueue = $this->createMock(ServerQueue::class);
         $this->mockHandlerFactory = $this->createMock(HandlerFactoryInterface::class);
+
+        $this->mockHandlerFactory
+            ->method('makeBackend')
+            ->willReturn(new GenericBackend());
+
+        $this->mockHandlerFactory
+            ->method('makeFilterEvaluator')
+            ->willReturn(new FilterEvaluator());
+
+        $this->mockHandlerFactory
+            ->method('makeWriteDispatcher')
+            ->willReturn(new WriteOperationDispatcher());
 
         $this->subject = new ServerProtocolHandlerFactory(
             $this->mockHandlerFactory,
@@ -82,10 +96,6 @@ final class ServerProtocolHandlerFactoryTest extends TestCase
 
     public function test_it_should_get_a_search_handler(): void
     {
-        $this->mockHandlerFactory
-            ->expects(self::once())->method('makeRequestHandler')
-            ->willReturn(new GenericRequestHandler());
-
         self::assertInstanceof(
             ServerSearchHandler::class,
             $this->subject->get(
@@ -95,45 +105,15 @@ final class ServerProtocolHandlerFactoryTest extends TestCase
         );
     }
 
-    public function test_it_should_get_a_paging_handler_when_supported(): void
+    public function test_it_should_get_a_paging_handler_when_a_paging_control_is_present(): void
     {
         $controls = new ControlBag(new PagingControl(10));
-
-        $mockPagingHandler = $this->createMock(PagingHandlerInterface::class);
-
-        $this->mockHandlerFactory
-            ->expects(self::once())
-            ->method('makePagingHandler')
-            ->willReturn($mockPagingHandler);
 
         self::assertInstanceOf(
             ServerPagingHandler::class,
             $this->subject->get(
                 Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'),
                 $controls,
-            )
-        );
-    }
-
-    public function test_it_should_get_a_paging_unsupported_handler_when_no_paging_handler_exists(): void
-    {
-        $controls = new ControlBag(new PagingControl(10));
-
-        $this->mockHandlerFactory
-            ->expects(self::once())
-            ->method('makePagingHandler')
-            ->willReturn(null);
-
-        $this->mockHandlerFactory
-            ->expects(self::once())
-            ->method('makeRequestHandler')
-            ->willReturn(new GenericRequestHandler());
-
-        self::assertInstanceOf(
-            ServerPagingUnsupportedHandler::class,
-            $this->subject->get(
-                Operations::list(new EqualityFilter('foo', 'bar'), 'cn=foo'),
-                $controls
             )
         );
     }
@@ -162,10 +142,6 @@ final class ServerProtocolHandlerFactoryTest extends TestCase
 
     public function test_it_should_get_the_dispatch_handler_for_common_requests(): void
     {
-        $this->mockHandlerFactory
-            ->method('makeRequestHandler')
-            ->willReturn(new GenericRequestHandler());
-
         self::assertInstanceOf(
             ServerDispatchHandler::class,
             $this->subject->get(Operations::delete('cn=foo'), new ControlBag())
