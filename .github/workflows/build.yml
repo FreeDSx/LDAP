@@ -18,7 +18,7 @@ jobs:
         with:
           php-version: ${{ matrix.php-versions }}
           coverage: xdebug
-          tools: composer:v2.5
+          tools: composer:2.9
 
       # Linux: OpenLDAP via Docker
       - name: Create slapd socket directory
