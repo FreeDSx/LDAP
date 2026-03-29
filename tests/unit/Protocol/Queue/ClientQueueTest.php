@@ -192,6 +192,7 @@ final class ClientQueueTest extends TestCase
 
         $mockWrapper = $this->createMock(MessageWrapperInterface::class);
         $mockWrapper
+            ->expects($this->once())
             ->method('unwrap')
             ->with('foo')
             ->willReturn(new Buffer('bar', 3));
