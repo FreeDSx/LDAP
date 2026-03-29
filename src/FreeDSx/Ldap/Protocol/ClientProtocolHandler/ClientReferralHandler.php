@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Exception\FilterParseException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ReferralException;
@@ -58,27 +59,22 @@ class ClientReferralHandler implements ResponseHandlerInterface
         LdapMessageResponse $messageFrom
     ): ?LdapMessageResponse {
         $result = $messageFrom->getResponse();
-        switch ($this->options->getReferral()) {
-            case 'throw':
-                $message = $result instanceof LdapResult
-                    ? $result->getDiagnosticMessage()
-                    : 'Referral response encountered.';
-                $referrals = $result instanceof LdapResult
-                    ? $result->getReferrals()
-                    : [];
 
-                throw new ReferralException($message, ...$referrals);
-            case 'follow':
-                return $this->followReferral(
-                    $messageTo,
-                    $messageFrom
-                );
-            default:
-                throw new RuntimeException(sprintf(
-                    'The referral option "%s" is invalid.',
-                    $this->options->getReferral()
-                ));
-        }
+        return match ($this->options->getReferral()) {
+            LdapClient::REFERRAL_THROW => throw new ReferralException(
+                $result instanceof LdapResult ? $result->getDiagnosticMessage() : 'Referral response encountered.',
+                ...($result instanceof LdapResult ? $result->getReferrals() : []),
+            ),
+            LdapClient::REFERRAL_FOLLOW => $this->followReferral(
+                $messageTo,
+                $messageFrom,
+            ),
+            LdapClient::REFERRAL_IGNORE => null,
+            default => throw new RuntimeException(sprintf(
+                'The referral option "%s" is invalid.',
+                $this->options->getReferral()
+            )),
+        };
     }
 
     /**
@@ -156,7 +152,7 @@ class ClientReferralHandler implements ResponseHandlerInterface
                 }
 
                 return $client->send(
-                    $messageTo->getRequest(),
+                    $request,
                     ...$messageTo->controls()->toArray()
                 );
                 # Skip referrals that fail due to connection issues and not other issues
@@ -196,9 +192,9 @@ class ClientReferralHandler implements ResponseHandlerInterface
             if ($referral->getScope() === LdapUrl::SCOPE_SUB) {
                 $request->setScope(SearchRequest::SCOPE_WHOLE_SUBTREE);
             } elseif ($referral->getScope() === LdapUrl::SCOPE_BASE) {
-                $request->setScope(SearchRequest::SCOPE_SINGLE_LEVEL);
-            } else {
                 $request->setScope(SearchRequest::SCOPE_BASE_OBJECT);
+            } else {
+                $request->setScope(SearchRequest::SCOPE_SINGLE_LEVEL);
             }
         }
 

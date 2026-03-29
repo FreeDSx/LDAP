@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Sync;
 
 use FreeDSx\Ldap\Exception\CancelRequestException;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Session;
 use Symfony\Component\Process\Process;
@@ -57,7 +58,7 @@ class SyncReplTest extends LdapTestCase
         $this->bindClient($client);
 
         $client
-            ->syncRepl()
+            ->syncRepl(Filters::equal('objectClass', 'organizationalUnit'))
             ->poll(function (SyncEntryResult $result) use (&$entries): void {
                 $entries[] = $result;
             });

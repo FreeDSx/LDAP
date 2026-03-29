@@ -18,13 +18,30 @@ use FreeDSx\Ldap\Search\Filters;
 
 class LdapProxyTest extends ServerTestCase
 {
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+
+        if (!extension_loaded('pcntl')) {
+            return;
+        }
+
+        static::initSharedServer(
+            'ldapproxy',
+            'tcp',
+        );
+    }
+
+    public static function tearDownAfterClass(): void
+    {
+        parent::tearDownAfterClass();
+        static::tearDownSharedServer();
+    }
+
     public function setUp(): void
     {
         $this->setServerMode('ldapproxy');
-
         parent::setUp();
-
-        $this->createServerProcess('tcp');
     }
 
     public function testItBindsToTheProxy(): void
@@ -49,26 +66,26 @@ class LdapProxyTest extends ServerTestCase
         $search = Operations::search(
             Filters::equal(
                 'objectClass',
-                'inetOrgPerson'
+                'organizationalUnit'
             ),
-            'cn'
+            'ou'
         );
         $paging = $this->ldapClient()
             ->paging($search);
 
-        $entries = $paging->getEntries();
+        $entries = $paging->getEntries(4);
 
         $this->assertCount(
-            1000,
+            4,
             $entries
         );
 
         while ($paging->hasEntries()) {
-            $entries->add(...$paging->getEntries()->toArray());
+            $entries->add(...$paging->getEntries(4)->toArray());
         }
 
         $this->assertCount(
-            10001,
+            12,
             $entries
         );
     }

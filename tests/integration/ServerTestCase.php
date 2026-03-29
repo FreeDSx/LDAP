@@ -15,28 +15,154 @@ namespace Tests\Integration\FreeDSx\Ldap;
 
 use Exception;
 use FreeDSx\Ldap\LdapClient;
+use RuntimeException;
 use Symfony\Component\Process\Process;
 
 class ServerTestCase extends LdapTestCase
 {
-    private Process $subject;
+    private const SERVER_MAX_WAIT_SECONDS = 10;
 
-    private ?LdapClient $client;
+    private const SERVER_POLL_INTERVAL_US = 15_000; // 15ms
+
+    /**
+     * Shared server process — started once per test class via setUpBeforeClass.
+     */
+    private static ?Process $sharedProcess = null;
+
+    /**
+     * Stored so the shared server can be restarted after a test that stops it.
+     */
+    private static string $sharedMode = 'ldapserver';
+
+    private static string $sharedTransport = 'tcp';
+
+    private static ?string $sharedHandler = null;
+
+    /**
+     * Per-test client — a fresh connection to the shared server for each test.
+     */
+    private ?LdapClient $client = null;
+
+    /**
+     * Set when a test spins up its own server (paging, ssl, unix).
+     */
+    private ?Process $overrideProcess = null;
+
+    /**
+     * Set when stopServer() halts the shared process so tearDown can restore it.
+     */
+    private bool $needsSharedRestart = false;
 
     private string $serverMode = 'ldapserver';
 
     public function setUp(): void
     {
         parent::setUp();
+
         if (!extension_loaded('pcntl')) {
             $this->markTestSkipped('The PCNTL extension is required to run the built-in LDAP server.');
+        }
+
+        if (self::$sharedProcess !== null) {
+            // Clear any leftover output from the previous test before creating
+            // the client so waitForServerOutput() never sees stale markers.
+            self::$sharedProcess->clearOutput();
+            $this->client = $this->buildClient(self::$sharedTransport);
         }
     }
 
     public function tearDown(): void
     {
         parent::tearDown();
-        $this->stopServer();
+
+        $this->client?->unbind();
+        $this->client = null;
+
+        if ($this->overrideProcess !== null) {
+            $this->overrideProcess->stop();
+            $this->overrideProcess = null;
+        }
+
+        if ($this->needsSharedRestart) {
+            self::launchSharedProcess(
+                self::$sharedMode,
+                self::$sharedTransport,
+                self::$sharedHandler,
+            );
+            $this->needsSharedRestart = false;
+        }
+    }
+
+    /**
+     * Shared-server lifecycle — called from setUpBeforeClass / tearDownAfterClass
+     */
+    protected static function initSharedServer(
+        string $mode,
+        string $transport,
+        ?string $handler = null,
+    ): void {
+        self::$sharedMode = $mode;
+        self::$sharedTransport = $transport;
+        self::$sharedHandler = $handler;
+
+        self::launchSharedProcess($mode, $transport, $handler);
+    }
+
+    protected static function tearDownSharedServer(): void
+    {
+        self::$sharedProcess?->stop();
+        self::$sharedProcess = null;
+    }
+
+    /**
+     * Per-test server override. For tests that require a different config
+     */
+    protected function createServerProcess(
+        string $transport,
+        ?string $handler = null,
+    ): void {
+        $processArgs = [
+            'php',
+            __DIR__ . '/../bin/' . $this->serverMode . '.php',
+            $transport,
+        ];
+
+        if ($handler !== null) {
+            $processArgs[] = $handler;
+        }
+
+        $process = new Process($processArgs);
+        $process->start();
+        self::waitForProcess($process, 'server starting...');
+
+        $this->overrideProcess = $process;
+        $this->client = $this->buildClient($transport);
+    }
+
+    protected function stopServer(): void
+    {
+        $this->client?->unbind();
+        $this->client = null;
+
+        if ($this->overrideProcess !== null) {
+            $this->overrideProcess->stop();
+            $this->overrideProcess = null;
+        } elseif (self::$sharedProcess !== null) {
+            self::$sharedProcess->stop();
+            self::$sharedProcess = null;
+            $this->needsSharedRestart = true;
+        }
+    }
+
+    protected function waitForServerOutput(string $marker): string
+    {
+        $process = $this->overrideProcess ?? self::$sharedProcess
+            ?? throw new RuntimeException('No server process is running.');
+
+        return self::waitForProcess(
+            $process,
+            $marker,
+        );
     }
 
     protected function authenticate(): void
@@ -47,53 +173,43 @@ class ServerTestCase extends LdapTestCase
         );
     }
 
-    protected function waitForServerOutput(string $marker): string
+    protected function setServerMode(string $mode): void
     {
-        $maxWait = 10;
-        $i = 0;
-
-        while ($this->subject->isRunning()) {
-            $output = $this->subject->getOutput();
-            $this->subject->clearOutput();
-
-            if (str_contains($output, $marker)) {
-                return $output;
-            }
-
-            $i++;
-            if ($i === $maxWait) {
-                break;
-            }
-
-            sleep(1);
-        }
-
-        throw new Exception(sprintf(
-            'The expected output (%s) was not received after %d seconds. Received: %s',
-            $marker,
-            $i,
-            PHP_EOL . $this->subject->getErrorOutput()
-        ));
+        $this->serverMode = $mode;
     }
 
-    protected function createServerProcess(
+    protected function ldapClient(): LdapClient
+    {
+        return $this->client ?? throw new RuntimeException('The test LDAP client is not set.');
+    }
+
+    private static function launchSharedProcess(
+        string $mode,
         string $transport,
-        ?string $handler = null
+        ?string $handler,
     ): void {
         $processArgs = [
             'php',
-            __DIR__ . '/../bin/' . $this->serverMode . '.php',
+            __DIR__ . '/../bin/' . $mode . '.php',
             $transport,
         ];
 
-        if ($handler) {
+        if ($handler !== null) {
             $processArgs[] = $handler;
         }
 
-        $this->subject = new Process($processArgs);
-        $this->subject->start();
-        $this->waitForServerOutput('server starting...');
+        $process = new Process($processArgs);
+        $process->start();
+        self::waitForProcess(
+            $process,
+            'server starting...'
+        );
 
+        self::$sharedProcess = $process;
+    }
+
+    private function buildClient(string $transport): LdapClient
+    {
         $useSsl = false;
         $servers = '127.0.0.1';
 
@@ -105,7 +221,7 @@ class ServerTestCase extends LdapTestCase
             $servers = sys_get_temp_dir() . '/ldap.socket';
         }
 
-        $this->client = $this->getClient(
+        return $this->getClient(
             $this->makeOptions()
                 ->setPort(10389)
                 ->setTransport($transport)
@@ -115,20 +231,30 @@ class ServerTestCase extends LdapTestCase
         );
     }
 
-    protected function stopServer(): void
+    private static function waitForProcess(Process $process, string $marker): string
     {
-        $this->ldapClient()->unbind();
-        $this->client = null;
-        $this->subject->stop();
-    }
+        $deadline = microtime(true) + self::SERVER_MAX_WAIT_SECONDS;
 
-    protected function setServerMode(string $mode): void
-    {
-        $this->serverMode = $mode;
-    }
+        while ($process->isRunning()) {
+            $output = $process->getOutput();
+            $process->clearOutput();
 
-    protected function ldapClient(): LdapClient
-    {
-        return $this->client ?? throw new \RuntimeException('The test LDAP client is not set.');
+            if (str_contains($output, $marker)) {
+                return $output;
+            }
+
+            if (microtime(true) >= $deadline) {
+                break;
+            }
+
+            usleep(self::SERVER_POLL_INTERVAL_US);
+        }
+
+        throw new Exception(sprintf(
+            'The expected output (%s) was not received after %d seconds. Received: %s',
+            $marker,
+            self::SERVER_MAX_WAIT_SECONDS,
+            PHP_EOL . $process->getErrorOutput()
+        ));
     }
 }

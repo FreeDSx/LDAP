@@ -487,6 +487,10 @@ class LdapClientTest extends LdapTestCase
 
     public function testStartTlsIgnoreCertValidation(): void
     {
+        if (gethostbyname('foo.com') !== '127.0.0.1') {
+            $this->markTestSkipped('foo.com must resolve to 127.0.0.1 for this test (add it to /etc/hosts).');
+        }
+
         $this->client = $this->getClient(
             $this->makeOptions()
                 ->setServers(['foo.com'])
@@ -543,6 +547,10 @@ class LdapClientTest extends LdapTestCase
 
     public function testUseSslIgnoreCertValidation(): void
     {
+        if (gethostbyname('foo.com') !== '127.0.0.1') {
+            $this->markTestSkipped('foo.com must resolve to 127.0.0.1 for this test (add it to /etc/hosts).');
+        }
+
         $this->client = $this->getClient(
             $this->makeOptions()
                 ->setServers(['foo.com'])
