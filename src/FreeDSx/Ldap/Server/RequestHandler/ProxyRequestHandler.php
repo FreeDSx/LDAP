@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\RequestHandler;
 
 use FreeDSx\Ldap\ClientOptions;
-use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
@@ -26,6 +25,7 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\RequestContext;
 use SensitiveParameter;
@@ -108,8 +108,24 @@ class ProxyRequestHandler implements RequestHandlerInterface
     public function search(
         RequestContext $context,
         SearchRequest $search
-    ): Entries {
-        return $this->ldap()->search($search, ...$context->controls()->toArray());
+    ): SearchResult {
+        /** @var SearchResponse $response */
+        $response = $this->ldap()
+            ->sendAndReceive(
+                $search,
+                ...$context->controls()->toArray()
+            )
+            ->getResponse();
+
+        if ($response->getResultCode() === ResultCode::SUCCESS) {
+            return SearchResult::make($response->getEntries());
+        }
+
+        return SearchResult::makeWithResultCode(
+            $response->getEntries(),
+            $response->getResultCode(),
+            $response->getDiagnosticMessage(),
+        );
     }
 
     /**

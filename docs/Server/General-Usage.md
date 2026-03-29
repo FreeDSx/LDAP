@@ -83,7 +83,7 @@ The interface has the following methods:
 
     public function modifyDn(RequestContext $context, ModifyDnRequest $modifyDn);
 
-    public function search(RequestContext $context, SearchRequest $search) : Entries;
+    public function search(RequestContext $context, SearchRequest $search) : SearchResult;
     
     public function bind(string $username, string $password) : bool;
 ```
@@ -149,6 +149,7 @@ should extend this class and override the methods for the requests you want to s
 namespace Foo;
 
 use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
+use FreeDSx\Ldap\Server\RequestHandler\SearchResult;
 
 class LdapRequestHandler extends GenericRequestHandler
 {
@@ -172,25 +173,27 @@ class LdapRequestHandler extends GenericRequestHandler
     }
 
     /**
-     * Override the search request. This must send back an entries object.
+     * Override the search request. Return a SearchResult with the entries to send back.
      *
      * @param RequestContext $context
      * @param SearchRequest $search
-     * @return Entries
+     * @return SearchResult
      */
-    public function search(RequestContext $context, SearchRequest $search): Entries
+    public function search(RequestContext $context, SearchRequest $search): SearchResult
     {
-        return new Entries(
-            Entry::fromArray('cn=Foo,dc=FreeDSx,dc=local', [
-                'cn' => 'Foo',
-                'sn' => 'Bar',
-                'givenName' => 'Foo',
-            ]),
-            Entry::fromArray('cn=Chad,dc=FreeDSx,dc=local', [
-                'cn' => 'Chad',
-                'sn' => 'Sikorra',
-                'givenName' => 'Chad',
-            ])
+        return SearchResult::make(
+            new Entries(
+                Entry::fromArray('cn=Foo,dc=FreeDSx,dc=local', [
+                    'cn' => 'Foo',
+                    'sn' => 'Bar',
+                    'givenName' => 'Foo',
+                ]),
+                Entry::fromArray('cn=Chad,dc=FreeDSx,dc=local', [
+                    'cn' => 'Chad',
+                    'sn' => 'Sikorra',
+                    'givenName' => 'Chad',
+                ])
+            )
         );
     }
 }

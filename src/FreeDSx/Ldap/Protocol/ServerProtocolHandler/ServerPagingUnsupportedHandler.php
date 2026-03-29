@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\RequestContext;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\RequestHandler\SearchResult as HandlerSearchResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
@@ -65,14 +66,27 @@ class ServerPagingUnsupportedHandler implements ServerProtocolHandlerInterface
             );
         }
 
+        $handlerResult = null;
+
         try {
-            $searchResult = SearchResult::makeSuccessResult(
-                $this->dispatcher->search(
-                    $context,
-                    $request
-                ),
-                (string) $request->getBaseDn()
+            $handlerResult = $this->dispatcher->search(
+                $context,
+                $request,
             );
+            $baseDn = (string) $request->getBaseDn();
+
+            $searchResult = $handlerResult->getResultCode() === ResultCode::SUCCESS
+                ? SearchResult::makeSuccessResult(
+                    $handlerResult->getEntries(),
+                    $baseDn,
+                    $handlerResult->getDiagnosticMessage(),
+                )
+                : SearchResult::makeErrorResult(
+                    $handlerResult->getResultCode(),
+                    $baseDn,
+                    $handlerResult->getDiagnosticMessage(),
+                    $handlerResult->getEntries(),
+                );
         } catch (OperationException $e) {
             $searchResult = SearchResult::makeErrorResult(
                 $e->getCode(),
@@ -84,7 +98,8 @@ class ServerPagingUnsupportedHandler implements ServerProtocolHandlerInterface
         $this->sendEntriesToClient(
             $searchResult,
             $message,
-            $this->queue
+            $this->queue,
+            ...($handlerResult instanceof HandlerSearchResult ? $handlerResult->getControls() : []),
         );
     }
 }
