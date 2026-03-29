@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Ldap\Search\DirSync;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use FreeDSx\Ldap\Search\LdapQuery;
 use FreeDSx\Ldap\Search\Paging;
 use FreeDSx\Ldap\Search\RangeRetrieval;
 use FreeDSx\Ldap\Search\Vlv;
@@ -264,6 +265,14 @@ class LdapClient
             $newRdn,
             $deleteOldRdn
         ));
+    }
+
+    /**
+     * Create a fluent query builder for constructing and executing a search.
+     */
+    public function query(): LdapQuery
+    {
+        return new LdapQuery($this);
     }
 
     /**

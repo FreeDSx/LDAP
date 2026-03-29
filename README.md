@@ -45,7 +45,6 @@ Use the LdapClient class and the helper classes:
 ```php
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapClient;
-use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 
 $ldap = new LdapClient(
@@ -65,30 +64,19 @@ $ldap->bind(
     password: '12345'
 );
 
-# Build up an LDAP filter using the helper methods
-$filter = Filters::and(
-    Filters::equal('objectClass', 'user'),
-    Filters::startsWith('cn', 'S'),
-    # Add a filter object based off a raw string filter...
-    Filters::raw('(telephoneNumber=*)')
-);
-# Create a search operation to be used based on the above filter
-$search = Operations::search(
-    $filter,
-    'cn'
-);
-
-# Create a paged search, 100 results at a time
-$paging = $ldap->paging(
-    $search,
-    100
-);
+# Use the query builder to construct and execute a paged search, 100 results at a time
+$paging = $ldap->query()
+    ->select('cn')
+    ->andWhere(Filters::equal('objectClass', 'user'))
+    ->andWhere(Filters::startsWith('cn', 'S'))
+    ->andWhere(Filters::raw('(telephoneNumber=*)'))
+    ->paging(100);
 
 while ($paging->hasEntries()) {
     $entries = $paging->getEntries();
 
     var_dump(count($entries));
-    
+
     foreach ($entries as $entry) {
         echo "Entry: " . $entry->getDn() . PHP_EOL;
     }

@@ -1,5 +1,14 @@
 # Searching and Filters
 
+* [Query Builder](#query-builder)
+  * [Configuring the Search](#configuring-the-search)
+  * [Building Filters](#building-filters)
+  * [Executing the Search](#executing-the-search)
+    * [Get All Entries](#get-all-entries)
+    * [Get First Entry](#get-first-entry)
+    * [Paging](#query-builder-paging)
+    * [Streaming](#streaming)
+  * [Advanced Usage](#advanced-usage)
 * [Standard Searches](#standard-searches)
   * [Read Search](#read-search)
   * [List Search](#list-search)
@@ -26,8 +35,166 @@
   * [Construction Using String Filters](#construction-using-string-filters)
   * [String Representation](#string-representation)
 
-To search LDAP you can use standard searching, paging, or VLV. Each of these has their own use. The client class has 
+To search LDAP you can use standard searching, paging, or VLV. Each of these has their own use. The client class has
 helper methods for making each of these easier to work with.
+
+## Query Builder
+
+The query builder is the preferred way to construct and execute searches. Obtain one via `$ldap->query()` and
+chain calls to configure the search before executing it with one of the execution methods.
+
+```php
+use FreeDSx\Ldap\Search\Filters;
+
+$entries = $ldap->query()
+    ->from('dc=example,dc=local')
+    ->select('cn', 'mail')
+    ->andWhere(Filters::equal('objectClass', 'user'))
+    ->andWhere(Filters::present('telephoneNumber'))
+    ->get();
+
+foreach ($entries as $entry) {
+    echo $entry->getDn() . PHP_EOL;
+}
+```
+
+### Configuring the Search
+
+| Method | Description |
+|--------|-------------|
+| `from(string\|Dn $baseDn)` | Set the base DN to search from. |
+| `select(string\|Attribute ...$attrs)` | Attributes to return. Returns all attributes if not called. |
+| `useSubtreeScope()` | Search the entire subtree under the base DN *(default)*. |
+| `useSingleLevelScope()` | Search only direct children of the base DN. |
+| `useBaseScope()` | Search only the base DN object itself. |
+| `sizeLimit(int $limit)` | Maximum number of entries the server should return. |
+| `timeLimit(int $seconds)` | Maximum time in seconds the server should spend on the search. |
+
+### Building Filters
+
+Filters are accumulated using `andWhere()` and `orWhere()`. The first call to either method sets the filter directly
+with no wrapper. Subsequent calls append to an existing `AndFilter` / `OrFilter`, or wrap the current filter in one.
+
+```php
+use FreeDSx\Ldap\Search\Filters;
+
+# All conditions AND'd together: (&(objectClass=user)(telephoneNumber=*)(cn=S*))
+$ldap->query()
+    ->andWhere(Filters::equal('objectClass', 'user'))
+    ->andWhere(Filters::present('telephoneNumber'))
+    ->andWhere(Filters::startsWith('cn', 'S'))
+    ->get();
+
+# All conditions OR'd together: (|(objectClass=user)(objectClass=group))
+$ldap->query()
+    ->orWhere(Filters::equal('objectClass', 'user'))
+    ->orWhere(Filters::equal('objectClass', 'group'))
+    ->get();
+
+# Combine using nested Filters for complex logic:
+# (&(objectClass=user)(|(department=IT)(department=HR)))
+$ldap->query()
+    ->andWhere(Filters::equal('objectClass', 'user'))
+    ->andWhere(
+        Filters::or(
+            Filters::equal('department', 'IT'),
+            Filters::equal('department', 'HR'),
+        )
+    )
+    ->get();
+```
+
+Use `where()` to replace the entire filter at once when you have already constructed a complete `FilterInterface`:
+
+```php
+$filter = Filters::raw('(&(objectClass=user)(title=*Manager*))');
+
+$entries = $ldap->query()
+    ->from('dc=example,dc=local')
+    ->where($filter)
+    ->get();
+```
+
+### Executing the Search
+
+#### Get All Entries
+
+Execute the search and return all matching entries as an `Entries` collection:
+
+```php
+$entries = $ldap->query()
+    ->andWhere(Filters::equal('objectClass', 'user'))
+    ->get();
+```
+
+#### Get First Entry
+
+Execute the search and return the first matching entry, or `null` if none exists. Automatically applies a server-side
+`sizeLimit` of `1` unless you have already configured one yourself:
+
+```php
+$entry = $ldap->query()
+    ->from('dc=example,dc=local')
+    ->andWhere(Filters::equal('cn', 'jsmith'))
+    ->first();
+
+if ($entry) {
+    echo $entry->getDn() . PHP_EOL;
+}
+```
+
+#### Query Builder Paging
+
+Execute the search as a paged operation, returning a `Paging` helper to iterate through results in chunks:
+
+```php
+$paging = $ldap->query()
+    ->select('cn', 'mail')
+    ->andWhere(Filters::equal('objectClass', 'user'))
+    ->paging(100);   # 100 entries per page
+
+while ($paging->hasEntries()) {
+    foreach ($paging->getEntries() as $entry) {
+        echo $entry->getDn() . PHP_EOL;
+    }
+}
+```
+
+#### Streaming
+
+Execute the search as a lazy generator, yielding one result at a time as entries arrive from the server. Each yielded
+value is an `EntryResult`, which exposes both the entry and any per-entry response controls:
+
+```php
+use FreeDSx\Ldap\Search\Result\EntryResult;
+
+$query = $ldap->query()
+    ->select('cn', 'mail')
+    ->andWhere(Filters::equal('objectClass', 'user'));
+
+foreach ($query->stream() as $result) {
+    $entry = $result->getEntry();
+    $controls = $result->getMessage()->getControls();
+
+    echo $entry->getDn() . PHP_EOL;
+}
+```
+
+### Advanced Usage
+
+Use `toSearchRequest()` to obtain the underlying `SearchRequest` when you need options not exposed by the builder
+(such as VLV searches or custom controls):
+
+```php
+$search = $ldap->query()
+    ->from('dc=example,dc=local')
+    ->select('cn')
+    ->andWhere(Filters::equal('objectClass', 'user'))
+    ->toSearchRequest();
+
+# Pass the request directly to VLV or other client methods
+$vlv = $ldap->vlv($search, 'cn', 100);
+```
  
 ## Standard Searches
 
