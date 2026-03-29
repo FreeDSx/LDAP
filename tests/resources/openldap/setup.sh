@@ -53,6 +53,10 @@ certtool --generate-certificate \
   --template ${RESOURCE_PATH}/cert/slapd.info \
   --outfile ${SLAPD_CERT}
 
+cp ${SLAPD_CERT} ./tests/resources/cert/slapd.crt
+cp ${SLAPD_KEY} ./tests/resources/cert/slapd.key
+chmod 644 ./tests/resources/cert/slapd.key
+
 # Needed permission changes for the cert...
 adduser openldap ssl-cert
 chgrp ssl-cert ${SLAPD_KEY}

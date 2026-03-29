@@ -514,6 +514,9 @@ class LdapClientTest extends LdapTestCase
         if ($this->isActiveDirectory()) {
             $this->markTestSkipped('Connecting via a unix socket only tested on OpenLDAP.');
         }
+        if (!file_exists('/var/run/slapd/ldapi')) {
+            $this->markTestSkipped('OpenLDAP unix socket not available at /var/run/slapd/ldapi.');
+        }
         $this->client = $this->getClient(
             $this->makeOptions()
                 ->setTransport('unix')

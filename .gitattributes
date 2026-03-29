@@ -1,0 +1,4 @@
+* text=auto
+
+# Shell scripts must always use LF so they run correctly in WSL2 and Linux containers
+*.sh text eol=lf

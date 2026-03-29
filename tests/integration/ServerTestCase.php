@@ -25,6 +25,14 @@ class ServerTestCase extends LdapTestCase
 
     private string $serverMode = 'ldapserver';
 
+    public function setUp(): void
+    {
+        parent::setUp();
+        if (!extension_loaded('pcntl')) {
+            $this->markTestSkipped('The PCNTL extension is required to run the built-in LDAP server.');
+        }
+    }
+
     public function tearDown(): void
     {
         parent::tearDown();
@@ -94,12 +102,12 @@ class ServerTestCase extends LdapTestCase
             $useSsl = true;
         }
         if ($transport === 'unix') {
-            $servers = '/var/run/ldap.socket';
+            $servers = sys_get_temp_dir() . '/ldap.socket';
         }
 
         $this->client = $this->getClient(
             $this->makeOptions()
-                ->setPort(3389)
+                ->setPort(10389)
                 ->setTransport($transport)
                 ->setServers((array) $servers)
                 ->setSslValidateCert(false)

@@ -200,8 +200,8 @@ class LdapServerRequestHandler extends GenericRequestHandler implements SaslHand
     }
 }
 
-$sslKey = "/etc/ssl/private/slapd.key";
-$sslCert = "/etc/ssl/certs/slapd.crt";
+$sslKey = __DIR__ . '/../resources/cert/slapd.key';
+$sslCert = __DIR__ . '/../resources/cert/slapd.crt';
 
 $transport = $argv[1] ?? 'tcp';
 $handler = $argv[2] ?? null;
@@ -214,8 +214,9 @@ if ($transport === 'ssl') {
 
 $options = (new ServerOptions())
     ->setRequestHandler(new LdapServerRequestHandler())
-    ->setPort(3389)
+    ->setPort(10389)
     ->setTransport($transport)
+    ->setUnixSocket(sys_get_temp_dir() . '/ldap.socket')
     ->setSslCert($sslCert)
     ->setSslCertKey($sslKey)
     ->setUseSsl($useSsl)
