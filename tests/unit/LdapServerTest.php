@@ -183,9 +183,7 @@ class LdapServerTest extends TestCase
             ProxyHandler::class,
             $proxyOptions->getBackend()
         );
-        self::assertInstanceOf(
-            ProxyHandler::class,
-            $proxyOptions->getRootDseHandler(),
-        );
+
+        self::assertNull($proxyOptions->getRootDseHandler());
     }
 }

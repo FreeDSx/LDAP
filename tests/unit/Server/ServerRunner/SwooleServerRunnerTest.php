@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\ServerRunner;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerRunner\SwooleServerRunner;
+use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
 
 final class SwooleServerRunnerTest extends TestCase
@@ -30,7 +31,8 @@ final class SwooleServerRunnerTest extends TestCase
         $this->expectExceptionMessageMatches('/Swoole extension/');
 
         new SwooleServerRunner(
-            $this->createMock(ServerProtocolFactory::class),
+            serverProtocolFactory: $this->createMock(ServerProtocolFactory::class),
+            options: new ServerOptions(),
         );
     }
 }

@@ -17,11 +17,11 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\ChildProcess;
-use FreeDSx\Ldap\Server\LoggerTrait;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
-use Psr\Log\LoggerInterface;
+use FreeDSx\Ldap\ServerOptions;
+use Psr\Log\LogLevel;
 
 /**
  * Uses PNCTL to fork incoming requests and send them to the server protocol handler.
@@ -30,17 +30,10 @@ use Psr\Log\LoggerInterface;
  */
 class PcntlServerRunner implements ServerRunnerInterface
 {
-    use LoggerTrait;
-
     /**
      * The time to wait, in seconds, before we run some clean-up tasks to then wait again.
      */
     private const SOCKET_ACCEPT_TIMEOUT = 5;
-
-    /**
-     * The max time to wait (in seconds) for any child processes before we force kill them.
-     */
-    private const MAX_SHUTDOWN_WAIT_TIME = 15;
 
     private SocketServer $server;
 
@@ -72,7 +65,7 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     public function __construct(
         private readonly ServerProtocolFactory $serverProtocolFactory,
-        private readonly ?LoggerInterface $logger,
+        private readonly ServerOptions $options,
     ) {
         if (!extension_loaded('pcntl')) {
             throw new RuntimeException(
@@ -172,6 +165,19 @@ class PcntlServerRunner implements ServerRunnerInterface
             // If there was no client received, we still want to clean up any children that have stopped.
             if ($socket === null) {
                 $this->cleanUpChildProcesses();
+
+                continue;
+            }
+
+            $maxConnections = $this->options->getMaxConnections();
+            if ($maxConnections > 0 && count($this->childProcesses) >= $maxConnections) {
+                $this->logInfo(
+                    'Connection limit reached, dropping new connection.',
+                    $this->defaultContext,
+                );
+
+                $this->server->removeClient($socket);
+                $socket->close();
 
                 continue;
             }
@@ -279,8 +285,8 @@ class PcntlServerRunner implements ServerRunnerInterface
 
         $waitTime = 0;
         while (!empty($this->childProcesses)) {
-            // If we reach max wait time, attempt to force end them and then stop.
-            if ($waitTime >= self::MAX_SHUTDOWN_WAIT_TIME) {
+            // If we reach the shutdown timeout, attempt to force end them and then stop.
+            if ($waitTime >= $this->options->getShutdownTimeout()) {
                 $this->forceEndChildProcesses();
 
                 break;
@@ -412,5 +418,32 @@ class PcntlServerRunner implements ServerRunnerInterface
             true
         );
         $this->cleanUpChildProcesses();
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function logInfo(
+        string $message,
+        array $context = [],
+    ): void {
+        $this->options->getLogger()?->log(
+            LogLevel::INFO,
+            $message,
+            $context,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     * @throws RuntimeException
+     */
+    private function logAndThrow(
+        string $message,
+        array $context = [],
+    ): never {
+        $this->options->getLogger()?->log(LogLevel::ERROR, $message, $context);
+
+        throw new RuntimeException($message);
     }
 }

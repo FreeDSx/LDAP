@@ -212,13 +212,13 @@ class Container
         if ($options->getUseSwooleRunner()) {
             return new SwooleServerRunner(
                 serverProtocolFactory: $this->get(ServerProtocolFactory::class),
-                logger: $options->getLogger(),
+                options: $options,
             );
         }
 
         return new PcntlServerRunner(
             serverProtocolFactory: $this->get(ServerProtocolFactory::class),
-            logger: $options->getLogger(),
+            options: $options,
         );
     }
 

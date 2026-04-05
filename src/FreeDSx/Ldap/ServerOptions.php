@@ -127,6 +127,10 @@ final class ServerOptions
 
     private bool $useSwooleRunner = false;
 
+    private int $maxConnections = 0;
+
+    private int $shutdownTimeout = 15;
+
     /**
      * @var string[]
      */
@@ -442,6 +446,38 @@ final class ServerOptions
     public function setUseSwooleRunner(bool $use): self
     {
         $this->useSwooleRunner = $use;
+
+        return $this;
+    }
+
+    /**
+     * The maximum number of concurrent connections the server will accept.
+     *
+     * Zero (the default) means no limit.
+     */
+    public function getMaxConnections(): int
+    {
+        return $this->maxConnections;
+    }
+
+    public function setMaxConnections(int $maxConnections): self
+    {
+        $this->maxConnections = $maxConnections;
+
+        return $this;
+    }
+
+    /**
+     * Seconds to wait for active connections to close gracefully before forcing them closed on shutdown.
+     */
+    public function getShutdownTimeout(): int
+    {
+        return $this->shutdownTimeout;
+    }
+
+    public function setShutdownTimeout(int $shutdownTimeout): self
+    {
+        $this->shutdownTimeout = $shutdownTimeout;
 
         return $this;
     }

@@ -61,6 +61,30 @@ final class ServerOptionsTest extends TestCase
         $this->subject->setSaslMechanisms(ServerOptions::SASL_PLAIN, 'GSSAPI');
     }
 
+    public function test_max_connections_defaults_to_zero(): void
+    {
+        self::assertSame(0, $this->subject->getMaxConnections());
+    }
+
+    public function test_it_can_set_max_connections(): void
+    {
+        $this->subject->setMaxConnections(500);
+
+        self::assertSame(500, $this->subject->getMaxConnections());
+    }
+
+    public function test_shutdown_timeout_defaults_to_fifteen_seconds(): void
+    {
+        self::assertSame(15, $this->subject->getShutdownTimeout());
+    }
+
+    public function test_it_can_set_shutdown_timeout(): void
+    {
+        $this->subject->setShutdownTimeout(30);
+
+        self::assertSame(30, $this->subject->getShutdownTimeout());
+    }
+
     public function test_it_accepts_all_defined_mechanism_constants(): void
     {
         $this->subject->setSaslMechanisms(
