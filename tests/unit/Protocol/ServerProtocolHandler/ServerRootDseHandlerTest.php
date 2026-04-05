@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -79,6 +80,7 @@ final class ServerRootDseHandlerTest extends TestCase
             ->with(
                 self::equalTo(new LdapMessageResponse(1, new SearchResultEntry(Entry::create('', [
                     'namingContexts' => 'dc=Foo,dc=Bar',
+                    'subschemaSubentry' => ['cn=Subschema'],
                     'supportedExtension' => [
                         ExtendedRequest::OID_WHOAMI,
                     ],
@@ -180,6 +182,7 @@ final class ServerRootDseHandlerTest extends TestCase
         );
         $rootDse = Entry::create('', [
             'namingContexts' => 'dc=Foo,dc=Bar',
+            'subschemaSubentry' => ['cn=Subschema'],
             'supportedExtension' => [
                 ExtendedRequest::OID_WHOAMI,
             ],
@@ -268,6 +271,7 @@ final class ServerRootDseHandlerTest extends TestCase
             ->with(
                 new LdapMessageResponse(1, new SearchResultEntry(Entry::create('', [
                     'namingContexts' => [],
+                    'subschemaSubentry' => [],
                     'supportedExtension' => [],
                     'supportedLDAPVersion' => [],
                     'vendorName' => [],
@@ -279,6 +283,56 @@ final class ServerRootDseHandlerTest extends TestCase
             $search,
             $this->mockToken,
         );
+    }
+
+    public function test_it_advertises_subschema_subentry_in_rootdse(): void
+    {
+        $search = new LdapMessageRequest(
+            1,
+            (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope()
+        );
+
+        $this->mockQueue
+            ->expects($this->once())
+            ->method('sendMessage')
+            ->with(
+                self::callback(function (LdapMessageResponse $response) {
+                    /** @var SearchResultEntry $result */
+                    $result = $response->getResponse();
+                    $attr = $result->getEntry()->get('subschemaSubentry');
+
+                    return $attr !== null && $attr->has('cn=Subschema');
+                }),
+                self::anything(),
+            );
+
+        $this->subject->handleRequest($search, $this->mockToken);
+    }
+
+    public function test_it_uses_configured_subschema_entry_dn(): void
+    {
+        $this->options->setSubschemaEntry(new Dn('cn=schema,dc=example,dc=com'));
+
+        $search = new LdapMessageRequest(
+            1,
+            (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope()
+        );
+
+        $this->mockQueue
+            ->expects($this->once())
+            ->method('sendMessage')
+            ->with(
+                self::callback(function (LdapMessageResponse $response) {
+                    /** @var SearchResultEntry $result */
+                    $result = $response->getResponse();
+                    $attr = $result->getEntry()->get('subschemaSubentry');
+
+                    return $attr !== null && $attr->has('cn=schema,dc=example,dc=com');
+                }),
+                self::anything(),
+            );
+
+        $this->subject->handleRequest($search, $this->mockToken);
     }
 
     public function test_it_should_only_return_specific_attributes_from_the_RootDSE_if_requested(): void

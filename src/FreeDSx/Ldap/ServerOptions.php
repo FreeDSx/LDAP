@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
@@ -95,6 +96,8 @@ final class ServerOptions
     private ?string $sslCertPassphrase = null;
 
     private ?string $dseAltServer = null;
+
+    private ?Dn $subschemaEntry = null;
 
     /**
      * @var string[]
@@ -269,6 +272,18 @@ final class ServerOptions
     public function setDseAltServer(?string $dseAlServer): self
     {
         $this->dseAltServer = $dseAlServer;
+
+        return $this;
+    }
+
+    public function getSubschemaEntry(): Dn
+    {
+        return $this->subschemaEntry ?? new Dn('cn=Subschema');
+    }
+
+    public function setSubschemaEntry(Dn $subschemaEntry): self
+    {
+        $this->subschemaEntry = $subschemaEntry;
 
         return $this;
     }

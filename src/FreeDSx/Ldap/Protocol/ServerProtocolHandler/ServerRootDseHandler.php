@@ -54,6 +54,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
     ): void {
         $entry = Entry::fromArray('', [
             'namingContexts' => $this->options->getDseNamingContexts(),
+            'subschemaSubentry' => [$this->options->getSubschemaEntry()->toString()],
             'supportedExtension' => [
                 ExtendedRequest::OID_WHOAMI,
             ],

@@ -25,16 +25,15 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerRootDseHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSearchHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerStartTlsHandler;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSubschemaHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnbindHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerWhoAmIHandler;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\GenericBackend;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -125,6 +124,17 @@ final class ServerProtocolHandlerFactoryTest extends TestCase
             $this->subject->get(
                 Operations::read(''),
                 new ControlBag()
+            ),
+        );
+    }
+
+    public function test_it_should_get_a_subschema_handler(): void
+    {
+        self::assertInstanceOf(
+            ServerSubschemaHandler::class,
+            $this->subject->get(
+                Operations::read('cn=Subschema'),
+                new ControlBag(),
             ),
         );
     }

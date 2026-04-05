@@ -54,6 +54,11 @@ class ServerProtocolHandlerFactory
             );
         } elseif ($this->isRootDseSearch($request)) {
             return $this->getRootDseHandler();
+        } elseif ($this->isSubschemaSearch($request)) {
+            return new ServerProtocolHandler\ServerSubschemaHandler(
+                options: $this->options,
+                queue: $this->queue,
+            );
         } elseif ($this->isPagingSearch($request, $controls)) {
             return $this->getPagingHandler();
         } elseif ($request instanceof SearchRequest) {
@@ -72,6 +77,17 @@ class ServerProtocolHandlerFactory
                 writeDispatcher: $this->handlerFactory->makeWriteDispatcher(),
             );
         }
+    }
+
+    private function isSubschemaSearch(RequestInterface $request): bool
+    {
+        if (!$request instanceof SearchRequest) {
+            return false;
+        }
+        $subschemaEntry = $this->options->getSubschemaEntry()->toString();
+
+        return $request->getScope() === SearchRequest::SCOPE_BASE_OBJECT
+            && strtolower((string) $request->getBaseDn()) === strtolower($subschemaEntry);
     }
 
     private function isRootDseSearch(RequestInterface $request): bool
