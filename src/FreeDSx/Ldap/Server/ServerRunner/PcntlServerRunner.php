@@ -146,6 +146,7 @@ class PcntlServerRunner implements ServerRunnerInterface
             'The server process has started and is now accepting clients.',
             $this->defaultContext
         );
+        $this->options->getOnServerReady()?->__invoke();
 
         do {
             $socket = $this->server->accept(self::SOCKET_ACCEPT_TIMEOUT);

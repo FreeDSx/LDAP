@@ -129,6 +129,8 @@ final class ServerOptions
 
     private int $maxConnections = 0;
 
+    private ?\Closure $onServerReady = null;
+
     private int $shutdownTimeout = 15;
 
     /**
@@ -485,6 +487,18 @@ final class ServerOptions
     public function getUseSwooleRunner(): bool
     {
         return $this->useSwooleRunner;
+    }
+
+    public function getOnServerReady(): ?\Closure
+    {
+        return $this->onServerReady;
+    }
+
+    public function setOnServerReady(?\Closure $onServerReady): self
+    {
+        $this->onServerReady = $onServerReady;
+
+        return $this;
     }
 
     /**

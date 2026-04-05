@@ -64,12 +64,11 @@ $server = (new LdapServer(
     (new ServerOptions())
         ->setPort(10389)
         ->setTransport($transport)
+        ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL))
 ))->useBackend($adapter);
 
 if ($runner === 'swoole') {
     $server->useSwooleRunner();
 }
-
-echo 'server starting...' . PHP_EOL;
 
 $server->run();

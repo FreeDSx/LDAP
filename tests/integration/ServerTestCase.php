@@ -77,7 +77,11 @@ class ServerTestCase extends LdapTestCase
     {
         parent::tearDown();
 
-        $this->client?->unbind();
+        try {
+            $this->client?->unbind();
+        } catch (\Throwable) {
+            // Server may have already closed; ignore unbind failures during teardown.
+        }
         $this->client = null;
 
         if ($this->overrideProcess !== null) {
@@ -147,7 +151,11 @@ class ServerTestCase extends LdapTestCase
 
     protected function stopServer(): void
     {
-        $this->client?->unbind();
+        try {
+            $this->client?->unbind();
+        } catch (\Throwable) {
+            // Connection may already be closed; ignore unbind failures.
+        }
         $this->client = null;
 
         if ($this->overrideProcess !== null) {

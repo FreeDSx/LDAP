@@ -13,12 +13,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Setup extension cache environment
+        if: runner.os == 'Linux'
+        id: extcache
+        uses: shivammathur/cache-extensions@v1
+        with:
+          php-version: ${{ matrix.php-versions }}
+          extensions: swoole
+          key: ext-cache-v1
+
+      - name: Cache extensions
+        if: runner.os == 'Linux'
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.extcache.outputs.dir }}
+          key: ${{ steps.extcache.outputs.key }}
+          restore-keys: ${{ steps.extcache.outputs.key }}
+
       - name: Setup PHP (Linux)
         if: runner.os == 'Linux'
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-versions }}
-          extensions: swoole-5.1.6
+          extensions: swoole
           coverage: none
           tools: composer:2.9
 

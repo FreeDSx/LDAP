@@ -54,11 +54,11 @@ class LdapServer
     {
         $this->validateSaslConfiguration();
 
+        $runner = $this->options->getServerRunner() ?? $this->container->get(ServerRunnerInterface::class);
+
         $socketServer = $this->container
             ->get(SocketServerFactory::class)
             ->makeAndBind();
-
-        $runner = $this->options->getServerRunner() ?? $this->container->get(ServerRunnerInterface::class);
 
         $runner->run($socketServer);
     }

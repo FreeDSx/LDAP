@@ -67,14 +67,16 @@ class SwooleServerRunner implements ServerRunnerInterface
                 . '(^5.1 for PHP 8.3/8.4, ^6.0 for PHP 8.5+)'
             );
         }
+
+        // Enable coroutine hooks before any socket is created so that
+        // stream_socket_accept (and related functions) are coroutine-aware
+        // for the server socket that makeAndBind() is about to create.
+        Runtime::enableCoroutine(SWOOLE_HOOK_ALL);
     }
 
     public function run(SocketServer $server): void
     {
         $this->server = $server;
-
-        // Hook all standard PHP blocking I/O so it works inside coroutines.
-        Runtime::enableCoroutine(SWOOLE_HOOK_ALL);
 
         Coroutine\run(function (): void {
             $this->registerShutdownSignals();
@@ -108,6 +110,10 @@ class SwooleServerRunner implements ServerRunnerInterface
     private function startDrainTimeout(): void
     {
         Coroutine::create(function (): void {
+            if (empty($this->activeSockets)) {
+                return;
+            }
+
             Coroutine::sleep($this->options->getShutdownTimeout());
 
             if (empty($this->activeSockets)) {
@@ -129,6 +135,7 @@ class SwooleServerRunner implements ServerRunnerInterface
     private function acceptClients(): void
     {
         $this->options->getLogger()?->info('SwooleServerRunner: accepting clients.');
+        $this->options->getOnServerReady()?->__invoke();
 
         while ($this->server->isConnected()) {
             try {

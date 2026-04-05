@@ -8,11 +8,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Setup extension cache environment
+        id: extcache
+        uses: shivammathur/cache-extensions@v1
+        with:
+          php-version: '8.1'
+          extensions: openssl,mbstring,swoole
+          key: ext-cache-v1
+
+      - name: Cache extensions
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.extcache.outputs.dir }}
+          key: ${{ steps.extcache.outputs.key }}
+          restore-keys: ${{ steps.extcache.outputs.key }}
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.1'
-          extensions: openssl,mbstring,swoole-5.1.6
+          extensions: openssl,mbstring,swoole
           coverage: pcov
           tools: composer:2.9
 

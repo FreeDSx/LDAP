@@ -5,6 +5,7 @@ declare(strict_types=1);
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\SearchContext;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
@@ -17,7 +18,7 @@ use FreeDSx\Ldap\ServerOptions;
 
 require __DIR__ . '/../../vendor/autoload.php';
 
-class LdapServerBackend implements WritableLdapBackendInterface, SaslHandlerInterface
+class LdapServerBackend implements WritableLdapBackendInterface, SaslHandlerInterface, PasswordAuthenticatableInterface
 {
     use WritableBackendTrait;
 
@@ -57,17 +58,16 @@ class LdapServerBackend implements WritableLdapBackendInterface, SaslHandlerInte
     }
 
     public function verifyPassword(
-        Dn $dn,
+        string $name,
         string $password,
     ): bool {
-        $username = $dn->toString();
 
         $this->logRequest(
             'bind',
-            "username => $username, password => $password"
+            "username => $name, password => $password"
         );
 
-        return isset($this->users[$username]) && $this->users[$username] === $password;
+        return isset($this->users[$name]) && $this->users[$name] === $password;
     }
 
     public function add(AddCommand $command): void
@@ -165,7 +165,8 @@ $options = (new ServerOptions())
     ->setUnixSocket(sys_get_temp_dir() . '/ldap.socket')
     ->setSslCert($sslCert)
     ->setSslCertKey($sslKey)
-    ->setUseSsl($useSsl);
+    ->setUseSsl($useSsl)
+    ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));
 
 if ($handler === 'sasl') {
     $options->setSaslMechanisms(
@@ -176,7 +177,5 @@ if ($handler === 'sasl') {
 }
 
 $server = (new LdapServer($options))->useBackend($backend);
-
-echo 'server starting...' . PHP_EOL;
 
 $server->run();

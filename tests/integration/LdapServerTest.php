@@ -209,6 +209,9 @@ class LdapServerTest extends ServerTestCase
                 'namingContexts' => [
                     'dc=FreeDSx,dc=local',
                 ],
+                'subschemaSubentry' => [
+                    'cn=Subschema',
+                ],
                 'supportedExtension' => [
                     '1.3.6.1.4.1.4203.1.11.3',
                     '1.3.6.1.4.1.1466.20037',
