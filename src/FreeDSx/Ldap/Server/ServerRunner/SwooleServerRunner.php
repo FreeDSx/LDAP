@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\ServerRunner;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
+use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
@@ -36,6 +37,13 @@ use Throwable;
  * Note on JsonFileStorageAdapter: although Swoole hooks make file reads
  * coroutine-friendly, flock() may still cause brief stalls under high write
  * concurrency. For write-heavy workloads prefer the InMemoryStorageAdapter.
+ *
+ * Note on socket creation: the SocketServer must be created inside Coroutine\run()
+ * for Swoole's stream hooks to intercept stream_socket_accept() as a yielding call.
+ * If the socket is created before the event loop starts, stream_socket_accept()
+ * blocks the event loop entirely and signals are never delivered. The run() method
+ * therefore closes the passed SocketServer immediately and uses the injected
+ * SocketServerFactory to recreate it inside the coroutine.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -75,6 +83,7 @@ class SwooleServerRunner implements ServerRunnerInterface
     public function __construct(
         private readonly ServerProtocolFactory $serverProtocolFactory,
         private readonly ServerOptions $options,
+        private readonly SocketServerFactory $socketServerFactory,
     ) {
         if (!extension_loaded('swoole')) {
             throw new RuntimeException(
@@ -84,18 +93,21 @@ class SwooleServerRunner implements ServerRunnerInterface
             );
         }
 
-        // Enable coroutine hooks before any socket is created so that
-        // stream_socket_accept (and related functions) are coroutine-aware
-        // for the server socket that makeAndBind() is about to create.
         Runtime::enableCoroutine(SWOOLE_HOOK_ALL);
         $this->waitGroup = new WaitGroup();
     }
 
     public function run(SocketServer $server): void
     {
-        $this->server = $server;
+        // Close the socket that was created outside the coroutine context.
+        // Swoole's stream hook only intercepts stream_socket_accept() as a
+        // yielding call when the socket is created inside Coroutine\run().
+        // A socket created before the event loop starts causes stream_socket_accept()
+        // to block the loop entirely, preventing signal delivery.
+        $server->close();
 
         Coroutine\run(function (): void {
+            $this->server = $this->socketServerFactory->makeAndBind();
             $this->registerShutdownSignals();
             $this->acceptClients();
         });
@@ -168,7 +180,7 @@ class SwooleServerRunner implements ServerRunnerInterface
         $this->logServerStarted();
         $this->options->getOnServerReady()?->__invoke();
 
-        while ($this->server->isConnected()) {
+        while (!$this->isShuttingDown) {
             try {
                 $socket = $this->server->accept(self::SOCKET_ACCEPT_TIMEOUT);
             } catch (Throwable $e) {
@@ -180,12 +192,6 @@ class SwooleServerRunner implements ServerRunnerInterface
 
             if ($socket === null) {
                 continue;
-            }
-
-            if ($this->isShuttingDown) {
-                $this->logClientRejectedDuringShutdown();
-                $socket->close();
-                break;
             }
 
             $maxConnections = $this->options->getMaxConnections();

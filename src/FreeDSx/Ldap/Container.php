@@ -213,6 +213,7 @@ class Container
             return new SwooleServerRunner(
                 serverProtocolFactory: $this->get(ServerProtocolFactory::class),
                 options: $options,
+                socketServerFactory: $this->get(SocketServerFactory::class),
             );
         }
 
