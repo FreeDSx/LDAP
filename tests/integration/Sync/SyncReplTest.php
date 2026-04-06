@@ -159,7 +159,7 @@ class SyncReplTest extends LdapTestCase
         $server = (string) (getenv('LDAP_SERVER') ?: 'localhost');
         $port = (int) (getenv('LDAP_PORT') ?: 389);
 
-        for ($i = 0; $i < 30; $i++) {
+        for ($i = 0; $i < 35; $i++) {
             $connection = @fsockopen(
                 $server,
                 $port,
@@ -181,7 +181,7 @@ class SyncReplTest extends LdapTestCase
             'LDAP server at %s:%d did not become available within %d seconds.',
             $server,
             $port,
-            30,
+            35,
         ));
     }
 }
