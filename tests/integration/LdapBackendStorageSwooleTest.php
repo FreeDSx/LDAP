@@ -68,13 +68,13 @@ final class LdapBackendStorageSwooleTest extends LdapBackendStorageTest
             $this->markTestSkipped('The swoole extension is required to run SwooleServerRunner tests.');
         }
 
-        // parent::setUp() connects the per-test client to the shared server.
         parent::setUp();
 
-        // Mutating tests need a fresh isolated server. Doing this in setUp()
-        // rather than inline in the test method ensures Swoole's coroutine has
-        // the same natural setUp→test gap to finish binding the socket.
         if (in_array($this->name(), self::MUTATING_TESTS, true)) {
+            // Stop the shared server and spin up a fresh one for each mutating
+            // test. The LdapClient created by parent::setUp() is lazy (no TCP
+            // connection yet), so stopServer() will find no active Swoole
+            // connections and the drain coroutine exits immediately.
             $this->stopServer();
             $this->createServerProcess('tcp', 'swoole');
         }

@@ -21,7 +21,9 @@ use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
 use FreeDSx\Ldap\ServerOptions;
+use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
+use Throwable;
 
 /**
  * Uses PNCTL to fork incoming requests and send them to the server protocol handler.
@@ -30,6 +32,8 @@ use Psr\Log\LogLevel;
  */
 class PcntlServerRunner implements ServerRunnerInterface
 {
+    use ServerRunnerLoggerTrait;
+
     /**
      * The time to wait, in seconds, before we run some clean-up tasks to then wait again.
      */
@@ -142,10 +146,7 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     private function acceptClients(): void
     {
-        $this->logInfo(
-            'The server process has started and is now accepting clients.',
-            $this->defaultContext
-        );
+        $this->logServerStarted($this->defaultContext);
         $this->options->getOnServerReady()?->__invoke();
 
         do {
@@ -153,10 +154,7 @@ class PcntlServerRunner implements ServerRunnerInterface
 
             if ($this->isShuttingDown) {
                 if ($socket) {
-                    $this->logInfo(
-                        'A client was accepted, but the server is shutting down. Closing connection.',
-                        $this->defaultContext
-                    );
+                    $this->logClientRejectedDuringShutdown($this->defaultContext);
                     $socket->close();
                 }
 
@@ -172,10 +170,7 @@ class PcntlServerRunner implements ServerRunnerInterface
 
             $maxConnections = $this->options->getMaxConnections();
             if ($maxConnections > 0 && count($this->childProcesses) >= $maxConnections) {
-                $this->logInfo(
-                    'Connection limit reached, dropping new connection.',
-                    $this->defaultContext,
-                );
+                $this->logConnectionLimitReached($this->defaultContext);
 
                 $this->server->removeClient($socket);
                 $socket->close();
@@ -232,7 +227,11 @@ class PcntlServerRunner implements ServerRunnerInterface
                         'The child process has received a signal to stop.',
                         $context
                     );
-                    $protocolHandler->shutdown($context);
+                    try {
+                        $protocolHandler->shutdown($context);
+                    } catch (Throwable $e) {
+                        $this->logShutdownNotifyError($e, $context);
+                    }
                 }
             );
         }
@@ -270,10 +269,7 @@ class PcntlServerRunner implements ServerRunnerInterface
             return;
         }
         $this->isShuttingDown = true;
-        $this->logInfo(
-            'The server shutdown process has started.',
-            $this->defaultContext
-        );
+        $this->logShutdownStarted($this->defaultContext);
 
         // We can't do anything else without the posix ext ... :(
         if (!$this->isPosixExtLoaded) {
@@ -302,10 +298,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         }
 
         $this->server->close();
-        $this->logInfo(
-            'The server shutdown process has completed.',
-            $this->defaultContext
-        );
+        $this->logShutdownCompleted($this->defaultContext);
     }
 
     /**
@@ -389,11 +382,10 @@ class PcntlServerRunner implements ServerRunnerInterface
             $pid,
             $socket
         );
-        $this->logInfo(
-            'A new client has connected.',
+        $this->logClientConnected(
             array_merge(
                 ['child_pid' => $pid],
-                $this->defaultContext
+                $this->defaultContext,
             )
         );
         $this->cleanUpChildProcesses();
@@ -419,6 +411,11 @@ class PcntlServerRunner implements ServerRunnerInterface
             true
         );
         $this->cleanUpChildProcesses();
+    }
+
+    private function getRunnerLogger(): ?LoggerInterface
+    {
+        return $this->options->getLogger();
     }
 
     /**
