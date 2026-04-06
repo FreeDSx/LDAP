@@ -46,7 +46,7 @@ class SwooleServerRunner implements ServerRunnerInterface
     /**
      * Seconds to wait for a new client before re-checking the server connection state.
      */
-    private const SOCKET_ACCEPT_TIMEOUT = 1;
+    private const SOCKET_ACCEPT_TIMEOUT = 0.5;
 
     private SocketServer $server;
 

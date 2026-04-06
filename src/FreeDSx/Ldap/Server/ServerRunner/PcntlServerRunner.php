@@ -37,7 +37,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     /**
      * The time to wait, in seconds, before we run some clean-up tasks to then wait again.
      */
-    private const SOCKET_ACCEPT_TIMEOUT = 5;
+    private const SOCKET_ACCEPT_TIMEOUT = 0.5;
 
     private SocketServer $server;
 
