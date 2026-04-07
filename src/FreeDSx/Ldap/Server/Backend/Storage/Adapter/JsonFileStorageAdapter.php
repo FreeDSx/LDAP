@@ -18,10 +18,12 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\SearchContext;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\CoroutineLock;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\StorageLockInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
@@ -33,14 +35,10 @@ use Generator;
 /**
  * A file-backed storage adapter that persists the directory as a JSON file.
  *
- * Safe for use with the PCNTL server runner: write operations are serialised
- * using flock(LOCK_EX), so concurrent child processes do not corrupt the file.
- * An in-memory cache is invalidated via filemtime checks to avoid re-reading
- * the file on every read operation within a single forked process.
+ * Use the named constructors to select the correct locking strategy:
  *
- * Note: when used with the Swoole server runner, standard flock/fread calls
- * are blocking and will stall the event loop. Use the InMemoryStorageAdapter
- * with Swoole, or a Swoole-coroutine-aware file I/O layer instead.
+ *   JsonFileStorageAdapter::forPcntl('/path/to/file.json')
+ *   JsonFileStorageAdapter::forSwoole('/path/to/file.json')
  *
  * JSON format:
  * {
@@ -67,8 +65,30 @@ class JsonFileStorageAdapter implements WritableLdapBackendInterface
 
     private int $cacheMtime = 0;
 
-    public function __construct(private readonly string $filePath)
-    {
+    private function __construct(
+        private readonly string $filePath,
+        private readonly StorageLockInterface $lock,
+    ) {
+    }
+
+    public static function forPcntl(
+        string $filePath,
+        ?StorageLockInterface $lock = null,
+    ): self {
+        return new self(
+            $filePath,
+            $lock ?? new FileLock($filePath)
+        );
+    }
+
+    public static function forSwoole(
+        string $filePath,
+        ?StorageLockInterface $lock = null,
+    ): self {
+        return new self(
+            $filePath,
+            $lock ?? new CoroutineLock($filePath)
+        );
     }
 
     public function get(Dn $dn): ?Entry
@@ -92,136 +112,206 @@ class JsonFileStorageAdapter implements WritableLdapBackendInterface
      */
     public function add(AddCommand $command): void
     {
-        $entry = $command->entry;
-        $this->withLock(function (array $data) use ($entry): array {
-            $normDn = $this->normalise($entry->getDn());
-
-            if (isset($data[$normDn])) {
-                throw new OperationException(
-                    sprintf('Entry already exists: %s', $entry->getDn()->toString()),
-                    ResultCode::ENTRY_ALREADY_EXISTS,
-                );
-            }
-
-            $data[$normDn] = $this->entryToArray($entry);
-
-            return $data;
-        });
+        $this->withMutation(
+            fn(string $contents): string => $this->executeAdd(
+                $contents,
+                $command
+            )
+        );
     }
 
     public function delete(DeleteCommand $command): void
     {
-        $normDn = $this->normalise($command->dn);
-        $this->withLock(function (array $data) use ($normDn, $command): array {
-            foreach (array_keys($data) as $key) {
-                if ($this->isInScope($key, $normDn, SearchRequest::SCOPE_SINGLE_LEVEL)) {
-                    throw new OperationException(
-                        sprintf('Entry "%s" has subordinate entries and cannot be deleted.', $command->dn->toString()),
-                        ResultCode::NOT_ALLOWED_ON_NON_LEAF,
-                    );
-                }
-            }
-
-            unset($data[$normDn]);
-
-            return $data;
-        });
+        $this->withMutation(
+            fn(string $contents): string => $this->executeDelete(
+                $contents,
+                $command
+            )
+        );
     }
 
     public function update(UpdateCommand $command): void
     {
-        $normDn = $this->normalise($command->dn);
-        $this->withLock(function (array $data) use ($normDn, $command): array {
-            if (!isset($data[$normDn])) {
-                throw new OperationException(
-                    sprintf('No such object: %s', $command->dn->toString()),
-                    ResultCode::NO_SUCH_OBJECT,
-                );
-            }
-
-            $entry = $this->arrayToEntry($data[$normDn]);
-
-            foreach ($command->changes as $change) {
-                $attribute = $change->getAttribute();
-                $attrName = $attribute->getName();
-                $values = $attribute->getValues();
-
-                switch ($change->getType()) {
-                    case Change::TYPE_ADD:
-                        $existing = $entry->get($attrName);
-                        if ($existing !== null) {
-                            $existing->add(...$values);
-                        } else {
-                            $entry->add($attribute);
-                        }
-                        break;
-
-                    case Change::TYPE_DELETE:
-                        if (count($values) === 0) {
-                            $entry->reset($attrName);
-                        } else {
-                            $entry->get($attrName)?->remove(...$values);
-                        }
-                        break;
-
-                    case Change::TYPE_REPLACE:
-                        if (count($values) === 0) {
-                            $entry->reset($attrName);
-                        } else {
-                            $entry->set($attribute);
-                        }
-                        break;
-                }
-            }
-
-            $data[$normDn] = $this->entryToArray($entry);
-
-            return $data;
-        });
+        $this->withMutation(
+            fn(string $contents): string => $this->executeUpdate(
+                $contents,
+                $command
+            )
+        );
     }
 
     public function move(MoveCommand $command): void
     {
-        $normOld = $this->normalise($command->dn);
-        $this->withLock(function (array $data) use ($normOld, $command): array {
-            if (!isset($data[$normOld])) {
+        $this->withMutation(
+            fn(string $contents): string => $this->executeMove(
+                $contents,
+                $command
+            )
+        );
+    }
+
+    /**
+     * @param callable(string): string $mutation
+     */
+    private function withMutation(callable $mutation): void
+    {
+        try {
+            $this->lock->withLock($mutation);
+        } finally {
+            $this->cache = null;
+        }
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function executeAdd(
+        string $contents,
+        AddCommand $command,
+    ): string {
+        $data = $this->decodeContents($contents);
+        $normDn = $this->normalise($command->entry->getDn());
+
+        if (isset($data[$normDn])) {
+            throw new OperationException(
+                sprintf('Entry already exists: %s', $command->entry->getDn()->toString()),
+                ResultCode::ENTRY_ALREADY_EXISTS,
+            );
+        }
+
+        $data[$normDn] = $this->entryToArray($command->entry);
+
+        return $this->encodeContents($data);
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function executeDelete(
+        string $contents,
+        DeleteCommand $command,
+    ): string {
+        $data = $this->decodeContents($contents);
+        $normDn = $this->normalise($command->dn);
+
+        foreach (array_keys($data) as $key) {
+            if ($this->isInScope($key, $normDn, SearchRequest::SCOPE_SINGLE_LEVEL)) {
                 throw new OperationException(
-                    sprintf('No such object: %s', $command->dn->toString()),
-                    ResultCode::NO_SUCH_OBJECT,
+                    sprintf('Entry "%s" has subordinate entries and cannot be deleted.', $command->dn->toString()),
+                    ResultCode::NOT_ALLOWED_ON_NON_LEAF,
                 );
             }
+        }
 
-            $entry = $this->arrayToEntry($data[$normOld]);
+        unset($data[$normDn]);
 
-            $parent = $command->newParent ?? $command->dn->getParent();
-            $newDnString = $parent !== null
-                ? $command->newRdn->toString() . ',' . $parent->toString()
-                : $command->newRdn->toString();
+        return $this->encodeContents($data);
+    }
 
-            $newDn = new Dn($newDnString);
-            $newEntry = new Entry($newDn, ...$entry->getAttributes());
+    /**
+     * @throws OperationException
+     */
+    private function executeUpdate(
+        string $contents,
+        UpdateCommand $command,
+    ): string {
+        $data = $this->decodeContents($contents);
+        $normDn = $this->normalise($command->dn);
 
-            if ($command->deleteOldRdn) {
-                $oldRdn = $command->dn->getRdn();
-                $newEntry->get($oldRdn->getName())?->remove($oldRdn->getValue());
+        if (!isset($data[$normDn])) {
+            throw new OperationException(
+                sprintf('No such object: %s', $command->dn->toString()),
+                ResultCode::NO_SUCH_OBJECT,
+            );
+        }
+
+        $entry = $this->arrayToEntry($data[$normDn]);
+
+        foreach ($command->changes as $change) {
+            $attribute = $change->getAttribute();
+            $attrName = $attribute->getName();
+            $values = $attribute->getValues();
+
+            switch ($change->getType()) {
+                case Change::TYPE_ADD:
+                    $existing = $entry->get($attrName);
+                    if ($existing !== null) {
+                        $existing->add(...$values);
+                    } else {
+                        $entry->add($attribute);
+                    }
+                    break;
+
+                case Change::TYPE_DELETE:
+                    if (count($values) === 0) {
+                        $entry->reset($attrName);
+                    } else {
+                        $entry->get($attrName)?->remove(...$values);
+                    }
+                    break;
+
+                case Change::TYPE_REPLACE:
+                    if (count($values) === 0) {
+                        $entry->reset($attrName);
+                    } else {
+                        $entry->set($attribute);
+                    }
+                    break;
             }
+        }
 
-            $rdnName = $command->newRdn->getName();
-            $rdnValue = $command->newRdn->getValue();
-            $existing = $newEntry->get($rdnName);
-            if ($existing !== null) {
-                if (!$existing->has($rdnValue)) {
-                    $existing->add($rdnValue);
-                }
-            } else {
-                $newEntry->set(new Attribute($rdnName, $rdnValue));
+        $data[$normDn] = $this->entryToArray($entry);
+
+        return $this->encodeContents($data);
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function executeMove(
+        string $contents,
+        MoveCommand $command,
+    ): string {
+        $data = $this->decodeContents($contents);
+        $normOld = $this->normalise($command->dn);
+
+        if (!isset($data[$normOld])) {
+            throw new OperationException(
+                sprintf('No such object: %s', $command->dn->toString()),
+                ResultCode::NO_SUCH_OBJECT,
+            );
+        }
+
+        $entry = $this->arrayToEntry($data[$normOld]);
+
+        $parent = $command->newParent ?? $command->dn->getParent();
+        $newDnString = $parent !== null
+            ? $command->newRdn->toString() . ',' . $parent->toString()
+            : $command->newRdn->toString();
+
+        $newDn = new Dn($newDnString);
+        $newEntry = new Entry($newDn, ...$entry->getAttributes());
+
+        if ($command->deleteOldRdn) {
+            $oldRdn = $command->dn->getRdn();
+            $newEntry->get($oldRdn->getName())?->remove($oldRdn->getValue());
+        }
+
+        $rdnName = $command->newRdn->getName();
+        $rdnValue = $command->newRdn->getValue();
+        $existing = $newEntry->get($rdnName);
+        if ($existing !== null) {
+            if (!$existing->has($rdnValue)) {
+                $existing->add($rdnValue);
             }
+        } else {
+            $newEntry->set(new Attribute($rdnName, $rdnValue));
+        }
 
-            unset($data[$normOld]);
-            $data[$this->normalise($newDn)] = $this->entryToArray($newEntry);
+        unset($data[$normOld]);
+        $data[$this->normalise($newDn)] = $this->entryToArray($newEntry);
 
-            return $data;
-        });
+        return $this->encodeContents($data);
     }
 
     /**
@@ -251,20 +341,8 @@ class JsonFileStorageAdapter implements WritableLdapBackendInterface
             return $this->cache;
         }
 
-        $raw = json_decode($contents, true);
-
-        if (!is_array($raw)) {
-            $this->cache = [];
-            $this->cacheMtime = $mtime;
-
-            return $this->cache;
-        }
-
         $entries = [];
-        foreach ($raw as $normDn => $data) {
-            if (!is_string($normDn)) {
-                continue;
-            }
+        foreach ($this->decodeContents($contents) as $normDn => $data) {
             $entries[$normDn] = $this->arrayToEntry($data);
         }
 
@@ -272,84 +350,6 @@ class JsonFileStorageAdapter implements WritableLdapBackendInterface
         $this->cacheMtime = $mtime;
 
         return $this->cache;
-    }
-
-    /**
-     * Open the file with an exclusive lock, call $mutation with the current
-     * data array, write back the result, then release the lock.
-     *
-     * @param callable(array<string, mixed>): array<string, mixed> $mutation
-     */
-    private function withLock(callable $mutation): void
-    {
-        $handle = fopen($this->filePath, 'c+');
-
-        if ($handle === false) {
-            throw new RuntimeException(sprintf(
-                'Unable to open storage file: %s',
-                $this->filePath
-            ));
-        }
-
-        if (!flock($handle, LOCK_EX)) {
-            fclose($handle);
-            throw new RuntimeException(sprintf(
-                'Unable to acquire exclusive lock on storage file: %s',
-                $this->filePath
-            ));
-        }
-
-        try {
-            $data = $mutation($this->readFromHandle($handle));
-            $this->writeToHandle($handle, $data);
-        } finally {
-            flock($handle, LOCK_UN);
-            fclose($handle);
-            $this->cache = null;
-        }
-    }
-
-    /**
-     * Read and decode the current JSON contents from an open file handle.
-     *
-     * @param resource $handle
-     * @return array<string, mixed>
-     */
-    private function readFromHandle(mixed $handle): array
-    {
-        $size = fstat($handle)['size'] ?? 0;
-        $contents = $size > 0 ? fread($handle, $size) : '';
-        $rawDecoded = ($contents !== '' && $contents !== false)
-            ? json_decode($contents, true)
-            : null;
-
-        if (!is_array($rawDecoded)) {
-            return [];
-        }
-
-        $data = [];
-        foreach ($rawDecoded as $key => $value) {
-            if (is_string($key)) {
-                $data[$key] = $value;
-            }
-        }
-
-        return $data;
-    }
-
-    /**
-     * Encode and write data back to an open file handle, truncating first.
-     *
-     * @param resource $handle
-     * @param array<string, mixed> $data
-     */
-    private function writeToHandle(
-        mixed $handle,
-        array $data,
-    ): void {
-        ftruncate($handle, 0);
-        rewind($handle);
-        fwrite($handle, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '{}');
     }
 
     /**
@@ -366,6 +366,37 @@ class JsonFileStorageAdapter implements WritableLdapBackendInterface
             'dn' => $entry->getDn()->toString(),
             'attributes' => $attributes,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function decodeContents(string $contents): array
+    {
+        if ($contents === '') {
+            return [];
+        }
+
+        $raw = json_decode($contents, true);
+
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        return array_filter($raw, function ($key) {
+            return is_string($key);
+        }, ARRAY_FILTER_USE_KEY);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function encodeContents(array $data): string
+    {
+        return json_encode(
+            $data,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
+        ) ?: '{}';
     }
 
     private function arrayToEntry(mixed $data): Entry
@@ -388,7 +419,10 @@ class JsonFileStorageAdapter implements WritableLdapBackendInterface
                         $stringValues[] = $v;
                     }
                 }
-                $attributes[] = new Attribute($name, ...$stringValues);
+                $attributes[] = new Attribute(
+                    $name,
+                    ...$stringValues
+                );
             }
         }
 

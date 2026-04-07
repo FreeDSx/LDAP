@@ -62,7 +62,7 @@ final class JsonFileStorageAdapterTest extends TestCase
             new Attribute('cn', 'Bob'),
         );
 
-        $this->subject = new JsonFileStorageAdapter($this->tempFile);
+        $this->subject = JsonFileStorageAdapter::forPcntl($this->tempFile);
         $this->subject->add(new AddCommand($this->base));
         $this->subject->add(new AddCommand($this->alice));
         $this->subject->add(new AddCommand($this->bob));
@@ -95,7 +95,8 @@ final class JsonFileStorageAdapterTest extends TestCase
 
     public function test_get_on_nonexistent_file_returns_null(): void
     {
-        $adapter = new JsonFileStorageAdapter($this->tempFile . '.nonexistent');
+        $adapter = JsonFileStorageAdapter::forPcntl($this->tempFile . '.nonexistent');
+
         self::assertNull($adapter->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
 
@@ -108,8 +109,12 @@ final class JsonFileStorageAdapterTest extends TestCase
             attributes: [],
             typesOnly: false,
         )));
+
         self::assertCount(1, $entries);
-        self::assertSame('dc=example,dc=com', array_values($entries)[0]->getDn()->toString());
+        self::assertSame(
+            'dc=example,dc=com',
+            array_values($entries)[0]->getDn()->toString()
+        );
     }
 
     public function test_search_single_level_returns_direct_children(): void
@@ -121,9 +126,13 @@ final class JsonFileStorageAdapterTest extends TestCase
             attributes: [],
             typesOnly: false,
         )));
+
         // Only alice is a direct child of dc=example,dc=com; bob is under ou=People
         self::assertCount(1, $entries);
-        self::assertSame('cn=Alice,dc=example,dc=com', array_values($entries)[0]->getDn()->toString());
+        self::assertSame(
+            'cn=Alice,dc=example,dc=com',
+            array_values($entries)[0]->getDn()->toString()
+        );
     }
 
     public function test_search_subtree_returns_base_and_all_descendants(): void
@@ -135,7 +144,11 @@ final class JsonFileStorageAdapterTest extends TestCase
             attributes: [],
             typesOnly: false,
         )));
-        self::assertCount(3, $entries);
+
+        self::assertCount(
+            3,
+            $entries
+        );
     }
 
     public function test_add_stores_entry(): void
@@ -152,13 +165,15 @@ final class JsonFileStorageAdapterTest extends TestCase
         $this->subject->add(new AddCommand($entry));
 
         // A second independent adapter instance reading the same file should see the new entry
-        $adapter2 = new JsonFileStorageAdapter($this->tempFile);
+        $adapter2 = JsonFileStorageAdapter::forPcntl($this->tempFile);
+
         self::assertNotNull($adapter2->get(new Dn('cn=Persistent,dc=example,dc=com')));
     }
 
     public function test_delete_removes_entry(): void
     {
         $this->subject->delete(new DeleteCommand(new Dn('cn=Alice,dc=example,dc=com')));
+
         self::assertNull($this->subject->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
 
@@ -166,7 +181,8 @@ final class JsonFileStorageAdapterTest extends TestCase
     {
         $this->subject->delete(new DeleteCommand(new Dn('cn=Alice,dc=example,dc=com')));
 
-        $adapter2 = new JsonFileStorageAdapter($this->tempFile);
+        $adapter2 = JsonFileStorageAdapter::forPcntl($this->tempFile);
+
         self::assertNull($adapter2->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
 
@@ -226,6 +242,7 @@ final class JsonFileStorageAdapterTest extends TestCase
 
         $entry = $this->subject->get(new Dn('cn=Alice,dc=example,dc=com'));
         $mail = $entry?->get('mail');
+
         self::assertNotNull($mail);
         self::assertFalse($mail->has('a@b.com'));
         self::assertTrue($mail->has('c@d.com'));
@@ -341,7 +358,7 @@ final class JsonFileStorageAdapterTest extends TestCase
     {
         file_put_contents($this->tempFile, '');
 
-        $adapter = new JsonFileStorageAdapter($this->tempFile);
+        $adapter = JsonFileStorageAdapter::forPcntl($this->tempFile);
 
         self::assertNull($adapter->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
@@ -350,7 +367,7 @@ final class JsonFileStorageAdapterTest extends TestCase
     {
         file_put_contents($this->tempFile, 'not valid json {{{');
 
-        $adapter = new JsonFileStorageAdapter($this->tempFile);
+        $adapter = JsonFileStorageAdapter::forPcntl($this->tempFile);
 
         self::assertNull($adapter->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
@@ -363,20 +380,12 @@ final class JsonFileStorageAdapterTest extends TestCase
         // Corrupt the file — a cache-bypassing read would return null.
         file_put_contents($this->tempFile, 'corrupted');
 
-        // Touch the file so its mtime changes and the adapter re-reads it.
-        // We want to verify only that a second add() does not use stale cache;
-        // here we instead verify the same-mtime cache hit path: restore the
-        // file, then call get() again without advancing mtime.
-        // Since we just wrote garbage, the cache was invalidated by withLock.
-        // Instead test the cache HIT by doing two get() calls without any write.
-        $adapter = new JsonFileStorageAdapter($this->tempFile);
+        $adapter = JsonFileStorageAdapter::forPcntl($this->tempFile);
 
         // Prime the cache on first call (returns null from corrupted file).
         $adapter->get(new Dn('cn=Alice,dc=example,dc=com'));
 
         // Second call on same adapter+same mtime must use the in-memory cache.
-        // We verify this indirectly: overwriting the file again would change its
-        // mtime and cause a re-read, so we simply assert consistency.
         $result = $adapter->get(new Dn('cn=Alice,dc=example,dc=com'));
 
         self::assertNull($result);
@@ -385,7 +394,7 @@ final class JsonFileStorageAdapterTest extends TestCase
 
     public function test_get_cache_is_invalidated_when_file_mtime_changes(): void
     {
-        $adapter = new JsonFileStorageAdapter($this->tempFile);
+        $adapter = JsonFileStorageAdapter::forPcntl($this->tempFile);
 
         // Prime the cache with a valid file (contains Alice).
         self::assertNotNull($adapter->get(new Dn('cn=Alice,dc=example,dc=com')));

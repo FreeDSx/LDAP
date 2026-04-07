@@ -227,14 +227,17 @@ comparisons. No password scheme is set automatically — the hash format must be
 A file-backed adapter that persists the directory as a JSON file. Safe for PCNTL (write operations are serialised with
 `flock(LOCK_EX)` and the in-memory cache is invalidated via `filemtime` checks).
 
-**Note**: Not suitable for Swoole — the blocking `flock`/`fread` calls will stall the event loop. Use
-`InMemoryStorageAdapter` with Swoole instead.
+Use the named constructor that matches your server runner:
 
 ```php
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Storage\Adapter\JsonFileStorageAdapter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorageAdapter;
 
-$adapter = new JsonFileStorageAdapter('/var/lib/myapp/ldap.json');
+// PCNTL runner — uses flock() to serialise writes across forked processes
+$adapter = JsonFileStorageAdapter::forPcntl('/var/lib/myapp/ldap.json');
+
+// Swoole runner — uses a coroutine Channel mutex and non-blocking file I/O
+$adapter = JsonFileStorageAdapter::forSwoole('/var/lib/myapp/ldap.json');
 
 $server = (new LdapServer())->useBackend($adapter);
 $server->run();

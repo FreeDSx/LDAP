@@ -55,7 +55,7 @@ if ($handler === 'file') {
         unlink($filePath);
     }
 
-    $adapter = new JsonFileStorageAdapter($filePath);
+    $adapter = JsonFileStorageAdapter::forPcntl($filePath);
 
     foreach ($entries as $entry) {
         $adapter->add(new AddCommand($entry));
