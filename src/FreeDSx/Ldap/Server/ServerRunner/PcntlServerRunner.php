@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\ChildProcess;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
+use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
 use FreeDSx\Ldap\ServerOptions;
@@ -65,6 +66,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     public function __construct(
         private readonly ServerProtocolFactory $serverProtocolFactory,
         private readonly ServerOptions $options,
+        private readonly SocketServerFactory $socketServerFactory,
     ) {
         if (!extension_loaded('pcntl')) {
             throw new RuntimeException(
@@ -91,9 +93,9 @@ class PcntlServerRunner implements ServerRunnerInterface
     /**
      * @throws EncoderException
      */
-    public function run(SocketServer $server): void
+    public function run(): void
     {
-        $this->server = $server;
+        $this->server = $this->socketServerFactory->makeAndBind();
 
         try {
             $this->acceptClients();

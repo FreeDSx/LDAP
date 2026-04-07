@@ -24,7 +24,6 @@ use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\ServerOptions;
-use FreeDSx\Socket\SocketServer;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -57,8 +56,7 @@ class LdapServerTest extends TestCase
     {
         $this->mockServerRunner
             ->expects(self::once())
-            ->method('run')
-            ->with(self::isInstanceOf(SocketServer::class));
+            ->method('run');
 
         $this->subject->run();
     }

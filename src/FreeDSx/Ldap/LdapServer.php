@@ -21,7 +21,6 @@ use FreeDSx\Ldap\Server\RequestHandler\ProxyHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
-use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
 use Psr\Log\LoggerInterface;
@@ -45,7 +44,7 @@ class LdapServer
     }
 
     /**
-     * Runs the LDAP server. Binds the socket on the request IP/port and sends it to the server runner.
+     * Runs the LDAP server. Binds the socket and starts accepting client connections.
      *
      * @throws ConnectionException
      * @throws InvalidArgumentException
@@ -56,11 +55,7 @@ class LdapServer
 
         $runner = $this->options->getServerRunner() ?? $this->container->get(ServerRunnerInterface::class);
 
-        $socketServer = $this->container
-            ->get(SocketServerFactory::class)
-            ->makeAndBind();
-
-        $runner->run($socketServer);
+        $runner->run();
     }
 
     /**

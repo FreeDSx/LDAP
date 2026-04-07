@@ -40,10 +40,6 @@ use Throwable;
  *
  * Note on socket creation: the SocketServer must be created inside Coroutine\run()
  * for Swoole's stream hooks to intercept stream_socket_accept() as a yielding call.
- * If the socket is created before the event loop starts, stream_socket_accept()
- * blocks the event loop entirely and signals are never delivered. The run() method
- * therefore closes the passed SocketServer immediately and uses the injected
- * SocketServerFactory to recreate it inside the coroutine.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -92,15 +88,8 @@ class SwooleServerRunner implements ServerRunnerInterface
         $this->waitGroup = new WaitGroup();
     }
 
-    public function run(SocketServer $server): void
+    public function run(): void
     {
-        // Close the socket that was created outside the coroutine context.
-        // Swoole's stream hook only intercepts stream_socket_accept() as a
-        // yielding call when the socket is created inside Coroutine\run().
-        // A socket created before the event loop starts causes stream_socket_accept()
-        // to block the loop entirely, preventing signal delivery.
-        $server->close();
-
         Coroutine\run(function (): void {
             $this->server = $this->socketServerFactory->makeAndBind();
             $this->registerShutdownSignals();

@@ -220,6 +220,7 @@ class Container
         return new PcntlServerRunner(
             serverProtocolFactory: $this->get(ServerProtocolFactory::class),
             options: $options,
+            socketServerFactory: $this->get(SocketServerFactory::class),
         );
     }
 
