@@ -1,6 +1,10 @@
 General LDAP Server Usage
 ===================
 
+* [Quick Start Scenarios](#quick-start-scenarios)
+  * [In-Memory Server](#in-memory-server)
+  * [File-Backed Server with Custom Bind Names](#file-backed-server-with-custom-bind-names)
+  * [Challenge SASL with a Custom Authenticator](#challenge-sasl-with-a-custom-authenticator)
 * [Running the Server](#running-the-server)
 * [Creating a Proxy Server](#creating-a-proxy-server)
 * [Providing a Backend](#providing-a-backend)
@@ -11,6 +15,10 @@ General LDAP Server Usage
     * [JsonFileStorageAdapter](#jsonfilestorageadapter)
   * [Proxy Backend](#proxy-backend)
   * [Custom Filter Evaluation](#custom-filter-evaluation)
+* [Authentication](#authentication)
+  * [Default Authentication](#default-authentication)
+  * [Custom Bind Name Resolution](#custom-bind-name-resolution)
+  * [Custom Authenticator](#custom-authenticator)
 * [Handling the RootDSE](#handling-the-rootdse)
 * [StartTLS SSL Certificate Support](#starttls-ssl-certificate-support)
 * [SASL Authentication](#sasl-authentication)
@@ -20,8 +28,146 @@ General LDAP Server Usage
 The LdapServer class runs an LDAP server process that accepts client requests and sends back responses. It defaults to
 using a forking method (PCNTL) for handling client connections, which is only available on Linux.
 
-The server has no built-in entry persistence. You provide a backend that implements the storage and authentication
-logic for your use case. See the [Providing a Backend](#providing-a-backend) section for details.
+The server has no built-in entry persistence. You provide a backend that implements the storage logic for your use
+case. Authentication is a separate, independently configurable concern. See [Providing a Backend](#providing-a-backend)
+and [Authentication](#authentication) for details.
+
+## Quick Start Scenarios
+
+### In-Memory Server
+
+The simplest useful setup: an in-memory directory pre-seeded with entries. Ideal for testing or applications that
+reconstruct the directory on each start.
+
+The built-in `PasswordAuthenticator` handles bind authentication automatically — it reads the `userPassword` attribute
+from entries and verifies credentials against it. Supported hash schemes: `{SHA}`, `{SSHA}`, `{MD5}`, `{SMD5}`, and
+plaintext.
+
+```php
+use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorageAdapter;
+use FreeDSx\Ldap\ServerOptions;
+
+$passwordHash = '{SHA}' . base64_encode(sha1('secret', true));
+
+$server = new LdapServer(
+    (new ServerOptions())->setDseNamingContexts('dc=example,dc=com')
+);
+
+$server->useBackend(new InMemoryStorageAdapter(
+    new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
+    new Entry(
+        new Dn('cn=admin,dc=example,dc=com'),
+        new Attribute('cn', 'admin'),
+        new Attribute('userPassword', $passwordHash),
+    ),
+));
+
+$server->run();
+```
+
+Clients bind as `cn=admin,dc=example,dc=com` with password `secret`. No further configuration needed.
+
+---
+
+### File-Backed Server with Custom Bind Names
+
+A persistent directory stored in a JSON file. Clients bind with a bare username (`alice`) instead of a full DN — a
+custom `BindNameResolverInterface` translates the username to an entry.
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorageAdapter;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\ServerOptions;
+
+class UidBindNameResolver implements BindNameResolverInterface
+{
+    public function resolve(string $name, LdapBackendInterface $backend): ?Entry
+    {
+        foreach ($backend->search(/* uid=$name search context */) as $entry) {
+            return $entry;
+        }
+
+        return null;
+    }
+}
+
+$server = new LdapServer(
+    (new ServerOptions())
+        ->setDseNamingContexts('dc=example,dc=com')
+        ->setSaslMechanisms(ServerOptions::SASL_PLAIN)
+        ->setBindNameResolver(new UidBindNameResolver())
+);
+
+$server->useBackend(JsonFileStorageAdapter::forPcntl('/var/lib/myapp/ldap.json'));
+$server->run();
+```
+
+The custom resolver drives all auth paths: simple bind, SASL PLAIN, and (if enabled) challenge SASL all use it
+through the built-in `PasswordAuthenticator`.
+
+---
+
+### Challenge SASL with a Custom Authenticator
+
+For full control over credential storage — for example, delegating to an external user store or database — implement
+`PasswordAuthenticatableInterface` directly. This single interface covers all bind types:
+
+- `verifyPassword()` is called for simple binds and SASL PLAIN
+- `getPassword()` is called for challenge mechanisms (CRAM-MD5, DIGEST-MD5, SCRAM-*)
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorageAdapter;
+use FreeDSx\Ldap\ServerOptions;
+use SensitiveParameter;
+
+class MyAuthenticator implements PasswordAuthenticatableInterface
+{
+    public function verifyPassword(
+        string $name,
+        #[SensitiveParameter]
+        string $password,
+    ): bool {
+        // Verify against your user store — hashed comparison is fine here.
+        $stored = $this->lookupPassword($name);
+
+        return $stored !== null && password_verify($password, $stored);
+    }
+
+    public function getPassword(string $username, string $mechanism): ?string
+    {
+        // Challenge SASL requires a plaintext (or recoverable) password.
+        // Passwords stored with one-way hashing (bcrypt, argon2) cannot be used here.
+        return $this->lookupPlaintextPassword($username);
+    }
+}
+
+$server = new LdapServer(
+    (new ServerOptions())
+        ->setDseNamingContexts('dc=example,dc=com')
+        ->setSaslMechanisms(
+            ServerOptions::SASL_PLAIN,
+            ServerOptions::SASL_SCRAM_SHA_256,
+        )
+);
+
+$server->useBackend(JsonFileStorageAdapter::forPcntl('/var/lib/myapp/ldap.json'));
+$server->usePasswordAuthenticator(new MyAuthenticator());
+$server->run();
+```
+
+The backend handles directory data (search, writes). The authenticator handles credentials. Neither needs to know
+about the other.
+
+---
 
 ## Running The Server
 
@@ -69,13 +215,15 @@ $server = (new LdapServer())->useBackend(new MyBackend());
 $server->run();
 ```
 
-The framework routes all client LDAP operations — search, bind, add, delete, modify, rename, compare — to the backend.
-Paging is handled automatically: the framework stores a PHP Generator per connection and resumes it for each page
+All client LDAP operations — search, add, delete, modify, rename, compare — are routed to the backend.
+Paging is handled automatically: a PHP generator is stored per connection and resumes it for each page
 request. Your `search()` implementation simply yields entries.
+
+Authentication is a **separate concern** handled by `PasswordAuthenticatableInterface`. See [Authentication](#authentication).
 
 ### Read-Only Backend
 
-`LdapBackendInterface` covers the three operations needed for a read-only server:
+`LdapBackendInterface` requires two methods:
 
 ```php
 namespace App;
@@ -89,15 +237,16 @@ use Generator;
 class MyReadOnlyBackend implements LdapBackendInterface
 {
     /**
-     * Yield entries that are candidates for the search. The framework applies
-     * FilterEvaluator as a final pass, so you may pre-filter for efficiency or
+     * Yield entries that are candidates for the search.
+     *
+     * The FilterEvaluator as a final pass, so you may pre-filter for efficiency or
      * yield all entries in scope for simplicity.
      */
     public function search(SearchContext $context): Generator
     {
-        // $context->baseDn   — Dn: the search base
-        // $context->scope    — int: SearchRequest::SCOPE_BASE_OBJECT | SCOPE_SINGLE_LEVEL | SCOPE_WHOLE_SUBTREE
-        // $context->filter   — FilterInterface: the requested LDAP filter
+        // $context->baseDn    — Dn: the search base
+        // $context->scope     — int: SearchRequest::SCOPE_BASE_OBJECT | SCOPE_SINGLE_LEVEL | SCOPE_WHOLE_SUBTREE
+        // $context->filter    — FilterInterface: the requested LDAP filter
         // $context->attributes — Attribute[]: requested attributes (empty = all)
         // $context->typesOnly — bool: return only attribute names, not values
 
@@ -107,43 +256,39 @@ class MyReadOnlyBackend implements LdapBackendInterface
 
     /**
      * Return a single entry by DN, or null if it does not exist.
-     * Used for compare operations and internal lookups.
+     * Used for compare operations and bind name resolution.
      */
     public function get(Dn $dn): ?Entry
     {
         // ...
         return null;
     }
-
-    /**
-     * Verify a plaintext password for a simple bind request.
-     * Return true if the credentials are valid, false otherwise.
-     */
-    public function verifyPassword(Dn $dn, string $password): bool
-    {
-        return $dn->toString() === 'cn=admin,dc=example,dc=com'
-            && $password === 'secret';
-    }
 }
 ```
 
 ### Writable Backend
 
-`WritableLdapBackendInterface` extends `LdapBackendInterface` with write operations:
+`WritableLdapBackendInterface` extends `LdapBackendInterface` with write operations. Use `WritableBackendTrait` to
+implement the write dispatch — it routes each operation to a dedicated method receiving a typed command object:
 
 ```php
 namespace App;
 
-use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Entry\Rdn;
-use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\SearchContext;
+use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
+use FreeDSx\Ldap\Server\Backend\Write\WritableBackendTrait;
+use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 use Generator;
 
 class MyBackend implements WritableLdapBackendInterface
 {
+    use WritableBackendTrait;
+
     public function search(SearchContext $context): Generator
     {
         // yield matching entries...
@@ -152,34 +297,31 @@ class MyBackend implements WritableLdapBackendInterface
     public function get(Dn $dn): ?Entry
     {
         // ...
+        return null;
     }
 
-    public function verifyPassword(Dn $dn, string $password): bool
+    public function add(AddCommand $command): void
     {
-        // ...
+        // $command->entry — Entry to persist
     }
 
-    public function add(Entry $entry): void
+    public function delete(DeleteCommand $command): void
     {
-        // Persist the new entry. Throw OperationException(ENTRY_ALREADY_EXISTS) if it exists.
+        // $command->dn — Dn of the entry to remove
     }
 
-    public function delete(Dn $dn): void
+    public function update(UpdateCommand $command): void
     {
-        // Remove the entry. Throw OperationException(NOT_ALLOWED_ON_NON_LEAF) if it has children.
+        // $command->dn      — Dn of the entry to modify
+        // $command->changes — Change[] of attribute changes to apply
     }
 
-    /**
-     * @param Change[] $changes
-     */
-    public function update(Dn $dn, array $changes): void
+    public function move(MoveCommand $command): void
     {
-        // Apply attribute changes to the entry.
-    }
-
-    public function move(Dn $dn, Rdn $newRdn, bool $deleteOldRdn, ?Dn $newParent): void
-    {
-        // Rename or move the entry (ModifyDN operation).
+        // $command->dn         — Dn: current entry DN
+        // $command->newRdn     — Rdn: new relative DN
+        // $command->deleteOldRdn — bool: whether to remove the old RDN attribute value
+        // $command->newParent  — ?Dn: new parent DN (null = same parent)
     }
 }
 ```
@@ -202,7 +344,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Storage\Adapter\InMemoryStorageAdapter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorageAdapter;
 
 $passwordHash = '{SHA}' . base64_encode(sha1('secret', true));
 
@@ -218,9 +360,6 @@ $adapter = new InMemoryStorageAdapter(
 $server = (new LdapServer())->useBackend($adapter);
 $server->run();
 ```
-
-Password verification supports `{SHA}` hashed values stored in the `userPassword` attribute, as well as plaintext
-comparisons. No password scheme is set automatically — the hash format must be present in the stored value.
 
 #### JsonFileStorageAdapter
 
@@ -291,7 +430,7 @@ $server->run();
 
 ### Custom Filter Evaluation
 
-By default the framework applies a pure-PHP `FilterEvaluator` to entries yielded by `search()` as a correctness
+By default, a pure-PHP `FilterEvaluator` is applied to entries yielded by `search()` as a correctness
 guarantee. For backends that translate LDAP filters to a native query language (SQL, MongoDB, etc.) and return
 pre-filtered results, you can replace the evaluator:
 
@@ -307,12 +446,12 @@ $server = (new LdapServer())
 $server->run();
 ```
 
-The custom evaluator must implement `FreeDSx\Ldap\Server\Storage\FilterEvaluatorInterface`:
+The custom evaluator must implement `FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface`:
 
 ```php
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
-use FreeDSx\Ldap\Server\Storage\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 
 class MySqlFilterEvaluator implements FilterEvaluatorInterface
 {
@@ -322,6 +461,99 @@ class MySqlFilterEvaluator implements FilterEvaluatorInterface
         return true;
     }
 }
+```
+
+## Authentication
+
+The `PasswordAuthenticatableInterface` covers all bind types through two methods:
+
+```php
+interface PasswordAuthenticatableInterface
+{
+    // Called for simple binds and SASL PLAIN.
+    public function verifyPassword(
+        string $name,
+        string $password
+    ): bool;
+
+    // Called for challenge-based SASL (CRAM-MD5, DIGEST-MD5, SCRAM-*).
+    // Return the plaintext password, or null to reject.
+    public function getPassword(
+        string $username,
+        string $mechanism
+    ): ?string;
+}
+```
+
+### Default Authentication
+
+When no explicit authenticator is registered, we build a `PasswordAuthenticator` automatically. It
+resolves the bind name to an entry via the backend's `get()` method (or a custom resolver — see below), then verifies
+the supplied password against the `userPassword` attribute. Supported schemes: `{SHA}`, `{SSHA}`, `{MD5}`, `{SMD5}`,
+and plaintext.
+
+This means simple bind authentication works out of the box with any backend that stores `userPassword` on entries —
+no additional configuration required.
+
+### Custom Bind Name Resolution
+
+By default, the built-in `PasswordAuthenticator` treats the bind name as a literal DN. If clients bind with something
+else — a bare username, an email address, etc. — supply a custom `BindNameResolverInterface`:
+
+```php
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Entry\Entry;
+
+class UidBindNameResolver implements BindNameResolverInterface
+{
+    public function resolve(
+        string $name,
+         LdapBackendInterface $backend
+    ): ?Entry {
+        // Translate the bind name to an entry however you like.
+        // Return null to reject authentication.
+    }
+}
+```
+
+```php
+use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\LdapServer;
+
+$server = new LdapServer(
+    (new ServerOptions)->setBindNameResolver(new UidBindNameResolver())
+);
+```
+
+The resolver is used for all auth paths (simple bind, SASL PLAIN, and challenge SASL) through the built-in
+`PasswordAuthenticator`.
+
+### Custom Authenticator
+
+For full control — external auth services, custom credential storage, etc. — implement
+`PasswordAuthenticatableInterface` and register it:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use SensitiveParameter;
+
+class MyAuthenticator implements PasswordAuthenticatableInterface
+{
+    public function verifyPassword(string $name, #[SensitiveParameter] string $password): bool
+    {
+        // Your credential verification logic.
+    }
+
+    public function getPassword(string $username, string $mechanism): ?string
+    {
+        // Return plaintext password for challenge SASL, or null to reject.
+        // Return null here if you don't support challenge SASL.
+    }
+}
+
+$server = (new LdapServer())->usePasswordAuthenticator(new MyAuthenticator());
 ```
 
 ## Handling the RootDSE
@@ -374,8 +606,7 @@ $server = (new LdapServer())
 $server->run();
 ```
 
-If your backend class also implements `RootDseHandlerInterface`, you do not need to call `useRootDseHandler()` — the
-framework detects and uses it automatically.
+If your backend class also implements `RootDseHandlerInterface`, you do not need to call `useRootDseHandler()` — it will be used automatically.
 
 ## SASL Authentication
 
@@ -387,116 +618,42 @@ support via `ServerOptions::setSaslMechanisms()`. The configured mechanisms are 
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
 
-$server = (new LdapServer(
+$server = new LdapServer(
     (new ServerOptions)->setSaslMechanisms(
         ServerOptions::SASL_PLAIN,
-        ServerOptions::SASL_CRAM_MD5,
         ServerOptions::SASL_SCRAM_SHA_256,
     )
-))->useBackend(new MyBackend());
+);
 ```
+
+All SASL mechanisms are handled through `PasswordAuthenticatableInterface`. No separate interface or backend
+modification is needed.
 
 ### PLAIN Mechanism
 
-The `PLAIN` mechanism reuses your existing `LdapBackendInterface::verifyPassword()` method. When a client
-authenticates with SASL PLAIN, the server extracts the username and password from the SASL credentials and calls
-`verifyPassword()` exactly as it would for a simple bind.
+The `PLAIN` mechanism extracts the username and password from the SASL credentials and calls
+`PasswordAuthenticatableInterface::verifyPassword()` — the same path as a simple bind. The built-in
+`PasswordAuthenticator` handles this automatically, so no additional configuration is needed beyond enabling the
+mechanism.
 
 **Note**: PLAIN transmits credentials in cleartext. Only enable it when the connection is protected by TLS (StartTLS
 or `setUseSsl`).
 
 ### Challenge-Based Mechanisms (CRAM-MD5, DIGEST-MD5, and SCRAM)
 
-`CRAM-MD5`, `DIGEST-MD5`, and the `SCRAM-*` family are challenge-response mechanisms. The server issues a challenge to
-the client and verifies the client's response against a digest computed from the user's plaintext password. Because the
-verification is cryptographic, the server must be able to look up the plaintext (or equivalent) password for a given
-username.
+`CRAM-MD5`, `DIGEST-MD5`, and the `SCRAM-*` family are challenge-response mechanisms. The server issues a challenge
+to the client and verifies the response against a digest computed from the user's plaintext password. The server calls
+`PasswordAuthenticatableInterface::getPassword()` to retrieve the password.
 
-To support these mechanisms, your backend must additionally implement
-`FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface`:
+The built-in `PasswordAuthenticator` implements `getPassword()` by reading the raw value of the `userPassword`
+attribute from the resolved entry. This works when passwords are stored in plaintext. If passwords are stored as
+one-way hashes (bcrypt, argon2) you must supply a custom authenticator that can return a recoverable value.
 
-```php
-interface SaslHandlerInterface
-{
-    public function getPassword(
-        string $username,
-        string $mechanism,
-    ): ?string;
-}
-```
+**Note**: Because challenge mechanisms require a recoverable password, they are fundamentally incompatible with
+one-way hashing. If one-way hashing is a hard requirement, use `PLAIN` over TLS instead.
 
-Return the user's plaintext password for the given username and mechanism, or `null` if the user does not exist or
-should not be permitted to authenticate. Returning `null` results in a generic `invalidCredentials` error.
-
-The `$mechanism` parameter lets you apply per-mechanism policy if needed (e.g. disallow weak mechanisms for certain
-users), but in most cases you can ignore it and return the same password regardless.
-
-Example backend supporting both simple binds and challenge-based SASL:
-
-```php
-namespace App;
-
-use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
-use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
-use Generator;
-
-class MyBackend implements LdapBackendInterface, SaslHandlerInterface
-{
-    private array $users = [
-        'alice' => 'her-plaintext-password',
-        'bob'   => 'his-plaintext-password',
-    ];
-
-    public function search(SearchContext $context): Generator
-    {
-        // yield entries...
-    }
-
-    public function get(Dn $dn): ?Entry
-    {
-        return null;
-    }
-
-    // Used for simple binds and SASL PLAIN.
-    public function verifyPassword(Dn $dn, string $password): bool
-    {
-        $user = $this->users[$dn->toString()] ?? null;
-
-        return $user !== null && $user === $password;
-    }
-
-    // Used for CRAM-MD5, DIGEST-MD5, and all SCRAM variants.
-    public function getPassword(string $username, string $mechanism): ?string
-    {
-        return $this->users[$username] ?? null;
-    }
-}
-```
-
-Then enable the desired mechanisms on the server:
-
-```php
-use FreeDSx\Ldap\ServerOptions;
-use FreeDSx\Ldap\LdapServer;
-use App\MyBackend;
-
-$server = (new LdapServer(
-    (new ServerOptions)->setSaslMechanisms(
-        ServerOptions::SASL_CRAM_MD5,
-        ServerOptions::SASL_DIGEST_MD5,
-        ServerOptions::SASL_SCRAM_SHA_256,
-    )
-))->useBackend(new MyBackend());
-
-$server->run();
-```
-
-**SCRAM variants**: The following constants are available for the SCRAM family. `SCRAM-SHA-256` is the recommended
-choice for new deployments ([RFC 7677](https://www.rfc-editor.org/rfc/rfc7677) standardises it as the preferred
-mechanism, citing SHA-1's known weaknesses).
+**SCRAM variants**: The following constants are available. `SCRAM-SHA-256` is the recommended choice for new
+deployments ([RFC 7677](https://www.rfc-editor.org/rfc/rfc7677) standardises it as the preferred mechanism).
 
 | Constant                             | Mechanism                       |
 |--------------------------------------|---------------------------------|
@@ -508,10 +665,6 @@ mechanism, citing SHA-1's known weaknesses).
 
 Channel-binding (`-PLUS`) variants of each are also available (e.g. `SASL_SCRAM_SHA_256_PLUS`) for environments where
 TLS channel binding is required.
-
-**Note**: Because `getPassword()` must return the plaintext password, you cannot store passwords as one-way hashes
-(e.g. bcrypt) when supporting CRAM-MD5, DIGEST-MD5, or SCRAM. If one-way hashing is a requirement, use `PLAIN` over
-TLS instead, which allows password verification via `verifyPassword()`.
 
 ## StartTLS SSL Certificate Support
 
