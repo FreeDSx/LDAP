@@ -17,7 +17,6 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchangeInput;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchangeResult;
@@ -26,7 +25,6 @@ use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapper\SaslMessageWrapper;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
@@ -43,29 +41,17 @@ class SaslBind implements BindInterface
 {
     use VersionValidatorTrait;
 
-    private readonly SaslExchange $exchange;
-
     /**
      * @param string[] $mechanisms
      */
     public function __construct(
         private readonly ServerQueue $queue,
-        private readonly PasswordAuthenticatableInterface $authenticator,
+        private readonly SaslExchange $exchange,
         private readonly Sasl $sasl = new Sasl(),
         private readonly array $mechanisms = [],
         private readonly ResponseFactory $responseFactory = new ResponseFactory(),
         private readonly SaslUsernameExtractorFactory $usernameExtractorFactory = new SaslUsernameExtractorFactory(),
-        ?SaslExchange $exchange = null,
-        ?MechanismOptionsBuilderFactory $optionsBuilderFactory = null,
     ) {
-        $factory = $optionsBuilderFactory ?? new MechanismOptionsBuilderFactory($this->authenticator);
-
-        $this->exchange = $exchange ?? new SaslExchange(
-            $this->queue,
-            $this->responseFactory,
-            $factory,
-            $this->authenticator,
-        );
     }
 
     /**
