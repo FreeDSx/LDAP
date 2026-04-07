@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Integration\FreeDSx\Ldap;
+namespace Tests\Integration\FreeDSx\Ldap\Storage;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
@@ -19,22 +19,8 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
+use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 
-/**
- * End-to-end integration tests for BackendStorageRequestHandler wired via
- * LdapServer::useStorageAdapter() with an InMemoryStorageAdapter.
- *
- * A single server process is started for the test class. With the PCNTL runner,
- * each client connection is handled in a forked child process, so write
- * operations in one test do not affect subsequent tests.
- *
- * The server is started via tests/bin/ldapbackendstorage.php, seeded with:
- *
- *   dc=foo,dc=bar                        objectClass=domain
- *   cn=user,dc=foo,dc=bar                userPassword={SHA}<12345>
- *   ou=people,dc=foo,dc=bar              objectClass=organizationalUnit
- *   cn=alice,ou=people,dc=foo,dc=bar     sn=Smith, mail=alice@foo.bar
- */
 class LdapBackendStorageTest extends ServerTestCase
 {
     public static function setUpBeforeClass(): void
@@ -299,5 +285,45 @@ class LdapBackendStorageTest extends ServerTestCase
         );
 
         self::assertFalse($result);
+    }
+
+    public function testPagingReturnsAllEntriesAcrossMultiplePages(): void
+    {
+        $this->authenticateUser();
+
+        $search = Operations::search(Filters::present('objectClass'))
+            ->base('dc=foo,dc=bar')
+            ->useSubtreeScope();
+
+        $paging = $this->ldapClient()->paging($search, 2);
+
+        $allEntries = [];
+
+        while ($paging->hasEntries()) {
+            foreach ($paging->getEntries() as $entry) {
+                $allEntries[] = $entry->getDn()->toString();
+            }
+        }
+
+        // Seed has 4 entries: dc=foo,dc=bar + cn=user + ou=people + cn=alice
+        self::assertCount(4, $allEntries);
+    }
+
+    public function testPagingCanBeAbandoned(): void
+    {
+        $this->authenticateUser();
+
+        $search = Operations::search(Filters::present('objectClass'))
+            ->base('dc=foo,dc=bar')
+            ->useSubtreeScope();
+
+        $paging = $this->ldapClient()->paging($search, 1);
+
+        // Get the first page only, then abandon
+        $paging->getEntries();
+        $paging->end();
+
+        // After abandonment, hasEntries() must return false
+        self::assertFalse($paging->hasEntries());
     }
 }

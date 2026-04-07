@@ -259,7 +259,7 @@ class ServerTestCase extends LdapTestCase
         ));
     }
 
-    private function buildClient(string $transport): LdapClient
+    protected function buildClient(string $transport): LdapClient
     {
         $useSsl = false;
         $servers = '127.0.0.1';

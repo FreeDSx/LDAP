@@ -4,20 +4,6 @@ declare(strict_types=1);
 
 /**
  * Server bootstrap script for LdapBackendStorageTest.
- *
- * Seeds an InMemoryStorageAdapter with a small directory and starts the server
- * using LdapServer::useBackend(). This exercises the full stack:
- * ServerSearchHandler + ServerDispatchHandler + FilterEvaluator + InMemoryStorageAdapter.
- *
- * Entries seeded:
- *   dc=foo,dc=bar                       (base)
- *   cn=user,dc=foo,dc=bar               (password: 12345)
- *   ou=people,dc=foo,dc=bar
- *   cn=alice,ou=people,dc=foo,dc=bar    (sn=Smith, mail=alice@foo.bar)
- *
- * Usage: php ldapbackendstorage.php [transport] [runner]
- *   transport: tcp (default), unix
- *   runner:    pcntl (default), swoole
  */
 
 use FreeDSx\Ldap\Entry\Attribute;
@@ -25,13 +11,18 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorageAdapter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorageAdapter;
+use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\ServerOptions;
 
 require __DIR__ . '/../../vendor/autoload.php';
 
 $passwordHash = '{SHA}' . base64_encode(sha1('12345', true));
 
-$adapter = new InMemoryStorageAdapter(
+$transport = $argv[1] ?? 'tcp';
+$handler = $argv[2] ?? null;
+
+$entries = [
     new Entry(
         new Dn('dc=foo,dc=bar'),
         new Attribute('dc', 'foo'),
@@ -55,10 +46,23 @@ $adapter = new InMemoryStorageAdapter(
         new Attribute('sn', 'Smith'),
         new Attribute('mail', 'alice@foo.bar'),
     ),
-);
+];
 
-$transport = $argv[1] ?? 'tcp';
-$runner = $argv[2] ?? 'pcntl';
+if ($handler === 'file') {
+    $filePath = sys_get_temp_dir() . '/ldap_test_backend_storage.json';
+
+    if (file_exists($filePath)) {
+        unlink($filePath);
+    }
+
+    $adapter = new JsonFileStorageAdapter($filePath);
+
+    foreach ($entries as $entry) {
+        $adapter->add(new AddCommand($entry));
+    }
+} else {
+    $adapter = new InMemoryStorageAdapter(...$entries);
+}
 
 $server = (new LdapServer(
     (new ServerOptions())
@@ -67,7 +71,7 @@ $server = (new LdapServer(
         ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL))
 ))->useBackend($adapter);
 
-if ($runner === 'swoole') {
+if ($handler === 'swoole') {
     $server->useSwooleRunner();
 }
 

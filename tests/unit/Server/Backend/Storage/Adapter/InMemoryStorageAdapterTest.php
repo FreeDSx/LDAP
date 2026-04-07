@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
+use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 use PHPUnit\Framework\TestCase;
 
 final class InMemoryStorageAdapterTest extends TestCase
@@ -295,5 +296,83 @@ final class InMemoryStorageAdapterTest extends TestCase
 
         self::assertNull($this->subject->get(new Dn('cn=Alice,dc=example,dc=com')));
         self::assertNotNull($this->subject->get(new Dn('cn=Alice,ou=People,dc=example,dc=com')));
+    }
+
+    public function test_supports_returns_true_for_add_command(): void
+    {
+        self::assertTrue($this->subject->supports(new AddCommand($this->alice)));
+    }
+
+    public function test_supports_returns_true_for_delete_command(): void
+    {
+        self::assertTrue($this->subject->supports(
+            new DeleteCommand(new Dn('cn=Alice,dc=example,dc=com')
+        )));
+    }
+
+    public function test_supports_returns_true_for_update_command(): void
+    {
+        self::assertTrue($this->subject->supports(new UpdateCommand(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            [],
+        )));
+    }
+
+    public function test_supports_returns_true_for_move_command(): void
+    {
+        self::assertTrue($this->subject->supports(new MoveCommand(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            Rdn::create('cn=Alice'),
+            false,
+            null,
+        )));
+    }
+
+    public function test_supports_returns_false_for_unknown_request(): void
+    {
+        $unknown = $this->createMock(WriteRequestInterface::class);
+
+        self::assertFalse($this->subject->supports($unknown));
+    }
+
+    public function test_handle_dispatches_add_command(): void
+    {
+        $entry = new Entry(new Dn('cn=New,dc=example,dc=com'), new Attribute('cn', 'New'));
+        $this->subject->handle(new AddCommand($entry));
+
+        self::assertNotNull($this->subject->get(new Dn('cn=New,dc=example,dc=com')));
+    }
+
+    public function test_handle_dispatches_delete_command(): void
+    {
+        $this->subject->handle(new DeleteCommand(new Dn('cn=Alice,dc=example,dc=com')));
+
+        self::assertNull($this->subject->get(new Dn('cn=Alice,dc=example,dc=com')));
+    }
+
+    public function test_handle_dispatches_update_command(): void
+    {
+        $this->subject->handle(new UpdateCommand(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_REPLACE, 'cn', 'Alicia')],
+        ));
+
+        self::assertSame(
+            ['Alicia'],
+            $this->subject->get(new Dn('cn=Alice,dc=example,dc=com'))?->get('cn')?->getValues()
+        );
+    }
+
+    public function test_handle_dispatches_move_command(): void
+    {
+        $this->subject->handle(new MoveCommand(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            Rdn::create('cn=Alicia'),
+            true,
+            null,
+        ));
+
+        self::assertNull($this->subject->get(new Dn('cn=Alice,dc=example,dc=com')));
+        self::assertNotNull($this->subject->get(new Dn('cn=Alicia,dc=example,dc=com')));
     }
 }
