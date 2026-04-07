@@ -21,7 +21,7 @@ final class LdapSaslServerTest extends ServerTestCase
 {
     public function setUp(): void
     {
-        $this->setServerMode('ldapserver');
+        $this->setServerMode('ldap-server');
 
         parent::setUp();
 

@@ -20,7 +20,7 @@ require __DIR__ . '/../../vendor/autoload.php';
 $signalFile = $argv[1] ?? null;
 
 if ($signalFile === null) {
-    fwrite(STDERR, 'Usage: ldapsyncwrite.php <signal_file>' . PHP_EOL);
+    fwrite(STDERR, 'Usage: ldap-sync-write.php <signal_file>' . PHP_EOL);
 
     exit(1);
 }

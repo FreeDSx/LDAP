@@ -145,7 +145,7 @@ class SyncReplTest extends LdapTestCase
     {
         $process = new Process([
             'php',
-            __DIR__ . '/../../bin/ldapsyncwrite.php',
+            __DIR__ . '/../../bin/ldap-sync-write.php',
             $this->syncSignalFile,
         ]);
         $process->setTimeout(60);

@@ -34,7 +34,7 @@ class ServerTestCase extends LdapTestCase
     /**
      * Stored so the shared server can be restarted after a test that stops it.
      */
-    private static string $sharedMode = 'ldapserver';
+    private static string $sharedMode = 'ldap-server';
 
     private static string $sharedTransport = 'tcp';
 
@@ -55,7 +55,7 @@ class ServerTestCase extends LdapTestCase
      */
     private bool $needsSharedRestart = false;
 
-    private string $serverMode = 'ldapserver';
+    private string $serverMode = 'ldap-server';
 
     public function setUp(): void
     {

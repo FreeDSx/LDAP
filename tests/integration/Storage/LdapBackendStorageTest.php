@@ -31,7 +31,7 @@ class LdapBackendStorageTest extends ServerTestCase
             return;
         }
 
-        static::initSharedServer('ldapbackendstorage', 'tcp');
+        static::initSharedServer('ldap-backend-storage', 'tcp');
     }
 
     public static function tearDownAfterClass(): void
@@ -42,7 +42,7 @@ class LdapBackendStorageTest extends ServerTestCase
 
     public function setUp(): void
     {
-        $this->setServerMode('ldapbackendstorage');
+        $this->setServerMode('ldap-backend-storage');
 
         parent::setUp();
     }

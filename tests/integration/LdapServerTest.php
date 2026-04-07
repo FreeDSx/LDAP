@@ -30,7 +30,7 @@ class LdapServerTest extends ServerTestCase
             return;
         }
 
-        static::initSharedServer('ldapserver', 'tcp');
+        static::initSharedServer('ldap-server', 'tcp');
     }
 
     public static function tearDownAfterClass(): void
@@ -41,7 +41,7 @@ class LdapServerTest extends ServerTestCase
 
     public function setUp(): void
     {
-        $this->setServerMode('ldapserver');
+        $this->setServerMode('ldap-server');
 
         parent::setUp();
     }

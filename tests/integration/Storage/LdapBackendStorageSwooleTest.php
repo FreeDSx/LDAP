@@ -51,7 +51,7 @@ final class LdapBackendStorageSwooleTest extends LdapBackendStorageTest
         }
 
         static::initSharedServer(
-            'ldapbackendstorage',
+            'ldap-backend-storage',
             'tcp',
             'swoole',
         );

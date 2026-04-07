@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Search\Filters;
  * Runs the full LdapBackendStorageTest suite against JsonFileStorageAdapter,
  * and adds a test that verifies writes persist across separate client connections.
  *
- * Uses the same ldapbackendstorage.php bootstrap script with the 'file' handler,
+ * Uses the same ldap-backend-storage.php bootstrap script with the 'file' handler,
  * which seeds a JsonFileStorageAdapter and recreates the JSON file on each startup.
  *
  * Each mutating test restarts the server so the seeded JSON file is recreated
@@ -48,7 +48,7 @@ final class LdapBackendFileStorageTest extends LdapBackendStorageTest
             return;
         }
 
-        static::initSharedServer('ldapbackendstorage', 'tcp', 'file');
+        static::initSharedServer('ldap-backend-storage', 'tcp', 'file');
     }
 
     public static function tearDownAfterClass(): void
