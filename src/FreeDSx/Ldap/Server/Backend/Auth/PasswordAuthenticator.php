@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Auth;
 
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use SensitiveParameter;
 
 /**
@@ -29,6 +30,7 @@ final class PasswordAuthenticator implements PasswordAuthenticatableInterface
 {
     public function __construct(
         private readonly BindNameResolverInterface $nameResolver,
+        private readonly LdapBackendInterface $backend,
     ) {
     }
 
@@ -37,7 +39,10 @@ final class PasswordAuthenticator implements PasswordAuthenticatableInterface
         #[SensitiveParameter]
         string $password,
     ): bool {
-        $entry = $this->nameResolver->resolve($name);
+        $entry = $this->nameResolver->resolve(
+            $name,
+            $this->backend
+        );
 
         if ($entry === null) {
             return false;

@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -25,18 +26,25 @@ final class PasswordAuthenticatorTest extends TestCase
 {
     private BindNameResolverInterface&MockObject $mockResolver;
 
+    private LdapBackendInterface&MockObject $mockBackend;
+
     protected function setUp(): void
     {
         $this->mockResolver = $this->createMock(BindNameResolverInterface::class);
+        $this->mockBackend = $this->createMock(LdapBackendInterface::class);
     }
 
     private function subject(?Entry $resolvedEntry = null): PasswordAuthenticator
     {
         $this->mockResolver
             ->method('resolve')
+            ->with(self::isType('string'), $this->mockBackend)
             ->willReturn($resolvedEntry);
 
-        return new PasswordAuthenticator($this->mockResolver);
+        return new PasswordAuthenticator(
+            $this->mockResolver,
+            $this->mockBackend
+        );
     }
 
     public function test_returns_false_when_entry_not_found(): void

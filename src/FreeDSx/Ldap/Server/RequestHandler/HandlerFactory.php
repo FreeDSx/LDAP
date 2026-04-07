@@ -88,7 +88,12 @@ class HandlerFactory implements HandlerFactoryInterface
             return $backend;
         }
 
-        return new PasswordAuthenticator(new DnBindNameResolver($backend));
+        $nameResolver = $this->options->getBindNameResolver() ?? new DnBindNameResolver();
+
+        return new PasswordAuthenticator(
+            $nameResolver,
+            $backend
+        );
     }
 
     /**

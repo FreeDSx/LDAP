@@ -43,10 +43,16 @@ final class DnBindNameResolverTest extends TestCase
             ->with(new Dn('cn=Alice,dc=example,dc=com'))
             ->willReturn($entry);
 
-        $subject = new DnBindNameResolver($this->mockBackend);
-        $result = $subject->resolve('cn=Alice,dc=example,dc=com');
+        $subject = new DnBindNameResolver();
+        $result = $subject->resolve(
+            'cn=Alice,dc=example,dc=com',
+            $this->mockBackend
+        );
 
-        self::assertSame($entry, $result);
+        self::assertSame(
+            $entry,
+            $result
+        );
     }
 
     public function test_resolve_returns_null_when_entry_not_found(): void
@@ -55,8 +61,8 @@ final class DnBindNameResolverTest extends TestCase
             ->method('get')
             ->willReturn(null);
 
-        $subject = new DnBindNameResolver($this->mockBackend);
-        $result = $subject->resolve('cn=Unknown,dc=example,dc=com');
+        $subject = new DnBindNameResolver();
+        $result = $subject->resolve('cn=Unknown,dc=example,dc=com', $this->mockBackend);
 
         self::assertNull($result);
     }

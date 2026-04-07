@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
@@ -376,6 +377,23 @@ final class ServerOptionsTest extends TestCase
         self::assertSame(
             $authenticator,
             $this->subject->getPasswordAuthenticator()
+        );
+    }
+
+    public function test_bind_name_resolver_is_null_by_default(): void
+    {
+        self::assertNull($this->subject->getBindNameResolver());
+    }
+
+    public function test_it_can_set_bind_name_resolver(): void
+    {
+        $resolver = $this->createMock(BindNameResolverInterface::class);
+
+        $this->subject->setBindNameResolver($resolver);
+
+        self::assertSame(
+            $resolver,
+            $this->subject->getBindNameResolver()
         );
     }
 

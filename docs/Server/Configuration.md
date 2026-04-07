@@ -15,6 +15,7 @@ LDAP Server Configuration
     * [ServerOptions:setBackend](#setbackend)
     * [ServerOptions:setFilterEvaluator](#setfilterevaluator)
     * [ServerOptions:setRootDseHandler](#setrootdsehandler)
+    * [ServerOptions:setBindNameResolver](#setbindnameresolver)
 * [RootDSE Options](#rootdse-options)
     * [ServerOptions:setDseNamingContexts](#setdsenamingcontexts)
     * [ServerOptions:setDseAltServer](#setdsealtserver)
@@ -214,6 +215,48 @@ $server = new LdapServer(
 ```
 
 **Default**: `null`
+
+------------------
+#### setBindNameResolver
+
+This should be an object instance that implements `FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface`.
+It translates a raw LDAP bind name into an `Entry` so the built-in `PasswordAuthenticator` can locate and verify credentials.
+
+The default resolver (`DnBindNameResolver`) treats the bind name as a literal DN and delegates to `LdapBackendInterface::get()`.
+Supply a custom resolver when clients bind with something other than a full DN — for example, a bare username or an email address:
+
+```php
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Entry\Entry;
+
+class UidBindNameResolver implements BindNameResolverInterface
+{
+    public function resolve(
+        string $name,
+        LdapBackendInterface $backend
+    ): ?Entry {
+        // Search for an entry whose uid attribute matches the bind name
+        // ...
+    }
+}
+```
+
+```php
+use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\LdapServer;
+
+$server = new LdapServer(
+    (new ServerOptions)
+        ->setBackend(new MyDirectoryBackend())
+        ->setBindNameResolver(new UidBindNameResolver())
+);
+```
+
+**Note**: This option is only used when the built-in `PasswordAuthenticator` is active. If you provide a fully custom
+authenticator via `setPasswordAuthenticator()`, name resolution is entirely your responsibility and this option has no effect.
+
+**Default**: `null` (`DnBindNameResolver` is used, treating the bind name as a literal DN)
 
 ## RootDSE Options
 

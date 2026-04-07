@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
@@ -111,6 +112,8 @@ final class ServerOptions
     private ?LdapBackendInterface $backend = null;
 
     private ?PasswordAuthenticatableInterface $passwordAuthenticator = null;
+
+    private ?BindNameResolverInterface $bindNameResolver = null;
 
     private ?RootDseHandlerInterface $rootDseHandler = null;
 
@@ -355,6 +358,18 @@ final class ServerOptions
     public function setPasswordAuthenticator(?PasswordAuthenticatableInterface $passwordAuthenticator): self
     {
         $this->passwordAuthenticator = $passwordAuthenticator;
+
+        return $this;
+    }
+
+    public function getBindNameResolver(): ?BindNameResolverInterface
+    {
+        return $this->bindNameResolver;
+    }
+
+    public function setBindNameResolver(?BindNameResolverInterface $bindNameResolver): self
+    {
+        $this->bindNameResolver = $bindNameResolver;
 
         return $this;
     }

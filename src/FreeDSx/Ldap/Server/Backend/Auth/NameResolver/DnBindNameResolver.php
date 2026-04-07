@@ -21,21 +21,14 @@ use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
  * The default bind-name resolver. Treats the bind name as a DN and delegates
  * to LdapBackendInterface::get().
  *
- * This covers the common convention where clients bind with a full DN such as
- * "cn=admin,dc=example,dc=com". For non-DN bind names (email addresses, bare
- * usernames, etc.) provide a custom BindNameResolverInterface implementation.
- *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final class DnBindNameResolver implements BindNameResolverInterface
 {
-    public function __construct(
-        private readonly LdapBackendInterface $backend,
-    ) {
-    }
-
-    public function resolve(string $name): ?Entry
-    {
-        return $this->backend->get(new Dn($name));
+    public function resolve(
+        string $name,
+        LdapBackendInterface $backend,
+    ): ?Entry {
+        return $backend->get(new Dn($name));
     }
 }
