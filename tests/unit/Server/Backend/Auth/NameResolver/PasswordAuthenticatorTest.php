@@ -107,4 +107,86 @@ final class PasswordAuthenticatorTest extends TestCase
             $this->subject($entry)->verifyPassword('cn=Test,dc=example,dc=com', 'wrong')
         );
     }
+
+    public function test_returns_true_for_correct_ssha_password(): void
+    {
+        $salt = 'salt';
+        $hashed = '{SSHA}' . base64_encode(sha1('mypassword' . $salt, true) . $salt);
+        $entry = new Entry(
+            new Dn('cn=Test,dc=example,dc=com'),
+            new Attribute('userPassword', $hashed),
+        );
+
+        self::assertTrue(
+            $this->subject($entry)->verifyPassword('cn=Test,dc=example,dc=com', 'mypassword')
+        );
+    }
+
+    public function test_returns_false_for_wrong_ssha_password(): void
+    {
+        $salt = 'salt';
+        $hashed = '{SSHA}' . base64_encode(sha1('mypassword' . $salt, true) . $salt);
+        $entry = new Entry(
+            new Dn('cn=Test,dc=example,dc=com'),
+            new Attribute('userPassword', $hashed),
+        );
+
+        self::assertFalse(
+            $this->subject($entry)->verifyPassword('cn=Test,dc=example,dc=com', 'wrong')
+        );
+    }
+
+    public function test_returns_true_for_correct_md5_password(): void
+    {
+        $hashed = '{MD5}' . base64_encode(md5('mypassword', true));
+        $entry = new Entry(
+            new Dn('cn=Test,dc=example,dc=com'),
+            new Attribute('userPassword', $hashed),
+        );
+
+        self::assertTrue(
+            $this->subject($entry)->verifyPassword('cn=Test,dc=example,dc=com', 'mypassword')
+        );
+    }
+
+    public function test_returns_false_for_wrong_md5_password(): void
+    {
+        $hashed = '{MD5}' . base64_encode(md5('mypassword', true));
+        $entry = new Entry(
+            new Dn('cn=Test,dc=example,dc=com'),
+            new Attribute('userPassword', $hashed),
+        );
+
+        self::assertFalse(
+            $this->subject($entry)->verifyPassword('cn=Test,dc=example,dc=com', 'wrong')
+        );
+    }
+
+    public function test_returns_true_for_correct_smd5_password(): void
+    {
+        $salt = 'salt';
+        $hashed = '{SMD5}' . base64_encode(md5('mypassword' . $salt, true) . $salt);
+        $entry = new Entry(
+            new Dn('cn=Test,dc=example,dc=com'),
+            new Attribute('userPassword', $hashed),
+        );
+
+        self::assertTrue(
+            $this->subject($entry)->verifyPassword('cn=Test,dc=example,dc=com', 'mypassword')
+        );
+    }
+
+    public function test_returns_false_for_wrong_smd5_password(): void
+    {
+        $salt = 'salt';
+        $hashed = '{SMD5}' . base64_encode(md5('mypassword' . $salt, true) . $salt);
+        $entry = new Entry(
+            new Dn('cn=Test,dc=example,dc=com'),
+            new Attribute('userPassword', $hashed),
+        );
+
+        self::assertFalse(
+            $this->subject($entry)->verifyPassword('cn=Test,dc=example,dc=com', 'wrong')
+        );
+    }
 }

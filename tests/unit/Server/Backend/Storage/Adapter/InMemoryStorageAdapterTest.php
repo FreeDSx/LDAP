@@ -203,6 +203,55 @@ final class InMemoryStorageAdapterTest extends TestCase
         ));
     }
 
+    public function test_add_throws_entry_already_exists(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::ENTRY_ALREADY_EXISTS);
+
+        $this->subject->add(new AddCommand($this->alice));
+    }
+
+    public function test_update_add_value_to_existing_attribute(): void
+    {
+        $this->subject->update(new UpdateCommand(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_ADD, 'cn', 'Alicia')],
+        ));
+
+        $entry = $this->subject->get(new Dn('cn=Alice,dc=example,dc=com'));
+        self::assertNotNull($entry);
+
+        $cn = $entry->get('cn');
+        self::assertNotNull($cn);
+
+        self::assertTrue($cn->has('Alice'));
+        self::assertTrue($cn->has('Alicia'));
+    }
+
+    public function test_update_delete_specific_attribute_value(): void
+    {
+        $this->subject->update(new UpdateCommand(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_DELETE, 'userPassword', 'secret')],
+        ));
+
+        $entry = $this->subject->get(new Dn('cn=Alice,dc=example,dc=com'));
+
+        self::assertFalse($entry?->get('userPassword')?->has('secret') ?? false);
+    }
+
+    public function test_update_replace_with_no_values_clears_attribute(): void
+    {
+        $this->subject->update(new UpdateCommand(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_REPLACE, 'userPassword')],
+        ));
+
+        self::assertNull(
+            $this->subject->get(new Dn('cn=Alice,dc=example,dc=com'))?->get('userPassword')
+        );
+    }
+
     public function test_move_throws_no_such_object_for_missing_entry(): void
     {
         self::expectException(OperationException::class);
@@ -214,6 +263,22 @@ final class InMemoryStorageAdapterTest extends TestCase
             true,
             null,
         ));
+    }
+
+    public function test_move_creates_new_rdn_attribute_when_it_does_not_exist_in_entry(): void
+    {
+        // Alice has no 'uid' attribute; renaming to uid=alice should create it.
+        $this->subject->move(new MoveCommand(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            Rdn::create('uid=alice'),
+            false,
+            null,
+        ));
+
+        $entry = $this->subject->get(new Dn('uid=alice,dc=example,dc=com'));
+
+        self::assertNotNull($entry);
+        self::assertTrue($entry->get('uid')?->has('alice'));
     }
 
     public function test_move_to_new_parent(): void

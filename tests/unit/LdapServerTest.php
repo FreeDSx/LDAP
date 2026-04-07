@@ -13,11 +13,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap;
 
-use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
-use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
@@ -173,6 +174,49 @@ class LdapServerTest extends TestCase
         $this->subject->run();
 
         $this->expectNotToPerformAssertions();
+    }
+
+    public function test_it_should_use_the_password_authenticator_specified(): void
+    {
+        $authenticator = $this->createMock(PasswordAuthenticatableInterface::class);
+
+        $this->subject->usePasswordAuthenticator($authenticator);
+
+        self::assertSame(
+            $authenticator,
+            $this->subject->getOptions()->getPasswordAuthenticator()
+        );
+    }
+
+    public function test_it_should_use_the_write_handler_specified(): void
+    {
+        $handler = $this->createMock(WriteHandlerInterface::class);
+
+        $this->subject->useWriteHandler($handler);
+
+        self::assertContains(
+            $handler,
+            $this->subject->getOptions()->getWriteHandlers()
+        );
+    }
+
+    public function test_it_should_use_the_filter_evaluator_specified(): void
+    {
+        $evaluator = $this->createMock(FilterEvaluatorInterface::class);
+
+        $this->subject->useFilterEvaluator($evaluator);
+
+        self::assertSame(
+            $evaluator,
+            $this->subject->getOptions()->getFilterEvaluator()
+        );
+    }
+
+    public function test_it_should_enable_swoole_runner(): void
+    {
+        $this->subject->useSwooleRunner();
+
+        self::assertTrue($this->subject->getOptions()->getUseSwooleRunner());
     }
 
     public function test_it_should_make_a_proxy_server(): void

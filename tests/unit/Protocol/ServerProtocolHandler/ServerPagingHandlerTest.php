@@ -259,6 +259,49 @@ class ServerPagingHandlerTest extends TestCase
         );
     }
 
+    public function test_it_sends_an_operations_error_when_the_paging_generator_has_expired(): void
+    {
+        // A paging request exists and has been processed, but its generator was never stored
+        // (simulating a session that expired or was evicted).
+        $searchRequest = $this->makeSearchRequest();
+
+        $pagingReq = new PagingRequest(
+            new PagingControl(10, ''),
+            $searchRequest,
+            new ControlBag(),
+            'expiredcookie',
+        );
+        $pagingReq->markProcessed();
+        $this->requestHistory->pagingRequest()->add($pagingReq);
+
+        $message = $this->makeSearchMessage(
+            cookie: 'expiredcookie',
+            searchRequest: $searchRequest,
+        );
+
+        $this->mockBackend
+            ->expects(self::never())
+            ->method('search');
+
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage')
+            ->with(self::callback(function (LdapMessageResponse $response): bool {
+                $paging = $response->controls()->get(Control::OID_PAGING);
+                $done = $response->getResponse();
+
+                return $paging instanceof PagingControl
+                    && $paging->getCookie() === ''
+                    && $done instanceof SearchResultDone
+                    && $done->getResultCode() === ResultCode::OPERATIONS_ERROR;
+            }));
+
+        $this->subject->handleRequest(
+            $message,
+            $this->mockToken
+        );
+    }
+
     public function test_it_throws_an_exception_if_the_paging_cookie_does_not_exist(): void
     {
         $message = $this->makeSearchMessage(
