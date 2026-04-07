@@ -63,6 +63,15 @@ final class PasswordAuthenticator implements PasswordAuthenticatableInterface
         return false;
     }
 
+    public function getPassword(
+        string $username,
+        string $mechanism,
+    ): ?string {
+        $entry = $this->nameResolver->resolve($username, $this->backend);
+
+        return $entry?->get('userPassword')?->getValues()[0] ?? null;
+    }
+
     /**
      * Verify a plain-text password against a (possibly hashed) stored value.
      *

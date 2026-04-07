@@ -197,4 +197,50 @@ final class PasswordAuthenticatorTest extends TestCase
             $this->subject($entry)->verifyPassword('cn=Test,dc=example,dc=com', 'wrong')
         );
     }
+
+    public function test_get_password_returns_null_when_entry_not_found(): void
+    {
+        self::assertNull(
+            $this->subject()->getPassword('unknown', 'SCRAM-SHA-256')
+        );
+    }
+
+    public function test_get_password_returns_null_when_entry_has_no_user_password(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'Alice'),
+        );
+
+        self::assertNull(
+            $this->subject($entry)->getPassword('cn=Alice,dc=example,dc=com', 'SCRAM-SHA-256')
+        );
+    }
+
+    public function test_get_password_returns_raw_value_for_plaintext_password(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('userPassword', 'secret'),
+        );
+
+        self::assertSame(
+            'secret',
+            $this->subject($entry)->getPassword('cn=Alice,dc=example,dc=com', 'SCRAM-SHA-256')
+        );
+    }
+
+    public function test_get_password_returns_raw_value_for_hashed_password(): void
+    {
+        $hashed = '{SHA}' . base64_encode(sha1('secret', true));
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('userPassword', $hashed),
+        );
+
+        self::assertSame(
+            $hashed,
+            $this->subject($entry)->getPassword('cn=Alice,dc=example,dc=com', 'SCRAM-SHA-256')
+        );
+    }
 }

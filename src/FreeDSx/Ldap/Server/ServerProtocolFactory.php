@@ -57,7 +57,7 @@ class ServerProtocolFactory
                 authenticator: $passwordAuthenticator,
                 sasl: new Sasl(['supported' => $saslMechanisms]),
                 mechanisms: $saslMechanisms,
-                optionsBuilderFactory: new MechanismOptionsBuilderFactory($backend),
+                optionsBuilderFactory: new MechanismOptionsBuilderFactory($passwordAuthenticator),
             );
         }
 

@@ -16,20 +16,20 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\ScramMechanismOptionsBuilder;
-use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Sasl\Mechanism\ScramMechanism;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class ScramMechanismOptionsBuilderTest extends TestCase
 {
-    private SaslHandlerInterface&MockObject $mockHandler;
+    private PasswordAuthenticatableInterface&MockObject $mockHandler;
 
     private ScramMechanismOptionsBuilder $subject;
 
     protected function setUp(): void
     {
-        $this->mockHandler = $this->createMock(SaslHandlerInterface::class);
+        $this->mockHandler = $this->createMock(PasswordAuthenticatableInterface::class);
         $this->subject = new ScramMechanismOptionsBuilder($this->mockHandler);
     }
 

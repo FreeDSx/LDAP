@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder;
 
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Sasl\Mechanism\ScramMechanism;
 
 /**
@@ -33,7 +33,7 @@ class ScramMechanismOptionsBuilder implements MechanismOptionsBuilderInterface
 
     private ?string $username = null;
 
-    public function __construct(private readonly SaslHandlerInterface $handler)
+    public function __construct(private readonly PasswordAuthenticatableInterface $handler)
     {
     }
 

@@ -56,12 +56,14 @@ class SaslBind implements BindInterface
         private readonly ResponseFactory $responseFactory = new ResponseFactory(),
         private readonly SaslUsernameExtractorFactory $usernameExtractorFactory = new SaslUsernameExtractorFactory(),
         ?SaslExchange $exchange = null,
-        MechanismOptionsBuilderFactory $optionsBuilderFactory = new MechanismOptionsBuilderFactory(),
+        ?MechanismOptionsBuilderFactory $optionsBuilderFactory = null,
     ) {
+        $factory = $optionsBuilderFactory ?? new MechanismOptionsBuilderFactory($this->authenticator);
+
         $this->exchange = $exchange ?? new SaslExchange(
             $this->queue,
             $this->responseFactory,
-            $optionsBuilderFactory,
+            $factory,
             $this->authenticator,
         );
     }

@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder;
 
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\UsernameExtractor\SaslUsernameExtractorInterface;
 use FreeDSx\Sasl\Mechanism\DigestMD5Mechanism;
 
@@ -28,7 +28,7 @@ class DigestMD5MechanismOptionsBuilder implements MechanismOptionsBuilderInterfa
     use RequiresPasswordTrait;
 
     public function __construct(
-        private readonly SaslHandlerInterface $handler,
+        private readonly PasswordAuthenticatableInterface $handler,
         private readonly SaslUsernameExtractorInterface $usernameExtractor,
     ) {
     }

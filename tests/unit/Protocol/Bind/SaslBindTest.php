@@ -19,22 +19,14 @@ use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
 use FreeDSx\Ldap\Protocol\Bind\SaslBind;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-
-/**
- * Combined interface so PHPUnit can mock both at once.
- */
-interface SaslBackendInterface extends LdapBackendInterface, SaslHandlerInterface {}
 
 final class SaslBindTest extends TestCase
 {
@@ -106,28 +98,6 @@ final class SaslBindTest extends TestCase
         ));
     }
 
-    public function test_it_throws_when_challenge_based_mechanism_is_used_without_sasl_handler(): void
-    {
-        $subject = new SaslBind(
-            queue: $this->mockQueue,
-            authenticator: $this->mockAuthenticator,
-            mechanisms: [ServerOptions::SASL_CRAM_MD5],
-            optionsBuilderFactory: new MechanismOptionsBuilderFactory($this->createMock(LdapBackendInterface::class)),
-        );
-
-        $this->mockQueue
-            ->expects(self::never())
-            ->method('sendMessage');
-
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::OTHER);
-
-        $subject->bind(new LdapMessageRequest(
-            1,
-            new SaslBindRequest('CRAM-MD5'),
-        ));
-    }
-
     public function test_it_can_authenticate_with_plain(): void
     {
         // PLAIN credential format: "authzid\x00authcid\x00passwd" (all three parts must be non-empty)
@@ -177,19 +147,15 @@ final class SaslBindTest extends TestCase
 
     public function test_challenge_mechanism_sends_invalid_credentials_on_authentication_failure(): void
     {
-        /** @var SaslBackendInterface&MockObject $mockSaslBackend */
-        $mockSaslBackend = $this->createMock(SaslBackendInterface::class);
-
         $subject = new SaslBind(
             queue: $this->mockQueue,
             authenticator: $this->mockAuthenticator,
             mechanisms: [ServerOptions::SASL_CRAM_MD5],
-            optionsBuilderFactory: new MechanismOptionsBuilderFactory($mockSaslBackend),
         );
 
         // Return a real password so the HMAC callable runs; the client digest is wrong so
         // the challenge will set isAuthenticated=false and isComplete=true.
-        $mockSaslBackend
+        $this->mockAuthenticator
             ->method('getPassword')
             ->willReturn('correctpassword');
 
@@ -235,14 +201,10 @@ final class SaslBindTest extends TestCase
 
     public function test_it_throws_protocol_error_when_non_sasl_request_received_during_exchange(): void
     {
-        /** @var SaslBackendInterface&MockObject $mockSaslBackend */
-        $mockSaslBackend = $this->createMock(SaslBackendInterface::class);
-
         $subject = new SaslBind(
             queue: $this->mockQueue,
             authenticator: $this->mockAuthenticator,
             mechanisms: [ServerOptions::SASL_CRAM_MD5],
-            optionsBuilderFactory: new MechanismOptionsBuilderFactory($mockSaslBackend),
         );
 
         // First sendMessage is the SASL_BIND_IN_PROGRESS challenge; second is the error response.

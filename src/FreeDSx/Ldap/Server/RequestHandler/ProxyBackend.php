@@ -86,8 +86,16 @@ class ProxyBackend implements WritableLdapBackendInterface, PasswordAuthenticata
         try {
             return (bool) $this->ldap()->bind($name, $password);
         } catch (BindException $e) {
-            throw new OperationException($e->getMessage(), $e->getCode());
+            throw new OperationException(
+                $e->getMessage(),
+                $e->getCode(),
+            );
         }
+    }
+
+    public function getPassword(string $username, string $mechanism): ?string
+    {
+        return null;
     }
 
     public function add(AddCommand $command): void

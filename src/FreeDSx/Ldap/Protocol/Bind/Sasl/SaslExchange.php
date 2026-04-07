@@ -50,7 +50,7 @@ final class SaslExchange
     public function run(SaslExchangeInput $input): SaslExchangeResult
     {
         $mechName = $input->getMechName();
-        $optionsBuilder = $this->optionsBuilderFactory->make($mechName, $this->authenticator);
+        $optionsBuilder = $this->optionsBuilderFactory->make($mechName);
         $challenge = $input->getChallenge();
         $message = $input->getInitialMessage();
         $received = $input->getInitialCredentials();

@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap;
 
-use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
@@ -21,17 +20,11 @@ use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
-use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
-
-/**
- * Combined interface so PHPUnit can mock a backend that also handles SASL.
- */
-interface SaslBackendInterface extends LdapBackendInterface, SaslHandlerInterface {}
 
 class LdapServerTest extends TestCase
 {
@@ -127,43 +120,7 @@ class LdapServerTest extends TestCase
         );
     }
 
-    public function test_it_throws_when_challenge_mechanisms_are_configured_without_a_backend(): void
-    {
-        $this->options->setSaslMechanisms(ServerOptions::SASL_CRAM_MD5);
-
-        self::expectException(InvalidArgumentException::class);
-
-        $this->subject->run();
-    }
-
-    public function test_it_throws_when_challenge_mechanisms_are_configured_with_a_non_sasl_backend(): void
-    {
-        $this->options
-            ->setSaslMechanisms(ServerOptions::SASL_CRAM_MD5)
-            ->setBackend($this->createMock(LdapBackendInterface::class));
-
-        self::expectException(InvalidArgumentException::class);
-
-        $this->subject->run();
-    }
-
-    public function test_it_does_not_throw_when_challenge_mechanisms_are_configured_with_a_sasl_backend(): void
-    {
-        /** @var LdapBackendInterface&SaslHandlerInterface&MockObject $mockSaslBackend */
-        $mockSaslBackend = $this->createMock(SaslBackendInterface::class);
-
-        $this->mockServerRunner->method('run');
-
-        $this->options
-            ->setSaslMechanisms(ServerOptions::SASL_CRAM_MD5)
-            ->setBackend($mockSaslBackend);
-
-        $this->subject->run();
-
-        $this->expectNotToPerformAssertions();
-    }
-
-    public function test_it_does_not_throw_for_plain_mechanism_without_a_sasl_backend(): void
+    public function test_it_does_not_throw_for_sasl_mechanisms_without_a_sasl_backend(): void
     {
         $this->mockServerRunner->method('run');
 

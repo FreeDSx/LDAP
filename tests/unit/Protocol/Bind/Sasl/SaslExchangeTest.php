@@ -33,9 +33,8 @@ final class SaslExchangeTest extends TestCase
 {
     /**
      * Using 'PLAIN' as the mechanism name so that the real MechanismOptionsBuilderFactory
-     * can produce a PlainMechanismOptionsBuilder (which only requires LdapBackendInterface,
-     * not SaslHandlerInterface). The mock challenge ignores the option array, so the
-     * specific mechanism does not affect the exchange-loop behavior under test.
+     * can produce a PlainMechanismOptionsBuilder. The mock challenge ignores the option
+     * array, so the specific mechanism does not affect the exchange-loop behavior under test.
      */
     private const MECH = 'PLAIN';
 
@@ -50,11 +49,13 @@ final class SaslExchangeTest extends TestCase
         $this->mockQueue = $this->createMock(ServerQueue::class);
         $this->mockChallenge = $this->createMock(ChallengeInterface::class);
 
+        $mockAuthenticator = $this->createMock(PasswordAuthenticatableInterface::class);
+
         $this->subject = new SaslExchange(
             queue: $this->mockQueue,
             responseFactory: new ResponseFactory(),
-            optionsBuilderFactory: new MechanismOptionsBuilderFactory(),
-            authenticator: $this->createMock(PasswordAuthenticatableInterface::class),
+            optionsBuilderFactory: new MechanismOptionsBuilderFactory($mockAuthenticator),
+            authenticator: $mockAuthenticator,
         );
     }
 

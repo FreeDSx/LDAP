@@ -13,13 +13,11 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
-use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
-use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -47,12 +45,9 @@ class LdapServer
      * Runs the LDAP server. Binds the socket and starts accepting client connections.
      *
      * @throws ConnectionException
-     * @throws InvalidArgumentException
      */
     public function run(): void
     {
-        $this->validateSaslConfiguration();
-
         $runner = $this->options->getServerRunner() ?? $this->container->get(ServerRunnerInterface::class);
 
         $runner->run();
@@ -154,33 +149,6 @@ class LdapServer
         $this->options->setUseSwooleRunner(true);
 
         return $this;
-    }
-
-    /**
-     * Validates that the SASL configuration is consistent before the server starts.
-     *
-     * @throws InvalidArgumentException
-     */
-    private function validateSaslConfiguration(): void
-    {
-        $challengeMechanisms = array_diff(
-            $this->options->getSaslMechanisms(),
-            [ServerOptions::SASL_PLAIN],
-        );
-
-        if (empty($challengeMechanisms)) {
-            return;
-        }
-
-        $backend = $this->options->getBackend();
-
-        if (!$backend instanceof SaslHandlerInterface) {
-            throw new InvalidArgumentException(sprintf(
-                'The SASL mechanism(s) [%s] require the backend to implement %s.',
-                implode(', ', $challengeMechanisms),
-                SaslHandlerInterface::class,
-            ));
-        }
     }
 
     /**

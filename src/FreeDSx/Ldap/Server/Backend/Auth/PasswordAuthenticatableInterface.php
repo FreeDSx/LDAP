@@ -16,11 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Auth;
 use SensitiveParameter;
 
 /**
- * Implemented by anything that can verify a bind password.
- *
- * Decoupled from LdapBackendInterface so that backends are not forced to
- * provide authentication logic. The framework supplies a default
- * PasswordAuthenticator that delegates entry lookup to any LdapBackendInterface.
+ * Implemented by anything that can handle bind authentication.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -36,4 +32,13 @@ interface PasswordAuthenticatableInterface
         #[SensitiveParameter]
         string $password,
     ): bool;
+
+    /**
+     * Return the plaintext password for the given username and SASL mechanism,
+     * or null if the user does not exist or should not authenticate.
+     */
+    public function getPassword(
+        string $username,
+        string $mechanism,
+    ): ?string;
 }
