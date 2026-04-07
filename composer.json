@@ -29,7 +29,8 @@
     "squizlabs/php_codesniffer": "^3.7",
     "slevomat/coding-standard": "^7.2",
     "phpstan/phpstan-phpunit": "^2.0",
-    "phpstan/extension-installer": "^1.4"
+    "phpstan/extension-installer": "^1.4",
+    "swoole/ide-helper": "^6.0"
   },
   "suggest": {
     "ext-openssl": "For SSL/TLS support and some SASL mechanisms.",
