@@ -24,7 +24,6 @@ use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Sasl\SaslContext;
 
 /**
@@ -38,7 +37,6 @@ final class SaslExchange
         private readonly ServerQueue $queue,
         private readonly ResponseFactory $responseFactory,
         private readonly MechanismOptionsBuilderFactory $optionsBuilderFactory,
-        private readonly PasswordAuthenticatableInterface $authenticator,
     ) {
     }
 

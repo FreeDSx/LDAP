@@ -55,7 +55,6 @@ final class SaslExchangeTest extends TestCase
             queue: $this->mockQueue,
             responseFactory: new ResponseFactory(),
             optionsBuilderFactory: new MechanismOptionsBuilderFactory($mockAuthenticator),
-            authenticator: $mockAuthenticator,
         );
     }
 

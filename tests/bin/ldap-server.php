@@ -13,12 +13,11 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WritableBackendTrait;
 use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
-use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
 use FreeDSx\Ldap\ServerOptions;
 
 require __DIR__ . '/../../vendor/autoload.php';
 
-class LdapServerBackend implements WritableLdapBackendInterface, SaslHandlerInterface, PasswordAuthenticatableInterface
+class LdapServerBackend implements WritableLdapBackendInterface, PasswordAuthenticatableInterface
 {
     use WritableBackendTrait;
 
