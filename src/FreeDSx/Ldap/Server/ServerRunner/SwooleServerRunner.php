@@ -51,11 +51,6 @@ class SwooleServerRunner implements ServerRunnerInterface
 {
     use ServerRunnerLoggerTrait;
 
-    /**
-     * Seconds to wait for a new client before re-checking the server connection state.
-     */
-    private const SOCKET_ACCEPT_TIMEOUT = 0.5;
-
     private SocketServer $server;
 
     private bool $isShuttingDown = false;
@@ -182,7 +177,7 @@ class SwooleServerRunner implements ServerRunnerInterface
 
         while (!$this->isShuttingDown) {
             try {
-                $socket = $this->server->accept(self::SOCKET_ACCEPT_TIMEOUT);
+                $socket = $this->server->accept($this->options->getSocketAcceptTimeout());
             } catch (Throwable $e) {
                 $this->options->getLogger()?->error(
                     'SwooleServerRunner: accept() failed: ' . $e->getMessage()

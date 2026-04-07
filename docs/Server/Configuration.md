@@ -10,6 +10,7 @@ LDAP Server Configuration
     * [ServerOptions:setIdleTimeout](#setidletimeout)
     * [ServerOptions:setRequireAuthentication](#setrequireauthentication)
     * [ServerOptions:setAllowAnonymous](#setallowanonymous)
+    * [ServerOptions:setSocketAcceptTimeout](#setsocketaccepttimeout)
 * [Backend](#backend)
     * [ServerOptions:setBackend](#setbackend)
     * [ServerOptions:setFilterEvaluator](#setfilterevaluator)
@@ -122,6 +123,15 @@ Whether authentication (bind) should be required before an operation is allowed.
 Whether anonymous binds should be allowed.
 
 **Default**: `false`
+
+------------------
+#### setSocketAcceptTimeout
+
+The number of seconds (fractional) to wait for a new client connection before re-checking server state. Lower values
+make the server more responsive to shutdown signals and connection-limit changes at the cost of slightly more CPU usage
+in the accept loop.
+
+**Default**: `0.5`
 
 
 ## Backend

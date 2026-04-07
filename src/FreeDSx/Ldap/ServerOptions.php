@@ -133,6 +133,8 @@ final class ServerOptions
 
     private int $shutdownTimeout = 15;
 
+    private float $socketAcceptTimeout = 0.5;
+
     /**
      * @var string[]
      */
@@ -480,6 +482,21 @@ final class ServerOptions
     public function setShutdownTimeout(int $shutdownTimeout): self
     {
         $this->shutdownTimeout = $shutdownTimeout;
+
+        return $this;
+    }
+
+    /**
+     * Seconds (fractional) to wait for a new client connection before re-checking server state.
+     */
+    public function getSocketAcceptTimeout(): float
+    {
+        return $this->socketAcceptTimeout;
+    }
+
+    public function setSocketAcceptTimeout(float $socketAcceptTimeout): self
+    {
+        $this->socketAcceptTimeout = $socketAcceptTimeout;
 
         return $this;
     }

@@ -34,11 +34,6 @@ class PcntlServerRunner implements ServerRunnerInterface
 {
     use ServerRunnerLoggerTrait;
 
-    /**
-     * The time to wait, in seconds, before we run some clean-up tasks to then wait again.
-     */
-    private const SOCKET_ACCEPT_TIMEOUT = 0.5;
-
     private SocketServer $server;
 
     /**
@@ -150,7 +145,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         $this->options->getOnServerReady()?->__invoke();
 
         do {
-            $socket = $this->server->accept(self::SOCKET_ACCEPT_TIMEOUT);
+            $socket = $this->server->accept($this->options->getSocketAcceptTimeout());
 
             if ($this->isShuttingDown) {
                 if ($socket) {

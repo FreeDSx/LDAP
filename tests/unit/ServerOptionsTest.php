@@ -482,6 +482,24 @@ final class ServerOptionsTest extends TestCase
         self::assertTrue($this->subject->getUseSwooleRunner());
     }
 
+    public function test_socket_accept_timeout_defaults_to_half_second(): void
+    {
+        self::assertSame(
+            0.5,
+            $this->subject->getSocketAcceptTimeout()
+        );
+    }
+
+    public function test_it_can_set_socket_accept_timeout(): void
+    {
+        $this->subject->setSocketAcceptTimeout(1.0);
+
+        self::assertSame(
+            1.0,
+            $this->subject->getSocketAcceptTimeout()
+        );
+    }
+
     public function test_on_server_ready_is_null_by_default(): void
     {
         self::assertNull($this->subject->getOnServerReady());
