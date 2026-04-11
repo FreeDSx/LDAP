@@ -16,6 +16,8 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
@@ -412,17 +414,15 @@ final class FilterEvaluatorTest extends TestCase
         ));
     }
 
-    public function test_matching_rule_unknown_returns_false(): void
+    public function test_matching_rule_unknown_throws_inappropriate_matching(): void
     {
-        $filter = new MatchingRuleFilter(
-            '1.2.3.4.5.unknown',
-            'cn',
-            'Alice',
-        );
-        self::assertFalse($this->subject->evaluate(
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INAPPROPRIATE_MATCHING);
+
+        $this->subject->evaluate(
             $this->entry,
-            $filter
-        ));
+            new MatchingRuleFilter('1.2.3.4.5.unknown', 'cn', 'Alice'),
+        );
     }
 
     public function test_matching_rule_dn_attributes(): void
@@ -454,11 +454,14 @@ final class FilterEvaluatorTest extends TestCase
         ));
     }
 
-    public function test_unknown_filter_type_returns_false(): void
+    public function test_unknown_filter_type_throws_protocol_error(): void
     {
-        self::assertFalse($this->subject->evaluate(
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::PROTOCOL_ERROR);
+
+        $this->subject->evaluate(
             $this->entry,
-            $this->createMock(FilterInterface::class)
-        ));
+            $this->createMock(FilterInterface::class),
+        );
     }
 }

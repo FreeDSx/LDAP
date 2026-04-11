@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage;
 
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
@@ -61,7 +63,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             $filter instanceof LessThanOrEqualFilter => $this->evaluateLessOrEqual($entry, $filter),
             $filter instanceof ApproximateFilter => $this->evaluateApproximate($entry, $filter),
             $filter instanceof MatchingRuleFilter => $this->evaluateMatchingRule($entry, $filter),
-            default => false,
+            default => throw new OperationException(
+                sprintf('Unrecognized filter type: %s', get_class($filter)),
+                ResultCode::PROTOCOL_ERROR,
+            ),
         };
     }
 
@@ -309,7 +314,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             self::MATCHING_RULE_CASE_EXACT => $value === $filterValue,
             self::MATCHING_RULE_BIT_AND => ((int) $value & (int) $filterValue) === (int) $filterValue,
             self::MATCHING_RULE_BIT_OR => ((int) $value & (int) $filterValue) !== 0,
-            default => false,
+            default => throw new OperationException(
+                sprintf('Unsupported matching rule: %s', $rule),
+                ResultCode::INAPPROPRIATE_MATCHING,
+            ),
         };
     }
 }
