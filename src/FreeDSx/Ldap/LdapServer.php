@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -80,6 +81,16 @@ class LdapServer
     public function useBackend(LdapBackendInterface $backend): self
     {
         $this->options->setBackend($backend);
+
+        return $this;
+    }
+
+    /**
+     * Override the bind name resolver used to translate a raw bind name to an Entry.
+     */
+    public function useBindNameResolver(BindNameResolverInterface $resolver): self
+    {
+        $this->options->setBindNameResolver($resolver);
 
         return $this;
     }

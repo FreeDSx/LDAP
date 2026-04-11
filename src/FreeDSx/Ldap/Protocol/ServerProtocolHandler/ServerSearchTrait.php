@@ -106,6 +106,8 @@ trait ServerSearchTrait
             filter: $request->getFilter(),
             attributes: $request->getAttributes(),
             typesOnly: $request->getAttributesOnly(),
+            sizeLimit: $request->getSizeLimit(),
+            timeLimit: $request->getTimeLimit(),
         );
     }
 

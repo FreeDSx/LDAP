@@ -38,6 +38,8 @@ final class SearchContext
         readonly public FilterInterface $filter,
         readonly public array $attributes,
         readonly public bool $typesOnly,
+        readonly public int $sizeLimit = 0,
+        readonly public int $timeLimit = 0,
     ) {
     }
 }
