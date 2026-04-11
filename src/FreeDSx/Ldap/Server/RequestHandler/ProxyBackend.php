@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WritableBackendTrait;
 use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
@@ -76,6 +77,17 @@ class ProxyBackend implements WritableLdapBackendInterface, PasswordAuthenticata
     public function get(Dn $dn): ?Entry
     {
         return $this->ldap()->read($dn->toString());
+    }
+
+    public function compare(
+        Dn $dn,
+        EqualityFilter $filter,
+    ): bool {
+        return $this->ldap()->compare(
+            $dn,
+            $filter->getAttribute(),
+            $filter->getValue(),
+        );
     }
 
     public function verifyPassword(

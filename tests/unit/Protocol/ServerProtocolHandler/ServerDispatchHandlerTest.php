@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
@@ -23,9 +24,9 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
@@ -41,8 +42,6 @@ final class ServerDispatchHandlerTest extends TestCase
 
     private WriteHandlerInterface&MockObject $mockWriteHandler;
 
-    private FilterEvaluatorInterface&MockObject $mockFilterEvaluator;
-
     private ServerQueue&MockObject $mockQueue;
 
     private TokenInterface&MockObject $mockToken;
@@ -53,7 +52,6 @@ final class ServerDispatchHandlerTest extends TestCase
         $this->mockQueue = $this->createMock(ServerQueue::class);
         $this->mockBackend = $this->createMock(LdapBackendInterface::class);
         $this->mockWriteHandler = $this->createMock(WriteHandlerInterface::class);
-        $this->mockFilterEvaluator = $this->createMock(FilterEvaluatorInterface::class);
 
         $this->mockQueue
             ->method('sendMessage')
@@ -66,7 +64,6 @@ final class ServerDispatchHandlerTest extends TestCase
         $this->subject = new ServerDispatchHandler(
             queue: $this->mockQueue,
             backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
             writeDispatcher: new WriteOperationDispatcher($this->mockWriteHandler),
         );
     }
@@ -100,10 +97,10 @@ final class ServerDispatchHandlerTest extends TestCase
         $this->subject->handleRequest($add, $this->mockToken);
     }
 
-    public function test_it_sends_a_compare_request_using_the_backend_and_filter_evaluator(): void
+    public function test_it_delegates_compare_to_the_backend(): void
     {
-        $entry = Entry::create('cn=foo,dc=bar');
-        $compare = new LdapMessageRequest(1, new CompareRequest('cn=foo,dc=bar', Filters::equal('foo', 'bar')));
+        $filter = Filters::equal('foo', 'bar');
+        $compare = new LdapMessageRequest(1, new CompareRequest('cn=foo,dc=bar', $filter));
 
         $this->mockWriteHandler
             ->expects(self::never())
@@ -111,24 +108,26 @@ final class ServerDispatchHandlerTest extends TestCase
 
         $this->mockBackend
             ->expects(self::once())
-            ->method('get')
-            ->willReturn($entry);
-
-        $this->mockFilterEvaluator
-            ->expects(self::once())
-            ->method('evaluate')
+            ->method('compare')
+            ->with(
+                self::isInstanceOf(Dn::class),
+                self::isInstanceOf(EqualityFilter::class),
+            )
             ->willReturn(true);
 
         $this->subject->handleRequest($compare, $this->mockToken);
     }
 
-    public function test_it_throws_no_such_object_when_comparing_a_non_existent_entry(): void
+    public function test_it_propagates_operation_exceptions_from_backend_compare(): void
     {
         $compare = new LdapMessageRequest(1, new CompareRequest('cn=foo,dc=bar', Filters::equal('foo', 'bar')));
 
         $this->mockBackend
-            ->method('get')
-            ->willReturn(null);
+            ->method('compare')
+            ->willThrowException(new OperationException(
+                'No such object: cn=foo,dc=bar',
+                ResultCode::NO_SUCH_OBJECT,
+            ));
 
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
@@ -141,7 +140,6 @@ final class ServerDispatchHandlerTest extends TestCase
         $subject = new ServerDispatchHandler(
             queue: $this->mockQueue,
             backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
             writeDispatcher: new WriteOperationDispatcher(),
         );
 

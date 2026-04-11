@@ -73,7 +73,6 @@ class ServerProtocolHandlerFactory
             return new ServerProtocolHandler\ServerDispatchHandler(
                 queue: $this->queue,
                 backend: $this->handlerFactory->makeBackend(),
-                filterEvaluator: $this->handlerFactory->makeFilterEvaluator(),
                 writeDispatcher: $this->handlerFactory->makeWriteDispatcher(),
             );
         }

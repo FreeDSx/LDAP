@@ -21,7 +21,6 @@ use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteCommandFactory;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -36,7 +35,6 @@ class ServerDispatchHandler implements ServerProtocolHandlerInterface
     public function __construct(
         private readonly ServerQueue $queue,
         private readonly LdapBackendInterface $backend,
-        private readonly FilterEvaluatorInterface $filterEvaluator,
         private readonly WriteOperationDispatcher $writeDispatcher,
         private readonly WriteCommandFactory $commandFactory = new WriteCommandFactory(),
         private readonly ResponseFactory $responseFactory = new ResponseFactory(),
@@ -55,10 +53,12 @@ class ServerDispatchHandler implements ServerProtocolHandlerInterface
         $request = $message->getRequest();
 
         if ($request instanceof Request\CompareRequest) {
-            $compareMatch = $this->handleCompare($request);
+            $match = $this->backend->compare($request->getDn(), $request->getFilter());
             $this->queue->sendMessage($this->responseFactory->getStandardResponse(
                 $message,
-                $compareMatch ? ResultCode::COMPARE_TRUE : ResultCode::COMPARE_FALSE,
+                $match
+                    ? ResultCode::COMPARE_TRUE
+                    : ResultCode::COMPARE_FALSE,
             ));
 
             return;
@@ -67,22 +67,5 @@ class ServerDispatchHandler implements ServerProtocolHandlerInterface
         $this->writeDispatcher->dispatch($this->commandFactory->fromRequest($request));
 
         $this->queue->sendMessage($this->responseFactory->getStandardResponse($message));
-    }
-
-    /**
-     * @throws OperationException
-     */
-    private function handleCompare(Request\CompareRequest $request): bool
-    {
-        $entry = $this->backend->get($request->getDn());
-
-        if ($entry === null) {
-            throw new OperationException(
-                sprintf('No such object: %s', $request->getDn()->toString()),
-                ResultCode::NO_SUCH_OBJECT,
-            );
-        }
-
-        return $this->filterEvaluator->evaluate($entry, $request->getFilter());
     }
 }

@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\Write\WritableBackendTrait;
 use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 use Generator;
@@ -54,6 +55,34 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
     public function get(Dn $dn): ?Entry
     {
         return $this->storage->find($dn->normalize());
+    }
+
+    /**
+     * @throws OperationException
+     */
+    public function compare(
+        Dn $dn,
+        EqualityFilter $filter,
+    ): bool {
+        $entry = $this->get($dn);
+
+        if ($entry === null) {
+            $this->throwNoSuchObject($dn);
+        }
+
+        $attribute = $entry->get($filter->getAttribute());
+
+        if ($attribute === null) {
+            return false;
+        }
+
+        foreach ($attribute->getValues() as $value) {
+            if (strcasecmp($value, $filter->getValue()) === 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function search(SearchContext $context): Generator

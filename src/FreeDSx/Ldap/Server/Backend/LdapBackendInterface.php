@@ -15,6 +15,8 @@ namespace FreeDSx\Ldap\Server\Backend;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use Generator;
 
 /**
@@ -49,4 +51,17 @@ interface LdapBackendInterface
      * Fetch a single entry by DN, or return null if it does not exist.
      */
     public function get(Dn $dn): ?Entry;
+
+    /**
+     * Evaluate a compare assertion against an entry.
+     *
+     * Return true if the attribute-value assertion matches, false if it does not.
+     * Throw OperationException(NO_SUCH_OBJECT) if the entry does not exist.
+     *
+     * @throws OperationException
+     */
+    public function compare(
+        Dn $dn,
+        EqualityFilter $filter,
+    ): bool;
 }

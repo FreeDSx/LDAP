@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\SearchContext;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
@@ -54,6 +57,34 @@ class LdapServerBackend implements WritableLdapBackendInterface, PasswordAuthent
                 'foo' => 'bar',
             ]
         );
+    }
+
+    public function compare(
+        Dn $dn,
+        EqualityFilter $filter,
+    ): bool {
+        $entry = $this->get($dn);
+
+        if ($entry === null) {
+            throw new OperationException(
+                sprintf('No such object: %s', $dn->toString()),
+                ResultCode::NO_SUCH_OBJECT,
+            );
+        }
+
+        $attribute = $entry->get($filter->getAttribute());
+
+        if ($attribute === null) {
+            return false;
+        }
+
+        foreach ($attribute->getValues() as $value) {
+            if (strcasecmp($value, $filter->getValue()) === 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function verifyPassword(

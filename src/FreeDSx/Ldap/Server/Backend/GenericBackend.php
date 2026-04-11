@@ -15,6 +15,9 @@ namespace FreeDSx\Ldap\Server\Backend;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use Generator;
 
 /**
@@ -35,5 +38,15 @@ final class GenericBackend implements LdapBackendInterface
     public function get(Dn $dn): ?Entry
     {
         return null;
+    }
+
+    public function compare(
+        Dn $dn,
+        EqualityFilter $filter,
+    ): bool {
+        throw new OperationException(
+            sprintf('No such object: %s', $dn->toString()),
+            ResultCode::NO_SUCH_OBJECT,
+        );
     }
 }
