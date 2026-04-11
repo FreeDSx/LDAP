@@ -77,12 +77,40 @@ trait ServerRunnerLoggerTrait
     /**
      * @param array<string, mixed> $context
      */
+    private function logClientError(
+        Throwable $e,
+        array $context = [],
+    ): void {
+        $this->getRunnerLogger()?->log(
+            LogLevel::ERROR,
+            'Unhandled error while handling client connection.',
+            array_merge($context, self::exceptionContext($e)),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
     private function logConnectionLimitReached(array $context = []): void
     {
         $this->getRunnerLogger()?->log(
             LogLevel::WARNING,
             'Connection limit reached, dropping new connection.',
             $context,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function logAcceptError(
+        Throwable $e,
+        array $context = [],
+    ): void {
+        $this->getRunnerLogger()?->log(
+            LogLevel::ERROR,
+            'Failed to accept incoming connection.',
+            array_merge($context, self::exceptionContext($e)),
         );
     }
 
@@ -113,6 +141,20 @@ trait ServerRunnerLoggerTrait
     /**
      * @param array<string, mixed> $context
      */
+    private function logShutdownForceClose(
+        int $activeConnections,
+        array $context = [],
+    ): void {
+        $this->getRunnerLogger()?->log(
+            LogLevel::WARNING,
+            'Shutdown timeout exceeded, forcing close of active connections.',
+            array_merge($context, ['active_connections' => $activeConnections]),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
     private function logShutdownNotifyError(
         Throwable $e,
         array $context = [],
@@ -120,11 +162,19 @@ trait ServerRunnerLoggerTrait
         $this->getRunnerLogger()?->log(
             LogLevel::WARNING,
             'Unexpected error while notifying client of shutdown.',
-            array_merge($context, [
-                'exception_message' => $e->getMessage(),
-                'exception_class' => $e::class,
-                'exception_stacktrace' => $e->getTraceAsString(),
-            ]),
+            array_merge($context, self::exceptionContext($e)),
         );
+    }
+
+    /**
+     * @return array{exception_message: string, exception_class: string, exception_stacktrace: string}
+     */
+    private static function exceptionContext(Throwable $e): array
+    {
+        return [
+            'exception_message' => $e->getMessage(),
+            'exception_class' => $e::class,
+            'exception_stacktrace' => $e->getTraceAsString(),
+        ];
     }
 }

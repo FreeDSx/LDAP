@@ -99,6 +99,10 @@ class PcntlServerRunner implements ServerRunnerInterface
 
         try {
             $this->acceptClients();
+        } catch (Throwable $e) {
+            $this->logAcceptError($e, $this->defaultContext);
+
+            throw $e;
         } finally {
             if ($this->isMainProcess) {
                 $this->handleServerShutdown();

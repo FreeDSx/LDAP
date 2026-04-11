@@ -147,11 +147,7 @@ class SwooleServerRunner implements ServerRunnerInterface
                 return;
             }
 
-            $this->options->getLogger()?->warning(sprintf(
-                'SwooleServerRunner: shutdown timeout (%d s) exceeded with %d active connection(s), forcing close.',
-                $this->options->getShutdownTimeout(),
-                count($this->activeSockets),
-            ));
+            $this->logShutdownForceClose(count($this->activeSockets));
 
             foreach ($this->activeSockets as $socket) {
                 $socket->close();
@@ -168,9 +164,8 @@ class SwooleServerRunner implements ServerRunnerInterface
             try {
                 $socket = $this->server->accept($this->options->getSocketAcceptTimeout());
             } catch (Throwable $e) {
-                $this->options->getLogger()?->error(
-                    'SwooleServerRunner: accept() failed: ' . $e->getMessage()
-                );
+                $this->logAcceptError($e);
+
                 break;
             }
 
@@ -200,7 +195,7 @@ class SwooleServerRunner implements ServerRunnerInterface
             });
         }
 
-        $this->options->getLogger()?->info('SwooleServerRunner: accept loop ended, draining active connections.');
+        $this->getRunnerLogger()?->info('Accept loop ended, draining active connections.');
     }
 
     private function handleClient(
@@ -213,9 +208,7 @@ class SwooleServerRunner implements ServerRunnerInterface
             $this->logClientConnected();
             $handler->handle();
         } catch (Throwable $e) {
-            $this->options->getLogger()?->error(
-                'SwooleServerRunner: unhandled error in client coroutine: ' . $e->getMessage()
-            );
+            $this->logClientError($e);
         } finally {
             $this->logClientClosed();
             $socket->close();
