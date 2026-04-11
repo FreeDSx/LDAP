@@ -152,7 +152,7 @@ $ldap = new LdapServer(
 
 `RequestHandlerInterface`, `GenericRequestHandler`, `PagingHandlerInterface`, and related classes have been removed.
 The server now works with a single backend object that implements `LdapBackendInterface` (read-only) or
-`WritableLdapBackendInterface` (read-write). Paging is handled automatically by the framework via PHP generators —
+`WritableLdapBackendInterface` (read-write). Paging is handled automatically by the backend via PHP generators —
 no separate paging handler is needed.
 
 **Before** (0.x `RequestHandlerInterface`):
@@ -201,7 +201,45 @@ class MyBackend implements LdapBackendInterface
 {
     public function search(SearchContext $context): Generator
     {
-        // Yield matching entries. The framework handles paging automatically.
+        // Yield matching entries. Paging is handled automatically.
+        yield from [];
+    }
+
+    public function get(Dn $dn): ?Entry
+    {
+        return null;
+    }
+}
+
+$server = (new LdapServer())
+    ->useBackend(new MyBackend());
+```
+
+### Authentication
+
+The `bind()` method on `GenericRequestHandler` has been replaced by `PasswordAuthenticatableInterface`. Authentication
+is now a separate concern decoupled from the backend.
+
+**Default behaviour**: if your backend stores a `userPassword` attribute on entries, the built-in `PasswordAuthenticator`
+verifies credentials automatically — no extra code needed. Supported schemes: `{SHA}`, `{SSHA}`, `{MD5}`, `{SMD5}`,
+and plaintext.
+
+**Custom authentication**: implement `PasswordAuthenticatableInterface` on your backend (or on a dedicated class) to
+replicate the old `bind()` behaviour:
+
+```php
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\SearchContext;
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use Generator;
+use SensitiveParameter;
+
+class MyBackend implements LdapBackendInterface, PasswordAuthenticatableInterface
+{
+    public function search(SearchContext $context): Generator
+    {
         yield from [];
     }
 
@@ -211,27 +249,81 @@ class MyBackend implements LdapBackendInterface
     }
 
     public function verifyPassword(
-        Dn $dn,
-        string $password,
+        string $name,
+        #[SensitiveParameter] string $password,
     ): bool {
-        return $dn->toString() === 'cn=admin,dc=example,dc=com'
-            && $password === 'secret';
+        return $name === 'cn=admin,dc=example,dc=com' && $password === 'secret';
+    }
+
+    public function getPassword(string $username, string $mechanism): ?string
+    {
+        // Return a plaintext password for challenge SASL mechanisms (CRAM-MD5, SCRAM-*, etc.),
+        // or null to disable challenge SASL for this user.
+        return null;
     }
 }
+```
 
+The use of `PasswordAuthenticatableInterface` on the backend is automatically detected. Alternatively, register a
+standalone authenticator:
+
+```php
 $server = (new LdapServer())
-    ->useBackend(new MyBackend());
+    ->useBackend(new MyBackend())
+    ->usePasswordAuthenticator(new MyAuthenticator());
 ```
 
 ### Write operations
 
-`add()`, `delete()`, `update()`, and `move()` are now part of `WritableLdapBackendInterface`. Implement that interface
-instead of `LdapBackendInterface` when your backend supports write operations.
+`add()`, `delete()`, `update()`, and `move()` are now part of `WritableLdapBackendInterface`. Each operation receives
+a typed command object. Use `WritableBackendTrait` to implement the dispatch automatically:
+
+```php
+use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
+use FreeDSx\Ldap\Server\Backend\Write\WritableBackendTrait;
+use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
+
+class MyBackend implements WritableLdapBackendInterface
+{
+    use WritableBackendTrait;
+
+    // search() and get() as above ...
+
+    public function add(AddCommand $command): void
+    {
+        // $command->entry — Entry to persist
+    }
+
+    public function delete(DeleteCommand $command): void
+    {
+        // $command->dn — Dn of the entry to remove
+    }
+
+    public function update(UpdateCommand $command): void
+    {
+        // $command->dn      — Dn of the entry to modify
+        // $command->changes — Change[] of attribute changes
+    }
+
+    public function move(MoveCommand $command): void
+    {
+        // $command->dn           — current entry Dn
+        // $command->newRdn       — new relative Dn
+        // $command->deleteOldRdn — bool
+        // $command->newParent    — ?Dn new parent
+    }
+}
+```
+
+Implement `WritableLdapBackendInterface` instead of `LdapBackendInterface` when your backend supports write operations.
 
 ### Paging
 
 Paging no longer requires a `PagingHandlerInterface` implementation. Return a `Generator` from `search()` and the
-framework automatically slices it into pages when a client sends a paged search control. The `supportedControl`
+the backend automatically slices it into pages when a client sends a paged search control. The `supportedControl`
 attribute of the RootDSE is populated automatically when a backend is configured.
 
 ### Proxy server
