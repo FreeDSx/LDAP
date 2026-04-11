@@ -146,6 +146,48 @@ final class WritableStorageBackendTest extends TestCase
         );
     }
 
+    public function test_search_base_scope_throws_no_such_object_when_base_does_not_exist(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
+
+        iterator_to_array($this->subject->search(new SearchContext(
+            baseDn: new Dn('cn=Missing,dc=example,dc=com'),
+            scope: SearchRequest::SCOPE_BASE_OBJECT,
+            filter: new PresentFilter('objectClass'),
+            attributes: [],
+            typesOnly: false,
+        )));
+    }
+
+    public function test_search_single_level_throws_no_such_object_when_base_does_not_exist(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
+
+        iterator_to_array($this->subject->search(new SearchContext(
+            baseDn: new Dn('cn=Missing,dc=example,dc=com'),
+            scope: SearchRequest::SCOPE_SINGLE_LEVEL,
+            filter: new PresentFilter('objectClass'),
+            attributes: [],
+            typesOnly: false,
+        )));
+    }
+
+    public function test_search_subtree_throws_no_such_object_when_base_does_not_exist(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
+
+        iterator_to_array($this->subject->search(new SearchContext(
+            baseDn: new Dn('cn=Missing,dc=example,dc=com'),
+            scope: SearchRequest::SCOPE_WHOLE_SUBTREE,
+            filter: new PresentFilter('objectClass'),
+            attributes: [],
+            typesOnly: false,
+        )));
+    }
+
     public function test_add_stores_entry(): void
     {
         $entry = new Entry(new Dn('cn=New,dc=example,dc=com'), new Attribute('cn', 'New'));

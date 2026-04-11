@@ -85,17 +85,27 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
         return false;
     }
 
+    /**
+     * @throws OperationException
+     */
     public function search(SearchContext $context): Generator
     {
         $normBase = $context->baseDn->normalize();
 
         if ($context->scope === SearchRequest::SCOPE_BASE_OBJECT) {
             $entry = $this->storage->find($normBase);
-            if ($entry !== null) {
-                yield $entry;
+
+            if ($entry === null) {
+                $this->throwNoSuchObject($context->baseDn);
             }
 
+            yield $entry;
+
             return;
+        }
+
+        if ($this->storage->find($normBase) === null) {
+            $this->throwNoSuchObject($context->baseDn);
         }
 
         foreach ($this->storage->list($normBase, $context->scope === SearchRequest::SCOPE_WHOLE_SUBTREE) as $entry) {

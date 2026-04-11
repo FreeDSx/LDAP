@@ -318,6 +318,95 @@ class ServerPagingHandlerTest extends TestCase
         );
     }
 
+    public function test_it_should_return_size_limit_exceeded_on_first_page_when_limit_is_hit(): void
+    {
+        $searchRequest = (new SearchRequest(Filters::raw('(foo=bar)')))
+            ->base('dc=foo,dc=bar')
+            ->sizeLimit(1);
+        $message = $this->makeSearchMessage(size: 10, searchRequest: $searchRequest);
+
+        $entry1 = Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']);
+        $entry2 = Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']);
+
+        $this->mockBackend
+            ->expects(self::once())
+            ->method('search')
+            ->willReturn($this->makeGenerator($entry1, $entry2));
+
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage')
+            ->with(
+                new LdapMessageResponse(2, new SearchResultEntry($entry1)),
+                self::callback(static function (LdapMessageResponse $response): bool {
+                    $paging = $response->controls()->get(Control::OID_PAGING);
+                    $done = $response->getResponse();
+
+                    return $paging instanceof PagingControl
+                        && $paging->getCookie() === ''
+                        && $done instanceof SearchResultDone
+                        && $done->getResultCode() === ResultCode::SIZE_LIMIT_EXCEEDED;
+                }),
+            );
+
+        $this->subject->handleRequest($message, $this->mockToken);
+    }
+
+    public function test_it_should_accumulate_size_limit_across_pages(): void
+    {
+        $searchRequest = (new SearchRequest(Filters::raw('(foo=bar)')))
+            ->base('dc=foo,dc=bar')
+            ->sizeLimit(2);
+
+        $entry1 = Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']);
+        $entry2 = Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']);
+        $entry3 = Entry::create('cn=3,dc=foo,dc=bar', ['cn' => '3']);
+
+        $this->mockBackend
+            ->expects(self::once())
+            ->method('search')
+            ->willReturn($this->makeGenerator($entry1, $entry2, $entry3));
+
+        $capturedCookie = '';
+        $sizeLimitExceededSeen = false;
+
+        $this->mockQueue
+            ->method('sendMessage')
+            ->willReturnCallback(
+                function (LdapMessageResponse ...$responses) use (&$capturedCookie, &$sizeLimitExceededSeen) {
+                    foreach ($responses as $response) {
+                        $paging = $response->controls()->get(Control::OID_PAGING);
+                        if ($paging instanceof PagingControl && $paging->getCookie() !== '') {
+                            $capturedCookie = $paging->getCookie();
+                        }
+                        $done = $response->getResponse();
+                        if ($done instanceof SearchResultDone && $done->getResultCode() === ResultCode::SIZE_LIMIT_EXCEEDED) {
+                            $sizeLimitExceededSeen = true;
+                        }
+                    }
+
+                    return $this->mockQueue;
+                }
+            );
+
+        // First page: pageSize=1, sizeLimit=2 — gets entry1, stores generator
+        $this->subject->handleRequest(
+            $this->makeSearchMessage(size: 1, searchRequest: $searchRequest),
+            $this->mockToken,
+        );
+
+        self::assertNotEmpty($capturedCookie, 'Expected a non-empty cookie after the first page.');
+
+        // Second page: totalSent=1, gets entry2 — hits sizeLimit(2), returns SIZE_LIMIT_EXCEEDED
+        $pagingReq = $this->requestHistory->pagingRequest()->findByNextCookie($capturedCookie);
+        $this->subject->handleRequest(
+            $this->makeSearchMessage(size: 10, cookie: $capturedCookie, searchRequest: $pagingReq->getSearchRequest()),
+            $this->mockToken,
+        );
+
+        self::assertTrue($sizeLimitExceededSeen, 'Expected SIZE_LIMIT_EXCEEDED on the second page.');
+    }
+
     private function makeExistingPagingRequest(
         int $size = 10,
         string $cookie = 'bar',

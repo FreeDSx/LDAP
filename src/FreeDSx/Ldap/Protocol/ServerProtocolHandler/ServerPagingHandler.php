@@ -67,16 +67,26 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $controls = [];
         try {
             $response = $this->handlePaging($pagingRequest, $message);
-            $searchResult = SearchResult::makeSuccessResult(
-                $response->getEntries(),
-                (string) $searchRequest->getBaseDn()
-            );
-            $controls[] = new PagingControl(
-                $response->getRemaining(),
-                $response->isComplete()
-                    ? ''
-                    : $pagingRequest->getNextCookie()
-            );
+            if ($response->isSizeLimitExceeded()) {
+                $searchResult = SearchResult::makeErrorResult(
+                    ResultCode::SIZE_LIMIT_EXCEEDED,
+                    (string) $searchRequest->getBaseDn(),
+                    '',
+                    $response->getEntries(),
+                );
+                $controls[] = new PagingControl(0, '');
+            } else {
+                $searchResult = SearchResult::makeSuccessResult(
+                    $response->getEntries(),
+                    (string) $searchRequest->getBaseDn()
+                );
+                $controls[] = new PagingControl(
+                    $response->getRemaining(),
+                    $response->isComplete()
+                        ? ''
+                        : $pagingRequest->getNextCookie()
+                );
+            }
         } catch (OperationException $e) {
             $searchResult = SearchResult::makeErrorResult(
                 $e->getCode(),
@@ -135,11 +145,16 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $context = $this->makeSearchContext($searchRequest);
         $generator = $this->backend->search($context);
 
-        [$page, $generatorExhausted] = $this->collectFromGenerator(
+        [$page, $generatorExhausted, $sizeLimitExceeded] = $this->collectFromGenerator(
             $generator,
             $pagingRequest->getSize(),
             $context,
+            0,
         );
+
+        if ($sizeLimitExceeded) {
+            return PagingResponse::makeSizeLimitExceeded(new Entries(...$page));
+        }
 
         $nextCookie = $this->generateCookie();
         $pagingRequest->updateNextCookie($nextCookie);
@@ -148,6 +163,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
             return PagingResponse::makeFinal(new Entries(...$page));
         }
 
+        $pagingRequest->incrementTotalSent(count($page));
         $this->requestHistory->storePagingGenerator($nextCookie, $generator);
 
         return PagingResponse::make(new Entries(...$page), 0);
@@ -192,11 +208,16 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $searchRequest = $pagingRequest->getSearchRequest();
         $context = $this->makeSearchContext($searchRequest);
 
-        [$page, $generatorExhausted] = $this->collectFromGenerator(
+        [$page, $generatorExhausted, $sizeLimitExceeded] = $this->collectFromGenerator(
             $generator,
             $pagingRequest->getSize(),
             $context,
+            $pagingRequest->getTotalSent(),
         );
+
+        if ($sizeLimitExceeded) {
+            return PagingResponse::makeSizeLimitExceeded(new Entries(...$page));
+        }
 
         $nextCookie = $this->generateCookie();
         $pagingRequest->updateNextCookie($nextCookie);
@@ -205,36 +226,59 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
             return PagingResponse::makeFinal(new Entries(...$page));
         }
 
+        $pagingRequest->incrementTotalSent(count($page));
         $this->requestHistory->storePagingGenerator($nextCookie, $generator);
 
         return PagingResponse::make(new Entries(...$page), 0);
     }
 
     /**
-     * Advances the generator, collecting up to $size entries that pass the filter.
-     * Returns the collected entries and whether the generator is exhausted.
+     * Advances the generator, collecting up to $pageSize entries that pass the filter.
      *
-     * @return array{Entry[], bool}
+     * Also enforces the client's sizeLimit from SearchContext. When the sizeLimit is
+     * reached before the generator is exhausted, $sizeLimitExceeded is true in the return.
+     *
+     * @return array{Entry[], bool, bool} [$page, $generatorExhausted, $sizeLimitExceeded]
      */
     private function collectFromGenerator(
         Generator $generator,
-        int $size,
+        int $pageSize,
         SearchContext $context,
+        int $totalAlreadySent,
     ): array {
         $page = [];
-        $limit = $size > 0 ? $size : PHP_INT_MAX;
+        $pageLimit = $pageSize > 0 ? $pageSize : PHP_INT_MAX;
+        $sizeLimit = $context->sizeLimit;
 
-        while ($generator->valid() && count($page) < $limit) {
+        while ($generator->valid() && count($page) < $pageLimit) {
             $entry = $generator->current();
 
             if ($entry instanceof Entry && $this->filterEvaluator->evaluate($entry, $context->filter)) {
-                $page[] = $this->applyAttributeFilter($entry, $context->attributes, $context->typesOnly);
+                $page[] = $this->applyAttributeFilter(
+                    $entry,
+                    $context->attributes,
+                    $context->typesOnly
+                );
+
+                if ($sizeLimit > 0 && ($totalAlreadySent + count($page)) >= $sizeLimit) {
+                    $generator->next();
+                    break;
+                }
             }
 
             $generator->next();
         }
 
-        return [$page, !$generator->valid()];
+        $generatorExhausted = !$generator->valid();
+        $sizeLimitExceeded = !$generatorExhausted
+            && $sizeLimit > 0
+            && ($totalAlreadySent + count($page)) >= $sizeLimit;
+
+        return [
+            $page,
+            $generatorExhausted,
+            $sizeLimitExceeded,
+        ];
     }
 
     /**

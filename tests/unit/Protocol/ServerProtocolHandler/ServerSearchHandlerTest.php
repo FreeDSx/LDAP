@@ -174,6 +174,74 @@ final class ServerSearchHandlerTest extends TestCase
         );
     }
 
+    public function test_it_should_return_size_limit_exceeded_with_partial_results_when_limit_is_hit(): void
+    {
+        $entry1 = Entry::create('dc=foo,dc=bar', ['cn' => 'foo']);
+        $entry2 = Entry::create('dc=bar,dc=foo', ['cn' => 'bar']);
+
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::equal('foo', 'bar')))
+                ->base('dc=foo,dc=bar')
+                ->sizeLimit(1)
+        );
+
+        $this->mockBackend
+            ->expects(self::once())
+            ->method('search')
+            ->willReturn($this->makeGenerator($entry1, $entry2));
+
+        $this->mockFilterEvaluator
+            ->method('evaluate')
+            ->willReturn(true);
+
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage')
+            ->with(
+                new LdapMessageResponse(2, new SearchResultEntry($entry1)),
+                new LdapMessageResponse(
+                    2,
+                    new SearchResultDone(ResultCode::SIZE_LIMIT_EXCEEDED, 'dc=foo,dc=bar')
+                ),
+            );
+
+        $this->subject->handleRequest($search, $this->mockToken);
+    }
+
+    public function test_it_should_not_enforce_size_limit_when_zero(): void
+    {
+        $entry1 = Entry::create('dc=foo,dc=bar', ['cn' => 'foo']);
+        $entry2 = Entry::create('dc=bar,dc=foo', ['cn' => 'bar']);
+
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::equal('foo', 'bar')))
+                ->base('dc=foo,dc=bar')
+                ->sizeLimit(0)
+        );
+
+        $this->mockBackend
+            ->expects(self::once())
+            ->method('search')
+            ->willReturn($this->makeGenerator($entry1, $entry2));
+
+        $this->mockFilterEvaluator
+            ->method('evaluate')
+            ->willReturn(true);
+
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage')
+            ->with(
+                new LdapMessageResponse(2, new SearchResultEntry($entry1)),
+                new LdapMessageResponse(2, new SearchResultEntry($entry2)),
+                new LdapMessageResponse(2, new SearchResultDone(0, 'dc=foo,dc=bar')),
+            );
+
+        $this->subject->handleRequest($search, $this->mockToken);
+    }
+
     public function test_it_should_send_a_successful_SearchResultDone_when_no_entries_match(): void
     {
         $search = new LdapMessageRequest(

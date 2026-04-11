@@ -29,7 +29,8 @@ final class PagingResponse
     public function __construct(
         private readonly Entries $entries,
         private readonly bool $isComplete = false,
-        private readonly int $remaining = 0
+        private readonly int $remaining = 0,
+        private readonly bool $sizeLimitExceeded = false,
     ) {
     }
 
@@ -49,6 +50,11 @@ final class PagingResponse
     public function isComplete(): bool
     {
         return $this->isComplete;
+    }
+
+    public function isSizeLimitExceeded(): bool
+    {
+        return $this->sizeLimitExceeded;
     }
 
     /**
@@ -78,6 +84,22 @@ final class PagingResponse
         return new self(
             $entries,
             true
+        );
+    }
+
+    /**
+     * Make a terminal paging response indicating that the client's sizeLimit was reached
+     * before the full result set was returned. The entries collected up to the limit are included.
+     *
+     * @param Entries<Entry> $entries
+     */
+    public static function makeSizeLimitExceeded(Entries $entries): self
+    {
+        return new self(
+            $entries,
+            true,
+            0,
+            true,
         );
     }
 }

@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Entry\Entries;
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
@@ -52,18 +52,33 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
             $filter = $context->filter;
             $attributes = $context->attributes;
             $typesOnly = $context->typesOnly;
+            $sizeLimit = $context->sizeLimit;
 
             $results = [];
+            $sizeLimitExceeded = false;
+
             foreach ($this->backend->search($context) as $entry) {
                 if ($this->filterEvaluator->evaluate($entry, $filter)) {
                     $results[] = $this->applyAttributeFilter($entry, $attributes, $typesOnly);
+                    if ($sizeLimit > 0 && count($results) >= $sizeLimit) {
+                        $sizeLimitExceeded = true;
+                        break;
+                    }
                 }
             }
 
-            $searchResult = SearchResult::makeSuccessResult(
-                new Entries(...$results),
-                (string) $request->getBaseDn(),
-            );
+            $entries = new Entries(...$results);
+            $searchResult = $sizeLimitExceeded
+                ? SearchResult::makeErrorResult(
+                    ResultCode::SIZE_LIMIT_EXCEEDED,
+                    (string) $request->getBaseDn(),
+                    '',
+                    $entries,
+                )
+                : SearchResult::makeSuccessResult(
+                    $entries,
+                    (string) $request->getBaseDn()
+                );
         } catch (OperationException $e) {
             $searchResult = SearchResult::makeErrorResult(
                 $e->getCode(),

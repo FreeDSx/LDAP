@@ -150,33 +150,52 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         $contains = array_map('strtolower', $filter->getContains());
 
         foreach ($attribute->getValues() as $value) {
-            $lowerValue = strtolower($value);
-
-            if ($startsWith !== null && !str_starts_with($lowerValue, $startsWith)) {
-                continue;
-            }
-
-            if ($endsWith !== null && !str_ends_with($lowerValue, $endsWith)) {
-                continue;
-            }
-
-            $pos = 0;
-            $allFound = true;
-            foreach ($contains as $substr) {
-                $found = strpos($lowerValue, $substr, $pos);
-                if ($found === false) {
-                    $allFound = false;
-                    break;
-                }
-                $pos = $found + strlen($substr);
-            }
-
-            if ($allFound) {
+            if ($this->substringMatches(strtolower($value), $startsWith, $endsWith, $contains)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * RFC 4511 §4.5.1.7.1 — evaluate one attribute value against the decomposed substring components.
+     *
+     * Each matched portion must start strictly after the end of the previous one:
+     *   initial occupies [0, len(initial)-1], so 'any' searches start at len(initial).
+     *   After all 'any' matches, 'final' must begin at a position >= $pos.
+     *
+     * @param string[] $contains
+     */
+    private function substringMatches(
+        string $value,
+        ?string $startsWith,
+        ?string $endsWith,
+        array $contains,
+    ): bool {
+        if ($startsWith !== null && !str_starts_with($value, $startsWith)) {
+            return false;
+        }
+
+        // Start 'any' searches after the initial match, not at position 0.
+        $pos = $startsWith !== null ? strlen($startsWith) : 0;
+
+        foreach ($contains as $substr) {
+            $found = strpos($value, $substr, $pos);
+            if ($found === false) {
+                return false;
+            }
+            $pos = $found + strlen($substr);
+        }
+
+        if ($endsWith === null) {
+            return true;
+        }
+
+        // 'final' must be at the end of the value AND must not overlap the previous match.
+        $endsWithStart = strlen($value) - strlen($endsWith);
+
+        return $endsWithStart >= $pos && str_ends_with($value, $endsWith);
     }
 
     private function evaluateGreaterOrEqual(

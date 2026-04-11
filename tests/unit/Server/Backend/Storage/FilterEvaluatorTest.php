@@ -143,6 +143,66 @@ final class FilterEvaluatorTest extends TestCase
         self::assertFalse($this->subject->evaluate($this->entry, $filter));
     }
 
+    public function test_substring_any_does_not_match_within_initial_portion(): void
+    {
+        // RFC 4511 §4.5.1.7.1: 'any' must appear AFTER the initial match.
+        // "testing" starts with "test" (positions 0-3); the 'any' "t" must be
+        // found at position 4+. "ing" has no "t", so the filter must not match.
+        $entry = new Entry(
+            new Dn('cn=testing,dc=example,dc=com'),
+            new Attribute('cn', 'testing'),
+        );
+        $filter = (new SubstringFilter('cn'))
+            ->setStartsWith('test')
+            ->setContains('t');
+
+        self::assertFalse($this->subject->evaluate($entry, $filter));
+    }
+
+    public function test_substring_any_matches_after_initial_portion(): void
+    {
+        // "testting" has a second "t" at position 4, which is after the "test" initial.
+        $entry = new Entry(
+            new Dn('cn=testting,dc=example,dc=com'),
+            new Attribute('cn', 'testting'),
+        );
+        $filter = (new SubstringFilter('cn'))
+            ->setStartsWith('test')
+            ->setContains('t');
+
+        self::assertTrue($this->subject->evaluate($entry, $filter));
+    }
+
+    public function test_substring_final_requires_distinct_occurrence_from_any(): void
+    {
+        // RFC 4511 §4.5.1.7.1: 'final' must start after the last 'any' match.
+        // Filter *foo*foo against value "foo": the 'any' match consumes "foo" at [0,2],
+        // leaving nothing for 'final' to start at position >= 3 — no match.
+        $entry = new Entry(
+            new Dn('cn=foo,dc=example,dc=com'),
+            new Attribute('cn', 'foo'),
+        );
+        $filter = (new SubstringFilter('cn'))
+            ->setContains('foo')
+            ->setEndsWith('foo');
+
+        self::assertFalse($this->subject->evaluate($entry, $filter));
+    }
+
+    public function test_substring_final_matches_after_any_when_two_occurrences_exist(): void
+    {
+        // "foofoo" has two non-overlapping occurrences: 'any' at [0,2], 'final' at [3,5].
+        $entry = new Entry(
+            new Dn('cn=foofoo,dc=example,dc=com'),
+            new Attribute('cn', 'foofoo'),
+        );
+        $filter = (new SubstringFilter('cn'))
+            ->setContains('foo')
+            ->setEndsWith('foo');
+
+        self::assertTrue($this->subject->evaluate($entry, $filter));
+    }
+
     public function test_substring_ordered_contains(): void
     {
         $filter = (new SubstringFilter('mail'))
