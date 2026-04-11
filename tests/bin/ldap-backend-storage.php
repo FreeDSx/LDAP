@@ -61,7 +61,7 @@ if ($handler === 'file') {
         $adapter->add(new AddCommand($entry));
     }
 } else {
-    $adapter = new InMemoryStorageAdapter(...$entries);
+    $adapter = new InMemoryStorageAdapter($entries);
 }
 
 $server = (new LdapServer(

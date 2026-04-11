@@ -57,14 +57,14 @@ $server = new LdapServer(
     (new ServerOptions())->setDseNamingContexts('dc=example,dc=com')
 );
 
-$server->useBackend(new InMemoryStorageAdapter(
+$server->useBackend(new InMemoryStorageAdapter([
     new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
     new Entry(
         new Dn('cn=admin,dc=example,dc=com'),
         new Attribute('cn', 'admin'),
         new Attribute('userPassword', $passwordHash),
     ),
-));
+]));
 
 $server->run();
 ```
@@ -348,14 +348,14 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorageAdapter;
 
 $passwordHash = '{SHA}' . base64_encode(sha1('secret', true));
 
-$adapter = new InMemoryStorageAdapter(
+$adapter = new InMemoryStorageAdapter([
     new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
     new Entry(
         new Dn('cn=admin,dc=example,dc=com'),
         new Attribute('cn', 'admin'),
         new Attribute('userPassword', $passwordHash),
     ),
-);
+]);
 
 $server = (new LdapServer())->useBackend($adapter);
 $server->run();

@@ -58,11 +58,11 @@ final class InMemoryStorageAdapterTest extends TestCase
             new Attribute('cn', 'Bob'),
         );
 
-        $this->subject = new InMemoryStorageAdapter(
+        $this->subject = new InMemoryStorageAdapter([
             $this->base,
             $this->alice,
             $this->bob,
-        );
+        ]);
     }
 
     public function test_get_returns_entry_by_dn(): void

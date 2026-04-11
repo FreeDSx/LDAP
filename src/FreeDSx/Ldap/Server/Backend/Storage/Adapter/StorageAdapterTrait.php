@@ -76,7 +76,10 @@ trait StorageAdapterTrait
             strlen($normDn) - strlen(',' . $normBase)
         );
 
-        return !str_contains($prefix, ',');
+        return !str_contains(
+            $prefix,
+            ','
+        );
     }
 
 }

@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -24,6 +23,7 @@ use FreeDSx\Ldap\Server\Backend\SearchContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\CoroutineLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\StorageLockInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\WriteEntryOperationHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
@@ -68,6 +68,7 @@ class JsonFileStorageAdapter implements WritableLdapBackendInterface
     private function __construct(
         private readonly string $filePath,
         private readonly StorageLockInterface $lock,
+        private readonly WriteEntryOperationHandler $entryHandler = new WriteEntryOperationHandler(),
     ) {
     }
 
@@ -77,7 +78,7 @@ class JsonFileStorageAdapter implements WritableLdapBackendInterface
     ): self {
         return new self(
             $filePath,
-            $lock ?? new FileLock($filePath)
+            $lock ?? new FileLock($filePath),
         );
     }
 
@@ -87,7 +88,7 @@ class JsonFileStorageAdapter implements WritableLdapBackendInterface
     ): self {
         return new self(
             $filePath,
-            $lock ?? new CoroutineLock($filePath)
+            $lock ?? new CoroutineLock($filePath),
         );
     }
 
@@ -112,42 +113,98 @@ class JsonFileStorageAdapter implements WritableLdapBackendInterface
      */
     public function add(AddCommand $command): void
     {
-        $this->withMutation(
-            fn(string $contents): string => $this->executeAdd(
-                $contents,
-                $command
-            )
-        );
+        $this->withMutation(function (string $contents) use ($command): string {
+            $data = $this->decodeContents($contents);
+            $normDn = $this->normalise($command->entry->getDn());
+
+            if (isset($data[$normDn])) {
+                throw new OperationException(
+                    sprintf('Entry already exists: %s', $command->entry->getDn()->toString()),
+                    ResultCode::ENTRY_ALREADY_EXISTS,
+                );
+            }
+
+            $data[$normDn] = $this->entryToArray($command->entry);
+
+            return $this->encodeContents($data);
+        });
     }
 
+    /**
+     * @throws OperationException
+     */
     public function delete(DeleteCommand $command): void
     {
-        $this->withMutation(
-            fn(string $contents): string => $this->executeDelete(
-                $contents,
-                $command
-            )
-        );
+        $this->withMutation(function (string $contents) use ($command): string {
+            $data = $this->decodeContents($contents);
+            $normDn = $this->normalise($command->dn);
+
+            foreach (array_keys($data) as $key) {
+                if ($this->isInScope($key, $normDn, SearchRequest::SCOPE_SINGLE_LEVEL)) {
+                    throw new OperationException(
+                        sprintf('Entry "%s" has subordinate entries and cannot be deleted.', $command->dn->toString()),
+                        ResultCode::NOT_ALLOWED_ON_NON_LEAF,
+                    );
+                }
+            }
+
+            unset($data[$normDn]);
+
+            return $this->encodeContents($data);
+        });
     }
 
+    /**
+     * @throws OperationException
+     */
     public function update(UpdateCommand $command): void
     {
-        $this->withMutation(
-            fn(string $contents): string => $this->executeUpdate(
-                $contents,
-                $command
-            )
-        );
+        $this->withMutation(function (string $contents) use ($command): string {
+            $data = $this->decodeContents($contents);
+            $normDn = $this->normalise($command->dn);
+
+            if (!isset($data[$normDn])) {
+                throw new OperationException(
+                    sprintf('No such object: %s', $command->dn->toString()),
+                    ResultCode::NO_SUCH_OBJECT,
+                );
+            }
+
+            $entry = $this->entryHandler->apply(
+                $this->arrayToEntry($data[$normDn]),
+                $command,
+            );
+            $data[$normDn] = $this->entryToArray($entry);
+
+            return $this->encodeContents($data);
+        });
     }
 
+    /**
+     * @throws OperationException
+     */
     public function move(MoveCommand $command): void
     {
-        $this->withMutation(
-            fn(string $contents): string => $this->executeMove(
-                $contents,
-                $command
-            )
-        );
+        $this->withMutation(function (string $contents) use ($command): string {
+            $data = $this->decodeContents($contents);
+            $normOld = $this->normalise($command->dn);
+
+            if (!isset($data[$normOld])) {
+                throw new OperationException(
+                    sprintf('No such object: %s', $command->dn->toString()),
+                    ResultCode::NO_SUCH_OBJECT,
+                );
+            }
+
+            $newEntry = $this->entryHandler->apply(
+                $this->arrayToEntry($data[$normOld]),
+                $command,
+            );
+            unset($data[$normOld]);
+            $data[$this->normalise($newEntry->getDn())] = $this->entryToArray($newEntry);
+
+            return $this->encodeContents($data);
+        });
     }
 
     /**
@@ -160,158 +217,6 @@ class JsonFileStorageAdapter implements WritableLdapBackendInterface
         } finally {
             $this->cache = null;
         }
-    }
-
-    /**
-     * @throws OperationException
-     */
-    private function executeAdd(
-        string $contents,
-        AddCommand $command,
-    ): string {
-        $data = $this->decodeContents($contents);
-        $normDn = $this->normalise($command->entry->getDn());
-
-        if (isset($data[$normDn])) {
-            throw new OperationException(
-                sprintf('Entry already exists: %s', $command->entry->getDn()->toString()),
-                ResultCode::ENTRY_ALREADY_EXISTS,
-            );
-        }
-
-        $data[$normDn] = $this->entryToArray($command->entry);
-
-        return $this->encodeContents($data);
-    }
-
-    /**
-     * @throws OperationException
-     */
-    private function executeDelete(
-        string $contents,
-        DeleteCommand $command,
-    ): string {
-        $data = $this->decodeContents($contents);
-        $normDn = $this->normalise($command->dn);
-
-        foreach (array_keys($data) as $key) {
-            if ($this->isInScope($key, $normDn, SearchRequest::SCOPE_SINGLE_LEVEL)) {
-                throw new OperationException(
-                    sprintf('Entry "%s" has subordinate entries and cannot be deleted.', $command->dn->toString()),
-                    ResultCode::NOT_ALLOWED_ON_NON_LEAF,
-                );
-            }
-        }
-
-        unset($data[$normDn]);
-
-        return $this->encodeContents($data);
-    }
-
-    /**
-     * @throws OperationException
-     */
-    private function executeUpdate(
-        string $contents,
-        UpdateCommand $command,
-    ): string {
-        $data = $this->decodeContents($contents);
-        $normDn = $this->normalise($command->dn);
-
-        if (!isset($data[$normDn])) {
-            throw new OperationException(
-                sprintf('No such object: %s', $command->dn->toString()),
-                ResultCode::NO_SUCH_OBJECT,
-            );
-        }
-
-        $entry = $this->arrayToEntry($data[$normDn]);
-
-        foreach ($command->changes as $change) {
-            $attribute = $change->getAttribute();
-            $attrName = $attribute->getName();
-            $values = $attribute->getValues();
-
-            switch ($change->getType()) {
-                case Change::TYPE_ADD:
-                    $existing = $entry->get($attrName);
-                    if ($existing !== null) {
-                        $existing->add(...$values);
-                    } else {
-                        $entry->add($attribute);
-                    }
-                    break;
-
-                case Change::TYPE_DELETE:
-                    if (count($values) === 0) {
-                        $entry->reset($attrName);
-                    } else {
-                        $entry->get($attrName)?->remove(...$values);
-                    }
-                    break;
-
-                case Change::TYPE_REPLACE:
-                    if (count($values) === 0) {
-                        $entry->reset($attrName);
-                    } else {
-                        $entry->set($attribute);
-                    }
-                    break;
-            }
-        }
-
-        $data[$normDn] = $this->entryToArray($entry);
-
-        return $this->encodeContents($data);
-    }
-
-    /**
-     * @throws OperationException
-     */
-    private function executeMove(
-        string $contents,
-        MoveCommand $command,
-    ): string {
-        $data = $this->decodeContents($contents);
-        $normOld = $this->normalise($command->dn);
-
-        if (!isset($data[$normOld])) {
-            throw new OperationException(
-                sprintf('No such object: %s', $command->dn->toString()),
-                ResultCode::NO_SUCH_OBJECT,
-            );
-        }
-
-        $entry = $this->arrayToEntry($data[$normOld]);
-
-        $parent = $command->newParent ?? $command->dn->getParent();
-        $newDnString = $parent !== null
-            ? $command->newRdn->toString() . ',' . $parent->toString()
-            : $command->newRdn->toString();
-
-        $newDn = new Dn($newDnString);
-        $newEntry = new Entry($newDn, ...$entry->getAttributes());
-
-        if ($command->deleteOldRdn) {
-            $oldRdn = $command->dn->getRdn();
-            $newEntry->get($oldRdn->getName())?->remove($oldRdn->getValue());
-        }
-
-        $rdnName = $command->newRdn->getName();
-        $rdnValue = $command->newRdn->getValue();
-        $existing = $newEntry->get($rdnName);
-        if ($existing !== null) {
-            if (!$existing->has($rdnValue)) {
-                $existing->add($rdnValue);
-            }
-        } else {
-            $newEntry->set(new Attribute($rdnName, $rdnValue));
-        }
-
-        unset($data[$normOld]);
-        $data[$this->normalise($newDn)] = $this->entryToArray($newEntry);
-
-        return $this->encodeContents($data);
     }
 
     /**
