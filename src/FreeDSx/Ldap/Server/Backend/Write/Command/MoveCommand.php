@@ -28,7 +28,7 @@ final class MoveCommand implements WriteRequestInterface
         readonly public Dn $dn,
         readonly public Rdn $newRdn,
         readonly public bool $deleteOldRdn,
-        readonly ?Dn $newParent,
+        readonly public ?Dn $newParent,
     ) {
     }
 }
