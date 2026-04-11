@@ -228,10 +228,7 @@ final class JsonFileStorage implements EntryStorageInterface
      */
     private function encodeContents(array $data): string
     {
-        return json_encode(
-            $data,
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
-        ) ?: '{}';
+        return json_encode($data, JSON_UNESCAPED_UNICODE) ?: '{}';
     }
 
     private function arrayToEntry(mixed $data): Entry
