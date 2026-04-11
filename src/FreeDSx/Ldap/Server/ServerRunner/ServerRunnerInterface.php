@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\ServerRunner;
 
-use FreeDSx\Socket\SocketServer;
-
 /**
  * Runs the TCP server, accepts client connections, dispatches client connections to the server protocol handler.
  *
@@ -25,5 +23,5 @@ interface ServerRunnerInterface
     /**
      * Runs the socket server to accept incoming client connections and dispatch them to the protocol handler.
      */
-    public function run(SocketServer $server): void;
+    public function run(): void;
 }

@@ -30,7 +30,7 @@ class LdapServerTest extends ServerTestCase
             return;
         }
 
-        static::initSharedServer('ldapserver', 'tcp');
+        static::initSharedServer('ldap-server', 'tcp');
     }
 
     public static function tearDownAfterClass(): void
@@ -41,7 +41,7 @@ class LdapServerTest extends ServerTestCase
 
     public function setUp(): void
     {
-        $this->setServerMode('ldapserver');
+        $this->setServerMode('ldap-server');
 
         parent::setUp();
     }
@@ -166,25 +166,13 @@ class LdapServerTest extends ServerTestCase
     {
         $this->authenticate();
 
-        $this->ldapClient()->compare(
+        $result = $this->ldapClient()->compare(
             'cn=meh,dc=foo,dc=bar',
             'foo',
             'bar'
         );
-        $output = $this->waitForServerOutput('---compare---');
 
-        $this->assertStringContainsString(
-            'dn => cn=meh,dc=foo,dc=bar',
-            $output
-        );
-        $this->assertStringContainsString(
-            'Name => foo',
-            $output
-        );
-        $this->assertStringContainsString(
-            'Value => bar',
-            $output
-        );
+        $this->assertTrue($result);
     }
 
     public function testItCanModifyDn(): void
@@ -221,6 +209,9 @@ class LdapServerTest extends ServerTestCase
                 'namingContexts' => [
                     'dc=FreeDSx,dc=local',
                 ],
+                'subschemaSubentry' => [
+                    'cn=Subschema',
+                ],
                 'supportedExtension' => [
                     '1.3.6.1.4.1.4203.1.11.3',
                     '1.3.6.1.4.1.1466.20037',
@@ -230,6 +221,9 @@ class LdapServerTest extends ServerTestCase
                 ],
                 'vendorName' => [
                     'FreeDSx',
+                ],
+                'supportedControl' => [
+                    '1.2.840.113556.1.4.319',
                 ],
             ],
             $rootDse->toArray()
@@ -309,49 +303,29 @@ class LdapServerTest extends ServerTestCase
         $this->authenticate();
 
         $allEntries = [];
-        $i = 0;
+        $iterations = 0;
 
-        $search = Operations::search(Filters::raw('(cn=foo)'));
+        $search = Operations::search(Filters::raw('(foo=*)'))->base('dc=foo,dc=bar');
         $paging = $this->ldapClient()->paging($search);
 
         while ($paging->hasEntries()) {
-            $i++;
+            $iterations++;
             $entries = $paging->getEntries(100);
             $allEntries = array_merge(
                 $allEntries,
                 $entries->toArray()
             );
-
-            $output = $this->waitForServerOutput('---paging---');
-
-            if ($i === 3) {
-                $this->assertStringContainsString('Final response', $output);
-            } else {
-                $this->assertStringContainsString('Regular response', $output);
-            }
         }
 
+        $this->assertSame(3, $iterations);
         $this->assertCount(300, $allEntries);
-    }
-
-    public function testItThrowsAnExceptionForPagingWhenNotSupported(): void
-    {
-        $this->authenticate();
-
-        $this->expectExceptionMessage('The server does not support the paging control.');
-        $this->expectExceptionCode(ResultCode::UNAVAILABLE_CRITICAL_EXTENSION);
-
-        $search = Operations::search(Filters::raw('(cn=foo)'));
-        $this->ldapClient()->paging($search)
-            ->isCritical()
-            ->getEntries();
     }
 
     public function testItDoesASearchWhenPagingIsNotMarkedAsCritical(): void
     {
         $this->authenticate();
 
-        $search = Operations::search(Filters::raw('(cn=foo)'));
+        $search = Operations::search(Filters::raw('(name=user)'))->base('dc=foo,dc=bar');
         $paging = $this->ldapClient()->paging($search);
         $result = $paging->getEntries();
 

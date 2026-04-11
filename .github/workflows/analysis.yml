@@ -8,16 +8,41 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Setup extension cache environment
+        id: extcache
+        uses: shivammathur/cache-extensions@v1
+        with:
+          php-version: '8.5'
+          extensions: openssl,mbstring,swoole
+          key: ext-cache-v1
+
+      - name: Cache extensions
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.extcache.outputs.dir }}
+          key: ${{ steps.extcache.outputs.key }}
+          restore-keys: ${{ steps.extcache.outputs.key }}
+
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.1'
-          extension-csv: openssl,mbstring
+          php-version: '8.5'
+          extensions: openssl,mbstring,swoole
           coverage: pcov
           tools: composer:2.9
 
-      - name: Install OpenLDAP
-        run: sudo ./tests/resources/openldap/setup.sh
+      - name: Create slapd socket directory
+        run: sudo mkdir -p /var/run/slapd && sudo chmod 777 /var/run/slapd
+
+      - name: Start OpenLDAP
+        run: docker compose -f tests/resources/openldap/docker-compose.yml up -d --build --wait
+
+      - name: Show OpenLDAP logs on failure
+        if: failure()
+        run: docker compose -f tests/resources/openldap/docker-compose.yml logs --tail=100
+
+      - name: Add foo.com hosts entry
+        run: echo "127.0.0.1 foo.com" | sudo tee -a /etc/hosts
 
       - name: Get Composer Cache Directory
         id: composer-cache
@@ -40,9 +65,7 @@ jobs:
           composer run-script analyse-tests
 
       - name: Run Test Coverage
-        env:
-          COMPOSER_ALLOW_SUPERUSER: 1
-        run: sudo composer run-script --timeout=0 test-coverage
+        run: composer run-script --timeout=0 test-coverage
 
       - name: Upload Unit Coverage to Codecov
         uses: codecov/codecov-action@v3

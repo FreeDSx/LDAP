@@ -25,11 +25,11 @@ use FreeDSx\Ldap\Server\RequestContext;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ProxyHandler extends ProxyRequestHandler implements RootDseHandlerInterface
+class ProxyHandler extends ProxyBackend implements RootDseHandlerInterface
 {
     public function __construct(LdapClient $client)
     {
-        $this->ldap = $client;
+        parent::__construct($client);
     }
 
     /**
@@ -47,7 +47,6 @@ class ProxyHandler extends ProxyRequestHandler implements RootDseHandlerInterfac
             )
             ->first();
 
-        // This technically could happen...but should not.
         if (!$rootDse) {
             throw new OperationException(
                 'Entry not found.',

@@ -15,8 +15,11 @@ namespace FreeDSx\Ldap\Server;
 
 use FreeDSx\Ldap\Protocol\Authenticator;
 use FreeDSx\Ldap\Protocol\Bind\AnonymousBind;
+use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
+use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
 use FreeDSx\Ldap\Protocol\Bind\SaslBind;
 use FreeDSx\Ldap\Protocol\Bind\SimpleBind;
+use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Sasl\Sasl;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
@@ -38,23 +41,30 @@ class ServerProtocolFactory
     {
         $serverQueue = new ServerQueue($socket);
 
-        $requestHandler = $this->handlerFactory->makeRequestHandler();
+        $backend = $this->handlerFactory->makeBackend();
+        $passwordAuthenticator = $this->handlerFactory->makePasswordAuthenticator();
 
         $authenticators = [
             new SimpleBind(
                 queue: $serverQueue,
-                dispatcher: $requestHandler,
+                authenticator: $passwordAuthenticator,
             ),
             new AnonymousBind($serverQueue),
         ];
         $saslMechanisms = $this->options->getSaslMechanisms();
 
         if (!empty($saslMechanisms)) {
+            $responseFactory = new ResponseFactory();
             $authenticators[] = new SaslBind(
                 queue: $serverQueue,
-                dispatcher: $requestHandler,
+                exchange: new SaslExchange(
+                    $serverQueue,
+                    $responseFactory,
+                    new MechanismOptionsBuilderFactory($passwordAuthenticator),
+                ),
                 sasl: new Sasl(['supported' => $saslMechanisms]),
                 mechanisms: $saslMechanisms,
+                responseFactory: $responseFactory,
             );
         }
 

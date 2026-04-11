@@ -7,7 +7,7 @@ Upgrading from 0.x to 1.0
     * [Server Options](#server-options)
     * [Constructing a Proxy Server](#constructing-a-proxy-server)
     * [Using a Custom ServerRunner](#using-a-custom-serverrunner)
-    * [Request Handler Search Return Type](#request-handler-search-return-type)
+    * [Migrating from RequestHandlerInterface to LdapBackendInterface](#migrating-from-requesthandlerinterface-to-ldapbackendinterface)
 
 ## Client Changes
 
@@ -148,65 +148,255 @@ $ldap = new LdapServer(
 );
 ```
 
-## Using Request Handlers
+## Migrating from RequestHandlerInterface to LdapBackendInterface
 
-Previously, you could have set request handlers using the fully qualified class name. These must now be class instances.
+`RequestHandlerInterface`, `GenericRequestHandler`, `PagingHandlerInterface`, and related classes have been removed.
+The server now works with a single backend object that implements `LdapBackendInterface` (read-only) or
+`WritableLdapBackendInterface` (read-write). Paging is handled automatically by the backend via PHP generators —
+no separate paging handler is needed.
 
-**Before**:
-
-```php
-use FreeDSx\Ldap\LdapServer;
-use Foo\LdapProxyHandler;
-
-$server = new LdapServer([
-    'request_handler' => LdapProxyHandler::class,
-]);
-$server->run();
-```
-
-**After**:
+**Before** (0.x `RequestHandlerInterface`):
 
 ```php
-use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\ServerOptions;
-use Foo\LdapProxyHandler;
+use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Server\RequestContext;
+use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
+
+class MyHandler extends GenericRequestHandler
+{
+    public function bind(
+        RequestContext $context,
+        string $username,
+        string $password,
+    ): bool {
+        return $username === 'admin' && $password === 'secret';
+    }
+
+    public function search(
+        RequestContext $context,
+        SearchRequest $request,
+    ): Entries {
+        return new Entries();
+    }
+}
 
 $server = new LdapServer(
     (new ServerOptions)
-        ->setRequestHandler(new LdapProxyHandler())
+        ->setRequestHandler(new MyHandler())
 );
-$server->run();
 ```
 
-## Request Handler Search Return Type
-
-The `search()` method of `RequestHandlerInterface` now returns `SearchResult` instead of `Entries`. Wrap your returned
-entries in `SearchResult::make()`. The new return type also allows returning response controls and non-success result
-codes (e.g. for partial results).
-
-**Before**:
+**After** (1.0 `LdapBackendInterface`):
 
 ```php
-use FreeDSx\Ldap\Entry\Entries;
-use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Server\RequestContext;
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\SearchContext;
+use Generator;
 
-public function search(RequestContext $context, SearchRequest $search): Entries
+class MyBackend implements LdapBackendInterface
 {
-    return new Entries(/* ... */);
+    public function search(SearchContext $context): Generator
+    {
+        // Yield matching entries. Paging is handled automatically.
+        yield from [];
+    }
+
+    public function get(Dn $dn): ?Entry
+    {
+        return null;
+    }
+
+    public function compare(
+        Dn $dn,
+        EqualityFilter $filter,
+    ): bool {
+        throw new OperationException(
+            sprintf('No such object: %s', $dn->toString()),
+            ResultCode::NO_SUCH_OBJECT,
+        );
+    }
+}
+
+$server = (new LdapServer())
+    ->useBackend(new MyBackend());
+```
+
+### Authentication
+
+The `bind()` method on `GenericRequestHandler` has been replaced by `PasswordAuthenticatableInterface`. Authentication
+is now a separate concern decoupled from the backend.
+
+**Default behaviour**: if your backend stores a `userPassword` attribute on entries, the built-in `PasswordAuthenticator`
+verifies credentials automatically — no extra code needed. Supported schemes: `{SHA}`, `{SSHA}`, `{MD5}`, `{SMD5}`,
+and plaintext.
+
+**Custom authentication**: implement `PasswordAuthenticatableInterface` on your backend (or on a dedicated class) to
+replicate the old `bind()` behaviour:
+
+```php
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\SearchContext;
+use Generator;
+use SensitiveParameter;
+
+class MyBackend implements LdapBackendInterface, PasswordAuthenticatableInterface
+{
+    public function search(SearchContext $context): Generator
+    {
+        yield from [];
+    }
+
+    public function get(Dn $dn): ?Entry
+    {
+        return null;
+    }
+
+    public function compare(
+        Dn $dn,
+        EqualityFilter $filter,
+    ): bool {
+        throw new OperationException(
+            sprintf('No such object: %s', $dn->toString()),
+            ResultCode::NO_SUCH_OBJECT,
+        );
+    }
+
+    public function verifyPassword(
+        string $name,
+        #[SensitiveParameter] string $password,
+    ): bool {
+        return $name === 'cn=admin,dc=example,dc=com' && $password === 'secret';
+    }
+
+    public function getPassword(string $username, string $mechanism): ?string
+    {
+        // Return a plaintext password for challenge SASL mechanisms (CRAM-MD5, SCRAM-*, etc.),
+        // or null to disable challenge SASL for this user.
+        return null;
+    }
 }
 ```
 
-**After**:
+The use of `PasswordAuthenticatableInterface` on the backend is automatically detected. Alternatively, register a
+standalone authenticator:
 
 ```php
-use FreeDSx\Ldap\Entry\Entries;
-use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Server\RequestContext;
-use FreeDSx\Ldap\Server\RequestHandler\SearchResult;
+$server = (new LdapServer())
+    ->useBackend(new MyBackend())
+    ->usePasswordAuthenticator(new MyAuthenticator());
+```
 
-public function search(RequestContext $context, SearchRequest $search): SearchResult
+### Write operations
+
+`add()`, `delete()`, `update()`, and `move()` are now part of `WritableLdapBackendInterface`. Each operation receives
+a typed command object. Use `WritableBackendTrait` to implement the dispatch automatically:
+
+```php
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Server\Backend\SearchContext;
+use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
+use FreeDSx\Ldap\Server\Backend\Write\WritableBackendTrait;
+use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
+use Generator;
+
+class MyBackend implements WritableLdapBackendInterface
 {
-    return SearchResult::make(new Entries(/* ... */));
+    use WritableBackendTrait;
+
+    public function search(SearchContext $context): Generator
+    {
+        yield from [];
+    }
+
+    public function get(Dn $dn): ?Entry
+    {
+        return null;
+    }
+
+    public function compare(
+        Dn $dn,
+        EqualityFilter $filter,
+    ): bool {
+        // $dn     — Dn of the entry to compare against
+        // $filter — EqualityFilter: the attribute-value assertion
+        // Throw OperationException(NO_SUCH_OBJECT) if the entry does not exist.
+        throw new OperationException(
+            sprintf('No such object: %s', $dn->toString()),
+            ResultCode::NO_SUCH_OBJECT,
+        );
+    }
+
+    public function add(AddCommand $command): void
+    {
+        // $command->entry — Entry to persist
+    }
+
+    public function delete(DeleteCommand $command): void
+    {
+        // $command->dn — Dn of the entry to remove
+    }
+
+    public function update(UpdateCommand $command): void
+    {
+        // $command->dn      — Dn of the entry to modify
+        // $command->changes — Change[] of attribute changes
+    }
+
+    public function move(MoveCommand $command): void
+    {
+        // $command->dn           — current entry Dn
+        // $command->newRdn       — new relative Dn
+        // $command->deleteOldRdn — bool
+        // $command->newParent    — ?Dn new parent
+    }
 }
+```
+
+Implement `WritableLdapBackendInterface` instead of `LdapBackendInterface` when your backend supports write operations.
+
+### Paging
+
+Paging no longer requires a `PagingHandlerInterface` implementation. Return a `Generator` from `search()` and the
+the backend automatically slices it into pages when a client sends a paged search control. The `supportedControl`
+attribute of the RootDSE is populated automatically when a backend is configured.
+
+### Proxy server
+
+`ProxyRequestHandler` has been replaced by `ProxyBackend`. Extend it and provide an `LdapClient` instance:
+
+```php
+use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\RequestHandler\ProxyBackend;
+
+$server = (new LdapServer())
+    ->useBackend(new ProxyBackend(
+        (new ClientOptions)->setServers(['ldap.example.com'])
+    ));
+```
+
+Or use the convenience factory (unchanged from 0.x):
+
+```php
+$server = LdapServer::makeProxy('ldap.example.com');
 ```

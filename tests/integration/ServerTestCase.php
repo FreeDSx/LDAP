@@ -24,6 +24,8 @@ class ServerTestCase extends LdapTestCase
 
     private const SERVER_POLL_INTERVAL_US = 15_000; // 15ms
 
+    private const SERVER_TCP_PORT = 10389;
+
     /**
      * Shared server process — started once per test class via setUpBeforeClass.
      */
@@ -32,7 +34,7 @@ class ServerTestCase extends LdapTestCase
     /**
      * Stored so the shared server can be restarted after a test that stops it.
      */
-    private static string $sharedMode = 'ldapserver';
+    private static string $sharedMode = 'ldap-server';
 
     private static string $sharedTransport = 'tcp';
 
@@ -53,7 +55,7 @@ class ServerTestCase extends LdapTestCase
      */
     private bool $needsSharedRestart = false;
 
-    private string $serverMode = 'ldapserver';
+    private string $serverMode = 'ldap-server';
 
     public function setUp(): void
     {
@@ -75,7 +77,11 @@ class ServerTestCase extends LdapTestCase
     {
         parent::tearDown();
 
-        $this->client?->unbind();
+        try {
+            $this->client?->unbind();
+        } catch (\Throwable) {
+            // Server may have already closed; ignore unbind failures during teardown.
+        }
         $this->client = null;
 
         if ($this->overrideProcess !== null) {
@@ -135,13 +141,21 @@ class ServerTestCase extends LdapTestCase
         $process->start();
         self::waitForProcess($process, 'server starting...');
 
+        if ($transport !== 'unix') {
+            self::waitForPortOpen(self::SERVER_TCP_PORT);
+        }
+
         $this->overrideProcess = $process;
         $this->client = $this->buildClient($transport);
     }
 
     protected function stopServer(): void
     {
-        $this->client?->unbind();
+        try {
+            $this->client?->unbind();
+        } catch (\Throwable) {
+            // Connection may already be closed; ignore unbind failures.
+        }
         $this->client = null;
 
         if ($this->overrideProcess !== null) {
@@ -200,15 +214,52 @@ class ServerTestCase extends LdapTestCase
 
         $process = new Process($processArgs);
         $process->start();
-        self::waitForProcess(
-            $process,
-            'server starting...'
-        );
+        self::waitForProcess($process, 'server starting...');
+
+        if ($transport !== 'unix') {
+            self::waitForPortOpen(self::SERVER_TCP_PORT);
+        }
 
         self::$sharedProcess = $process;
     }
 
-    private function buildClient(string $transport): LdapClient
+    /**
+     * Probes localhost:$port until a TCP connection succeeds or the timeout
+     * expires. Called after waitForProcess() because the server bootstrap
+     * script echoes "server starting..." before the socket is bound, so the
+     * process output marker alone is not sufficient to guarantee readiness.
+     */
+    private static function waitForPortOpen(int $port): void
+    {
+        $deadline = microtime(true) + self::SERVER_MAX_WAIT_SECONDS;
+
+        while (microtime(true) < $deadline) {
+            $socket = @fsockopen(
+                '127.0.0.1',
+                $port,
+                $errno,
+                $errstr,
+                0.1
+            );
+
+            if ($socket !== false) {
+                fclose($socket);
+                usleep(100_000); // 100ms stabilization after successful probe
+
+                return;
+            }
+
+            usleep(self::SERVER_POLL_INTERVAL_US);
+        }
+
+        throw new Exception(sprintf(
+            'Port %d was not ready after %d seconds.',
+            $port,
+            self::SERVER_MAX_WAIT_SECONDS,
+        ));
+    }
+
+    protected function buildClient(string $transport): LdapClient
     {
         $useSsl = false;
         $servers = '127.0.0.1';

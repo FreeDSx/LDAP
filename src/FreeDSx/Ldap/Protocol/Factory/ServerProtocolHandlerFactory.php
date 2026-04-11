@@ -54,21 +54,39 @@ class ServerProtocolHandlerFactory
             );
         } elseif ($this->isRootDseSearch($request)) {
             return $this->getRootDseHandler();
+        } elseif ($this->isSubschemaSearch($request)) {
+            return new ServerProtocolHandler\ServerSubschemaHandler(
+                options: $this->options,
+                queue: $this->queue,
+            );
         } elseif ($this->isPagingSearch($request, $controls)) {
             return $this->getPagingHandler();
         } elseif ($request instanceof SearchRequest) {
             return new ServerProtocolHandler\ServerSearchHandler(
                 queue: $this->queue,
-                dispatcher: $this->handlerFactory->makeRequestHandler(),
+                backend: $this->handlerFactory->makeBackend(),
+                filterEvaluator: $this->handlerFactory->makeFilterEvaluator(),
             );
         } elseif ($request instanceof UnbindRequest) {
             return new ServerProtocolHandler\ServerUnbindHandler($this->queue);
         } else {
             return new ServerProtocolHandler\ServerDispatchHandler(
                 queue: $this->queue,
-                dispatcher: $this->handlerFactory->makeRequestHandler(),
+                backend: $this->handlerFactory->makeBackend(),
+                writeDispatcher: $this->handlerFactory->makeWriteDispatcher(),
             );
         }
+    }
+
+    private function isSubschemaSearch(RequestInterface $request): bool
+    {
+        if (!$request instanceof SearchRequest) {
+            return false;
+        }
+        $subschemaEntry = $this->options->getSubschemaEntry()->toString();
+
+        return $request->getScope() === SearchRequest::SCOPE_BASE_OBJECT
+            && strtolower((string) $request->getBaseDn()) === strtolower($subschemaEntry);
     }
 
     private function isRootDseSearch(RequestInterface $request): bool
@@ -102,18 +120,10 @@ class ServerProtocolHandlerFactory
 
     private function getPagingHandler(): ServerProtocolHandlerInterface
     {
-        $pagingHandler = $this->handlerFactory->makePagingHandler();
-
-        if (!$pagingHandler) {
-            return new ServerProtocolHandler\ServerPagingUnsupportedHandler(
-                queue: $this->queue,
-                dispatcher: $this->handlerFactory->makeRequestHandler(),
-            );
-        }
-
         return new ServerProtocolHandler\ServerPagingHandler(
             queue: $this->queue,
-            pagingHandler: $pagingHandler,
+            backend: $this->handlerFactory->makeBackend(),
+            filterEvaluator: $this->handlerFactory->makeFilterEvaluator(),
             requestHistory: $this->requestHistory,
         );
     }

@@ -54,6 +54,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
     ): void {
         $entry = Entry::fromArray('', [
             'namingContexts' => $this->options->getDseNamingContexts(),
+            'subschemaSubentry' => [$this->options->getSubschemaEntry()->toString()],
             'supportedExtension' => [
                 ExtendedRequest::OID_WHOAMI,
             ],
@@ -66,7 +67,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
                 ExtendedRequest::OID_START_TLS
             );
         }
-        if ($this->options->getPagingHandler()) {
+        if ($this->options->getBackend() !== null) {
             $entry->add(
                 'supportedControl',
                 Control::OID_PAGING
@@ -84,8 +85,6 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
 
         /** @var SearchRequest $request */
         $request = $message->getRequest();
-        $this->filterEntryAttributes($request, $entry);
-
         if ($this->rootDseHandler) {
             $entry = $this->rootDseHandler->rootDse(
                 new RequestContext($message->controls(), $token),
@@ -93,6 +92,8 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
                 $entry
             );
         }
+
+        $this->filterEntryAttributes($request, $entry);
 
         $this->queue->sendMessage(
             new LdapMessageResponse(

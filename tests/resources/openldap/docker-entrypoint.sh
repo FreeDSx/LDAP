@@ -72,8 +72,8 @@ chown openldap:openldap /var/run/slapd
 
 # Copy certs to the volume mount if provided.
 # ca.crt     - needed by the PHP test runner to validate TLS connections to OpenLDAP
-# slapd.crt  - used by the PHP LDAP server (ldapserver.php) for TLS
-# slapd.key  - used by the PHP LDAP server (ldapserver.php) for TLS
+# slapd.crt  - used by the PHP LDAP server (ldap-server.php) for TLS
+# slapd.key  - used by the PHP LDAP server (ldap-server.php) for TLS
 if [ -d "/cert-output" ]; then
     cp ${CA_CERT} /cert-output/ca.crt
     cp ${SLAPD_CERT} /cert-output/slapd.crt

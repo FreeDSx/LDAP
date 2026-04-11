@@ -10,10 +10,13 @@ LDAP Server Configuration
     * [ServerOptions:setIdleTimeout](#setidletimeout)
     * [ServerOptions:setRequireAuthentication](#setrequireauthentication)
     * [ServerOptions:setAllowAnonymous](#setallowanonymous)
-* [LDAP Protocol Handlers](#ldap-protocol-handlers)
-   * [ServerOptions:setRequestHandler](#setrequesthandler)
-   * [ServerOptions:setRootDseHandler](#setrootdsehandler)
-   * [ServerOptions:setPagingHandler](#setpaginghandler)
+    * [ServerOptions:setSocketAcceptTimeout](#setsocketaccepttimeout)
+* [Backend](#backend)
+    * [ServerOptions:setBackend](#setbackend)
+    * [ServerOptions:setFilterEvaluator](#setfilterevaluator)
+    * [ServerOptions:setRootDseHandler](#setrootdsehandler)
+    * [ServerOptions:setPasswordAuthenticator](#setpasswordauthenticator)
+    * [ServerOptions:setBindNameResolver](#setbindnameresolver)
 * [RootDSE Options](#rootdse-options)
     * [ServerOptions:setDseNamingContexts](#setdsenamingcontexts)
     * [ServerOptions:setDseAltServer](#setdsealtserver)
@@ -36,7 +39,7 @@ use FreeDSx\Ldap\LdapServer;
 $options = (new ServerOptions)
   ->setDseAltServer('dc2.local')
   ->setPort(33389);
-  
+
 $ldap = new LdapServer($options);
 ```
 
@@ -64,7 +67,7 @@ than 1024 instead if needed.
 ------------------
 #### setUnixSocket
 
-When using `unix` as the transport type, this is the full path to the socket file the client must interact with. 
+When using `unix` as the transport type, this is the full path to the socket file the client must interact with.
 
 **Default**: `/var/run/ldap.socket`
 
@@ -123,73 +126,191 @@ Whether anonymous binds should be allowed.
 
 **Default**: `false`
 
+------------------
+#### setSocketAcceptTimeout
 
-## LDAP Protocol Handlers
+The number of seconds (fractional) to wait for a new client connection before re-checking server state. Lower values
+make the server more responsive to shutdown signals and connection-limit changes at the cost of slightly more CPU usage
+in the accept loop.
 
-The LDAP server works by being provided "handler" classes. These classes implement interfaces to handle specific LDAP
-client requests and finish responses to them. You can either define a fully qualified class name for the handler in the 
-option, or provide an instance of the class. There are also methods available on the server for setting instances of these
-handlers (which will be detailed below).
+**Default**: `0.5`
+
+
+## Backend
+
+The LDAP server works by being provided a backend that implements `LdapBackendInterface` (or the writable extension
+`WritableLdapBackendInterface`). The backend is responsible for handling directory data (search, authentication, and
+optionally write operations). You can also plug in a custom filter evaluator or a custom RootDSE handler.
 
 ------------------
-#### setRequestHandler
+#### setBackend
 
-This should be an object instance that implements `FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface`. Server 
-request operations are then passed to this class along with the request context.
+This should be an object instance that implements `FreeDSx\Ldap\Server\Backend\LdapBackendInterface`. All directory
+operations (search, authenticate, and optionally write) are dispatched to this backend. Paging is handled automatically — no separate paging handler is needed.
 
-This request handler is used for each client connection.
+You can also use the fluent `useBackend()` method on `LdapServer` instead of setting it in `ServerOptions`:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use App\MyDirectoryBackend;
+
+$server = (new LdapServer())
+    ->useBackend(new MyDirectoryBackend());
+```
+
+Or via `ServerOptions`:
 
 ```php
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
-use App\MySpecialRequestHandler;
+use App\MyDirectoryBackend;
 
 $server = new LdapServer(
     (new ServerOptions)
-        ->setRequestHandler(new MySpecialRequestHandler())
+        ->setBackend(new MyDirectoryBackend())
 );
 ```
 
-**Default**: `FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler`
+**Default**: `null` (a no-op backend that returns errors for all operations)
 
+------------------
+#### setFilterEvaluator
+
+This should be an object instance that implements `FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface`. If provided,
+the server uses it when evaluating LDAP search filters against candidate entries returned by the backend. The default
+evaluator covers all standard LDAP filter types. A custom evaluator is useful when you need non-standard matching rules
+(for example, bitwise matching rules for Active Directory compatibility).
+
+```php
+use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\LdapServer;
+use App\MyFilterEvaluator;
+
+$server = (new LdapServer())
+    ->useFilterEvaluator(new MyFilterEvaluator());
+```
+
+**Default**: `FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator`
+
+------------------
 #### setRootDseHandler
 
-This should be an object instance that implements `FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface`. If this is defined,
-the server will use it when responding to RootDSE requests from clients. If it is not defined, then the server will always
-respond with a default RootDSE entry composed of values provided in the `ServerOptions::getDse*()` config options.
+This should be an object instance that implements `FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface`. If
+defined, the server calls it when responding to RootDSE requests from clients, passing the pre-built default entry so
+the handler can inspect or augment it. If not defined, the server responds with a default RootDSE entry composed of
+values from the `ServerOptions::getDse*()` configuration options.
+
+When a backend is provided and implements `RootDseHandlerInterface`, it is used automatically — no separate
+`setRootDseHandler()` call is needed.
 
 ```php
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
-use App\MySpecialRootDseHandler;
+use App\MyRootDseHandler;
 
 $server = new LdapServer(
     (new ServerOptions)
-        ->setRootDseHandler(new MySpecialRootDseHandler())
+        ->setRootDseHandler(new MyRootDseHandler())
 );
 ```
 
 **Default**: `null`
 
-#### setPagingHandler
+------------------
+#### setPasswordAuthenticator
 
-This should be an object instance that implements `FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface`. If this is defined,
-the server will use it when responding to client paged search requests. If it is not defined, then the server may
-send an operation error to the client if it requested a paged search as critical. If the paged search was not marked as
-critical, then the server will ignore the client paging control and send the search through the standard `ServerOptions::getRequestHandler()` class instance.
+This should be an object instance that implements `FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface`.
+It handles all password-based bind authentication — both simple binds and SASL mechanisms — through two methods:
+
+* `verifyPassword(string $name, string $password): bool` — called for simple binds and SASL PLAIN
+* `getPassword(string $username, string $mechanism): ?string` — called for challenge-based SASL mechanisms
+  (CRAM-MD5, DIGEST-MD5, SCRAM-*) that need a server-side credential to compute a digest
+
+The server resolves an authenticator in this order:
+
+1. An explicit instance set via `setPasswordAuthenticator()`
+2. The backend, if it implements `PasswordAuthenticatableInterface`
+3. A built-in `PasswordAuthenticator` that resolves the bind name to an entry via the configured
+   `BindNameResolverInterface` and verifies the entry's `userPassword` attribute
+
+Use this option when you need to delegate authentication to an external system (a database, an upstream LDAP server,
+an identity provider, etc.) without implementing the storage backend interface:
+
+```php
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+
+class ExternalAuthenticator implements PasswordAuthenticatableInterface
+{
+    public function verifyPassword(string $name, #[\SensitiveParameter] string $password): bool
+    {
+        // delegate to your auth system
+    }
+
+    public function getPassword(string $username, string $mechanism): ?string
+    {
+        // return plaintext password for SASL challenge mechanisms,
+        // or null to disable challenge SASL for this user
+        return null;
+    }
+}
+```
 
 ```php
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
-use App\MySpecialPagingHandler;
 
 $server = new LdapServer(
     (new ServerOptions)
-        ->setPagingHandler(new MySpecialPagingHandler())
+        ->setPasswordAuthenticator(new ExternalAuthenticator())
 );
 ```
 
-**Default**: `null`
+**Note**: Challenge-based SASL mechanisms (CRAM-MD5, DIGEST-MD5, SCRAM-*) require `getPassword()` to return a
+plaintext (or recoverable) credential. If `getPassword()` returns `null`, the mechanism will fail for that user.
+
+**Default**: `null` (resolved automatically as described above)
+
+------------------
+#### setBindNameResolver
+
+This should be an object instance that implements `FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface`.
+It translates a raw LDAP bind name into an `Entry` so the built-in `PasswordAuthenticator` can locate and verify credentials.
+
+The default resolver (`DnBindNameResolver`) treats the bind name as a literal DN and delegates to `LdapBackendInterface::get()`.
+Supply a custom resolver when clients bind with something other than a full DN — for example, a bare username or an email address:
+
+```php
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Entry\Entry;
+
+class UidBindNameResolver implements BindNameResolverInterface
+{
+    public function resolve(
+        string $name,
+        LdapBackendInterface $backend
+    ): ?Entry {
+        // Search for an entry whose uid attribute matches the bind name
+        // ...
+    }
+}
+```
+
+```php
+use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\LdapServer;
+
+$server = new LdapServer(
+    (new ServerOptions)
+        ->setBackend(new MyDirectoryBackend())
+        ->setBindNameResolver(new UidBindNameResolver())
+);
+```
+
+**Note**: This option is only used when the built-in `PasswordAuthenticator` is active. If you provide a fully custom
+authenticator via `setPasswordAuthenticator()`, name resolution is entirely your responsibility and this option has no effect.
+
+**Default**: `null` (`DnBindNameResolver` is used, treating the bind name as a literal DN)
 
 ## RootDSE Options
 
@@ -242,7 +363,7 @@ The server certificate private key. This can also be bundled with the certificat
 ------------------
 #### setSslCertPassphrase
 
-The passphrase needed for the server certificate's private key. 
+The passphrase needed for the server certificate's private key.
 
 **Default**: `(null)`
 
@@ -264,11 +385,27 @@ to use an encrypted stream only for communication to the server.
 The SASL mechanisms the server should support and advertise to clients via the `supportedSaslMechanisms` RootDSE attribute.
 Use the constants defined on `ServerOptions` to specify mechanisms:
 
-| Constant                         | Mechanism    | Handler Required                                     |
-|----------------------------------|--------------|------------------------------------------------------|
-| `ServerOptions::SASL_PLAIN`      | `PLAIN`      | `RequestHandlerInterface` (existing `bind()` method) |
-| `ServerOptions::SASL_CRAM_MD5`   | `CRAM-MD5`   | `SaslHandlerInterface`                               |
-| `ServerOptions::SASL_DIGEST_MD5` | `DIGEST-MD5` | `SaslHandlerInterface`                               |
+| Constant                                  | Mechanism             | Auth method called on `PasswordAuthenticatableInterface` |
+|-------------------------------------------|-----------------------|----------------------------------------------------------|
+| `ServerOptions::SASL_PLAIN`               | `PLAIN`               | `verifyPassword()`                                       |
+| `ServerOptions::SASL_CRAM_MD5`            | `CRAM-MD5`            | `getPassword()` (plaintext credential required)          |
+| `ServerOptions::SASL_DIGEST_MD5`          | `DIGEST-MD5`          | `getPassword()` (plaintext credential required)          |
+| `ServerOptions::SASL_SCRAM_SHA_1`         | `SCRAM-SHA-1`         | `getPassword()` (plaintext credential required)          |
+| `ServerOptions::SASL_SCRAM_SHA_1_PLUS`    | `SCRAM-SHA-1-PLUS`    | `getPassword()` (plaintext credential required)          |
+| `ServerOptions::SASL_SCRAM_SHA_224`       | `SCRAM-SHA-224`       | `getPassword()` (plaintext credential required)          |
+| `ServerOptions::SASL_SCRAM_SHA_224_PLUS`  | `SCRAM-SHA-224-PLUS`  | `getPassword()` (plaintext credential required)          |
+| `ServerOptions::SASL_SCRAM_SHA_256`       | `SCRAM-SHA-256`       | `getPassword()` (plaintext credential required)          |
+| `ServerOptions::SASL_SCRAM_SHA_256_PLUS`  | `SCRAM-SHA-256-PLUS`  | `getPassword()` (plaintext credential required)          |
+| `ServerOptions::SASL_SCRAM_SHA_384`       | `SCRAM-SHA-384`       | `getPassword()` (plaintext credential required)          |
+| `ServerOptions::SASL_SCRAM_SHA_384_PLUS`  | `SCRAM-SHA-384-PLUS`  | `getPassword()` (plaintext credential required)          |
+| `ServerOptions::SASL_SCRAM_SHA_512`       | `SCRAM-SHA-512`       | `getPassword()` (plaintext credential required)          |
+| `ServerOptions::SASL_SCRAM_SHA_512_PLUS`  | `SCRAM-SHA-512-PLUS`  | `getPassword()` (plaintext credential required)          |
+| `ServerOptions::SASL_SCRAM_SHA3_512`      | `SCRAM-SHA3-512`      | `getPassword()` (plaintext credential required)          |
+| `ServerOptions::SASL_SCRAM_SHA3_512_PLUS` | `SCRAM-SHA3-512-PLUS` | `getPassword()` (plaintext credential required)          |
+
+All mechanisms are handled through `PasswordAuthenticatableInterface` — no separate handler interface is required.
+Configure authentication via `setPasswordAuthenticator()` or by implementing `PasswordAuthenticatableInterface`
+on your backend. See [Authentication](General-Usage.md#authentication) for details.
 
 ```php
 use FreeDSx\Ldap\ServerOptions;
@@ -278,7 +415,7 @@ $server = new LdapServer(
     (new ServerOptions)
         ->setSaslMechanisms(
             ServerOptions::SASL_PLAIN,
-            ServerOptions::SASL_DIGEST_MD5,
+            ServerOptions::SASL_SCRAM_SHA_256,
         )
 );
 ```

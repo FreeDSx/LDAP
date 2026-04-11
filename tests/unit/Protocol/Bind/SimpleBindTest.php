@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Protocol\Bind\SimpleBind;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -32,26 +32,26 @@ final class SimpleBindTest extends TestCase
 {
     private SimpleBind $subject;
 
-    private RequestHandlerInterface&MockObject $mockDispatcher;
+    private PasswordAuthenticatableInterface&MockObject $mockAuthenticator;
 
     private ServerQueue&MockObject $mockQueue;
 
     protected function setUp(): void
     {
         $this->mockQueue = $this->createMock(ServerQueue::class);
-        $this->mockDispatcher = $this->createMock(RequestHandlerInterface::class);
+        $this->mockAuthenticator = $this->createMock(PasswordAuthenticatableInterface::class);
 
         $this->subject = new SimpleBind(
             $this->mockQueue,
-            $this->mockDispatcher,
+            $this->mockAuthenticator,
         );
     }
 
     public function test_it_should_return_a_token_on_success(): void
     {
-        $this->mockDispatcher
+        $this->mockAuthenticator
             ->expects(self::once())
-            ->method('bind')
+            ->method('verifyPassword')
             ->with('foo@bar', 'bar')
             ->willReturn(true);
 
@@ -82,9 +82,9 @@ final class SimpleBindTest extends TestCase
 
     public function test_it_should_throw_an_operations_exception_with_invalid_credentials_if_they_are_wrong(): void
     {
-        $this->mockDispatcher
+        $this->mockAuthenticator
             ->expects(self::once())
-            ->method('bind')
+            ->method('verifyPassword')
             ->with('foo@bar', 'bar')
             ->willReturn(false);
 

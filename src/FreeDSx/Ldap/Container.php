@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Server\RequestHandler\HandlerFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
+use FreeDSx\Ldap\Server\ServerRunner\SwooleServerRunner;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Socket\SocketPool;
 
@@ -206,9 +207,20 @@ class Container
 
     private function makeServerRunner(): ServerRunnerInterface
     {
+        $options = $this->get(ServerOptions::class);
+
+        if ($options->getUseSwooleRunner()) {
+            return new SwooleServerRunner(
+                serverProtocolFactory: $this->get(ServerProtocolFactory::class),
+                options: $options,
+                socketServerFactory: $this->get(SocketServerFactory::class),
+            );
+        }
+
         return new PcntlServerRunner(
             serverProtocolFactory: $this->get(ServerProtocolFactory::class),
-            logger: $this->get(ServerOptions::class)->getLogger(),
+            options: $options,
+            socketServerFactory: $this->get(SocketServerFactory::class),
         );
     }
 

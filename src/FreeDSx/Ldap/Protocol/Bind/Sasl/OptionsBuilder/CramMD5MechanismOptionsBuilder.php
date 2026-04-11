@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder;
 
-use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Sasl\Mechanism\CramMD5Mechanism;
 
 /**
@@ -25,7 +25,7 @@ class CramMD5MechanismOptionsBuilder implements MechanismOptionsBuilderInterface
 {
     use RequiresPasswordTrait;
 
-    public function __construct(private readonly SaslHandlerInterface $handler)
+    public function __construct(private readonly PasswordAuthenticatableInterface $handler)
     {
     }
 

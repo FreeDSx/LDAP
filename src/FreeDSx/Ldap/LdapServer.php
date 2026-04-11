@@ -13,15 +13,16 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
-use FreeDSx\Ldap\Exception\InvalidArgumentException;
-use FreeDSx\Ldap\Server\RequestHandler\PagingHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyHandler;
-use FreeDSx\Ldap\Server\RequestHandler\ProxyPagingHandler;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
-use FreeDSx\Ldap\Server\RequestHandler\SaslHandlerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
-use FreeDSx\Ldap\Server\SocketServerFactory;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
 use Psr\Log\LoggerInterface;
 
@@ -44,22 +45,15 @@ class LdapServer
     }
 
     /**
-     * Runs the LDAP server. Binds the socket on the request IP/port and sends it to the server runner.
+     * Runs the LDAP server. Binds the socket and starts accepting client connections.
      *
      * @throws ConnectionException
-     * @throws InvalidArgumentException
      */
     public function run(): void
     {
-        $this->validateSaslConfiguration();
-
-        $socketServer = $this->container
-            ->get(SocketServerFactory::class)
-            ->makeAndBind();
-
         $runner = $this->options->getServerRunner() ?? $this->container->get(ServerRunnerInterface::class);
 
-        $runner->run($socketServer);
+        $runner->run();
     }
 
     /**
@@ -71,11 +65,52 @@ class LdapServer
     }
 
     /**
-     * Specify an instance of a request handler to use for incoming LDAP requests.
+     * Specify an entry storage implementation to back the LDAP server.
+     *
+     * Use useBackend() instead when implementing a fully custom backend (e.g.
+     * a proxy) that handles LDAP semantics itself.
      */
-    public function useRequestHandler(RequestHandlerInterface $requestHandler): self
+    public function useStorage(EntryStorageInterface $storage): self
     {
-        $this->options->setRequestHandler($requestHandler);
+        return $this->useBackend(new WritableStorageBackend($storage));
+    }
+
+    /**
+     * Specify a backend to use for incoming LDAP requests.
+     */
+    public function useBackend(LdapBackendInterface $backend): self
+    {
+        $this->options->setBackend($backend);
+
+        return $this;
+    }
+
+    /**
+     * Override the bind name resolver used to translate a raw bind name to an Entry.
+     */
+    public function useBindNameResolver(BindNameResolverInterface $resolver): self
+    {
+        $this->options->setBindNameResolver($resolver);
+
+        return $this;
+    }
+
+    /**
+     * Override the password authenticator used for simple bind and SASL PLAIN.
+     */
+    public function usePasswordAuthenticator(PasswordAuthenticatableInterface $authenticator): self
+    {
+        $this->options->setPasswordAuthenticator($authenticator);
+
+        return $this;
+    }
+
+    /**
+     * Register a handler for one or more LDAP write operations.
+     */
+    public function useWriteHandler(WriteHandlerInterface $handler): self
+    {
+        $this->options->addWriteHandler($handler);
 
         return $this;
     }
@@ -91,11 +126,12 @@ class LdapServer
     }
 
     /**
-     * Specify an instance of a paging handler to use for paged search requests.
+     * Override the filter evaluator used by the server when applying LDAP filters
+     * to entries returned by the backend's search() generator.
      */
-    public function usePagingHandler(PagingHandlerInterface $pagingHandler): self
+    public function useFilterEvaluator(FilterEvaluatorInterface $evaluator): self
     {
-        $this->options->setPagingHandler($pagingHandler);
+        $this->options->setFilterEvaluator($evaluator);
 
         return $this;
     }
@@ -111,30 +147,16 @@ class LdapServer
     }
 
     /**
-     * Validates that the SASL configuration is consistent before the server starts.
+     * Configure the server to use the Swoole coroutine runner instead of the default PCNTL process runner.
      *
-     * @throws InvalidArgumentException
+     * Requires the swoole PHP extension. The SwooleServerRunner handles each client connection in its own
+     * coroutine within a single process, making in-memory storage adapters safe to use concurrently.
      */
-    private function validateSaslConfiguration(): void
+    public function useSwooleRunner(): self
     {
-        $challengeMechanisms = array_diff(
-            $this->options->getSaslMechanisms(),
-            [ServerOptions::SASL_PLAIN],
-        );
+        $this->options->setUseSwooleRunner(true);
 
-        if (empty($challengeMechanisms)) {
-            return;
-        }
-
-        $handler = $this->options->getRequestHandler();
-
-        if (!$handler instanceof SaslHandlerInterface) {
-            throw new InvalidArgumentException(sprintf(
-                'The SASL mechanism(s) [%s] require the request handler to implement %s.',
-                implode(', ', $challengeMechanisms),
-                SaslHandlerInterface::class,
-            ));
-        }
+        return $this;
     }
 
     /**
@@ -155,11 +177,8 @@ class LdapServer
             $clientOptions->setServers((array) $servers)
         );
 
-        $proxyRequestHandler = new ProxyHandler($client);
         $server = new LdapServer($serverOptions);
-        $server->useRequestHandler($proxyRequestHandler);
-        $server->useRootDseHandler($proxyRequestHandler);
-        $server->usePagingHandler(new ProxyPagingHandler($client));
+        $server->useBackend(new ProxyHandler($client));
 
         return $server;
     }

@@ -14,21 +14,21 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder;
 
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\PlainMechanismOptionsBuilder;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Sasl\Mechanism\PlainMechanism;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class PlainMechanismOptionsBuilderTest extends TestCase
 {
-    private RequestHandlerInterface&MockObject $mockDispatcher;
+    private PasswordAuthenticatableInterface&MockObject $mockAuthenticator;
 
     private PlainMechanismOptionsBuilder $subject;
 
     protected function setUp(): void
     {
-        $this->mockDispatcher = $this->createMock(RequestHandlerInterface::class);
-        $this->subject = new PlainMechanismOptionsBuilder($this->mockDispatcher);
+        $this->mockAuthenticator = $this->createMock(PasswordAuthenticatableInterface::class);
+        $this->subject = new PlainMechanismOptionsBuilder($this->mockAuthenticator);
     }
 
     public function test_it_supports_the_plain_mechanism(): void
@@ -52,11 +52,11 @@ final class PlainMechanismOptionsBuilderTest extends TestCase
         self::assertIsCallable($options['validate']);
     }
 
-    public function test_the_validate_callable_delegates_to_dispatcher_bind(): void
+    public function test_the_validate_callable_delegates_to_backend_verify_password(): void
     {
-        $this->mockDispatcher
+        $this->mockAuthenticator
             ->expects(self::once())
-            ->method('bind')
+            ->method('verifyPassword')
             ->with('cn=user,dc=foo,dc=bar', '12345')
             ->willReturn(true);
 
@@ -68,10 +68,10 @@ final class PlainMechanismOptionsBuilderTest extends TestCase
         self::assertTrue($result);
     }
 
-    public function test_the_validate_callable_returns_false_when_bind_fails(): void
+    public function test_the_validate_callable_returns_false_when_verify_password_fails(): void
     {
-        $this->mockDispatcher
-            ->method('bind')
+        $this->mockAuthenticator
+            ->method('verifyPassword')
             ->willReturn(false);
 
         $options = $this->subject->buildOptions(null, PlainMechanism::NAME);

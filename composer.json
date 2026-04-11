@@ -17,7 +17,7 @@
   "require": {
     "php": ">=8.1",
     "freedsx/asn1": ">=0.4.0",
-    "freedsx/socket": ">=0.5.0",
+    "freedsx/socket": ">=0.6.2",
     "freedsx/sasl": ">=0.2.1",
     "psr/log": "^3"
   },
@@ -29,11 +29,13 @@
     "squizlabs/php_codesniffer": "^3.7",
     "slevomat/coding-standard": "^7.2",
     "phpstan/phpstan-phpunit": "^2.0",
-    "phpstan/extension-installer": "^1.4"
+    "phpstan/extension-installer": "^1.4",
+    "swoole/ide-helper": "^6.0"
   },
   "suggest": {
     "ext-openssl": "For SSL/TLS support and some SASL mechanisms.",
-    "ext-pcntl": "For LDAP server functionality."
+    "ext-pcntl": "For LDAP server functionality.",
+    "ext-swoole": "For the SwooleServerRunner, enabling coroutine-based connection handling with shared in-memory storage."
   },
   "autoload": {
     "psr-4": {"FreeDSx\\Ldap\\": "src/FreeDSx/Ldap"}

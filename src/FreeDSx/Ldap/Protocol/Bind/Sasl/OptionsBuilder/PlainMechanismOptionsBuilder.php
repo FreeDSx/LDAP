@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder;
 
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Sasl\Mechanism\PlainMechanism;
 
 /**
@@ -23,7 +23,7 @@ use FreeDSx\Sasl\Mechanism\PlainMechanism;
  */
 class PlainMechanismOptionsBuilder implements MechanismOptionsBuilderInterface
 {
-    public function __construct(private readonly RequestHandlerInterface $dispatcher)
+    public function __construct(private readonly PasswordAuthenticatableInterface $authenticator)
     {
     }
 
@@ -36,7 +36,10 @@ class PlainMechanismOptionsBuilder implements MechanismOptionsBuilderInterface
     ): array {
         return [
             'validate' => fn (?string $authzId, string $authcId, string $password): bool =>
-                $this->dispatcher->bind($authcId, $password),
+                $this->authenticator->verifyPassword(
+                    $authcId,
+                    $password
+                ),
         ];
     }
 

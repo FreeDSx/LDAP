@@ -27,7 +27,7 @@ class LdapProxyTest extends ServerTestCase
         }
 
         static::initSharedServer(
-            'ldapproxy',
+            'ldap-proxy',
             'tcp',
         );
     }
@@ -40,7 +40,7 @@ class LdapProxyTest extends ServerTestCase
 
     public function setUp(): void
     {
-        $this->setServerMode('ldapproxy');
+        $this->setServerMode('ldap-proxy');
         parent::setUp();
     }
 

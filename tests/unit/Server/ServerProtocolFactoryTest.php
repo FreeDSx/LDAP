@@ -15,9 +15,10 @@ namespace Tests\Unit\FreeDSx\Ldap\Server;
 
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+use FreeDSx\Ldap\Server\Backend\GenericBackend;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
-use FreeDSx\Ldap\Server\RequestHandler\GenericRequestHandler;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Socket;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -36,6 +37,14 @@ final class ServerProtocolFactoryTest extends TestCase
         $this->mockHandlerFactory = $this->createMock(HandlerFactoryInterface::class);
         $this->mockServerAuthorization = $this->createMock(ServerAuthorization::class);
 
+        $this->mockHandlerFactory
+            ->method('makeBackend')
+            ->willReturn(new GenericBackend());
+
+        $this->mockHandlerFactory
+            ->method('makeFilterEvaluator')
+            ->willReturn(new FilterEvaluator());
+
         $this->subject = new ServerProtocolFactory(
             $this->mockHandlerFactory,
             new ServerOptions(),
@@ -49,20 +58,17 @@ final class ServerProtocolFactoryTest extends TestCase
 
         $this->mockHandlerFactory
             ->expects($this->once())
-            ->method('makeRequestHandler')
-            ->willReturn(new GenericRequestHandler());
+            ->method('makeBackend')
+            ->willReturn(new GenericBackend());
 
         $this->subject->make($mockSocket);
     }
 
     public function test_it_includes_sasl_when_mechanisms_are_configured(): void
     {
-        $mockSocket = $this->createMock(Socket::class);
+        $this->expectNotToPerformAssertions();
 
-        $this->mockHandlerFactory
-            ->expects($this->once())
-            ->method('makeRequestHandler')
-            ->willReturn(new GenericRequestHandler());
+        $mockSocket = $this->createMock(Socket::class);
 
         $subject = new ServerProtocolFactory(
             $this->mockHandlerFactory,

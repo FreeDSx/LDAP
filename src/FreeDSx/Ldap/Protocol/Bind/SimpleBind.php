@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
@@ -36,7 +36,7 @@ class SimpleBind implements BindInterface
 
     public function __construct(
         private readonly ServerQueue $queue,
-        private readonly RequestHandlerInterface $dispatcher,
+        private readonly PasswordAuthenticatableInterface $authenticator,
         private readonly ResponseFactory $responseFactory = new ResponseFactory(),
     ) {
     }
@@ -67,7 +67,7 @@ class SimpleBind implements BindInterface
      */
     private function simpleBind(SimpleBindRequest $request): TokenInterface
     {
-        if (!$this->dispatcher->bind($request->getUsername(), $request->getPassword())) {
+        if (!$this->authenticator->verifyPassword($request->getUsername(), $request->getPassword())) {
             throw new OperationException(
                 'Invalid credentials.',
                 ResultCode::INVALID_CREDENTIALS
