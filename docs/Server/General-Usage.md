@@ -242,6 +242,9 @@ namespace App;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\SearchContext;
 use Generator;
@@ -275,6 +278,28 @@ class MyReadOnlyBackend implements LdapBackendInterface
         // ...
         return null;
     }
+
+    /**
+     * Return true if the attribute-value assertion matches the entry, false if not.
+     * Throw OperationException(NO_SUCH_OBJECT) if the entry does not exist.
+     */
+    public function compare(
+        Dn $dn,
+        EqualityFilter $filter,
+    ): bool {
+        $entry = $this->get($dn);
+
+        if ($entry === null) {
+            throw new OperationException(
+                sprintf('No such object: %s', $dn->toString()),
+                ResultCode::NO_SUCH_OBJECT,
+            );
+        }
+
+        $attribute = $entry->get($filter->getAttribute());
+
+        return $attribute !== null && $attribute->has($filter->getValue());
+    }
 }
 ```
 
@@ -288,6 +313,9 @@ namespace App;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\SearchContext;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
@@ -312,6 +340,24 @@ class MyBackend implements WritableLdapBackendInterface
         return null;
     }
 
+    public function compare(
+        Dn $dn,
+        EqualityFilter $filter,
+    ): bool {
+        $entry = $this->get($dn);
+
+        if ($entry === null) {
+            throw new OperationException(
+                sprintf('No such object: %s', $dn->toString()),
+                ResultCode::NO_SUCH_OBJECT,
+            );
+        }
+
+        $attribute = $entry->get($filter->getAttribute());
+
+        return $attribute !== null && $attribute->has($filter->getValue());
+    }
+
     public function add(AddCommand $command): void
     {
         // $command->entry — Entry to persist
@@ -330,10 +376,10 @@ class MyBackend implements WritableLdapBackendInterface
 
     public function move(MoveCommand $command): void
     {
-        // $command->dn         — Dn: current entry DN
-        // $command->newRdn     — Rdn: new relative DN
+        // $command->dn           — Dn: current entry DN
+        // $command->newRdn       — Rdn: new relative DN
         // $command->deleteOldRdn — bool: whether to remove the old RDN attribute value
-        // $command->newParent  — ?Dn: new parent DN (null = same parent)
+        // $command->newParent    — ?Dn: new parent DN (null = same parent)
     }
 }
 ```

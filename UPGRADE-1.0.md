@@ -192,7 +192,10 @@ $server = new LdapServer(
 ```php
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\SearchContext;
 use Generator;
@@ -208,6 +211,16 @@ class MyBackend implements LdapBackendInterface
     public function get(Dn $dn): ?Entry
     {
         return null;
+    }
+
+    public function compare(
+        Dn $dn,
+        EqualityFilter $filter,
+    ): bool {
+        throw new OperationException(
+            sprintf('No such object: %s', $dn->toString()),
+            ResultCode::NO_SUCH_OBJECT,
+        );
     }
 }
 
@@ -228,11 +241,14 @@ and plaintext.
 replicate the old `bind()` behaviour:
 
 ```php
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\SearchContext;
-use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Entry\Entry;
 use Generator;
 use SensitiveParameter;
 
@@ -246,6 +262,16 @@ class MyBackend implements LdapBackendInterface, PasswordAuthenticatableInterfac
     public function get(Dn $dn): ?Entry
     {
         return null;
+    }
+
+    public function compare(
+        Dn $dn,
+        EqualityFilter $filter,
+    ): bool {
+        throw new OperationException(
+            sprintf('No such object: %s', $dn->toString()),
+            ResultCode::NO_SUCH_OBJECT,
+        );
     }
 
     public function verifyPassword(
@@ -279,18 +305,46 @@ $server = (new LdapServer())
 a typed command object. Use `WritableBackendTrait` to implement the dispatch automatically:
 
 ```php
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Server\Backend\SearchContext;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WritableBackendTrait;
 use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
+use Generator;
 
 class MyBackend implements WritableLdapBackendInterface
 {
     use WritableBackendTrait;
 
-    // search() and get() as above ...
+    public function search(SearchContext $context): Generator
+    {
+        yield from [];
+    }
+
+    public function get(Dn $dn): ?Entry
+    {
+        return null;
+    }
+
+    public function compare(
+        Dn $dn,
+        EqualityFilter $filter,
+    ): bool {
+        // $dn     — Dn of the entry to compare against
+        // $filter — EqualityFilter: the attribute-value assertion
+        // Throw OperationException(NO_SUCH_OBJECT) if the entry does not exist.
+        throw new OperationException(
+            sprintf('No such object: %s', $dn->toString()),
+            ResultCode::NO_SUCH_OBJECT,
+        );
+    }
 
     public function add(AddCommand $command): void
     {
