@@ -34,9 +34,9 @@ use Throwable;
  * single PHP process. This means all coroutines share the same memory, making
  * in-memory storage adapters safe to use with concurrent clients.
  *
- * Note on JsonFileStorageAdapter: although Swoole hooks make file reads
- * coroutine-friendly, flock() may still cause brief stalls under high write
- * concurrency. For write-heavy workloads prefer the InMemoryStorageAdapter.
+ * Note on JsonFileStorage: although Swoole hooks make file reads coroutine-friendly,
+ * flock() may still cause brief stalls under high write concurrency. For write-heavy
+ * workloads prefer InMemoryStorage.
  *
  * Note on socket creation: the SocketServer must be created inside Coroutine\run()
  * for Swoole's stream hooks to intercept stream_socket_accept() as a yielding call.

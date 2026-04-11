@@ -95,4 +95,76 @@ class DnTest extends TestCase
         );
         self::assertNull($this->subject->getParent());
     }
+
+    public function test_normalize_returns_lowercased_copy(): void
+    {
+        $dn = new Dn('CN=Alice,DC=Example,DC=Com');
+        $normalized = $dn->normalize();
+
+        self::assertSame(
+            'cn=alice,dc=example,dc=com',
+            $normalized->toString(),
+        );
+        self::assertSame(
+            'CN=Alice,DC=Example,DC=Com',
+            $dn->toString(),
+        );
+    }
+
+    public function test_is_child_of_returns_true_for_direct_child(): void
+    {
+        $child = new Dn('cn=alice,dc=example,dc=com');
+
+        self::assertTrue(
+            $child->isChildOf(new Dn('dc=example,dc=com')),
+        );
+    }
+
+    public function test_is_child_of_returns_false_for_grandchild(): void
+    {
+        $grandchild = new Dn('cn=alice,ou=people,dc=example,dc=com');
+
+        self::assertFalse(
+            $grandchild->isChildOf(new Dn('dc=example,dc=com')),
+        );
+    }
+
+    public function test_is_child_of_returns_false_for_unrelated_dn(): void
+    {
+        $dn = new Dn('cn=alice,dc=other,dc=com');
+
+        self::assertFalse(
+            $dn->isChildOf(new Dn('dc=example,dc=com')),
+        );
+    }
+
+    public function test_is_child_of_root_returns_true_for_single_component_dn(): void
+    {
+        self::assertTrue(
+            (new Dn('dc=com'))->isChildOf(new Dn('')),
+        );
+    }
+
+    public function test_is_child_of_root_returns_false_for_multi_component_dn(): void
+    {
+        self::assertFalse(
+            (new Dn('dc=example,dc=com'))->isChildOf(new Dn('')),
+        );
+    }
+
+    public function test_is_child_of_is_case_insensitive(): void
+    {
+        self::assertTrue(
+            (new Dn('cn=alice,dc=example,dc=com'))->isChildOf(new Dn('DC=EXAMPLE,DC=COM')),
+        );
+    }
+
+    public function test_is_child_of_handles_escaped_comma_in_rdn_value(): void
+    {
+        $child = new Dn('cn=fo\,o,dc=local,dc=example');
+
+        self::assertTrue(
+            $child->isChildOf(new Dn('dc=local,dc=example')),
+        );
+    }
 }

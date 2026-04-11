@@ -10,9 +10,9 @@ General LDAP Server Usage
 * [Providing a Backend](#providing-a-backend)
   * [Read-Only Backend](#read-only-backend)
   * [Writable Backend](#writable-backend)
-  * [Built-In Storage Adapters](#built-in-storage-adapters)
-    * [InMemoryStorageAdapter](#inmemorystorageadapter)
-    * [JsonFileStorageAdapter](#jsonfilestorageadapter)
+  * [Built-In Storage Implementations](#built-in-storage-implementations)
+    * [InMemoryStorage](#inmemorystorage)
+    * [JsonFileStorage](#jsonfilestorage)
   * [Proxy Backend](#proxy-backend)
   * [Custom Filter Evaluation](#custom-filter-evaluation)
 * [Authentication](#authentication)
@@ -48,7 +48,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorageAdapter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\ServerOptions;
 
 $passwordHash = '{SHA}' . base64_encode(sha1('secret', true));
@@ -57,7 +57,7 @@ $server = new LdapServer(
     (new ServerOptions())->setDseNamingContexts('dc=example,dc=com')
 );
 
-$server->useBackend(new InMemoryStorageAdapter([
+$server->useStorage(new InMemoryStorage([
     new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
     new Entry(
         new Dn('cn=admin,dc=example,dc=com'),
@@ -82,7 +82,7 @@ custom `BindNameResolverInterface` translates the username to an entry.
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorageAdapter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -105,7 +105,7 @@ $server = new LdapServer(
         ->setBindNameResolver(new UidBindNameResolver())
 );
 
-$server->useBackend(JsonFileStorageAdapter::forPcntl('/var/lib/myapp/ldap.json'));
+$server->useStorage(JsonFileStorage::forPcntl('/var/lib/myapp/ldap.json'));
 $server->run();
 ```
 
@@ -125,7 +125,7 @@ For full control over credential storage — for example, delegating to an exter
 ```php
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorageAdapter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 use FreeDSx\Ldap\ServerOptions;
 use SensitiveParameter;
 
@@ -159,7 +159,7 @@ $server = new LdapServer(
         )
 );
 
-$server->useBackend(JsonFileStorageAdapter::forPcntl('/var/lib/myapp/ldap.json'));
+$server->useStorage(JsonFileStorage::forPcntl('/var/lib/myapp/ldap.json'));
 $server->usePasswordAuthenticator(new MyAuthenticator());
 $server->run();
 ```
@@ -205,8 +205,20 @@ For a customisable proxy, extend `ProxyBackend` directly. See [Proxy Backend](#p
 
 ## Providing a Backend
 
-A backend is a class implementing `LdapBackendInterface` (read-only) or `WritableLdapBackendInterface` (read + write).
-It is registered with `LdapServer::useBackend()`:
+For storage-backed servers, provide an `EntryStorageInterface` implementation via `useStorage()`. FreeDSx LDAP
+wraps it in `WritableStorageBackend`, which handles all LDAP semantics — validation, error codes, scope checking,
+and entry transformation. Your storage implementation handles only raw persistence.
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+
+$server = (new LdapServer())->useStorage(new InMemoryStorage($entries));
+$server->run();
+```
+
+For backends that implement full LDAP semantics themselves (e.g. a proxy), use `useBackend()` with a class
+implementing `LdapBackendInterface` (read-only) or `WritableLdapBackendInterface` (read + write):
 
 ```php
 use FreeDSx\Ldap\LdapServer;
@@ -268,8 +280,8 @@ class MyReadOnlyBackend implements LdapBackendInterface
 
 ### Writable Backend
 
-`WritableLdapBackendInterface` extends `LdapBackendInterface` with write operations. Use `WritableBackendTrait` to
-implement the write dispatch — it routes each operation to a dedicated method receiving a typed command object:
+`WritableLdapBackendInterface` extends `LdapBackendInterface` with write operations. Use `WritableBackendTrait`
+to implement the write dispatch — it routes each operation to a dedicated method receiving a typed command object:
 
 ```php
 namespace App;
@@ -326,13 +338,13 @@ class MyBackend implements WritableLdapBackendInterface
 }
 ```
 
-### Built-In Storage Adapters
+### Built-In Storage Implementations
 
-Two adapters are included for common use cases.
+Two storage implementations are included for common use cases. Both are used via `useStorage()`.
 
-#### InMemoryStorageAdapter
+#### InMemoryStorage
 
-An in-memory, array-backed storage adapter. Suitable for:
+An in-memory, array-backed storage implementation. Suitable for:
 
 - **Swoole**: all connections share the same process memory.
 - **PCNTL** with pre-seeded, read-only data: data seeded before `run()` is inherited by all forked child processes.
@@ -344,41 +356,38 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorageAdapter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 
 $passwordHash = '{SHA}' . base64_encode(sha1('secret', true));
 
-$adapter = new InMemoryStorageAdapter([
+$server = (new LdapServer())->useStorage(new InMemoryStorage([
     new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
     new Entry(
         new Dn('cn=admin,dc=example,dc=com'),
         new Attribute('cn', 'admin'),
         new Attribute('userPassword', $passwordHash),
     ),
-]);
-
-$server = (new LdapServer())->useBackend($adapter);
+]));
 $server->run();
 ```
 
-#### JsonFileStorageAdapter
+#### JsonFileStorage
 
-A file-backed adapter that persists the directory as a JSON file. Safe for PCNTL (write operations are serialised with
-`flock(LOCK_EX)` and the in-memory cache is invalidated via `filemtime` checks).
+A file-backed storage implementation that persists the directory as a JSON file. Safe for PCNTL (write operations are
+serialised with `flock(LOCK_EX)` and the in-memory read cache is invalidated via `filemtime` checks).
 
 Use the named constructor that matches your server runner:
 
 ```php
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorageAdapter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 
 // PCNTL runner — uses flock() to serialise writes across forked processes
-$adapter = JsonFileStorageAdapter::forPcntl('/var/lib/myapp/ldap.json');
+$server = (new LdapServer())->useStorage(JsonFileStorage::forPcntl('/var/lib/myapp/ldap.json'));
+$server->run();
 
 // Swoole runner — uses a coroutine Channel mutex and non-blocking file I/O
-$adapter = JsonFileStorageAdapter::forSwoole('/var/lib/myapp/ldap.json');
-
-$server = (new LdapServer())->useBackend($adapter);
+$server = (new LdapServer())->useStorage(JsonFileStorage::forSwoole('/var/lib/myapp/ldap.json'));
 $server->run();
 ```
 

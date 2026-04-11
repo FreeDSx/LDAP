@@ -25,6 +25,7 @@ use function count;
 use function implode;
 use function ltrim;
 use function preg_split;
+use function strtolower;
 
 /**
  * Represents a Distinguished Name.
@@ -130,6 +131,32 @@ class Dn implements IteratorAggregate, Countable, Stringable
         } catch (UnexpectedValueException | InvalidArgumentException) {
             return false;
         }
+    }
+
+    /**
+     * Return a normalised (lowercased) copy of this DN.
+     */
+    public function normalize(): Dn
+    {
+        return new Dn(strtolower($this->dn));
+    }
+
+    /**
+     * Return true if this DN is a direct child of $parent.
+     *
+     * @throws UnexpectedValueException
+     */
+    public function isChildOf(Dn $parent): bool
+    {
+        $parentDn = $parent->toString();
+        if ($parentDn === '') {
+            return $this->getParent() === null
+                && $this->toString() !== '';
+        }
+        $myParent = $this->getParent();
+
+        return $myParent !== null
+            && strtolower($myParent->toString()) === strtolower($parentDn);
     }
 
     /**

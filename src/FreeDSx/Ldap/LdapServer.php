@@ -15,6 +15,8 @@ namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\RequestHandler\ProxyHandler;
 use FreeDSx\Ldap\Server\RequestHandler\RootDseHandlerInterface;
@@ -62,14 +64,18 @@ class LdapServer
     }
 
     /**
-     * Specify a backend to use for incoming LDAP requests.
+     * Specify an entry storage implementation to back the LDAP server.
      *
-     * The backend handles search and optionally write operations (add, delete,
-     * modify, rename) if it implements WritableLdapBackendInterface. Bind
-     * authentication is handled by a PasswordAuthenticatableInterface — either
-     * one registered via usePasswordAuthenticator(), the backend itself if it
-     * implements that interface, or the default PasswordAuthenticator (which
-     * reads the userPassword attribute from entries returned by the backend).
+     * Use useBackend() instead when implementing a fully custom backend (e.g.
+     * a proxy) that handles LDAP semantics itself.
+     */
+    public function useStorage(EntryStorageInterface $storage): self
+    {
+        return $this->useBackend(new WritableStorageBackend($storage));
+    }
+
+    /**
+     * Specify a backend to use for incoming LDAP requests.
      */
     public function useBackend(LdapBackendInterface $backend): self
     {
@@ -80,11 +86,6 @@ class LdapServer
 
     /**
      * Override the password authenticator used for simple bind and SASL PLAIN.
-     *
-     * By default the server constructs a PasswordAuthenticator that reads the
-     * userPassword attribute from entries returned by the backend. Use this
-     * method to supply a custom implementation — for example, to support
-     * additional hash formats or to delegate verification to an external service.
      */
     public function usePasswordAuthenticator(PasswordAuthenticatableInterface $authenticator): self
     {
@@ -95,10 +96,6 @@ class LdapServer
 
     /**
      * Register a handler for one or more LDAP write operations.
-     *
-     * Handlers are tried in registration order, before the backend is used as
-     * a fallback. Multiple calls register multiple handlers, allowing each
-     * write operation to be handled by a separate class.
      */
     public function useWriteHandler(WriteHandlerInterface $handler): self
     {

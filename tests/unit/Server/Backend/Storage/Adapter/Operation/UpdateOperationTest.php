@@ -17,6 +17,8 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\UpdateOperation;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use PHPUnit\Framework\TestCase;
@@ -124,14 +126,14 @@ final class UpdateOperationTest extends TestCase
     {
         $command = new UpdateCommand(
             new Dn('cn=alice,dc=example,dc=com'),
-            [new Change(Change::TYPE_REPLACE, 'cn', 'alicia')],
+            [new Change(Change::TYPE_REPLACE, 'userPassword', 'newpassword')],
         );
 
         $result = $this->subject->execute($this->entry, $command);
 
         self::assertSame(
-            ['alicia'],
-            $result->get('cn')?->getValues()
+            ['newpassword'],
+            $result->get('userPassword')?->getValues()
         );
     }
 
@@ -140,23 +142,23 @@ final class UpdateOperationTest extends TestCase
         $command = new UpdateCommand(
             new Dn('cn=alice,dc=example,dc=com'),
             [
-                new Change(Change::TYPE_REPLACE, 'cn', 'alicia'),
-                new Change(Change::TYPE_ADD, 'cn', 'alice'),
+                new Change(Change::TYPE_REPLACE, 'mail', 'new@example.com'),
+                new Change(Change::TYPE_ADD, 'mail', 'alice@example.com'),
             ],
         );
 
         $result = $this->subject->execute($this->entry, $command);
 
-        $cn = $result->get('cn');
+        $mail = $result->get('mail');
 
-        self::assertNotNull($cn);
+        self::assertNotNull($mail);
         self::assertContains(
-            'alicia',
-            $cn->getValues()
+            'new@example.com',
+            $mail->getValues()
         );
         self::assertContains(
-            'alice',
-            $cn->getValues()
+            'alice@example.com',
+            $mail->getValues()
         );
     }
 
@@ -164,7 +166,7 @@ final class UpdateOperationTest extends TestCase
     {
         $command = new UpdateCommand(
             new Dn('cn=alice,dc=example,dc=com'),
-            [new Change(Change::TYPE_REPLACE, 'cn', 'alicia')],
+            [new Change(Change::TYPE_REPLACE, 'userPassword', 'newpassword')],
         );
 
         $result = $this->subject->execute($this->entry, $command);
@@ -172,6 +174,128 @@ final class UpdateOperationTest extends TestCase
         self::assertSame(
             $this->entry,
             $result
+        );
+    }
+
+    public function test_type_add_throws_attribute_or_value_exists_for_duplicate_value(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::ATTRIBUTE_OR_VALUE_EXISTS);
+
+        $this->subject->execute($this->entry, new UpdateCommand(
+            new Dn('cn=alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_ADD, 'mail', 'alice@example.com')],
+        ));
+    }
+
+    public function test_type_delete_throws_no_such_attribute_for_missing_attribute(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NO_SUCH_ATTRIBUTE);
+
+        $this->subject->execute($this->entry, new UpdateCommand(
+            new Dn('cn=alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_DELETE, 'telephoneNumber')],
+        ));
+    }
+
+    public function test_type_delete_throws_no_such_attribute_for_missing_value(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NO_SUCH_ATTRIBUTE);
+
+        $this->subject->execute($this->entry, new UpdateCommand(
+            new Dn('cn=alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_DELETE, 'mail', 'nobody@example.com')],
+        ));
+    }
+
+    public function test_type_delete_whole_attribute_throws_not_allowed_on_rdn_for_rdn_attribute(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NOT_ALLOWED_ON_RDN);
+
+        $this->subject->execute($this->entry, new UpdateCommand(
+            new Dn('cn=alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_DELETE, 'cn')],
+        ));
+    }
+
+    public function test_type_delete_specific_value_throws_not_allowed_on_rdn_for_rdn_value(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NOT_ALLOWED_ON_RDN);
+
+        $this->subject->execute($this->entry, new UpdateCommand(
+            new Dn('cn=alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_DELETE, 'cn', 'alice')],
+        ));
+    }
+
+    public function test_type_delete_specific_value_allows_removing_non_rdn_value_from_rdn_attribute(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=alice,dc=example,dc=com'),
+            new Attribute('cn', 'alice', 'alicia'),
+        );
+
+        $result = $this->subject->execute($entry, new UpdateCommand(
+            new Dn('cn=alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_DELETE, 'cn', 'alicia')],
+        ));
+
+        $cn = $result->get('cn');
+
+        self::assertNotNull($cn);
+        self::assertNotContains(
+            'alicia',
+            $cn->getValues(),
+        );
+        self::assertContains(
+            'alice',
+            $cn->getValues(),
+        );
+    }
+
+    public function test_type_replace_clear_throws_not_allowed_on_rdn_for_rdn_attribute(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NOT_ALLOWED_ON_RDN);
+
+        $this->subject->execute($this->entry, new UpdateCommand(
+            new Dn('cn=alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_REPLACE, 'cn')],
+        ));
+    }
+
+    public function test_type_replace_throws_not_allowed_on_rdn_when_new_values_omit_rdn_value(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NOT_ALLOWED_ON_RDN);
+
+        $this->subject->execute($this->entry, new UpdateCommand(
+            new Dn('cn=alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_REPLACE, 'cn', 'alicia')],
+        ));
+    }
+
+    public function test_type_replace_allows_replacing_rdn_attribute_when_rdn_value_is_retained(): void
+    {
+        $result = $this->subject->execute($this->entry, new UpdateCommand(
+            new Dn('cn=alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_REPLACE, 'cn', 'alice', 'alicia')],
+        ));
+
+        $cn = $result->get('cn');
+
+        self::assertNotNull($cn);
+        self::assertContains(
+            'alice',
+            $cn->getValues(),
+        );
+        self::assertContains(
+            'alicia',
+            $cn->getValues(),
         );
     }
 }

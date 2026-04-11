@@ -16,29 +16,25 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\CoroutineLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\StorageLockInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\WriteEntryOperationHandler;
-use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
-use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
-use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
-use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
-use FreeDSx\Ldap\Server\Backend\Write\WritableBackendTrait;
-use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\AtomicStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use Generator;
 
 /**
- * A file-backed storage adapter that persists the directory as a JSON file.
+ * A file-backed storage implementation that persists entries as a JSON file.
  *
- * Use the named constructors to select the correct locking strategy:
+ * Use the named constructors to select the appropriate locking strategy:
  *
- *   JsonFileStorageAdapter::forPcntl('/path/to/file.json')
- *   JsonFileStorageAdapter::forSwoole('/path/to/file.json')
+ *   JsonFileStorage::forPcntl('/path/to/file.json')
+ *   JsonFileStorage::forSwoole('/path/to/file.json')
+ *
+ * Reads are non-transactional (no lock acquired). Write operations performed
+ * through WritableStorageBackend are always routed through atomic(), which
+ * acquires the lock, loads the entire file into an in-memory buffer, passes
+ * that buffer to the operation, then writes the result back atomically.
  *
  * JSON format:
  * {
@@ -53,10 +49,9 @@ use Generator;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class JsonFileStorageAdapter implements WritableLdapBackendInterface
+final class JsonFileStorage implements EntryStorageInterface, AtomicStorageInterface
 {
-    use StorageAdapterTrait;
-    use WritableBackendTrait;
+    use ArrayEntryStorageTrait;
 
     /**
      * @var array<string, Entry>|null
@@ -68,7 +63,6 @@ class JsonFileStorageAdapter implements WritableLdapBackendInterface
     private function __construct(
         private readonly string $filePath,
         private readonly StorageLockInterface $lock,
-        private readonly WriteEntryOperationHandler $entryHandler = new WriteEntryOperationHandler(),
     ) {
     }
 
@@ -92,118 +86,55 @@ class JsonFileStorageAdapter implements WritableLdapBackendInterface
         );
     }
 
-    public function get(Dn $dn): ?Entry
+    public function find(Dn $dn): ?Entry
     {
-        return $this->read()[$this->normalise($dn)] ?? null;
-    }
-
-    public function search(SearchContext $context): Generator
-    {
-        $normBase = $this->normalise($context->baseDn);
-
-        foreach ($this->read() as $normDn => $entry) {
-            if ($this->isInScope($normDn, $normBase, $context->scope)) {
-                yield $entry;
-            }
-        }
+        return $this->read()[$dn->toString()] ?? null;
     }
 
     /**
-     * @throws OperationException
+     * @return Generator<Entry>
      */
-    public function add(AddCommand $command): void
+    public function list(Dn $baseDn, bool $subtree): Generator
     {
-        $this->withMutation(function (string $contents) use ($command): string {
+        return $this->yieldByScope(
+            $this->read(),
+            $baseDn,
+            $subtree
+        );
+    }
+
+    public function store(Entry $entry): void
+    {
+        $this->withMutation(function (string $contents) use ($entry): string {
             $data = $this->decodeContents($contents);
-            $normDn = $this->normalise($command->entry->getDn());
-
-            if (isset($data[$normDn])) {
-                throw new OperationException(
-                    sprintf('Entry already exists: %s', $command->entry->getDn()->toString()),
-                    ResultCode::ENTRY_ALREADY_EXISTS,
-                );
-            }
-
-            $data[$normDn] = $this->entryToArray($command->entry);
+            $data[$entry->getDn()->normalize()->toString()] = $this->entryToArray($entry);
 
             return $this->encodeContents($data);
         });
     }
 
-    /**
-     * @throws OperationException
-     */
-    public function delete(DeleteCommand $command): void
+    public function remove(Dn $dn): void
     {
-        $this->withMutation(function (string $contents) use ($command): string {
+        $this->withMutation(function (string $contents) use ($dn): string {
             $data = $this->decodeContents($contents);
-            $normDn = $this->normalise($command->dn);
-
-            foreach (array_keys($data) as $key) {
-                if ($this->isInScope($key, $normDn, SearchRequest::SCOPE_SINGLE_LEVEL)) {
-                    throw new OperationException(
-                        sprintf('Entry "%s" has subordinate entries and cannot be deleted.', $command->dn->toString()),
-                        ResultCode::NOT_ALLOWED_ON_NON_LEAF,
-                    );
-                }
-            }
-
-            unset($data[$normDn]);
+            unset($data[$dn->toString()]);
 
             return $this->encodeContents($data);
         });
     }
 
-    /**
-     * @throws OperationException
-     */
-    public function update(UpdateCommand $command): void
+    public function atomic(callable $operation): void
     {
-        $this->withMutation(function (string $contents) use ($command): string {
+        $this->withMutation(function (string $contents) use ($operation): string {
             $data = $this->decodeContents($contents);
-            $normDn = $this->normalise($command->dn);
-
-            if (!isset($data[$normDn])) {
-                throw new OperationException(
-                    sprintf('No such object: %s', $command->dn->toString()),
-                    ResultCode::NO_SUCH_OBJECT,
-                );
-            }
-
-            $entry = $this->entryHandler->apply(
-                $this->arrayToEntry($data[$normDn]),
-                $command,
+            $buffer = new JsonEntryBuffer(
+                $data,
+                $this->arrayToEntry(...),
+                $this->entryToArray(...),
             );
-            $data[$normDn] = $this->entryToArray($entry);
+            $operation($buffer);
 
-            return $this->encodeContents($data);
-        });
-    }
-
-    /**
-     * @throws OperationException
-     */
-    public function move(MoveCommand $command): void
-    {
-        $this->withMutation(function (string $contents) use ($command): string {
-            $data = $this->decodeContents($contents);
-            $normOld = $this->normalise($command->dn);
-
-            if (!isset($data[$normOld])) {
-                throw new OperationException(
-                    sprintf('No such object: %s', $command->dn->toString()),
-                    ResultCode::NO_SUCH_OBJECT,
-                );
-            }
-
-            $newEntry = $this->entryHandler->apply(
-                $this->arrayToEntry($data[$normOld]),
-                $command,
-            );
-            unset($data[$normOld]);
-            $data[$this->normalise($newEntry->getDn())] = $this->entryToArray($newEntry);
-
-            return $this->encodeContents($data);
+            return $this->encodeContents($buffer->getData());
         });
     }
 

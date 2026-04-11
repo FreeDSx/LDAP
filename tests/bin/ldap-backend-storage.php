@@ -10,9 +10,8 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorageAdapter;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorageAdapter;
-use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 use FreeDSx\Ldap\ServerOptions;
 
 require __DIR__ . '/../../vendor/autoload.php';
@@ -48,6 +47,13 @@ $entries = [
     ),
 ];
 
+$server = new LdapServer(
+    (new ServerOptions())
+        ->setPort(10389)
+        ->setTransport($transport)
+        ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL))
+);
+
 if ($handler === 'file') {
     $filePath = sys_get_temp_dir() . '/ldap_test_backend_storage.json';
 
@@ -55,21 +61,16 @@ if ($handler === 'file') {
         unlink($filePath);
     }
 
-    $adapter = JsonFileStorageAdapter::forPcntl($filePath);
+    $storage = JsonFileStorage::forPcntl($filePath);
 
     foreach ($entries as $entry) {
-        $adapter->add(new AddCommand($entry));
+        $storage->store($entry);
     }
-} else {
-    $adapter = new InMemoryStorageAdapter($entries);
-}
 
-$server = (new LdapServer(
-    (new ServerOptions())
-        ->setPort(10389)
-        ->setTransport($transport)
-        ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL))
-))->useBackend($adapter);
+    $server->useStorage($storage);
+} else {
+    $server->useStorage(new InMemoryStorage($entries));
+}
 
 if ($handler === 'swoole') {
     $server->useSwooleRunner();
