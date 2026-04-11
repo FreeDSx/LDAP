@@ -19,7 +19,6 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\CoroutineLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\StorageLockInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\AtomicStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use Generator;
 
@@ -49,7 +48,7 @@ use Generator;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class JsonFileStorage implements EntryStorageInterface, AtomicStorageInterface
+final class JsonFileStorage implements EntryStorageInterface
 {
     use ArrayEntryStorageTrait;
 

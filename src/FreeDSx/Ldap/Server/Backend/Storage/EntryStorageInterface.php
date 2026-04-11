@@ -74,4 +74,14 @@ interface EntryStorageInterface
      * Remove the entry for the given normalised DN. A no-op if the entry does not exist.
      */
     public function remove(Dn $dn): void;
+
+    /**
+     * Execute $operation as an atomic read-modify-write cycle.
+     *
+     * Implementations backed by a file, database, or any resource accessible to concurrent connections must acquire
+     * an appropriate lock or open a transaction before executing $operation, then commit or release on completion.
+     *
+     * @param callable(EntryStorageInterface): void $operation
+     */
+    public function atomic(callable $operation): void;
 }

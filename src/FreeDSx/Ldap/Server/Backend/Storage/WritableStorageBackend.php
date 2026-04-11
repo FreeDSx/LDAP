@@ -35,10 +35,9 @@ use Generator;
  * filtering, DN normalisation, and entry transformation — so that storage
  * implementations only need to provide raw persistence primitives.
  *
- * When the storage also implements AtomicStorageInterface, write operations
- * are wrapped in atomic() to ensure transactional consistency (e.g. file
- * locking, database transactions). Storage implementations that do not need
- * atomicity may implement EntryStorageInterface alone.
+ * All write operations are routed through EntryStorageInterface::atomic() to
+ * ensure transactional consistency. See EntryStorageInterface::atomic() for the
+ * contract each storage implementation must satisfy.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -80,7 +79,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
      */
     public function add(AddCommand $command): void
     {
-        $this->runWriteOperation(function (EntryStorageInterface $storage) use ($command): void {
+        $this->storage->atomic(function (EntryStorageInterface $storage) use ($command): void {
             $dn = $command->entry->getDn()->normalize();
             $this->assertParentExists($storage, $dn);
 
@@ -97,7 +96,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
      */
     public function delete(DeleteCommand $command): void
     {
-        $this->runWriteOperation(function (EntryStorageInterface $storage) use ($command): void {
+        $this->storage->atomic(function (EntryStorageInterface $storage) use ($command): void {
             $dn = $command->dn->normalize();
             $this->findOrFail($storage, $dn);
 
@@ -120,7 +119,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
      */
     public function update(UpdateCommand $command): void
     {
-        $this->runWriteOperation(function (EntryStorageInterface $storage) use ($command): void {
+        $this->storage->atomic(function (EntryStorageInterface $storage) use ($command): void {
             $dn = $command->dn->normalize();
             $entry = $this->findOrFail($storage, $dn);
             $storage->store($this->entryHandler->apply(
@@ -135,7 +134,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
      */
     public function move(MoveCommand $command): void
     {
-        $this->runWriteOperation(function (EntryStorageInterface $storage) use ($command): void {
+        $this->storage->atomic(function (EntryStorageInterface $storage) use ($command): void {
             $normOld = $command->dn->normalize();
             $entry = $this->findOrFail($storage, $normOld);
 
@@ -228,17 +227,5 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
             sprintf('Entry already exists: %s', $dn->toString()),
             ResultCode::ENTRY_ALREADY_EXISTS,
         );
-    }
-
-    /**
-     * @param callable(EntryStorageInterface): void $operation
-     */
-    private function runWriteOperation(callable $operation): void
-    {
-        if ($this->storage instanceof AtomicStorageInterface) {
-            $this->storage->atomic($operation);
-        } else {
-            $operation($this->storage);
-        }
     }
 }

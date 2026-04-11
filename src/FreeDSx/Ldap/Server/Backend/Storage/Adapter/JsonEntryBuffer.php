@@ -93,6 +93,11 @@ final class JsonEntryBuffer implements EntryStorageInterface
         unset($this->data[$dn->toString()]);
     }
 
+    public function atomic(callable $operation): void
+    {
+        $operation($this);
+    }
+
     /**
      * @return array<string, mixed>
      */

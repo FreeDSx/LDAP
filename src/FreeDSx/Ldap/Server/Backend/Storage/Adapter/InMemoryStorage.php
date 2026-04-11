@@ -80,4 +80,9 @@ final class InMemoryStorage implements EntryStorageInterface
     {
         unset($this->entries[$dn->toString()]);
     }
+
+    public function atomic(callable $operation): void
+    {
+        $operation($this);
+    }
 }
