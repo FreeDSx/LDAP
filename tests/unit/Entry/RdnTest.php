@@ -110,4 +110,57 @@ class RdnTest extends TestCase
             Rdn::escapeAll('# foo '),
         );
     }
+
+    public function test_has_returns_true_for_the_primary_component(): void
+    {
+        self::assertTrue($this->subject->has('cn'));
+    }
+
+    public function test_has_is_case_insensitive_on_the_attribute_name(): void
+    {
+        self::assertTrue($this->subject->has('CN'));
+    }
+
+    public function test_has_returns_false_when_no_component_matches(): void
+    {
+        self::assertFalse($this->subject->has('uid'));
+    }
+
+    public function test_has_finds_additional_multivalued_components(): void
+    {
+        $rdn = Rdn::create('cn=alice+uid=asmith');
+
+        self::assertTrue($rdn->has('uid'));
+    }
+
+    public function test_get_value_of_returns_the_primary_component_value(): void
+    {
+        self::assertSame(
+            'foo',
+            $this->subject->getValueOf('cn'),
+        );
+    }
+
+    public function test_get_value_of_is_case_insensitive_on_the_attribute_name(): void
+    {
+        self::assertSame(
+            'foo',
+            $this->subject->getValueOf('CN'),
+        );
+    }
+
+    public function test_get_value_of_returns_null_when_no_component_matches(): void
+    {
+        self::assertNull($this->subject->getValueOf('uid'));
+    }
+
+    public function test_get_value_of_returns_additional_multivalued_component_value(): void
+    {
+        $rdn = Rdn::create('cn=alice+uid=asmith');
+
+        self::assertSame(
+            'asmith',
+            $rdn->getValueOf('uid'),
+        );
+    }
 }

@@ -13,11 +13,14 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend;
 
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use Generator;
 
 /**
@@ -30,7 +33,17 @@ use Generator;
  */
 final class GenericBackend implements LdapBackendInterface
 {
-    public function search(SearchContext $context): Generator
+    public function search(
+        SearchRequest $request,
+        ControlBag $controls = new ControlBag(),
+    ): EntryStream {
+        return new EntryStream($this->yieldNothing());
+    }
+
+    /**
+     * @return Generator<never>
+     */
+    private function yieldNothing(): Generator
     {
         yield from [];
     }

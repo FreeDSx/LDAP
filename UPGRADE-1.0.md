@@ -190,21 +190,31 @@ $server = new LdapServer(
 **After** (1.0 `LdapBackendInterface`):
 
 ```php
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use Generator;
 
 class MyBackend implements LdapBackendInterface
 {
-    public function search(SearchContext $context): Generator
+    public function search(
+        SearchRequest $request,
+        ControlBag $controls = new ControlBag(),
+    ): EntryStream {
+        // Return an EntryStream wrapping a generator of candidate entries.
+        // Paging is handled automatically.
+        return new EntryStream($this->yieldNothing());
+    }
+
+    private function yieldNothing(): Generator
     {
-        // Yield matching entries. Paging is handled automatically.
         yield from [];
     }
 
@@ -241,20 +251,29 @@ and plaintext.
 replicate the old `bind()` behaviour:
 
 ```php
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use Generator;
 use SensitiveParameter;
 
 class MyBackend implements LdapBackendInterface, PasswordAuthenticatableInterface
 {
-    public function search(SearchContext $context): Generator
+    public function search(
+        SearchRequest $request,
+        ControlBag $controls = new ControlBag(),
+    ): EntryStream {
+        return new EntryStream($this->yieldNothing());
+    }
+
+    private function yieldNothing(): Generator
     {
         yield from [];
     }
@@ -305,12 +324,14 @@ $server = (new LdapServer())
 a typed command object. Use `WritableBackendTrait` to implement the dispatch automatically:
 
 ```php
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
@@ -323,7 +344,14 @@ class MyBackend implements WritableLdapBackendInterface
 {
     use WritableBackendTrait;
 
-    public function search(SearchContext $context): Generator
+    public function search(
+        SearchRequest $request,
+        ControlBag $controls = new ControlBag(),
+    ): EntryStream {
+        return new EntryStream($this->yieldNothing());
+    }
+
+    private function yieldNothing(): Generator
     {
         yield from [];
     }

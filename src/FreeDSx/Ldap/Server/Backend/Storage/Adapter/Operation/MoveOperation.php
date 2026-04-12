@@ -39,19 +39,24 @@ final class MoveOperation
         $newEntry = new Entry($newDn, ...$entry->getAttributes());
 
         if ($command->deleteOldRdn) {
-            $oldRdn = $command->dn->getRdn();
-            $newEntry->get($oldRdn->getName())?->remove($oldRdn->getValue());
+            foreach ($command->dn->getRdn()->getAll() as $component) {
+                $newEntry->get($component->getName())?->removeValues(
+                    [$component->getValue()],
+                    caseSensitive: false,
+                );
+            }
         }
 
-        $rdnName = $command->newRdn->getName();
-        $rdnValue = $command->newRdn->getValue();
-        $existing = $newEntry->get($rdnName);
-        if ($existing !== null) {
-            if (!$existing->has($rdnValue)) {
-                $existing->add($rdnValue);
+        foreach ($command->newRdn->getAll() as $component) {
+            $existing = $newEntry->get($component->getName());
+            if ($existing === null) {
+                $newEntry->set(new Attribute($component->getName(), $component->getValue()));
+
+                continue;
             }
-        } else {
-            $newEntry->set(new Attribute($rdnName, $rdnValue));
+            if (!$existing->has($component->getValue(), caseSensitive: false)) {
+                $existing->add($component->getValue());
+            }
         }
 
         return $newEntry;

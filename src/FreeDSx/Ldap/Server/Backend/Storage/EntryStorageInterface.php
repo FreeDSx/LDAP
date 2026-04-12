@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Server\Backend\Storage;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\DefaultHasChildrenTrait;
-use Generator;
 
 /**
  * Primitive storage contract for directory entries.
@@ -37,6 +36,11 @@ interface EntryStorageInterface
     public function find(Dn $dn): ?Entry;
 
     /**
+     * Return true if an entry with the given normalised DN exists.
+     */
+    public function exists(Dn $dn): bool;
+
+    /**
      * Return true if the given normalised DN has any direct children.
      *
      * Implementations may use {@see DefaultHasChildrenTrait} for a default implementation built on top of list().
@@ -45,22 +49,17 @@ interface EntryStorageInterface
     public function hasChildren(Dn $dn): bool;
 
     /**
-     * Yield entries rooted at $baseDn.
+     * Yield entries according to the scope defined in $options.
      *
-     * When $subtree is false: yield only direct children (base entry not included).
-     * When $subtree is true: yield all entries whose DN matches or is subordinate to $baseDn.
+     * When $options->subtree is false: yield only direct children (base entry not included).
+     * When $options->subtree is true: yield all entries whose DN matches or is subordinate to $options->baseDn.
      *
-     * Pass a Dn with an empty string to list from the root of the tree.
+     * Pass a Dn with an empty string as baseDn to list from the root of the tree.
      *
      * Implementations should stream entries lazily where possible to avoid
      * loading the entire dataset into memory at once.
-     *
-     * @return Generator<Entry>
      */
-    public function list(
-        Dn $baseDn,
-        bool $subtree
-    ): Generator;
+    public function list(StorageListOptions $options): EntryStream;
 
     /**
      * Persist the entry, replacing any existing entry at the same DN.

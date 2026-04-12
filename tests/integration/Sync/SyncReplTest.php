@@ -145,6 +145,7 @@ class SyncReplTest extends LdapTestCase
     {
         $process = new Process([
             'php',
+            '-dpcov.enabled=0',
             __DIR__ . '/../../bin/ldap-sync-write.php',
             $this->syncSignalFile,
         ]);

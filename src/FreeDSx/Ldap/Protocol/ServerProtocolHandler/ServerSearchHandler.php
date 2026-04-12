@@ -48,20 +48,27 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
         $request = $this->getSearchRequestFromMessage($message);
 
         try {
-            $context = $this->makeSearchContext($request);
-            $filter = $context->filter;
-            $attributes = $context->attributes;
-            $typesOnly = $context->typesOnly;
-            $sizeLimit = $context->sizeLimit;
+            $this->assertBaseDnProvided($request);
 
             $results = [];
             $sizeLimitExceeded = false;
+            $sizeLimit = $request->getSizeLimit();
 
-            foreach ($this->backend->search($context) as $entry) {
-                if ($this->filterEvaluator->evaluate($entry, $filter)) {
-                    $results[] = $this->applyAttributeFilter($entry, $attributes, $typesOnly);
+            $result = $this->backend->search(
+                $request,
+                $this->nonPagingControls($message),
+            );
+
+            foreach ($result->entries as $entry) {
+                if ($result->isPreFiltered || $this->filterEvaluator->evaluate($entry, $request->getFilter())) {
+                    $results[] = $this->applyAttributeFilter(
+                        $entry,
+                        $request->getAttributes(),
+                        $request->getAttributesOnly(),
+                    );
                     if ($sizeLimit > 0 && count($results) >= $sizeLimit) {
                         $sizeLimitExceeded = true;
+
                         break;
                     }
                 }

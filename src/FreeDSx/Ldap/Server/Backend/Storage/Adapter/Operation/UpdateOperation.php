@@ -62,7 +62,7 @@ final class UpdateOperation
         }
 
         foreach ($attribute->getValues() as $value) {
-            if ($existing->has($value)) {
+            if ($existing->has($value, caseSensitive: false)) {
                 throw new OperationException(
                     sprintf('Attribute "%s" already contains the value "%s".', $attrName, $value),
                     ResultCode::ATTRIBUTE_OR_VALUE_EXISTS,
@@ -134,17 +134,20 @@ final class UpdateOperation
             );
         }
 
-        $rdnValue = $entry->getDn()->getRdn()->getValue();
+        $rdnValue = $this->getRdnValueForAttribute(
+            $entry,
+            $attrName,
+        );
 
         foreach ($values as $value) {
-            if (!$existing->has($value)) {
+            if (!$existing->has($value, caseSensitive: false)) {
                 throw new OperationException(
                     sprintf('Value "%s" does not exist in attribute "%s".', $value, $attrName),
                     ResultCode::NO_SUCH_ATTRIBUTE,
                 );
             }
 
-            if ($this->isRdnAttribute($entry, $attrName) && $value === $rdnValue) {
+            if ($rdnValue !== null && strcasecmp($value, $rdnValue) === 0) {
                 throw new OperationException(
                     sprintf(
                         'Value "%s" is the RDN value for attribute "%s" and cannot be removed.',
@@ -156,7 +159,10 @@ final class UpdateOperation
             }
         }
 
-        $existing->remove(...$values);
+        $existing->removeValues(
+            $values,
+            caseSensitive: false
+        );
     }
 
     /**
@@ -177,9 +183,9 @@ final class UpdateOperation
             return;
         }
 
-        $rdnValue = $entry->getDn()->getRdn()->getValue();
+        $rdnValue = $this->getRdnValueForAttribute($entry, $attrName);
 
-        if ($this->isRdnAttribute($entry, $attrName) && !in_array($rdnValue, $values, true)) {
+        if ($rdnValue !== null && !$attribute->has($rdnValue, caseSensitive: false)) {
             throw new OperationException(
                 sprintf(
                     'Replacing attribute "%s" must retain the RDN value "%s".',
@@ -212,11 +218,19 @@ final class UpdateOperation
 
     private function isRdnAttribute(
         Entry $entry,
-        string $attrName
+        string $attrName,
     ): bool {
-        return strcasecmp(
-            $entry->getDn()->getRdn()->getName(),
-            $attrName
-        ) === 0;
+        return $entry->getDn()
+            ->getRdn()
+            ->has($attrName);
+    }
+
+    private function getRdnValueForAttribute(
+        Entry $entry,
+        string $attrName,
+    ): ?string {
+        return $entry->getDn()
+            ->getRdn()
+            ->getValueOf($attrName);
     }
 }

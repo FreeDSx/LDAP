@@ -14,7 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Entry\Dn;
-use Generator;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
  * Provides a default hasChildren() implementation in terms of list().
@@ -27,11 +28,11 @@ use Generator;
  */
 trait DefaultHasChildrenTrait
 {
-    abstract public function list(Dn $baseDn, bool $subtree): Generator;
+    abstract public function list(StorageListOptions $options): EntryStream;
 
     public function hasChildren(Dn $dn): bool
     {
-        foreach ($this->list($dn, false) as $ignored) {
+        foreach ($this->list(StorageListOptions::matchAll(baseDn: $dn, subtree: false))->entries as $ignored) {
             return true;
         }
 

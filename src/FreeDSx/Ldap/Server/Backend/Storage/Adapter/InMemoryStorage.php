@@ -15,8 +15,9 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use Generator;
+use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
  * An in-memory storage implementation backed by a plain PHP array.
@@ -59,15 +60,20 @@ final class InMemoryStorage implements EntryStorageInterface
         return $this->entries[$dn->toString()] ?? null;
     }
 
-    /**
-     * @return Generator<Entry>
-     */
-    public function list(Dn $baseDn, bool $subtree): Generator
+    public function exists(Dn $dn): bool
     {
-        return $this->yieldByScope(
-            $this->entries,
-            $baseDn,
-            $subtree
+        return isset($this->entries[$dn->toString()]);
+    }
+
+    public function list(StorageListOptions $options): EntryStream
+    {
+        return new EntryStream(
+            $this->yieldByScope(
+                $this->entries,
+                $options->baseDn,
+                $options->subtree,
+                $options->timeLimit,
+            ),
         );
     }
 

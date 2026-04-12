@@ -31,10 +31,11 @@ use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 /**
  * Pure-PHP implementation of FilterEvaluatorInterface.
  *
- * Evaluates LDAP filters against in-memory Entry objects. Attribute name
- * comparisons are always case-insensitive. Value comparisons default to
- * case-insensitive string comparison, matching the caseIgnoreMatch semantics
- * used by the majority of LDAP schema attribute types.
+ * Evaluates LDAP filters against in-memory Entry objects using the three-valued logic (TRUE / FALSE / UNDEFINED)
+ * required by RFC 4511 §4.5.1.
+ *
+ * Attribute name comparisons are always case-insensitive. Value comparisons default to case-insensitive string
+ * comparison, matching the caseIgnoreMatch semantics used by the majority of LDAP schema attribute types.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -52,6 +53,13 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         FilterInterface $filter,
     ): bool {
+        return $this->evaluateFilter($entry, $filter) === FilterResult::True;
+    }
+
+    private function evaluateFilter(
+        Entry $entry,
+        FilterInterface $filter,
+    ): FilterResult {
         return match (true) {
             $filter instanceof AndFilter => $this->evaluateAnd($entry, $filter),
             $filter instanceof OrFilter => $this->evaluateOr($entry, $filter),
@@ -73,72 +81,100 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     private function evaluateAnd(
         Entry $entry,
         AndFilter $filter,
-    ): bool {
+    ): FilterResult {
+        $hasUndefined = false;
+
         foreach ($filter->get() as $child) {
-            if (!$this->evaluate($entry, $child)) {
-                return false;
+            $result = $this->evaluateFilter(
+                $entry,
+                $child,
+            );
+            if ($result === FilterResult::False) {
+                return FilterResult::False;
+            }
+            if ($result === FilterResult::Undefined) {
+                $hasUndefined = true;
             }
         }
 
-        return true;
+        return $hasUndefined
+            ? FilterResult::Undefined
+            : FilterResult::True;
     }
 
     private function evaluateOr(
         Entry $entry,
         OrFilter $filter,
-    ): bool {
+    ): FilterResult {
+        $hasUndefined = false;
+
         foreach ($filter->get() as $child) {
-            if ($this->evaluate($entry, $child)) {
-                return true;
+            $result = $this->evaluateFilter(
+                $entry,
+                $child,
+            );
+            if ($result === FilterResult::True) {
+                return FilterResult::True;
+            }
+            if ($result === FilterResult::Undefined) {
+                $hasUndefined = true;
             }
         }
 
-        return false;
+        return $hasUndefined
+            ? FilterResult::Undefined
+            : FilterResult::False;
     }
 
     private function evaluateNot(
         Entry $entry,
         NotFilter $filter,
-    ): bool {
-        return !$this->evaluate($entry, $filter->get());
+    ): FilterResult {
+        return match ($this->evaluateFilter($entry, $filter->get())) {
+            FilterResult::True => FilterResult::False,
+            FilterResult::False => FilterResult::True,
+            FilterResult::Undefined => FilterResult::Undefined,
+        };
     }
 
     private function evaluatePresent(
         Entry $entry,
         PresentFilter $filter,
-    ): bool {
-        return $entry->has($filter->getAttribute());
+    ): FilterResult {
+        return $entry->has($filter->getAttribute())
+            ? FilterResult::True
+            : FilterResult::False;
     }
 
     private function evaluateEquality(
         Entry $entry,
         EqualityFilter $filter,
-    ): bool {
+    ): FilterResult {
         $attribute = $entry->get($filter->getAttribute());
 
         if ($attribute === null) {
-            return false;
+            return FilterResult::Undefined;
         }
 
         $filterValue = strtolower($filter->getValue());
 
         foreach ($attribute->getValues() as $value) {
             if (strtolower($value) === $filterValue) {
-                return true;
+                return FilterResult::True;
             }
         }
 
-        return false;
+        return FilterResult::False;
     }
 
     private function evaluateSubstring(
         Entry $entry,
         SubstringFilter $filter,
-    ): bool {
+    ): FilterResult {
         $attribute = $entry->get($filter->getAttribute());
 
         if ($attribute === null) {
-            return false;
+            return FilterResult::Undefined;
         }
 
         $startsWith = $filter->getStartsWith() !== null
@@ -151,20 +187,14 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
         foreach ($attribute->getValues() as $value) {
             if ($this->substringMatches(strtolower($value), $startsWith, $endsWith, $contains)) {
-                return true;
+                return FilterResult::True;
             }
         }
 
-        return false;
+        return FilterResult::False;
     }
 
     /**
-     * RFC 4511 §4.5.1.7.1 — evaluate one attribute value against the decomposed substring components.
-     *
-     * Each matched portion must start strictly after the end of the previous one:
-     *   initial occupies [0, len(initial)-1], so 'any' searches start at len(initial).
-     *   After all 'any' matches, 'final' must begin at a position >= $pos.
-     *
      * @param string[] $contains
      */
     private function substringMatches(
@@ -177,7 +207,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return false;
         }
 
-        // Start 'any' searches after the initial match, not at position 0.
         $pos = $startsWith !== null ? strlen($startsWith) : 0;
 
         foreach ($contains as $substr) {
@@ -192,7 +221,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return true;
         }
 
-        // 'final' must be at the end of the value AND must not overlap the previous match.
         $endsWithStart = strlen($value) - strlen($endsWith);
 
         return $endsWithStart >= $pos && str_ends_with($value, $endsWith);
@@ -201,43 +229,43 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     private function evaluateGreaterOrEqual(
         Entry $entry,
         GreaterThanOrEqualFilter $filter,
-    ): bool {
+    ): FilterResult {
         $attribute = $entry->get($filter->getAttribute());
 
         if ($attribute === null) {
-            return false;
+            return FilterResult::Undefined;
         }
 
         $filterValue = $filter->getValue();
 
         foreach ($attribute->getValues() as $value) {
             if ($this->compareOrdered($value, $filterValue) >= 0) {
-                return true;
+                return FilterResult::True;
             }
         }
 
-        return false;
+        return FilterResult::False;
     }
 
     private function evaluateLessOrEqual(
         Entry $entry,
         LessThanOrEqualFilter $filter,
-    ): bool {
+    ): FilterResult {
         $attribute = $entry->get($filter->getAttribute());
 
         if ($attribute === null) {
-            return false;
+            return FilterResult::Undefined;
         }
 
         $filterValue = $filter->getValue();
 
         foreach ($attribute->getValues() as $value) {
             if ($this->compareOrdered($value, $filterValue) <= 0) {
-                return true;
+                return FilterResult::True;
             }
         }
 
-        return false;
+        return FilterResult::False;
     }
 
     private function compareOrdered(
@@ -254,39 +282,42 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     private function evaluateApproximate(
         Entry $entry,
         ApproximateFilter $filter,
-    ): bool {
-        // The LDAP spec does not define approximate matching precisely.
-        // Most servers treat it as case-insensitive equality, which we mirror here.
+    ): FilterResult {
         $attribute = $entry->get($filter->getAttribute());
 
         if ($attribute === null) {
-            return false;
+            return FilterResult::Undefined;
         }
 
         $filterValue = strtolower($filter->getValue());
 
         foreach ($attribute->getValues() as $value) {
             if (strtolower($value) === $filterValue) {
-                return true;
+                return FilterResult::True;
             }
         }
 
-        return false;
+        return FilterResult::False;
     }
 
     private function evaluateMatchingRule(
         Entry $entry,
         MatchingRuleFilter $filter,
-    ): bool {
+    ): FilterResult {
         $filterValue = $filter->getValue();
+        $values = $this->collectValuesToTest($entry, $filter);
 
-        foreach ($this->collectValuesToTest($entry, $filter) as $value) {
+        if ($values === []) {
+            return FilterResult::Undefined;
+        }
+
+        foreach ($values as $value) {
             if ($this->matchByRule($filter->getMatchingRule(), $value, $filterValue)) {
-                return true;
+                return FilterResult::True;
             }
         }
 
-        return false;
+        return FilterResult::False;
     }
 
     /**
@@ -305,22 +336,54 @@ final class FilterEvaluator implements FilterEvaluatorInterface
                 $values = $attribute->getValues();
             }
         } else {
-            // Null attribute name: match against all attributes
             foreach ($entry->getAttributes() as $attribute) {
-                foreach ($attribute->getValues() as $v) {
-                    $values[] = $v;
-                }
+                $values = array_merge(
+                    $values,
+                    $attribute->getValues(),
+                );
             }
         }
 
-        // Optionally also match against RDN component values from the entry's DN
         if ($filter->getUseDnAttributes()) {
-            foreach ($entry->getDn()->toArray() as $rdn) {
-                $values[] = $rdn->getValue();
-            }
+            $values = array_merge(
+                $values,
+                $this->collectDnValues(
+                    $entry,
+                    $filterAttributeName,
+                ),
+            );
         }
 
         return $values;
+    }
+
+    /**
+     * Collects attribute values from all RDN components of the entry's DN.
+     *
+     * @return array<string>
+     */
+    private function collectDnValues(
+        Entry $entry,
+        ?string $filterAttributeName,
+    ): array {
+        $components = array_merge(
+            ...array_map(
+                fn ($rdn) => $rdn->getAll(),
+                $entry->getDn()->toArray(),
+            ),
+        );
+
+        if ($filterAttributeName !== null) {
+            $components = array_filter(
+                $components,
+                fn ($component) => strcasecmp($component->getName(), $filterAttributeName) === 0,
+            );
+        }
+
+        return array_map(
+            fn ($component) => $component->getValue(),
+            $components,
+        );
     }
 
     private function matchByRule(

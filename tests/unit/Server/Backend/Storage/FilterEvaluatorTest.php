@@ -500,6 +500,58 @@ final class FilterEvaluatorTest extends TestCase
         ));
     }
 
+    public function test_matching_rule_dn_attributes_includes_multivalued_rdn_components(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=John+uid=jdoe,dc=example,dc=com'),
+            new Attribute('cn', 'John'),
+        );
+
+        $filter = new MatchingRuleFilter(
+            null,
+            'uid',
+            'jdoe',
+            true,
+        );
+
+        self::assertTrue($this->subject->evaluate(
+            $entry,
+            $filter,
+        ));
+    }
+
+    public function test_matching_rule_dn_attributes_filters_by_attribute_name(): void
+    {
+        // Filter targets 'uid', DN has dc=example — must NOT match "example" via the dc component.
+        $filter = new MatchingRuleFilter(
+            null,
+            'uid',
+            'example',
+            true,
+        );
+
+        self::assertFalse($this->subject->evaluate(
+            $this->entry,
+            $filter,
+        ));
+    }
+
+    public function test_matching_rule_dn_attributes_without_attribute_name_matches_any_component(): void
+    {
+        // No attribute name set + dnAttributes — should match any RDN component value.
+        $filter = new MatchingRuleFilter(
+            null,
+            null,
+            'example',
+            true,
+        );
+
+        self::assertTrue($this->subject->evaluate(
+            $this->entry,
+            $filter,
+        ));
+    }
+
     public function test_matching_rule_null_attribute_matches_all(): void
     {
         // No attribute name set — should match against all attribute values
@@ -511,6 +563,86 @@ final class FilterEvaluatorTest extends TestCase
         self::assertTrue($this->subject->evaluate(
             $this->entry,
             $filter
+        ));
+    }
+
+    public function test_not_returns_false_when_attribute_is_absent(): void
+    {
+        // RFC 4511 §4.5.1: NOT(UNDEFINED) = UNDEFINED, which maps to false.
+        // An entry missing "description" must NOT match (!(description=test)).
+        self::assertFalse(
+            $this->subject->evaluate(
+                $this->entry,
+                Filters::not(Filters::equal('description', 'test')),
+            ),
+        );
+    }
+
+    public function test_not_present_on_absent_attribute_returns_true(): void
+    {
+        // PresentFilter is definitively FALSE (not UNDEFINED) when absent.
+        // NOT(FALSE) = TRUE, so (!(description=*)) matches.
+        self::assertTrue(
+            $this->subject->evaluate(
+                $this->entry,
+                Filters::not(new PresentFilter('description')),
+            ),
+        );
+    }
+
+    public function test_and_with_undefined_child_returns_false(): void
+    {
+        // AND(TRUE, UNDEFINED) = UNDEFINED → false at the public boundary.
+        $filter = Filters::and(
+            Filters::equal('cn', 'Alice'),
+            Filters::equal('description', 'test'),
+        );
+
+        self::assertFalse($this->subject->evaluate(
+            $this->entry,
+            $filter,
+        ));
+    }
+
+    public function test_or_with_undefined_child_returns_false(): void
+    {
+        // OR(FALSE, UNDEFINED) = UNDEFINED → false at the public boundary.
+        $filter = Filters::or(
+            Filters::equal('cn', 'Bob'),
+            Filters::equal('description', 'test'),
+        );
+
+        self::assertFalse($this->subject->evaluate(
+            $this->entry,
+            $filter,
+        ));
+    }
+
+    public function test_or_with_true_and_undefined_returns_true(): void
+    {
+        // OR(TRUE, UNDEFINED) = TRUE — short-circuits on the first TRUE.
+        $filter = Filters::or(
+            Filters::equal('cn', 'Alice'),
+            Filters::equal('description', 'test'),
+        );
+
+        self::assertTrue($this->subject->evaluate(
+            $this->entry,
+            $filter,
+        ));
+    }
+
+    public function test_and_with_false_and_undefined_returns_false(): void
+    {
+        // AND(FALSE, UNDEFINED) = FALSE — short-circuits on the first FALSE.
+        $filter = Filters::and(
+            Filters::equal('cn', 'Bob'),
+            Filters::equal('description', 'test'),
+        );
+
+        self::assertFalse($this->subject->evaluate(
+            $this->entry,
+            $filter,
         ));
     }
 

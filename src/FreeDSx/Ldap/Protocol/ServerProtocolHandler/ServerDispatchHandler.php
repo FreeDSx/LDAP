@@ -43,29 +43,37 @@ class ServerDispatchHandler implements ServerProtocolHandlerInterface
 
     /**
      * {@inheritDoc}
-     * @throws OperationException
+     *
      * @throws EncoderException
      */
     public function handleRequest(
         LdapMessageRequest $message,
         TokenInterface $token,
     ): void {
-        $request = $message->getRequest();
+        try {
+            $request = $message->getRequest();
 
-        if ($request instanceof Request\CompareRequest) {
-            $match = $this->backend->compare($request->getDn(), $request->getFilter());
+            if ($request instanceof Request\CompareRequest) {
+                $match = $this->backend->compare($request->getDn(), $request->getFilter());
+                $this->queue->sendMessage($this->responseFactory->getStandardResponse(
+                    $message,
+                    $match
+                        ? ResultCode::COMPARE_TRUE
+                        : ResultCode::COMPARE_FALSE,
+                ));
+
+                return;
+            }
+
+            $this->writeDispatcher->dispatch($this->commandFactory->fromRequest($request));
+
+            $this->queue->sendMessage($this->responseFactory->getStandardResponse($message));
+        } catch (OperationException $e) {
             $this->queue->sendMessage($this->responseFactory->getStandardResponse(
                 $message,
-                $match
-                    ? ResultCode::COMPARE_TRUE
-                    : ResultCode::COMPARE_FALSE,
+                $e->getCode(),
+                $e->getMessage(),
             ));
-
-            return;
         }
-
-        $this->writeDispatcher->dispatch($this->commandFactory->fromRequest($request));
-
-        $this->queue->sendMessage($this->responseFactory->getStandardResponse($message));
     }
 }

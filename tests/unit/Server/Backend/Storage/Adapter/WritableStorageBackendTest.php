@@ -22,9 +22,13 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use Generator;
+use PHPUnit\Framework\MockObject\MockObject;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
@@ -91,13 +95,10 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_search_base_scope_returns_only_base(): void
     {
-        $entries = iterator_to_array($this->subject->search(new SearchContext(
-            baseDn: new Dn('dc=example,dc=com'),
-            scope: SearchRequest::SCOPE_BASE_OBJECT,
-            filter: new PresentFilter('objectClass'),
-            attributes: [],
-            typesOnly: false,
-        )));
+        $request = (new SearchRequest(new PresentFilter('objectClass')))
+            ->base('dc=example,dc=com')
+            ->useBaseScope();
+        $entries = iterator_to_array($this->subject->search($request)->entries);
 
         self::assertCount(
             1,
@@ -111,13 +112,10 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_search_single_level_returns_direct_children(): void
     {
-        $entries = iterator_to_array($this->subject->search(new SearchContext(
-            baseDn: new Dn('dc=example,dc=com'),
-            scope: SearchRequest::SCOPE_SINGLE_LEVEL,
-            filter: new PresentFilter('objectClass'),
-            attributes: [],
-            typesOnly: false,
-        )));
+        $request = (new SearchRequest(new PresentFilter('objectClass')))
+            ->base('dc=example,dc=com')
+            ->useSingleLevelScope();
+        $entries = iterator_to_array($this->subject->search($request)->entries);
 
         // Only alice is a direct child of dc=example,dc=com; bob is under ou=People
         self::assertCount(
@@ -132,13 +130,10 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_search_subtree_returns_base_and_all_descendants(): void
     {
-        $entries = iterator_to_array($this->subject->search(new SearchContext(
-            baseDn: new Dn('dc=example,dc=com'),
-            scope: SearchRequest::SCOPE_WHOLE_SUBTREE,
-            filter: new PresentFilter('objectClass'),
-            attributes: [],
-            typesOnly: false,
-        )));
+        $request = (new SearchRequest(new PresentFilter('objectClass')))
+            ->base('dc=example,dc=com')
+            ->useSubtreeScope();
+        $entries = iterator_to_array($this->subject->search($request)->entries);
 
         self::assertCount(
             3,
@@ -151,13 +146,10 @@ final class WritableStorageBackendTest extends TestCase
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
 
-        iterator_to_array($this->subject->search(new SearchContext(
-            baseDn: new Dn('cn=Missing,dc=example,dc=com'),
-            scope: SearchRequest::SCOPE_BASE_OBJECT,
-            filter: new PresentFilter('objectClass'),
-            attributes: [],
-            typesOnly: false,
-        )));
+        $request = (new SearchRequest(new PresentFilter('objectClass')))
+            ->base('cn=Missing,dc=example,dc=com')
+            ->useBaseScope();
+        $this->subject->search($request);
     }
 
     public function test_search_single_level_throws_no_such_object_when_base_does_not_exist(): void
@@ -165,13 +157,10 @@ final class WritableStorageBackendTest extends TestCase
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
 
-        iterator_to_array($this->subject->search(new SearchContext(
-            baseDn: new Dn('cn=Missing,dc=example,dc=com'),
-            scope: SearchRequest::SCOPE_SINGLE_LEVEL,
-            filter: new PresentFilter('objectClass'),
-            attributes: [],
-            typesOnly: false,
-        )));
+        $request = (new SearchRequest(new PresentFilter('objectClass')))
+            ->base('cn=Missing,dc=example,dc=com')
+            ->useSingleLevelScope();
+        $this->subject->search($request);
     }
 
     public function test_search_subtree_throws_no_such_object_when_base_does_not_exist(): void
@@ -179,13 +168,10 @@ final class WritableStorageBackendTest extends TestCase
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
 
-        iterator_to_array($this->subject->search(new SearchContext(
-            baseDn: new Dn('cn=Missing,dc=example,dc=com'),
-            scope: SearchRequest::SCOPE_WHOLE_SUBTREE,
-            filter: new PresentFilter('objectClass'),
-            attributes: [],
-            typesOnly: false,
-        )));
+        $request = (new SearchRequest(new PresentFilter('objectClass')))
+            ->base('cn=Missing,dc=example,dc=com')
+            ->useSubtreeScope();
+        $this->subject->search($request);
     }
 
     public function test_add_stores_entry(): void
@@ -472,6 +458,35 @@ final class WritableStorageBackendTest extends TestCase
             false,
             null,
         )));
+    }
+
+    public function test_search_converts_time_limit_exception_to_operation_exception(): void
+    {
+        /** @var EntryStorageInterface&MockObject $storage */
+        $storage = $this->createMock(EntryStorageInterface::class);
+        $storage->method('exists')->willReturn(true);
+        $storage->method('list')->willReturn(
+            new EntryStream($this->makeTimeLimitStream()),
+        );
+
+        $subject = new WritableStorageBackend($storage);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::TIME_LIMIT_EXCEEDED);
+
+        $request = (new SearchRequest(new PresentFilter('objectClass')))
+            ->base('dc=example,dc=com')
+            ->useSingleLevelScope();
+        iterator_to_array($subject->search($request)->entries);
+    }
+
+    /**
+     * @return Generator<Entry>
+     */
+    private function makeTimeLimitStream(): Generator
+    {
+        yield new Entry(new Dn('dc=example,dc=com'));
+        throw new TimeLimitExceededException();
     }
 
     public function test_supports_returns_false_for_unknown_request(): void

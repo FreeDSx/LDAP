@@ -13,6 +13,8 @@ General LDAP Server Usage
   * [Built-In Storage Implementations](#built-in-storage-implementations)
     * [InMemoryStorage](#inmemorystorage)
     * [JsonFileStorage](#jsonfilestorage)
+    * [SqliteStorage](#sqlitestorage)
+    * [MysqlStorage](#mysqlstorage)
   * [Proxy Backend](#proxy-backend)
   * [Custom Filter Evaluation](#custom-filter-evaluation)
 * [Authentication](#authentication)
@@ -240,31 +242,40 @@ Authentication is a **separate concern** handled by `PasswordAuthenticatableInte
 ```php
 namespace App;
 
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use Generator;
 
 class MyReadOnlyBackend implements LdapBackendInterface
 {
     /**
-     * Yield entries that are candidates for the search.
+     * Return an EntryStream of candidate entries for the search.
      *
-     * The FilterEvaluator as a final pass, so you may pre-filter for efficiency or
+     * The FilterEvaluator runs as a final pass, so you may pre-filter for efficiency or
      * yield all entries in scope for simplicity.
      */
-    public function search(SearchContext $context): Generator
-    {
-        // $context->baseDn    — Dn: the search base
-        // $context->scope     — int: SearchRequest::SCOPE_BASE_OBJECT | SCOPE_SINGLE_LEVEL | SCOPE_WHOLE_SUBTREE
-        // $context->filter    — FilterInterface: the requested LDAP filter
-        // $context->attributes — Attribute[]: requested attributes (empty = all)
-        // $context->typesOnly — bool: return only attribute names, not values
+    public function search(
+        SearchRequest $request,
+        ControlBag $controls = new ControlBag(),
+    ): EntryStream {
+        // $request->getBaseDn()         — ?Dn: the search base
+        // $request->getScope()          — int: SearchRequest::SCOPE_BASE_OBJECT | SCOPE_SINGLE_LEVEL | SCOPE_WHOLE_SUBTREE
+        // $request->getFilter()         — FilterInterface: the requested LDAP filter
+        // $request->getAttributes()     — Attribute[]: requested attributes (empty = all)
+        // $request->getAttributesOnly() — bool: return only attribute names, not values
 
+        return new EntryStream($this->yieldEntries());
+    }
+
+    private function yieldEntries(): Generator
+    {
         yield Entry::fromArray('cn=Foo,dc=example,dc=com', ['cn' => 'Foo', 'sn' => 'Bar']);
         yield Entry::fromArray('cn=Bar,dc=example,dc=com', ['cn' => 'Bar', 'sn' => 'Baz']);
     }
@@ -311,12 +322,14 @@ to implement the write dispatch — it routes each operation to a dedicated meth
 ```php
 namespace App;
 
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
@@ -329,9 +342,17 @@ class MyBackend implements WritableLdapBackendInterface
 {
     use WritableBackendTrait;
 
-    public function search(SearchContext $context): Generator
+    public function search(
+        SearchRequest $request,
+        ControlBag $controls = new ControlBag(),
+    ): EntryStream {
+        // Return an EntryStream wrapping a generator of matching entries...
+        return new EntryStream($this->yieldNothing());
+    }
+
+    private function yieldNothing(): Generator
     {
-        // yield matching entries...
+        yield from [];
     }
 
     public function get(Dn $dn): ?Entry
@@ -386,7 +407,7 @@ class MyBackend implements WritableLdapBackendInterface
 
 ### Built-In Storage Implementations
 
-Two storage implementations are included for common use cases. Both are used via `useStorage()`.
+Four storage implementations are included for common use cases. All are used via `useStorage()`.
 
 #### InMemoryStorage
 
@@ -448,6 +469,132 @@ JSON format:
       "userPassword": ["{SHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g="]
     }
   }
+}
+```
+
+#### SqliteStorage
+
+A SQLite-backed storage implementation that persists the directory in a SQLite database file via PDO. Suitable for
+use cases that need durable persistence across restarts with support for concurrent access:
+
+- **PCNTL**: a single shared PDO connection is inherited by all forked child processes. SQLite WAL mode handles concurrent access at the OS level.
+- **Swoole**: each coroutine gets its own PDO connection to avoid blocking.
+
+Use the named constructor that matches your server runner:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqliteStorage;
+
+// PCNTL runner — WAL journal mode, shared connection
+$server = (new LdapServer())->useStorage(SqliteStorage::forPcntl('/var/lib/myapp/ldap.sqlite'));
+$server->run();
+
+// Swoole runner — WAL journal mode, per-coroutine connection
+$server = (new LdapServer())->useStorage(SqliteStorage::forSwoole('/var/lib/myapp/ldap.sqlite'));
+$server->run();
+```
+
+Use `:memory:` as the path to run a non-persistent, in-process SQLite database (useful for testing):
+
+```php
+$server = (new LdapServer())->useStorage(SqliteStorage::forPcntl(':memory:'));
+```
+
+#### MysqlStorage
+
+A MySQL/MariaDB-backed storage implementation. Requires MySQL 8.0+ or MariaDB 10.6+.
+
+Use the named constructor that matches your server runner:
+
+```php
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\MysqlStorage;
+
+// PCNTL runner — shared connection across forked processes
+$server = (new LdapServer())->useStorage(
+    MysqlStorage::forPcntl('mysql:host=localhost;dbname=ldap', 'user', 'secret')
+);
+$server->run();
+
+// Swoole runner — per-coroutine connection
+$server = (new LdapServer())->useStorage(
+    MysqlStorage::forSwoole('mysql:host=localhost;dbname=ldap', 'user', 'secret')
+);
+$server->run();
+```
+
+The DSN follows the standard PDO MySQL format. The character set is automatically configured to `utf8mb4`
+and the time zone to UTC on each connection.
+
+##### Custom PDO driver
+
+`SqliteStorage` and `MysqlStorage` are both factories for `PdoStorage`, which is the generic PDO-backed
+implementation. To support a different database engine, implement `PdoStorageFactoryInterface` with
+`PdoStorageFactoryTrait` and supply the appropriate `PdoDialectInterface`, filter translator, and
+connection opener:
+
+```php
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorageFactoryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorageFactoryTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
+use PDO;
+
+final class PostgresStorage implements PdoStorageFactoryInterface
+{
+    use PdoStorageFactoryTrait;
+
+    public function __construct(
+        private readonly string $dsn,
+        private readonly string $username,
+        #[\SensitiveParameter]
+        private readonly string $password,
+    ) {
+    }
+
+    public static function forPcntl(
+        string $dsn,
+        string $username,
+        #[\SensitiveParameter]
+        string $password,
+    ): PdoStorage {
+        return (new self($dsn, $username, $password))->createShared();
+    }
+
+    public static function forSwoole(
+        string $dsn,
+        string $username,
+        #[\SensitiveParameter]
+        string $password,
+    ): PdoStorage {
+        return (new self($dsn, $username, $password))->createPerCoroutine();
+    }
+
+    protected function dialect(): PdoDialectInterface
+    {
+        return new MyPostgresDialect();
+    }
+
+    protected function translator(): FilterTranslatorInterface
+    {
+        return new MyPostgresFilterTranslator();
+    }
+
+    protected function openConnection(PdoDialectInterface $dialect): PDO
+    {
+        $pdo = new PDO(
+            $this->dsn,
+            $this->username,
+            $this->password,
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+        );
+
+        PdoStorage::initialize($pdo, $dialect);
+
+        return $pdo;
+    }
 }
 ```
 

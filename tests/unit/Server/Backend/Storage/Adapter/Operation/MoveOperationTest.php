@@ -197,4 +197,110 @@ final class MoveOperationTest extends TestCase
             $result->get('mail')?->getValues()
         );
     }
+
+    public function test_delete_old_rdn_removes_value_case_insensitively(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'ALICE'),
+            new Attribute('mail', 'alice@example.com'),
+        );
+
+        $command = new MoveCommand(
+            dn: new Dn('cn=Alice,dc=example,dc=com'),
+            newRdn: new Rdn('cn', 'bob'),
+            deleteOldRdn: true,
+            newParent: null,
+        );
+
+        $result = $this->subject->execute($entry, $command);
+        $cn = $result->get('cn');
+
+        self::assertNotNull($cn);
+        self::assertNotContains(
+            'ALICE',
+            $cn->getValues(),
+        );
+        self::assertContains(
+            'bob',
+            $cn->getValues(),
+        );
+    }
+
+    public function test_delete_old_rdn_removes_all_multivalued_rdn_components(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=alice+uid=asmith,dc=example,dc=com'),
+            new Attribute('cn', 'alice'),
+            new Attribute('uid', 'asmith'),
+            new Attribute('mail', 'alice@example.com'),
+        );
+
+        $command = new MoveCommand(
+            dn: new Dn('cn=alice+uid=asmith,dc=example,dc=com'),
+            newRdn: new Rdn('cn', 'bob'),
+            deleteOldRdn: true,
+            newParent: null,
+        );
+
+        $result = $this->subject->execute($entry, $command);
+
+        self::assertNotContains(
+            'alice',
+            $result->get('cn')?->getValues() ?? [],
+        );
+        self::assertNotContains(
+            'asmith',
+            $result->get('uid')?->getValues() ?? [],
+        );
+        self::assertContains(
+            'bob',
+            $result->get('cn')?->getValues() ?? [],
+        );
+    }
+
+    public function test_new_multivalued_rdn_components_all_added(): void
+    {
+        $command = new MoveCommand(
+            dn: new Dn('cn=alice,dc=example,dc=com'),
+            newRdn: Rdn::create('cn=bob+uid=bsmith'),
+            deleteOldRdn: false,
+            newParent: null,
+        );
+
+        $result = $this->subject->execute($this->entry, $command);
+
+        self::assertContains(
+            'bob',
+            $result->get('cn')?->getValues() ?? [],
+        );
+        self::assertSame(
+            ['bsmith'],
+            $result->get('uid')?->getValues(),
+        );
+    }
+
+    public function test_new_rdn_value_not_duplicated_when_casing_differs(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'Alice'),
+        );
+
+        $command = new MoveCommand(
+            dn: new Dn('cn=Alice,dc=example,dc=com'),
+            newRdn: new Rdn('cn', 'ALICE'),
+            deleteOldRdn: false,
+            newParent: null,
+        );
+
+        $result = $this->subject->execute($entry, $command);
+        $cn = $result->get('cn');
+
+        self::assertNotNull($cn);
+        self::assertCount(
+            1,
+            $cn->getValues(),
+        );
+    }
 }
