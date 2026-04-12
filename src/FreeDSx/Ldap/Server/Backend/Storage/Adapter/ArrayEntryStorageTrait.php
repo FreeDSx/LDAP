@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use Generator;
 
 /**
@@ -38,20 +39,23 @@ trait ArrayEntryStorageTrait
         array $entries,
         Dn $baseDn,
         bool $subtree,
+        int $timeLimit = 0,
     ): Generator {
-        $normBase = $baseDn->toString();
+        $deadline = $timeLimit > 0
+            ? microtime(true) + $timeLimit
+            : null;
 
         foreach ($entries as $normDn => $entry) {
-            if ($normBase === '' && $subtree) {
+            if ($deadline !== null && microtime(true) >= $deadline) {
+                throw new TimeLimitExceededException();
+            }
+
+            $entryDn = new Dn($normDn);
+
+            if ($subtree && $entryDn->isDescendantOf($baseDn)) {
                 yield $entry;
-            } elseif ($subtree) {
-                if ($normDn === $normBase || str_ends_with($normDn, ',' . $normBase)) {
-                    yield $entry;
-                }
-            } else {
-                if ((new Dn($normDn))->isChildOf($baseDn)) {
-                    yield $entry;
-                }
+            } elseif (!$subtree && $entryDn->isChildOf($baseDn)) {
+                yield $entry;
             }
         }
     }

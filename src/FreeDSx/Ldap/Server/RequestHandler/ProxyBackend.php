@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\RequestHandler;
 
 use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
@@ -22,16 +23,14 @@ use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Write\WritableBackendTrait;
 use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 use Generator;
@@ -64,10 +63,27 @@ class ProxyBackend implements WritableLdapBackendInterface, PasswordAuthenticata
         }
     }
 
-    public function search(SearchContext $context): Generator
-    {
-        $request = $this->buildSearchRequest($context);
-        $entries = $this->ldap()->search($request);
+    public function search(
+        SearchRequest $request,
+        ControlBag $controls = new ControlBag(),
+    ): EntryStream {
+        return new EntryStream(
+            $this->yieldSearchResults($request, $controls),
+            isPreFiltered: true,
+        );
+    }
+
+    /**
+     * @return Generator<Entry>
+     */
+    private function yieldSearchResults(
+        SearchRequest $request,
+        ControlBag $controls,
+    ): Generator {
+        $entries = $this->ldap()->search(
+            $request,
+            ...$controls->toArray(),
+        );
 
         foreach ($entries as $entry) {
             yield $entry;
@@ -152,24 +168,4 @@ class ProxyBackend implements WritableLdapBackendInterface, PasswordAuthenticata
         return $this->ldap;
     }
 
-    private function buildSearchRequest(SearchContext $context): SearchRequest
-    {
-        // Request all attributes from upstream so the FilterEvaluator
-        // can evaluate the filter against full entries before applying attribute
-        // projection via applyAttributeFilter().
-        $request = Operations::search($context->filter);
-        $request->base($context->baseDn->toString());
-
-        match ($context->scope) {
-            SearchRequest::SCOPE_BASE_OBJECT => $request->useBaseScope(),
-            SearchRequest::SCOPE_SINGLE_LEVEL => $request->useSingleLevelScope(),
-            default => $request->useSubtreeScope(),
-        };
-
-        if ($context->typesOnly) {
-            $request->setAttributesOnly(true);
-        }
-
-        return $request;
-    }
 }

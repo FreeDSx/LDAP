@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use PHPUnit\Framework\TestCase;
 
 final class InMemoryStorageTest extends TestCase
@@ -52,7 +53,7 @@ final class InMemoryStorageTest extends TestCase
 
     public function test_list_returns_all_entries(): void
     {
-        $entries = iterator_to_array($this->subject->list(new Dn(''), true));
+        $entries = iterator_to_array($this->subject->list(StorageListOptions::matchAll(new Dn(''), true))->entries);
 
         self::assertCount(
             1,
@@ -71,7 +72,7 @@ final class InMemoryStorageTest extends TestCase
         $grandchild = new Entry(new Dn('cn=Sub,cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Sub'));
         $storage = new InMemoryStorage([$parent, $child, $grandchild]);
 
-        $entries = iterator_to_array($storage->list(new Dn('dc=example,dc=com'), false));
+        $entries = iterator_to_array($storage->list(StorageListOptions::matchAll(new Dn('dc=example,dc=com'), false))->entries);
 
         self::assertCount(
             1,
@@ -90,10 +91,37 @@ final class InMemoryStorageTest extends TestCase
         $grandchild = new Entry(new Dn('cn=Sub,cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Sub'));
         $storage = new InMemoryStorage([$parent, $child, $grandchild]);
 
-        $entries = iterator_to_array($storage->list(new Dn('dc=example,dc=com'), true));
+        $entries = iterator_to_array(
+            $storage->list(StorageListOptions::matchAll(
+                new Dn('dc=example,dc=com'),
+                true
+            ))->entries
+        );
 
         self::assertCount(
             3,
+            $entries,
+        );
+    }
+
+    public function test_list_subtree_does_not_match_string_suffix_collision(): void
+    {
+        // The escaped comma in the RDN value would let a naive str_ends_with
+        // match consider this entry a descendant of "John,dc=example,dc=com",
+        // even though its actual parent is "dc=example,dc=com".
+        $entry = new Entry(
+            new Dn('cn=Doe\,John,dc=example,dc=com'),
+            new Attribute('cn', 'Doe,John'),
+        );
+        $storage = new InMemoryStorage([$entry]);
+
+        $entries = iterator_to_array($storage->list(StorageListOptions::matchAll(
+            new Dn('John,dc=example,dc=com'),
+            true,
+        ))->entries);
+
+        self::assertCount(
+            0,
             $entries,
         );
     }
@@ -147,7 +175,12 @@ final class InMemoryStorageTest extends TestCase
 
         self::assertCount(
             1,
-            iterator_to_array($this->subject->list(new Dn(''), true)),
+            iterator_to_array($this->subject->list(
+                StorageListOptions::matchAll(
+                    new Dn(''),
+                    true
+                ))->entries
+            ),
         );
     }
 
@@ -165,7 +198,40 @@ final class InMemoryStorageTest extends TestCase
 
         self::assertCount(
             0,
-            iterator_to_array($storage->list(new Dn(''), true)),
+            iterator_to_array($storage->list(StorageListOptions::matchAll(new Dn(''), true))->entries),
         );
+    }
+
+    public function test_list_with_zero_time_limit_returns_all_entries(): void
+    {
+        $parent = new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'));
+        $child = new Entry(new Dn('cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Bob'));
+        $storage = new InMemoryStorage([$parent, $child]);
+
+        $entries = iterator_to_array(
+            $storage->list(StorageListOptions::matchAll(
+                new Dn('dc=example,dc=com'),
+                true,
+            ))->entries,
+        );
+
+        self::assertCount(2, $entries);
+    }
+
+    public function test_list_with_positive_time_limit_returns_entries_when_within_deadline(): void
+    {
+        $parent = new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'));
+        $child = new Entry(new Dn('cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Bob'));
+        $storage = new InMemoryStorage([$parent, $child]);
+
+        $entries = iterator_to_array(
+            $storage->list(StorageListOptions::matchAll(
+                new Dn('dc=example,dc=com'),
+                true,
+                timeLimit: 60,
+            ))->entries,
+        );
+
+        self::assertCount(2, $entries);
     }
 }

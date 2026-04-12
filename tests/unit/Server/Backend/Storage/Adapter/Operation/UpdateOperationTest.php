@@ -298,4 +298,140 @@ final class UpdateOperationTest extends TestCase
             $cn->getValues(),
         );
     }
+
+    public function test_type_delete_whole_attribute_throws_not_allowed_on_rdn_for_secondary_rdn_component(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=alice+uid=asmith,dc=example,dc=com'),
+            new Attribute('cn', 'alice'),
+            new Attribute('uid', 'asmith'),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NOT_ALLOWED_ON_RDN);
+
+        $this->subject->execute($entry, new UpdateCommand(
+            new Dn('cn=alice+uid=asmith,dc=example,dc=com'),
+            [new Change(Change::TYPE_DELETE, 'uid')],
+        ));
+    }
+
+    public function test_type_delete_specific_value_throws_not_allowed_on_rdn_for_secondary_rdn_value(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=alice+uid=asmith,dc=example,dc=com'),
+            new Attribute('cn', 'alice'),
+            new Attribute('uid', 'asmith'),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NOT_ALLOWED_ON_RDN);
+
+        $this->subject->execute($entry, new UpdateCommand(
+            new Dn('cn=alice+uid=asmith,dc=example,dc=com'),
+            [new Change(Change::TYPE_DELETE, 'uid', 'asmith')],
+        ));
+    }
+
+    public function test_type_replace_clear_throws_not_allowed_on_rdn_for_secondary_rdn_component(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=alice+uid=asmith,dc=example,dc=com'),
+            new Attribute('cn', 'alice'),
+            new Attribute('uid', 'asmith'),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NOT_ALLOWED_ON_RDN);
+
+        $this->subject->execute($entry, new UpdateCommand(
+            new Dn('cn=alice+uid=asmith,dc=example,dc=com'),
+            [new Change(Change::TYPE_REPLACE, 'uid')],
+        ));
+    }
+
+    public function test_type_replace_throws_not_allowed_on_rdn_when_secondary_rdn_value_omitted(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=alice+uid=asmith,dc=example,dc=com'),
+            new Attribute('cn', 'alice'),
+            new Attribute('uid', 'asmith'),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NOT_ALLOWED_ON_RDN);
+
+        $this->subject->execute($entry, new UpdateCommand(
+            new Dn('cn=alice+uid=asmith,dc=example,dc=com'),
+            [new Change(Change::TYPE_REPLACE, 'uid', 'different')],
+        ));
+    }
+
+    public function test_type_add_with_case_differing_value_throws_attribute_or_value_exists(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::ATTRIBUTE_OR_VALUE_EXISTS);
+
+        $this->subject->execute($this->entry, new UpdateCommand(
+            new Dn('cn=alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_ADD, 'mail', 'ALICE@EXAMPLE.COM')],
+        ));
+    }
+
+    public function test_type_delete_specific_value_succeeds_with_case_differing_value(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=bob,dc=example,dc=com'),
+            new Attribute('cn', 'bob'),
+            new Attribute('mail', 'Bob@Example.com'),
+        );
+
+        $result = $this->subject->execute($entry, new UpdateCommand(
+            new Dn('cn=bob,dc=example,dc=com'),
+            [new Change(Change::TYPE_DELETE, 'mail', 'bob@example.com')],
+        ));
+
+        self::assertNull($result->get('mail')?->firstValue());
+    }
+
+    public function test_type_delete_rdn_value_with_case_differing_throws_not_allowed_on_rdn(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'Alice'),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NOT_ALLOWED_ON_RDN);
+
+        $this->subject->execute($entry, new UpdateCommand(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_DELETE, 'cn', 'alice')],
+        ));
+    }
+
+    public function test_type_replace_rdn_attribute_with_case_differing_rdn_value_is_allowed(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'Alice'),
+        );
+
+        $result = $this->subject->execute($entry, new UpdateCommand(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_REPLACE, 'cn', 'alice', 'alicia')],
+        ));
+
+        $cn = $result->get('cn');
+
+        self::assertNotNull($cn);
+        self::assertContains(
+            'alice',
+            $cn->getValues(),
+        );
+        self::assertContains(
+            'alicia',
+            $cn->getValues(),
+        );
+    }
 }

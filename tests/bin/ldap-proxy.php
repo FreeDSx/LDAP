@@ -9,9 +9,10 @@ require __DIR__ . '/../../vendor/autoload.php';
 
 $server = LdapServer::makeProxy(
     servers: 'localhost',
-    serverOptions: (new ServerOptions())->setPort(10389)
+    serverOptions: (new ServerOptions())
+        ->setPort(10389)
+        ->setSocketAcceptTimeout(0.1)
+        ->setOnServerReady(fn () => fwrite(STDOUT, 'server starting...' . PHP_EOL)),
 );
-
-echo "server starting..." . PHP_EOL;
 
 $server->run();

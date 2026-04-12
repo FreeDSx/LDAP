@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
@@ -26,7 +27,6 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
 
 trait ServerSearchTrait
 {
@@ -92,23 +92,28 @@ trait ServerSearchTrait
     /**
      * @throws OperationException
      */
-    private function makeSearchContext(SearchRequest $request): SearchContext
+    private function assertBaseDnProvided(SearchRequest $request): void
     {
-        $baseDn = $request->getBaseDn();
-
-        if ($baseDn === null) {
-            throw new OperationException('No base DN provided.', ResultCode::PROTOCOL_ERROR);
+        if ($request->getBaseDn() === null) {
+            throw new OperationException(
+                'No base DN provided.',
+                ResultCode::PROTOCOL_ERROR,
+            );
         }
+    }
 
-        return new SearchContext(
-            baseDn: $baseDn,
-            scope: $request->getScope(),
-            filter: $request->getFilter(),
-            attributes: $request->getAttributes(),
-            typesOnly: $request->getAttributesOnly(),
-            sizeLimit: $request->getSizeLimit(),
-            timeLimit: $request->getTimeLimit(),
+    /**
+     * Returns a ControlBag containing the message controls minus the paging control,
+     * which the server consumes itself and must not forward to backends.
+     */
+    private function nonPagingControls(LdapMessageRequest $message): ControlBag
+    {
+        $filtered = array_filter(
+            $message->controls()->toArray(),
+            static fn (Control $control): bool => $control->getTypeOid() !== Control::OID_PAGING,
         );
+
+        return new ControlBag(...$filtered);
     }
 
     /**

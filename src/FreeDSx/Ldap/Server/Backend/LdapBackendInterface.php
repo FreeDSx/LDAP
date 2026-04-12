@@ -13,11 +13,13 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend;
 
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
-use Generator;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 
 /**
  * The core contract for an LDAP backend storage implementation.
@@ -38,14 +40,17 @@ use Generator;
 interface LdapBackendInterface
 {
     /**
-     * Yield Entry objects matching (or potentially matching) the given search context.
+     * Return an EntryStream for the given search context.
      *
-     * Applies FilterEvaluator after receiving each entry, so implementations may pre-filter (for efficiency) or yield
-     * all in-scope candidates (for simplicity).
-     *
-     * @return Generator<Entry>
+     * The result wraps a lazy generator of candidate entries and a flag indicating whether the backend has already
+     * applied the filter exactly. When EntryStream::$isPreFiltered is true, the caller may skip PHP-level
+     * FilterEvaluator evaluation. Otherwise, all yielded entries are passed through FilterEvaluator as a final
+     * correctness pass.
      */
-    public function search(SearchContext $context): Generator;
+    public function search(
+        SearchRequest $request,
+        ControlBag $controls = new ControlBag(),
+    ): EntryStream;
 
     /**
      * Fetch a single entry by DN, or return null if it does not exist.

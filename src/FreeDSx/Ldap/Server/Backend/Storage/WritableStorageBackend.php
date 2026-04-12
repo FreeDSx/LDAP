@@ -13,18 +13,21 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage;
 
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\WriteEntryOperationHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Write\WritableBackendTrait;
 use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 use Generator;
@@ -88,28 +91,79 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
     /**
      * @throws OperationException
      */
-    public function search(SearchContext $context): Generator
-    {
-        $normBase = $context->baseDn->normalize();
+    public function search(
+        SearchRequest $request,
+        ControlBag $controls = new ControlBag(),
+    ): EntryStream {
+        $baseDn = $request->getBaseDn() ?? new Dn('');
+        $normBase = $baseDn->normalize();
 
-        if ($context->scope === SearchRequest::SCOPE_BASE_OBJECT) {
+        if ($request->getScope() === SearchRequest::SCOPE_BASE_OBJECT) {
             $entry = $this->storage->find($normBase);
 
             if ($entry === null) {
-                $this->throwNoSuchObject($context->baseDn);
+                $this->throwNoSuchObject($baseDn);
             }
 
-            yield $entry;
-
-            return;
+            return new EntryStream($this->yieldSingle($entry));
         }
 
-        if ($this->storage->find($normBase) === null) {
-            $this->throwNoSuchObject($context->baseDn);
+        if (!$this->storage->exists($normBase)) {
+            $this->throwNoSuchObject($baseDn);
         }
 
-        foreach ($this->storage->list($normBase, $context->scope === SearchRequest::SCOPE_WHOLE_SUBTREE) as $entry) {
-            yield $entry;
+        $subtree = $request->getScope() === SearchRequest::SCOPE_WHOLE_SUBTREE;
+        $options = new StorageListOptions(
+            baseDn: $normBase,
+            subtree: $subtree,
+            filter: $request->getFilter(),
+            timeLimit: $request->getTimeLimit(),
+            sizeLimit: $request->getSizeLimit(),
+        );
+
+        try {
+            $stream = $this->storage->list($options);
+        } catch (InvalidAttributeException $e) {
+            throw new OperationException(
+                $e->getMessage(),
+                ResultCode::PROTOCOL_ERROR,
+                $e,
+            );
+        }
+
+        return new EntryStream(
+            $this->wrapWithTimeLimitHandling($stream->entries),
+            $stream->isPreFiltered,
+        );
+    }
+
+    /**
+     * @return Generator<Entry>
+     */
+    private function yieldSingle(Entry $entry): Generator
+    {
+        yield $entry;
+    }
+
+    /**
+     * Wraps a storage generator and converts TimeLimitExceededException to an OperationException so the protocol layer
+     * receives a well-formed LDAP error.
+     *
+     * @param Generator<Entry> $generator
+     * @return Generator<Entry>
+     * @throws OperationException
+     */
+    private function wrapWithTimeLimitHandling(Generator $generator): Generator
+    {
+        try {
+            foreach ($generator as $entry) {
+                yield $entry;
+            }
+        } catch (TimeLimitExceededException) {
+            throw new OperationException(
+                'Time limit exceeded.',
+                ResultCode::TIME_LIMIT_EXCEEDED,
+            );
         }
     }
 
@@ -118,11 +172,11 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
      */
     public function add(AddCommand $command): void
     {
-        $this->storage->atomic(function (EntryStorageInterface $storage) use ($command): void {
+        $this->writeAtomic(function (EntryStorageInterface $storage) use ($command): void {
             $dn = $command->entry->getDn()->normalize();
             $this->assertParentExists($storage, $dn);
 
-            if ($storage->find($dn) !== null) {
+            if ($storage->exists($dn)) {
                 $this->throwEntryAlreadyExists($command->entry->getDn());
             }
 
@@ -135,7 +189,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
      */
     public function delete(DeleteCommand $command): void
     {
-        $this->storage->atomic(function (EntryStorageInterface $storage) use ($command): void {
+        $this->writeAtomic(function (EntryStorageInterface $storage) use ($command): void {
             $dn = $command->dn->normalize();
             $this->findOrFail($storage, $dn);
 
@@ -158,7 +212,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
      */
     public function update(UpdateCommand $command): void
     {
-        $this->storage->atomic(function (EntryStorageInterface $storage) use ($command): void {
+        $this->writeAtomic(function (EntryStorageInterface $storage) use ($command): void {
             $dn = $command->dn->normalize();
             $entry = $this->findOrFail($storage, $dn);
             $storage->store($this->entryHandler->apply(
@@ -173,7 +227,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
      */
     public function move(MoveCommand $command): void
     {
-        $this->storage->atomic(function (EntryStorageInterface $storage) use ($command): void {
+        $this->writeAtomic(function (EntryStorageInterface $storage) use ($command): void {
             $normOld = $command->dn->normalize();
             $entry = $this->findOrFail($storage, $normOld);
 
@@ -189,13 +243,33 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
             $newEntry = $this->entryHandler->apply($entry, $command);
             $normNew = $newEntry->getDn()->normalize();
 
-            if ($storage->find($normNew) !== null) {
+            if ($storage->exists($normNew)) {
                 $this->throwEntryAlreadyExists($newEntry->getDn());
             }
 
             $storage->remove($normOld);
             $storage->store($newEntry);
         });
+    }
+
+    /**
+     * Runs a write operation under the storage's atomic boundary and translates storage-layer exceptions into their
+     * corresponding LDAP OperationException result codes.
+     *
+     * @param callable(EntryStorageInterface): void $operation
+     * @throws OperationException
+     */
+    private function writeAtomic(callable $operation): void
+    {
+        try {
+            $this->storage->atomic($operation);
+        } catch (DnTooLongException $e) {
+            throw new OperationException(
+                $e->getMessage(),
+                ResultCode::ADMIN_LIMIT_EXCEEDED,
+                $e,
+            );
+        }
     }
 
     /**
@@ -225,7 +299,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
             return;
         }
 
-        if ($storage->find($parent) === null) {
+        if (!$storage->exists($parent)) {
             $this->throwNoSuchObject($parent);
         }
     }
@@ -241,7 +315,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
 
         $normNewParent = $command->newParent->normalize();
 
-        if ($normNewParent->getParent() !== null && $storage->find($normNewParent) === null) {
+        if ($normNewParent->getParent() !== null && !$storage->exists($normNewParent)) {
             $this->throwNoSuchObject($command->newParent);
         }
     }

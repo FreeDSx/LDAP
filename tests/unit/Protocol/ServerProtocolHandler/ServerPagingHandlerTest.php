@@ -28,7 +28,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingHandler;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
@@ -86,8 +86,8 @@ class ServerPagingHandlerTest extends TestCase
         $this->mockBackend
             ->expects(self::once())
             ->method('search')
-            ->with(self::isInstanceOf(SearchContext::class))
-            ->willReturn($this->makeGenerator($entry1, $entry2));
+            ->with(self::isInstanceOf(SearchRequest::class))
+            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
 
         $resultEntry1 = new LdapMessageResponse(
             2,
@@ -130,7 +130,7 @@ class ServerPagingHandlerTest extends TestCase
         $this->mockBackend
             ->expects(self::once())
             ->method('search')
-            ->willReturn($this->makeGenerator($entry1, $entry2));
+            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
 
         $this->mockQueue
             ->expects(self::once())
@@ -163,7 +163,7 @@ class ServerPagingHandlerTest extends TestCase
         $this->mockBackend
             ->expects(self::once())
             ->method('search')
-            ->willReturn($this->makeGenerator($entry1, $entry2));
+            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
 
         $capturedCookie = '';
 
@@ -331,7 +331,7 @@ class ServerPagingHandlerTest extends TestCase
         $this->mockBackend
             ->expects(self::once())
             ->method('search')
-            ->willReturn($this->makeGenerator($entry1, $entry2));
+            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
 
         $this->mockQueue
             ->expects(self::once())
@@ -365,7 +365,7 @@ class ServerPagingHandlerTest extends TestCase
         $this->mockBackend
             ->expects(self::once())
             ->method('search')
-            ->willReturn($this->makeGenerator($entry1, $entry2, $entry3));
+            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2, $entry3)));
 
         $capturedCookie = '';
         $sizeLimitExceededSeen = false;

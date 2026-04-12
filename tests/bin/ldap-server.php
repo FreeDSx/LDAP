@@ -8,8 +8,10 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
@@ -31,15 +33,24 @@ class LdapServerBackend implements WritableLdapBackendInterface, PasswordAuthent
         'cn=user,dc=foo,dc=bar' => '12345',
     ];
 
-    public function search(SearchContext $context): Generator
-    {
+    public function search(
+        SearchRequest $request,
+        ControlBag $controls = new ControlBag(),
+    ): EntryStream {
+        $baseDn = $request->getBaseDn()?->toString() ?? '';
+
         $this->logRequest(
             'search',
-            "base-dn => {$context->baseDn->toString()}, filter => {$context->filter->toString()}"
+            "base-dn => {$baseDn}, filter => {$request->getFilter()->toString()}"
         );
 
+        return new EntryStream($this->yieldSearchResults($baseDn));
+    }
+
+    private function yieldSearchResults(string $baseDn): Generator
+    {
         yield Entry::fromArray(
-            $context->baseDn->toString(),
+            $baseDn,
             [
                 'objectClass' => 'inetOrgPerson',
                 'cn' => 'user',
@@ -159,7 +170,14 @@ class LdapServerBackend implements WritableLdapBackendInterface, PasswordAuthent
 
 class LdapServerPagingBackend extends LdapServerBackend
 {
-    public function search(SearchContext $context): Generator
+    public function search(
+        SearchRequest $request,
+        ControlBag $controls = new ControlBag(),
+    ): EntryStream {
+        return new EntryStream($this->yieldPagingResults());
+    }
+
+    private function yieldPagingResults(): Generator
     {
         for ($i = 1; $i <= 300; $i++) {
             yield Entry::fromArray(
@@ -196,6 +214,7 @@ $options = (new ServerOptions())
     ->setSslCert($sslCert)
     ->setSslCertKey($sslKey)
     ->setUseSsl($useSsl)
+    ->setSocketAcceptTimeout(0.1)
     ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));
 
 if ($handler === 'sasl') {

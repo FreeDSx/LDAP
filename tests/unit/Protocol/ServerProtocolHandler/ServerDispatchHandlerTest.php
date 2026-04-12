@@ -21,7 +21,9 @@ use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
@@ -80,7 +82,7 @@ final class ServerDispatchHandlerTest extends TestCase
         $this->subject->handleRequest($add, $this->mockToken);
     }
 
-    public function test_it_propagates_operation_exceptions_from_the_write_handler(): void
+    public function test_it_sends_error_response_for_operation_exceptions_from_the_write_handler(): void
     {
         $add = new LdapMessageRequest(1, new AddRequest(Entry::create('cn=foo,dc=bar')));
 
@@ -91,8 +93,14 @@ final class ServerDispatchHandlerTest extends TestCase
                 ResultCode::ENTRY_ALREADY_EXISTS,
             ));
 
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::ENTRY_ALREADY_EXISTS);
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage')
+            ->with(self::callback(function (LdapMessageResponse $msg): bool {
+                return $msg->getResponse() instanceof LdapResult
+                    && $msg->getResponse()->getResultCode() === ResultCode::ENTRY_ALREADY_EXISTS;
+            }))
+            ->willReturnSelf();
 
         $this->subject->handleRequest($add, $this->mockToken);
     }
@@ -118,7 +126,7 @@ final class ServerDispatchHandlerTest extends TestCase
         $this->subject->handleRequest($compare, $this->mockToken);
     }
 
-    public function test_it_propagates_operation_exceptions_from_backend_compare(): void
+    public function test_it_sends_error_response_for_operation_exceptions_from_backend_compare(): void
     {
         $compare = new LdapMessageRequest(1, new CompareRequest('cn=foo,dc=bar', Filters::equal('foo', 'bar')));
 
@@ -129,13 +137,19 @@ final class ServerDispatchHandlerTest extends TestCase
                 ResultCode::NO_SUCH_OBJECT,
             ));
 
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage')
+            ->with(self::callback(function (LdapMessageResponse $msg): bool {
+                return $msg->getResponse() instanceof LdapResult
+                    && $msg->getResponse()->getResultCode() === ResultCode::NO_SUCH_OBJECT;
+            }))
+            ->willReturnSelf();
 
         $this->subject->handleRequest($compare, $this->mockToken);
     }
 
-    public function test_it_throws_unwilling_to_perform_when_no_write_handler_supports_the_operation(): void
+    public function test_it_sends_error_response_when_no_write_handler_supports_the_operation(): void
     {
         $subject = new ServerDispatchHandler(
             queue: $this->mockQueue,
@@ -145,18 +159,26 @@ final class ServerDispatchHandlerTest extends TestCase
 
         $add = new LdapMessageRequest(1, new AddRequest(Entry::create('cn=foo,dc=bar')));
 
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage')
+            ->with(self::callback(function (LdapMessageResponse $msg): bool {
+                return $msg->getResponse() instanceof LdapResult
+                    && $msg->getResponse()->getResultCode() === ResultCode::UNWILLING_TO_PERFORM;
+            }))
+            ->willReturnSelf();
 
         $subject->handleRequest($add, $this->mockToken);
     }
 
-    public function test_it_throws_an_operation_exception_for_unsupported_requests(): void
+    public function test_it_sends_error_response_for_unsupported_requests(): void
     {
         $request = new LdapMessageRequest(2, new AbandonRequest(1));
 
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::NO_SUCH_OPERATION);
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage')
+            ->willReturnSelf();
 
         $this->subject->handleRequest($request, $this->mockToken);
     }

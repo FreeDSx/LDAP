@@ -168,6 +168,24 @@ class AttributeTest extends TestCase
         self::assertFalse($this->subject->has('bleh'));
     }
 
+    public function test_has_case_insensitive_matches_existing_value(): void
+    {
+        self::assertTrue($this->subject->has('foo', caseSensitive: false));
+        self::assertTrue($this->subject->has('FOO', caseSensitive: false));
+        self::assertTrue($this->subject->has('Foo', caseSensitive: false));
+    }
+
+    public function test_has_case_insensitive_returns_false_for_unknown_value(): void
+    {
+        self::assertFalse($this->subject->has('bleh', caseSensitive: false));
+        self::assertFalse($this->subject->has('BLEH', caseSensitive: false));
+    }
+
+    public function test_has_defaults_to_byte_exact(): void
+    {
+        self::assertFalse($this->subject->has('FOO'));
+    }
+
     public function test_it_should_check_if_it_equals_another_attribute(): void
     {
         self::assertTrue($this->subject->equals(new Attribute('cn')));

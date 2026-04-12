@@ -160,6 +160,36 @@ class Dn implements IteratorAggregate, Countable, Stringable
     }
 
     /**
+     * Return true if this DN is the same as, or a descendant of, $base.
+     *
+     * @throws UnexpectedValueException
+     */
+    public function isDescendantOf(Dn $base): bool
+    {
+        $baseDn = $base->toString();
+        $thisDn = $this->toString();
+
+        if ($baseDn === '') {
+            return $thisDn !== '';
+        }
+
+        $baseLower = strtolower($baseDn);
+        if (strtolower($thisDn) === $baseLower) {
+            return true;
+        }
+
+        $parent = $this->getParent();
+        while ($parent !== null) {
+            if (strtolower($parent->toString()) === $baseLower) {
+                return true;
+            }
+            $parent = $parent->getParent();
+        }
+
+        return false;
+    }
+
+    /**
      * @todo This needs proper handling. But the regex would probably be rather crazy.
      *
      * @throws UnexpectedValueException

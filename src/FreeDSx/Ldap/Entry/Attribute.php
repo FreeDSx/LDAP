@@ -77,13 +77,25 @@ class Attribute implements IteratorAggregate, Countable, Stringable
     /**
      * Check if the attribute has a specific value.
      */
-    public function has(string $value): bool
-    {
-        return in_array(
-            $value,
-            $this->values,
-            true
-        );
+    public function has(
+        string $value,
+        bool $caseSensitive = true,
+    ): bool {
+        if ($caseSensitive) {
+            return in_array(
+                $value,
+                $this->values,
+                true
+            );
+        }
+
+        foreach ($this->values as $existing) {
+            if (strcasecmp($existing, $value) === 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -91,9 +103,32 @@ class Attribute implements IteratorAggregate, Countable, Stringable
      */
     public function remove(string ...$values): self
     {
+        return $this->removeValues($values);
+    }
+
+    /**
+     * Remove all values specified from the attribute. Optionally, specify if the values should be removed in a
+     * case-sensitive manner.
+     *
+     * @param string[] $values
+     */
+    public function removeValues(
+        array $values,
+        bool $caseSensitive = true,
+    ): self {
         foreach ($values as $value) {
-            if (($i = array_search($value, $this->values, true)) !== false) {
-                unset($this->values[$i]);
+            if ($caseSensitive) {
+                if (($i = array_search($value, $this->values, true)) !== false) {
+                    unset($this->values[$i]);
+                }
+
+                continue;
+            }
+
+            foreach ($this->values as $i => $existing) {
+                if (strcasecmp($existing, $value) === 0) {
+                    unset($this->values[$i]);
+                }
             }
         }
 

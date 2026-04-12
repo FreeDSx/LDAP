@@ -20,7 +20,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use PHPUnit\Framework\TestCase;
@@ -168,15 +167,10 @@ final class JsonFileStorageTest extends TestCase
         $grandchild = new Entry(new Dn('cn=Sub,cn=Alice,dc=example,dc=com'), new Attribute('cn', 'Sub'));
         $this->subject->add(new AddCommand($grandchild));
 
-        $filter = new PresentFilter('objectClass');
-        $context = new SearchContext(
-            new Dn('dc=example,dc=com'),
-            SearchRequest::SCOPE_SINGLE_LEVEL,
-            $filter,
-            [],
-            false,
-        );
-        $results = iterator_to_array($this->subject->search($context));
+        $request = (new SearchRequest(new PresentFilter('objectClass')))
+            ->base('dc=example,dc=com')
+            ->useSingleLevelScope();
+        $results = iterator_to_array($this->subject->search($request)->entries);
 
         self::assertCount(
             1,
@@ -195,15 +189,10 @@ final class JsonFileStorageTest extends TestCase
         $grandchild = new Entry(new Dn('cn=Sub,cn=Alice,dc=example,dc=com'), new Attribute('cn', 'Sub'));
         $this->subject->add(new AddCommand($grandchild));
 
-        $filter = new PresentFilter('objectClass');
-        $context = new SearchContext(
-            new Dn('dc=example,dc=com'),
-            SearchRequest::SCOPE_WHOLE_SUBTREE,
-            $filter,
-            [],
-            false,
-        );
-        $results = iterator_to_array($this->subject->search($context));
+        $request = (new SearchRequest(new PresentFilter('objectClass')))
+            ->base('dc=example,dc=com')
+            ->useSubtreeScope();
+        $results = iterator_to_array($this->subject->search($request)->entries);
 
         self::assertCount(
             3,

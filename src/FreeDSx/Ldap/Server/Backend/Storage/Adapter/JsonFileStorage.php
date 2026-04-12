@@ -19,8 +19,9 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\CoroutineLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\StorageLockInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use Generator;
+use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
  * A file-backed storage implementation that persists entries as a JSON file.
@@ -90,15 +91,20 @@ final class JsonFileStorage implements EntryStorageInterface
         return $this->read()[$dn->toString()] ?? null;
     }
 
-    /**
-     * @return Generator<Entry>
-     */
-    public function list(Dn $baseDn, bool $subtree): Generator
+    public function exists(Dn $dn): bool
     {
-        return $this->yieldByScope(
-            $this->read(),
-            $baseDn,
-            $subtree
+        return isset($this->read()[$dn->toString()]);
+    }
+
+    public function list(StorageListOptions $options): EntryStream
+    {
+        return new EntryStream(
+            $this->yieldByScope(
+                $this->read(),
+                $options->baseDn,
+                $options->subtree,
+                $options->timeLimit,
+            ),
         );
     }
 
@@ -228,7 +234,10 @@ final class JsonFileStorage implements EntryStorageInterface
      */
     private function encodeContents(array $data): string
     {
-        return json_encode($data, JSON_UNESCAPED_UNICODE) ?: '{}';
+        return json_encode(
+            $data,
+            JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
+        );
     }
 
     private function arrayToEntry(mixed $data): Entry

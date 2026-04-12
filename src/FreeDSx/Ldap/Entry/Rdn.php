@@ -69,6 +69,41 @@ class Rdn implements Stringable
         return count($this->additional) !== 0;
     }
 
+    /**
+     * Return all potential RDNs, accounting for multivalued RDNs.
+     *
+     * @return list<Rdn>
+     */
+    public function getAll(): array
+    {
+        return array_values([
+            $this,
+            ...$this->additional,
+        ]);
+    }
+
+    /**
+     * Whether any component has the given attribute name (case-insensitive).
+     */
+    public function has(string $name): bool
+    {
+        return $this->getValueOf($name) !== null;
+    }
+
+    /**
+     * Value of the component with the given attribute name, or null if absent (case-insensitive).
+     */
+    public function getValueOf(string $name): ?string
+    {
+        foreach ($this->getAll() as $component) {
+            if (strcasecmp($component->getName(), $name) === 0) {
+                return $component->getValue();
+            }
+        }
+
+        return null;
+    }
+
     public function toString(): string
     {
         $rdn = $this->name . '=' . $this->value;

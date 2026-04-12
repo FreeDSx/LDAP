@@ -167,4 +167,78 @@ class DnTest extends TestCase
             $child->isChildOf(new Dn('dc=local,dc=example')),
         );
     }
+
+    public function test_is_descendant_of_returns_true_for_direct_child(): void
+    {
+        self::assertTrue(
+            (new Dn('cn=alice,dc=example,dc=com'))->isDescendantOf(new Dn('dc=example,dc=com')),
+        );
+    }
+
+    public function test_is_descendant_of_returns_true_for_grandchild(): void
+    {
+        self::assertTrue(
+            (new Dn('cn=alice,ou=people,dc=example,dc=com'))->isDescendantOf(new Dn('dc=example,dc=com')),
+        );
+    }
+
+    public function test_is_descendant_of_returns_true_for_identical_dn(): void
+    {
+        self::assertTrue(
+            (new Dn('dc=example,dc=com'))->isDescendantOf(new Dn('dc=example,dc=com')),
+        );
+    }
+
+    public function test_is_descendant_of_is_case_insensitive(): void
+    {
+        self::assertTrue(
+            (new Dn('cn=alice,dc=example,dc=com'))->isDescendantOf(new Dn('DC=EXAMPLE,DC=COM')),
+        );
+    }
+
+    public function test_is_descendant_of_returns_false_for_unrelated_dn(): void
+    {
+        self::assertFalse(
+            (new Dn('cn=alice,dc=other,dc=org'))->isDescendantOf(new Dn('dc=example,dc=com')),
+        );
+    }
+
+    public function test_is_descendant_of_returns_false_for_parent_dn(): void
+    {
+        self::assertFalse(
+            (new Dn('dc=example,dc=com'))->isDescendantOf(new Dn('cn=alice,dc=example,dc=com')),
+        );
+    }
+
+    public function test_is_descendant_of_empty_base_matches_any_non_empty_dn(): void
+    {
+        self::assertTrue(
+            (new Dn('dc=com'))->isDescendantOf(new Dn('')),
+        );
+        self::assertTrue(
+            (new Dn('cn=alice,dc=example,dc=com'))->isDescendantOf(new Dn('')),
+        );
+    }
+
+    public function test_is_descendant_of_empty_dn_against_empty_base_is_false(): void
+    {
+        self::assertFalse(
+            (new Dn(''))->isDescendantOf(new Dn('')),
+        );
+    }
+
+    public function test_is_descendant_of_rejects_string_suffix_collision_from_escaped_comma(): void
+    {
+        // The entry parent is "dc=example,dc=com". A naive str_ends_with against
+        // ",John,dc=example,dc=com" would be true and let this entry slip into
+        // a subtree search whose base is "John,dc=example,dc=com".
+        $entry = new Dn('cn=Doe\,John,dc=example,dc=com');
+
+        self::assertFalse(
+            $entry->isDescendantOf(new Dn('John,dc=example,dc=com')),
+        );
+        self::assertTrue(
+            $entry->isDescendantOf(new Dn('dc=example,dc=com')),
+        );
+    }
 }

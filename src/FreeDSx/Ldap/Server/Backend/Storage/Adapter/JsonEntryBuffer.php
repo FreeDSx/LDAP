@@ -16,7 +16,10 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 use Closure;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
+use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use Generator;
 
 /**
@@ -61,24 +64,36 @@ final class JsonEntryBuffer implements EntryStorageInterface
         return ($this->toEntry)($this->data[$key]);
     }
 
+    public function exists(Dn $dn): bool
+    {
+        return isset($this->data[$dn->toString()]);
+    }
+
+    public function list(StorageListOptions $options): EntryStream
+    {
+        return new EntryStream($this->generateEntries($options));
+    }
+
     /**
      * @return Generator<Entry>
      */
-    public function list(Dn $baseDn, bool $subtree): Generator
+    private function generateEntries(StorageListOptions $options): Generator
     {
-        $normBase = $baseDn->toString();
+        $deadline = $options->timeLimit > 0
+            ? microtime(true) + $options->timeLimit
+            : null;
 
         foreach ($this->data as $normDn => $entryData) {
-            if ($normBase === '' && $subtree) {
+            if ($deadline !== null && microtime(true) >= $deadline) {
+                throw new TimeLimitExceededException();
+            }
+
+            $entryDn = new Dn($normDn);
+
+            if ($options->subtree && $entryDn->isDescendantOf($options->baseDn)) {
                 yield ($this->toEntry)($entryData);
-            } elseif ($subtree) {
-                if ($normDn === $normBase || str_ends_with($normDn, ',' . $normBase)) {
-                    yield ($this->toEntry)($entryData);
-                }
-            } else {
-                if ((new Dn($normDn))->isChildOf($baseDn)) {
-                    yield ($this->toEntry)($entryData);
-                }
+            } elseif (!$options->subtree && $entryDn->isChildOf($options->baseDn)) {
+                yield ($this->toEntry)($entryData);
             }
         }
     }

@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\RequestHandler;
 
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
@@ -27,7 +29,6 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
-use FreeDSx\Ldap\Server\Backend\SearchContext;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
@@ -52,15 +53,16 @@ final class ProxyBackendTest extends TestCase
         $this->subject->setLdapClient($this->mockLdap);
     }
 
-    private function makeContext(int $scope = SearchRequest::SCOPE_WHOLE_SUBTREE): SearchContext
-    {
-        return new SearchContext(
-            baseDn: new Dn('dc=example,dc=com'),
-            scope: $scope,
-            filter: new PresentFilter('objectClass'),
-            attributes: [],
-            typesOnly: false,
-        );
+    private function makeRequest(
+        int $scope = SearchRequest::SCOPE_WHOLE_SUBTREE,
+        int $sizeLimit = 0,
+        int $timeLimit = 0,
+    ): SearchRequest {
+        return (new SearchRequest(new PresentFilter('objectClass')))
+            ->base('dc=example,dc=com')
+            ->setScope($scope)
+            ->sizeLimit($sizeLimit)
+            ->timeLimit($timeLimit);
     }
 
     public function test_search_yields_entries_from_upstream(): void
@@ -72,7 +74,7 @@ final class ProxyBackendTest extends TestCase
             ->method('search')
             ->willReturn(new Entries($entry));
 
-        $results = iterator_to_array($this->subject->search($this->makeContext()));
+        $results = iterator_to_array($this->subject->search($this->makeRequest())->entries);
 
         self::assertCount(1, $results);
         self::assertSame($entry, $results[0]);
@@ -86,7 +88,7 @@ final class ProxyBackendTest extends TestCase
             ->with(self::callback(fn(SearchRequest $r) => $r->getScope() === SearchRequest::SCOPE_BASE_OBJECT))
             ->willReturn(new Entries());
 
-        iterator_to_array($this->subject->search($this->makeContext(SearchRequest::SCOPE_BASE_OBJECT)));
+        iterator_to_array($this->subject->search($this->makeRequest(SearchRequest::SCOPE_BASE_OBJECT))->entries);
     }
 
     public function test_search_uses_single_level_scope(): void
@@ -97,7 +99,7 @@ final class ProxyBackendTest extends TestCase
             ->with(self::callback(fn(SearchRequest $r) => $r->getScope() === SearchRequest::SCOPE_SINGLE_LEVEL))
             ->willReturn(new Entries());
 
-        iterator_to_array($this->subject->search($this->makeContext(SearchRequest::SCOPE_SINGLE_LEVEL)));
+        iterator_to_array($this->subject->search($this->makeRequest(SearchRequest::SCOPE_SINGLE_LEVEL))->entries);
     }
 
     public function test_search_uses_subtree_scope_by_default(): void
@@ -108,7 +110,57 @@ final class ProxyBackendTest extends TestCase
             ->with(self::callback(fn(SearchRequest $r) => $r->getScope() === SearchRequest::SCOPE_WHOLE_SUBTREE))
             ->willReturn(new Entries());
 
-        iterator_to_array($this->subject->search($this->makeContext()));
+        iterator_to_array($this->subject->search($this->makeRequest())->entries);
+    }
+
+    public function test_search_marks_stream_pre_filtered(): void
+    {
+        $this->mockLdap
+            ->method('search')
+            ->willReturn(new Entries());
+
+        $stream = $this->subject->search($this->makeRequest());
+
+        self::assertTrue($stream->isPreFiltered);
+    }
+
+    public function test_search_forwards_size_and_time_limits(): void
+    {
+        $this->mockLdap
+            ->expects(self::once())
+            ->method('search')
+            ->with(self::callback(
+                fn(SearchRequest $r): bool => $r->getSizeLimit() === 25 && $r->getTimeLimit() === 7,
+            ))
+            ->willReturn(new Entries());
+
+        iterator_to_array(
+            $this->subject->search($this->makeRequest(
+                sizeLimit: 25,
+                timeLimit: 7,
+            ))->entries,
+        );
+    }
+
+    public function test_search_forwards_controls_to_upstream(): void
+    {
+        $control = new Control('1.2.840.113556.1.4.473');
+
+        $this->mockLdap
+            ->expects(self::once())
+            ->method('search')
+            ->with(
+                self::isInstanceOf(SearchRequest::class),
+                $control,
+            )
+            ->willReturn(new Entries());
+
+        iterator_to_array(
+            $this->subject->search(
+                $this->makeRequest(),
+                new ControlBag($control),
+            )->entries,
+        );
     }
 
     public function test_get_reads_entry_by_dn(): void

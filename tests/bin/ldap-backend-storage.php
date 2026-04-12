@@ -12,6 +12,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqliteStorage;
 use FreeDSx\Ldap\ServerOptions;
 
 require __DIR__ . '/../../vendor/autoload.php';
@@ -51,6 +52,7 @@ $server = new LdapServer(
     (new ServerOptions())
         ->setPort(10389)
         ->setTransport($transport)
+        ->setSocketAcceptTimeout(0.1)
         ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL))
 );
 
@@ -62,6 +64,22 @@ if ($handler === 'file') {
     }
 
     $storage = JsonFileStorage::forPcntl($filePath);
+
+    foreach ($entries as $entry) {
+        $storage->store($entry);
+    }
+
+    $server->useStorage($storage);
+} elseif ($handler === 'sqlite') {
+    $dbPath = sys_get_temp_dir() . '/ldap_test_backend_storage.sqlite';
+
+    foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $path) {
+        if (file_exists($path)) {
+            unlink($path);
+        }
+    }
+
+    $storage = SqliteStorage::forPcntl($dbPath);
 
     foreach ($entries as $entry) {
         $storage->store($entry);
