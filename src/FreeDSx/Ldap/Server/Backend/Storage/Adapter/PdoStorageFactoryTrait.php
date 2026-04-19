@@ -38,9 +38,13 @@ trait PdoStorageFactoryTrait
     protected function createShared(): PdoStorage
     {
         $dialect = $this->dialect();
+        $factory = fn (): PDO => $this->openConnection($dialect);
 
         return new PdoStorage(
-            new SharedPdoConnectionProvider($this->openConnection($dialect)),
+            new SharedPdoConnectionProvider(
+                $factory(),
+                $factory,
+            ),
             $this->translator(),
             $dialect,
         );

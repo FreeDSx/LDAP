@@ -11,23 +11,14 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
-
-use PDO;
+namespace FreeDSx\Ldap\Server\Backend;
 
 /**
- * Resolves a PDO connection and its transaction state for the current execution context.
+ * Implemented by components whose cached state or connections should be discarded on demand (such as after forking).
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-interface PdoConnectionProviderInterface
+interface ResettableInterface
 {
-    public function get(): PDO;
-
-    public function txState(): PdoTxState;
-
-    /**
-     * Discard any cached connection and transaction state.
-     */
     public function reset(): void;
 }

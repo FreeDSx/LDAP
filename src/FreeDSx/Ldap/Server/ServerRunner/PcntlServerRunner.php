@@ -17,6 +17,7 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\ChildProcess;
+use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Socket\Socket;
@@ -346,6 +347,12 @@ class PcntlServerRunner implements ServerRunnerInterface
     ): never {
         $context = ['pid' => $pid];
         $this->isMainProcess = false;
+        $backend = $this->options->getBackend();
+
+        if ($backend instanceof ResettableInterface) {
+            $backend->reset();
+        }
+
         $serverProtocolHandler = $this->serverProtocolFactory->make($socket);
 
         $this->installChildSignalHandlers(
