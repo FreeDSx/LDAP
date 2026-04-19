@@ -27,6 +27,7 @@ final class Config
         'memory',
         'json',
         'sqlite',
+        'mysql',
     ];
 
     /**

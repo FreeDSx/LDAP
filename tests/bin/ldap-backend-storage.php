@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\MysqlStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqliteStorage;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -72,8 +73,8 @@ if ($storageOpt !== null || $runnerOpt !== null) {
     };
 }
 
-if (!in_array($storage, ['memory', 'json', 'sqlite'], true)) {
-    fwrite(STDERR, "Invalid --storage value: {$storage}. Expected one of: memory, json, sqlite." . PHP_EOL);
+if (!in_array($storage, ['memory', 'json', 'sqlite', 'mysql'], true)) {
+    fwrite(STDERR, "Invalid --storage value: {$storage}. Expected one of: memory, json, sqlite, mysql." . PHP_EOL);
     exit(2);
 }
 if (!in_array($runner, ['pcntl', 'swoole'], true)) {
@@ -153,7 +154,7 @@ if ($storage === 'memory') {
     }
 
     $server->useStorage($adapter);
-} else {
+} elseif ($storage === 'sqlite') {
     $dbPath = sys_get_temp_dir() . '/ldap_test_backend_storage.sqlite';
 
     foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $path) {
@@ -165,6 +166,38 @@ if ($storage === 'memory') {
     $adapter = $runner === 'swoole'
         ? SqliteStorage::forSwoole($dbPath)
         : SqliteStorage::forPcntl($dbPath);
+
+    if ($runner === 'swoole') {
+        Swoole\Coroutine\run(function () use ($adapter, $entries): void {
+            foreach ($entries as $entry) {
+                $adapter->store($entry);
+            }
+        });
+    } else {
+        foreach ($entries as $entry) {
+            $adapter->store($entry);
+        }
+    }
+
+    $server->useStorage($adapter);
+} else {
+    $dsn = getenv('MYSQL_DSN') ?: 'mysql:host=127.0.0.1;port=3306;dbname=freedsx';
+    $user = getenv('MYSQL_USER') ?: 'root';
+    $password = getenv('MYSQL_PASSWORD') ?: 'root';
+
+    // Start each run from a known-empty table.
+    $cleanup = new PDO(
+        $dsn,
+        $user,
+        $password,
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+    );
+    $cleanup->exec('DROP TABLE IF EXISTS entries');
+    unset($cleanup);
+
+    $adapter = $runner === 'swoole'
+        ? MysqlStorage::forSwoole($dsn, $user, $password)
+        : MysqlStorage::forPcntl($dsn, $user, $password);
 
     if ($runner === 'swoole') {
         Swoole\Coroutine\run(function () use ($adapter, $entries): void {
