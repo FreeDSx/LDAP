@@ -13,83 +13,80 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock;
 
-use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 
 /**
- * PCNTL-safe lock using flock(LOCK_EX) to serialize writes across forked children.
+ * PCNTL-safe lock: serializes writes on a sidecar `.lock` file and publishes updates atomically via rename().
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class FileLock implements StorageLockInterface
+final class FileLock implements StorageLockInterface
 {
-    public function __construct(private readonly string $filePath)
-    {
-    }
+    use AtomicStorageLockTrait;
 
-    public function withLock(callable $mutation): void
+    private const LOCK_SUFFIX = '.lock';
+
+    /**
+     * @var resource|null
+     */
+    private $lockHandle = null;
+
+    private function acquireLock(): void
     {
         $handle = fopen(
-            $this->filePath,
-            'c+'
+            $this->filePath . self::LOCK_SUFFIX,
+            'c',
         );
 
         if ($handle === false) {
-            throw new RuntimeException(sprintf(
-                'Unable to open storage file: %s',
-                $this->filePath
-            ));
+            throw new StorageIoException('Unable to open the storage backend lock.');
         }
 
         if (!flock($handle, LOCK_EX)) {
             fclose($handle);
 
-            throw new RuntimeException(sprintf(
-                'Unable to acquire exclusive lock on storage file: %s',
-                $this->filePath
-            ));
+            throw new StorageIoException('Unable to acquire exclusive lock on the storage backend.');
         }
 
-        try {
-            $result = $mutation($this->readFromHandle($handle));
-
-            $this->writeToHandle(
-                $handle,
-                $result
-            );
-        } finally {
-            flock($handle, LOCK_UN);
-            fclose($handle);
-        }
+        $this->lockHandle = $handle;
     }
 
-    /**
-     * @param resource $handle
-     */
-    private function readFromHandle(mixed $handle): string
+    private function releaseLock(): void
     {
-        $size = fstat($handle)['size'] ?? 0;
+        if ($this->lockHandle === null) {
+            return;
+        }
 
-        if ($size <= 0) {
+        flock($this->lockHandle, LOCK_UN);
+        fclose($this->lockHandle);
+        $this->lockHandle = null;
+    }
+
+    private function readCurrentContents(): string
+    {
+        if (!file_exists($this->filePath)) {
             return '';
         }
 
-        $contents = fread(
-            $handle,
-            $size
-        );
+        $contents = file_get_contents($this->filePath);
 
-        return $contents !== false ? $contents : '';
+        if ($contents === false) {
+            throw new StorageIoException('Unable to read the storage backend contents.');
+        }
+
+        return $contents;
     }
 
-    /**
-     * @param resource $handle
-     */
-    private function writeToHandle(
-        mixed $handle,
+    private function writeContentsToTemp(
+        string $tmpPath,
         string $contents,
-    ): void {
-        ftruncate($handle, 0);
-        rewind($handle);
-        fwrite($handle, $contents);
+    ): int {
+        $bytesWritten = file_put_contents($tmpPath, $contents);
+
+        if ($bytesWritten === false) {
+            throw new StorageIoException('Unable to stage the storage update.');
+        }
+
+        return $bytesWritten;
     }
 }

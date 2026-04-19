@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Write\WritableBackendTrait;
 use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
@@ -265,6 +266,12 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             throw new OperationException(
                 $e->getMessage(),
                 ResultCode::ADMIN_LIMIT_EXCEEDED,
+                $e,
+            );
+        } catch (StorageIoException $e) {
+            throw new OperationException(
+                'The backend storage is currently unavailable.',
+                ResultCode::UNAVAILABLE,
                 $e,
             );
         }

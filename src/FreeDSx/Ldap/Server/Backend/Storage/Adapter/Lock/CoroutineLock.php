@@ -13,37 +13,56 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock;
 
-use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
 
 /**
- * Swoole coroutine lock backed by a Channel(1) mutex.
+ * Swoole coroutine lock: serializes writes on a Channel(1) mutex and publishes updates atomically via rename().
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final class CoroutineLock implements StorageLockInterface
 {
+    use AtomicStorageLockTrait;
+
     /**
      * @var Channel<mixed>|null
      */
     private ?Channel $mutex = null;
 
-    public function __construct(private readonly string $filePath)
+    private function acquireLock(): void
     {
+        $this->getOrCreateMutex()->pop();
     }
 
-    public function withLock(callable $mutation): void
+    private function releaseLock(): void
     {
-        $mutex = $this->getOrCreateMutex();
-        $mutex->pop();
-
-        try {
-            $result = $mutation($this->read());
-            $this->write($result);
-        } finally {
-            $mutex->push(true);
+        if ($this->mutex === null) {
+            return;
         }
+
+        $this->mutex->push(true);
+    }
+
+    private function readCurrentContents(): string
+    {
+        $contents = Coroutine\System::readFile($this->filePath);
+
+        return $contents !== false ? $contents : '';
+    }
+
+    private function writeContentsToTemp(
+        string $tmpPath,
+        string $contents,
+    ): int {
+        $bytesWritten = Coroutine\System::writeFile($tmpPath, $contents);
+
+        if ($bytesWritten === false) {
+            throw new StorageIoException('Unable to stage the storage update.');
+        }
+
+        return $bytesWritten;
     }
 
     /**
@@ -67,27 +86,5 @@ final class CoroutineLock implements StorageLockInterface
         $mutex->push(true);
 
         return $mutex;
-    }
-
-    private function read(): string
-    {
-        $contents = Coroutine\System::readFile($this->filePath);
-
-        return ($contents !== false) ? $contents : '';
-    }
-
-    private function write(string $contents): void
-    {
-        $result = Coroutine\System::writeFile(
-            $this->filePath,
-            $contents
-        );
-
-        if ($result === false) {
-            throw new RuntimeException(sprintf(
-                'Unable to write to storage file: %s',
-                $this->filePath
-            ));
-        }
     }
 }
