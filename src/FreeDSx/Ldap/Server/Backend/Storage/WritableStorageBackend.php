@@ -43,10 +43,24 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
 {
     use WritableBackendTrait;
 
+    /**
+     * @var array<string, true> normalised DN strings of protected naming contexts.
+     */
+    private readonly array $namingContexts;
+
+    /**
+     * @param string[] $namingContexts DN strings that may not be deleted.
+     */
     public function __construct(
         private readonly EntryStorageInterface $storage,
         private readonly WriteEntryOperationHandler $entryHandler = new WriteEntryOperationHandler(),
+        array $namingContexts = [],
     ) {
+        $normalised = [];
+        foreach ($namingContexts as $namingContext) {
+            $normalised[(new Dn($namingContext))->normalize()->toString()] = true;
+        }
+        $this->namingContexts = $normalised;
     }
 
     public function reset(): void
@@ -189,6 +203,8 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
      */
     public function delete(DeleteCommand $command): void
     {
+        $this->assertNotNamingContext($command->dn);
+
         $this->writeAtomic(function (EntryStorageInterface $storage) use ($command): void {
             $dn = $command->dn->normalize();
             $this->findOrFail($storage, $dn);
@@ -227,6 +243,8 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
      */
     public function move(MoveCommand $command): void
     {
+        $this->assertNotNamingContext($command->dn);
+
         $this->writeAtomic(function (EntryStorageInterface $storage) use ($command): void {
             $normOld = $command->dn->normalize();
             $entry = $this->findOrFail($storage, $normOld);
@@ -323,6 +341,24 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         if ($normNewParent->getParent() !== null && !$storage->exists($normNewParent)) {
             $this->throwNoSuchObject($command->newParent);
         }
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function assertNotNamingContext(Dn $dn): void
+    {
+        if (!isset($this->namingContexts[$dn->normalize()->toString()])) {
+            return;
+        }
+
+        throw new OperationException(
+            sprintf(
+                'Entry "%s" is a naming context and cannot be deleted or renamed.',
+                $dn->toString()
+            ),
+            ResultCode::UNWILLING_TO_PERFORM,
+        );
     }
 
     /**

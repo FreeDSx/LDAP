@@ -233,6 +233,82 @@ final class WritableStorageBackendTest extends TestCase
         $this->subject->delete(new DeleteCommand(new Dn('dc=example,dc=com')));
     }
 
+    public function test_delete_throws_unwilling_to_perform_for_configured_naming_context(): void
+    {
+        $leaf = new Entry(
+            new Dn('dc=example,dc=com'),
+            new Attribute('dc', 'example'),
+        );
+        $backend = new WritableStorageBackend(
+            storage: new InMemoryStorage([$leaf]),
+            namingContexts: ['dc=example,dc=com'],
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
+
+        $backend->delete(new DeleteCommand(new Dn('dc=example,dc=com')));
+    }
+
+    public function test_delete_naming_context_check_is_case_insensitive(): void
+    {
+        $leaf = new Entry(
+            new Dn('dc=example,dc=com'),
+            new Attribute('dc', 'example'),
+        );
+        $backend = new WritableStorageBackend(
+            storage: new InMemoryStorage([$leaf]),
+            namingContexts: ['DC=Example,DC=Com'],
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
+
+        $backend->delete(new DeleteCommand(new Dn('dc=example,dc=com')));
+    }
+
+    public function test_move_throws_unwilling_to_perform_when_renaming_naming_context(): void
+    {
+        $leaf = new Entry(
+            new Dn('dc=example,dc=com'),
+            new Attribute('dc', 'example'),
+        );
+        $backend = new WritableStorageBackend(
+            storage: new InMemoryStorage([$leaf]),
+            namingContexts: ['dc=example,dc=com'],
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
+
+        $backend->move(new MoveCommand(
+            new Dn('dc=example,dc=com'),
+            Rdn::create('dc=renamed'),
+            true,
+            null,
+        ));
+    }
+
+    public function test_delete_allows_non_naming_context_entries_when_naming_context_configured(): void
+    {
+        $base = new Entry(
+            new Dn('dc=example,dc=com'),
+            new Attribute('dc', 'example'),
+        );
+        $leaf = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'Alice'),
+        );
+        $backend = new WritableStorageBackend(
+            storage: new InMemoryStorage([$base, $leaf]),
+            namingContexts: ['dc=example,dc=com'],
+        );
+
+        $backend->delete(new DeleteCommand(new Dn('cn=Alice,dc=example,dc=com')));
+
+        self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
+    }
+
     public function test_update_add_attribute_value(): void
     {
         $this->subject->update(new UpdateCommand(
