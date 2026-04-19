@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use Generator;
@@ -487,6 +488,94 @@ final class WritableStorageBackendTest extends TestCase
     {
         yield new Entry(new Dn('dc=example,dc=com'));
         throw new TimeLimitExceededException();
+    }
+
+    public function test_add_converts_storage_io_exception_to_unavailable_operation_exception(): void
+    {
+        $ioException = new StorageIoException('Unable to publish the storage update.');
+        /** @var EntryStorageInterface&MockObject $storage */
+        $storage = $this->createMock(EntryStorageInterface::class);
+        $storage->method('atomic')
+            ->willThrowException($ioException);
+
+        $subject = new WritableStorageBackend($storage);
+
+        try {
+            $subject->add(new AddCommand(new Entry(
+                new Dn('cn=New,dc=example,dc=com'),
+                new Attribute('cn', 'New'),
+            )));
+            self::fail('Expected OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::UNAVAILABLE,
+                $e->getCode(),
+            );
+            self::assertSame(
+                'The backend storage is currently unavailable.',
+                $e->getMessage(),
+            );
+            self::assertSame(
+                $ioException,
+                $e->getPrevious(),
+            );
+        }
+    }
+
+    public function test_delete_converts_storage_io_exception_to_unavailable_operation_exception(): void
+    {
+        /** @var EntryStorageInterface&MockObject $storage */
+        $storage = $this->createMock(EntryStorageInterface::class);
+        $storage->method('atomic')
+            ->willThrowException(new StorageIoException('Unable to acquire exclusive lock on the storage backend.'));
+
+        $subject = new WritableStorageBackend($storage);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::UNAVAILABLE);
+        self::expectExceptionMessage('The backend storage is currently unavailable.');
+
+        $subject->delete(new DeleteCommand(new Dn('cn=Alice,dc=example,dc=com')));
+    }
+
+    public function test_update_converts_storage_io_exception_to_unavailable_operation_exception(): void
+    {
+        /** @var EntryStorageInterface&MockObject $storage */
+        $storage = $this->createMock(EntryStorageInterface::class);
+        $storage->method('atomic')
+            ->willThrowException(new StorageIoException('Unable to stage the storage update.'));
+
+        $subject = new WritableStorageBackend($storage);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::UNAVAILABLE);
+        self::expectExceptionMessage('The backend storage is currently unavailable.');
+
+        $subject->update(new UpdateCommand(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            [new Change(Change::TYPE_REPLACE, 'cn', 'Alicia')],
+        ));
+    }
+
+    public function test_move_converts_storage_io_exception_to_unavailable_operation_exception(): void
+    {
+        /** @var EntryStorageInterface&MockObject $storage */
+        $storage = $this->createMock(EntryStorageInterface::class);
+        $storage->method('atomic')
+            ->willThrowException(new StorageIoException('Unable to publish the storage update.'));
+
+        $subject = new WritableStorageBackend($storage);
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::UNAVAILABLE);
+        self::expectExceptionMessage('The backend storage is currently unavailable.');
+
+        $subject->move(new MoveCommand(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            Rdn::create('cn=Alicia'),
+            true,
+            null,
+        ));
     }
 
     public function test_supports_returns_false_for_unknown_request(): void
