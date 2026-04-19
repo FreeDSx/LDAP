@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -27,6 +28,7 @@ use FreeDSx\Ldap\Search\Filter\NotFilter;
 use FreeDSx\Ldap\Search\Filter\OrFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
+use WeakMap;
 
 /**
  * Pure-PHP implementation of FilterEvaluatorInterface.
@@ -49,10 +51,49 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
     private const MATCHING_RULE_BIT_OR = '1.2.840.113556.1.4.804';
 
+    /**
+     * Flattened RDN components of the current entry's DN; scoped to one evaluate() call.
+     *
+     * @var array<\FreeDSx\Ldap\Entry\Rdn>|null
+     */
+    private ?array $cachedDnRdns = null;
+
+    /**
+     * Lowercased base name => first matching attribute; scoped to one evaluate() call.
+     *
+     * @var array<string, Attribute>|null
+     */
+    private ?array $attributeIndex = null;
+
+    /**
+     * @var WeakMap<object, string>
+     */
+    private WeakMap $loweredSingleValueCache;
+
+    /**
+     * @var WeakMap<object, array{startsWith: ?string, endsWith: ?string, contains: list<string>}>
+     */
+    private WeakMap $substringCache;
+
+    /**
+     * @var WeakMap<object, bool>
+     */
+    private WeakMap $orderedDigitCache;
+
+    public function __construct()
+    {
+        $this->loweredSingleValueCache = new WeakMap();
+        $this->substringCache = new WeakMap();
+        $this->orderedDigitCache = new WeakMap();
+    }
+
     public function evaluate(
         Entry $entry,
         FilterInterface $filter,
     ): bool {
+        $this->cachedDnRdns = null;
+        $this->attributeIndex = null;
+
         return $this->evaluateFilter($entry, $filter) === FilterResult::True;
     }
 
@@ -141,7 +182,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         PresentFilter $filter,
     ): FilterResult {
-        return $entry->has($filter->getAttribute())
+        return $this->lookupAttribute($entry, $filter->getAttribute()) !== null
             ? FilterResult::True
             : FilterResult::False;
     }
@@ -150,13 +191,13 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         EqualityFilter $filter,
     ): FilterResult {
-        $attribute = $entry->get($filter->getAttribute());
+        $attribute = $this->lookupAttribute($entry, $filter->getAttribute());
 
         if ($attribute === null) {
             return FilterResult::Undefined;
         }
 
-        $filterValue = strtolower($filter->getValue());
+        $filterValue = $this->lowerSingleValue($filter);
 
         foreach ($attribute->getValues() as $value) {
             if (strtolower($value) === $filterValue) {
@@ -171,22 +212,21 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         SubstringFilter $filter,
     ): FilterResult {
-        $attribute = $entry->get($filter->getAttribute());
+        $attribute = $this->lookupAttribute($entry, $filter->getAttribute());
 
         if ($attribute === null) {
             return FilterResult::Undefined;
         }
 
-        $startsWith = $filter->getStartsWith() !== null
-            ? strtolower($filter->getStartsWith())
-            : null;
-        $endsWith = $filter->getEndsWith() !== null
-            ? strtolower($filter->getEndsWith())
-            : null;
-        $contains = array_map('strtolower', $filter->getContains());
+        $compiled = $this->substringLowered($filter);
 
         foreach ($attribute->getValues() as $value) {
-            if ($this->substringMatches(strtolower($value), $startsWith, $endsWith, $contains)) {
+            if ($this->substringMatches(
+                strtolower($value),
+                $compiled['startsWith'],
+                $compiled['endsWith'],
+                $compiled['contains'],
+            )) {
                 return FilterResult::True;
             }
         }
@@ -230,16 +270,17 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         GreaterThanOrEqualFilter $filter,
     ): FilterResult {
-        $attribute = $entry->get($filter->getAttribute());
+        $attribute = $this->lookupAttribute($entry, $filter->getAttribute());
 
         if ($attribute === null) {
             return FilterResult::Undefined;
         }
 
         $filterValue = $filter->getValue();
+        $filterIsDigit = $this->orderedFilterValueIsDigit($filter);
 
         foreach ($attribute->getValues() as $value) {
-            if ($this->compareOrdered($value, $filterValue) >= 0) {
+            if ($this->compareOrdered($value, $filterValue, $filterIsDigit) >= 0) {
                 return FilterResult::True;
             }
         }
@@ -251,16 +292,17 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         LessThanOrEqualFilter $filter,
     ): FilterResult {
-        $attribute = $entry->get($filter->getAttribute());
+        $attribute = $this->lookupAttribute($entry, $filter->getAttribute());
 
         if ($attribute === null) {
             return FilterResult::Undefined;
         }
 
         $filterValue = $filter->getValue();
+        $filterIsDigit = $this->orderedFilterValueIsDigit($filter);
 
         foreach ($attribute->getValues() as $value) {
-            if ($this->compareOrdered($value, $filterValue) <= 0) {
+            if ($this->compareOrdered($value, $filterValue, $filterIsDigit) <= 0) {
                 return FilterResult::True;
             }
         }
@@ -271,8 +313,9 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     private function compareOrdered(
         string $value,
         string $filterValue,
+        bool $filterValueIsDigit,
     ): int {
-        if (ctype_digit($value) && ctype_digit($filterValue)) {
+        if ($filterValueIsDigit && ctype_digit($value)) {
             return (int) $value <=> (int) $filterValue;
         }
 
@@ -283,13 +326,13 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         ApproximateFilter $filter,
     ): FilterResult {
-        $attribute = $entry->get($filter->getAttribute());
+        $attribute = $this->lookupAttribute($entry, $filter->getAttribute());
 
         if ($attribute === null) {
             return FilterResult::Undefined;
         }
 
-        $filterValue = strtolower($filter->getValue());
+        $filterValue = $this->lowerSingleValue($filter);
 
         foreach ($attribute->getValues() as $value) {
             if (strtolower($value) === $filterValue) {
@@ -331,15 +374,15 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         $values = [];
 
         if ($filterAttributeName !== null) {
-            $attribute = $entry->get($filterAttributeName);
+            $attribute = $this->lookupAttribute($entry, $filterAttributeName);
             if ($attribute !== null) {
                 $values = $attribute->getValues();
             }
         } else {
             foreach ($entry->getAttributes() as $attribute) {
-                $values = array_merge(
+                array_push(
                     $values,
-                    $attribute->getValues(),
+                    ...$attribute->getValues(),
                 );
             }
         }
@@ -366,12 +409,13 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         ?string $filterAttributeName,
     ): array {
-        $components = array_merge(
-            ...array_map(
-                fn ($rdn) => $rdn->getAll(),
-                $entry->getDn()->toArray(),
-            ),
-        );
+        $components = $this->cachedDnRdns
+            ?? ($this->cachedDnRdns = array_merge(
+                ...array_map(
+                    fn ($rdn) => $rdn->getAll(),
+                    $entry->getDn()->toArray(),
+                ),
+            ));
 
         if ($filterAttributeName !== null) {
             $components = array_filter(
@@ -401,5 +445,56 @@ final class FilterEvaluator implements FilterEvaluatorInterface
                 ResultCode::INAPPROPRIATE_MATCHING,
             ),
         };
+    }
+
+    /**
+     * Fast attribute lookup. Defers to Entry::get() when the filter attribute has options,
+     * to preserve Attribute::equals() options-matching semantics.
+     */
+    private function lookupAttribute(
+        Entry $entry,
+        string $filterAttributeName,
+    ): ?Attribute {
+        if (str_contains($filterAttributeName, ';')) {
+            return $entry->get($filterAttributeName);
+        }
+
+        if ($this->attributeIndex === null) {
+            $index = [];
+            foreach ($entry->getAttributes() as $attr) {
+                $lc = strtolower($attr->getName());
+                $index[$lc] ??= $attr;
+            }
+            $this->attributeIndex = $index;
+        }
+
+        return $this->attributeIndex[strtolower($filterAttributeName)] ?? null;
+    }
+
+    private function lowerSingleValue(EqualityFilter|ApproximateFilter $filter): string
+    {
+        return $this->loweredSingleValueCache[$filter] ??= strtolower($filter->getValue());
+    }
+
+    /**
+     * @return array{startsWith: ?string, endsWith: ?string, contains: list<string>}
+     */
+    private function substringLowered(SubstringFilter $filter): array
+    {
+        return $this->substringCache[$filter] ??= [
+            'startsWith' => $filter->getStartsWith() !== null
+                ? strtolower($filter->getStartsWith())
+                : null,
+            'endsWith' => $filter->getEndsWith() !== null
+                ? strtolower($filter->getEndsWith())
+                : null,
+            'contains' => array_values(array_map('strtolower', $filter->getContains())),
+        ];
+    }
+
+    private function orderedFilterValueIsDigit(
+        GreaterThanOrEqualFilter|LessThanOrEqualFilter $filter,
+    ): bool {
+        return $this->orderedDigitCache[$filter] ??= ctype_digit($filter->getValue());
     }
 }

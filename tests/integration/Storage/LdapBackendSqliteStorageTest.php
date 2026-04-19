@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filters;
 
 /**
@@ -107,6 +108,60 @@ final class LdapBackendSqliteStorageTest extends LdapBackendStorageTest
         );
         self::assertSame(
             'cn=persistent,dc=foo,dc=bar',
+            $entries->first()?->getDn()->toString()
+        );
+    }
+
+    public function testApproximateWithAsciiValueMatches(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(new ApproximateFilter('cn', 'Alice'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope()
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            $entries->first()?->getDn()->toString()
+        );
+    }
+
+    /**
+     * Canary for the GTE/LTE digit-value inexact rule: alice has uidNumber=99.
+     * A byte-wise SQL compare ("99" > "100") would incorrectly return her for
+     * (uidNumber>=100). PHP re-evaluation must kick in and integer-compare,
+     * excluding her. If this fails, translateGte was wrongly marked exact
+     * for a digit filter value.
+     */
+    public function testGteDigitFilterExcludesLowerNumericValueEvenThoughBytewiseCompareWouldMatch(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::greaterThanOrEqual('uidNumber', '100'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope()
+        );
+
+        self::assertCount(0, $entries);
+    }
+
+    public function testGteAsciiNonDigitValueMatchesLexicographically(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::greaterThanOrEqual('sn', 'Smith'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope()
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame(
+            'cn=alice,ou=people,dc=foo,dc=bar',
             $entries->first()?->getDn()->toString()
         );
     }

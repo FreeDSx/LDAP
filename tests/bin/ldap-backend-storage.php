@@ -45,6 +45,7 @@ $entries = [
         new Attribute('objectClass', 'inetOrgPerson'),
         new Attribute('sn', 'Smith'),
         new Attribute('mail', 'alice@foo.bar'),
+        new Attribute('uidNumber', '99'),
     ),
 ];
 
