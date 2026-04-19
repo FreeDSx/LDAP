@@ -656,4 +656,210 @@ final class FilterEvaluatorTest extends TestCase
             $this->createMock(FilterInterface::class),
         );
     }
+
+    public function test_equality_matches_attribute_with_mixed_case_name_on_entry(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('CN', 'Bob'),
+        );
+
+        self::assertTrue($this->subject->evaluate(
+            $entry,
+            Filters::equal('cn', 'Bob'),
+        ));
+    }
+
+    public function test_equality_with_attribute_options_in_filter_matches_same_options_on_entry(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('cn;lang-en', 'Hello'),
+            new Attribute('cn;lang-de', 'Hallo'),
+        );
+
+        self::assertTrue($this->subject->evaluate(
+            $entry,
+            Filters::equal('cn;lang-en', 'Hello'),
+        ));
+        self::assertFalse($this->subject->evaluate(
+            $entry,
+            Filters::equal('cn;lang-en', 'Hallo'),
+        ));
+    }
+
+    public function test_equality_with_attribute_options_in_filter_does_not_match_base_only_entry(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('cn', 'Hello'),
+        );
+
+        self::assertFalse($this->subject->evaluate(
+            $entry,
+            Filters::equal('cn;lang-en', 'Hello'),
+        ));
+    }
+
+    public function test_equality_filter_without_options_matches_any_option_variant_on_entry(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('cn;lang-en', 'Hello'),
+        );
+
+        self::assertTrue($this->subject->evaluate(
+            $entry,
+            Filters::equal('cn', 'Hello'),
+        ));
+    }
+
+    public function test_equality_multi_valued_attribute_matches_second_value(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Multi,dc=example,dc=com'),
+            new Attribute('mailAlias', 'a@foo.bar', 'b@foo.bar', 'c@foo.bar'),
+        );
+
+        self::assertTrue($this->subject->evaluate(
+            $entry,
+            Filters::equal('mailAlias', 'b@foo.bar'),
+        ));
+    }
+
+    public function test_substring_present_absent_and_options_conformance(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Ann,dc=example,dc=com'),
+            new Attribute('cn;lang-en', 'Annabelle'),
+        );
+
+        $filter = (new SubstringFilter('cn'))->setStartsWith('Ann');
+        self::assertTrue($this->subject->evaluate($entry, $filter));
+
+        $filterMiss = (new SubstringFilter('sn'))->setStartsWith('Ann');
+        self::assertFalse($this->subject->evaluate($entry, $filterMiss));
+    }
+
+    public function test_gte_undefined_when_attribute_absent(): void
+    {
+        self::assertFalse($this->subject->evaluate(
+            $this->entry,
+            Filters::greaterThanOrEqual('employeeNumber', '1'),
+        ));
+    }
+
+    public function test_lte_undefined_when_attribute_absent(): void
+    {
+        self::assertFalse($this->subject->evaluate(
+            $this->entry,
+            Filters::lessThanOrEqual('employeeNumber', '1'),
+        ));
+    }
+
+    public function test_approximate_undefined_when_attribute_absent(): void
+    {
+        self::assertFalse($this->subject->evaluate(
+            $this->entry,
+            new ApproximateFilter('employeeNumber', '1'),
+        ));
+    }
+
+    public function test_same_filter_against_many_entries_produces_consistent_results(): void
+    {
+        $filter = Filters::equal('cn', 'Alice');
+
+        $matching = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'Alice'),
+        );
+        $nonMatching = new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('cn', 'Bob'),
+        );
+
+        for ($i = 0; $i < 50; $i++) {
+            self::assertTrue($this->subject->evaluate($matching, $filter));
+            self::assertFalse($this->subject->evaluate($nonMatching, $filter));
+        }
+    }
+
+    public function test_same_substring_filter_against_many_entries_is_stable(): void
+    {
+        $filter = (new SubstringFilter('mail'))
+            ->setStartsWith('alice')
+            ->setContains('example')
+            ->setEndsWith('com');
+
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('mail', 'alice@example.com'),
+        );
+
+        for ($i = 0; $i < 25; $i++) {
+            self::assertTrue($this->subject->evaluate($entry, $filter));
+        }
+    }
+
+    public function test_same_gte_filter_against_digit_and_non_digit_entries_is_stable(): void
+    {
+        $filter = Filters::greaterThanOrEqual('uidNumber', '100');
+
+        $digitMatches = new Entry(
+            new Dn('cn=One,dc=example,dc=com'),
+            new Attribute('uidNumber', '500'),
+        );
+        $digitMisses = new Entry(
+            new Dn('cn=Two,dc=example,dc=com'),
+            new Attribute('uidNumber', '99'),
+        );
+
+        for ($i = 0; $i < 25; $i++) {
+            self::assertTrue($this->subject->evaluate($digitMatches, $filter));
+            self::assertFalse($this->subject->evaluate($digitMisses, $filter));
+        }
+    }
+
+    /**
+     * Guards against evaluate() stashing compiled state directly on the filter
+     * (e.g. a cached lowerValue property). Such a cache must live outside the
+     * filter — serialize catches any structural mutation, including in nested
+     * children of composite filters.
+     */
+    public function test_filter_is_not_mutated_by_evaluation(): void
+    {
+        $filter = Filters::and(
+            Filters::equal('cn', 'Alice'),
+            Filters::or(
+                Filters::equal('sn', 'Smith'),
+                Filters::greaterThanOrEqual('uidNumber', '100'),
+            ),
+        );
+        $snapshot = serialize($filter);
+
+        $this->subject->evaluate($this->entry, $filter);
+        $this->subject->evaluate($this->entry, $filter);
+
+        self::assertSame(
+            $snapshot,
+            serialize($filter),
+        );
+    }
+
+    public function test_substring_filter_is_not_mutated_by_evaluation(): void
+    {
+        $filter = (new SubstringFilter('mail'))
+            ->setStartsWith('alice')
+            ->setContains('example')
+            ->setEndsWith('com');
+        $snapshot = serialize($filter);
+
+        $this->subject->evaluate($this->entry, $filter);
+        $this->subject->evaluate($this->entry, $filter);
+
+        self::assertSame(
+            $snapshot,
+            serialize($filter),
+        );
+    }
 }

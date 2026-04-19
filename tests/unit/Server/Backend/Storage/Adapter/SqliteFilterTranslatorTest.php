@@ -98,11 +98,22 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
     }
 
-    public function test_approximate_filter_is_marked_inexact(): void
+    public function test_approximate_filter_with_ascii_value_is_exact(): void
     {
         $result = $this->subject->translate(new ApproximateFilter(
             'cn',
             'Alice',
+        ));
+
+        self::assertNotNull($result);
+        self::assertTrue($result->isExact);
+    }
+
+    public function test_approximate_filter_with_non_ascii_value_is_inexact(): void
+    {
+        $result = $this->subject->translate(new ApproximateFilter(
+            'cn',
+            'Café',
         ));
 
         self::assertNotNull($result);
@@ -158,6 +169,40 @@ final class SqliteFilterTranslatorTest extends TestCase
             ['30'],
             $result->params,
         );
+    }
+
+    public function test_gte_filter_with_digit_value_is_inexact(): void
+    {
+        // Critical: PHP compareOrdered does integer compare when both sides
+        // are ctype_digit, so SQL byte compare would diverge. Must stay inexact.
+        $result = $this->subject->translate(new GreaterThanOrEqualFilter(
+            'uidNumber',
+            '100',
+        ));
+
+        self::assertNotNull($result);
+        self::assertFalse($result->isExact);
+    }
+
+    public function test_gte_filter_with_ascii_non_digit_value_is_exact(): void
+    {
+        $result = $this->subject->translate(new GreaterThanOrEqualFilter(
+            'sn',
+            'Smith',
+        ));
+
+        self::assertNotNull($result);
+        self::assertTrue($result->isExact);
+    }
+
+    public function test_gte_filter_with_non_ascii_value_is_inexact(): void
+    {
+        $result = $this->subject->translate(new GreaterThanOrEqualFilter(
+            'sn',
+            'Smíth',
+        ));
+
+        self::assertNotNull($result);
         self::assertFalse($result->isExact);
     }
 
@@ -177,6 +222,38 @@ final class SqliteFilterTranslatorTest extends TestCase
             ['50'],
             $result->params,
         );
+    }
+
+    public function test_lte_filter_with_digit_value_is_inexact(): void
+    {
+        $result = $this->subject->translate(new LessThanOrEqualFilter(
+            'uidNumber',
+            '100',
+        ));
+
+        self::assertNotNull($result);
+        self::assertFalse($result->isExact);
+    }
+
+    public function test_lte_filter_with_ascii_non_digit_value_is_exact(): void
+    {
+        $result = $this->subject->translate(new LessThanOrEqualFilter(
+            'sn',
+            'Smith',
+        ));
+
+        self::assertNotNull($result);
+        self::assertTrue($result->isExact);
+    }
+
+    public function test_lte_filter_with_non_ascii_value_is_inexact(): void
+    {
+        $result = $this->subject->translate(new LessThanOrEqualFilter(
+            'sn',
+            'Smíth',
+        ));
+
+        self::assertNotNull($result);
         self::assertFalse($result->isExact);
     }
 

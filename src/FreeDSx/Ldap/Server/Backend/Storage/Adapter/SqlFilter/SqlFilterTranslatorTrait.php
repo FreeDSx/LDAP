@@ -114,12 +114,15 @@ trait SqlFilterTranslatorTrait
         $attribute = $this->validateAttribute($filter->getAttribute());
 
         $alias = $this->valueAlias();
+        $value = $filter->getValue();
 
         // Approximate matching is implementation-defined (RFC 4511 §4.5.1.7.6).
+        // Both SQL and PHP implementations pick case-insensitive equality, so
+        // for ASCII values the result is exact and PHP re-eval can be skipped.
         return new SqlFilterResult(
             $this->buildValueExists($attribute, "lower($alias) = lower(?)"),
-            [$filter->getValue()],
-            isExact: false,
+            [$value],
+            isExact: SqlFilterUtility::isAscii($value),
             referencedAttributes: [$attribute],
         );
     }
@@ -129,11 +132,12 @@ trait SqlFilterTranslatorTrait
         $attribute = $this->validateAttribute($filter->getAttribute());
 
         $alias = $this->valueAlias();
+        $value = $filter->getValue();
 
         return new SqlFilterResult(
             $this->buildValueExists($attribute, "lower($alias) >= lower(?)"),
-            [$filter->getValue()],
-            isExact: false,
+            [$value],
+            isExact: $this->isOrderedCompareExact($value),
             referencedAttributes: [$attribute],
         );
     }
@@ -143,13 +147,26 @@ trait SqlFilterTranslatorTrait
         $attribute = $this->validateAttribute($filter->getAttribute());
 
         $alias = $this->valueAlias();
+        $value = $filter->getValue();
 
         return new SqlFilterResult(
             $this->buildValueExists($attribute, "lower($alias) <= lower(?)"),
-            [$filter->getValue()],
-            isExact: false,
+            [$value],
+            isExact: $this->isOrderedCompareExact($value),
             referencedAttributes: [$attribute],
         );
+    }
+
+    /**
+     * GTE/LTE are exact only for ASCII non-digit filter values. PHP's
+     * compareOrdered switches to integer compare when both operands are
+     * ctype_digit (e.g. "99" < "100"); SQL stays byte-wise ("99" > "100"),
+     * so digit filter values must fall through to PHP re-evaluation.
+     */
+    private function isOrderedCompareExact(string $value): bool
+    {
+        return SqlFilterUtility::isAscii($value)
+            && !ctype_digit($value);
     }
 
     private function translateSubstring(SubstringFilter $filter): ?SqlFilterResult
@@ -169,12 +186,12 @@ trait SqlFilterTranslatorTrait
         //   - startsWith only, endsWith only, or both without contains
         //   - a single contains without startsWith/endsWith
         // Any contains + anchor combination (or 2+ contains) needs PHP re-eval.
-        $hasContains = count($filter->getContains()) > 0;
+        $containsCount = count($filter->getContains());
         $hasAnchor = $filter->getStartsWith() !== null
             || $filter->getEndsWith() !== null;
 
-        $isExact = count($filter->getContains()) < 2
-            && !($hasContains && $hasAnchor)
+        $isExact = $containsCount < 2
+            && !($containsCount > 0 && $hasAnchor)
             && SqlFilterUtility::isAscii((string) $filter->getStartsWith())
             && SqlFilterUtility::isAscii((string) $filter->getEndsWith())
             && $this->areAllAscii($filter->getContains());
@@ -245,7 +262,7 @@ trait SqlFilterTranslatorTrait
                 $hasUntranslatable = true;
             }
             $parts[] = '(' . $result->sql . ')';
-            $params = array_merge($params, $result->params);
+            array_push($params, ...$result->params);
         }
 
         if ($parts === []) {
@@ -274,7 +291,7 @@ trait SqlFilterTranslatorTrait
                 $hasInexact = true;
             }
             $parts[] = '(' . $result->sql . ')';
-            $params = array_merge($params, $result->params);
+            array_push($params, ...$result->params);
         }
 
         if ($parts === []) {
@@ -314,7 +331,7 @@ trait SqlFilterTranslatorTrait
         if ($result->referencedAttributes !== []) {
             $guards = array_map(
                 fn (string $attribute): string => $this->buildPresenceCheck($attribute),
-                $result->referencedAttributes,
+                array_values(array_unique($result->referencedAttributes)),
             );
 
             return new SqlFilterResult(
