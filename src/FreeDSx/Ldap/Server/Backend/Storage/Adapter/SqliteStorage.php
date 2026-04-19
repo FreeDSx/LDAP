@@ -34,6 +34,8 @@ final class SqliteStorage implements PdoStorageFactoryInterface
 
     private const PRAGMA_SYNCHRONOUS_NORMAL = 'PRAGMA synchronous = NORMAL';
 
+    private const PRAGMA_BUSY_TIMEOUT_MS = 'PRAGMA busy_timeout = 5000';
+
     public function __construct(private readonly string $dbPath)
     {
     }
@@ -66,8 +68,9 @@ final class SqliteStorage implements PdoStorageFactoryInterface
             null,
             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
         );
-        $pdo->exec(self::PRAGMA_JOURNAL_MODE_WAL);
+        $pdo->exec(self::PRAGMA_BUSY_TIMEOUT_MS);
         $pdo->exec(self::PRAGMA_SYNCHRONOUS_NORMAL);
+        $pdo->exec(self::PRAGMA_JOURNAL_MODE_WAL);
 
         PdoStorage::initialize($pdo, $dialect);
 

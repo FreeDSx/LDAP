@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Write\WritableBackendTrait;
 use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use Generator;
 
 /**
@@ -37,7 +38,7 @@ use Generator;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class WritableStorageBackend implements WritableLdapBackendInterface
+final class WritableStorageBackend implements WritableLdapBackendInterface, ResettableInterface
 {
     use WritableBackendTrait;
 
@@ -45,6 +46,13 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
         private readonly EntryStorageInterface $storage,
         private readonly WriteEntryOperationHandler $entryHandler = new WriteEntryOperationHandler(),
     ) {
+    }
+
+    public function reset(): void
+    {
+        if ($this->storage instanceof ResettableInterface) {
+            $this->storage->reset();
+        }
     }
 
     public function get(Dn $dn): ?Entry

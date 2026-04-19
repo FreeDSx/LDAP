@@ -239,17 +239,16 @@ final class SqliteStorageTest extends TestCase
         $mockPdo = $this->createMock(PDO::class);
 
         $beginTransactionCalls = 0;
-        $mockPdo->method('beginTransaction')
-            ->willReturnCallback(static function () use (&$beginTransactionCalls): bool {
-                if (++$beginTransactionCalls === 1) {
-                    throw new RuntimeException('DB connection error');
+        $mockPdo->method('exec')
+            ->willReturnCallback(static function (string $sql) use (&$beginTransactionCalls): int {
+                if ($sql === 'BEGIN IMMEDIATE') {
+                    if (++$beginTransactionCalls === 1) {
+                        throw new RuntimeException('DB connection error');
+                    }
                 }
 
-                return true;
+                return 0;
             });
-
-        $mockPdo->method('inTransaction')->willReturn(false);
-        $mockPdo->method('commit')->willReturn(true);
 
         $storage = new PdoStorage(
             new SharedPdoConnectionProvider($mockPdo),
@@ -257,7 +256,7 @@ final class SqliteStorageTest extends TestCase
             new SqliteDialect(),
         );
 
-        // First call: beginTransaction throws; txDepth must recover to 0.
+        // First call: BEGIN IMMEDIATE throws; txDepth must recover to 0.
         try {
             $storage->atomic(fn() => null);
             self::fail('Expected RuntimeException was not thrown.');
@@ -265,7 +264,7 @@ final class SqliteStorageTest extends TestCase
             self::assertSame('DB connection error', $e->getMessage());
         }
 
-        // Second call: txDepth is 0, so beginTransaction must be called again (not SAVEPOINT).
+        // Second call: txDepth is 0, so BEGIN IMMEDIATE must be issued again (not SAVEPOINT).
         // A corrupted txDepth of 1 would issue SAVEPOINT sp_1 here instead.
         $storage->atomic(fn() => null);
 
@@ -319,27 +318,16 @@ final class SqliteStorageTest extends TestCase
     {
         /** @var PDO&MockObject $mockPdo */
         $mockPdo = $this->createMock(PDO::class);
-        $mockPdo->method('beginTransaction')->willReturn(true);
-        $mockPdo->method('inTransaction')->willReturn(true);
 
         $commitCalls = 0;
         $rollBackCalls = 0;
-        $mockPdo->method('commit')
-            ->willReturnCallback(static function () use (&$commitCalls): bool {
-                $commitCalls++;
-
-                return true;
-            });
-        $mockPdo->method('rollBack')
-            ->willReturnCallback(static function () use (&$rollBackCalls): bool {
-                $rollBackCalls++;
-
-                return true;
-            });
-
         $mockPdo->method('exec')
-            ->willReturnCallback(static function (string $sql): int {
-                if (str_contains($sql, 'SAVEPOINT sp_1') && !str_contains($sql, 'ROLLBACK') && !str_contains($sql, 'RELEASE')) {
+            ->willReturnCallback(static function (string $sql) use (&$commitCalls, &$rollBackCalls): int {
+                if ($sql === 'COMMIT') {
+                    $commitCalls++;
+                } elseif ($sql === 'ROLLBACK') {
+                    $rollBackCalls++;
+                } elseif (str_contains($sql, 'SAVEPOINT sp_1') && !str_contains($sql, 'ROLLBACK') && !str_contains($sql, 'RELEASE')) {
                     throw new RuntimeException('savepoint error');
                 }
 
@@ -376,15 +364,8 @@ final class SqliteStorageTest extends TestCase
     {
         /** @var PDO&MockObject $mockPdo */
         $mockPdo = $this->createMock(PDO::class);
-        $mockPdo->method('beginTransaction')->willReturn(true);
-        $mockPdo->method('inTransaction')->willReturn(true);
-        $mockPdo->method('commit')->willReturn(true);
-        $mockPdo->method('rollBack')->willReturn(true);
-
-        $callCount = 0;
         $mockPdo->method('exec')
-            ->willReturnCallback(static function (string $sql) use (&$callCount): int {
-                $callCount++;
+            ->willReturnCallback(static function (string $sql): int {
                 if (str_contains($sql, 'SAVEPOINT sp_1') && !str_contains($sql, 'ROLLBACK') && !str_contains($sql, 'RELEASE')) {
                     throw new RuntimeException('savepoint error');
                 }
@@ -407,13 +388,13 @@ final class SqliteStorageTest extends TestCase
 
         $commitCalls = 0;
         $mockPdo = $this->createMock(PDO::class);
-        $mockPdo->method('beginTransaction')->willReturn(true);
-        $mockPdo->method('inTransaction')->willReturn(true);
-        $mockPdo->method('commit')
-            ->willReturnCallback(static function () use (&$commitCalls): bool {
-                $commitCalls++;
+        $mockPdo->method('exec')
+            ->willReturnCallback(static function (string $sql) use (&$commitCalls): int {
+                if ($sql === 'COMMIT') {
+                    $commitCalls++;
+                }
 
-                return true;
+                return 0;
             });
 
         $storage = new PdoStorage(

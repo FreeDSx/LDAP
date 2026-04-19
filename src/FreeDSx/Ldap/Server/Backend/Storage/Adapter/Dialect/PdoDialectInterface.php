@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 
+use PDO;
+
 /**
  * Provides the database-specific SQL strings used by PdoStorage.
  *
@@ -20,6 +22,22 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
  */
 interface PdoDialectInterface
 {
+    /**
+     * Begin a write-capable transaction.
+     */
+    public function beginTransaction(PDO $pdo): void;
+
+    /**
+     * Commit the current transaction started by beginTransaction().
+     */
+    public function commit(PDO $pdo): void;
+
+    /**
+     * Roll back the current transaction started by beginTransaction().
+     */
+    public function rollBack(PDO $pdo): void;
+
+
     /**
      * DDL for the `entries` table. Required columns:
      *   lc_dn         — PK, lowercased DN

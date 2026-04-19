@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 
+use PDO;
+
 /**
  * Standard SQL that should be cross-platform across the adapters.
  *
@@ -20,6 +22,21 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
  */
 trait PdoDialectTrait
 {
+    public function beginTransaction(PDO $pdo): void
+    {
+        $pdo->beginTransaction();
+    }
+
+    public function commit(PDO $pdo): void
+    {
+        $pdo->commit();
+    }
+
+    public function rollBack(PDO $pdo): void
+    {
+        $pdo->rollBack();
+    }
+
     public function queryExists(): string
     {
         return <<<SQL

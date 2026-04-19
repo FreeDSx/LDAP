@@ -72,6 +72,13 @@ final class CoroutinePdoConnectionProvider implements PdoConnectionProviderInter
         return $this->txStates[$cid];
     }
 
+    /**
+     * No-op: connections are already isolated per coroutine, and coroutines do not cross fork boundaries.
+     */
+    public function reset(): void
+    {
+    }
+
     private function requireCoroutineId(): int
     {
         $cid = Coroutine::getCid();

@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
+use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use Generator;
 use JsonException;
 use PDO;
@@ -37,13 +38,18 @@ use Throwable;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class PdoStorage implements EntryStorageInterface
+final class PdoStorage implements EntryStorageInterface, ResettableInterface
 {
     public function __construct(
         private readonly PdoConnectionProviderInterface $provider,
         private readonly FilterTranslatorInterface $translator,
         private readonly PdoDialectInterface $dialect,
     ) {
+    }
+
+    public function reset(): void
+    {
+        $this->provider->reset();
     }
 
     public static function initialize(
@@ -199,10 +205,12 @@ final class PdoStorage implements EntryStorageInterface
 
         $depth = $txState->depth++;
         $savepointCreated = false;
+        $transactionStarted = false;
 
         try {
             if ($depth === 0) {
-                $pdo->beginTransaction();
+                $this->dialect->beginTransaction($pdo);
+                $transactionStarted = true;
             } else {
                 $pdo->exec("SAVEPOINT {$this->savepointName($depth)}");
                 $savepointCreated = true;
@@ -211,16 +219,16 @@ final class PdoStorage implements EntryStorageInterface
             $operation($this);
 
             if ($depth === 0 && $txState->broken) {
-                $pdo->rollBack();
+                $this->dialect->rollBack($pdo);
             } elseif ($depth === 0) {
-                $pdo->commit();
+                $this->dialect->commit($pdo);
             } else {
                 $pdo->exec("RELEASE SAVEPOINT {$this->savepointName($depth)}");
             }
         } catch (Throwable $e) {
-            if ($depth === 0 && $pdo->inTransaction()) {
-                $pdo->rollBack();
-            } elseif ($depth > 0 && $savepointCreated) {
+            if ($transactionStarted) {
+                $this->dialect->rollBack($pdo);
+            } elseif ($savepointCreated) {
                 $pdo->exec("ROLLBACK TO SAVEPOINT {$this->savepointName($depth)}");
             } elseif ($depth > 0) {
                 // Savepoint creation itself failed; the outer transaction is now in an unknown state and must not be committed.

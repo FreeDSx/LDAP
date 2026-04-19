@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 
+use PDO;
+
 /**
  * SQLite-specific SQL for PdoStorage.
  *
@@ -21,6 +23,25 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 final class SqliteDialect implements PdoDialectInterface
 {
     use PdoDialectTrait;
+
+    /**
+     * `BEGIN IMMEDIATE` acquires the reserved lock up front so concurrent writers wait (honoring `busy_timeout`)
+     * instead of racing, which returns SQLITE_BUSY immediately to avoid deadlock.
+     */
+    public function beginTransaction(PDO $pdo): void
+    {
+        $pdo->exec('BEGIN IMMEDIATE');
+    }
+
+    public function commit(PDO $pdo): void
+    {
+        $pdo->exec('COMMIT');
+    }
+
+    public function rollBack(PDO $pdo): void
+    {
+        $pdo->exec('ROLLBACK');
+    }
 
     public function ddlCreateTable(): string
     {
