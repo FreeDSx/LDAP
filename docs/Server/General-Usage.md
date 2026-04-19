@@ -603,6 +603,38 @@ final class PostgresStorage implements PdoStorageFactoryInterface
 }
 ```
 
+#### Seeding Initial Entries
+
+`LdapImporter` writes a batch of entries in one atomic transaction. Use it to populate a persistent storage backend
+before `$server->run()`. The same pattern works for every adapter.
+
+```php
+use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqliteStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
+
+$storage = SqliteStorage::forPcntl('/var/lib/myapp/ldap.sqlite');
+
+(new LdapImporter($storage))->importEntries([
+    new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
+    new Entry(
+        new Dn('cn=admin,dc=example,dc=com'),
+        new Attribute('cn', 'admin'),
+    ),
+]);
+
+(new LdapServer())->useStorage($storage)->run();
+```
+
+`importEntries()` is an upsert: existing entries at the same DN are replaced. Re-running is safe, but any changes made
+between imports are overwritten — guard the call yourself if you only want to seed on first run.
+
+For Swoole factories (`::forSwoole()`), wrap the `importEntries()` call in `Swoole\Coroutine\run()` so the adapter's
+coroutine-scoped connection is available during import.
+
 ### Proxy Backend
 
 `ProxyBackend` implements `WritableLdapBackendInterface` by forwarding all operations to an upstream LDAP server.
