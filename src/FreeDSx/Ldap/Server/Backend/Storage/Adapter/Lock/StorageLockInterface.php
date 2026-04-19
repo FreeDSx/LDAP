@@ -21,8 +21,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock;
 interface StorageLockInterface
 {
     /**
-     * Acquire exclusive access to the storage, pass the raw contents to the mutation callable, then persist the
-     * returned string and release the lock.
+     * Lock exclusively, hand the raw contents to $mutation, persist its return value, and release the lock.
      *
      * @param callable(string): string $mutation
      */

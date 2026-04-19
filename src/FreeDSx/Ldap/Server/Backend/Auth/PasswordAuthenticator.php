@@ -18,11 +18,7 @@ use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use SensitiveParameter;
 
 /**
- * Default password authenticator. Resolves the bind name to an Entry via a
- * BindNameResolverInterface, then verifies the supplied password against the
- * entry's userPassword attribute.
- *
- * Supported storage schemes: {SHA}, {SSHA}, {MD5}, {SMD5}, and plain-text.
+ * Resolves the bind name to an Entry and verifies its userPassword; supports {SHA}, {SSHA}, {MD5}, {SMD5}, and plaintext.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -73,9 +69,7 @@ final class PasswordAuthenticator implements PasswordAuthenticatableInterface
     }
 
     /**
-     * Verify a plain-text password against a (possibly hashed) stored value.
-     *
-     * Supports {SHA}, {SSHA}, {MD5}, {SMD5}, and plain-text storage.
+     * Verify plaintext against the stored value, which may be {SHA}, {SSHA}, {MD5}, {SMD5}, or plaintext.
      */
     private function checkPassword(
         #[SensitiveParameter]

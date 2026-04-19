@@ -20,15 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
- * An in-memory storage implementation backed by a plain PHP array.
- *
- * Suitable for single-process use cases: the Swoole server runner (all
- * connections share the same process memory), or pre-seeded read-only
- * use with the PCNTL runner (data seeded before run() is inherited by
- * all forked child processes).
- *
- * With the PCNTL runner, write operations performed by one child process
- * are not visible to other children or the parent.
+ * Array-backed storage; safe under Swoole or as a pre-seeded read-only fixture under PCNTL (child writes are not shared).
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -37,16 +29,12 @@ final class InMemoryStorage implements EntryStorageInterface
     use ArrayEntryStorageTrait;
 
     /**
-     * Entries keyed by their normalised (lowercased) DN string.
-     *
-     * @var array<string, Entry>
+     * @var array<string, Entry> keyed by normalised DN string
      */
     private array $entries = [];
 
     /**
-     * Pre-populate the storage with a set of entries.
-     *
-     * @param Entry[] $entries
+     * @param Entry[] $entries pre-populated into the store
      */
     public function __construct(array $entries = [])
     {

@@ -14,10 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Write;
 
 /**
- * Implemented by any class that handles one or more LDAP write operations.
- *
- * The framework calls supports() first and only calls handle() when it returns
- * true, so implementations never need no-op stubs for unsupported operations.
+ * Handles one or more LDAP write operations; the framework only calls handle() after supports() returns true.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

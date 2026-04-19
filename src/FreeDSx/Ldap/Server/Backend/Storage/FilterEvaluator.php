@@ -31,13 +31,7 @@ use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use WeakMap;
 
 /**
- * Pure-PHP implementation of FilterEvaluatorInterface.
- *
- * Evaluates LDAP filters against in-memory Entry objects using the three-valued logic (TRUE / FALSE / UNDEFINED)
- * required by RFC 4511 §4.5.1.
- *
- * Attribute name comparisons are always case-insensitive. Value comparisons default to case-insensitive string
- * comparison, matching the caseIgnoreMatch semantics used by the majority of LDAP schema attribute types.
+ * Pure-PHP FilterEvaluatorInterface using RFC 4511 §4.5.1 three-valued logic; names/values compare case-insensitively.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -448,8 +442,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     }
 
     /**
-     * Fast attribute lookup. Defers to Entry::get() when the filter attribute has options,
-     * to preserve Attribute::equals() options-matching semantics.
+     * Defers to Entry::get() when the filter attribute has options, to preserve Attribute::equals() options-matching.
      */
     private function lookupAttribute(
         Entry $entry,

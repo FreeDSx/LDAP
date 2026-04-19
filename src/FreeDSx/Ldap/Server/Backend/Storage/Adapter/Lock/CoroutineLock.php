@@ -18,15 +18,15 @@ use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
 
 /**
- * Locking strategy for the Swoole server runner.
- *
- * Uses a Swoole\Coroutine\Channel(1) as a coroutine-safe mutex.
+ * Swoole coroutine lock backed by a Channel(1) mutex.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final class CoroutineLock implements StorageLockInterface
 {
-    /** @var Channel<mixed>|null */
+    /**
+     * @var Channel<mixed>|null
+     */
     private ?Channel $mutex = null;
 
     public function __construct(private readonly string $filePath)
@@ -46,7 +46,9 @@ final class CoroutineLock implements StorageLockInterface
         }
     }
 
-    /** @return Channel<mixed> */
+    /**
+     * @return Channel<mixed>
+     */
     private function getOrCreateMutex(): Channel
     {
         if ($this->mutex === null) {
@@ -56,7 +58,9 @@ final class CoroutineLock implements StorageLockInterface
         return $this->mutex;
     }
 
-    /** @return Channel<mixed> */
+    /**
+     * @return Channel<mixed>
+     */
     private static function createMutex(): Channel
     {
         $mutex = new Channel(1);

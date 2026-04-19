@@ -17,11 +17,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 
 /**
- * Holds an ordered list of write handlers and routes each write command to
- * the first handler that declares support for it.
- *
- * Handlers are tried in registration order. Explicitly registered handlers
- * take priority when the backend is appended last as a fallback.
+ * Routes a write command to the first registered handler that supports it; explicit handlers precede the fallback backend.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

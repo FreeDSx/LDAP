@@ -20,12 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator
 use PDO;
 
 /**
- * SQLite-specific factory for PdoStorage.
- *
- * Use the named constructors to select the appropriate runner:
- *
- *   SqliteStorage::forPcntl('/path/to/db.sqlite')
- *   SqliteStorage::forSwoole('/path/to/db.sqlite')
+ * SQLite factory for PdoStorage; use SqliteStorage::forPcntl() or ::forSwoole() to select the runner.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

@@ -130,11 +130,7 @@ final class LdapBackendSqliteStorageTest extends LdapBackendStorageTest
     }
 
     /**
-     * Canary for the GTE/LTE digit-value inexact rule: alice has uidNumber=99.
-     * A byte-wise SQL compare ("99" > "100") would incorrectly return her for
-     * (uidNumber>=100). PHP re-evaluation must kick in and integer-compare,
-     * excluding her. If this fails, translateGte was wrongly marked exact
-     * for a digit filter value.
+     * Canary: if translateGte is wrongly marked exact for a digit value, SQL byte-compare ("99">"100") returns alice.
      */
     public function testGteDigitFilterExcludesLowerNumericValueEvenThoughBytewiseCompareWouldMatch(): void
     {

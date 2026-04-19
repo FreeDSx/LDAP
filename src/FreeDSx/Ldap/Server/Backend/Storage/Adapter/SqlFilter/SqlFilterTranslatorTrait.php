@@ -26,37 +26,26 @@ use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 
 /**
- * Provides a reusable LDAP-filter-to-SQL translation implementation.
+ * Reusable LDAP-filter-to-SQL translator; concrete classes supply buildPresenceCheck() and buildValueExists().
  *
- * Implementing classes must provide two driver-specific primitives:
- *   - buildPresenceCheck(string $attribute): SQL fragment testing whether an attribute key exists
- *   - buildValueExists(string $attribute, string $innerCondition): SQL fragment iterating attribute values
- *
- * All AND/OR/NOT composition, substring/LIKE handling, GTE/LTE comparisons,
- * and LIKE escaping are generic and provided here.
- *
- * Translation rules:
- *   - AND: translates only the translatable children; partial results are allowed
- *   - OR:  all children must be translatable; returns null if any child is not
- *   - NOT: translatable only if the child is. Honors RFC 4511 §4.5.1.7
- *   - MatchingRuleFilter: always null / not supported
+ * Composition rules: AND keeps translatable children, OR requires every child to translate, NOT honors RFC 4511 §4.5.1.7,
+ * MatchingRuleFilter is never translated.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 trait SqlFilterTranslatorTrait
 {
     /**
-     * Returns a SQL fragment that tests whether an attribute key is present.
+     * SQL fragment testing whether the attribute key is present.
      *
      * @param string $attribute Pre-validated and safe to embed in SQL.
      */
     abstract protected function buildPresenceCheck(string $attribute): string;
 
     /**
-     * Wraps an inner condition so that it is evaluated for each value of an attribute.
+     * Wraps $innerCondition so it is evaluated per attribute value, referencing the current value via {@see valueAlias()}.
      *
      * @param string $attribute Pre-validated and safe to embed in SQL.
-     * @param string $innerCondition References the current value via the alias returned by {@see valueAlias()}.
      */
     abstract protected function buildValueExists(
         string $attribute,
@@ -158,10 +147,7 @@ trait SqlFilterTranslatorTrait
     }
 
     /**
-     * GTE/LTE are exact only for ASCII non-digit filter values. PHP's
-     * compareOrdered switches to integer compare when both operands are
-     * ctype_digit (e.g. "99" < "100"); SQL stays byte-wise ("99" > "100"),
-     * so digit filter values must fall through to PHP re-evaluation.
+     * Exact only for ASCII non-digit values; PHP compareOrdered int-compares when both operands are digits, SQL does not.
      */
     private function isOrderedCompareExact(string $value): bool
     {

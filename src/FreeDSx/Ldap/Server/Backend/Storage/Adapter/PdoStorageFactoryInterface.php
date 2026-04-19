@@ -14,11 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 /**
- * Constructs a configured PdoStorage instance for a specific database driver.
- *
- * Example:
- *
- *   $storage = SqliteStorage::forPcntl('/path/to/db.sqlite')
+ * Constructs a configured PdoStorage for a specific database driver (e.g. SqliteStorage::forPcntl('/path/to/db.sqlite')).
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

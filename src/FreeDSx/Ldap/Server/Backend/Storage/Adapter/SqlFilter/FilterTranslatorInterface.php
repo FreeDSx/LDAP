@@ -16,16 +16,10 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 
 /**
- * Translates an LDAP FilterInterface into a SQL fragment for use in a WHERE clause.
+ * Translates FilterInterface into a SQL WHERE fragment.
  *
- * Return values:
- *   - null                             — filter cannot be expressed in SQL; all in-scope
- *                                        entries are returned; PHP eval must run over the
- *                                        full candidate set.
- *   - SqlFilterResult (isExact: true)  — the SQL exactly captures the filter semantics;
- *                                        PHP eval can safely be skipped for these entries.
- *   - SqlFilterResult (isExact: false) — partial SQL (superset); PHP eval still runs
- *                                        but only over the already-reduced candidate set.
+ * Returns null when untranslatable (PHP eval runs over the full candidate set), an exact SqlFilterResult when PHP eval
+ * can be skipped, or a non-exact SqlFilterResult (superset) that still needs PHP eval over the reduced candidates.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

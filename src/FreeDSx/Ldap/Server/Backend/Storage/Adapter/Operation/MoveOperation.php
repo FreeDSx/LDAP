@@ -19,8 +19,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 
 /**
- * Constructs a new Entry from the given RDN / parent, handling old RDN
- * deletion and new RDN attribute assignment.
+ * Builds the renamed/moved Entry, handling old-RDN removal and new-RDN attribute assignment.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

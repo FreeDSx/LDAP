@@ -23,11 +23,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use Generator;
 
 /**
- * A transient EntryStorageInterface view over an in-flight JSON data buffer.
- *
- * Created by JsonFileStorage::atomic() for the duration of a single locked
- * read-modify-write cycle. Changes are held in memory and written back when
- * the atomic operation completes.
+ * Transient EntryStorageInterface view used by JsonFileStorage::atomic() for one locked read-modify-write cycle.
  *
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>

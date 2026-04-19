@@ -18,10 +18,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterf
 use PDO;
 
 /**
- * Shared factory wiring for PdoStorage.
- *
- * Concrete factories provide the dialect, translator, and connection opener;
- * this trait assembles the PdoStorage with the correct connection provider.
+ * Shared PdoStorage wiring: concrete factories provide dialect, translator, and connection opener; the trait picks the provider.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

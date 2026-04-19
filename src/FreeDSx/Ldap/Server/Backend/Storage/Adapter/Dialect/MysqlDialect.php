@@ -14,9 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 
 /**
- * MySQL/MariaDB-specific SQL for PdoStorage.
- *
- * Requires MySQL 8.0+ or MariaDB 10.6+.
+ * MySQL/MariaDB SQL for PdoStorage; requires MySQL 8.0+ or MariaDB 10.6+.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -25,7 +23,7 @@ final class MysqlDialect implements PdoDialectInterface
     use PdoDialectTrait;
 
     /**
-     * The 768-character DN columns are sized to the maximum that still fits InnoDB's index.
+     * DN columns are 768 chars — the maximum that still fits an InnoDB index.
      *
      * @TODO How to handle indexing on attributes?
      */
@@ -44,8 +42,7 @@ final class MysqlDialect implements PdoDialectInterface
     }
 
     /**
-     * Returns null because the index is already defined inline in ddlCreateTable().
-     * PdoStorage::initialize() skips execution when null is returned.
+     * Null: the index is defined inline in ddlCreateTable().
      */
     public function ddlCreateIndex(): ?string
     {
@@ -53,8 +50,7 @@ final class MysqlDialect implements PdoDialectInterface
     }
 
     /**
-     * @todo VALUES() in ON DUPLICATE KEY UPDATE is deprecated since MySQL 8.0.20 and removed in 9.0.
-     *       Replace with row alias syntax (AS new_entry) once MariaDB support for that is confirmed.
+     * @todo Replace VALUES() (deprecated in MySQL 8.0.20, removed in 9.0) with row alias syntax once MariaDB supports it.
      */
     public function queryUpsert(): string
     {

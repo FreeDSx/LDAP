@@ -20,14 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\MysqlFilterTranslator;
 use PDO;
 
 /**
- * MySQL/MariaDB-specific factory for PdoStorage.
- *
- * Use the named constructors to select the appropriate runner:
- *
- *   MysqlStorage::forPcntl('mysql:host=localhost;dbname=ldap', 'user', 'pass')
- *   MysqlStorage::forSwoole('mysql:host=localhost;dbname=ldap', 'user', 'pass')
- *
- * Requires MySQL 8.0+ or MariaDB 10.6+.
+ * MySQL/MariaDB factory for PdoStorage; use forPcntl()/forSwoole() to select the runner. Requires MySQL 8.0+ or MariaDB 10.6+.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
