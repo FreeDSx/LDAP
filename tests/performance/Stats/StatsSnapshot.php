@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Performance\FreeDSx\Ldap\LoadTest;
+namespace Tests\Performance\FreeDSx\Ldap\Stats;
 
 /**
  * Frozen result of a load run.

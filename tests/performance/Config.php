@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Performance\FreeDSx\Ldap\LoadTest;
+namespace Tests\Performance\FreeDSx\Ldap;
 
 use InvalidArgumentException;
 
@@ -67,7 +67,7 @@ final class Config
         public readonly int $port = 10389,
         public readonly int $warmup = 2,
         public readonly string $serverMode = 'spawn',
-        public readonly ?int $seed = null,
+        public readonly ?int $rngSeed = null,
         public readonly string $output = 'text',
         public readonly int $seedEntries = 100,
     ) {

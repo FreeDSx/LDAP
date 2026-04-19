@@ -11,10 +11,11 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Performance\FreeDSx\Ldap\LoadTest;
+namespace Tests\Performance\FreeDSx\Ldap\Server;
 
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Performance\FreeDSx\Ldap\Config;
 
 /**
  * Spawns ldap-backend-storage.php, waits for the readiness marker, and stops it on destruction.
@@ -25,7 +26,7 @@ final class ServerManager
 
     private const POLL_INTERVAL_US = 15_000;
 
-    private const BOOTSTRAP_PATH = __DIR__ . '/../bin/ldap-backend-storage.php';
+    private const BOOTSTRAP_PATH = __DIR__ . '/../../bin/ldap-backend-storage.php';
 
     private ?Process $process = null;
 

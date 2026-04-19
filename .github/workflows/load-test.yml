@@ -1,0 +1,154 @@
+name: Load Test
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/performance/**'
+      - 'tests/bin/ldap-*.php'
+      - 'composer.json'
+      - 'composer.lock'
+      - '.github/workflows/load-test.yml'
+  push:
+    branches: [master, '1.0']
+  workflow_dispatch:
+
+concurrency:
+  group: load-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    name: ${{ matrix.backend }} + ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { backend: memory, runner: swoole, profile: 'memory:swoole' }
+          - { backend: json,   runner: pcntl,  profile: 'json:pcntl' }
+          - { backend: json,   runner: swoole, profile: 'json:swoole' }
+          - { backend: sqlite, runner: pcntl,  profile: 'sqlite:pcntl' }
+          - { backend: sqlite, runner: swoole, profile: 'sqlite:swoole' }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup extension cache environment
+        id: extcache
+        uses: shivammathur/cache-extensions@v1
+        with:
+          php-version: '8.5'
+          extensions: swoole, pdo_sqlite, pcntl
+          key: load-test-ext-v1
+
+      - name: Cache extensions
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.extcache.outputs.dir }}
+          key: ${{ steps.extcache.outputs.key }}
+          restore-keys: ${{ steps.extcache.outputs.key }}
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: swoole, pdo_sqlite, pcntl
+          coverage: none
+          tools: composer:2.9
+
+      - name: Install Composer dependencies
+        run: composer install --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Run load test
+        run: |
+          php tests/bin/ldap-load-test.php \
+            --backend=${{ matrix.backend }} \
+            --runner=${{ matrix.runner }} \
+            --ci-profile=${{ matrix.profile }} \
+            --duration=15 --warmup=3 --clients=16 --rng-seed=1 \
+            --output=json \
+            --threshold-report=threshold-${{ matrix.backend }}-${{ matrix.runner }}.json \
+            > raw-${{ matrix.backend }}-${{ matrix.runner }}.json
+
+      - name: Upload load-test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-${{ matrix.backend }}-${{ matrix.runner }}
+          path: |
+            raw-*.json
+            threshold-*.json
+
+  load-test-mysql:
+    runs-on: ubuntu-latest
+    name: mysql + ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [pcntl, swoole]
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: freedsx
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup extension cache environment
+        id: extcache
+        uses: shivammathur/cache-extensions@v1
+        with:
+          php-version: '8.5'
+          extensions: swoole, pdo_mysql, pcntl
+          key: load-test-mysql-ext-v1
+
+      - name: Cache extensions
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.extcache.outputs.dir }}
+          key: ${{ steps.extcache.outputs.key }}
+          restore-keys: ${{ steps.extcache.outputs.key }}
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: swoole, pdo_mysql, pcntl
+          coverage: none
+          tools: composer:2.9
+
+      - name: Install Composer dependencies
+        run: composer install --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Run load test
+        env:
+          MYSQL_DSN: 'mysql:host=127.0.0.1;port=3306;dbname=freedsx'
+          MYSQL_USER: root
+          MYSQL_PASSWORD: root
+        run: |
+          php tests/bin/ldap-load-test.php \
+            --backend=mysql \
+            --runner=${{ matrix.runner }} \
+            --ci-profile=mysql:${{ matrix.runner }} \
+            --duration=15 --warmup=3 --clients=16 --rng-seed=1 \
+            --output=json \
+            --threshold-report=threshold-mysql-${{ matrix.runner }}.json \
+            > raw-mysql-${{ matrix.runner }}.json
+
+      - name: Upload load-test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-mysql-${{ matrix.runner }}
+          path: |
+            raw-*.json
+            threshold-*.json

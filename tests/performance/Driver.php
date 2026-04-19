@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Performance\FreeDSx\Ldap\LoadTest;
+namespace Tests\Performance\FreeDSx\Ldap;
 
 use RuntimeException;
 use Swoole\Coroutine;
@@ -20,6 +20,11 @@ use Swoole\Coroutine\WaitGroup;
 use Swoole\Runtime;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Tests\Performance\FreeDSx\Ldap\Server\ServerManager;
+use Tests\Performance\FreeDSx\Ldap\Stats\StatsCollector;
+use Tests\Performance\FreeDSx\Ldap\Stats\StatsSnapshot;
+use Tests\Performance\FreeDSx\Ldap\Workload\Worker;
+use Tests\Performance\FreeDSx\Ldap\Workload\WorkloadMix;
 use Throwable;
 
 /**
@@ -33,12 +38,12 @@ final class Driver
     ) {
     }
 
-    public function run(OutputInterface $output): void
+    public function run(OutputInterface $output): StatsSnapshot
     {
         $this->assertSwooleAvailable();
 
-        if ($this->config->seed !== null) {
-            mt_srand($this->config->seed);
+        if ($this->config->rngSeed !== null) {
+            mt_srand($this->config->rngSeed);
         }
 
         $progress = $this->progressChannel($output);
@@ -63,12 +68,13 @@ final class Driver
         $progress->writeln($this->describeRunStart());
 
         try {
-            $snapshot = $this->runCoroutinePool($mix, $stats);
+            return $this->runCoroutinePool(
+                $mix,
+                $stats,
+            );
         } finally {
             $serverManager?->stop();
         }
-
-        (new Report($this->config, $mix, $snapshot))->render($output);
     }
 
     private function progressChannel(OutputInterface $output): OutputInterface

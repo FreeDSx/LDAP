@@ -11,10 +11,13 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Performance\FreeDSx\Ldap\LoadTest;
+namespace Tests\Performance\FreeDSx\Ldap\Report;
 
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Output\OutputInterface;
+use Tests\Performance\FreeDSx\Ldap\Config;
+use Tests\Performance\FreeDSx\Ldap\Stats\StatsSnapshot;
+use Tests\Performance\FreeDSx\Ldap\Workload\WorkloadMix;
 
 /**
  * Formats a StatsSnapshot as either a human-readable table or machine-readable JSON.

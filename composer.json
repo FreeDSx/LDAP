@@ -44,7 +44,8 @@
   "autoload-dev": {
     "psr-4": {
       "Tests\\Integration\\FreeDSx\\Ldap\\": "tests/integration",
-      "Tests\\Unit\\FreeDSx\\Ldap\\": "tests/unit"
+      "Tests\\Unit\\FreeDSx\\Ldap\\": "tests/unit",
+      "Tests\\Performance\\FreeDSx\\Ldap\\": "tests/performance"
     }
   },
   "config": {
@@ -69,6 +70,7 @@
       "docker compose -f tests/resources/openldap/docker-compose.yml up -d --build --wait",
       "@test-integration"
     ],
+    "test-load": "php tests/bin/ldap-load-test.php --backend=sqlite --runner=swoole --duration=10 --warmup=2 --clients=8 --output=text",
     "analyse": [
       "phpstan --memory-limit=-1 analyse"
     ],
