@@ -199,7 +199,8 @@ class PcntlServerRunner implements ServerRunnerInterface
                     $socket
                 );
             }
-        } while ($this->server->isConnected());
+        // Use the shutdown flag, not the socket state (not reliable after forking)
+        } while (!$this->isShuttingDown);
     }
 
     /**
