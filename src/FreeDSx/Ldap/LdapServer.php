@@ -72,7 +72,10 @@ class LdapServer
      */
     public function useStorage(EntryStorageInterface $storage): self
     {
-        return $this->useBackend(new WritableStorageBackend($storage));
+        return $this->useBackend(new WritableStorageBackend(
+            storage: $storage,
+            namingContexts: $this->options->getDseNamingContexts(),
+        ));
     }
 
     /**
