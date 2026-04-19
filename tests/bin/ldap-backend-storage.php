@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\MysqlStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqliteStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
 use FreeDSx\Ldap\ServerOptions;
 
 require __DIR__ . '/../../vendor/autoload.php';
@@ -141,16 +142,12 @@ if ($storage === 'memory') {
         ? JsonFileStorage::forSwoole($filePath)
         : JsonFileStorage::forPcntl($filePath);
 
+    $importer = new LdapImporter($adapter);
+
     if ($runner === 'swoole') {
-        Swoole\Coroutine\run(function () use ($adapter, $entries): void {
-            foreach ($entries as $entry) {
-                $adapter->store($entry);
-            }
-        });
+        Swoole\Coroutine\run(fn () => $importer->importEntries($entries));
     } else {
-        foreach ($entries as $entry) {
-            $adapter->store($entry);
-        }
+        $importer->importEntries($entries);
     }
 
     $server->useStorage($adapter);
@@ -167,16 +164,12 @@ if ($storage === 'memory') {
         ? SqliteStorage::forSwoole($dbPath)
         : SqliteStorage::forPcntl($dbPath);
 
+    $importer = new LdapImporter($adapter);
+
     if ($runner === 'swoole') {
-        Swoole\Coroutine\run(function () use ($adapter, $entries): void {
-            foreach ($entries as $entry) {
-                $adapter->store($entry);
-            }
-        });
+        Swoole\Coroutine\run(fn () => $importer->importEntries($entries));
     } else {
-        foreach ($entries as $entry) {
-            $adapter->store($entry);
-        }
+        $importer->importEntries($entries);
     }
 
     $server->useStorage($adapter);
@@ -199,16 +192,12 @@ if ($storage === 'memory') {
         ? MysqlStorage::forSwoole($dsn, $user, $password)
         : MysqlStorage::forPcntl($dsn, $user, $password);
 
+    $importer = new LdapImporter($adapter);
+
     if ($runner === 'swoole') {
-        Swoole\Coroutine\run(function () use ($adapter, $entries): void {
-            foreach ($entries as $entry) {
-                $adapter->store($entry);
-            }
-        });
+        Swoole\Coroutine\run(fn () => $importer->importEntries($entries));
     } else {
-        foreach ($entries as $entry) {
-            $adapter->store($entry);
-        }
+        $importer->importEntries($entries);
     }
 
     $server->useStorage($adapter);
