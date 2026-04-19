@@ -821,10 +821,7 @@ final class FilterEvaluatorTest extends TestCase
     }
 
     /**
-     * Guards against evaluate() stashing compiled state directly on the filter
-     * (e.g. a cached lowerValue property). Such a cache must live outside the
-     * filter — serialize catches any structural mutation, including in nested
-     * children of composite filters.
+     * Guards against evaluate() stashing compiled state on the filter; serialize catches nested composite mutations too.
      */
     public function test_filter_is_not_mutated_by_evaluation(): void
     {

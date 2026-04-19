@@ -24,10 +24,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use Generator;
 
 /**
- * A no-op backend used when no backend has been configured via LdapServer::useBackend().
- *
- * Read operations return empty / false results. Write operations are handled by
- * an empty WriteOperationDispatcher, which returns UNWILLING_TO_PERFORM.
+ * No-op fallback backend: reads return empty, writes are rejected with UNWILLING_TO_PERFORM by the empty dispatcher.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

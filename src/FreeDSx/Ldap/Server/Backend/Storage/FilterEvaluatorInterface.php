@@ -17,11 +17,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 
 /**
- * Evaluates an LDAP filter against an entry.
- *
- * Implementations may choose different strategies — pure-PHP evaluation,
- * SQL translation, etc. — without coupling the request handler to any
- * specific approach.
+ * Evaluates an LDAP filter against an entry; implementations pick their own strategy (pure-PHP, SQL translation, etc).
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

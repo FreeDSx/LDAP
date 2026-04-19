@@ -23,7 +23,7 @@ final class PdoTxState
     public int $depth = 0;
 
     /**
-     * Set when a nested savepoint operation fails before establishing its savepoint.
+     * Set when a nested savepoint fails before it is established.
      */
     public bool $broken = false;
 }

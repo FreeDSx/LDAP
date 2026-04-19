@@ -22,30 +22,14 @@ use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 
 /**
- * The core contract for an LDAP backend storage implementation.
- *
- * Implement this interface to provide a read-only backend.
- *
- * For a writable backend (add, delete, modify, rename) implement WritableLdapBackendInterface.
- *
- * The search() method returns a Generator that yields Entry objects. This library applies its own FilterEvaluator as a
- * final pass, so the backend may pre-filter for efficiency (e.g. translate to a SQL WHERE clause) or yield all
- * candidates in scope and let the framework filter.
- *
- * Each generator is scoped to a single client connection and a single paging session. It is paused between pages and
- * garbage-collected when the session ends, so no external paging state management is needed.
+ * Read-only LDAP backend contract; implement WritableLdapBackendInterface for full CRUD.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 interface LdapBackendInterface
 {
     /**
-     * Return an EntryStream for the given search context.
-     *
-     * The result wraps a lazy generator of candidate entries and a flag indicating whether the backend has already
-     * applied the filter exactly. When EntryStream::$isPreFiltered is true, the caller may skip PHP-level
-     * FilterEvaluator evaluation. Otherwise, all yielded entries are passed through FilterEvaluator as a final
-     * correctness pass.
+     * Set EntryStream::$isPreFiltered to true when the backend has applied the filter exactly; otherwise FilterEvaluator re-checks each yielded entry.
      */
     public function search(
         SearchRequest $request,
@@ -58,10 +42,7 @@ interface LdapBackendInterface
     public function get(Dn $dn): ?Entry;
 
     /**
-     * Evaluate a compare assertion against an entry.
-     *
-     * Return true if the attribute-value assertion matches, false if it does not.
-     * Throw OperationException(NO_SUCH_OBJECT) if the entry does not exist.
+     * Evaluate a compare assertion; throws OperationException(NO_SUCH_OBJECT) when the entry is missing.
      *
      * @throws OperationException
      */

@@ -18,8 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 
 /**
- * The default bind-name resolver. Treats the bind name as a DN and delegates
- * to LdapBackendInterface::get().
+ * Default resolver: treats the bind name as a DN and delegates to LdapBackendInterface::get().
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

@@ -14,9 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 
 /**
- * Translates LDAP filters into MySQL-compatible SQL WHERE clause fragments.
- *
- * Requires MySQL 8.0+ or MariaDB 10.6+.
+ * MySQL/MariaDB SQL WHERE translator for LDAP filters; requires MySQL 8.0+ or MariaDB 10.6+.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

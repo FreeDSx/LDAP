@@ -18,11 +18,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
- * Provides a default hasChildren() implementation in terms of list().
- *
- * Suitable for any EntryStorageInterface implementation. Adapters that can
- * answer the question more efficiently (e.g. via an EXISTS query on a database)
- * should override hasChildren() directly.
+ * Default hasChildren() built on list(); override in adapters that can answer via an EXISTS query.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

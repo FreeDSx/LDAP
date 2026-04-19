@@ -16,9 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock;
 use FreeDSx\Ldap\Exception\RuntimeException;
 
 /**
- * Locking strategy for the PCNTL server runner.
- *
- * Uses fopen + flock(LOCK_EX) to serialize concurrent writes across forked child processes.
+ * PCNTL-safe lock using flock(LOCK_EX) to serialize writes across forked children.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -65,8 +63,6 @@ class FileLock implements StorageLockInterface
     }
 
     /**
-     * Read the raw file contents from an open file handle.
-     *
      * @param resource $handle
      */
     private function readFromHandle(mixed $handle): string
@@ -86,8 +82,6 @@ class FileLock implements StorageLockInterface
     }
 
     /**
-     * Write a string back to an open file handle, truncating first.
-     *
      * @param resource $handle
      */
     private function writeToHandle(

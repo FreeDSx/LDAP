@@ -21,36 +21,26 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 interface PdoDialectInterface
 {
     /**
-     * DDL to create the entries table if it does not already exist.
-     *
-     * Required columns:
-     *   lc_dn         — primary key, lowercased DN string
-     *   dn            — original-case DN string
-     *   lc_parent_dn  — lowercased parent DN string (empty string for root entries)
+     * DDL for the `entries` table. Required columns:
+     *   lc_dn         — PK, lowercased DN
+     *   dn            — original-case DN
+     *   lc_parent_dn  — lowercased parent DN ('' for root)
      *   attributes    — JSON object mapping lowercased attribute names to string-value arrays
      */
     public function ddlCreateTable(): string;
 
     /**
-     * DDL to create an index on lc_parent_dn if it does not already exist.
-     *
-     * Return null if the index is already defined inline in ddlCreateTable()
+     * DDL to create an index on lc_parent_dn; return null when already defined inline in ddlCreateTable().
      */
     public function ddlCreateIndex(): ?string;
 
     /**
-     * SELECT 1 WHERE lc_dn = ? LIMIT 1
-     *
-     * Lightweight existence check without fetching attributes.
-     *
-     * Parameters: [lc_dn]
+     * Existence check: `SELECT 1 FROM entries WHERE lc_dn = ? LIMIT 1`. Parameters: [lc_dn]
      */
     public function queryExists(): string;
 
     /**
-     * SELECT dn, attributes WHERE lc_dn = ?
-     *
-     * Parameters: [lc_dn]
+     * `SELECT dn, attributes FROM entries WHERE lc_dn = ?`. Parameters: [lc_dn]
      */
     public function queryFetchEntry(): string;
 
@@ -60,40 +50,27 @@ interface PdoDialectInterface
     public function queryFetchAll(): string;
 
     /**
-     * SELECT dn, attributes WHERE lc_parent_dn = ?
-     *
-     * Parameters: [lc_parent_dn]
+     * `SELECT dn, attributes FROM entries WHERE lc_parent_dn = ?`. Parameters: [lc_parent_dn]
      */
     public function queryFetchChildren(): string;
 
     /**
-     * Recursive CTE that returns the base entry and all its descendants.
-     *
-     * The outer SELECT returns (dn, attributes) from the CTE result set.
-     * PdoStorage appends `WHERE (filter)` when a translated filter is available.
-     *
-     * Parameters: [lc_dn]
+     * Recursive CTE returning (dn, attributes) for the base entry and its descendants; PdoStorage may append `WHERE (filter)`. Parameters: [lc_dn]
      */
     public function querySubtree(): string;
 
     /**
-     * Returns at least one row when children exist under lc_parent_dn, zero rows otherwise.
-     *
-     * Parameters: [lc_parent_dn]
+     * Returns a row when children exist under lc_parent_dn, none otherwise. Parameters: [lc_parent_dn]
      */
     public function queryHasChildren(): string;
 
     /**
-     * INSERT or UPDATE (upsert) a single entry.
-     *
-     * Parameters: [lc_dn, dn, lc_parent_dn, attributes]
+     * Upsert a single entry. Parameters: [lc_dn, dn, lc_parent_dn, attributes]
      */
     public function queryUpsert(): string;
 
     /**
-     * DELETE FROM entries WHERE lc_dn = ?
-     *
-     * Parameters: [lc_dn]
+     * `DELETE FROM entries WHERE lc_dn = ?`. Parameters: [lc_dn]
      */
     public function queryDelete(): string;
 

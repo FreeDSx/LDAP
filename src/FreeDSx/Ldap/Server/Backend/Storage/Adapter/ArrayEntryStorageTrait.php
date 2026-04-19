@@ -19,11 +19,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use Generator;
 
 /**
- * Provides scope-filtered list helpers for array-backed EntryStorageInterface implementations.
- *
- * Includes DefaultHasChildrenTrait for the default hasChildren() implementation.
- * Use DefaultHasChildrenTrait directly if you only need the hasChildren() default
- * (e.g. for a database-backed adapter that handles list() natively).
+ * Scope-filtered list helpers for array-backed stores; composes DefaultHasChildrenTrait (use that directly for DB-backed adapters).
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

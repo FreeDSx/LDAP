@@ -18,8 +18,7 @@ use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 
 /**
- * A DTO encapsulating all parameters for a storage list operation, decoupled
- * from LDAP protocol objects.
+ * DTO for EntryStorageInterface::list(), decoupled from LDAP protocol objects.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -35,9 +34,7 @@ final class StorageListOptions
     }
 
     /**
-     * Create options that match all entries within the given scope.
-     *
-     * Convenient for internal operations (e.g. hasChildren) and tests that do not need a meaningful filter.
+     * Match-all options for internal callers (e.g. hasChildren) and tests that do not need a meaningful filter.
      */
     public static function matchAll(
         Dn $baseDn,

@@ -33,15 +33,7 @@ use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 use Generator;
 
 /**
- * Orchestrates LDAP directory operations over a pluggable EntryStorageInterface.
- *
- * Handles all LDAP semantics — existence checks, subordinate checks, scope
- * filtering, DN normalisation, and entry transformation — so that storage
- * implementations only need to provide raw persistence primitives.
- *
- * All write operations are routed through EntryStorageInterface::atomic() to
- * ensure transactional consistency. See EntryStorageInterface::atomic() for the
- * contract each storage implementation must satisfy.
+ * Applies LDAP semantics over a pluggable EntryStorageInterface; writes are routed through EntryStorageInterface::atomic().
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -146,8 +138,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
     }
 
     /**
-     * Wraps a storage generator and converts TimeLimitExceededException to an OperationException so the protocol layer
-     * receives a well-formed LDAP error.
+     * Converts TimeLimitExceededException from the storage generator into an LDAP OperationException.
      *
      * @param Generator<Entry> $generator
      * @return Generator<Entry>
@@ -253,8 +244,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface
     }
 
     /**
-     * Runs a write operation under the storage's atomic boundary and translates storage-layer exceptions into their
-     * corresponding LDAP OperationException result codes.
+     * Runs the operation under storage->atomic() and maps storage-layer exceptions to LDAP result codes.
      *
      * @param callable(EntryStorageInterface): void $operation
      * @throws OperationException

@@ -33,10 +33,7 @@ final class SqlFilterUtility
     }
 
     /**
-     * Returns true if the value contains only 7-bit ASCII bytes.
-     *
-     * The SQL translator's case-insensitive comparisons use `lower()`, which
-     * is ASCII-only on SQLite and collation-dependent on MySQL.
+     * True when $value is 7-bit ASCII; the translator falls back to PHP eval otherwise because SQL `lower()` is ASCII-only on SQLite and collation-dependent on MySQL.
      */
     public static function isAscii(string $value): bool
     {

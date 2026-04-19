@@ -16,9 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 use PDO;
 
 /**
- * Returns a single shared PDO connection and transaction state.
- *
- * Used by the PCNTL runner and by unit tests that inject a pre-built PDO.
+ * Single shared PDO connection and transaction state; used by the PCNTL runner and unit tests with a pre-built PDO.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

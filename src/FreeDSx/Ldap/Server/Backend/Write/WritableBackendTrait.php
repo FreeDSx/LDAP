@@ -19,9 +19,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 
 /**
- * Use this trait in classes that implement WritableLdapBackendInterface and
- * want to handle all four write operations via distinct, methods
- * rather than a single handle() with instanceof checks.
+ * Splits WriteHandlerInterface::handle() into four typed methods (add/delete/update/move) for WritableLdapBackendInterface.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

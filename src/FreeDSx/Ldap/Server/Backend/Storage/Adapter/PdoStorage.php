@@ -31,21 +31,9 @@ use PDOStatement;
 use Throwable;
 
 /**
- * A PDO-backed storage implementation that persists LDAP entries using a relational database.
+ * PDO-backed storage; pass a PdoDialectInterface + PdoConnectionProviderInterface, or use SqliteStorage / MysqlStorage factories.
  *
- * Pass a PdoDialectInterface to target the desired database engine and a PdoConnectionProviderInterface to resolve the
- * PDO connection for the current execution context.
- *
- * When injecting a pre-existing PDO (e.g. for testing), wrap it in a SharedPdoConnectionProvider and call initialize()
- * first:
- *
- *   $dialect = new SqliteDialect();
- *   PdoStorage::initialize($pdo, $dialect);
- *   $storage = new PdoStorage(
- *       new SharedPdoConnectionProvider($pdo),
- *       $translator,
- *       $dialect,
- *   );
+ * When injecting a pre-built PDO, wrap it in SharedPdoConnectionProvider and call PdoStorage::initialize($pdo, $dialect) first.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

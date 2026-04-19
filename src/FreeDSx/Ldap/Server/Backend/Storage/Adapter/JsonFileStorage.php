@@ -24,28 +24,9 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
- * A file-backed storage implementation that persists entries as a JSON file.
+ * JSON-file storage; use forPcntl() / forSwoole() to pick a locking strategy. Reads are lock-free; writes go through atomic() which loads, mutates, and rewrites the file under lock.
  *
- * Use the named constructors to select the appropriate locking strategy:
- *
- *   JsonFileStorage::forPcntl('/path/to/file.json')
- *   JsonFileStorage::forSwoole('/path/to/file.json')
- *
- * Reads are non-transactional (no lock acquired). Write operations performed
- * through WritableStorageBackend are always routed through atomic(), which
- * acquires the lock, loads the entire file into an in-memory buffer, passes
- * that buffer to the operation, then writes the result back atomically.
- *
- * JSON format:
- * {
- *   "cn=admin,dc=example,dc=com": {
- *     "dn": "cn=admin,dc=example,dc=com",
- *     "attributes": {
- *       "cn": ["admin"],
- *       "userPassword": ["{SHA}..."]
- *     }
- *   }
- * }
+ * File format: { "cn=x,dc=y": { "dn": "cn=x,dc=y", "attributes": { "cn": ["x"] } } }
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

@@ -17,10 +17,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use Generator;
 
 /**
- * The result of a storage list() or backend search() call.
- *
- * Wraps the lazy entry generator together with a flag indicating whether the adapter has already applied the LDAP
- * filter exactly in its native query.
+ * Lazy entry generator returned by storage list() / backend search(); $isPreFiltered marks an exact native filter match.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
