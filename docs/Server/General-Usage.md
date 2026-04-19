@@ -413,10 +413,15 @@ Four storage implementations are included for common use cases. All are used via
 
 An in-memory, array-backed storage implementation. Suitable for:
 
-- **Swoole**: all connections share the same process memory.
+- **Swoole**: all connections share the same process memory, so reads and writes are visible to every client.
 - **PCNTL** with pre-seeded, read-only data: data seeded before `run()` is inherited by all forked child processes.
 
-**Note**: With PCNTL, write operations performed by one child process are not visible to other children.
+> **⚠️ PCNTL write caveat**
+>
+> Under the PCNTL runner, `InMemoryStorage` is **not safe for multi-client write workloads**. Each forked child receives
+> its own copy of the store at fork time. Written data is not propagated.
+>
+> Use one of `JsonFileStorage`, `SqliteStorage`, or `MysqlStorage` if you need write behavior and use PCNTL.
 
 ```php
 use FreeDSx\Ldap\Entry\Attribute;

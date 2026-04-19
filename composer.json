@@ -26,6 +26,7 @@
     "symplify/easy-coding-standard": "^9.4",
     "phpstan/phpstan": "^2.1",
     "symfony/process": "^5.4",
+    "symfony/console": "^6.4",
     "squizlabs/php_codesniffer": "^3.7",
     "slevomat/coding-standard": "^7.2",
     "phpstan/phpstan-phpunit": "^2.0",
