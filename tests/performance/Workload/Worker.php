@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Performance\FreeDSx\Ldap\LoadTest;
+namespace Tests\Performance\FreeDSx\Ldap\Workload;
 
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Attribute;
@@ -23,6 +23,8 @@ use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use LogicException;
 use Swoole\Coroutine\Channel;
+use Tests\Performance\FreeDSx\Ldap\Config;
+use Tests\Performance\FreeDSx\Ldap\Stats\StatsCollector;
 use Throwable;
 
 /**

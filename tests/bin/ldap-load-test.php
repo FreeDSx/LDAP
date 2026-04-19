@@ -11,22 +11,15 @@ declare(strict_types=1);
  */
 
 use Symfony\Component\Console\Application;
-use Tests\Performance\FreeDSx\Ldap\LoadTest\LoadTestCommand;
+use Tests\Performance\FreeDSx\Ldap\LoadTestCommand;
 
 require __DIR__ . '/../../vendor/autoload.php';
-
-require_once __DIR__ . '/../performance/Config.php';
-require_once __DIR__ . '/../performance/WorkloadMix.php';
-require_once __DIR__ . '/../performance/StatsCollector.php';
-require_once __DIR__ . '/../performance/StatsSnapshot.php';
-require_once __DIR__ . '/../performance/ServerManager.php';
-require_once __DIR__ . '/../performance/Worker.php';
-require_once __DIR__ . '/../performance/Report.php';
-require_once __DIR__ . '/../performance/Driver.php';
-require_once __DIR__ . '/../performance/LoadTestCommand.php';
 
 $command = new LoadTestCommand();
 $application = new Application('FreeDSx LDAP load test');
 $application->add($command);
-$application->setDefaultCommand((string) $command->getName(), true);
+$application->setDefaultCommand(
+    (string) $command->getName(),
+    true,
+);
 $application->run();
