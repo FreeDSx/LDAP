@@ -31,9 +31,12 @@ final class MysqlFilterTranslator implements FilterTranslatorInterface
         string $attribute,
         string $innerCondition,
     ): string {
+        // NO_SEMIJOIN is required: MySQL 8.0 silently rewrites the correlated JSON_TABLE
+        // subquery into an unconditional hash join that loses the outer `attributes` reference,
+        // producing zero rows for every filter.
         return <<<SQL
             EXISTS (
-                SELECT 1
+                SELECT /*+ NO_SEMIJOIN() */ 1
                 FROM JSON_TABLE(
                     attributes,
                     '$."{$attribute}".values[*]' COLUMNS (val TEXT PATH '$')
