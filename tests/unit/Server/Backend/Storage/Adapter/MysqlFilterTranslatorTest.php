@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\LessThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
@@ -725,6 +726,39 @@ final class MysqlFilterTranslatorTest extends TestCase
         self::assertSame(
             ['Alice', 'person'],
             $result->params,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{0: FilterInterface}>
+     */
+    public static function valueBearingFilterProvider(): iterable
+    {
+        yield 'equality' => [new EqualityFilter('cn', 'Alice')];
+        yield 'approximate' => [new ApproximateFilter('cn', 'Alice')];
+        yield 'substring' => [
+            new SubstringFilter(
+                'cn',
+                'Al',
+                'ce',
+                'i',
+            ),
+        ];
+        yield 'gte' => [new GreaterThanOrEqualFilter('uidNumber', '100')];
+        yield 'lte' => [new LessThanOrEqualFilter('uidNumber', '100')];
+    }
+
+    /**
+     * @dataProvider valueBearingFilterProvider
+     */
+    public function test_value_bearing_filters_include_no_semijoin_hint(FilterInterface $filter): void
+    {
+        $result = $this->subject->translate($filter);
+
+        self::assertNotNull($result);
+        self::assertStringContainsString(
+            'NO_SEMIJOIN()',
+            $result->sql,
         );
     }
 }
