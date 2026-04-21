@@ -146,6 +146,39 @@ final class SqliteStorageTest extends TestCase
         self::assertCount(2, $results);
     }
 
+    public function test_interleaved_lists_do_not_share_cursor_state(): void
+    {
+        $this->subject->add(new AddCommand(
+            new Entry(new Dn('cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Bob')),
+        ));
+        $this->subject->add(new AddCommand(
+            new Entry(new Dn('cn=Carol,dc=example,dc=com'), new Attribute('cn', 'Carol')),
+        ));
+
+        $outerIterator = $this->storage->list(StorageListOptions::matchAll(
+            new Dn('dc=example,dc=com'),
+            true,
+        ))->entries;
+
+        $outerIterator->current();
+        $outerIterator->next();
+
+        $inner = iterator_to_array($this->storage->list(StorageListOptions::matchAll(
+            new Dn('dc=example,dc=com'),
+            true,
+        ))->entries);
+
+        $remaining = [];
+        while ($outerIterator->valid()) {
+            $remaining[] = $outerIterator->current();
+            $outerIterator->next();
+        }
+
+        self::assertCount(4, $inner);
+        // Outer yielded 1 entry before the inner list; the remaining 3 must still come through.
+        self::assertCount(3, $remaining);
+    }
+
     public function test_has_children_returns_true_when_children_exist(): void
     {
         self::assertTrue($this->storage->hasChildren(new Dn('dc=example,dc=com')));

@@ -56,21 +56,21 @@
   },
   "scripts": {
     "test-coverage": [
-      "phpunit --testsuite unit --coverage-clover=coverage-unit.xml",
-      "phpunit --testsuite integration --coverage-clover=coverage-integration.xml"
+      "XDEBUG_MODE=coverage phpunit --testsuite unit --coverage-clover=coverage-unit.xml",
+      "XDEBUG_MODE=coverage phpunit --testsuite integration --coverage-clover=coverage-integration.xml"
     ],
     "test-unit": [
-      "phpunit --testsuite unit"
+      "XDEBUG_MODE=off phpunit --testsuite unit"
     ],
     "test-integration": [
-      "phpunit --testsuite integration"
+      "XDEBUG_MODE=off phpunit --testsuite integration"
     ],
     "test-integration-local": [
       "docker compose -f tests/resources/openldap/docker-compose.yml down --rmi local",
       "docker compose -f tests/resources/openldap/docker-compose.yml up -d --build --wait",
       "@test-integration"
     ],
-    "test-load": "php tests/bin/ldap-load-test.php --backend=sqlite --runner=swoole --duration=10 --warmup=2 --clients=8 --output=text",
+    "test-load": "XDEBUG_MODE=off php tests/bin/ldap-load-test.php --backend=sqlite --runner=swoole --duration=10 --warmup=2 --clients=8 --output=text",
     "analyse": [
       "phpstan --memory-limit=-1 analyse"
     ],

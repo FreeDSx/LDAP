@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
@@ -31,6 +32,7 @@ use JsonException;
 use PDO;
 use PDOStatement;
 use Throwable;
+use WeakMap;
 
 /**
  * PDO-backed storage; pass a PdoDialectInterface + PdoConnectionProviderInterface, or use SqliteStorage / MysqlStorage factories.
@@ -41,16 +43,25 @@ use Throwable;
  */
 final class PdoStorage implements EntryStorageInterface, ResettableInterface
 {
+    private const STATEMENT_CACHE_MAX = 64;
+
+    /**
+     * @var WeakMap<PDO, array<string, list<PDOStatement>>>
+     */
+    private WeakMap $statementCache;
+
     public function __construct(
         private readonly PdoConnectionProviderInterface $provider,
         private readonly FilterTranslatorInterface $translator,
         private readonly PdoDialectInterface $dialect,
     ) {
+        $this->statementCache = new WeakMap();
     }
 
     public function reset(): void
     {
         $this->provider->reset();
+        $this->statementCache = new WeakMap();
     }
 
     public static function initialize(
@@ -133,7 +144,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
      * @return Generator<Entry>
      */
     private function generateRows(
-        PDOStatement $stmt,
+        PooledStatement $stmt,
         ?float $deadline,
     ): Generator {
         while (($row = $stmt->fetch()) !== false) {
@@ -337,7 +348,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
         bool $subtree,
         ?SqlFilterResult $filterResult,
         ?int $sizeLimit,
-    ): PDOStatement {
+    ): PooledStatement {
         if (!$subtree) {
             return $this->buildChildQuery(
                 $base,
@@ -364,7 +375,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
         string $base,
         ?SqlFilterResult $filterResult,
         ?int $sizeLimit,
-    ): PDOStatement {
+    ): PooledStatement {
         $sql = $this->dialect->queryFetchChildren();
         $params = [$base];
 
@@ -385,7 +396,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
     private function buildRootQuery(
         ?SqlFilterResult $filterResult,
         ?int $sizeLimit,
-    ): PDOStatement {
+    ): PooledStatement {
         $sql = $this->dialect->queryFetchAll();
         $params = [];
 
@@ -404,7 +415,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
         string $base,
         ?SqlFilterResult $filterResult,
         ?int $sizeLimit,
-    ): PDOStatement {
+    ): PooledStatement {
         if ($filterResult !== null) {
             return $this->buildFilteredSubtreeQuery(
                 $base,
@@ -426,7 +437,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
         string $base,
         SqlFilterResult $filterResult,
         ?int $sizeLimit,
-    ): PDOStatement {
+    ): PooledStatement {
         $fetchAll = $this->dialect->queryFetchAll();
         $filterSql = $filterResult->sql;
         $sql = <<<SQL
@@ -522,11 +533,59 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
     private function prepareAndExecute(
         string $query,
         array $params = [],
-    ): PDOStatement {
-        $stmt = $this->provider->get()->prepare($query);
+    ): PooledStatement {
+        $pdo = $this->provider->get();
+        $pools = $this->statementCache[$pdo] ?? [];
+
+        if (isset($pools[$query]) && $pools[$query] !== []) {
+            $pool = $pools[$query];
+            $stmt = array_pop($pool);
+            $pools[$query] = $pool;
+        } else {
+            if (!isset($pools[$query]) && count($pools) >= self::STATEMENT_CACHE_MAX) {
+                array_shift($pools);
+            }
+
+            $stmt = $pdo->prepare($query);
+            if ($stmt === false) {
+                throw new StorageIoException('Failed to prepare SQL statement.');
+            }
+
+            if (!isset($pools[$query])) {
+                $pools[$query] = [];
+            }
+        }
+
+        $this->statementCache[$pdo] = $pools;
+
         $stmt->execute($params);
 
-        return $stmt;
+        return new PooledStatement(
+            $stmt,
+            function (PDOStatement $released) use ($pdo, $query): void {
+                $this->returnToPool($pdo, $query, $released);
+            },
+        );
+    }
+
+    private function returnToPool(
+        PDO $pdo,
+        string $query,
+        PDOStatement $stmt,
+    ): void {
+        try {
+            $stmt->closeCursor();
+        } catch (Throwable) {
+            return;
+        }
+
+        $pools = $this->statementCache[$pdo] ?? [];
+        if (!isset($pools[$query])) {
+            return;
+        }
+
+        $pools[$query][] = $stmt;
+        $this->statementCache[$pdo] = $pools;
     }
 
     private function savepointName(int $depth): string
