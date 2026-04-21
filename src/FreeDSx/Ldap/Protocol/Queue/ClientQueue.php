@@ -26,7 +26,6 @@ use FreeDSx\Ldap\Protocol\LdapQueue;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Queue\Message;
 use FreeDSx\Socket\SocketPool;
-use Generator;
 
 /**
  * The LDAP Queue class for sending and receiving messages for clients.
@@ -68,17 +67,6 @@ class ClientQueue extends LdapQueue
         }
 
         return $message;
-    }
-
-    /**
-     * @return Generator<LdapMessageResponse>
-     * @throws ConnectionException
-     */
-    public function getMessages(?int $id = null): Generator
-    {
-        $this->initSocket();
-
-        return parent::getMessages($id);
     }
 
     /**
