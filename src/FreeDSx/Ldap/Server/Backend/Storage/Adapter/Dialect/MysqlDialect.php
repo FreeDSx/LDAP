@@ -24,8 +24,6 @@ final class MysqlDialect implements PdoDialectInterface
 
     /**
      * DN columns are 768 chars — the maximum that still fits an InnoDB index.
-     *
-     * @TODO How to handle indexing on attributes?
      */
     public function ddlCreateTable(): string
     {
@@ -42,7 +40,7 @@ final class MysqlDialect implements PdoDialectInterface
     }
 
     /**
-     * Null: the index is defined inline in ddlCreateTable().
+     * @inheritDoc Inline with ddlCreateTable().
      */
     public function ddlCreateIndex(): ?string
     {
@@ -50,7 +48,34 @@ final class MysqlDialect implements PdoDialectInterface
     }
 
     /**
-     * @todo Replace VALUES() (deprecated in MySQL 8.0.20, removed in 9.0) with row alias syntax once MariaDB supports it.
+     * entry_lc_dn collation matches entries.lc_dn (FK requirement); value_lower uses utf8mb4_bin so pre-lowered values compare byte-wise.
+     */
+    public function ddlCreateSidecarTable(): string
+    {
+        return <<<SQL
+            CREATE TABLE IF NOT EXISTS entry_attribute_values (
+                entry_lc_dn      VARCHAR(768) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+                attr_name_lower  VARCHAR(255) NOT NULL,
+                value_lower      VARCHAR(255) NOT NULL,
+                value_original   TEXT NOT NULL,
+                INDEX idx_eav_attr_value (attr_name_lower, value_lower),
+                INDEX idx_eav_entry (entry_lc_dn),
+                CONSTRAINT fk_eav_entry FOREIGN KEY (entry_lc_dn)
+                    REFERENCES entries(lc_dn) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+        SQL;
+    }
+
+    /**
+     * @inheritDoc Inline with ddlCreateSidecarTable().
+     */
+    public function ddlCreateSidecarIndexes(): array
+    {
+        return [];
+    }
+
+    /**
+     * @todo Replace VALUES() with row alias syntax once MariaDB supports it.
      */
     public function queryUpsert(): string
     {

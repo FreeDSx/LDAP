@@ -338,4 +338,107 @@ class LdapBackendStorageTest extends ServerTestCase
         // After abandonment, hasEntries() must return false
         self::assertFalse($paging->hasEntries());
     }
+
+    public function testSubstringStartsWithMatches(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::startsWith('cn', 'al'))
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope()
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            $entries->first()?->getDn()->toString(),
+        );
+    }
+
+    public function testSubstringContainsMatches(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::contains('cn', 'lic'))
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope()
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            $entries->first()?->getDn()->toString(),
+        );
+    }
+
+    public function testSubstringEndsWithMatches(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::endsWith('cn', 'ice'))
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope()
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            $entries->first()?->getDn()->toString(),
+        );
+    }
+
+    public function testGteAsciiExcludesLowerValue(): void
+    {
+        $this->authenticateUser();
+
+        // Scope to ou=people so cn=user (which would match cn >= 'alicf') is excluded.
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::gte('cn', 'alicf'))
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope()
+        );
+
+        // 'alice' < 'alicf' lexicographically
+        self::assertCount(0, $entries);
+    }
+
+    public function testLteAsciiIncludesMatchingValue(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::and(
+                Filters::present('cn'),
+                Filters::lte('cn', 'alice'),
+            ))
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope()
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            $entries->first()?->getDn()->toString(),
+        );
+    }
+
+    public function testNotEqualityExcludesMatches(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::and(
+                Filters::present('cn'),
+                Filters::not(Filters::equal('cn', 'alice')),
+            ))
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope()
+        );
+
+        // Under ou=people only alice exists in the seed; NOT-equal alice leaves zero matches.
+        self::assertCount(0, $entries);
+    }
 }

@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 
 /**
- * MySQL/MariaDB SQL WHERE translator for LDAP filters; requires MySQL 8.0+ or MariaDB 10.6+.
+ * MySQL/MariaDB SQL WHERE translator for LDAP filters; targets the `entry_attribute_values` sidecar index.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -22,32 +22,26 @@ final class MysqlFilterTranslator implements FilterTranslatorInterface
 {
     use SqlFilterTranslatorTrait;
 
-    protected function buildPresenceCheck(string $attribute): string
+    private function buildPresenceCheck(string $attribute): string
     {
-        return "JSON_CONTAINS_PATH(attributes, 'one', '$.\"{$attribute}\"')";
+        return <<<SQL
+            lc_dn IN (SELECT s.entry_lc_dn FROM entry_attribute_values s
+                WHERE s.attr_name_lower = '$attribute')
+            SQL;
     }
 
-    protected function buildValueExists(
+    private function buildValueExists(
         string $attribute,
         string $innerCondition,
     ): string {
-        // NO_SEMIJOIN is required: MySQL 8.0 silently rewrites the correlated JSON_TABLE
-        // subquery into an unconditional hash join that loses the outer `attributes` reference,
-        // producing zero rows for every filter.
         return <<<SQL
-            EXISTS (
-                SELECT /*+ NO_SEMIJOIN() */ 1
-                FROM JSON_TABLE(
-                    attributes,
-                    '$."{$attribute}".values[*]' COLUMNS (val TEXT PATH '$')
-                ) AS _jt
-                WHERE $innerCondition
-            )
-        SQL;
+            lc_dn IN (SELECT s.entry_lc_dn FROM entry_attribute_values s
+                WHERE s.attr_name_lower = '$attribute' AND $innerCondition)
+            SQL;
     }
 
-    protected function valueAlias(): string
+    private function valueAlias(): string
     {
-        return 'val';
+        return 's.value_lower';
     }
 }

@@ -62,6 +62,27 @@ final class SqliteDialect implements PdoDialectInterface
         SQL;
     }
 
+    public function ddlCreateSidecarTable(): string
+    {
+        return <<<SQL
+            CREATE TABLE IF NOT EXISTS entry_attribute_values (
+                entry_lc_dn      TEXT NOT NULL,
+                attr_name_lower  TEXT NOT NULL,
+                value_lower      TEXT NOT NULL,
+                value_original   TEXT NOT NULL,
+                FOREIGN KEY (entry_lc_dn) REFERENCES entries(lc_dn) ON DELETE CASCADE
+            )
+        SQL;
+    }
+
+    public function ddlCreateSidecarIndexes(): array
+    {
+        return [
+            'CREATE INDEX IF NOT EXISTS idx_eav_attr_value ON entry_attribute_values (attr_name_lower, value_lower)',
+            'CREATE INDEX IF NOT EXISTS idx_eav_entry ON entry_attribute_values (entry_lc_dn)',
+        ];
+    }
+
     public function queryUpsert(): string
     {
         return <<<SQL

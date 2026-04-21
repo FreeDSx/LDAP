@@ -584,6 +584,10 @@ final class SqliteStorageTest extends TestCase
             ->willReturn($sqlite->ddlCreateTable());
         $dialect->method('ddlCreateIndex')
             ->willReturn($sqlite->ddlCreateIndex());
+        $dialect->method('ddlCreateSidecarTable')
+            ->willReturn($sqlite->ddlCreateSidecarTable());
+        $dialect->method('ddlCreateSidecarIndexes')
+            ->willReturn($sqlite->ddlCreateSidecarIndexes());
         $dialect->method('queryUpsert')
             ->willReturn($sqlite->queryUpsert());
         $dialect->method('queryExists')

@@ -21,7 +21,12 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 final class SqlFilterUtility
 {
     /**
-     * Escapes LIKE special characters using `!` as the escape character.
+     * Char limit for sidecar `value_lower`; queries longer than this can't match exactly.
+     */
+    public const MAX_INDEXED_VALUE_CHARS = 255;
+
+    /**
+     * Escape LIKE specials using `!` as the escape char.
      */
     public static function escape(string $value): string
     {
@@ -33,7 +38,7 @@ final class SqlFilterUtility
     }
 
     /**
-     * True when $value is 7-bit ASCII; the translator falls back to PHP eval otherwise because SQL `lower()` is ASCII-only on SQLite and collation-dependent on MySQL.
+     * True when $value is 7-bit ASCII.
      */
     public static function isAscii(string $value): bool
     {

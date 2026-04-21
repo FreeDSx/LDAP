@@ -36,6 +36,8 @@ final class SqliteStorage implements PdoStorageFactoryInterface
 
     private const PRAGMA_BUSY_TIMEOUT_MS = 'PRAGMA busy_timeout = 5000';
 
+    private const PRAGMA_FOREIGN_KEYS_ON = 'PRAGMA foreign_keys = ON';
+
     public function __construct(private readonly string $dbPath)
     {
     }
@@ -71,6 +73,7 @@ final class SqliteStorage implements PdoStorageFactoryInterface
         $pdo->exec(self::PRAGMA_BUSY_TIMEOUT_MS);
         $pdo->exec(self::PRAGMA_SYNCHRONOUS_NORMAL);
         $pdo->exec(self::PRAGMA_JOURNAL_MODE_WAL);
+        $pdo->exec(self::PRAGMA_FOREIGN_KEYS_ON);
 
         PdoStorage::initialize($pdo, $dialect);
 
