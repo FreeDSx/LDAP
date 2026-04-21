@@ -31,7 +31,19 @@ class LdapBackendStorageTest extends ServerTestCase
             return;
         }
 
-        static::initSharedServer('ldap-backend-storage', 'tcp');
+        static::initSharedServer(
+            'ldap-backend-storage',
+            'tcp',
+            static::storageHandlerArg(),
+        );
+    }
+
+    /**
+     * Hook for subclasses to route the shared server through a different backend.
+     */
+    protected static function storageHandlerArg(): ?string
+    {
+        return null;
     }
 
     public static function tearDownAfterClass(): void
