@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 
 /**
- * Translates LDAP filters into SQLite-compatible SQL WHERE clause fragments.
+ * SQLite SQL WHERE translator for LDAP filters; targets the `entry_attribute_values` sidecar index.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -22,20 +22,26 @@ final class SqliteFilterTranslator implements FilterTranslatorInterface
 {
     use SqlFilterTranslatorTrait;
 
-    protected function buildPresenceCheck(string $attribute): string
+    private function buildPresenceCheck(string $attribute): string
     {
-        return "json_type(attributes, '$.\"{$attribute}\"') IS NOT NULL";
+        return <<<SQL
+            lc_dn IN (SELECT s.entry_lc_dn FROM entry_attribute_values s
+                WHERE s.attr_name_lower = '$attribute')
+            SQL;
     }
 
-    protected function buildValueExists(
+    private function buildValueExists(
         string $attribute,
         string $innerCondition,
     ): string {
-        return "EXISTS (SELECT 1 FROM json_each(attributes, '$.\"{$attribute}\".values') WHERE {$innerCondition})";
+        return <<<SQL
+            lc_dn IN (SELECT s.entry_lc_dn FROM entry_attribute_values s
+                WHERE s.attr_name_lower = '$attribute' AND $innerCondition)
+            SQL;
     }
 
-    protected function valueAlias(): string
+    private function valueAlias(): string
     {
-        return 'value';
+        return 's.value_lower';
     }
 }

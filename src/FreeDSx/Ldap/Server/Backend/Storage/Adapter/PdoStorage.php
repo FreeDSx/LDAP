@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
@@ -70,6 +71,12 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
         $indexDdl = $dialect->ddlCreateIndex();
         if ($indexDdl !== null) {
             $pdo->exec($indexDdl);
+        }
+
+        $pdo->exec($dialect->ddlCreateSidecarTable());
+
+        foreach ($dialect->ddlCreateSidecarIndexes() as $indexSql) {
+            $pdo->exec($indexSql);
         }
     }
 
@@ -148,12 +155,93 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
 
         $this->assertDnFits($dnString);
 
-        $this->prepareAndExecute($this->dialect->queryUpsert(), [
-            $normDn->toString(),
-            $dnString,
-            $normDn->getParent()?->toString() ?? '',
-            $this->encodeAttributes($entry),
-        ]);
+        $lcDn = $normDn->toString();
+
+        $this->atomic(function () use ($entry, $lcDn, $dnString, $normDn): void {
+            $this->prepareAndExecute($this->dialect->queryUpsert(), [
+                $lcDn,
+                $dnString,
+                $normDn->getParent()?->toString() ?? '',
+                $this->encodeAttributes($entry),
+            ]);
+
+            $this->prepareAndExecute(
+                $this->dialect->querySidecarDelete(),
+                [$lcDn],
+            );
+
+            $this->insertSidecarRows(
+                $lcDn,
+                $entry,
+            );
+        });
+    }
+
+    private function insertSidecarRows(
+        string $lcDn,
+        Entry $entry,
+    ): void {
+        $rows = $this->buildSidecarRows($lcDn, $entry);
+        if ($rows === []) {
+            return;
+        }
+
+        $tuple = '(?, ?, ?, ?)';
+        $placeholders = implode(
+            ', ',
+            array_fill(0, count($rows), $tuple),
+        );
+        $params = [];
+        foreach ($rows as $row) {
+            $params[] = $row[0];
+            $params[] = $row[1];
+            $params[] = $row[2];
+            $params[] = $row[3];
+        }
+
+        $this->prepareAndExecute(
+            $this->dialect->querySidecarInsertPrefix() . $placeholders,
+            $params,
+        );
+    }
+
+    /**
+     * @return list<array{string, string, string, string}> (entry_lc_dn, attr_name_lower, value_lower, value_original)
+     */
+    private function buildSidecarRows(
+        string $lcDn,
+        Entry $entry,
+    ): array {
+        $rows = [];
+
+        foreach ($entry->getAttributes() as $attribute) {
+            $attrNameLower = strtolower($attribute->getName());
+
+            foreach ($attribute->getValues() as $value) {
+                $rows[] = [
+                    $lcDn,
+                    $attrNameLower,
+                    $this->buildSidecarValueLower($value),
+                    $value,
+                ];
+            }
+        }
+
+        return $rows;
+    }
+
+    private function buildSidecarValueLower(string $value): string
+    {
+        if (!mb_check_encoding($value, 'UTF-8')) {
+            return '';
+        }
+
+        return mb_substr(
+            mb_strtolower($value, 'UTF-8'),
+            0,
+            SqlFilterUtility::MAX_INDEXED_VALUE_CHARS,
+            'UTF-8',
+        );
     }
 
     /**
@@ -317,13 +405,38 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
         ?SqlFilterResult $filterResult,
         ?int $sizeLimit,
     ): PDOStatement {
-        $params = [$base];
-        $sql = $this->dialect->querySubtree();
-
         if ($filterResult !== null) {
-            $sql .= ' WHERE (' . $filterResult->sql . ')';
-            $params = array_merge($params, $filterResult->params);
+            return $this->buildFilteredSubtreeQuery(
+                $base,
+                $filterResult,
+                $sizeLimit,
+            );
         }
+
+        return $this->prepareAndExecute(
+            $this->dialect->querySubtree() . $this->buildLimitClause($sizeLimit),
+            [$base],
+        );
+    }
+
+    /**
+     * Filter drives via the sidecar index; scope suffix is LIKE-checked per candidate.
+     */
+    private function buildFilteredSubtreeQuery(
+        string $base,
+        SqlFilterResult $filterResult,
+        ?int $sizeLimit,
+    ): PDOStatement {
+        $fetchAll = $this->dialect->queryFetchAll();
+        $filterSql = $filterResult->sql;
+        $sql = <<<SQL
+            $fetchAll WHERE ($filterSql)
+            AND (lc_dn = ? OR lc_dn LIKE ? ESCAPE '!')
+            SQL;
+
+        $params = $filterResult->params;
+        $params[] = $base;
+        $params[] = '%,' . SqlFilterUtility::escape($base);
 
         return $this->prepareAndExecute(
             $sql . $this->buildLimitClause($sizeLimit),
@@ -345,10 +458,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
         $attributes = [];
 
         foreach ($entry->getAttributes() as $attribute) {
-            $attributes[strtolower($attribute->getName())] = [
-                'name' => $attribute->getName(),
-                'values' => array_values($attribute->getValues()),
-            ];
+            $attributes[$attribute->getName()] = array_values($attribute->getValues());
         }
 
         return json_encode(
@@ -386,23 +496,16 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
 
         $attributes = [];
 
-        foreach ($raw as $lcName => $slot) {
-            if (!is_string($lcName) || !is_array($slot)) {
+        foreach ($raw as $name => $values) {
+            if (!is_string($name) || !is_array($values)) {
                 continue;
             }
-
-            $displayName = isset($slot['name']) && is_string($slot['name'])
-                ? $slot['name']
-                : $lcName;
-            $values = isset($slot['values']) && is_array($slot['values'])
-                ? $slot['values']
-                : [];
 
             $stringValues = array_values(
                 array_filter($values, fn($v) => is_string($v)),
             );
             $attributes[] = new Attribute(
-                $displayName,
+                $name,
                 ...$stringValues
             );
         }

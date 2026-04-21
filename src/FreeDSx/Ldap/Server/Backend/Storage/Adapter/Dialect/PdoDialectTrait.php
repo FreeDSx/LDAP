@@ -106,4 +106,17 @@ trait PdoDialectTrait
             WHERE lc_dn = ?
         SQL;
     }
+
+    public function querySidecarDelete(): string
+    {
+        return <<<SQL
+            DELETE FROM entry_attribute_values
+            WHERE entry_lc_dn = ?
+        SQL;
+    }
+
+    public function querySidecarInsertPrefix(): string
+    {
+        return 'INSERT INTO entry_attribute_values (entry_lc_dn, attr_name_lower, value_lower, value_original) VALUES ';
+    }
 }

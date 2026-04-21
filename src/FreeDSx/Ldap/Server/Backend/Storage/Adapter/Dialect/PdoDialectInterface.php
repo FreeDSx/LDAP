@@ -53,6 +53,22 @@ interface PdoDialectInterface
     public function ddlCreateIndex(): ?string;
 
     /**
+     * DDL for the `entry_attribute_values` sidecar index table. Required columns:
+     *   entry_lc_dn      — FK to entries.lc_dn ON DELETE CASCADE
+     *   attr_name_lower  — lowercased attribute description (stripped of options)
+     *   value_lower      — lowercased value, truncated to 255 chars (indexed)
+     *   value_original   — original-case full value (not indexed; retained for debugging)
+     */
+    public function ddlCreateSidecarTable(): string;
+
+    /**
+     * DDL statements creating sidecar indexes; empty when indexes are defined inline in ddlCreateSidecarTable().
+     *
+     * @return list<string>
+     */
+    public function ddlCreateSidecarIndexes(): array;
+
+    /**
      * Existence check: `SELECT 1 FROM entries WHERE lc_dn = ? LIMIT 1`. Parameters: [lc_dn]
      */
     public function queryExists(): string;
@@ -91,6 +107,16 @@ interface PdoDialectInterface
      * `DELETE FROM entries WHERE lc_dn = ?`. Parameters: [lc_dn]
      */
     public function queryDelete(): string;
+
+    /**
+     * `DELETE FROM entry_attribute_values WHERE entry_lc_dn = ?`. Parameters: [entry_lc_dn]
+     */
+    public function querySidecarDelete(): string;
+
+    /**
+     * INSERT prefix for the sidecar; caller appends `(?, ?, ?, ?)` tuples for (entry_lc_dn, attr_name_lower, value_lower, value_original).
+     */
+    public function querySidecarInsertPrefix(): string;
 
     /**
      * Maximum DN byte-length allowed by the storage backend, or null if there is no practical limit.

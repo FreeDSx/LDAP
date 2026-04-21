@@ -36,13 +36,17 @@ final class SqliteFilterTranslatorTest extends TestCase
         $this->subject = new SqliteFilterTranslator();
     }
 
-    public function test_present_filter_returns_json_type_check(): void
+    public function test_present_emits_sidecar_presence_exists(): void
     {
         $result = $this->subject->translate(new PresentFilter('cn'));
 
         self::assertNotNull($result);
-        self::assertSame(
-            "json_type(attributes, '$.\"cn\"') IS NOT NULL",
+        self::assertStringContainsString(
+            'FROM entry_attribute_values s',
+            $result->sql,
+        );
+        self::assertStringContainsString(
+            "s.attr_name_lower = 'cn'",
             $result->sql,
         );
         self::assertSame(
@@ -51,18 +55,18 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
     }
 
-    public function test_present_filter_lowercases_attribute_name(): void
+    public function test_present_lowercases_attribute_name(): void
     {
         $result = $this->subject->translate(new PresentFilter('objectClass'));
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            '$."objectclass"',
+            "s.attr_name_lower = 'objectclass'",
             $result->sql,
         );
     }
 
-    public function test_equality_filter_returns_exists_lower_equals(): void
+    public function test_equality_emits_sidecar_value_equality(): void
     {
         $result = $this->subject->translate(new EqualityFilter(
             'cn',
@@ -70,17 +74,17 @@ final class SqliteFilterTranslatorTest extends TestCase
         ));
 
         self::assertNotNull($result);
-        self::assertSame(
-            "EXISTS (SELECT 1 FROM json_each(attributes, '$.\"cn\".values') WHERE lower(value) = lower(?))",
+        self::assertStringContainsString(
+            's.value_lower = ?',
             $result->sql,
         );
         self::assertSame(
-            ['Alice'],
+            ['alice'],
             $result->params,
         );
     }
 
-    public function test_approximate_filter_translates_same_as_equality(): void
+    public function test_approximate_translates_same_as_equality(): void
     {
         $result = $this->subject->translate(new ApproximateFilter(
             'cn',
@@ -88,17 +92,17 @@ final class SqliteFilterTranslatorTest extends TestCase
         ));
 
         self::assertNotNull($result);
-        self::assertSame(
-            "EXISTS (SELECT 1 FROM json_each(attributes, '$.\"cn\".values') WHERE lower(value) = lower(?))",
+        self::assertStringContainsString(
+            's.value_lower = ?',
             $result->sql,
         );
         self::assertSame(
-            ['Alice'],
+            ['alice'],
             $result->params,
         );
     }
 
-    public function test_approximate_filter_with_ascii_value_is_exact(): void
+    public function test_approximate_with_ascii_value_is_exact(): void
     {
         $result = $this->subject->translate(new ApproximateFilter(
             'cn',
@@ -109,7 +113,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertTrue($result->isExact);
     }
 
-    public function test_approximate_filter_with_non_ascii_value_is_inexact(): void
+    public function test_approximate_with_non_ascii_value_is_inexact(): void
     {
         $result = $this->subject->translate(new ApproximateFilter(
             'cn',
@@ -120,7 +124,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
-    public function test_equality_filter_with_ascii_value_is_exact(): void
+    public function test_equality_with_ascii_value_is_exact(): void
     {
         $result = $this->subject->translate(new EqualityFilter(
             'cn',
@@ -131,7 +135,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertTrue($result->isExact);
     }
 
-    public function test_equality_filter_with_non_ascii_value_is_inexact(): void
+    public function test_equality_with_non_ascii_value_is_inexact(): void
     {
         $result = $this->subject->translate(new EqualityFilter(
             'cn',
@@ -142,18 +146,32 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
-    public function test_substring_with_non_ascii_fragment_is_inexact(): void
+    public function test_equality_with_long_value_is_inexact(): void
     {
-        $result = $this->subject->translate(new SubstringFilter(
+        $result = $this->subject->translate(new EqualityFilter(
             'cn',
-            'Café',
+            str_repeat('a', 256),
         ));
 
         self::assertNotNull($result);
         self::assertFalse($result->isExact);
     }
 
-    public function test_gte_filter_returns_exists_lower_gte(): void
+    public function test_equality_value_is_lowercased_and_truncated(): void
+    {
+        $result = $this->subject->translate(new EqualityFilter(
+            'cn',
+            str_repeat('A', 300),
+        ));
+
+        self::assertNotNull($result);
+        self::assertSame(
+            [str_repeat('a', 255)],
+            $result->params,
+        );
+    }
+
+    public function test_gte_emits_sidecar_value_gte(): void
     {
         $result = $this->subject->translate(new GreaterThanOrEqualFilter(
             'age',
@@ -161,8 +179,8 @@ final class SqliteFilterTranslatorTest extends TestCase
         ));
 
         self::assertNotNull($result);
-        self::assertSame(
-            "EXISTS (SELECT 1 FROM json_each(attributes, '$.\"age\".values') WHERE lower(value) >= lower(?))",
+        self::assertStringContainsString(
+            's.value_lower >= ?',
             $result->sql,
         );
         self::assertSame(
@@ -171,7 +189,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
     }
 
-    public function test_gte_filter_with_digit_value_is_inexact(): void
+    public function test_gte_with_digit_value_is_inexact(): void
     {
         // Critical: PHP compareOrdered does integer compare when both sides
         // are ctype_digit, so SQL byte compare would diverge. Must stay inexact.
@@ -184,7 +202,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
-    public function test_gte_filter_with_ascii_non_digit_value_is_exact(): void
+    public function test_gte_with_ascii_non_digit_value_is_exact(): void
     {
         $result = $this->subject->translate(new GreaterThanOrEqualFilter(
             'sn',
@@ -195,7 +213,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertTrue($result->isExact);
     }
 
-    public function test_gte_filter_with_non_ascii_value_is_inexact(): void
+    public function test_gte_with_non_ascii_value_is_inexact(): void
     {
         $result = $this->subject->translate(new GreaterThanOrEqualFilter(
             'sn',
@@ -206,7 +224,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
-    public function test_lte_filter_returns_exists_lower_lte(): void
+    public function test_lte_emits_sidecar_value_lte(): void
     {
         $result = $this->subject->translate(new LessThanOrEqualFilter(
             'age',
@@ -214,8 +232,8 @@ final class SqliteFilterTranslatorTest extends TestCase
         ));
 
         self::assertNotNull($result);
-        self::assertSame(
-            "EXISTS (SELECT 1 FROM json_each(attributes, '$.\"age\".values') WHERE lower(value) <= lower(?))",
+        self::assertStringContainsString(
+            's.value_lower <= ?',
             $result->sql,
         );
         self::assertSame(
@@ -224,18 +242,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
     }
 
-    public function test_lte_filter_with_digit_value_is_inexact(): void
-    {
-        $result = $this->subject->translate(new LessThanOrEqualFilter(
-            'uidNumber',
-            '100',
-        ));
-
-        self::assertNotNull($result);
-        self::assertFalse($result->isExact);
-    }
-
-    public function test_lte_filter_with_ascii_non_digit_value_is_exact(): void
+    public function test_lte_is_always_inexact(): void
     {
         $result = $this->subject->translate(new LessThanOrEqualFilter(
             'sn',
@@ -243,21 +250,10 @@ final class SqliteFilterTranslatorTest extends TestCase
         ));
 
         self::assertNotNull($result);
-        self::assertTrue($result->isExact);
-    }
-
-    public function test_lte_filter_with_non_ascii_value_is_inexact(): void
-    {
-        $result = $this->subject->translate(new LessThanOrEqualFilter(
-            'sn',
-            'Smíth',
-        ));
-
-        self::assertNotNull($result);
         self::assertFalse($result->isExact);
     }
 
-    public function test_attribute_with_option_strips_option_from_json_path(): void
+    public function test_attribute_with_option_strips_option(): void
     {
         $result = $this->subject->translate(new EqualityFilter(
             'userCertificate;binary',
@@ -266,7 +262,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            '$."usercertificate"',
+            "s.attr_name_lower = 'usercertificate'",
             $result->sql,
         );
         self::assertStringNotContainsString(
@@ -281,7 +277,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            '$."cn"',
+            "s.attr_name_lower = 'cn'",
             $result->sql,
         );
         self::assertStringNotContainsString(
@@ -290,18 +286,18 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
     }
 
-    public function test_numericoid_attribute_translates_with_quoted_path(): void
+    public function test_numericoid_attribute_translates(): void
     {
         $result = $this->subject->translate(new PresentFilter('2.5.4.3'));
 
         self::assertNotNull($result);
-        self::assertSame(
-            "json_type(attributes, '$.\"2.5.4.3\"') IS NOT NULL",
+        self::assertStringContainsString(
+            "s.attr_name_lower = '2.5.4.3'",
             $result->sql,
         );
     }
 
-    public function test_numericoid_equality_attribute_translates_with_quoted_path(): void
+    public function test_numericoid_equality_translates(): void
     {
         $result = $this->subject->translate(new EqualityFilter(
             '2.5.4.3',
@@ -310,11 +306,11 @@ final class SqliteFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            '$."2.5.4.3"',
+            "s.attr_name_lower = '2.5.4.3'",
             $result->sql,
         );
         self::assertSame(
-            ['Alice'],
+            ['alice'],
             $result->params,
         );
     }
@@ -361,7 +357,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertNull($result);
     }
 
-    public function test_substring_with_starts_with_only(): void
+    public function test_substring_starts_with_only_emits_prefix_like(): void
     {
         $result = $this->subject->translate(new SubstringFilter(
             'cn',
@@ -370,31 +366,37 @@ final class SqliteFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            'json_each',
+            "s.value_lower LIKE ? ESCAPE '!'",
             $result->sql,
         );
         self::assertSame(
-            ['Al%'],
+            ['al%'],
             $result->params,
         );
+        self::assertTrue($result->isExact);
     }
 
-    public function test_substring_with_ends_with_only(): void
+    public function test_substring_ends_with_only_falls_back_to_presence_inexact(): void
     {
         $result = $this->subject->translate(new SubstringFilter(
             'cn',
             null,
-            'ice',
+            'ce',
         ));
 
         self::assertNotNull($result);
+        self::assertStringNotContainsString(
+            'LIKE',
+            $result->sql,
+        );
+        self::assertFalse($result->isExact);
         self::assertSame(
-            ['%ice'],
+            [],
             $result->params,
         );
     }
 
-    public function test_substring_with_contains_only(): void
+    public function test_substring_single_contains_falls_back_to_presence_inexact(): void
     {
         $result = $this->subject->translate(new SubstringFilter(
             'cn',
@@ -404,13 +406,14 @@ final class SqliteFilterTranslatorTest extends TestCase
         ));
 
         self::assertNotNull($result);
-        self::assertSame(
-            ['%lic%'],
-            $result->params,
+        self::assertStringNotContainsString(
+            'LIKE',
+            $result->sql,
         );
+        self::assertFalse($result->isExact);
     }
 
-    public function test_substring_with_all_components(): void
+    public function test_substring_with_all_fragments_uses_prefix_only(): void
     {
         $result = $this->subject->translate(new SubstringFilter(
             'cn',
@@ -420,14 +423,15 @@ final class SqliteFilterTranslatorTest extends TestCase
         ));
 
         self::assertNotNull($result);
-        self::assertSame(
-            ['A%', '%lic%', '%e'],
-            $result->params,
-        );
         self::assertStringContainsString(
-            'AND',
+            "s.value_lower LIKE ? ESCAPE '!'",
             $result->sql,
         );
+        self::assertSame(
+            ['a%'],
+            $result->params,
+        );
+        self::assertFalse($result->isExact);
     }
 
     public function test_substring_escapes_special_like_characters(): void
@@ -444,85 +448,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
     }
 
-    public function test_substring_with_contains_and_anchors_is_not_exact(): void
-    {
-        $result = $this->subject->translate(new SubstringFilter(
-            'cn',
-            'A',
-            'e',
-            'lic',
-        ));
-
-        self::assertNotNull($result);
-        self::assertFalse($result->isExact);
-    }
-
-    public function test_substring_with_contains_and_starts_with_is_not_exact(): void
-    {
-        $result = $this->subject->translate(new SubstringFilter(
-            'cn',
-            'Alice',
-            null,
-            'lic',
-        ));
-
-        self::assertNotNull($result);
-        self::assertFalse($result->isExact);
-    }
-
-    public function test_substring_with_contains_and_ends_with_is_not_exact(): void
-    {
-        $result = $this->subject->translate(new SubstringFilter(
-            'cn',
-            null,
-            'ice',
-            'lic',
-        ));
-
-        self::assertNotNull($result);
-        self::assertFalse($result->isExact);
-    }
-
-    public function test_substring_with_single_contains_only_is_exact(): void
-    {
-        $result = $this->subject->translate(new SubstringFilter(
-            'cn',
-            null,
-            null,
-            'lic',
-        ));
-
-        self::assertNotNull($result);
-        self::assertTrue($result->isExact);
-    }
-
-    public function test_substring_with_starts_and_ends_without_contains_is_exact(): void
-    {
-        $result = $this->subject->translate(new SubstringFilter(
-            'cn',
-            'A',
-            'e',
-        ));
-
-        self::assertNotNull($result);
-        self::assertTrue($result->isExact);
-    }
-
-    public function test_substring_with_multiple_contains_is_not_exact(): void
-    {
-        $result = $this->subject->translate(new SubstringFilter(
-            'cn',
-            'a',
-            'd',
-            'b',
-            'c',
-        ));
-
-        self::assertNotNull($result);
-        self::assertFalse($result->isExact);
-    }
-
-    public function test_and_filter_all_translatable_returns_combined(): void
+    public function test_and_of_translatable_is_exact(): void
     {
         $result = $this->subject->translate(new AndFilter(
             new PresentFilter('cn'),
@@ -544,7 +470,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertTrue($result->isExact);
     }
 
-    public function test_and_filter_partial_translatable_returns_translatable_children_only(): void
+    public function test_and_partial_translatable_is_inexact(): void
     {
         $result = $this->subject->translate(new AndFilter(
             new PresentFilter('cn'),
@@ -556,18 +482,14 @@ final class SqliteFilterTranslatorTest extends TestCase
         ));
 
         self::assertNotNull($result);
-        self::assertStringContainsString(
-            'json_type',
-            $result->sql,
-        );
+        self::assertFalse($result->isExact);
         self::assertSame(
             [],
             $result->params,
         );
-        self::assertFalse($result->isExact);
     }
 
-    public function test_and_filter_with_no_translatable_children_returns_null(): void
+    public function test_and_with_no_translatable_children_returns_null(): void
     {
         $result = $this->subject->translate(new AndFilter(
             new MatchingRuleFilter(
@@ -580,7 +502,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertNull($result);
     }
 
-    public function test_or_filter_all_translatable_returns_combined(): void
+    public function test_or_of_translatable_is_exact(): void
     {
         $result = $this->subject->translate(new OrFilter(
             new PresentFilter('cn'),
@@ -595,27 +517,24 @@ final class SqliteFilterTranslatorTest extends TestCase
             ' OR ',
             $result->sql,
         );
-        self::assertSame(
-            ['person'],
-            $result->params,
-        );
-    }
-
-    public function test_or_filter_all_translatable_is_exact(): void
-    {
-        $result = $this->subject->translate(new OrFilter(
-            new PresentFilter('cn'),
-            new EqualityFilter(
-                'objectClass',
-                'person',
-            ),
-        ));
-
-        self::assertNotNull($result);
         self::assertTrue($result->isExact);
     }
 
-    public function test_or_filter_with_inexact_child_is_not_exact(): void
+    public function test_or_with_one_untranslatable_child_returns_null(): void
+    {
+        $result = $this->subject->translate(new OrFilter(
+            new PresentFilter('cn'),
+            new MatchingRuleFilter(
+                '1.2.840.113556.1.4.803',
+                'memberOf',
+                '2',
+            ),
+        ));
+
+        self::assertNull($result);
+    }
+
+    public function test_or_with_inexact_child_is_inexact(): void
     {
         $result = $this->subject->translate(new OrFilter(
             new AndFilter(
@@ -636,48 +555,18 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
-    public function test_or_filter_with_one_untranslatable_child_returns_null(): void
-    {
-        $result = $this->subject->translate(new OrFilter(
-            new PresentFilter('cn'),
-            new MatchingRuleFilter(
-                '1.2.840.113556.1.4.803',
-                'memberOf',
-                '2',
-            ),
-        ));
-
-        self::assertNull($result);
-    }
-
-    public function test_not_filter_with_translatable_child_returns_not_sql(): void
+    public function test_not_present_emits_plain_not(): void
     {
         $result = $this->subject->translate(
             new NotFilter(new PresentFilter('cn')),
         );
 
         self::assertNotNull($result);
-        self::assertStringContainsString(
-            'NOT (',
+        self::assertStringStartsWith(
+            'NOT (lc_dn IN (',
             $result->sql,
         );
-        self::assertSame(
-            [],
-            $result->params,
-        );
-    }
-
-    public function test_not_present_emits_plain_not_without_presence_guard(): void
-    {
-        $result = $this->subject->translate(
-            new NotFilter(new PresentFilter('cn')),
-        );
-
-        self::assertNotNull($result);
-        self::assertSame(
-            "NOT (json_type(attributes, '$.\"cn\"') IS NOT NULL)",
-            $result->sql,
-        );
+        self::assertTrue($result->isExact);
     }
 
     public function test_not_equality_adds_presence_guard(): void
@@ -690,12 +579,16 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
 
         self::assertNotNull($result);
-        self::assertSame(
-            "(NOT (EXISTS (SELECT 1 FROM json_each(attributes, '$.\"cn\".values') WHERE lower(value) = lower(?))) AND json_type(attributes, '$.\"cn\"') IS NOT NULL)",
+        self::assertStringStartsWith(
+            '(NOT (',
+            $result->sql,
+        );
+        self::assertStringContainsString(
+            "s.attr_name_lower = 'cn'",
             $result->sql,
         );
         self::assertSame(
-            ['Alice'],
+            ['alice'],
             $result->params,
         );
         self::assertTrue($result->isExact);
@@ -712,43 +605,9 @@ final class SqliteFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertFalse($result->isExact);
-        self::assertStringContainsString(
-            "json_type(attributes, '$.\"cn\"') IS NOT NULL",
-            $result->sql,
-        );
     }
 
-    public function test_not_substring_adds_presence_guard(): void
-    {
-        $result = $this->subject->translate(
-            new NotFilter(new SubstringFilter(
-                'cn',
-                'A',
-            )),
-        );
-
-        self::assertNotNull($result);
-        self::assertStringContainsString(
-            'NOT (',
-            $result->sql,
-        );
-        self::assertStringContainsString(
-            "json_type(attributes, '$.\"cn\"') IS NOT NULL",
-            $result->sql,
-        );
-    }
-
-    public function test_not_filter_with_exact_child_is_exact(): void
-    {
-        $result = $this->subject->translate(
-            new NotFilter(new PresentFilter('cn')),
-        );
-
-        self::assertNotNull($result);
-        self::assertTrue($result->isExact);
-    }
-
-    public function test_not_filter_with_inexact_child_is_not_exact(): void
+    public function test_not_composite_inner_is_inexact(): void
     {
         $result = $this->subject->translate(
             new NotFilter(new AndFilter(
@@ -765,7 +624,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
-    public function test_not_filter_with_untranslatable_child_returns_null(): void
+    public function test_not_with_untranslatable_child_returns_null(): void
     {
         $result = $this->subject->translate(
             new NotFilter(new MatchingRuleFilter(
@@ -791,24 +650,6 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertNull($result);
     }
 
-    public function test_attribute_name_is_lowercased_in_sql(): void
-    {
-        $result = $this->subject->translate(new EqualityFilter(
-            'objectClass',
-            'person',
-        ));
-
-        self::assertNotNull($result);
-        self::assertStringContainsString(
-            '$."objectclass"',
-            $result->sql,
-        );
-        self::assertStringNotContainsString(
-            '$."objectClass"',
-            $result->sql,
-        );
-    }
-
     public function test_and_params_are_merged_in_order(): void
     {
         $result = $this->subject->translate(new AndFilter(
@@ -824,7 +665,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertSame(
-            ['Alice', 'person'],
+            ['alice', 'person'],
             $result->params,
         );
     }

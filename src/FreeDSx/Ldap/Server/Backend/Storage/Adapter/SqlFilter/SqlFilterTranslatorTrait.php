@@ -26,36 +26,26 @@ use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 
 /**
- * Reusable LDAP-filter-to-SQL translator; concrete classes supply buildPresenceCheck() and buildValueExists().
- *
- * Composition rules: AND keeps translatable children, OR requires every child to translate, NOT honors RFC 4511 §4.5.1.7,
- * MatchingRuleFilter is never translated.
+ * Translates LDAP filters to SQL against the `entry_attribute_values` sidecar index.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 trait SqlFilterTranslatorTrait
 {
     /**
-     * SQL fragment testing whether the attribute key is present.
-     *
-     * @param string $attribute Pre-validated and safe to embed in SQL.
+     * @param string $attribute Pre-validated; safe to embed in SQL.
      */
-    abstract protected function buildPresenceCheck(string $attribute): string;
+    abstract private function buildPresenceCheck(string $attribute): string;
 
     /**
-     * Wraps $innerCondition so it is evaluated per attribute value, referencing the current value via {@see valueAlias()}.
-     *
-     * @param string $attribute Pre-validated and safe to embed in SQL.
+     * @param string $attribute Pre-validated; safe to embed in SQL.
      */
-    abstract protected function buildValueExists(
+    abstract private function buildValueExists(
         string $attribute,
         string $innerCondition,
     ): string;
 
-    /**
-     * Returns the column alias used by the value-iteration function.
-     */
-    abstract protected function valueAlias(): string;
+    abstract private function valueAlias(): string;
 
     public function translate(FilterInterface $filter): ?SqlFilterResult
     {
@@ -91,9 +81,9 @@ trait SqlFilterTranslatorTrait
         $value = $filter->getValue();
 
         return new SqlFilterResult(
-            $this->buildValueExists($attribute, "lower($alias) = lower(?)"),
-            [$value],
-            isExact: SqlFilterUtility::isAscii($value),
+            $this->buildValueExists($attribute, "$alias = ?"),
+            [$this->prepareMatchValue($value)],
+            isExact: $this->isExactEquality($value),
             referencedAttributes: [$attribute],
         );
     }
@@ -105,13 +95,11 @@ trait SqlFilterTranslatorTrait
         $alias = $this->valueAlias();
         $value = $filter->getValue();
 
-        // Approximate matching is implementation-defined (RFC 4511 §4.5.1.7.6).
-        // Both SQL and PHP implementations pick case-insensitive equality, so
-        // for ASCII values the result is exact and PHP re-eval can be skipped.
+        // Implementation-defined (RFC 4511 §4.5.1.7.6); mirror FilterEvaluator's case-insensitive equality.
         return new SqlFilterResult(
-            $this->buildValueExists($attribute, "lower($alias) = lower(?)"),
-            [$value],
-            isExact: SqlFilterUtility::isAscii($value),
+            $this->buildValueExists($attribute, "$alias = ?"),
+            [$this->prepareMatchValue($value)],
+            isExact: $this->isExactEquality($value),
             referencedAttributes: [$attribute],
         );
     }
@@ -123,10 +111,11 @@ trait SqlFilterTranslatorTrait
         $alias = $this->valueAlias();
         $value = $filter->getValue();
 
+        // Truncation preserves GTE when query <= 255 chars: full >= query implies its prefix >= query.
         return new SqlFilterResult(
-            $this->buildValueExists($attribute, "lower($alias) >= lower(?)"),
-            [$value],
-            isExact: $this->isOrderedCompareExact($value),
+            $this->buildValueExists($attribute, "$alias >= ?"),
+            [$this->prepareMatchValue($value)],
+            isExact: $this->isExactOrdered($value),
             referencedAttributes: [$attribute],
         );
     }
@@ -138,98 +127,110 @@ trait SqlFilterTranslatorTrait
         $alias = $this->valueAlias();
         $value = $filter->getValue();
 
+        // LTE under truncation admits false positives (stored value > 255 whose prefix equals query); always inexact.
         return new SqlFilterResult(
-            $this->buildValueExists($attribute, "lower($alias) <= lower(?)"),
-            [$value],
-            isExact: $this->isOrderedCompareExact($value),
+            $this->buildValueExists($attribute, "$alias <= ?"),
+            [$this->prepareMatchValue($value)],
+            isExact: false,
             referencedAttributes: [$attribute],
         );
-    }
-
-    /**
-     * Exact only for ASCII non-digit values; PHP compareOrdered int-compares when both operands are digits, SQL does not.
-     */
-    private function isOrderedCompareExact(string $value): bool
-    {
-        return SqlFilterUtility::isAscii($value)
-            && !ctype_digit($value);
     }
 
     private function translateSubstring(SubstringFilter $filter): ?SqlFilterResult
     {
         $attribute = $this->validateAttribute($filter->getAttribute());
 
-        [$conditions, $params] = $this->buildSubstringParts($filter);
+        $startsWith = $filter->getStartsWith();
+        $contains = $filter->getContains();
+        $endsWith = $filter->getEndsWith();
 
-        if ($conditions === []) {
+        if ($startsWith === null && $contains === [] && $endsWith === null) {
             return null;
         }
 
-        // LDAP substring ordering (RFC 4511 §4.5.1.7.2) requires each fragment
-        // to appear strictly after the previous one. Independent AND'd LIKE
-        // clauses cannot preserve that ordering, so we can only mark the result
-        // exact when each part is independently anchored:
-        //   - startsWith only, endsWith only, or both without contains
-        //   - a single contains without startsWith/endsWith
-        // Any contains + anchor combination (or 2+ contains) needs PHP re-eval.
-        $containsCount = count($filter->getContains());
-        $hasAnchor = $filter->getStartsWith() !== null
-            || $filter->getEndsWith() !== null;
+        // Prefix-anchored LIKE is the only valid superset under truncation; other fragments fall back to presence + PHP re-eval.
+        $alias = $this->valueAlias();
 
-        $isExact = $containsCount < 2
-            && !($containsCount > 0 && $hasAnchor)
-            && SqlFilterUtility::isAscii((string) $filter->getStartsWith())
-            && SqlFilterUtility::isAscii((string) $filter->getEndsWith())
-            && $this->areAllAscii($filter->getContains());
+        if ($startsWith !== null) {
+            $prefix = $this->prepareMatchValue($startsWith);
+            $sql = $this->buildValueExists(
+                $attribute,
+                "$alias LIKE ? ESCAPE '!'",
+            );
+            $params = [SqlFilterUtility::escape($prefix) . '%'];
+        } else {
+            $sql = $this->buildPresenceCheck($attribute);
+            $params = [];
+        }
+
+        $isExact = $this->isExactSubstring(
+            $startsWith,
+            $contains,
+            $endsWith,
+        );
 
         return new SqlFilterResult(
-            $this->buildValueExists($attribute, implode(' AND ', $conditions)),
+            $sql,
             $params,
             isExact: $isExact,
             referencedAttributes: [$attribute],
         );
     }
 
-    /**
-     * @param array<int|string, string> $values
-     */
-    private function areAllAscii(array $values): bool
+    private function isExactEquality(string $value): bool
     {
-        foreach ($values as $value) {
-            if (!SqlFilterUtility::isAscii($value)) {
-                return false;
-            }
-        }
-
-        return true;
+        return SqlFilterUtility::isAscii($value)
+            && mb_check_encoding($value, 'UTF-8')
+            && mb_strlen($value, 'UTF-8') <= SqlFilterUtility::MAX_INDEXED_VALUE_CHARS;
     }
 
     /**
-     * @return array{list<string>, list<string>}
+     * ASCII non-digit within truncation; digit-only values compare numerically in PHP but lexically in SQL.
      */
-    private function buildSubstringParts(SubstringFilter $filter): array
+    private function isExactOrdered(string $value): bool
     {
-        $conditions = [];
-        $params = [];
-        $alias = $this->valueAlias();
-        $likeClause = "lower($alias) LIKE lower(?) ESCAPE '!'";
+        return SqlFilterUtility::isAscii($value)
+            && !ctype_digit($value)
+            && mb_check_encoding($value, 'UTF-8')
+            && mb_strlen($value, 'UTF-8') <= SqlFilterUtility::MAX_INDEXED_VALUE_CHARS;
+    }
 
-        if ($filter->getStartsWith() !== null) {
-            $conditions[] = $likeClause;
-            $params[] = SqlFilterUtility::escape($filter->getStartsWith()) . '%';
+    /**
+     * @param array<string> $contains
+     */
+    private function isExactSubstring(
+        ?string $startsWith,
+        array $contains,
+        ?string $endsWith,
+    ): bool {
+        if ($startsWith === null) {
+            return false;
         }
 
-        foreach ($filter->getContains() as $contains) {
-            $conditions[] = $likeClause;
-            $params[] = '%' . SqlFilterUtility::escape($contains) . '%';
+        if ($contains !== [] || $endsWith !== null) {
+            return false;
         }
 
-        if ($filter->getEndsWith() !== null) {
-            $conditions[] = $likeClause;
-            $params[] = '%' . SqlFilterUtility::escape($filter->getEndsWith());
+        return SqlFilterUtility::isAscii($startsWith)
+            && mb_check_encoding($startsWith, 'UTF-8')
+            && mb_strlen($startsWith, 'UTF-8') <= SqlFilterUtility::MAX_INDEXED_VALUE_CHARS;
+    }
+
+    /**
+     * Pre-lower + truncate to match sidecar's value_lower; non-UTF-8 returns '' (matches binary-syntax rows only).
+     */
+    private function prepareMatchValue(string $value): string
+    {
+        if (!mb_check_encoding($value, 'UTF-8')) {
+            return '';
         }
 
-        return [$conditions, $params];
+        return mb_substr(
+            mb_strtolower($value, 'UTF-8'),
+            0,
+            SqlFilterUtility::MAX_INDEXED_VALUE_CHARS,
+            'UTF-8',
+        );
     }
 
     private function translateAnd(AndFilter $filter): ?SqlFilterResult

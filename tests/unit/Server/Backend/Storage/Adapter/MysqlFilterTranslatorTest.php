@@ -16,7 +16,6 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
-use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\LessThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
@@ -37,13 +36,21 @@ final class MysqlFilterTranslatorTest extends TestCase
         $this->subject = new MysqlFilterTranslator();
     }
 
-    public function test_present_filter_returns_json_contains_path(): void
+    public function test_present_filter_returns_sidecar_presence_exists(): void
     {
         $result = $this->subject->translate(new PresentFilter('cn'));
 
         self::assertNotNull($result);
-        self::assertSame(
-            "JSON_CONTAINS_PATH(attributes, 'one', '$.\"cn\"')",
+        self::assertStringContainsString(
+            'FROM entry_attribute_values s',
+            $result->sql,
+        );
+        self::assertStringContainsString(
+            "s.attr_name_lower = 'cn'",
+            $result->sql,
+        );
+        self::assertStringStartsWith(
+            'lc_dn IN (SELECT s.entry_lc_dn',
             $result->sql,
         );
         self::assertSame(
@@ -59,16 +66,12 @@ final class MysqlFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            '$."objectclass"',
-            $result->sql,
-        );
-        self::assertStringNotContainsString(
-            '$."objectClass"',
+            "s.attr_name_lower = 'objectclass'",
             $result->sql,
         );
     }
 
-    public function test_equality_filter_returns_json_table_exists(): void
+    public function test_equality_filter_emits_sidecar_value_equality(): void
     {
         $result = $this->subject->translate(new EqualityFilter(
             'cn',
@@ -77,15 +80,15 @@ final class MysqlFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            '$."cn".values[*]',
+            "s.attr_name_lower = 'cn'",
             $result->sql,
         );
         self::assertStringContainsString(
-            'lower(val) = lower(?)',
+            's.value_lower = ?',
             $result->sql,
         );
         self::assertSame(
-            ['Alice'],
+            ['alice'],
             $result->params,
         );
         self::assertTrue($result->isExact);
@@ -100,15 +103,11 @@ final class MysqlFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            'JSON_TABLE',
-            $result->sql,
-        );
-        self::assertStringContainsString(
-            'lower(val) = lower(?)',
+            's.value_lower = ?',
             $result->sql,
         );
         self::assertSame(
-            ['Alice'],
+            ['alice'],
             $result->params,
         );
     }
@@ -146,6 +145,31 @@ final class MysqlFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
+    public function test_equality_with_long_value_is_inexact(): void
+    {
+        $result = $this->subject->translate(new EqualityFilter(
+            'cn',
+            str_repeat('a', 256),
+        ));
+
+        self::assertNotNull($result);
+        self::assertFalse($result->isExact);
+    }
+
+    public function test_equality_lowercased_query_value_is_truncated_to_255_chars(): void
+    {
+        $result = $this->subject->translate(new EqualityFilter(
+            'cn',
+            str_repeat('A', 300),
+        ));
+
+        self::assertNotNull($result);
+        self::assertSame(
+            [str_repeat('a', 255)],
+            $result->params,
+        );
+    }
+
     public function test_substring_with_non_ascii_fragment_is_inexact(): void
     {
         $result = $this->subject->translate(new SubstringFilter(
@@ -157,7 +181,7 @@ final class MysqlFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
-    public function test_gte_filter_returns_json_table_gte(): void
+    public function test_gte_filter_emits_sidecar_value_gte(): void
     {
         $result = $this->subject->translate(new GreaterThanOrEqualFilter(
             'age',
@@ -166,11 +190,11 @@ final class MysqlFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            '$."age".values[*]',
+            "s.attr_name_lower = 'age'",
             $result->sql,
         );
         self::assertStringContainsString(
-            'lower(val) >= lower(?)',
+            's.value_lower >= ?',
             $result->sql,
         );
         self::assertSame(
@@ -212,7 +236,7 @@ final class MysqlFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
-    public function test_lte_filter_returns_json_table_lte(): void
+    public function test_lte_filter_emits_sidecar_value_lte(): void
     {
         $result = $this->subject->translate(new LessThanOrEqualFilter(
             'age',
@@ -221,11 +245,11 @@ final class MysqlFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            '$."age".values[*]',
+            "s.attr_name_lower = 'age'",
             $result->sql,
         );
         self::assertStringContainsString(
-            'lower(val) <= lower(?)',
+            's.value_lower <= ?',
             $result->sql,
         );
         self::assertSame(
@@ -234,18 +258,7 @@ final class MysqlFilterTranslatorTest extends TestCase
         );
     }
 
-    public function test_lte_filter_with_digit_value_is_inexact(): void
-    {
-        $result = $this->subject->translate(new LessThanOrEqualFilter(
-            'uidNumber',
-            '100',
-        ));
-
-        self::assertNotNull($result);
-        self::assertFalse($result->isExact);
-    }
-
-    public function test_lte_filter_with_ascii_non_digit_value_is_exact(): void
+    public function test_lte_filter_is_always_inexact_under_sidecar_truncation(): void
     {
         $result = $this->subject->translate(new LessThanOrEqualFilter(
             'sn',
@@ -253,21 +266,10 @@ final class MysqlFilterTranslatorTest extends TestCase
         ));
 
         self::assertNotNull($result);
-        self::assertTrue($result->isExact);
-    }
-
-    public function test_lte_filter_with_non_ascii_value_is_inexact(): void
-    {
-        $result = $this->subject->translate(new LessThanOrEqualFilter(
-            'sn',
-            'Smíth',
-        ));
-
-        self::assertNotNull($result);
         self::assertFalse($result->isExact);
     }
 
-    public function test_attribute_with_option_strips_option_from_json_path(): void
+    public function test_attribute_with_option_strips_option_from_sql(): void
     {
         $result = $this->subject->translate(new EqualityFilter(
             'userCertificate;binary',
@@ -276,7 +278,7 @@ final class MysqlFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            '$."usercertificate"',
+            "s.attr_name_lower = 'usercertificate'",
             $result->sql,
         );
         self::assertStringNotContainsString(
@@ -291,7 +293,7 @@ final class MysqlFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            '$."cn"',
+            "s.attr_name_lower = 'cn'",
             $result->sql,
         );
         self::assertStringNotContainsString(
@@ -300,18 +302,18 @@ final class MysqlFilterTranslatorTest extends TestCase
         );
     }
 
-    public function test_numericoid_attribute_translates_with_quoted_path(): void
+    public function test_numericoid_attribute_translates(): void
     {
         $result = $this->subject->translate(new PresentFilter('2.5.4.3'));
 
         self::assertNotNull($result);
-        self::assertSame(
-            "JSON_CONTAINS_PATH(attributes, 'one', '$.\"2.5.4.3\"')",
+        self::assertStringContainsString(
+            "s.attr_name_lower = '2.5.4.3'",
             $result->sql,
         );
     }
 
-    public function test_numericoid_equality_translates_with_quoted_path(): void
+    public function test_numericoid_equality_translates(): void
     {
         $result = $this->subject->translate(new EqualityFilter(
             '2.5.4.3',
@@ -320,11 +322,11 @@ final class MysqlFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            '$."2.5.4.3".values[*]',
+            "s.attr_name_lower = '2.5.4.3'",
             $result->sql,
         );
         self::assertSame(
-            ['Alice'],
+            ['alice'],
             $result->params,
         );
     }
@@ -371,7 +373,7 @@ final class MysqlFilterTranslatorTest extends TestCase
         self::assertNull($result);
     }
 
-    public function test_substring_with_starts_with_only(): void
+    public function test_substring_with_starts_with_only_emits_prefix_like(): void
     {
         $result = $this->subject->translate(new SubstringFilter(
             'cn',
@@ -380,115 +382,76 @@ final class MysqlFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            'JSON_TABLE',
-            $result->sql,
-        );
-        self::assertStringContainsString(
-            '$."cn".values[*]',
+            "s.value_lower LIKE ? ESCAPE '!'",
             $result->sql,
         );
         self::assertSame(
-            ['Al%'],
+            ['al%'],
             $result->params,
         );
-    }
-
-    public function test_substring_with_contains_and_anchors_is_not_exact(): void
-    {
-        $result = $this->subject->translate(new SubstringFilter(
-            'cn',
-            'A',
-            'e',
-            'lic',
-        ));
-
-        self::assertNotNull($result);
-        self::assertFalse($result->isExact);
-    }
-
-    public function test_substring_with_contains_and_starts_with_is_not_exact(): void
-    {
-        $result = $this->subject->translate(new SubstringFilter(
-            'cn',
-            'Alice',
-            null,
-            'lic',
-        ));
-
-        self::assertNotNull($result);
-        self::assertFalse($result->isExact);
-    }
-
-    public function test_substring_with_contains_and_ends_with_is_not_exact(): void
-    {
-        $result = $this->subject->translate(new SubstringFilter(
-            'cn',
-            null,
-            'ice',
-            'lic',
-        ));
-
-        self::assertNotNull($result);
-        self::assertFalse($result->isExact);
-    }
-
-    public function test_substring_with_single_contains_only_is_exact(): void
-    {
-        $result = $this->subject->translate(new SubstringFilter(
-            'cn',
-            null,
-            null,
-            'lic',
-        ));
-
-        self::assertNotNull($result);
         self::assertTrue($result->isExact);
     }
 
-    public function test_substring_with_starts_and_ends_without_contains_is_exact(): void
+    public function test_substring_with_ends_with_only_falls_back_to_presence(): void
     {
         $result = $this->subject->translate(new SubstringFilter(
             'cn',
-            'A',
-            'e',
+            null,
+            'ce',
         ));
 
         self::assertNotNull($result);
-        self::assertTrue($result->isExact);
-    }
-
-    public function test_substring_with_multiple_contains_is_not_exact(): void
-    {
-        $result = $this->subject->translate(new SubstringFilter(
-            'cn',
-            'a',
-            'd',
-            'b',
-            'c',
-        ));
-
-        self::assertNotNull($result);
-        self::assertFalse($result->isExact);
-    }
-
-    public function test_substring_with_all_components(): void
-    {
-        $result = $this->subject->translate(new SubstringFilter(
-            'cn',
-            'A',
-            'e',
-            'lic',
-        ));
-
-        self::assertNotNull($result);
-        self::assertSame(
-            ['A%', '%lic%', '%e'],
-            $result->params,
-        );
-        self::assertStringContainsString(
-            'AND',
+        self::assertStringNotContainsString(
+            'LIKE',
             $result->sql,
         );
+        self::assertStringContainsString(
+            "s.attr_name_lower = 'cn'",
+            $result->sql,
+        );
+        self::assertSame(
+            [],
+            $result->params,
+        );
+        self::assertFalse($result->isExact);
+    }
+
+    public function test_substring_with_single_contains_falls_back_to_presence(): void
+    {
+        $result = $this->subject->translate(new SubstringFilter(
+            'cn',
+            null,
+            null,
+            'lic',
+        ));
+
+        self::assertNotNull($result);
+        self::assertStringNotContainsString(
+            'LIKE',
+            $result->sql,
+        );
+        self::assertFalse($result->isExact);
+    }
+
+    public function test_substring_with_all_fragments_uses_prefix_only(): void
+    {
+        $result = $this->subject->translate(new SubstringFilter(
+            'cn',
+            'A',
+            'e',
+            'lic',
+        ));
+
+        self::assertNotNull($result);
+        self::assertStringContainsString(
+            "s.value_lower LIKE ? ESCAPE '!'",
+            $result->sql,
+        );
+        self::assertSame(
+            ['a%'],
+            $result->params,
+        );
+        self::assertFalse($result->isExact);
     }
 
     public function test_substring_escapes_special_like_characters(): void
@@ -616,8 +579,12 @@ final class MysqlFilterTranslatorTest extends TestCase
         );
 
         self::assertNotNull($result);
-        self::assertSame(
-            "NOT (JSON_CONTAINS_PATH(attributes, 'one', '$.\"cn\"'))",
+        self::assertStringStartsWith(
+            'NOT (lc_dn IN (',
+            $result->sql,
+        );
+        self::assertStringContainsString(
+            "s.attr_name_lower = 'cn'",
             $result->sql,
         );
     }
@@ -637,11 +604,11 @@ final class MysqlFilterTranslatorTest extends TestCase
             $result->sql,
         );
         self::assertStringContainsString(
-            "JSON_CONTAINS_PATH(attributes, 'one', '$.\"cn\"')",
+            "s.attr_name_lower = 'cn'",
             $result->sql,
         );
         self::assertSame(
-            ['Alice'],
+            ['alice'],
             $result->params,
         );
         self::assertTrue($result->isExact);
@@ -724,41 +691,8 @@ final class MysqlFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertSame(
-            ['Alice', 'person'],
+            ['alice', 'person'],
             $result->params,
-        );
-    }
-
-    /**
-     * @return iterable<string, array{0: FilterInterface}>
-     */
-    public static function valueBearingFilterProvider(): iterable
-    {
-        yield 'equality' => [new EqualityFilter('cn', 'Alice')];
-        yield 'approximate' => [new ApproximateFilter('cn', 'Alice')];
-        yield 'substring' => [
-            new SubstringFilter(
-                'cn',
-                'Al',
-                'ce',
-                'i',
-            ),
-        ];
-        yield 'gte' => [new GreaterThanOrEqualFilter('uidNumber', '100')];
-        yield 'lte' => [new LessThanOrEqualFilter('uidNumber', '100')];
-    }
-
-    /**
-     * @dataProvider valueBearingFilterProvider
-     */
-    public function test_value_bearing_filters_include_no_semijoin_hint(FilterInterface $filter): void
-    {
-        $result = $this->subject->translate($filter);
-
-        self::assertNotNull($result);
-        self::assertStringContainsString(
-            'NO_SEMIJOIN()',
-            $result->sql,
         );
     }
 }
