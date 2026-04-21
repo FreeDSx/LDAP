@@ -19,7 +19,7 @@ jobs:
         uses: shivammathur/cache-extensions@v1
         with:
           php-version: ${{ matrix.php-versions }}
-          extensions: swoole
+          extensions: swoole, pdo_mysql
           key: ext-cache-v1
 
       - name: Cache extensions
@@ -35,7 +35,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-versions }}
-          extensions: swoole
+          extensions: swoole, pdo_mysql
           coverage: none
           tools: composer:2.9
 
@@ -64,6 +64,19 @@ jobs:
       - name: Add foo.com hosts entry
         if: runner.os == 'Linux'
         run: echo "127.0.0.1 foo.com" | sudo tee -a /etc/hosts
+
+      # Linux: MySQL 8.0 for MysqlLdapBackendStorageTest. Test self-skips on other platforms.
+      - name: Start MySQL
+        if: runner.os == 'Linux'
+        run: |
+          docker run -d --name freedsx-mysql \
+            -e MYSQL_ROOT_PASSWORD=root \
+            -e MYSQL_DATABASE=freedsx \
+            -p 3306:3306 \
+            mysql:8.0
+          until docker exec freedsx-mysql mysqladmin ping -h 127.0.0.1 -proot --silent >/dev/null 2>&1; do
+            sleep 2
+          done
 
       # Windows: OpenLDAP natively in WSL1 (WSL2 is unavailable on GitHub-hosted runners —
       # they are VMs and do not support the nested Hyper-V that WSL2 requires).
@@ -111,4 +124,8 @@ jobs:
         run: composer run-script test-unit
 
       - name: Run Integration Tests
+        env:
+          MYSQL_DSN: ${{ runner.os == 'Linux' && 'mysql:host=127.0.0.1;port=3306;dbname=freedsx' || '' }}
+          MYSQL_USER: root
+          MYSQL_PASSWORD: root
         run: composer run-script test-integration
