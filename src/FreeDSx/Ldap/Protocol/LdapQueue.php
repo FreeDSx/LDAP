@@ -18,6 +18,7 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapperInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Queue\Asn1MessageQueue;
@@ -128,7 +129,7 @@ class LdapQueue extends Asn1MessageQueue
         $buffer = '';
 
         foreach ($messages as $message) {
-            $encoded = $this->encoder->encode($message->toAsn1());
+            $encoded = $this->encodeMessage($message);
             $buffer .= $this->messageWrapper !== null ? $this->messageWrapper->wrap($encoded) : $encoded;
             $bufferLen = strlen($buffer);
             if ($bufferLen >= self::BUFFER_SIZE) {
@@ -141,6 +142,32 @@ class LdapQueue extends Asn1MessageQueue
         }
 
         return $this;
+    }
+
+    /**
+     * Fast-path SearchResultEntry responses that carry no controls through a hand-rolled BER
+     * writer to avoid per-entry ASN.1 AST allocation. Everything else falls back to the generic
+     * encode(toAsn1()) path.
+     *
+     * @throws EncoderException
+     */
+    private function encodeMessage(LdapMessage $message): string
+    {
+        if (
+            $this->encoder instanceof LdapEncoder
+            && $message instanceof LdapMessageResponse
+            && $message->controls()->count() === 0
+        ) {
+            $response = $message->getResponse();
+            if ($response instanceof SearchResultEntry) {
+                return $this->encoder->encodeSearchResultEntryMessage(
+                    $message->getMessageId(),
+                    $response->getEntry(),
+                );
+            }
+        }
+
+        return $this->encoder->encode($message->toAsn1());
     }
 
     public function isConnected(): bool
