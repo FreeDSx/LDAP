@@ -32,25 +32,14 @@ use Throwable;
  */
 final class Worker
 {
-    private const BIND_DN = 'cn=user,dc=foo,dc=bar';
+    private readonly string $compareDn;
 
-    private const BIND_PASSWORD = '12345';
-
-    private const SEARCH_BASE = 'dc=foo,dc=bar';
-
-    private const WRITE_BASE = 'ou=people,dc=foo,dc=bar';
-
-    private const COMPARE_DN = 'cn=alice,ou=people,dc=foo,dc=bar';
+    private readonly string $mailDomain;
 
     /**
      * @var list<string> DNs known to exist at startup; used by search-read / search-eq.
      */
-    private const FIXED_READ_DNS = [
-        'dc=foo,dc=bar',
-        'cn=user,dc=foo,dc=bar',
-        'ou=people,dc=foo,dc=bar',
-        'cn=alice,ou=people,dc=foo,dc=bar',
-    ];
+    private readonly array $fixedReadDns;
 
     /**
      * @var list<string> DNs this worker added and has not yet deleted; modify/delete pick from here.
@@ -68,6 +57,23 @@ final class Worker
         private readonly Channel $startSignal,
         private readonly ?int $opsCap,
     ) {
+        $this->compareDn = 'cn=alice,' . $this->config->writeBase;
+        $this->mailDomain = $this->deriveMailDomain($this->config->baseDn);
+        $this->fixedReadDns = [
+            $this->config->baseDn,
+            $this->config->bindDn,
+            $this->config->writeBase,
+            $this->compareDn,
+        ];
+    }
+
+    private function deriveMailDomain(string $baseDn): string
+    {
+        if (preg_match_all('/dc=([^,]+)/i', $baseDn, $matches) === 0) {
+            return 'example.com';
+        }
+
+        return implode('.', array_map('strtolower', $matches[1]));
     }
 
     public function run(): void
@@ -75,7 +81,10 @@ final class Worker
         $client = $this->buildClient();
 
         try {
-            $client->bind(self::BIND_DN, self::BIND_PASSWORD);
+            $client->bind(
+                $this->config->bindDn,
+                $this->config->bindPassword,
+            );
         } catch (Throwable $e) {
             $this->readyBarrier->push(false);
 
@@ -159,7 +168,10 @@ final class Worker
 
     private function doBind(LdapClient $client): void
     {
-        $client->bind(self::BIND_DN, self::BIND_PASSWORD);
+        $client->bind(
+            $this->config->bindDn,
+            $this->config->bindPassword,
+        );
     }
 
     private function doSearchRead(LdapClient $client): void
@@ -174,7 +186,7 @@ final class Worker
     private function doSearchEq(LdapClient $client): void
     {
         $request = Operations::search($this->randomEqualityFilter())
-            ->base(self::SEARCH_BASE)
+            ->base($this->config->baseDn)
             ->useSubtreeScope();
 
         $client->search($request);
@@ -187,7 +199,7 @@ final class Worker
             : Filters::startsWith('cn', '');
 
         $request = Operations::search($filter)
-            ->base(self::SEARCH_BASE)
+            ->base($this->config->baseDn)
             ->useSubtreeScope();
 
         $client->search($request);
@@ -196,7 +208,7 @@ final class Worker
     private function doSearchList(LdapClient $client): void
     {
         $request = Operations::search(Filters::equal('objectClass', 'inetOrgPerson'))
-            ->base(self::WRITE_BASE)
+            ->base($this->config->writeBase)
             ->useSubtreeScope();
 
         $client->search($request);
@@ -207,10 +219,10 @@ final class Worker
         if ($this->config->seedEntries > 0 && mt_rand(1, 100) <= 80) {
             $idx = mt_rand(1, $this->config->seedEntries);
 
-            return "cn=seed-{$idx},ou=people,dc=foo,dc=bar";
+            return "cn=seed-{$idx}," . $this->config->writeBase;
         }
 
-        return self::FIXED_READ_DNS[array_rand(self::FIXED_READ_DNS)];
+        return $this->fixedReadDns[array_rand($this->fixedReadDns)];
     }
 
     private function randomEqualityFilter(): FilterInterface
@@ -220,29 +232,29 @@ final class Worker
 
             return mt_rand(0, 1) === 0
                 ? Filters::equal('cn', "seed-{$idx}")
-                : Filters::equal('mail', "seed-{$idx}@foo.bar");
+                : Filters::equal('mail', "seed-{$idx}@{$this->mailDomain}");
         }
 
         return mt_rand(0, 1) === 0
             ? Filters::equal('cn', 'alice')
-            : Filters::equal('mail', 'alice@foo.bar');
+            : Filters::equal('mail', "alice@{$this->mailDomain}");
     }
 
     private function doCompare(LdapClient $client): void
     {
-        $client->compare(self::COMPARE_DN, 'mail', 'alice@foo.bar');
+        $client->compare($this->compareDn, 'mail', "alice@{$this->mailDomain}");
     }
 
     private function doAdd(LdapClient $client): void
     {
         $seq = ++$this->addSeq;
         $cn = "load-w{$this->workerId}-{$seq}";
-        $dn = "cn={$cn}," . self::WRITE_BASE;
+        $dn = "cn={$cn}," . $this->config->writeBase;
 
         $client->create(new Entry(
             $dn,
             new Attribute('cn', $cn),
-            new Attribute('objectClass', 'inetOrgPerson'),
+            new Attribute('objectClass', 'inetOrgPerson', 'extensibleObject'),
             new Attribute('sn', 'Load'),
             new Attribute('uidNumber', (string) $seq),
         ));

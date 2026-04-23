@@ -56,21 +56,22 @@
   },
   "scripts": {
     "test-coverage": [
-      "XDEBUG_MODE=coverage phpunit --testsuite unit --coverage-clover=coverage-unit.xml",
-      "XDEBUG_MODE=coverage phpunit --testsuite integration --coverage-clover=coverage-integration.xml"
+      "@php -d xdebug.mode=coverage vendor/bin/phpunit --testsuite unit --coverage-clover=coverage-unit.xml",
+      "@php -d xdebug.mode=coverage vendor/bin/phpunit --testsuite integration --coverage-clover=coverage-integration.xml"
     ],
     "test-unit": [
-      "XDEBUG_MODE=off phpunit --testsuite unit"
+      "@php -d xdebug.mode=off vendor/bin/phpunit --testsuite unit"
     ],
     "test-integration": [
-      "XDEBUG_MODE=off phpunit --testsuite integration"
+      "@php -d xdebug.mode=off vendor/bin/phpunit --testsuite integration"
     ],
     "test-integration-local": [
       "docker compose -f tests/resources/openldap/docker-compose.yml down --rmi local",
       "docker compose -f tests/resources/openldap/docker-compose.yml up -d --build --wait",
       "@test-integration"
     ],
-    "test-load": "XDEBUG_MODE=off php tests/bin/ldap-load-test.php --backend=sqlite --runner=swoole --duration=10 --warmup=2 --clients=8 --output=text",
+    "test-load": "@php -d xdebug.mode=off tests/bin/ldap-load-test.php --backend=sqlite --runner=swoole --duration=10 --warmup=2 --clients=8 --output=text",
+    "test-load-compare": "@php -d xdebug.mode=off tests/bin/ldap-bench-compare.php",
     "analyse": [
       "phpstan --memory-limit=-1 analyse"
     ],
