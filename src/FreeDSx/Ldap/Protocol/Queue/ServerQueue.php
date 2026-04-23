@@ -56,7 +56,20 @@ class ServerQueue extends LdapQueue
      */
     public function sendMessage(LdapMessageResponse ...$response): self
     {
-        $this->sendLdapMessage(...$response);
+        $this->sendLdapMessage($response);
+
+        return $this;
+    }
+
+    /**
+     * Stream an iterable message response set out the socket.
+     *
+     * @param iterable<LdapMessageResponse> $responses
+     * @throws EncoderException
+     */
+    public function sendMessages(iterable $responses): self
+    {
+        $this->sendLdapMessage($responses);
 
         return $this;
     }

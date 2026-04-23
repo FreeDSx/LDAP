@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
-use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -21,74 +20,85 @@ use FreeDSx\Ldap\Operation\ResultCode;
 final class SearchResult
 {
     /**
-     * @param Entries<Entry> $entries
+     * @param iterable<Entry> $entries
      */
     private function __construct(
-        private readonly Entries $entries,
+        private readonly iterable $entries,
+        private readonly SearchResultState $state,
         private readonly string $baseDn = '',
-        private readonly int $resultCode = ResultCode::SUCCESS,
-        private readonly string $diagnosticMessage = ''
     ) {
     }
 
     /**
-     * Make a successful server search result representation.
+     * Successful server search result. The final result code may still be flipped to
+     * SIZE_LIMIT_EXCEEDED by the streaming producer via the shared SearchResultState.
      *
-     * @param Entries<Entry> $entries
+     * @param iterable<Entry> $entries
      */
     public static function makeSuccessResult(
-        Entries $entries,
+        iterable $entries,
         string $baseDn = '',
-        string $diagnosticMessage = ''
+        ?SearchResultState $state = null,
     ): self {
         return new self(
             $entries,
+            $state ?? new SearchResultState(),
             $baseDn,
-            ResultCode::SUCCESS,
-            $diagnosticMessage
         );
     }
 
     /**
-     * Make an error result for server search result representation. This could occur for any reason, such as a base DN
-     * not existing. This result MUST not return a success result code.
+     * Error result for a server search. Must not carry the SUCCESS code.
      *
-     * @param ?Entries<Entry> $entries
+     * @param ?iterable<Entry> $entries
      */
     public static function makeErrorResult(
         int $resultCode,
         string $baseDn = '',
         string $diagnosticMessage = '',
-        ?Entries $entries = null
+        ?iterable $entries = null,
     ): self {
         if ($resultCode === ResultCode::SUCCESS) {
             throw new InvalidArgumentException('You must not return a success result code on a search error.');
         }
 
         return new self(
-            $entries ?? new Entries(),
+            $entries ?? [],
+            new SearchResultState(
+                resultCode: $resultCode,
+                diagnosticMessage: $diagnosticMessage,
+            ),
             $baseDn,
-            $resultCode,
-            $diagnosticMessage
         );
     }
 
     /**
-     * @return Entries<Entry>
+     * Terminal result where the client's sizeLimit was reached; partial entries are included.
+     *
+     * @param iterable<Entry> $entries
      */
-    public function getEntries(): Entries
+    public static function makeSizeLimitResult(
+        iterable $entries,
+        string $baseDn = '',
+    ): self {
+        return new self(
+            $entries,
+            new SearchResultState(resultCode: ResultCode::SIZE_LIMIT_EXCEEDED),
+            $baseDn,
+        );
+    }
+
+    /**
+     * @return iterable<Entry>
+     */
+    public function getEntries(): iterable
     {
         return $this->entries;
     }
 
-    public function getResultCode(): int
+    public function getState(): SearchResultState
     {
-        return $this->resultCode;
-    }
-
-    public function getDiagnosticMessage(): string
-    {
-        return $this->diagnosticMessage;
+        return $this->state;
     }
 
     public function getBaseDn(): string

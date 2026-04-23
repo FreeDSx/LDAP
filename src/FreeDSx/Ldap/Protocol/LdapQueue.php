@@ -116,12 +116,14 @@ class LdapQueue extends Asn1MessageQueue
     /**
      * Send LDAP messages out the socket.
      *
-     * The logic in the loop is to send the messages in chunks of 8192 bytes to lessen the amount of TCP writes we need
-     * to perform if sending out many messages.
+     * Accepts any iterable (array, generator, …) so streaming producers can feed messages without
+     * materializing them up front. Messages are encoded and appended to an 8KB buffer; the buffer
+     * flushes whenever it fills, keeping syscall count low on large result sets.
      *
+     * @param iterable<LdapMessage> $messages
      * @throws EncoderException
      */
-    protected function sendLdapMessage(LdapMessage ...$messages): static
+    protected function sendLdapMessage(iterable $messages): static
     {
         $buffer = '';
 
