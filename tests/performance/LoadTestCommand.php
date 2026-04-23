@@ -125,6 +125,34 @@ final class LoadTestCommand extends Command
                 '100',
             )
             ->addOption(
+                'bind-dn',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'DN used to bind each worker client',
+                Config::DEFAULT_BIND_DN,
+            )
+            ->addOption(
+                'bind-password',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Password paired with --bind-dn',
+                Config::DEFAULT_BIND_PASSWORD,
+            )
+            ->addOption(
+                'base-dn',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Search base for read/eq/sub operations',
+                Config::DEFAULT_BASE_DN,
+            )
+            ->addOption(
+                'write-base',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Parent DN for add/modify/delete + seed-N entries',
+                Config::DEFAULT_WRITE_BASE,
+            )
+            ->addOption(
                 'ci-profile',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -243,6 +271,10 @@ final class LoadTestCommand extends Command
             rngSeed: $this->parseInt($input->getOption('rng-seed'), 'rng-seed'),
             output: $this->requireString($input, 'output'),
             seedEntries: $this->requireInt($input, 'seed-entries'),
+            bindDn: $this->requireString($input, 'bind-dn'),
+            bindPassword: $this->requireString($input, 'bind-password'),
+            baseDn: $this->requireString($input, 'base-dn'),
+            writeBase: $this->requireString($input, 'write-base'),
         );
     }
 

@@ -56,6 +56,14 @@ final class Config
 
     public const DEFAULT_MIX = 'bind=5,search-read=50,search-eq=25,search-sub=10,search-list=5,add=2,modify=2,delete=1';
 
+    public const DEFAULT_BIND_DN = 'cn=user,dc=foo,dc=bar';
+
+    public const DEFAULT_BIND_PASSWORD = '12345';
+
+    public const DEFAULT_BASE_DN = 'dc=foo,dc=bar';
+
+    public const DEFAULT_WRITE_BASE = 'ou=people,dc=foo,dc=bar';
+
     public function __construct(
         public readonly string $backend,
         public readonly string $runner,
@@ -70,6 +78,10 @@ final class Config
         public readonly ?int $rngSeed = null,
         public readonly string $output = 'text',
         public readonly int $seedEntries = 100,
+        public readonly string $bindDn = self::DEFAULT_BIND_DN,
+        public readonly string $bindPassword = self::DEFAULT_BIND_PASSWORD,
+        public readonly string $baseDn = self::DEFAULT_BASE_DN,
+        public readonly string $writeBase = self::DEFAULT_WRITE_BASE,
     ) {
         $this->assertEnum('backend', $backend, self::BACKENDS);
         $this->assertEnum('runner', $runner, self::RUNNERS);
