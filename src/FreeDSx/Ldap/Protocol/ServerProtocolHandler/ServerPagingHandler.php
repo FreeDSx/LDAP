@@ -66,11 +66,9 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         try {
             $response = $this->handlePaging($pagingRequest, $message);
             if ($response->isSizeLimitExceeded()) {
-                $searchResult = SearchResult::makeErrorResult(
-                    ResultCode::SIZE_LIMIT_EXCEEDED,
-                    (string) $searchRequest->getBaseDn(),
-                    '',
+                $searchResult = SearchResult::makeSizeLimitResult(
                     $response->getEntries(),
+                    (string) $searchRequest->getBaseDn(),
                 );
                 $controls[] = new PagingControl(0, '');
             } else {
@@ -107,7 +105,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
          * If a search result is anything other than success, or the paging is complete,
          * remove the paging request and discard the generator.
          */
-        if (($response && $response->isComplete()) || $searchResult->getResultCode() !== ResultCode::SUCCESS) {
+        if (($response && $response->isComplete()) || $searchResult->getState()->resultCode !== ResultCode::SUCCESS) {
             $this->requestHistory->pagingRequest()->remove($pagingRequest);
             $this->requestHistory->removePagingGenerator($pagingRequest->getNextCookie());
         }

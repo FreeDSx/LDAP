@@ -44,12 +44,28 @@ final class ServerSearchHandlerTest extends TestCase
 
     private TokenInterface&MockObject $mockToken;
 
+    /**
+     * @var list<LdapMessageResponse>
+     */
+    private array $sentMessages = [];
+
     protected function setUp(): void
     {
         $this->mockToken = $this->createMock(TokenInterface::class);
         $this->mockQueue = $this->createMock(ServerQueue::class);
         $this->mockBackend = $this->createMock(LdapBackendInterface::class);
         $this->mockFilterEvaluator = $this->createMock(FilterEvaluatorInterface::class);
+        $this->sentMessages = [];
+
+        $this->mockQueue
+            ->method('sendMessages')
+            ->willReturnCallback(function (iterable $messages): ServerQueue {
+                foreach ($messages as $message) {
+                    $this->sentMessages[] = $message;
+                }
+
+                return $this->mockQueue;
+            });
 
         $this->subject = new ServerSearchHandler(
             queue: $this->mockQueue,
@@ -61,6 +77,17 @@ final class ServerSearchHandlerTest extends TestCase
     private function makeGenerator(Entry ...$entries): Generator
     {
         yield from $entries;
+    }
+
+    /**
+     * @param list<LdapMessageResponse> $expected
+     */
+    private function assertSentMessages(array $expected): void
+    {
+        self::assertEquals(
+            $expected,
+            $this->sentMessages,
+        );
     }
 
     public function test_it_should_send_entries_from_the_backend_to_the_client(): void
@@ -83,22 +110,19 @@ final class ServerSearchHandlerTest extends TestCase
             ->method('evaluate')
             ->willReturn(true);
 
-        $this->mockQueue
-            ->expects(self::once())
-            ->method('sendMessage')
-            ->with(
-                new LdapMessageResponse(2, new SearchResultEntry($entry1)),
-                new LdapMessageResponse(2, new SearchResultEntry($entry2)),
-                new LdapMessageResponse(
-                    2,
-                    new SearchResultDone(0, 'dc=foo,dc=bar')
-                ),
-            );
-
         $this->subject->handleRequest(
             $search,
             $this->mockToken,
         );
+
+        $this->assertSentMessages([
+            new LdapMessageResponse(2, new SearchResultEntry($entry1)),
+            new LdapMessageResponse(2, new SearchResultEntry($entry2)),
+            new LdapMessageResponse(
+                2,
+                new SearchResultDone(0, 'dc=foo,dc=bar')
+            ),
+        ]);
     }
 
     public function test_it_should_filter_entries_that_do_not_match_the_filter(): void
@@ -120,21 +144,18 @@ final class ServerSearchHandlerTest extends TestCase
             ->method('evaluate')
             ->willReturnOnConsecutiveCalls(true, false);
 
-        $this->mockQueue
-            ->expects(self::once())
-            ->method('sendMessage')
-            ->with(
-                new LdapMessageResponse(2, new SearchResultEntry($entry1)),
-                new LdapMessageResponse(
-                    2,
-                    new SearchResultDone(0, 'dc=foo,dc=bar')
-                ),
-            );
-
         $this->subject->handleRequest(
             $search,
             $this->mockToken,
         );
+
+        $this->assertSentMessages([
+            new LdapMessageResponse(2, new SearchResultEntry($entry1)),
+            new LdapMessageResponse(
+                2,
+                new SearchResultDone(0, 'dc=foo,dc=bar')
+            ),
+        ]);
     }
 
     public function test_it_should_send_a_SearchResultDone_with_an_operation_exception_thrown_from_the_backend(): void
@@ -156,22 +177,21 @@ final class ServerSearchHandlerTest extends TestCase
                 ),
             );
 
-        $this->mockQueue
-            ->expects(self::once())
-            ->method('sendMessage')
-            ->with(self::equalTo(new LdapMessageResponse(
+        $this->subject->handleRequest(
+            $search,
+            $this->mockToken,
+        );
+
+        $this->assertSentMessages([
+            new LdapMessageResponse(
                 2,
                 new SearchResultDone(
                     ResultCode::OPERATIONS_ERROR,
                     'dc=foo,dc=bar',
                     "Fail"
                 )
-            )));
-
-        $this->subject->handleRequest(
-            $search,
-            $this->mockToken,
-        );
+            ),
+        ]);
     }
 
     public function test_it_should_return_size_limit_exceeded_with_partial_results_when_limit_is_hit(): void
@@ -195,18 +215,15 @@ final class ServerSearchHandlerTest extends TestCase
             ->method('evaluate')
             ->willReturn(true);
 
-        $this->mockQueue
-            ->expects(self::once())
-            ->method('sendMessage')
-            ->with(
-                new LdapMessageResponse(2, new SearchResultEntry($entry1)),
-                new LdapMessageResponse(
-                    2,
-                    new SearchResultDone(ResultCode::SIZE_LIMIT_EXCEEDED, 'dc=foo,dc=bar')
-                ),
-            );
-
         $this->subject->handleRequest($search, $this->mockToken);
+
+        $this->assertSentMessages([
+            new LdapMessageResponse(2, new SearchResultEntry($entry1)),
+            new LdapMessageResponse(
+                2,
+                new SearchResultDone(ResultCode::SIZE_LIMIT_EXCEEDED, 'dc=foo,dc=bar')
+            ),
+        ]);
     }
 
     public function test_it_should_not_enforce_size_limit_when_zero(): void
@@ -230,16 +247,13 @@ final class ServerSearchHandlerTest extends TestCase
             ->method('evaluate')
             ->willReturn(true);
 
-        $this->mockQueue
-            ->expects(self::once())
-            ->method('sendMessage')
-            ->with(
-                new LdapMessageResponse(2, new SearchResultEntry($entry1)),
-                new LdapMessageResponse(2, new SearchResultEntry($entry2)),
-                new LdapMessageResponse(2, new SearchResultDone(0, 'dc=foo,dc=bar')),
-            );
-
         $this->subject->handleRequest($search, $this->mockToken);
+
+        $this->assertSentMessages([
+            new LdapMessageResponse(2, new SearchResultEntry($entry1)),
+            new LdapMessageResponse(2, new SearchResultEntry($entry2)),
+            new LdapMessageResponse(2, new SearchResultDone(0, 'dc=foo,dc=bar')),
+        ]);
     }
 
     public function test_it_should_send_a_successful_SearchResultDone_when_no_entries_match(): void
@@ -254,19 +268,16 @@ final class ServerSearchHandlerTest extends TestCase
             ->method('search')
             ->willReturn(new EntryStream($this->makeGenerator()));
 
-        $this->mockQueue
-            ->expects(self::once())
-            ->method('sendMessage')
-            ->with(
-                new LdapMessageResponse(
-                    2,
-                    new SearchResultDone(0, 'dc=foo,dc=bar')
-                ),
-            );
-
         $this->subject->handleRequest(
             $search,
             $this->mockToken,
         );
+
+        $this->assertSentMessages([
+            new LdapMessageResponse(
+                2,
+                new SearchResultDone(0, 'dc=foo,dc=bar')
+            ),
+        ]);
     }
 }

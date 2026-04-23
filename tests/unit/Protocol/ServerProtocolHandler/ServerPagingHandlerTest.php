@@ -51,6 +51,11 @@ class ServerPagingHandlerTest extends TestCase
 
     private TokenInterface&MockObject $mockToken;
 
+    /**
+     * @var list<LdapMessageResponse>
+     */
+    private array $sentMessages = [];
+
     protected function setUp(): void
     {
         $this->mockToken = $this->createMock(TokenInterface::class);
@@ -58,10 +63,21 @@ class ServerPagingHandlerTest extends TestCase
         $this->mockBackend = $this->createMock(LdapBackendInterface::class);
         $this->mockFilterEvaluator = $this->createMock(FilterEvaluatorInterface::class);
         $this->requestHistory = new RequestHistory();
+        $this->sentMessages = [];
 
         $this->mockFilterEvaluator
             ->method('evaluate')
             ->willReturn(true);
+
+        $this->mockQueue
+            ->method('sendMessages')
+            ->willReturnCallback(function (iterable $messages): ServerQueue {
+                foreach ($messages as $message) {
+                    $this->sentMessages[] = $message;
+                }
+
+                return $this->mockQueue;
+            });
 
         $this->subject = new ServerPagingHandler(
             queue: $this->mockQueue,
@@ -74,6 +90,36 @@ class ServerPagingHandlerTest extends TestCase
     private function makeGenerator(Entry ...$entries): Generator
     {
         yield from $entries;
+    }
+
+    /**
+     * @return list<LdapMessageResponse>
+     */
+    private function entryMessages(): array
+    {
+        return array_values(array_filter(
+            $this->sentMessages,
+            static fn (LdapMessageResponse $m): bool => $m->getResponse() instanceof SearchResultEntry,
+        ));
+    }
+
+    private function doneMessage(): LdapMessageResponse
+    {
+        foreach ($this->sentMessages as $message) {
+            if ($message->getResponse() instanceof SearchResultDone) {
+                return $message;
+            }
+        }
+
+        self::fail('No SearchResultDone message was sent.');
+    }
+
+    private function donePagingControl(): PagingControl
+    {
+        $paging = $this->doneMessage()->controls()->get(Control::OID_PAGING);
+        self::assertInstanceOf(PagingControl::class, $paging);
+
+        return $paging;
     }
 
     public function test_it_should_call_the_backend_search_on_paging_start_and_return_entries(): void
@@ -89,34 +135,20 @@ class ServerPagingHandlerTest extends TestCase
             ->with(self::isInstanceOf(SearchRequest::class))
             ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
 
-        $resultEntry1 = new LdapMessageResponse(
-            2,
-            new SearchResultEntry($entry1)
-        );
-        $resultEntry2 = new LdapMessageResponse(
-            2,
-            new SearchResultEntry($entry2)
-        );
-
-        $this->mockQueue
-            ->expects(self::once())
-            ->method('sendMessage')
-            ->with(
-                $resultEntry1,
-                $resultEntry2,
-                self::callback(function (LdapMessageResponse $response) {
-                    /** @var PagingControl $paging */
-                    $paging = $response->controls()->get(Control::OID_PAGING);
-
-                    // Generator was exhausted with only 2 entries, so paging is complete (cookie='')
-                    return $paging && $paging->getCookie() === '';
-                })
-            );
-
         $this->subject->handleRequest(
             $message,
             $this->mockToken,
         );
+
+        self::assertEquals(
+            [
+                new LdapMessageResponse(2, new SearchResultEntry($entry1)),
+                new LdapMessageResponse(2, new SearchResultEntry($entry2)),
+            ],
+            $this->entryMessages(),
+        );
+        // Generator was exhausted with only 2 entries, so paging is complete (cookie='').
+        self::assertSame('', $this->donePagingControl()->getCookie());
     }
 
     public function test_it_should_store_the_generator_and_return_a_cookie_when_more_entries_remain(): void
@@ -132,24 +164,17 @@ class ServerPagingHandlerTest extends TestCase
             ->method('search')
             ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
 
-        $this->mockQueue
-            ->expects(self::once())
-            ->method('sendMessage')
-            ->with(
-                new LdapMessageResponse(2, new SearchResultEntry($entry1)),
-                self::callback(function (LdapMessageResponse $response) {
-                    /** @var PagingControl $paging */
-                    $paging = $response->controls()->get(Control::OID_PAGING);
-
-                    // Non-empty cookie means more entries remain.
-                    return $paging && $paging->getCookie() !== '';
-                })
-            );
-
         $this->subject->handleRequest(
             $message,
             $this->mockToken,
         );
+
+        self::assertEquals(
+            [new LdapMessageResponse(2, new SearchResultEntry($entry1))],
+            $this->entryMessages(),
+        );
+        // Non-empty cookie means more entries remain.
+        self::assertNotSame('', $this->donePagingControl()->getCookie());
     }
 
     public function test_it_should_continue_from_the_stored_generator_on_subsequent_pages(): void
@@ -165,22 +190,10 @@ class ServerPagingHandlerTest extends TestCase
             ->method('search')
             ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
 
-        $capturedCookie = '';
-
-        $this->mockQueue
-            ->method('sendMessage')
-            ->willReturnCallback(function (LdapMessageResponse ...$responses) use (&$capturedCookie) {
-                foreach ($responses as $response) {
-                    $paging = $response->controls()->get(Control::OID_PAGING);
-                    if ($paging instanceof PagingControl && $paging->getCookie() !== '') {
-                        $capturedCookie = $paging->getCookie();
-                    }
-                }
-
-                return $this->mockQueue;
-            });
-
         $this->subject->handleRequest($firstMessage, $this->mockToken);
+
+        $capturedCookie = $this->donePagingControl()->getCookie();
+        self::assertNotSame('', $capturedCookie);
 
         // Second page: use the captured cookie.
         $pagingReq = $this->requestHistory->pagingRequest()->findByNextCookie($capturedCookie);
@@ -206,20 +219,13 @@ class ServerPagingHandlerTest extends TestCase
             ->expects(self::never())
             ->method('search');
 
-        $this->mockQueue
-            ->expects(self::once())
-            ->method('sendMessage')
-            ->with(self::callback(function (LdapMessageResponse $response) {
-                /** @var PagingControl $paging */
-                $paging = $response->controls()->get(Control::OID_PAGING);
-
-                return $paging && $paging->getCookie() === '';
-            }));
-
         $this->subject->handleRequest(
             $message,
             $this->mockToken,
         );
+
+        self::assertSame([], $this->entryMessages());
+        self::assertSame('', $this->donePagingControl()->getCookie());
     }
 
     public function test_it_sends_a_result_code_error_in_SearchResultDone_if_the_old_and_new_paging_requests_are_different(): void
@@ -235,10 +241,13 @@ class ServerPagingHandlerTest extends TestCase
             ->expects(self::never())
             ->method('search');
 
-        $this->mockQueue
-            ->expects(self::once())
-            ->method('sendMessage')
-            ->with(self::equalTo(
+        $this->subject->handleRequest(
+            $message,
+            $this->mockToken,
+        );
+
+        self::assertEquals(
+            [
                 new LdapMessageResponse(
                     $message->getMessageId(),
                     new SearchResultDone(
@@ -246,16 +255,10 @@ class ServerPagingHandlerTest extends TestCase
                         'dc=foo,dc=bar',
                         "The search request and controls must be identical between paging requests."
                     ),
-                    ...[new PagingControl(
-                        0,
-                        ''
-                    )]
-                )
-            ));
-
-        $this->subject->handleRequest(
-            $message,
-            $this->mockToken,
+                    new PagingControl(0, '')
+                ),
+            ],
+            $this->sentMessages,
         );
     }
 
@@ -283,23 +286,16 @@ class ServerPagingHandlerTest extends TestCase
             ->expects(self::never())
             ->method('search');
 
-        $this->mockQueue
-            ->expects(self::once())
-            ->method('sendMessage')
-            ->with(self::callback(function (LdapMessageResponse $response): bool {
-                $paging = $response->controls()->get(Control::OID_PAGING);
-                $done = $response->getResponse();
-
-                return $paging instanceof PagingControl
-                    && $paging->getCookie() === ''
-                    && $done instanceof SearchResultDone
-                    && $done->getResultCode() === ResultCode::OPERATIONS_ERROR;
-            }));
-
         $this->subject->handleRequest(
             $message,
             $this->mockToken
         );
+
+        self::assertSame([], $this->entryMessages());
+        $done = $this->doneMessage()->getResponse();
+        self::assertInstanceOf(SearchResultDone::class, $done);
+        self::assertSame(ResultCode::OPERATIONS_ERROR, $done->getResultCode());
+        self::assertSame('', $this->donePagingControl()->getCookie());
     }
 
     public function test_it_throws_an_exception_if_the_paging_cookie_does_not_exist(): void
@@ -333,23 +329,17 @@ class ServerPagingHandlerTest extends TestCase
             ->method('search')
             ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
 
-        $this->mockQueue
-            ->expects(self::once())
-            ->method('sendMessage')
-            ->with(
-                new LdapMessageResponse(2, new SearchResultEntry($entry1)),
-                self::callback(static function (LdapMessageResponse $response): bool {
-                    $paging = $response->controls()->get(Control::OID_PAGING);
-                    $done = $response->getResponse();
-
-                    return $paging instanceof PagingControl
-                        && $paging->getCookie() === ''
-                        && $done instanceof SearchResultDone
-                        && $done->getResultCode() === ResultCode::SIZE_LIMIT_EXCEEDED;
-                }),
-            );
-
         $this->subject->handleRequest($message, $this->mockToken);
+
+        self::assertEquals(
+            [new LdapMessageResponse(2, new SearchResultEntry($entry1))],
+            $this->entryMessages(),
+        );
+
+        $done = $this->doneMessage()->getResponse();
+        self::assertInstanceOf(SearchResultDone::class, $done);
+        self::assertSame(ResultCode::SIZE_LIMIT_EXCEEDED, $done->getResultCode());
+        self::assertSame('', $this->donePagingControl()->getCookie());
     }
 
     public function test_it_should_accumulate_size_limit_across_pages(): void
@@ -367,35 +357,14 @@ class ServerPagingHandlerTest extends TestCase
             ->method('search')
             ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2, $entry3)));
 
-        $capturedCookie = '';
-        $sizeLimitExceededSeen = false;
-
-        $this->mockQueue
-            ->method('sendMessage')
-            ->willReturnCallback(
-                function (LdapMessageResponse ...$responses) use (&$capturedCookie, &$sizeLimitExceededSeen) {
-                    foreach ($responses as $response) {
-                        $paging = $response->controls()->get(Control::OID_PAGING);
-                        if ($paging instanceof PagingControl && $paging->getCookie() !== '') {
-                            $capturedCookie = $paging->getCookie();
-                        }
-                        $done = $response->getResponse();
-                        if ($done instanceof SearchResultDone && $done->getResultCode() === ResultCode::SIZE_LIMIT_EXCEEDED) {
-                            $sizeLimitExceededSeen = true;
-                        }
-                    }
-
-                    return $this->mockQueue;
-                }
-            );
-
         // First page: pageSize=1, sizeLimit=2 — gets entry1, stores generator
         $this->subject->handleRequest(
             $this->makeSearchMessage(size: 1, searchRequest: $searchRequest),
             $this->mockToken,
         );
 
-        self::assertNotEmpty($capturedCookie, 'Expected a non-empty cookie after the first page.');
+        $capturedCookie = $this->donePagingControl()->getCookie();
+        self::assertNotSame('', $capturedCookie, 'Expected a non-empty cookie after the first page.');
 
         // Second page: totalSent=1, gets entry2 — hits sizeLimit(2), returns SIZE_LIMIT_EXCEEDED
         $pagingReq = $this->requestHistory->pagingRequest()->findByNextCookie($capturedCookie);
@@ -403,6 +372,16 @@ class ServerPagingHandlerTest extends TestCase
             $this->makeSearchMessage(size: 10, cookie: $capturedCookie, searchRequest: $pagingReq->getSearchRequest()),
             $this->mockToken,
         );
+
+        $sizeLimitExceededSeen = false;
+        foreach ($this->sentMessages as $message) {
+            $done = $message->getResponse();
+            if ($done instanceof SearchResultDone && $done->getResultCode() === ResultCode::SIZE_LIMIT_EXCEEDED) {
+                $sizeLimitExceededSeen = true;
+
+                break;
+            }
+        }
 
         self::assertTrue($sizeLimitExceededSeen, 'Expected SIZE_LIMIT_EXCEEDED on the second page.');
     }

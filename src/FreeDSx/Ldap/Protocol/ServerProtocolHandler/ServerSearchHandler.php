@@ -13,14 +13,17 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
-use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
+use Generator;
 
 /**
  * Handles search request logic.
@@ -50,42 +53,21 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
         try {
             $this->assertBaseDnProvided($request);
 
-            $results = [];
-            $sizeLimitExceeded = false;
-            $sizeLimit = $request->getSizeLimit();
-
-            $result = $this->backend->search(
+            $backendResult = $this->backend->search(
                 $request,
                 $this->nonPagingControls($message),
             );
 
-            foreach ($result->entries as $entry) {
-                if ($result->isPreFiltered || $this->filterEvaluator->evaluate($entry, $request->getFilter())) {
-                    $results[] = $this->applyAttributeFilter(
-                        $entry,
-                        $request->getAttributes(),
-                        $request->getAttributesOnly(),
-                    );
-                    if ($sizeLimit > 0 && count($results) >= $sizeLimit) {
-                        $sizeLimitExceeded = true;
-
-                        break;
-                    }
-                }
-            }
-
-            $entries = new Entries(...$results);
-            $searchResult = $sizeLimitExceeded
-                ? SearchResult::makeErrorResult(
-                    ResultCode::SIZE_LIMIT_EXCEEDED,
-                    (string) $request->getBaseDn(),
-                    '',
-                    $entries,
-                )
-                : SearchResult::makeSuccessResult(
-                    $entries,
-                    (string) $request->getBaseDn()
-                );
+            $state = new SearchResultState();
+            $searchResult = SearchResult::makeSuccessResult(
+                $this->filteredEntryStream(
+                    $backendResult,
+                    $request,
+                    $state,
+                ),
+                (string) $request->getBaseDn(),
+                $state,
+            );
         } catch (OperationException $e) {
             $searchResult = SearchResult::makeErrorResult(
                 $e->getCode(),
@@ -99,5 +81,40 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
             $message,
             $this->queue,
         );
+    }
+
+    /**
+     * Streams filtered + attribute-projected entries from the backend.
+     *
+     * @return Generator<Entry>
+     */
+    private function filteredEntryStream(
+        EntryStream $backend,
+        SearchRequest $request,
+        SearchResultState $state,
+    ): Generator {
+        $sizeLimit = $request->getSizeLimit();
+        $filter = $request->getFilter();
+        $isPreFiltered = $backend->isPreFiltered;
+        $emitted = 0;
+
+        foreach ($backend->entries as $entry) {
+            if (!$isPreFiltered && !$this->filterEvaluator->evaluate($entry, $filter)) {
+                continue;
+            }
+
+            yield $this->applyAttributeFilter(
+                $entry,
+                $request->getAttributes(),
+                $request->getAttributesOnly(),
+            );
+            $emitted++;
+
+            if ($sizeLimit > 0 && $emitted >= $sizeLimit) {
+                $state->resultCode = ResultCode::SIZE_LIMIT_EXCEEDED;
+
+                return;
+            }
+        }
     }
 }

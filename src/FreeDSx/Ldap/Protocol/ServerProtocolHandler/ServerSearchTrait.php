@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use Generator;
 
 trait ServerSearchTrait
 {
@@ -36,27 +37,41 @@ trait ServerSearchTrait
         ServerQueue $queue,
         Control ...$controls
     ): void {
-        $messages = [];
-        $entries = $searchResult->getEntries();
+        $queue->sendMessages($this->buildResponseStream(
+            $searchResult,
+            $message->getMessageId(),
+            ...$controls,
+        ));
+    }
 
-        foreach ($entries->toArray() as $entry) {
-            $messages[] = new LdapMessageResponse(
-                $message->getMessageId(),
-                new SearchResultEntry($entry)
+    /**
+     * Yields a SearchResultEntry per backend entry followed by the terminal SearchResultDone.
+     *
+     * @return Generator<LdapMessageResponse>
+     */
+    private function buildResponseStream(
+        SearchResult $searchResult,
+        int $messageId,
+        Control ...$controls,
+    ): Generator {
+        foreach ($searchResult->getEntries() as $entry) {
+            yield new LdapMessageResponse(
+                $messageId,
+                new SearchResultEntry($entry),
             );
         }
 
-        $messages[] = new LdapMessageResponse(
-            $message->getMessageId(),
-            new SearchResultDone(
-                $searchResult->getResultCode(),
-                $searchResult->getBaseDn(),
-                $searchResult->getDiagnosticMessage()
-            ),
-            ...$controls
-        );
+        $state = $searchResult->getState();
 
-        $queue->sendMessage(...$messages);
+        yield new LdapMessageResponse(
+            $messageId,
+            new SearchResultDone(
+                $state->resultCode,
+                $searchResult->getBaseDn(),
+                $state->diagnosticMessage,
+            ),
+            ...$controls,
+        );
     }
 
     private function getSearchRequestFromMessage(LdapMessageRequest $message): SearchRequest

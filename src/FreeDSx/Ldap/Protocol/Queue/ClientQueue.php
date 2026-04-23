@@ -76,7 +76,7 @@ class ClientQueue extends LdapQueue
     public function sendMessage(LdapMessageRequest ...$messages): self
     {
         $this->initSocket();
-        $this->sendLdapMessage(...$messages);
+        $this->sendLdapMessage($messages);
 
         return $this;
     }
