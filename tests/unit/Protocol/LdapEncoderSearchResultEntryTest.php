@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\SearchEncodingCache;
 use PHPUnit\Framework\TestCase;
 use function str_repeat;
 
@@ -214,6 +215,85 @@ final class LdapEncoderSearchResultEntryTest extends TestCase
         );
     }
 
+    public function test_consecutive_entries_share_cache_and_stay_byte_identical(): void
+    {
+        $entry1 = new Entry(
+            new Dn('cn=alice,dc=example,dc=com'),
+            new Attribute('objectClass', 'top', 'person', 'inetOrgPerson'),
+            new Attribute('cn', 'alice'),
+            new Attribute('sn', 'Anderson'),
+        );
+        $entry2 = new Entry(
+            new Dn('cn=bob,dc=example,dc=com'),
+            new Attribute('objectClass', 'top', 'person', 'inetOrgPerson'),
+            new Attribute('cn', 'bob'),
+            new Attribute('sn', 'Brown'),
+        );
+
+        $cache = new SearchEncodingCache();
+        $cachedBytes = $this->encoder->encodeSearchResultEntryMessage(100, $entry1, $cache)
+            . $this->encoder->encodeSearchResultEntryMessage(101, $entry2, $cache);
+
+        $expected = $this->encoder->encode(
+            (new LdapMessageResponse(100, new SearchResultEntry($entry1)))->toAsn1(),
+        ) . $this->encoder->encode(
+            (new LdapMessageResponse(101, new SearchResultEntry($entry2)))->toAsn1(),
+        );
+
+        self::assertSame(
+            bin2hex($expected),
+            bin2hex($cachedBytes),
+        );
+    }
+
+    public function test_repeated_description_across_entries_matches_uncached(): void
+    {
+        $cache = new SearchEncodingCache();
+
+        $firstHit = $this->encoder->encodeSearchResultEntryMessage(
+            messageId: 200,
+            entry: new Entry(
+                new Dn('cn=a,dc=b'),
+                new Attribute('objectClass', 'top', 'person'),
+            ),
+            cache: $cache,
+        );
+        $secondHit = $this->encoder->encodeSearchResultEntryMessage(
+            messageId: 201,
+            entry: new Entry(
+                new Dn('cn=c,dc=b'),
+                new Attribute('objectClass', 'top', 'groupOfNames'),
+            ),
+            cache: $cache,
+        );
+
+        $expectedFirst = $this->encoder->encode(
+            (new LdapMessageResponse(200, new SearchResultEntry(
+                new Entry(
+                    new Dn('cn=a,dc=b'),
+                    new Attribute('objectClass', 'top', 'person'),
+                ),
+            )))->toAsn1(),
+        );
+        $expectedSecond = $this->encoder->encode(
+            (new LdapMessageResponse(201, new SearchResultEntry(
+                new Entry(
+                    new Dn('cn=c,dc=b'),
+                    new Attribute('objectClass', 'top', 'groupOfNames'),
+                ),
+            )))->toAsn1(),
+        );
+
+        self::assertSame(
+            bin2hex($expectedFirst),
+            bin2hex($firstHit),
+        );
+        self::assertSame(
+            bin2hex($expectedSecond),
+            bin2hex($secondHit),
+        );
+    }
+
     private function assertParity(
         int $messageId,
         Entry $entry,
@@ -225,14 +305,24 @@ final class LdapEncoderSearchResultEntryTest extends TestCase
             ))->toAsn1(),
         );
 
-        $actual = $this->encoder->encodeSearchResultEntryMessage(
+        $withoutCache = $this->encoder->encodeSearchResultEntryMessage(
             $messageId,
             $entry,
         );
 
+        $withCache = $this->encoder->encodeSearchResultEntryMessage(
+            $messageId,
+            $entry,
+            new SearchEncodingCache(),
+        );
+
         self::assertSame(
             bin2hex($expected),
-            bin2hex($actual),
+            bin2hex($withoutCache),
+        );
+        self::assertSame(
+            bin2hex($expected),
+            bin2hex($withCache),
         );
     }
 }

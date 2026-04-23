@@ -85,11 +85,12 @@ class LdapEncoder extends BerEncoder
     public function encodeSearchResultEntryMessage(
         int $messageId,
         Entry $entry,
+        ?SearchEncodingCache $cache = null,
     ): string {
         $innerPayload = $this->berOctetString($entry->getDn()->toString())
             . $this->berWrap(
                 self::TAG_SEQUENCE,
-                $this->berPartialAttributes($entry),
+                $this->berPartialAttributes($entry, $cache),
             );
 
         $protocolOp = $this->berWrap(
@@ -105,8 +106,10 @@ class LdapEncoder extends BerEncoder
         );
     }
 
-    private function berPartialAttributes(Entry $entry): string
-    {
+    private function berPartialAttributes(
+        Entry $entry,
+        ?SearchEncodingCache $cache,
+    ): string {
         $out = '';
 
         foreach ($entry->getAttributes() as $attribute) {
@@ -115,7 +118,11 @@ class LdapEncoder extends BerEncoder
                 $valuesPayload .= $this->berOctetString($value);
             }
 
-            $partialPayload = $this->berOctetString($attribute->getDescription())
+            $descriptionBytes = $cache !== null
+                ? $cache->description($attribute->getDescription())
+                : $this->berOctetString($attribute->getDescription());
+
+            $partialPayload = $descriptionBytes
                 . $this->berWrap(self::TAG_SET, $valuesPayload);
 
             $out .= $this->berWrap(

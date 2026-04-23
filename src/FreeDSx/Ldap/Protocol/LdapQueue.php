@@ -127,9 +127,10 @@ class LdapQueue extends Asn1MessageQueue
     protected function sendLdapMessage(iterable $messages): static
     {
         $buffer = '';
+        $cache = null;
 
         foreach ($messages as $message) {
-            $encoded = $this->encodeMessage($message);
+            $encoded = $this->encodeMessage($message, $cache);
             $buffer .= $this->messageWrapper !== null ? $this->messageWrapper->wrap($encoded) : $encoded;
             $bufferLen = strlen($buffer);
             if ($bufferLen >= self::BUFFER_SIZE) {
@@ -146,13 +147,17 @@ class LdapQueue extends Asn1MessageQueue
 
     /**
      * Fast-path SearchResultEntry responses that carry no controls through a hand-rolled BER
-     * writer to avoid per-entry ASN.1 AST allocation. Everything else falls back to the generic
-     * encode(toAsn1()) path.
+     * writer to avoid per-entry ASN.1 AST allocation. A SearchEncodingCache is lazily created
+     * on first fast-path hit and reused across the remaining fast-path messages in the same
+     * sendLdapMessage() call, so repeated attribute descriptions and short values are encoded
+     * once per response. Everything else falls back to the generic encode(toAsn1()) path.
      *
      * @throws EncoderException
      */
-    private function encodeMessage(LdapMessage $message): string
-    {
+    private function encodeMessage(
+        LdapMessage $message,
+        ?SearchEncodingCache &$cache,
+    ): string {
         if (
             $this->encoder instanceof LdapEncoder
             && $message instanceof LdapMessageResponse
@@ -160,9 +165,12 @@ class LdapQueue extends Asn1MessageQueue
         ) {
             $response = $message->getResponse();
             if ($response instanceof SearchResultEntry) {
+                $cache ??= new SearchEncodingCache();
+
                 return $this->encoder->encodeSearchResultEntryMessage(
                     $message->getMessageId(),
                     $response->getEntry(),
+                    $cache,
                 );
             }
         }
