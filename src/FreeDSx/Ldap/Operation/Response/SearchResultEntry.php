@@ -82,7 +82,12 @@ class SearchResultEntry implements ResponseInterface
                     }
                 }
 
-                $attributes[] = new Attribute($partialAttribute->getChild(0)->getValue(), ...$values);
+                $attrType = $partialAttribute->getChild(0);
+                if ($attrType === null) {
+                    throw new ProtocolException('The search result entry is malformed.');
+                }
+
+                $attributes[] = new Attribute($attrType->getValue(), ...$values);
             }
         }
 
