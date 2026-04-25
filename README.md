@@ -1,4 +1,4 @@
-# FreeDSx LDAP ![](https://github.com/FreeDSx/LDAP/workflows/Analysis/badge.svg) ![](https://github.com/FreeDSx/LDAP/workflows/Build/badge.svg) [![codecov](https://codecov.io/gh/FreeDSx/LDAP/branch/master/graph/badge.svg)](https://codecov.io/gh/FreeDSx/LDAP)
+# FreeDSx LDAP ![](https://github.com/FreeDSx/LDAP/workflows/Analysis/badge.svg) ![](https://github.com/FreeDSx/LDAP/workflows/Build/badge.svg) [![codecov](https://codecov.io/gh/FreeDSx/LDAP/branch/main/graph/badge.svg)](https://codecov.io/gh/FreeDSx/LDAP)
 FreeDSx LDAP is a pure PHP LDAP library. It has no requirement on the core PHP LDAP extension. This library currently implements
 most client functionality described in [RFC 4511](https://tools.ietf.org/html/rfc4511) and some very limited LDAP server
 functionality. It also implements some other client features from various RFCs:
