@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+0.8.1 (2026-04-25)
+------------------
+* Lock FreeDSx dependencies to prepare for a 1.0 release. This will be the final 0.x release.
+
 0.8.0 (2022-05-21)
 ------------------
 * Properly handle and reap child processes in the LDAP server.
