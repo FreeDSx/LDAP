@@ -16,9 +16,9 @@
   ],
   "require": {
     "php": ">=8.2",
-    "freedsx/asn1": "dev-main",
-    "freedsx/socket": "dev-main",
-    "freedsx/sasl": "dev-main",
+    "freedsx/asn1": "dev-main#a136e7981d2ca76b140570834bd65debf42ee3da",
+    "freedsx/socket": "dev-main#58b314ec8140deccfd6a321b3c27091f375b9e31",
+    "freedsx/sasl": "dev-main#8dfa6e105f101960d9fa5f9c57d9c461d2c20593",
     "psr/log": "^3"
   },
   "require-dev": {
@@ -33,6 +33,8 @@
     "phpstan/extension-installer": "^1.4",
     "swoole/ide-helper": "^6.0"
   },
+  "minimum-stability": "dev",
+  "prefer-stable": true,
   "suggest": {
     "ext-openssl": "For SSL/TLS support and some SASL mechanisms.",
     "ext-pcntl": "For LDAP server functionality.",
