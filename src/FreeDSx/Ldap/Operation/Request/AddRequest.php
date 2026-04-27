@@ -70,6 +70,8 @@ class AddRequest implements RequestInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): self
     {
@@ -116,10 +118,7 @@ class AddRequest implements RequestInterface
         ));
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $attributeList = Asn1::sequenceOf();
 

@@ -47,10 +47,7 @@ trait SyncRefreshDoneTrait
         return $this;
     }
 
-    /**
-     *{@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $asn1 = Asn1::context(
             static::VALUE_TAG,
@@ -74,6 +71,8 @@ trait SyncRefreshDoneTrait
 
     /**
      *{@inheritdoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): IntermediateResponse
     {

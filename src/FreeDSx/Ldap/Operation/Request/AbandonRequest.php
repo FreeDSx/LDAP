@@ -47,6 +47,8 @@ class AbandonRequest implements RequestInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): self
     {
@@ -54,13 +56,15 @@ class AbandonRequest implements RequestInterface
             throw new ProtocolException('The abandon request is malformed');
         }
 
-        return new self($type->getValue());
+        $messageId = $type->getValue();
+        if (!is_int($messageId)) {
+            throw new ProtocolException('The abandon request message ID is not an integer.');
+        }
+
+        return new self($messageId);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): IntegerType
     {
         return Asn1::application(
             self::APP_TAG,

@@ -175,10 +175,7 @@ class SyncStateControl extends Control
         return $this->state === self::STATE_MODIFY;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $this->controlValue = Asn1::sequence(
             Asn1::enumerated($this->state),
@@ -193,6 +190,8 @@ class SyncStateControl extends Control
 
     /**
      * {@inheritdoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): static
     {

@@ -25,10 +25,13 @@ interface ProtocolElementInterface
 {
     /**
      * Returns the Asn1 representation of an object that can be used by an encoder.
+     *
+     * @return AbstractType<mixed>
      */
     public function toAsn1(): AbstractType;
 
     /**
+     * @param AbstractType<mixed> $type
      * @return mixed
      * @throws ProtocolException
      */

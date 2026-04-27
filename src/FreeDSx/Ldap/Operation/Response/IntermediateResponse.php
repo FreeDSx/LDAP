@@ -18,6 +18,7 @@ use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use function is_string;
 
 /**
  * RFC 4511, 4.13.
@@ -38,6 +39,9 @@ class IntermediateResponse implements ResponseInterface
 
     private ?string $responseValue;
 
+    /**
+     * @var AbstractType<mixed>|null
+     */
     private ?AbstractType $responseValueToEncode = null;
 
     public function __construct(
@@ -48,6 +52,9 @@ class IntermediateResponse implements ResponseInterface
         $this->responseValue = $responseValue;
     }
 
+    /**
+     * @param AbstractType<mixed> $valueToEncode
+     */
     protected function setResponseValueToEncode(AbstractType $valueToEncode): void
     {
         $this->responseValueToEncode = $valueToEncode;
@@ -65,6 +72,8 @@ class IntermediateResponse implements ResponseInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): IntermediateResponse
     {
@@ -75,42 +84,49 @@ class IntermediateResponse implements ResponseInterface
         $name = null;
         $value = null;
         foreach ($type->getChildren() as $child) {
-            if ($child->getTagNumber() === 0 && $child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
-                $name = $child->getValue();
+            if ($child->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
+                continue;
             }
-            if ($child->getTagNumber() === 1 && $child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
-                $value = $child->getValue();
+            $childValue = $child->getValue();
+            if ($childValue !== null && !is_string($childValue)) {
+                continue;
+            }
+            if ($child->getTagNumber() === 0) {
+                $name = $childValue;
+            } elseif ($child->getTagNumber() === 1) {
+                $value = $childValue;
             }
         }
 
         if ($name === self::OID_SYNC_INFO) {
-            $response = SyncInfoMessage::fromAsn1($type);
-        } else {
-            $response = new self(
-                $name === null ? null : (string)$name,
-                $value === null ? null : (string)$value
-            );
+            return SyncInfoMessage::fromAsn1($type);
         }
 
-        return $response;
+        return new self(
+            $name,
+            $value,
+        );
     }
 
+    /**
+     * @param AbstractType<mixed> $responseName
+     */
     private static function isNotValidResponseName(AbstractType $responseName): bool
     {
         return $responseName->getTagNumber() !== 0
             || $responseName->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC;
     }
 
+    /**
+     * @param AbstractType<mixed> $responseValue
+     */
     private static function isNotValidResponseValue(AbstractType $responseValue): bool
     {
         return $responseValue->getTagNumber() !== 1
             || $responseValue->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $response = Asn1::sequence();
 
@@ -139,7 +155,9 @@ class IntermediateResponse implements ResponseInterface
     }
 
     /**
-     * @param array<int, array<int, int|class-string>> $tagMap
+     * @param AbstractType<mixed> $type
+     * @param array<int, array<int, int>> $tagMap
+     * @return AbstractType<mixed>
      * @throws ProtocolException
      */
     protected static function decodeEncodedValue(
@@ -148,7 +166,14 @@ class IntermediateResponse implements ResponseInterface
     ): AbstractType {
         $responseValue = $type->getChild(1);
 
-        if ($responseValue == null || self::isNotValidResponseValue($responseValue)) {
+        if ($responseValue === null || self::isNotValidResponseValue($responseValue)) {
+            throw new ProtocolException(
+                'The intermediate response either contains no value or is not an octet string.'
+            );
+        }
+
+        $rawValue = $responseValue->getValue();
+        if (!is_string($rawValue)) {
             throw new ProtocolException(
                 'The intermediate response either contains no value or is not an octet string.'
             );
@@ -156,12 +181,13 @@ class IntermediateResponse implements ResponseInterface
 
         return (new LdapEncoder())
             ->decode(
-                $responseValue->getValue(),
+                $rawValue,
                 $tagMap
             );
     }
 
     /**
+     * @param AbstractType<mixed> $type
      * @throws ProtocolException
      */
     protected static function decodeResponseName(AbstractType $type): string
@@ -174,6 +200,13 @@ class IntermediateResponse implements ResponseInterface
             );
         }
 
-        return $responseName->getValue();
+        $rawValue = $responseName->getValue();
+        if (!is_string($rawValue)) {
+            throw new ProtocolException(
+                'Expected a responseName value with a tag of 0 and a context specific class type.'
+            );
+        }
+
+        return $rawValue;
     }
 }

@@ -74,10 +74,7 @@ class SyncIdSet extends SyncInfoMessage
         return $this->entryUuids;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $asn1 = Asn1::context(
             self::VALUE_TAG,
@@ -106,6 +103,8 @@ class SyncIdSet extends SyncInfoMessage
 
     /**
      *{@inheritdoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): IntermediateResponse
     {

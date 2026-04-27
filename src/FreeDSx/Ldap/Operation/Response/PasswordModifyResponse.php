@@ -46,10 +46,7 @@ class PasswordModifyResponse extends ExtendedResponse
         return $this->generatedPassword;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         if ($this->generatedPassword !== null) {
             $this->responseValue = Asn1::sequence(Asn1::context(
@@ -64,6 +61,7 @@ class PasswordModifyResponse extends ExtendedResponse
     /**
      * {@inheritDoc}
      *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      * @throws PartialPduException
      * @throws ProtocolException

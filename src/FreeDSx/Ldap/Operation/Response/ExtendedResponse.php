@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
+use function is_string;
 
 /**
  * RFC 4511, 4.12
@@ -44,6 +45,9 @@ class ExtendedResponse extends LdapResult
 
     protected ?string $responseName;
 
+    /**
+     * @var AbstractType<mixed>|ProtocolElementInterface|string|null
+     */
     protected AbstractType|ProtocolElementInterface|string|null $responseValue;
 
     public function __construct(
@@ -79,6 +83,8 @@ class ExtendedResponse extends LdapResult
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      */
     public static function fromAsn1(AbstractType $type): static
@@ -93,9 +99,8 @@ class ExtendedResponse extends LdapResult
      * @throws ProtocolException
      * @throws EncoderException
      */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
-        /** @var SequenceType $asn1 */
         $asn1 = parent::toAsn1();
 
         if ($this->responseName !== null) {
@@ -122,6 +127,7 @@ class ExtendedResponse extends LdapResult
     }
 
     /**
+     * @param AbstractType<mixed> $type
      * @return array{0: ?string, 1: ?string}
      */
     private static function parseExtendedResponse(AbstractType $type): array
@@ -129,23 +135,22 @@ class ExtendedResponse extends LdapResult
         $info = [0 => null, 1 => null];
 
         foreach ($type->getChildren() as $child) {
-            if ($child->getTagNumber() === 10) {
-                $value = $child->getValue();
-                $info[0] = $value !== null
-                    ? (string) $value
-                    : null;
-            } elseif ($child->getTagNumber() === 11) {
-                $value = $child->getValue();
-                $info[1] = $value !== null
-                    ? (string) $value
-                    : null;
+            $tagNumber = $child->getTagNumber();
+            if ($tagNumber !== 10 && $tagNumber !== 11) {
+                continue;
             }
+            $value = $child->getValue();
+            if ($value !== null && !is_string($value)) {
+                continue;
+            }
+            $info[$tagNumber === 10 ? 0 : 1] = $value;
         }
 
         return $info;
     }
 
     /**
+     * @param AbstractType<mixed> $type
      * @throws ProtocolException
      * @throws EncoderException
      */
@@ -162,6 +167,8 @@ class ExtendedResponse extends LdapResult
     }
 
     /**
+     * @param AbstractType<mixed> $type
+     * @return AbstractType<mixed>|null
      * @throws ProtocolException
      * @throws EncoderException
      * @throws PartialPduException

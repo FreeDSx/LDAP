@@ -16,7 +16,9 @@ namespace FreeDSx\Ldap\Operation;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\EnumeratedType;
 use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -133,7 +135,7 @@ class LdapResult implements ResponseInterface
     /**
      * @throws ProtocolException
      */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $result = Asn1::sequence(
             Asn1::enumerated($this->resultCode),
@@ -160,6 +162,8 @@ class LdapResult implements ResponseInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      */
     public static function fromAsn1(AbstractType $type): static
@@ -175,6 +179,7 @@ class LdapResult implements ResponseInterface
     }
 
     /**
+     * @param AbstractType<mixed> $type
      * @return array{0: int, 1: string, 2: string, 3: LdapUrl[]}
      * @throws ProtocolException
      * @throws EncoderException
@@ -198,8 +203,11 @@ class LdapResult implements ResponseInterface
                     }
                     $child = (new LdapEncoder())->complete($child, AbstractType::TAG_TYPE_SEQUENCE);
                     foreach ($child->getChildren() as $ldapUrl) {
+                        if (!$ldapUrl instanceof OctetStringType) {
+                            throw new ProtocolException('The ASN1 structure for a referral is malformed.');
+                        }
                         try {
-                            $referrals[] = LdapUrl::parse((string) $ldapUrl->getValue());
+                            $referrals[] = LdapUrl::parse($ldapUrl->getValue());
                         } catch (UrlParseException $e) {
                             throw new ProtocolException($e->getMessage());
                         }
@@ -211,15 +219,24 @@ class LdapResult implements ResponseInterface
         $result = $type->getChild(0);
         $dn = $type->getChild(1);
         $diagnostic = $type->getChild(2);
-        if ($result === null || $dn === null || $diagnostic === null) {
+        if (
+            !$result instanceof EnumeratedType
+            || !$dn instanceof OctetStringType
+            || !$diagnostic instanceof OctetStringType
+        ) {
             throw new ProtocolException('The LDAP result is malformed.');
         }
 
+        $resultCode = $result->getValue();
+        if (!is_int($resultCode)) {
+            throw new ProtocolException('The LDAP result code is malformed.');
+        }
+
         return [
-            $result->getValue(),
+            $resultCode,
             $dn->getValue(),
             $diagnostic->getValue(),
-            $referrals
+            $referrals,
         ];
     }
 }

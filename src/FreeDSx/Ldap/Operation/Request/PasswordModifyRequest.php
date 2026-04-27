@@ -76,10 +76,7 @@ class PasswordModifyRequest extends ExtendedRequest
         return $this;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $this->requestValue = Asn1::sequence();
 
@@ -107,6 +104,8 @@ class PasswordModifyRequest extends ExtendedRequest
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      * @throws PartialPduException
      */

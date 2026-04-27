@@ -55,10 +55,7 @@ trait AttributeValueAssertionTrait
         return $this->value;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         return Asn1::context(
             tagNumber: self::CHOICE_TAG,
@@ -83,6 +80,8 @@ trait AttributeValueAssertionTrait
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      * @throws RuntimeException
      * @throws ProtocolException

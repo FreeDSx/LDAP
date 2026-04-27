@@ -71,7 +71,7 @@ class PwdPolicyResponseControl extends Control
      * @throws ProtocolException
      * @throws EncoderException
      */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $response = Asn1::sequence();
         $warning = null;
@@ -116,6 +116,8 @@ class PwdPolicyResponseControl extends Control
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      * @throws PartialPduException
      */

@@ -17,6 +17,7 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\BooleanType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
@@ -73,6 +74,8 @@ class SortingControl extends Control
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      * @throws PartialPduException
      */
@@ -97,16 +100,20 @@ class SortingControl extends Control
             foreach ($sequence->getChildren() as $keyItem) {
                 if ($keyItem instanceof OctetStringType && $keyItem->getTagClass() === AbstractType::TAG_CLASS_UNIVERSAL) {
                     $attrName = $keyItem->getValue();
-                } elseif ($keyItem->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $keyItem->getTagNumber() === 0) {
+                } elseif ($keyItem instanceof IncompleteType && $keyItem->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $keyItem->getTagNumber() === 0) {
                     $matchRule = $keyItem->getValue();
                 } elseif ($keyItem->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $keyItem->getTagNumber() === 1) {
                     if (!$keyItem instanceof IncompleteType) {
                         throw new ProtocolException('The sorting control is malformed.');
                     }
-                    $useReverseOrder = $encoder->complete(
+                    $reverseFlag = $encoder->complete(
                         type: $keyItem,
                         tagType: AbstractType::TAG_TYPE_BOOLEAN
-                    )->getValue();
+                    );
+                    if (!$reverseFlag instanceof BooleanType) {
+                        throw new ProtocolException('The sorting control reverseOrder flag is malformed.');
+                    }
+                    $useReverseOrder = $reverseFlag->getValue();
                 } else {
                     throw new ProtocolException('The sorting control contains unexpected data.');
                 }
@@ -129,10 +136,7 @@ class SortingControl extends Control
         );
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $this->controlValue = Asn1::sequenceOf();
 

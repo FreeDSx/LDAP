@@ -15,6 +15,8 @@ namespace FreeDSx\Ldap\Operation\Response;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\UrlParseException;
 use FreeDSx\Ldap\LdapUrl;
@@ -52,14 +54,19 @@ class SearchResultReference implements ResponseInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): self
     {
         $referrals = [];
 
         foreach ($type->getChildren() as $referral) {
+            if (!$referral instanceof OctetStringType) {
+                throw new ProtocolException('The search result reference is malformed.');
+            }
             try {
-                $referrals[] = LdapUrl::parse((string) $referral->getValue());
+                $referrals[] = LdapUrl::parse($referral->getValue());
             } catch (UrlParseException $e) {
                 throw new ProtocolException($e->getMessage());
             }
@@ -68,10 +75,7 @@ class SearchResultReference implements ResponseInterface
         return new self(...$referrals);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         return Asn1::application(
             self::TAG_NUMBER,

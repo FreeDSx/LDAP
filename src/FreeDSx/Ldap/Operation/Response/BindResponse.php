@@ -70,6 +70,8 @@ class BindResponse extends LdapResult
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      */
     public static function fromAsn1(AbstractType $type): static

@@ -53,10 +53,7 @@ class CancelRequest extends ExtendedRequest
         return $this;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $this->requestValue = Asn1::sequence(Asn1::integer($this->messageId));
 
@@ -65,6 +62,8 @@ class CancelRequest extends ExtendedRequest
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      * @throws PartialPduException
      */

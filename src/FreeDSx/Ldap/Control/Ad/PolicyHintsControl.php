@@ -54,10 +54,7 @@ class PolicyHintsControl extends Control
         return $this->isEnabled;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $this->controlValue = Asn1::sequence(Asn1::integer($this->isEnabled ? 1 : 0));
 
@@ -66,6 +63,8 @@ class PolicyHintsControl extends Control
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      * @throws PartialPduException
      */

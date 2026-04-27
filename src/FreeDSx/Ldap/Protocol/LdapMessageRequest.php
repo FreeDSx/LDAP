@@ -41,6 +41,9 @@ class LdapMessageRequest extends LdapMessage
         return $this->request;
     }
 
+    /**
+     * @return AbstractType<mixed>
+     */
     protected function getOperationAsn1(): AbstractType
     {
         return $this->request->toAsn1();

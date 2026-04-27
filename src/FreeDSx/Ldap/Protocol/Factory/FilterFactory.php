@@ -53,6 +53,7 @@ class FilterFactory
     ];
 
     /**
+     * @param AbstractType<mixed> $type
      * @throws ProtocolException
      * @throws RuntimeException
      */

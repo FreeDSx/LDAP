@@ -31,6 +31,8 @@ class UnbindRequest implements RequestInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): self
     {
@@ -41,10 +43,7 @@ class UnbindRequest implements RequestInterface
         return new self();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): NullType
     {
         return Asn1::application(
             self::APP_TAG,

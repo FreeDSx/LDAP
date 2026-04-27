@@ -33,6 +33,8 @@ class AnonBindRequest extends BindRequest
 
     /**
      * {@inheritdoc}
+     *
+     * @return AbstractType<mixed>
      */
     protected function getAsn1AuthChoice(): AbstractType
     {

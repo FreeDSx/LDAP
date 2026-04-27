@@ -72,6 +72,8 @@ class ExpectedEntryCountControl extends Control
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      * @throws PartialPduException
      */
@@ -100,10 +102,7 @@ class ExpectedEntryCountControl extends Control
         );
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $this->controlValue = Asn1::sequence(
             Asn1::integer($this->min),
@@ -114,6 +113,7 @@ class ExpectedEntryCountControl extends Control
     }
 
     /**
+     * @param AbstractType<mixed> $type
      * @throws ProtocolException
      */
     protected static function validate(AbstractType $type): void

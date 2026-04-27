@@ -70,7 +70,7 @@ class LdapMessageResponseTest extends TestCase
         $this->subject = LdapMessageResponse::fromAsn1(Asn1::sequence(
             Asn1::integer(3),
             Asn1::application(11, Asn1::sequence(
-                Asn1::integer(0),
+                Asn1::enumerated(0),
                 Asn1::octetString('dc=foo,dc=bar'),
                 Asn1::octetString('')
             )),

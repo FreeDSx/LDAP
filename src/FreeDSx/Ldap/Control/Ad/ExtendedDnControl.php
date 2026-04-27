@@ -56,6 +56,8 @@ class ExtendedDnControl extends Control
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      * @throws PartialPduException
      */
@@ -86,10 +88,7 @@ class ExtendedDnControl extends Control
         );
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $useHexFormat = $this->useHexFormat ? 0 : 1;
         $this->controlValue = Asn1::sequence(Asn1::integer($useHexFormat));
@@ -98,6 +97,7 @@ class ExtendedDnControl extends Control
     }
 
     /**
+     * @param AbstractType<mixed> $type
      * @throws ProtocolException
      */
     protected static function validate(AbstractType $type): void

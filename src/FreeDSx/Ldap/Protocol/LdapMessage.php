@@ -118,6 +118,8 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      * @throws PartialPduException
      * @throws RuntimeException
@@ -214,5 +216,8 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
         );
     }
 
+    /**
+     * @return AbstractType<mixed>
+     */
     abstract protected function getOperationAsn1(): AbstractType;
 }
