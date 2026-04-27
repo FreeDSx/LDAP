@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\ProtocolElementInterface;
 use function count;
+use function is_string;
 
 /**
  * An Extended Request. RFC 4511, 4.12
@@ -58,8 +59,14 @@ class ExtendedRequest implements RequestInterface
 
     private string $requestName;
 
+    /**
+     * @var null|string|AbstractType<mixed>|ProtocolElementInterface
+     */
     protected null|string|AbstractType|ProtocolElementInterface $requestValue;
 
+    /**
+     * @param null|string|AbstractType<mixed>|ProtocolElementInterface $requestValue
+     */
     public function __construct(
         string $requestName,
         null|string|AbstractType|ProtocolElementInterface $requestValue = null,
@@ -80,6 +87,9 @@ class ExtendedRequest implements RequestInterface
         return $this->requestName;
     }
 
+    /**
+     * @param null|string|AbstractType<mixed>|ProtocolElementInterface $requestValue
+     */
     public function setValue(null|string|AbstractType|ProtocolElementInterface $requestValue): static
     {
         $this->requestValue = $requestValue;
@@ -87,12 +97,15 @@ class ExtendedRequest implements RequestInterface
         return $this;
     }
 
+    /**
+     * @return null|string|AbstractType<mixed>|ProtocolElementInterface
+     */
     public function getValue(): null|string|AbstractType|ProtocolElementInterface
     {
         return $this->requestValue;
     }
 
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $asn1 = Asn1::sequence(Asn1::context(
             tagNumber: 0,
@@ -121,6 +134,8 @@ class ExtendedRequest implements RequestInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): static
     {
@@ -128,6 +143,8 @@ class ExtendedRequest implements RequestInterface
     }
 
     /**
+     * @param AbstractType<mixed> $type
+     * @return AbstractType<mixed>|null
      * @throws ProtocolException
      * @throws EncoderException
      * @throws PartialPduException
@@ -140,6 +157,7 @@ class ExtendedRequest implements RequestInterface
     }
 
     /**
+     * @param AbstractType<mixed> $type
      * @throws ProtocolException
      * @return array{0: string, 1: null|string}
      */
@@ -152,19 +170,28 @@ class ExtendedRequest implements RequestInterface
         $value = null;
 
         foreach ($type->getChildren() as $child) {
-            if ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 0) {
+            if ($child->getTagClass() !== AbstractType::TAG_CLASS_CONTEXT_SPECIFIC) {
+                continue;
+            }
+            if ($child->getTagNumber() === 0) {
                 $oid = $child;
-            } elseif ($child->getTagClass() === AbstractType::TAG_CLASS_CONTEXT_SPECIFIC && $child->getTagNumber() === 1) {
+            } elseif ($child->getTagNumber() === 1) {
                 $value = $child;
             }
         }
         if ($oid === null) {
             throw new ProtocolException('The extended request is malformed');
         }
-        if ($value !== null) {
-            $value = $value->getValue();
+
+        $oidValue = $oid->getValue();
+        $rawValue = $value?->getValue();
+        if (!is_string($oidValue) || ($rawValue !== null && !is_string($rawValue))) {
+            throw new ProtocolException('The extended request is malformed');
         }
 
-        return [$oid->getValue(), $value];
+        return [
+            $oidValue,
+            $rawValue,
+        ];
     }
 }

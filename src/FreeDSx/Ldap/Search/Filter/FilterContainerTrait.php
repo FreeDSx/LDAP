@@ -18,6 +18,7 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
+use FreeDSx\Asn1\Type\SetOfType;
 use FreeDSx\Asn1\Type\SetType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\Factory\FilterFactory;
@@ -85,10 +86,7 @@ trait FilterContainerTrait
         return $this->filters;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SetOfType
     {
         return Asn1::context(
             tagNumber: self::CHOICE_TAG,
@@ -136,6 +134,8 @@ trait FilterContainerTrait
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      * @throws ProtocolException
      */

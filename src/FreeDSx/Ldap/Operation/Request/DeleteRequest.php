@@ -49,16 +49,15 @@ class DeleteRequest implements RequestInterface, DnRequestInterface
         return $this->dn;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): OctetStringType
     {
         return Asn1::application(self::APP_TAG, Asn1::octetString($this->dn->toString()));
     }
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): static
     {
@@ -68,6 +67,7 @@ class DeleteRequest implements RequestInterface, DnRequestInterface
     }
 
     /**
+     * @param AbstractType<mixed> $type
      * @throws ProtocolException
      */
     protected static function validate(AbstractType $type): void

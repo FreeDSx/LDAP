@@ -78,6 +78,9 @@ class Control implements ProtocolElementInterface, Stringable
 
     public const OID_VLV_RESPONSE = '2.16.840.1.113730.3.4.10';
 
+    /**
+     * @param AbstractType<mixed>|ProtocolElementInterface|string|null $controlValue
+     */
     public function __construct(
         private string $controlType,
         private bool $criticality = false,
@@ -109,6 +112,9 @@ class Control implements ProtocolElementInterface, Stringable
         return $this->criticality;
     }
 
+    /**
+     * @param AbstractType<mixed>|ProtocolElementInterface|string|null $controlValue
+     */
     public function setValue(AbstractType|ProtocolElementInterface|string|null $controlValue): static
     {
         $this->controlValue = $controlValue;
@@ -116,15 +122,15 @@ class Control implements ProtocolElementInterface, Stringable
         return $this;
     }
 
+    /**
+     * @return AbstractType<mixed>|ProtocolElementInterface|string|null
+     */
     public function getValue(): AbstractType|ProtocolElementInterface|string|null
     {
         return $this->controlValue;
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $asn1 = Asn1::sequence(
             Asn1::octetString($this->controlType),
@@ -153,6 +159,8 @@ class Control implements ProtocolElementInterface, Stringable
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): static
     {
@@ -169,6 +177,7 @@ class Control implements ProtocolElementInterface, Stringable
     /**
      * @template T of Control
      * @phpstan-param T $control
+     * @param AbstractType<mixed> $type
      * @phpstan-return T
      * @throws ProtocolException
      */
@@ -188,6 +197,8 @@ class Control implements ProtocolElementInterface, Stringable
     }
 
     /**
+     * @param AbstractType<mixed> $type
+     * @return AbstractType<mixed>
      * @throws ProtocolException
      * @throws EncoderException
      * @throws PartialPduException
@@ -224,13 +235,17 @@ class Control implements ProtocolElementInterface, Stringable
                 continue;
             }
 
-            if ($i === 0) {
+            if ($i === 0 && $child instanceof OctetStringType) {
                 $oid = $child->getValue();
             } elseif ($child instanceof BooleanType) {
                 $criticality = $child->getValue();
             } elseif ($child instanceof OctetStringType) {
                 $value = $child->getValue();
             }
+        }
+
+        if ($oid === null) {
+            throw new ProtocolException('The received control is malformed. The control type OID is missing.');
         }
 
         return [$oid, $criticality, $value];

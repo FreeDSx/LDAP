@@ -366,6 +366,7 @@ class SearchRequest implements RequestInterface
     /**
      * {@inheritDoc}
      *
+     * @param AbstractType<mixed> $type
      * @throws RuntimeException
      */
     public static function fromAsn1(AbstractType $type): self
@@ -407,12 +408,25 @@ class SearchRequest implements RequestInterface
             $attrList[] = new Attribute($attribute->getValue());
         }
 
+        $scopeValue = $scope->getValue();
+        $derefValue = $deref->getValue();
+        $sizeLimitValue = $sizeLimit->getValue();
+        $timeLimitValue = $timeLimit->getValue();
+        if (
+            !is_int($scopeValue)
+            || !is_int($derefValue)
+            || !is_int($sizeLimitValue)
+            || !is_int($timeLimitValue)
+        ) {
+            throw new ProtocolException('The search request contains a non-integer numeric field.');
+        }
+
         $search = new self($filter, ...$attrList);
-        $search->setScope($scope->getValue());
+        $search->setScope($scopeValue);
         $search->setBaseDn($baseDn->getValue());
-        $search->setDereferenceAliases($deref->getValue());
-        $search->setSizeLimit($sizeLimit->getValue());
-        $search->setTimeLimit($timeLimit->getValue());
+        $search->setDereferenceAliases($derefValue);
+        $search->setSizeLimit($sizeLimitValue);
+        $search->setTimeLimit($timeLimitValue);
         $search->setAttributesOnly($typesOnly->getValue());
 
         return $search;
@@ -421,7 +435,7 @@ class SearchRequest implements RequestInterface
     /**
      * @throws RuntimeException
      */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         if ($this->baseDn === null) {
             throw new RuntimeException('The search baseDn cannot be empty.');

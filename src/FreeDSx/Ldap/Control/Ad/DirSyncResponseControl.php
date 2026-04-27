@@ -67,6 +67,8 @@ class DirSyncResponseControl extends Control
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      * @throws PartialPduException
      */
@@ -101,10 +103,7 @@ class DirSyncResponseControl extends Control
         );
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $this->controlValue = Asn1::sequence(
             Asn1::integer($this->moreResults),

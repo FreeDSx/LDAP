@@ -138,6 +138,8 @@ class Operations
 
     /**
      * Perform an extended operation.
+     *
+     * @param ProtocolElementInterface|AbstractType<mixed>|string|null $value
      */
     public static function extended(
         string $name,

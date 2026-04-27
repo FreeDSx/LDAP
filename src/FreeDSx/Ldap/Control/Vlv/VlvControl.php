@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Control\Vlv;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
@@ -114,7 +115,7 @@ class VlvControl extends Control
      * @throws EncoderException
      * @throws RuntimeException
      */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $this->controlValue = Asn1::sequence(
             Asn1::integer($this->before),
@@ -143,6 +144,8 @@ class VlvControl extends Control
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): static
     {

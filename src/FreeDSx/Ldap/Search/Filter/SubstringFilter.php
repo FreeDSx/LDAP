@@ -124,7 +124,7 @@ class SubstringFilter implements FilterInterface, Stringable
     /**
      * @throws RuntimeException
      */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         if ($this->startsWith === null && $this->endsWith === null && count($this->contains) === 0) {
             throw new RuntimeException('You must provide a contains, starts with, or ends with value to the substring filter.');
@@ -189,6 +189,8 @@ class SubstringFilter implements FilterInterface, Stringable
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      */
     public static function fromAsn1(AbstractType $type): self

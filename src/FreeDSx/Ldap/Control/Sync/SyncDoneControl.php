@@ -55,10 +55,7 @@ class SyncDoneControl extends Control
         return $this->refreshDeletes;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $this->controlValue = Asn1::sequence();
         if ($this->cookie !== null) {
@@ -75,6 +72,8 @@ class SyncDoneControl extends Control
 
     /**
      * {@inheritdoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): static
     {

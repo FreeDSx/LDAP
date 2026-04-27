@@ -39,6 +39,8 @@ class Controls
 {
     /**
      * Create a generic control by OID.
+     *
+     * @param ProtocolElementInterface|AbstractType<mixed>|null $value
      */
     public static function create(
         string $oid,

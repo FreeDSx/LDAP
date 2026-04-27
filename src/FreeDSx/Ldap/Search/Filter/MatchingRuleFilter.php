@@ -108,12 +108,8 @@ class MatchingRuleFilter implements FilterInterface, Stringable
         return $this;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
-        /** @var SequenceType $matchingRule */
         $matchingRule = Asn1::context(
             tagNumber: self::CHOICE_TAG,
             type: Asn1::sequence()
@@ -173,6 +169,8 @@ class MatchingRuleFilter implements FilterInterface, Stringable
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      */
     public static function fromAsn1(AbstractType $type): self

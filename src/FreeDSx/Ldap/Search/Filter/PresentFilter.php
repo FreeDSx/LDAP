@@ -38,10 +38,7 @@ class PresentFilter implements FilterInterface, Stringable
         $this->attribute = $attribute;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): OctetStringType
     {
         return Asn1::context(
             tagNumber: self::APP_TAG,
@@ -60,6 +57,8 @@ class PresentFilter implements FilterInterface, Stringable
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws ProtocolException
      * @throws EncoderException
      */

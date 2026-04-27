@@ -38,6 +38,7 @@ class ExtendedResponseFactory
     /**
      * Retrieve the Request Response/Request class given a protocol number and the ASN1.
      *
+     * @param AbstractType<mixed> $asn1
      * @throws ProtocolException
      * @throws RuntimeException
      */

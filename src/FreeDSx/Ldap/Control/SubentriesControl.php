@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Control;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\BooleanType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 
 /**
@@ -45,10 +46,7 @@ class SubentriesControl extends Control
         return $this;
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $this->controlValue = Asn1::boolean($this->isVisible);
 
@@ -57,6 +55,8 @@ class SubentriesControl extends Control
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): static
     {

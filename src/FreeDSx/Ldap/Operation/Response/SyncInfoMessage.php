@@ -60,6 +60,8 @@ abstract class SyncInfoMessage extends IntermediateResponse
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): IntermediateResponse
     {

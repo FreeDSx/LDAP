@@ -73,6 +73,8 @@ class CompareRequest implements RequestInterface, DnRequestInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws EncoderException
      * @throws RuntimeException
      */
@@ -91,10 +93,7 @@ class CompareRequest implements RequestInterface, DnRequestInterface
         return new self($dn->getValue(), EqualityFilter::fromAsn1($ava));
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         return Asn1::application(self::APP_TAG, Asn1::sequence(
             Asn1::octetString($this->dn->toString()),

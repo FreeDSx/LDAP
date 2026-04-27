@@ -93,10 +93,7 @@ class SyncRequestControl extends Control
         return $this;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $this->controlValue = Asn1::sequence(Asn1::enumerated($this->mode));
         if ($this->cookie !== null) {
@@ -109,6 +106,8 @@ class SyncRequestControl extends Control
 
     /**
      * {@inheritdoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): static
     {

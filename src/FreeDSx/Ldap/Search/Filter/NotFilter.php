@@ -52,10 +52,7 @@ class NotFilter implements FilterInterface, Stringable
         return $this;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         return Asn1::context(
             tagNumber: self::CHOICE_TAG,
@@ -81,6 +78,8 @@ class NotFilter implements FilterInterface, Stringable
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      * @throws ProtocolException
      * @throws EncoderException
      * @throws RuntimeException

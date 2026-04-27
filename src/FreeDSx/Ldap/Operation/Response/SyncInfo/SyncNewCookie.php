@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Operation\Response\SyncInfo;
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\OctetStringType;
+use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Response\IntermediateResponse;
 use FreeDSx\Ldap\Operation\Response\SyncInfoMessage;
@@ -32,10 +33,7 @@ class SyncNewCookie extends SyncInfoMessage
 {
     protected const VALUE_TAG = 0;
 
-    /**
-     *{@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $this->setResponseValueToEncode(Asn1::context(
             self::VALUE_TAG,
@@ -47,6 +45,8 @@ class SyncNewCookie extends SyncInfoMessage
 
     /**
      *{@inheritdoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): IntermediateResponse
     {

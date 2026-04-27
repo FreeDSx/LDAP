@@ -49,12 +49,14 @@ class SearchResultEntry implements ResponseInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): self
     {
         $attributes = [];
         $dn = $type->getChild(0);
-        if ($dn === null) {
+        if (!$dn instanceof OctetStringType) {
             throw new ProtocolException('The search result entry is malformed.');
         }
 
@@ -62,24 +64,30 @@ class SearchResultEntry implements ResponseInterface
         if ($partialAttributes !== null) {
             foreach ($partialAttributes->getChildren() as $partialAttribute) {
                 $values = [];
-                /** @var SequenceType|null $attrValues */
                 $attrValues = $partialAttribute->getChild(1);
-                if ($attrValues !== null) {
+                if ($attrValues instanceof SequenceType) {
                     foreach ($attrValues->getChildren() as $attrValue) {
-                        /** @var OctetStringType $attrValue */
+                        if (!$attrValue instanceof OctetStringType) {
+                            throw new ProtocolException('The search result entry is malformed.');
+                        }
                         $values[] = $attrValue->getValue();
                     }
                 }
 
+                $attrName = $partialAttribute->getChild(0);
+                if (!$attrName instanceof OctetStringType) {
+                    throw new ProtocolException('The search result entry is malformed.');
+                }
+
                 $attributes[] = new Attribute(
-                    (string) $partialAttribute->getChild(0)?->getValue(),
+                    $attrName->getValue(),
                     ...$values
                 );
             }
         }
 
         return new self(new Entry(
-            new Dn((string) $dn->getValue()),
+            new Dn($dn->getValue()),
             ...$attributes
         ));
     }

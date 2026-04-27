@@ -75,6 +75,7 @@ class SaslBindRequest extends BindRequest
     }
 
     /**
+     * @param AbstractType<mixed> $type
      * @return SaslBindRequest
      * @throws ProtocolException
      * @throws \FreeDSx\Asn1\Exception\EncoderException
@@ -101,6 +102,8 @@ class SaslBindRequest extends BindRequest
 
     /**
      * {@inheritDoc}
+     *
+     * @return AbstractType<mixed>
      */
     protected function getAsn1AuthChoice(): AbstractType
     {

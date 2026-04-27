@@ -44,11 +44,7 @@ class LdapEncoder extends BerEncoder
      */
     public function __construct()
     {
-        parent::__construct([
-            'primitive_only' => [
-                AbstractType::TAG_TYPE_OCTET_STRING,
-            ],
-        ]);
+        parent::__construct();
         $this->setTagMap(AbstractType::TAG_CLASS_APPLICATION, [
             0 => AbstractType::TAG_TYPE_SEQUENCE,
             1 => AbstractType::TAG_TYPE_SEQUENCE,

@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\IntegerType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
@@ -62,10 +63,7 @@ abstract class BindRequest implements RequestInterface
         return $this->username;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $this->validate();
 
@@ -78,6 +76,8 @@ abstract class BindRequest implements RequestInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): BindRequest
     {
@@ -94,7 +94,10 @@ abstract class BindRequest implements RequestInterface
         if (!($version instanceof IntegerType && $name instanceof OctetStringType)) {
             throw new ProtocolException('The bind request in malformed');
         }
-        $version = $version->getValue();
+        $versionValue = $version->getValue();
+        if (!is_int($versionValue)) {
+            throw new ProtocolException('The bind request version is not an integer.');
+        }
         $name = $name->getValue();
 
         if ($auth->getTagNumber() === 3) {
@@ -107,17 +110,26 @@ abstract class BindRequest implements RequestInterface
                 $auth->getTagNumber()
             ));
         }
-        $auth = (string) $auth->getValue();
-
-        if ($auth === '') {
-            return new AnonBindRequest($name, $version);
-        } else {
-            return new SimpleBindRequest($name, $auth, $version);
+        if (!($auth instanceof IncompleteType || $auth instanceof OctetStringType)) {
+            throw new ProtocolException('The bind request auth choice is malformed.');
         }
+        $authValue = $auth->getValue();
+
+        if ($authValue === '') {
+            return new AnonBindRequest($name, $versionValue);
+        }
+
+        return new SimpleBindRequest(
+            $name,
+            $authValue,
+            $versionValue,
+        );
     }
 
     /**
      * Get the ASN1 AuthenticationChoice for the bind request.
+     *
+     * @return AbstractType<mixed>
      */
     abstract protected function getAsn1AuthChoice(): AbstractType;
 

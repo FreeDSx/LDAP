@@ -91,6 +91,8 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
 
     /**
      * {@inheritDoc}
+     *
+     * @param AbstractType<mixed> $type
      */
     public static function fromAsn1(AbstractType $type): self
     {
@@ -115,10 +117,7 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
         );
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function toAsn1(): AbstractType
+    public function toAsn1(): SequenceType
     {
         $changes = Asn1::sequenceOf();
 
@@ -142,6 +141,7 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
     }
 
     /**
+     * @param AbstractType<mixed> $type
      * @throws ProtocolException
      */
     private static function parseChange(AbstractType $type): Change
@@ -156,7 +156,12 @@ class ModifyRequest implements RequestInterface, DnRequestInterface
             throw new ProtocolException('The change for the modify request is malformed.');
         }
 
-        return new Change($operation->getValue(), self::parsePartialAttribute($modification));
+        $modType = $operation->getValue();
+        if (!is_int($modType)) {
+            throw new ProtocolException('The change operation type is not an integer.');
+        }
+
+        return new Change($modType, self::parsePartialAttribute($modification));
     }
 
     /**
