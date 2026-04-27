@@ -16,7 +16,7 @@
   ],
   "require": {
     "php": ">=8.2",
-    "freedsx/asn1": "dev-main#a136e7981d2ca76b140570834bd65debf42ee3da",
+    "freedsx/asn1": "dev-main#46900759ae89b9e709356a86c1d84056c2e7ff67",
     "freedsx/socket": "dev-main#58b314ec8140deccfd6a321b3c27091f375b9e31",
     "freedsx/sasl": "dev-main#8dfa6e105f101960d9fa5f9c57d9c461d2c20593",
     "psr/log": "^3"
