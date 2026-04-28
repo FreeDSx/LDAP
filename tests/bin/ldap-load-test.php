@@ -13,7 +13,7 @@ declare(strict_types=1);
 use Symfony\Component\Console\Application;
 use Tests\Performance\FreeDSx\Ldap\LoadTestCommand;
 
-require __DIR__ . '/_bench_bootstrap.php';
+require __DIR__ . '/internals/bench_bootstrap.php';
 require __DIR__ . '/../../vendor/autoload.php';
 
 $command = new LoadTestCommand();

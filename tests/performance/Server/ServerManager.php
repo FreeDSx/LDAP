@@ -73,8 +73,47 @@ final class ServerManager
             return;
         }
 
-        $this->process->stop();
+        $process = $this->process;
         $this->process = null;
+
+        $pid = $process->getPid();
+
+        if ($pid !== null && function_exists('posix_kill')) {
+            $this->signalAndReap($pid);
+        }
+
+        try {
+            $process->stop(0.0);
+        } catch (\Throwable) {
+            //possible race conditions; safe to ignore.
+        }
+    }
+
+    /**
+     * Avoids Symfony Process::stop()'s SIGTERM/wait/SIGKILL dance, which segfaults under
+     * tracing JIT when stopping a pcntl-runner backend.
+     */
+    private function signalAndReap(int $pid): void
+    {
+        @posix_kill($pid, SIGTERM);
+
+        if (!function_exists('pcntl_waitpid')) {
+            return;
+        }
+
+        $deadline = microtime(true) + 5.0;
+        $status = 0;
+
+        while (microtime(true) < $deadline) {
+            $reaped = @pcntl_waitpid($pid, $status, WNOHANG);
+            if ($reaped === $pid || $reaped === -1) {
+                return;
+            }
+            usleep(self::POLL_INTERVAL_US);
+        }
+
+        @posix_kill($pid, SIGKILL);
+        @pcntl_waitpid($pid, $status);
     }
 
     public function __destruct()
