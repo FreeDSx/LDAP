@@ -22,6 +22,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Tests\Performance\FreeDSx\Ldap\Config;
 use Tests\Performance\FreeDSx\Ldap\Driver;
 use Tests\Performance\FreeDSx\Ldap\Report\Report;
+use Tests\Performance\FreeDSx\Ldap\Server\ServerManager;
 use Tests\Performance\FreeDSx\Ldap\Stats\StatsSnapshot;
 use Tests\Performance\FreeDSx\Ldap\Workload\WorkloadMix;
 use Throwable;
@@ -189,6 +190,14 @@ final class BenchCompareCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Per-request size limit applied to search-sub ops (0 = unlimited)',
                 (string) Config::DEFAULT_SEARCH_SUB_SIZE_LIMIT,
+            )
+            ->addOption(
+                'driver-processes',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Number of OS-level driver processes to fan out (each runs --clients coroutines). '
+                . 'Use >1 to escape the single-process bench client throughput ceiling.',
+                '1',
             );
     }
 
@@ -297,7 +306,7 @@ final class BenchCompareCommand extends Command
     }
 
     /**
-     * @return array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int}
+     * @return array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int, driverProcesses: int}
      */
     private function resolveParams(InputInterface $input): array
     {
@@ -313,6 +322,11 @@ final class BenchCompareCommand extends Command
             $duration = 15;
         }
 
+        $driverProcesses = $this->requireInt($input, 'driver-processes');
+        if ($driverProcesses < 1) {
+            throw new InvalidArgumentException('--driver-processes must be >= 1.');
+        }
+
         return [
             'duration' => $duration,
             'ops' => $ops,
@@ -323,6 +337,7 @@ final class BenchCompareCommand extends Command
             'seedEntries' => $this->requireInt($input, 'seed-entries'),
             'jit' => !(bool) $input->getOption('no-jit'),
             'searchSubSizeLimit' => $this->requireInt($input, 'search-sub-size-limit'),
+            'driverProcesses' => $driverProcesses,
         ];
     }
 
@@ -359,7 +374,7 @@ final class BenchCompareCommand extends Command
     }
 
     /**
-     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int} $params
+     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int, driverProcesses: int} $params
      */
     private function runAgainstTarget(
         OutputInterface $output,
@@ -376,11 +391,18 @@ final class BenchCompareCommand extends Command
             $params,
         );
 
-        return (new Driver($config))->run($output);
+        if ($params['driverProcesses'] === 1) {
+            return (new Driver($config))->run($output);
+        }
+
+        return (new MultiDriverCoordinator($params['driverProcesses']))->run(
+            $config,
+            $progress,
+        );
     }
 
     /**
-     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int} $params
+     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int, driverProcesses: int} $params
      */
     private function runAgainstFreedsx(
         OutputInterface $output,
@@ -395,11 +417,74 @@ final class BenchCompareCommand extends Command
             $params,
         );
 
-        return (new Driver($config))->run($output);
+        if ($params['driverProcesses'] === 1) {
+            return (new Driver($config))->run($output);
+        }
+
+        return $this->runFreedsxMultiDriver(
+            $config,
+            $params['driverProcesses'],
+            $progress,
+        );
     }
 
     /**
-     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int} $params
+     * Owns the FreeDSx server lifecycle in the parent so all N children connect to a single
+     * spawned instance instead of each trying (and failing) to start their own.
+     */
+    private function runFreedsxMultiDriver(
+        Config $spawnConfig,
+        int $driverProcesses,
+        OutputInterface $progress,
+    ): StatsSnapshot {
+        $progress->writeln(sprintf(
+            'Starting FreeDSx server (parent-owned for %d driver processes)...',
+            $driverProcesses,
+        ));
+
+        $serverManager = new ServerManager($spawnConfig);
+        $serverManager->start();
+        $progress->writeln('Server ready.');
+
+        try {
+            $childConfig = $this->withExternalServer($spawnConfig);
+
+            return (new MultiDriverCoordinator($driverProcesses))->run(
+                $childConfig,
+                $progress,
+            );
+        } finally {
+            $serverManager->stop();
+        }
+    }
+
+    private function withExternalServer(Config $config): Config
+    {
+        return new Config(
+            backend: $config->backend,
+            runner: $config->runner,
+            clients: $config->clients,
+            duration: $config->duration,
+            ops: $config->ops,
+            mix: $config->mix,
+            host: $config->host,
+            port: $config->port,
+            warmup: $config->warmup,
+            serverMode: 'external',
+            rngSeed: $config->rngSeed,
+            output: $config->output,
+            seedEntries: 0,
+            bindDn: $config->bindDn,
+            bindPassword: $config->bindPassword,
+            baseDn: $config->baseDn,
+            writeBase: $config->writeBase,
+            jit: $config->jit,
+            searchSubSizeLimit: $config->searchSubSizeLimit,
+        );
+    }
+
+    /**
+     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int, driverProcesses: int} $params
      */
     private function buildTargetConfig(
         InputInterface $input,
@@ -430,7 +515,7 @@ final class BenchCompareCommand extends Command
     }
 
     /**
-     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int} $params
+     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int, driverProcesses: int} $params
      */
     private function buildFreedsxConfig(
         InputInterface $input,
