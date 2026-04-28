@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
+use JsonException;
 use PDO;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -445,7 +446,7 @@ final class SqliteStorageTest extends TestCase
         );
     }
 
-    public function test_find_returns_null_for_entry_with_corrupted_json(): void
+    public function test_find_throws_when_entry_json_is_corrupted(): void
     {
         $pdo = new PDO('sqlite::memory:');
         $dialect = new SqliteDialect();
@@ -461,17 +462,19 @@ final class SqliteStorageTest extends TestCase
             $dialect,
         );
 
-        self::assertNull($storage->find(new Dn('cn=corrupt,dc=example,dc=com')));
+        $this->expectException(JsonException::class);
+
+        $storage->find(new Dn('cn=corrupt,dc=example,dc=com'));
     }
 
-    public function test_list_skips_entry_with_corrupted_json(): void
+    public function test_list_throws_when_entry_json_is_corrupted(): void
     {
         $pdo = new PDO('sqlite::memory:');
         $dialect = new SqliteDialect();
         PdoStorage::initialize($pdo, $dialect);
         $pdo->exec(
             "INSERT INTO entries (lc_dn, dn, lc_parent_dn, attributes) VALUES " .
-            "('cn=valid,dc=example,dc=com', 'cn=Valid,dc=example,dc=com', 'dc=example,dc=com', '{\"cn\":{\"name\":\"cn\",\"values\":[\"Valid\"]}}')"
+            "('cn=valid,dc=example,dc=com', 'cn=Valid,dc=example,dc=com', 'dc=example,dc=com', '{\"cn\":[\"Valid\"]}')"
         );
         $pdo->exec(
             "INSERT INTO entries (lc_dn, dn, lc_parent_dn, attributes) VALUES " .
@@ -484,17 +487,10 @@ final class SqliteStorageTest extends TestCase
             $dialect,
         );
 
-        $results = iterator_to_array(
-            $storage->list(StorageListOptions::matchAll(new Dn('dc=example,dc=com'), false))->entries
-        );
+        $this->expectException(JsonException::class);
 
-        self::assertCount(
-            1,
-            $results,
-        );
-        self::assertSame(
-            'cn=Valid,dc=example,dc=com',
-            $results[0]->getDn()->toString(),
+        iterator_to_array(
+            $storage->list(StorageListOptions::matchAll(new Dn('dc=example,dc=com'), false))->entries
         );
     }
 

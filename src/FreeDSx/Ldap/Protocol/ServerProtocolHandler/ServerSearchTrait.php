@@ -144,6 +144,10 @@ trait ServerSearchTrait
         array $requestedAttrs,
         bool $typesOnly,
     ): Entry {
+        if ($requestedAttrs === [] && !$typesOnly) {
+            return $entry;
+        }
+
         $names = array_map(
             static fn(Attribute $a): string => strtolower($a->getDescription()),
             $requestedAttrs
@@ -170,9 +174,9 @@ trait ServerSearchTrait
             }
         }
 
-        return new Entry(
+        return Entry::raw(
             $entry->getDn(),
-            ...$filteredAttributes
+            $filteredAttributes,
         );
     }
 }

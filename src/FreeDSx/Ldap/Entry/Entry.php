@@ -49,6 +49,20 @@ class Entry implements IteratorAggregate, Countable, Stringable
     }
 
     /**
+     * @internal
+     * @param Attribute[] $attributes
+     */
+    public static function raw(
+        Dn $dn,
+        array $attributes,
+    ): self {
+        $entry = new self($dn);
+        $entry->attributes = $attributes;
+
+        return $entry;
+    }
+
+    /**
      * Add an attribute and its values.
      */
     public function add(
