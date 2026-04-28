@@ -187,6 +187,19 @@ final class LoadTestCommand extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Path to write per-gate pass/fail JSON report (for CI artifact upload)',
+            )
+            ->addOption(
+                'no-jit',
+                null,
+                InputOption::VALUE_NONE,
+                'Disable opcache + tracing JIT on the spawned FreeDSx server (default: enabled).',
+            )
+            ->addOption(
+                'search-sub-size-limit',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Per-request size limit applied to search-sub ops (0 = unlimited)',
+                (string) Config::DEFAULT_SEARCH_SUB_SIZE_LIMIT,
             );
     }
 
@@ -275,6 +288,8 @@ final class LoadTestCommand extends Command
             bindPassword: $this->requireString($input, 'bind-password'),
             baseDn: $this->requireString($input, 'base-dn'),
             writeBase: $this->requireString($input, 'write-base'),
+            jit: !(bool) $input->getOption('no-jit'),
+            searchSubSizeLimit: $this->requireInt($input, 'search-sub-size-limit'),
         );
     }
 

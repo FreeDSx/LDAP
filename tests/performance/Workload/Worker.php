@@ -17,7 +17,9 @@ use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
@@ -134,6 +136,14 @@ final class Worker
         try {
             $this->dispatch($client, $effective);
             $this->stats->recordSuccess($op, hrtime(true) - $start);
+        } catch (OperationException $e) {
+            if ($e->getCode() === ResultCode::SIZE_LIMIT_EXCEEDED) {
+                $this->stats->recordSuccess($op, hrtime(true) - $start);
+
+                return;
+            }
+
+            $this->stats->recordError($op, $e::class);
         } catch (Throwable $e) {
             $this->stats->recordError($op, $e::class);
         }
@@ -201,6 +211,10 @@ final class Worker
         $request = Operations::search($filter)
             ->base($this->config->baseDn)
             ->useSubtreeScope();
+
+        if ($this->config->searchSubSizeLimit > 0) {
+            $request->sizeLimit($this->config->searchSubSizeLimit);
+        }
 
         $client->search($request);
     }

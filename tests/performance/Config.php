@@ -64,6 +64,8 @@ final class Config
 
     public const DEFAULT_WRITE_BASE = 'ou=people,dc=foo,dc=bar';
 
+    public const DEFAULT_SEARCH_SUB_SIZE_LIMIT = 500;
+
     public function __construct(
         public readonly string $backend,
         public readonly string $runner,
@@ -82,6 +84,8 @@ final class Config
         public readonly string $bindPassword = self::DEFAULT_BIND_PASSWORD,
         public readonly string $baseDn = self::DEFAULT_BASE_DN,
         public readonly string $writeBase = self::DEFAULT_WRITE_BASE,
+        public readonly bool $jit = true,
+        public readonly int $searchSubSizeLimit = self::DEFAULT_SEARCH_SUB_SIZE_LIMIT,
     ) {
         $this->assertEnum('backend', $backend, self::BACKENDS);
         $this->assertEnum('runner', $runner, self::RUNNERS);
@@ -91,6 +95,7 @@ final class Config
         $this->assertPositive('port', $port);
         $this->assertNonNegative('warmup', $warmup);
         $this->assertNonNegative('seed-entries', $seedEntries);
+        $this->assertNonNegative('search-sub-size-limit', $searchSubSizeLimit);
 
         if ($duration !== null) {
             $this->assertPositive('duration', $duration);
