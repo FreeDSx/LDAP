@@ -47,16 +47,20 @@ final class ServerManager
             throw new RuntimeException('ServerManager::start() called twice.');
         }
 
-        $this->process = new Process([
-            'php',
-            '-dpcov.enabled=0',
-            self::BOOTSTRAP_PATH,
-            'tcp',
-            '--storage=' . $this->config->backend,
-            '--runner=' . $this->config->runner,
-            '--port=' . $this->config->port,
-            '--seed-entries=' . $this->config->seedEntries,
-        ]);
+        $command = ['php', '-dpcov.enabled=0'];
+        if ($this->config->jit) {
+            $command[] = '-dopcache.enable_cli=1';
+            $command[] = '-dopcache.jit_buffer_size=128M';
+            $command[] = '-dopcache.jit=tracing';
+        }
+        $command[] = self::BOOTSTRAP_PATH;
+        $command[] = 'tcp';
+        $command[] = '--storage=' . $this->config->backend;
+        $command[] = '--runner=' . $this->config->runner;
+        $command[] = '--port=' . $this->config->port;
+        $command[] = '--seed-entries=' . $this->config->seedEntries;
+
+        $this->process = new Process($command);
 
         $this->process->start();
 

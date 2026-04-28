@@ -176,6 +176,19 @@ final class BenchCompareCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Report format: ' . implode(' | ', Config::OUTPUTS),
                 'text',
+            )
+            ->addOption(
+                'no-jit',
+                null,
+                InputOption::VALUE_NONE,
+                'Disable opcache + tracing JIT on the spawned FreeDSx server (default: enabled).',
+            )
+            ->addOption(
+                'search-sub-size-limit',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Per-request size limit applied to search-sub ops (0 = unlimited)',
+                (string) Config::DEFAULT_SEARCH_SUB_SIZE_LIMIT,
             );
     }
 
@@ -284,7 +297,7 @@ final class BenchCompareCommand extends Command
     }
 
     /**
-     * @return array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int}
+     * @return array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int}
      */
     private function resolveParams(InputInterface $input): array
     {
@@ -308,6 +321,8 @@ final class BenchCompareCommand extends Command
             'warmup' => $this->requireInt($input, 'warmup'),
             'rngSeed' => $this->parseInt($input->getOption('rng-seed'), 'rng-seed'),
             'seedEntries' => $this->requireInt($input, 'seed-entries'),
+            'jit' => !(bool) $input->getOption('no-jit'),
+            'searchSubSizeLimit' => $this->requireInt($input, 'search-sub-size-limit'),
         ];
     }
 
@@ -344,7 +359,7 @@ final class BenchCompareCommand extends Command
     }
 
     /**
-     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int} $params
+     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int} $params
      */
     private function runAgainstTarget(
         OutputInterface $output,
@@ -365,7 +380,7 @@ final class BenchCompareCommand extends Command
     }
 
     /**
-     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int} $params
+     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int} $params
      */
     private function runAgainstFreedsx(
         OutputInterface $output,
@@ -384,7 +399,7 @@ final class BenchCompareCommand extends Command
     }
 
     /**
-     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int} $params
+     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int} $params
      */
     private function buildTargetConfig(
         InputInterface $input,
@@ -409,11 +424,13 @@ final class BenchCompareCommand extends Command
             bindPassword: $this->requireString($input, 'target-bind-password'),
             baseDn: $bench->benchBaseDn,
             writeBase: $bench->writeBaseDn,
+            jit: $params['jit'],
+            searchSubSizeLimit: $params['searchSubSizeLimit'],
         );
     }
 
     /**
-     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int} $params
+     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSubSizeLimit: int} $params
      */
     private function buildFreedsxConfig(
         InputInterface $input,
@@ -433,6 +450,8 @@ final class BenchCompareCommand extends Command
             rngSeed: $params['rngSeed'],
             output: 'text',
             seedEntries: $params['seedEntries'],
+            jit: $params['jit'],
+            searchSubSizeLimit: $params['searchSubSizeLimit'],
         );
     }
 
