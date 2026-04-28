@@ -1,0 +1,46 @@
+# Profiling container for the FreeDSx server
+services:
+  freedsx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: freedsx-profile:latest
+    container_name: freedsx-profile
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+    volumes:
+      - ../..:/app:rw
+    working_dir: /app
+    command: ["sleep", "infinity"]
+    cpus: ${PROFILE_CPUS:-4}
+    depends_on:
+      - mysql
+      - openldap
+    environment:
+      MYSQL_DSN: "mysql:host=mysql;port=3306;dbname=freedsx"
+      MYSQL_USER: "root"
+      MYSQL_PASSWORD: "root"
+
+  mysql:
+    image: mysql:8.4
+    container_name: freedsx-profile-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: freedsx
+    command:
+      - --innodb-buffer-pool-size=512M
+      - --max_connections=200
+    tmpfs:
+      - /var/lib/mysql
+
+  openldap:
+    # Minimal vanilla slapd for bench comparison
+    build:
+      context: .
+      dockerfile: openldap.Dockerfile
+    image: freedsx-profile-openldap:latest
+    container_name: freedsx-profile-openldap
+    tmpfs:
+      - /var/lib/ldap

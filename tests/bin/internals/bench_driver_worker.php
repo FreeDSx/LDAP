@@ -18,7 +18,7 @@ use Tests\Performance\FreeDSx\Ldap\Driver;
 use Tests\Performance\FreeDSx\Ldap\Stats\StatsSnapshot;
 
 require __DIR__ . '/bench_bootstrap.php';
-require __DIR__ . '/../../vendor/autoload.php';
+require __DIR__ . '/../../../vendor/autoload.php';
 
 $payload = stream_get_contents(STDIN);
 

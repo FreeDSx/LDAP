@@ -74,6 +74,9 @@
     ],
     "test-load": "@php -d xdebug.mode=off tests/bin/ldap-load-test.php --backend=sqlite --runner=swoole --duration=10 --warmup=2 --clients=8 --output=text",
     "test-load-compare": "@php -d xdebug.mode=off tests/bin/ldap-bench-compare.php",
+    "profile": "tests/profile/profile.sh",
+    "profile-up": "docker compose -f tests/profile/docker-compose.yml up -d --build --wait",
+    "profile-down": "docker compose -f tests/profile/docker-compose.yml down",
     "analyse": [
       "phpstan --memory-limit=-1 analyse"
     ],
