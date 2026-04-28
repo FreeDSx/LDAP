@@ -28,7 +28,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use Generator;
-use JsonException;
 use PDO;
 use PDOStatement;
 use Throwable;
@@ -491,15 +490,11 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
             ? $row['attributes']
             : '{}';
 
-        try {
-            $raw = json_decode(
-                $attributesJson,
-                true,
-                flags: JSON_THROW_ON_ERROR,
-            );
-        } catch (JsonException) {
-            return null;
-        }
+        $raw = json_decode(
+            $attributesJson,
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
 
         if (!is_array($raw)) {
             return null;
@@ -512,18 +507,16 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
                 continue;
             }
 
-            $stringValues = array_values(
-                array_filter($values, fn($v) => is_string($v)),
-            );
-            $attributes[] = new Attribute(
+            /** @var string[] $values Trusted: written by encodeAttributes() from Attribute::getValues(): string[]. */
+            $attributes[] = Attribute::fromArray(
                 $name,
-                ...$stringValues
+                $values,
             );
         }
 
-        return new Entry(
+        return Entry::raw(
             new Dn($dn),
-            ...$attributes
+            $attributes,
         );
     }
 

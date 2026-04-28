@@ -27,6 +27,7 @@ use function explode;
 use function implode;
 use function str_replace;
 use function strtolower;
+use function str_contains;
 
 /**
  * Represents an entry attribute and any values.
@@ -60,6 +61,19 @@ class Attribute implements IteratorAggregate, Countable, Stringable
         string ...$values
     ) {
         $this->values = $values;
+    }
+
+    /**
+     * @param string[] $values
+     */
+    public static function fromArray(
+        string $attribute,
+        array $values,
+    ): self {
+        $attr = new self($attribute);
+        $attr->values = $values;
+
+        return $attr;
     }
 
     /**
@@ -160,6 +174,9 @@ class Attribute implements IteratorAggregate, Countable, Stringable
      */
     public function getName(): string
     {
+        if ($this->options === null && !str_contains($this->attribute, ';')) {
+            return $this->attribute;
+        }
         $this->options();
 
         return $this->attribute;
@@ -170,8 +187,15 @@ class Attribute implements IteratorAggregate, Countable, Stringable
      */
     public function getDescription(): string
     {
-        return $this->getName()
-            . ($this->options()->count() > 0 ? ';' . $this->options()->toString() : '');
+        if ($this->options === null && !str_contains($this->attribute, ';')) {
+            return $this->attribute;
+        }
+        $options = $this->options();
+        if ($options->count() === 0) {
+            return $this->attribute;
+        }
+
+        return $this->attribute . ';' . $options->toString();
     }
 
     /**
