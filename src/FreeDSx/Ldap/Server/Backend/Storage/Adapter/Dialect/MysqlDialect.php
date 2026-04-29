@@ -32,7 +32,7 @@ final class MysqlDialect implements PdoDialectInterface
                 lc_dn         VARCHAR(768) NOT NULL,
                 dn            VARCHAR(768) NOT NULL,
                 lc_parent_dn  VARCHAR(768) NOT NULL DEFAULT '',
-                attributes    JSON NOT NULL,
+                attributes    LONGBLOB NOT NULL,
                 PRIMARY KEY (lc_dn),
                 INDEX idx_lc_parent_dn (lc_parent_dn)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci

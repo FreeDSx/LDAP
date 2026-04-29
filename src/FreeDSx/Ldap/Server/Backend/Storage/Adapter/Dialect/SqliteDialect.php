@@ -50,7 +50,7 @@ final class SqliteDialect implements PdoDialectInterface
                 lc_dn         TEXT NOT NULL PRIMARY KEY,
                 dn            TEXT NOT NULL,
                 lc_parent_dn  TEXT NOT NULL DEFAULT '',
-                attributes    TEXT NOT NULL DEFAULT '{}'
+                attributes    BLOB NOT NULL DEFAULT 'a:0:{}'
             )
         SQL;
     }

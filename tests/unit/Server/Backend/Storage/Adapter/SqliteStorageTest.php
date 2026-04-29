@@ -28,11 +28,11 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqliteStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
-use JsonException;
 use PDO;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -446,14 +446,14 @@ final class SqliteStorageTest extends TestCase
         );
     }
 
-    public function test_find_throws_when_entry_json_is_corrupted(): void
+    public function test_find_throws_when_entry_attributes_blob_is_corrupted(): void
     {
         $pdo = new PDO('sqlite::memory:');
         $dialect = new SqliteDialect();
         PdoStorage::initialize($pdo, $dialect);
         $pdo->exec(
             "INSERT INTO entries (lc_dn, dn, lc_parent_dn, attributes) VALUES " .
-            "('cn=corrupt,dc=example,dc=com', 'cn=Corrupt,dc=example,dc=com', 'dc=example,dc=com', 'NOT_VALID_JSON')"
+            "('cn=corrupt,dc=example,dc=com', 'cn=Corrupt,dc=example,dc=com', 'dc=example,dc=com', 'NOT_VALID_BLOB')"
         );
 
         $storage = new PdoStorage(
@@ -462,23 +462,24 @@ final class SqliteStorageTest extends TestCase
             $dialect,
         );
 
-        $this->expectException(JsonException::class);
+        $this->expectException(StorageIoException::class);
 
         $storage->find(new Dn('cn=corrupt,dc=example,dc=com'));
     }
 
-    public function test_list_throws_when_entry_json_is_corrupted(): void
+    public function test_list_throws_when_entry_attributes_blob_is_corrupted(): void
     {
         $pdo = new PDO('sqlite::memory:');
         $dialect = new SqliteDialect();
         PdoStorage::initialize($pdo, $dialect);
+        $validBlob = serialize(['cn' => ['Valid']]);
         $pdo->exec(
             "INSERT INTO entries (lc_dn, dn, lc_parent_dn, attributes) VALUES " .
-            "('cn=valid,dc=example,dc=com', 'cn=Valid,dc=example,dc=com', 'dc=example,dc=com', '{\"cn\":[\"Valid\"]}')"
+            "('cn=valid,dc=example,dc=com', 'cn=Valid,dc=example,dc=com', 'dc=example,dc=com', '{$validBlob}')"
         );
         $pdo->exec(
             "INSERT INTO entries (lc_dn, dn, lc_parent_dn, attributes) VALUES " .
-            "('cn=corrupt,dc=example,dc=com', 'cn=Corrupt,dc=example,dc=com', 'dc=example,dc=com', 'NOT_VALID_JSON')"
+            "('cn=corrupt,dc=example,dc=com', 'cn=Corrupt,dc=example,dc=com', 'dc=example,dc=com', 'NOT_VALID_BLOB')"
         );
 
         $storage = new PdoStorage(
@@ -487,7 +488,7 @@ final class SqliteStorageTest extends TestCase
             $dialect,
         );
 
-        $this->expectException(JsonException::class);
+        $this->expectException(StorageIoException::class);
 
         iterator_to_array(
             $storage->list(StorageListOptions::matchAll(new Dn('dc=example,dc=com'), false))->entries

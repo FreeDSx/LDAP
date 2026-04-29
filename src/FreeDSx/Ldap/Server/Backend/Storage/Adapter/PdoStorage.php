@@ -469,10 +469,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
             $attributes[$attribute->getName()] = array_values($attribute->getValues());
         }
 
-        return json_encode(
-            $attributes,
-            JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
-        );
+        return serialize($attributes);
     }
 
     private function rowToEntry(mixed $row): ?Entry
@@ -484,28 +481,23 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
         $dn = isset($row['dn']) && is_string($row['dn'])
             ? $row['dn']
             : '';
-        $attributesJson = isset($row['attributes']) && is_string($row['attributes'])
+        $attributesBlob = isset($row['attributes']) && is_string($row['attributes'])
             ? $row['attributes']
-            : '{}';
+            : 'a:0:{}';
 
-        $raw = json_decode(
-            $attributesJson,
-            true,
-            flags: JSON_THROW_ON_ERROR,
+        /** @var array<string, list<string>>|false $raw Trusted: written by encodeAttributes() from Attribute::getValues(): string[]. */
+        $raw = @unserialize(
+            $attributesBlob,
+            ['allowed_classes' => false],
         );
 
         if (!is_array($raw)) {
-            return null;
+            throw new StorageIoException('Failed to decode entry attributes; storage row is corrupted.');
         }
 
         $attributes = [];
 
         foreach ($raw as $name => $values) {
-            if (!is_string($name) || !is_array($values)) {
-                continue;
-            }
-
-            /** @var string[] $values Trusted: written by encodeAttributes() from Attribute::getValues(): string[]. */
             $attributes[] = Attribute::fromArray(
                 $name,
                 $values,
