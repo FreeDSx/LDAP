@@ -31,7 +31,6 @@ use Generator;
 use PDO;
 use PDOStatement;
 use Throwable;
-use WeakMap;
 
 /**
  * PDO-backed storage; pass a PdoDialectInterface + PdoConnectionProviderInterface, or use SqliteStorage / MysqlStorage factories.
@@ -45,22 +44,21 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
     private const STATEMENT_CACHE_MAX = 64;
 
     /**
-     * @var WeakMap<PDO, array<string, list<PDOStatement>>>
+     * @var array<int, array<string, list<PDOStatement>>> Per-PDO pools keyed by spl_object_id; reset() clears it on connection drop.
      */
-    private WeakMap $statementCache;
+    private array $statementCache = [];
 
     public function __construct(
         private readonly PdoConnectionProviderInterface $provider,
         private readonly FilterTranslatorInterface $translator,
         private readonly PdoDialectInterface $dialect,
     ) {
-        $this->statementCache = new WeakMap();
     }
 
     public function reset(): void
     {
         $this->provider->reset();
-        $this->statementCache = new WeakMap();
+        $this->statementCache = [];
     }
 
     public static function initialize(
@@ -528,12 +526,12 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
         array $params = [],
     ): PooledStatement {
         $pdo = $this->provider->get();
-        $pools = $this->statementCache[$pdo] ?? [];
+        $key = spl_object_id($pdo);
+        $pools = &$this->statementCache[$key];
+        $pools ??= [];
 
         if (isset($pools[$query]) && $pools[$query] !== []) {
-            $pool = $pools[$query];
-            $stmt = array_pop($pool);
-            $pools[$query] = $pool;
+            $stmt = array_pop($pools[$query]);
         } else {
             if (!isset($pools[$query]) && count($pools) >= self::STATEMENT_CACHE_MAX) {
                 array_shift($pools);
@@ -549,20 +547,18 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
             }
         }
 
-        $this->statementCache[$pdo] = $pools;
-
         $stmt->execute($params);
 
         return new PooledStatement(
             $stmt,
-            function (PDOStatement $released) use ($pdo, $query): void {
-                $this->returnToPool($pdo, $query, $released);
+            function (PDOStatement $released) use ($key, $query): void {
+                $this->returnToPool($key, $query, $released);
             },
         );
     }
 
     private function returnToPool(
-        PDO $pdo,
+        int $key,
         string $query,
         PDOStatement $stmt,
     ): void {
@@ -572,13 +568,11 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface
             return;
         }
 
-        $pools = $this->statementCache[$pdo] ?? [];
-        if (!isset($pools[$query])) {
+        if (!isset($this->statementCache[$key][$query])) {
             return;
         }
 
-        $pools[$query][] = $stmt;
-        $this->statementCache[$pdo] = $pools;
+        $this->statementCache[$key][$query][] = $stmt;
     }
 
     private function savepointName(int $depth): string
