@@ -74,7 +74,9 @@ class LdapEncoder extends BerEncoder
      * Hand-rolled BER writer for the full LDAPMessage envelope wrapping a SearchResultEntry.
      *
      * Produces byte-for-byte the same output as encode(toAsn1()) but without allocating an ASN.1
-     * AST for every entry. This is the server's hot path during large search result delivery.
+     * AST for every entry, and with the short-form length prefix inlined at every call site so
+     * the per-entry encode is a flat sequence of concatenations with no helper-method overhead.
+     * This is the server's hot path during large search result delivery.
      *
      * @throws EncoderException
      */
@@ -83,65 +85,64 @@ class LdapEncoder extends BerEncoder
         Entry $entry,
         ?SearchEncodingCache $cache = null,
     ): string {
-        $innerPayload = $this->berOctetString($entry->getDn()->toString())
-            . $this->berWrap(
-                self::TAG_SEQUENCE,
-                $this->berPartialAttributes($entry, $cache),
-            );
-
-        $protocolOp = $this->berWrap(
-            self::TAG_SEARCH_RESULT_ENTRY,
-            $innerPayload,
-        );
-
-        $outerPayload = $this->berInteger($messageId) . $protocolOp;
-
-        return $this->berWrap(
-            self::TAG_SEQUENCE,
-            $outerPayload,
-        );
-    }
-
-    private function berPartialAttributes(
-        Entry $entry,
-        ?SearchEncodingCache $cache,
-    ): string {
-        $out = '';
+        $partials = '';
 
         foreach ($entry->getAttributes() as $attribute) {
             $valuesPayload = '';
             foreach ($attribute->getValues() as $value) {
-                $valuesPayload .= $this->berOctetString($value);
+                $vlen = strlen($value);
+                $valuesPayload .= $vlen < 128
+                    ? self::TAG_OCTET_STRING . chr($vlen) . $value
+                    : self::TAG_OCTET_STRING . $this->berLongLength($vlen) . $value;
             }
 
-            $descriptionBytes = $cache !== null
-                ? $cache->description($attribute->getDescription())
-                : $this->berOctetString($attribute->getDescription());
+            $setLen = strlen($valuesPayload);
+            $valuesSet = $setLen < 128
+                ? self::TAG_SET . chr($setLen) . $valuesPayload
+                : self::TAG_SET . $this->berLongLength($setLen) . $valuesPayload;
 
-            $partialPayload = $descriptionBytes
-                . $this->berWrap(self::TAG_SET, $valuesPayload);
+            if ($cache !== null) {
+                $description = $cache->description($attribute->getDescription());
+            } else {
+                $desc = $attribute->getDescription();
+                $descLen = strlen($desc);
+                $description = $descLen < 128
+                    ? self::TAG_OCTET_STRING . chr($descLen) . $desc
+                    : self::TAG_OCTET_STRING . $this->berLongLength($descLen) . $desc;
+            }
 
-            $out .= $this->berWrap(
-                self::TAG_SEQUENCE,
-                $partialPayload,
-            );
+            $partial = $description . $valuesSet;
+            $plen = strlen($partial);
+            $partials .= $plen < 128
+                ? self::TAG_SEQUENCE . chr($plen) . $partial
+                : self::TAG_SEQUENCE . $this->berLongLength($plen) . $partial;
         }
 
-        return $out;
-    }
+        $dn = $entry->getDn()->toString();
+        $dnLen = strlen($dn);
+        $allLen = strlen($partials);
 
-    private function berOctetString(string $value): string
-    {
-        return self::TAG_OCTET_STRING
-            . $this->berLength(strlen($value))
-            . $value;
-    }
+        $inner = (
+            $dnLen < 128
+                ? self::TAG_OCTET_STRING . chr($dnLen) . $dn
+                : self::TAG_OCTET_STRING . $this->berLongLength($dnLen) . $dn
+        ) . (
+            $allLen < 128
+                ? self::TAG_SEQUENCE . chr($allLen) . $partials
+                : self::TAG_SEQUENCE . $this->berLongLength($allLen) . $partials
+        );
+        $innerLen = strlen($inner);
 
-    private function berWrap(string $tagByte, string $payload): string
-    {
-        return $tagByte
-            . $this->berLength(strlen($payload))
-            . $payload;
+        $protocolOp = $innerLen < 128
+            ? self::TAG_SEARCH_RESULT_ENTRY . chr($innerLen) . $inner
+            : self::TAG_SEARCH_RESULT_ENTRY . $this->berLongLength($innerLen) . $inner;
+
+        $outer = $this->berInteger($messageId) . $protocolOp;
+        $outerLen = strlen($outer);
+
+        return $outerLen < 128
+            ? self::TAG_SEQUENCE . chr($outerLen) . $outer
+            : self::TAG_SEQUENCE . $this->berLongLength($outerLen) . $outer;
     }
 
     /**
@@ -171,20 +172,20 @@ class LdapEncoder extends BerEncoder
             $bytes = "\x00" . $bytes;
         }
 
+        $bl = strlen($bytes);
+
         return self::TAG_INTEGER
-            . $this->berLength(strlen($bytes))
+            . ($bl < 128 ? chr($bl) : $this->berLongLength($bl))
             . $bytes;
     }
 
     /**
-     * @param int<0, max> $length
+     * Long-form definite length octets for lengths >= 128. Cold path; the short form is inlined.
+     *
+     * @param int<128, max> $length
      */
-    private function berLength(int $length): string
+    private function berLongLength(int $length): string
     {
-        if ($length < 128) {
-            return chr($length);
-        }
-
         $bytes = '';
         $v = $length;
         while ($v > 0) {
