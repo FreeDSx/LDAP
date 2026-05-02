@@ -79,16 +79,16 @@ class SearchResultEntry implements ResponseInterface
                     throw new ProtocolException('The search result entry is malformed.');
                 }
 
-                $attributes[] = new Attribute(
+                $attributes[] = Attribute::fromArray(
                     $attrName->getValue(),
-                    ...$values
+                    $values,
                 );
             }
         }
 
-        return new self(new Entry(
+        return new self(Entry::raw(
             new Dn($dn->getValue()),
-            ...$attributes
+            $attributes,
         ));
     }
 
