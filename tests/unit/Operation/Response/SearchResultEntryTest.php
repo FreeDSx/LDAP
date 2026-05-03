@@ -65,6 +65,33 @@ final class SearchResultEntryTest extends TestCase
         );
     }
 
+    public function test_it_should_be_constructed_from_asn1_with_set_of_vals(): void
+    {
+        $this->subject = SearchResultEntry::fromAsn1(Asn1::application(4, Asn1::sequence(
+            Asn1::octetString('dc=foo,dc=bar'),
+            Asn1::sequenceOf(
+                Asn1::sequence(
+                    Asn1::octetString('cn'),
+                    Asn1::setOf(
+                        Asn1::octetString('foo')
+                    )
+                ),
+                Asn1::sequence(
+                    Asn1::octetString('sn'),
+                    Asn1::setOf(
+                        Asn1::octetString('foo'),
+                        Asn1::octetString('bar')
+                    )
+                ),
+            ),
+        )));
+
+        self::assertEquals(
+            Entry::create('dc=foo,dc=bar', ['cn' => ['foo'], 'sn' => ['foo', 'bar']]),
+            $this->subject->getEntry(),
+        );
+    }
+
     public function test_it_should_generate_correct_asn1(): void
     {
         self::assertEquals(
