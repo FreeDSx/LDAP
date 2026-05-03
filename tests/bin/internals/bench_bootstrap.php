@@ -18,7 +18,16 @@ if (getenv('FREEDSX_BENCH_BOOTSTRAPPED') === '1') {
     return;
 }
 
-$argv = $_SERVER['argv'] ?? [];
+$rawArgv = $_SERVER['argv'] ?? [];
+$argv = [];
+if (is_array($rawArgv)) {
+    foreach ($rawArgv as $rawArg) {
+        if (is_string($rawArg)) {
+            $argv[] = $rawArg;
+        }
+    }
+}
+
 if (in_array('--no-jit', $argv, true)) {
     return;
 }

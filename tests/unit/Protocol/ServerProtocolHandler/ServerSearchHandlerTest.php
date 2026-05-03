@@ -61,6 +61,10 @@ final class ServerSearchHandlerTest extends TestCase
             ->method('sendMessages')
             ->willReturnCallback(function (iterable $messages): ServerQueue {
                 foreach ($messages as $message) {
+                    if (!$message instanceof LdapMessageResponse) {
+                        continue;
+                    }
+
                     $this->sentMessages[] = $message;
                 }
 

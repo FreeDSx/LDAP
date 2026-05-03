@@ -91,6 +91,8 @@ final class AddRequestTest extends TestCase
 
     /**
      * @dataProvider malformedAsn1DataProvider
+     *
+     * @param AbstractType<mixed> $type
      */
     public function test_it_should_detect_a_malformed_asn1_request(AbstractType $type): void
     {
@@ -100,7 +102,7 @@ final class AddRequestTest extends TestCase
     }
 
     /**
-     * @return array<array<AbstractType>>
+     * @return array<array<AbstractType<mixed>>>
      */
     public static function malformedAsn1DataProvider()
     {

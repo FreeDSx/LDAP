@@ -15,7 +15,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Output\StreamOutput;
 use Tests\Performance\FreeDSx\Ldap\Config;
 use Tests\Performance\FreeDSx\Ldap\Driver;
-use Tests\Performance\FreeDSx\Ldap\Stats\StatsSnapshot;
 
 require __DIR__ . '/bench_bootstrap.php';
 require __DIR__ . '/../../../vendor/autoload.php';
@@ -54,12 +53,6 @@ try {
         $e->getMessage(),
         $e->getTraceAsString(),
     ));
-
-    exit(1);
-}
-
-if (!$snapshot instanceof StatsSnapshot) {
-    fwrite(STDERR, "bench-driver-worker: Driver did not return a StatsSnapshot\n");
 
     exit(1);
 }

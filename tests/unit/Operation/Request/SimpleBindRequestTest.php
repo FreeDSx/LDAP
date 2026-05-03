@@ -15,7 +15,6 @@ namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
-use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
@@ -67,9 +66,9 @@ final class SimpleBindRequestTest extends TestCase
             ->setUsername('foo')
             ->setPassword('bar');
 
-        self::assertInstanceOf(
-            SequenceType::class,
-            $this->subject->toAsn1()
+        self::assertCount(
+            3,
+            $this->subject->toAsn1()->getChildren(),
         );
     }
 
@@ -94,9 +93,9 @@ final class SimpleBindRequestTest extends TestCase
         $this->subject->setUsername('foo');
         $this->subject->setPassword('0');
 
-        self::assertInstanceOf(
-            SequenceType::class,
-            $this->subject->toAsn1()
+        self::assertCount(
+            3,
+            $this->subject->toAsn1()->getChildren(),
         );
     }
 
@@ -128,6 +127,8 @@ final class SimpleBindRequestTest extends TestCase
 
     /**
      * @dataProvider malformedAsn1DataProvider
+     *
+     * @param AbstractType<mixed> $type
      */
     public function test_it_should_detect_invalid_asn1_from_asn1(AbstractType $type): void
     {
@@ -137,7 +138,7 @@ final class SimpleBindRequestTest extends TestCase
     }
 
     /**
-     * @return array<array{0: AbstractType}>
+     * @return array<array{0: AbstractType<mixed>}>
      */
     public static function malformedAsn1DataProvider(): array
     {
