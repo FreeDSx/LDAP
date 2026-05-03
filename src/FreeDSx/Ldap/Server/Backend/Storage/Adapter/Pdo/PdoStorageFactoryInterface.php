@@ -11,7 +11,9 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
+namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
+
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 
 /**
  * Constructs a configured PdoStorage for a specific database driver (e.g. SqliteStorage::forPcntl('/path/to/db.sqlite')).

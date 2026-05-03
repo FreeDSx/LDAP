@@ -15,8 +15,13 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactoryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactoryTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SwooleWriterQueue;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use PDO;
 
 /**
@@ -47,9 +52,15 @@ final class SqliteStorage implements PdoStorageFactoryInterface
         return (new self($dbPath))->createShared();
     }
 
-    public static function forSwoole(string $dbPath): PdoStorage
+    public static function forSwoole(string $dbPath): EntryStorageInterface
     {
-        return (new self($dbPath))->createPerCoroutine();
+        $factory = new self($dbPath);
+
+        return new WriteSerializingStorage(
+            reads: $factory->createPerCoroutine(),
+            writes: $factory->createShared(),
+            queue: new SwooleWriterQueue(),
+        );
     }
 
     protected function dialect(): PdoDialectInterface

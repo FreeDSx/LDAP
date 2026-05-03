@@ -541,8 +541,8 @@ connection opener:
 
 ```php
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorageFactoryInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorageFactoryTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactoryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactoryTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
 use PDO;

@@ -14,7 +14,8 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\CoroutinePdoConnectionProvider;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\CoroutinePdoConnectionProvider;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoTxState;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Swoole\Coroutine;
@@ -81,7 +82,7 @@ final class CoroutinePdoConnectionProviderTest extends TestCase
 
         /** @var array<int, PDO> $pdos */
         $pdos = [];
-        /** @var array<int, \FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoTxState> $txStates */
+        /** @var array<int, PdoTxState> $txStates */
         $txStates = [];
 
         Coroutine\run(function () use ($provider, &$pdos, &$txStates): void {
@@ -110,7 +111,7 @@ final class CoroutinePdoConnectionProviderTest extends TestCase
 
                 $tx = $txCh->pop();
                 self::assertInstanceOf(
-                    \FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoTxState::class,
+                    PdoTxState::class,
                     $tx,
                 );
                 $txStates[] = $tx;

@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\DefaultHasChildrenTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\DefaultHasChildrenTrait;
 
 /**
  * Raw persistence contract; LDAP semantics live in WritableStorageBackend. Dn parameters are always normalised (lowercased).
