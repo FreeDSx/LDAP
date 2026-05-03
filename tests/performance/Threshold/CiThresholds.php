@@ -38,8 +38,8 @@ final class CiThresholds
         return match ($key) {
             'memory:swoole' => new ThresholdSet(
                 maxErrors: 0,
-                minThroughput: 400.0,
-                maxP99Ms: 200.0,
+                minThroughput: 800.0,
+                maxP99Ms: 100.0,
             ),
             'json:pcntl' => new ThresholdSet(
                 maxErrors: 0,
@@ -48,28 +48,28 @@ final class CiThresholds
             ),
             'json:swoole' => new ThresholdSet(
                 maxErrors: 0,
-                minThroughput: 200.0,
-                maxP99Ms: 500.0,
+                minThroughput: 600.0,
+                maxP99Ms: 150.0,
             ),
             'sqlite:pcntl' => new ThresholdSet(
                 maxErrors: 0,
-                minThroughput: 100.0,
-                maxP99Ms: 800.0,
+                minThroughput: 1100.0,
+                maxP99Ms: 150.0,
             ),
             'sqlite:swoole' => new ThresholdSet(
                 maxErrors: 0,
-                minThroughput: 200.0,
-                maxP99Ms: 500.0,
+                minThroughput: 1000.0,
+                maxP99Ms: 800.0,
             ),
             'mysql:pcntl' => new ThresholdSet(
                 maxErrors: 0,
-                minThroughput: 50.0,
-                maxP99Ms: 1500.0,
+                minThroughput: 850.0,
+                maxP99Ms: 200.0,
             ),
             'mysql:swoole' => new ThresholdSet(
                 maxErrors: 0,
-                minThroughput: 100.0,
-                maxP99Ms: 1000.0,
+                minThroughput: 850.0,
+                maxP99Ms: 200.0,
             ),
             default => throw new InvalidArgumentException(sprintf(
                 'Unknown CI profile "%s". Known: %s.',
