@@ -120,6 +120,8 @@ final class AndFilterTest extends TestCase
 
     /**
      * @dataProvider malformedAsn1DataProvider
+     *
+     * @param AbstractType<mixed> $type
      */
     public function test_it_should_not_be_constructed_from_invalid_asn1(AbstractType $type): void
     {
@@ -163,7 +165,7 @@ final class AndFilterTest extends TestCase
     }
 
     /**
-     * @return array<array{AbstractType}>
+     * @return array<array{AbstractType<mixed>}>
      */
     public static function malformedAsn1DataProvider(): array
     {
