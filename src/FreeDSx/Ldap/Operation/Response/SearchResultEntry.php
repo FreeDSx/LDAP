@@ -17,6 +17,7 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
+use FreeDSx\Asn1\Type\SetType;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
@@ -65,7 +66,7 @@ class SearchResultEntry implements ResponseInterface
             foreach ($partialAttributes->getChildren() as $partialAttribute) {
                 $values = [];
                 $attrValues = $partialAttribute->getChild(1);
-                if ($attrValues instanceof SequenceType) {
+                if ($attrValues instanceof SetType || $attrValues instanceof SequenceType) {
                     foreach ($attrValues->getChildren() as $attrValue) {
                         if (!$attrValue instanceof OctetStringType) {
                             throw new ProtocolException('The search result entry is malformed.');
