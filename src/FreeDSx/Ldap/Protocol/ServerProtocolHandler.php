@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Socket\Exception\ConnectionException;
+use FreeDSx\Socket\Exception\WriteTimeoutException;
 use Throwable;
 
 /**
@@ -65,6 +66,12 @@ readonly class ServerProtocolHandler
             # The message ID could not be used (zero or reused). Per RFC 4511 §4.1.1 the server cannot frame a
             # solicited response, so it sends a Notice of Disconnection and terminates the session.
             $this->sendNoticeOfDisconnect($e->getMessage());
+        } catch (WriteTimeoutException $e) {
+            # The client stopped reading mid-response; nothing further can be sent. Record it and close.
+            $this->eventLogger->record(
+                ServerEvent::WriteTimeout,
+                [EventContext::REASON_MESSAGE => $e->getMessage()],
+            );
         } catch (ConnectionException) {
             # Connection closure is recorded by the runner's lifecycle logging; no audit event for normal client disconnects.
         } catch (EncoderException|ProtocolException) {

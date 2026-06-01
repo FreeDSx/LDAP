@@ -102,6 +102,11 @@ final class ServerOptions
     private int $idleTimeout = 600;
 
     /**
+     * Disconnect a client whose response send makes no progress for this many seconds (a stalled reader).
+     */
+    private int $writeTimeout = 600;
+
+    /**
      * The largest incoming request PDU accepted, in bytes (5 MiB); 0 disables the limit.
      */
     private int $maxRequestSize = 5_242_880;
@@ -247,6 +252,18 @@ final class ServerOptions
     public function setIdleTimeout(int $idleTimeout): self
     {
         $this->idleTimeout = $idleTimeout;
+
+        return $this;
+    }
+
+    public function getWriteTimeout(): int
+    {
+        return $this->writeTimeout;
+    }
+
+    public function setWriteTimeout(int $writeTimeout): self
+    {
+        $this->writeTimeout = $writeTimeout;
 
         return $this;
     }

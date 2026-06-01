@@ -44,6 +44,7 @@ enum ServerEvent: string
     case CriticalControlRejected        = 'control.critical.rejected';
     case SchemaViolation                = 'schema.violation';
     case NoticeOfDisconnectSent         = 'session.disconnect_notice';
+    case WriteTimeout                   = 'session.write_timeout';
     case PasswordPolicyAccountLocked    = 'password_policy.account_locked';
     case PasswordPolicyAccountUnlocked  = 'password_policy.account_unlocked';
     case PasswordPolicyExpired          = 'password_policy.expired';
@@ -64,6 +65,7 @@ enum ServerEvent: string
             self::CriticalControlRejected,
             self::SchemaViolation,
             self::NoticeOfDisconnectSent,
+            self::WriteTimeout,
             self::PasswordPolicyExpired,
             self::PasswordPolicyChangeRejected => LogLevel::NOTICE,
             default => LogLevel::INFO,

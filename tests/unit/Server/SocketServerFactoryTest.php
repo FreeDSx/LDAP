@@ -59,6 +59,37 @@ final class SocketServerFactoryTest extends TestCase
         $this->subject->makeAndBind();
     }
 
+    public function test_it_flows_the_write_timeout_to_the_socket_server_for_the_pcntl_runner(): void
+    {
+        $subject = new SocketServerFactory(
+            (new ServerOptions())
+                ->setPort(3391)
+                ->setWriteTimeout(45),
+            $this->mockLogger,
+        );
+
+        self::assertSame(
+            45,
+            $subject->makeAndBind()->getOptions()->getWriteTimeout(),
+        );
+    }
+
+    public function test_it_disables_the_write_timeout_for_the_swoole_runner(): void
+    {
+        $subject = new SocketServerFactory(
+            (new ServerOptions())
+                ->setPort(3392)
+                ->setWriteTimeout(45)
+                ->setUseSwooleRunner(true),
+            $this->mockLogger,
+        );
+
+        self::assertSame(
+            0,
+            $subject->makeAndBind()->getOptions()->getWriteTimeout(),
+        );
+    }
+
     public function test_it_should_make_a_unix_based_socket_server(): void
     {
         if (str_starts_with(strtoupper(PHP_OS), 'WIN')) {

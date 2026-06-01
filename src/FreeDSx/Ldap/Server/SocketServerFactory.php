@@ -39,9 +39,16 @@ class SocketServerFactory
             $this->removeExistingSocketIfNeeded($resource);
         }
 
+        // The write timeout uses a non-blocking stream_select loop, which causes performance issues on swoole.
+        // so no available there until a proper solution is designed.
+        $writeTimeout = $this->options->getUseSwooleRunner()
+            ? 0
+            : $this->options->getWriteTimeout();
+
         $socketServerOptions = (new SocketServerOptions())
             ->setTransport(Transport::from($this->options->getTransport()))
             ->setIdleTimeout($this->options->getIdleTimeout())
+            ->setWriteTimeout($writeTimeout)
             ->setUseSsl($this->options->isUseSsl())
             ->setSslCert($this->options->getSslCert())
             ->setSslCertKey($this->options->getSslCertKey())

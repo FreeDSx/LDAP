@@ -28,11 +28,13 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 use FreeDSx\Socket\Exception\ConnectionException;
+use FreeDSx\Socket\Exception\WriteTimeoutException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -197,6 +199,32 @@ final class ServerProtocolHandlerTest extends TestCase
             ->handle();
     }
 
+    public function test_a_write_timeout_is_recorded_and_closes_without_a_notice_of_disconnect(): void
+    {
+        $recordingLogger = new RecordingLogger();
+        $this->queueReturns([
+            new LdapMessageRequest(1, new ModifyDnRequest('cn=foo,dc=bar', 'cn=bar', true)),
+        ]);
+
+        $this->mockQueue
+            ->expects(self::never())
+            ->method('sendMessage');
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('close');
+
+        $this->handlerWith(
+            new ThrowingMiddlewareHandler(new WriteTimeoutException('The write operation timed out after 600 seconds.')),
+            new EventLogger($recordingLogger, EventLogPolicy::default()),
+        )->handle();
+
+        $record = $this->findRecord($recordingLogger, 'session.write_timeout');
+        self::assertSame(
+            'The write operation timed out after 600 seconds.',
+            $record['context']['reason_message'],
+        );
+    }
+
     public function test_it_sends_a_notice_of_disconnect_and_closes_the_queue_on_shutdown(): void
     {
         $this->mockQueue
@@ -259,6 +287,33 @@ final class ServerProtocolHandlerTest extends TestCase
 
         $record = $this->findRecord($recordingLogger, 'session.disconnect_notice');
         self::assertNotEmpty($record['context']['exception_trace']);
+    }
+
+    public function test_a_write_timeout_is_logged_without_a_notice_of_disconnect(): void
+    {
+        $recordingLogger = new RecordingLogger();
+        $this->queueReturns([
+            new LdapMessageRequest(1, new ModifyDnRequest('cn=a,dc=bar', 'cn=b', true)),
+        ]);
+
+        $this->handlerWith(
+            new ThrowingMiddlewareHandler(new WriteTimeoutException('The write operation timed out after 600 seconds.')),
+            new EventLogger($recordingLogger, EventLogPolicy::default()),
+        )->handle();
+
+        $record = $this->findRecord($recordingLogger, 'session.write_timeout');
+        self::assertSame(
+            'The write operation timed out after 600 seconds.',
+            $record['context'][EventContext::REASON_MESSAGE],
+        );
+
+        foreach ($recordingLogger->records as $logged) {
+            self::assertNotSame(
+                'session.disconnect_notice',
+                $logged['message'],
+                'A stalled reader must not be sent a Notice of Disconnection.',
+            );
+        }
     }
 
     /**

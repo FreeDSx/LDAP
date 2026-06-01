@@ -189,6 +189,24 @@ final class ServerOptionsTest extends TestCase
         );
     }
 
+    public function test_write_timeout_defaults_to_600(): void
+    {
+        self::assertSame(
+            600,
+            $this->subject->getWriteTimeout(),
+        );
+    }
+
+    public function test_it_can_set_write_timeout(): void
+    {
+        $this->subject->setWriteTimeout(0);
+
+        self::assertSame(
+            0,
+            $this->subject->getWriteTimeout(),
+        );
+    }
+
     public function test_require_authentication_defaults_to_true(): void
     {
         self::assertTrue($this->subject->isRequireAuthentication());
