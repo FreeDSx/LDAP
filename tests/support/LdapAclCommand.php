@@ -14,7 +14,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\ServerOptions;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -139,7 +139,7 @@ class LdapAclCommand extends Command
                 ),
         );
 
-        $server->getOptions()->setStorage(new InMemoryStorage($entries));
+        $server->getOptions()->setStorageConfig(InMemoryStorageConfig::withEntries($entries));
         $server->run();
 
         return Command::SUCCESS;

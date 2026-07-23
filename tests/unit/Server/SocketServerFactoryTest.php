@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server;
 
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\Server\TlsVersion;
 use FreeDSx\Ldap\ServerOptions;
@@ -89,7 +90,7 @@ final class SocketServerFactoryTest extends TestCase
             (new ServerOptions())
                 ->setPort(3392)
                 ->setWriteTimeout(45)
-                ->setUseSwooleRunner(true),
+                ->setRunner(RunnerMode::Swoole),
             $this->mockLogger,
         );
 

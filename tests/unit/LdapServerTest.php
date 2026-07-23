@@ -13,14 +13,16 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
 use FreeDSx\Ldap\Ldif\Output\StringLdifOutput;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\ReplicaConfig;
 use FreeDSx\Ldap\ProxyOptions;
@@ -48,6 +50,8 @@ class LdapServerTest extends TestCase
 
     private ServerOptions $options;
 
+    private Container $container;
+
     private ServerRunnerInterface&MockObject $mockServerRunner;
 
     protected function setUp(): void
@@ -58,7 +62,11 @@ class LdapServerTest extends TestCase
             ->setPort(33389)
             ->setServerRunner($this->mockServerRunner);
 
-        $this->subject = new LdapServer($this->options);
+        $this->container = Container::forServer($this->options);
+        $this->subject = new LdapServer(
+            $this->options,
+            $this->container,
+        );
     }
 
     public function test_it_should_run_the_server(): void
@@ -67,14 +75,6 @@ class LdapServerTest extends TestCase
             ->expects(self::once())
             ->method('run');
 
-        $this->options->useInMemoryStorage();
-        $this->subject->run();
-    }
-
-    public function test_run_throws_when_no_storage_is_configured(): void
-    {
-        $this->expectException(RuntimeException::class);
-
         $this->subject->run();
     }
 
@@ -82,7 +82,7 @@ class LdapServerTest extends TestCase
     {
         $this->options
             ->setReplicaConfig(new ReplicaConfig(new ClientOptions()))
-            ->useInMemoryStorage();
+            ->setStorageConfig(InMemoryStorageConfig::withEntries());
 
         $this->expectException(RuntimeException::class);
 
@@ -127,7 +127,6 @@ class LdapServerTest extends TestCase
 
         $this->options->setSaslMechanisms(ServerOptions::SASL_PLAIN);
 
-        $this->options->useInMemoryStorage();
         $this->subject->run();
 
         $this->expectNotToPerformAssertions();
@@ -149,13 +148,10 @@ class LdapServerTest extends TestCase
 
     public function test_it_should_seed_entries_into_the_configured_storage(): void
     {
-        $storage = new InMemoryStorage();
-        $this->options->setStorage($storage);
-
         $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
 
-        self::assertNotNull($storage->find(new Dn('dc=example,dc=com')));
-        $foo = $storage->find(new Dn('cn=foo,dc=example,dc=com'));
+        self::assertNotNull($this->storage()->find(new Dn('dc=example,dc=com')));
+        $foo = $this->storage()->find(new Dn('cn=foo,dc=example,dc=com'));
         self::assertNotNull($foo);
         self::assertSame(
             ['Bar'],
@@ -165,12 +161,9 @@ class LdapServerTest extends TestCase
 
     public function test_it_should_stamp_operational_attributes_on_seeded_entries(): void
     {
-        $storage = new InMemoryStorage();
-        $this->options->setStorage($storage);
-
         $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
 
-        $foo = $storage->find(new Dn('cn=foo,dc=example,dc=com'));
+        $foo = $this->storage()->find(new Dn('cn=foo,dc=example,dc=com'));
 
         self::assertNotNull($foo);
         self::assertMatchesRegularExpression(
@@ -189,9 +182,6 @@ class LdapServerTest extends TestCase
 
     public function test_it_should_record_the_creator_dn_when_seeding(): void
     {
-        $storage = new InMemoryStorage();
-        $this->options->setStorage($storage);
-
         $this->subject->seed(
             new StringLdifLoader(self::SEED_LDIF),
             new Dn('cn=Importer,dc=example,dc=com'),
@@ -199,22 +189,22 @@ class LdapServerTest extends TestCase
 
         self::assertSame(
             'cn=Importer,dc=example,dc=com',
-            $storage->find(new Dn('cn=foo,dc=example,dc=com'))?->get('creatorsName')?->getValues()[0],
+            $this->storage()->find(new Dn('cn=foo,dc=example,dc=com'))?->get('creatorsName')?->getValues()[0],
         );
     }
 
-    public function test_it_should_throw_when_seeding_without_a_storage_backend(): void
+    public function test_it_should_throw_when_seeding_on_a_proxy_server(): void
     {
-        $this->expectException(RuntimeException::class);
+        $proxy = LdapServer::makeProxy(new ProxyOptions(new ClientOptions(['localhost'])));
 
-        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('not available on a proxy server');
+
+        $proxy->seed(new StringLdifLoader(self::SEED_LDIF));
     }
 
     public function test_it_should_reject_seeding_when_the_ldif_contains_change_records(): void
     {
-        $storage = new InMemoryStorage();
-        $this->options->setStorage($storage);
-
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('only accepts content records');
 
@@ -223,8 +213,6 @@ class LdapServerTest extends TestCase
 
     public function test_it_should_apply_modify_changes_against_the_seeded_storage(): void
     {
-        $storage = new InMemoryStorage();
-        $this->options->setStorage($storage);
         $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
 
         $this->subject->applyChanges(new StringLdifLoader(
@@ -233,43 +221,43 @@ class LdapServerTest extends TestCase
 
         self::assertSame(
             ['Updated'],
-            $storage->find(new Dn('cn=foo,dc=example,dc=com'))?->get('sn')?->getValues(),
+            $this->storage()->find(new Dn('cn=foo,dc=example,dc=com'))?->get('sn')?->getValues(),
         );
     }
 
     public function test_it_should_apply_a_delete_change_against_the_seeded_storage(): void
     {
-        $storage = new InMemoryStorage();
-        $this->options->setStorage($storage);
         $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
 
         $this->subject->applyChanges(new StringLdifLoader(
             "dn: cn=foo,dc=example,dc=com\nchangetype: delete\n",
         ));
 
-        self::assertNull($storage->find(new Dn('cn=foo,dc=example,dc=com')));
+        self::assertNull($this->storage()->find(new Dn('cn=foo,dc=example,dc=com')));
     }
 
-    public function test_it_should_throw_when_applying_changes_without_a_backend(): void
+    public function test_it_should_throw_when_applying_changes_on_a_proxy_server(): void
     {
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('requires storage configured');
+        $proxy = LdapServer::makeProxy(new ProxyOptions(new ClientOptions(['localhost'])));
 
-        $this->subject->applyChanges(new StringLdifLoader("dn: cn=x,dc=x\nchangetype: delete\n"));
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('not available on a proxy server');
+
+        $proxy->applyChanges(new StringLdifLoader("dn: cn=x,dc=x\nchangetype: delete\n"));
     }
 
-    public function test_it_should_throw_when_dumping_without_a_storage_backend(): void
+    public function test_it_should_throw_when_dumping_on_a_proxy_server(): void
     {
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('requires storage configured');
+        $proxy = LdapServer::makeProxy(new ProxyOptions(new ClientOptions(['localhost'])));
 
-        $this->subject->dump(new StringLdifOutput());
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('not available on a proxy server');
+
+        $proxy->dump(new StringLdifOutput());
     }
 
     public function test_it_should_dump_seeded_entries_to_the_given_output(): void
     {
-        $storage = new InMemoryStorage();
-        $this->options->setStorage($storage);
         $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
 
         $output = new StringLdifOutput();
@@ -295,11 +283,9 @@ class LdapServerTest extends TestCase
 
     public function test_dump_seed_round_trip_preserves_entryUUID_and_create_timestamp(): void
     {
-        $storage = new InMemoryStorage();
-        $this->options->setStorage($storage);
         $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
 
-        $originalFoo = $storage->find(new Dn('cn=foo,dc=example,dc=com'));
+        $originalFoo = $this->storage()->find(new Dn('cn=foo,dc=example,dc=com'));
         self::assertNotNull($originalFoo);
         $originalUuid = $originalFoo->get('entryUUID')?->firstValue();
         $originalTimestamp = $originalFoo->get('createTimestamp')?->firstValue();
@@ -312,11 +298,15 @@ class LdapServerTest extends TestCase
             (new DumpOptions())->setBaseDn(new Dn('dc=example,dc=com')),
         );
 
-        $restoredStorage = new InMemoryStorage();
-        (new LdapServer((new ServerOptions())->setStorage($restoredStorage)))
-            ->seed(new StringLdifLoader($output->getLdif()));
+        $restoreOptions = new ServerOptions();
+        $restoreContainer = Container::forServer($restoreOptions);
+        (new LdapServer(
+            $restoreOptions,
+            $restoreContainer,
+        ))->seed(new StringLdifLoader($output->getLdif()));
 
-        $restoredFoo = $restoredStorage->find(new Dn('cn=foo,dc=example,dc=com'));
+        $restoredFoo = $restoreContainer->get(EntryStorageInterface::class)
+            ->find(new Dn('cn=foo,dc=example,dc=com'));
         self::assertNotNull($restoredFoo);
         self::assertSame(
             $originalUuid,
@@ -330,8 +320,6 @@ class LdapServerTest extends TestCase
 
     public function test_it_should_apply_the_dump_options_filter(): void
     {
-        $storage = new InMemoryStorage();
-        $this->options->setStorage($storage);
         $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
 
         $output = new StringLdifOutput();
@@ -350,5 +338,13 @@ class LdapServerTest extends TestCase
             'dn: dc=example,dc=com',
             $output->getLdif(),
         );
+    }
+
+    /**
+     * The container-built storage the server operates on.
+     */
+    private function storage(): EntryStorageInterface
+    {
+        return $this->container->get(EntryStorageInterface::class);
     }
 }

@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Schema\PasswordPolicySchemaProvider;
 use FreeDSx\Ldap\Schema\Schema;
@@ -30,8 +29,8 @@ use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\DefaultPasswordQualityChecker;
 use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\PasswordQualityCheckerInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
@@ -43,6 +42,7 @@ use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRules;
 use FreeDSx\Ldap\Server\SearchLimits;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\Server\TlsVersion;
 use Psr\Log\LoggerInterface;
@@ -154,7 +154,7 @@ final class ServerOptions
 
     private ?string $dseVendorVersion = null;
 
-    private ?EntryStorageInterface $storage = null;
+    private StorageConfigInterface $storageConfig;
 
     private ?PasswordAuthenticatableInterface $passwordAuthenticator = null;
 
@@ -210,7 +210,7 @@ final class ServerOptions
 
     private ?ServerRunnerInterface $serverRunner = null;
 
-    private bool $useSwooleRunner = false;
+    private RunnerMode $runner = RunnerMode::Pcntl;
 
     private bool $monitorEnabled = false;
 
@@ -250,6 +250,14 @@ final class ServerOptions
      * @var string[]
      */
     private array $saslMechanisms = [];
+
+    /**
+     * @param ?StorageConfigInterface $storageConfig Storage backend; a transient in-memory directory when omitted.
+     */
+    public function __construct(?StorageConfigInterface $storageConfig = null)
+    {
+        $this->storageConfig = $storageConfig ?? InMemoryStorageConfig::withEntries();
+    }
 
     public function getIp(): string
     {
@@ -515,26 +523,14 @@ final class ServerOptions
         return $this;
     }
 
-    public function getStorage(): ?EntryStorageInterface
+    public function getStorageConfig(): StorageConfigInterface
     {
-        return $this->storage;
+        return $this->storageConfig;
     }
 
-    public function setStorage(?EntryStorageInterface $storage): self
+    public function setStorageConfig(StorageConfigInterface $storageConfig): self
     {
-        $this->storage = $storage;
-
-        return $this;
-    }
-
-    /**
-     * Back the server with a transient in-memory directory.
-     *
-     * @param Entry[] $entries
-     */
-    public function useInMemoryStorage(array $entries = []): self
-    {
-        $this->storage = new InMemoryStorage($entries);
+        $this->storageConfig = $storageConfig;
 
         return $this;
     }
@@ -842,9 +838,9 @@ final class ServerOptions
         return $this->serverRunner;
     }
 
-    public function setUseSwooleRunner(bool $use): self
+    public function setRunner(RunnerMode $runner): self
     {
-        $this->useSwooleRunner = $use;
+        $this->runner = $runner;
 
         return $this;
     }
@@ -904,10 +900,14 @@ final class ServerOptions
 
     /**
      * Named constructor for a read-only replica that mirrors an upstream primary over RFC 4533.
+     *
+     * @param StorageConfigInterface $storageConfig Persistent storage for the replica.
      */
-    public static function forReplica(ReplicaConfig $replicaConfig): self
-    {
-        return (new self())->setReplicaConfig($replicaConfig);
+    public static function forReplica(
+        ReplicaConfig $replicaConfig,
+        StorageConfigInterface $storageConfig,
+    ): self {
+        return (new self($storageConfig))->setReplicaConfig($replicaConfig);
     }
 
     public function getReplicaConfig(): ?ReplicaConfig
@@ -1088,9 +1088,9 @@ final class ServerOptions
         return $this;
     }
 
-    public function getUseSwooleRunner(): bool
+    public function getRunner(): RunnerMode
     {
-        return $this->useSwooleRunner;
+        return $this->runner;
     }
 
     public function getOnServerReady(): ?Closure

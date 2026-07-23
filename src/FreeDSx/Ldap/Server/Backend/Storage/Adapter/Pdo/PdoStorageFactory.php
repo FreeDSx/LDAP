@@ -24,7 +24,7 @@ use PDO;
 /**
  * Builds a PdoStorage from a PdoConfig, selecting the runner: forPcntl() (shared) or forSwoole() (per-coroutine).
  *
- * @api
+ * @internal the container builds storage from PdoConfig via ServerOptions::setStorageConfig()
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

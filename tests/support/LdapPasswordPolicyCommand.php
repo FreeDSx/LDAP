@@ -9,7 +9,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\ServerOptions;
 use Symfony\Component\Console\Command\Command;
@@ -85,7 +85,7 @@ final class LdapPasswordPolicyCommand extends Command
                 ->setSaslMechanisms(ServerOptions::SASL_PLAIN)
                 ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL)),
         );
-        $server->getOptions()->setStorage(new InMemoryStorage($entries));
+        $server->getOptions()->setStorageConfig(InMemoryStorageConfig::withEntries($entries));
         $server->run();
 
         return Command::SUCCESS;

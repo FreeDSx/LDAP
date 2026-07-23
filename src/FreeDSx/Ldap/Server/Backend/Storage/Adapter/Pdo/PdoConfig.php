@@ -19,6 +19,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageConfigInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageType;
 use PDO;
 use SensitiveParameter;
 
@@ -29,7 +31,7 @@ use SensitiveParameter;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class PdoConfig
+final class PdoConfig implements StorageConfigInterface
 {
     /**
      * @param array<int, mixed> $pdoOptions
@@ -247,5 +249,10 @@ final class PdoConfig
         $this->substringIndex = $substringIndex;
 
         return $this;
+    }
+
+    public function type(): StorageType
+    {
+        return StorageType::Pdo;
     }
 }

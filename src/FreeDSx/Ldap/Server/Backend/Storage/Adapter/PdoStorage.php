@@ -50,9 +50,11 @@ use PDOStatement;
 use Throwable;
 
 /**
- * PDO-backed storage; build one with PdoStorageFactory::forPcntl()/forSwoole() from a PdoConfig::forSqlite()/forMysql().
+ * PDO-backed storage; the container builds it from a PdoConfig set via ServerOptions::setStorageConfig().
  *
  * When injecting a pre-built PDO, wrap it in SharedPdoConnectionProvider and call PdoStorage::initialize($pdo, $dialect) first.
+ *
+ * @internal
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

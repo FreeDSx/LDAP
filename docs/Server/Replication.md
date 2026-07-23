@@ -32,7 +32,6 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 use FreeDSx\Ldap\ServerOptions;
 
 // The one sync-specific grant: the privileged sync control, over the base to sync.
@@ -45,12 +44,11 @@ $syncGrant = ControlRule::allow(
 // Add that grant to your directory's AclRules (see the Access Control page for the rest).
 $aclRules = $myAclRules->withControlRules($syncGrant);
 
-// A storage that is visible across connections (see Storage and Runner Requirements below).
-$storage = PdoStorageFactory::forPcntl(PdoConfig::forSqlite('/var/lib/freedsx/directory.sqlite'));
+// A storage config that is visible across connections (see Storage and Runner Requirements below).
+$storageConfig = PdoConfig::forSqlite('/var/lib/freedsx/directory.sqlite');
 
-$options = (new ServerOptions())
+$options = (new ServerOptions($storageConfig))
     ->setSyncEnabled(true)
-    ->setStorage($storage)
     ->setAclRules($aclRules);
 
 $server = new LdapServer($options);
@@ -177,7 +175,6 @@ use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\ReplicaConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 use FreeDSx\Ldap\Sync\Consumer\Checkpoint\FileReplicationCheckpoint;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -196,8 +193,10 @@ $replicaConfig = new ReplicaConfig(
 // How the replica authenticates to the provider (a simple bind here; use Operations::bindSasl() for SASL/EXTERNAL).
 $replicaConfig->setBind(Operations::bind('cn=replica,dc=example,dc=com', 'secret'));
 
-$options = ServerOptions::forReplica($replicaConfig)
-    ->setStorage(PdoStorageFactory::forPcntl(PdoConfig::forSqlite('/var/lib/freedsx/replica.sqlite')));
+$options = ServerOptions::forReplica(
+    $replicaConfig,
+    PdoConfig::forSqlite('/var/lib/freedsx/replica.sqlite'),
+);
 
 (new LdapServer($options))->run();
 ```

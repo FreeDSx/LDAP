@@ -50,7 +50,7 @@ final class ConnectionHandlerBuilderTest extends TestCase
 
     private function builderFor(ServerOptions $options): ConnectionHandlerBuilderInterface
     {
-        return Container::forServer($options->useInMemoryStorage())
+        return Container::forServer($options)
             ->get(ConnectionHandlerBuilderInterface::class);
     }
 }

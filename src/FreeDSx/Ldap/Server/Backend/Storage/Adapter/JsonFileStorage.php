@@ -36,11 +36,11 @@ use Psr\Log\NullLogger;
 use Throwable;
 
 /**
- * JSON-file storage; use forPcntl() / forSwoole() to pick a locking strategy. Reads are lock-free; writes go through atomic() which loads, mutates, and rewrites the file under lock.
+ * JSON-file storage; the container picks forPcntl()/forSwoole() locking from JsonStorageConfig. Reads are lock-free; writes go through atomic() which loads, mutates, and rewrites the file under lock.
  *
  * File format: { "cn=x,dc=y": { "dn": "cn=x,dc=y", "attributes": { "cn": ["x"] } } }
  *
- * @api
+ * @internal built from JsonStorageConfig via ServerOptions::setStorageConfig()
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

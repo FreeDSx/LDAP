@@ -34,16 +34,14 @@ string in code, `PdoStorage::schemaDdl(new SqliteDialect())` and `PdoStorage::sc
 ## Managing the Schema Yourself
 
 For a managed database you usually want to apply schema changes with your own tooling rather than have the library issue
-DDL on startup. Turn automatic setup off with the `initializeSchema` flag on the storage factory:
+DDL on startup. Turn automatic setup off with the `initializeSchema` flag on the `PdoConfig`, then pass the config to
+`setStorageConfig()` or the `ServerOptions` constructor:
 
 ```php
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 
-$storage = PdoStorageFactory::forPcntl(
-    PdoConfig::forSqlite('/var/lib/freedsx/directory.sqlite')
-        ->setInitializeSchema(false),
-);
+$storageConfig = PdoConfig::forSqlite('/var/lib/freedsx/directory.sqlite')
+    ->setInitializeSchema(false);
 ```
 
 With it off, the adapter never runs any DDL on connect. Creating and updating the tables is entirely up to you, using

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
@@ -25,7 +26,8 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordQualityRules;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Sasl\External\ExternalCredentialMapperInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
@@ -61,7 +63,10 @@ final class ServerOptionsTest extends TestCase
     public function test_for_replica_configures_a_read_only_replica(): void
     {
         $config = new ReplicaConfig(new ClientOptions());
-        $options = ServerOptions::forReplica($config);
+        $options = ServerOptions::forReplica(
+            $config,
+            PdoConfig::forSqlite(':memory:'),
+        );
 
         self::assertTrue($options->isReadOnly());
         self::assertSame(
@@ -590,30 +595,33 @@ final class ServerOptionsTest extends TestCase
         );
     }
 
-    public function test_storage_is_null_by_default(): void
+    public function test_storage_defaults_to_an_in_memory_config(): void
     {
-        self::assertNull($this->subject->getStorage());
-    }
-
-    public function test_it_can_set_storage(): void
-    {
-        $storage = new InMemoryStorage();
-
-        $this->subject->setStorage($storage);
-
-        self::assertSame(
-            $storage,
-            $this->subject->getStorage(),
+        self::assertInstanceOf(
+            InMemoryStorageConfig::class,
+            $this->subject->getStorageConfig(),
         );
     }
 
-    public function test_use_in_memory_storage_configures_an_in_memory_directory(): void
+    public function test_it_can_set_a_storage_config(): void
     {
-        $this->subject->useInMemoryStorage();
+        $config = PdoConfig::forSqlite(':memory:');
 
-        self::assertInstanceOf(
-            InMemoryStorage::class,
-            $this->subject->getStorage(),
+        $this->subject->setStorageConfig($config);
+
+        self::assertSame(
+            $config,
+            $this->subject->getStorageConfig(),
+        );
+    }
+
+    public function test_it_can_be_constructed_with_a_storage_config(): void
+    {
+        $config = PdoConfig::forSqlite(':memory:');
+
+        self::assertSame(
+            $config,
+            (new ServerOptions($config))->getStorageConfig(),
         );
     }
 
@@ -668,16 +676,22 @@ final class ServerOptionsTest extends TestCase
         );
     }
 
-    public function test_swoole_runner_is_disabled_by_default(): void
+    public function test_the_runner_defaults_to_pcntl(): void
     {
-        self::assertFalse($this->subject->getUseSwooleRunner());
+        self::assertSame(
+            RunnerMode::Pcntl,
+            $this->subject->getRunner(),
+        );
     }
 
-    public function test_it_can_enable_swoole_runner(): void
+    public function test_it_can_set_the_runner(): void
     {
-        $this->subject->setUseSwooleRunner(true);
+        $this->subject->setRunner(RunnerMode::Swoole);
 
-        self::assertTrue($this->subject->getUseSwooleRunner());
+        self::assertSame(
+            RunnerMode::Swoole,
+            $this->subject->getRunner(),
+        );
     }
 
     public function test_socket_accept_timeout_defaults_to_half_second(): void

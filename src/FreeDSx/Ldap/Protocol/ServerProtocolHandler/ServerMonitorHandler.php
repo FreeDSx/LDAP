@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
@@ -133,7 +134,7 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
             return $runner instanceof CoroutineServerRunnerInterface;
         }
 
-        return $this->options->getUseSwooleRunner();
+        return $this->options->getRunner() === RunnerMode::Swoole;
     }
 
     /**
@@ -189,7 +190,7 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
             return $runner::class;
         }
 
-        return $this->options->getUseSwooleRunner()
+        return $this->options->getRunner() === RunnerMode::Swoole
             ? SwooleServerRunner::class
             : PcntlServerRunner::class;
     }

@@ -14,12 +14,13 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Ldif;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Ldif\LdifChanges;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 
 final class LdapDumpServerTest extends ServerTestCase
@@ -109,9 +110,13 @@ final class LdapDumpServerTest extends ServerTestCase
 
     public function test_a_fresh_server_seeded_from_the_dump_reconstructs_the_directory(): void
     {
-        $storage = new InMemoryStorage();
-        (new LdapServer((new ServerOptions())->setStorage($storage)))
-            ->seed(new StringLdifLoader((string) file_get_contents(self::$dumpPath)));
+        $options = new ServerOptions();
+        $container = Container::forServer($options);
+        (new LdapServer(
+            $options,
+            $container,
+        ))->seed(new StringLdifLoader((string) file_get_contents(self::$dumpPath)));
+        $storage = $container->get(EntryStorageInterface::class);
 
         $alice = $storage->find(new Dn('cn=alice,dc=foo,dc=bar'));
         self::assertNotNull($alice);

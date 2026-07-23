@@ -16,7 +16,7 @@ LDAP Server Configuration
     * [ServerOptions:setAclRules](#setaclrules)
     * [ServerOptions:setAccessControl](#setaccesscontrol)
 * [Backend](#backend)
-    * [ServerOptions:setStorage](#setstorage)
+    * [ServerOptions:setStorageConfig](#setstorageconfig)
     * [ServerOptions:setPasswordAuthenticator](#setpasswordauthenticator)
     * [ServerOptions:setIdentityResolver](#setidentityresolver)
 * [Schema](#schema)
@@ -253,30 +253,29 @@ See [Access Control](Access-Control.md) for control-rule grants.
 ## Backend
 
 The LDAP server handles directory data through `WritableStorageBackend`, which applies LDAP semantics over the
-`EntryStorageInterface` set via `setStorage()`. You can also plug in a custom filter evaluator or a custom RootDSE
-handler.
+storage built from the configured backend config.
 
 ------------------
-#### setStorage
+#### setStorageConfig
 
-The storage backend is configured on `ServerOptions` via `setStorage()` (or `useInMemoryStorage()` for a
-transient in-memory directory). All directory operations (search, authenticate, and optionally write) are
-dispatched to it.
+Storage is configured on `ServerOptions` via `setStorageConfig()` or by passing a config to the `ServerOptions`
+constructor. Choose one of the built-in backend configs: `InMemoryStorageConfig`, `JsonStorageConfig`, or `PdoConfig`
+(SQLite or MySQL). All directory operations (search, authenticate, and optionally write) are dispatched to the
+resulting storage.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 
-$server = new LdapServer((new ServerOptions())->useInMemoryStorage());
+$server = new LdapServer(new ServerOptions(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')));
 ```
 
-For a custom source, pass your own `EntryStorageInterface` implementation to `setStorage()`.
+When no config is given the server uses a transient in-memory backend. That default is for testing only. Supply a
+persistent config such as `PdoConfig::forSqlite()` in production.
 
 The bundled SQLite and MySQL backends create their tables automatically on first connect. For managing that schema
 yourself, see [Database Schema](Database-Schema.md).
-
-**Note**: a non-proxy server started without a configured storage throws at startup rather than silently
-serving an empty directory.
 
 ------------------
 #### setPasswordAuthenticator
@@ -386,7 +385,7 @@ Password Modify requests.
 
 ## Schema
 
-These configure schema validation for `useStorage()` writes. For full documentation, see
+These configure schema validation for storage-backend writes. For full documentation, see
 [Schema Validation](Schema.md).
 
 ------------------
@@ -657,7 +656,8 @@ configure the rest.
 
 A `ServerOptions` setter that puts the server into read-only replica mode against the given `ReplicaConfig`. Client
 writes are refused and a background daemon keeps the local storage in step with the provider.
-`ServerOptions::forReplica($config)` is a shortcut that constructs the options with this already set.
+`ServerOptions::forReplica($replicaConfig, $storageConfig)` is a shortcut that constructs the options with this
+already set, taking the replica config and the backend storage config for the local mirror.
 
 **Default**: `null` (the server is a normal read-write directory).
 

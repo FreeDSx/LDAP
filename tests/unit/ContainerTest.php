@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
@@ -23,6 +24,13 @@ use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerFactoryMap;
 use FreeDSx\Ldap\Protocol\Queue\Response\MetricsResponseInterceptor;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
@@ -58,7 +66,7 @@ class ContainerTest extends TestCase
     {
         parent::setUp();
 
-        $this->subject = Container::forServer((new ServerOptions())->useInMemoryStorage());
+        $this->subject = Container::forServer(new ServerOptions());
     }
 
     public function test_it_assembles_the_backend_from_the_configured_storage(): void
@@ -66,6 +74,50 @@ class ContainerTest extends TestCase
         self::assertInstanceOf(
             WritableStorageBackend::class,
             $this->subject->get(HandlerFactoryInterface::class)->makeBackend(),
+        );
+    }
+
+    public function test_it_builds_in_memory_storage_from_an_in_memory_config(): void
+    {
+        $container = Container::forServer(
+            new ServerOptions(InMemoryStorageConfig::withEntries()),
+        );
+
+        self::assertInstanceOf(
+            InMemoryStorage::class,
+            $container->get(EntryStorageInterface::class),
+        );
+    }
+
+    public function test_it_builds_a_json_backend_from_a_json_config(): void
+    {
+        $container = Container::forServer(
+            new ServerOptions(JsonStorageConfig::forFile(sys_get_temp_dir() . '/freedsx_container_test.json')),
+        );
+
+        self::assertInstanceOf(
+            JsonFileStorage::class,
+            $container->get(EntryStorageInterface::class),
+        );
+    }
+
+    public function test_it_builds_a_pdo_backend_from_a_pdo_config(): void
+    {
+        $container = Container::forServer(
+            new ServerOptions(PdoConfig::forSqlite(':memory:')),
+        );
+
+        self::assertInstanceOf(
+            PdoStorage::class,
+            $container->get(EntryStorageInterface::class),
+        );
+    }
+
+    public function test_the_storage_is_a_shared_singleton(): void
+    {
+        self::assertSame(
+            $this->subject->get(EntryStorageInterface::class),
+            $this->subject->get(EntryStorageInterface::class),
         );
     }
 
@@ -194,7 +246,7 @@ class ContainerTest extends TestCase
         $container = $this->containerFor(
             (new ServerOptions())
                 ->setMonitorEnabled(true)
-                ->setUseSwooleRunner(true),
+                ->setRunner(RunnerMode::Swoole),
         );
 
         self::assertSame(
@@ -234,7 +286,7 @@ class ContainerTest extends TestCase
         }
 
         $container = $this->containerFor(
-            $this->journalingOptions()->setUseSwooleRunner(true),
+            $this->journalingOptions()->setRunner(RunnerMode::Swoole),
         );
 
         self::assertInstanceOf(
@@ -264,6 +316,6 @@ class ContainerTest extends TestCase
 
     private function containerFor(ServerOptions $options): Container
     {
-        return Container::forServer($options->useInMemoryStorage());
+        return Container::forServer($options);
     }
 }

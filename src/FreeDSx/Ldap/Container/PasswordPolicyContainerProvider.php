@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Container;
 
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\ReplicaPasswordStateStoreProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
@@ -80,7 +81,7 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
      */
     private function makeReplicaPasswordStateStore(Container $container): ReplicaPasswordStateStoreInterface
     {
-        $storage = $container->get(ServerOptions::class)->getStorage();
+        $storage = $container->get(EntryStorageInterface::class);
 
         return $storage instanceof ReplicaPasswordStateStoreProviderInterface
             ? $storage->replicaPasswordStateStore()

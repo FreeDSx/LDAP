@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
@@ -18,13 +20,13 @@ use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRule;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRules;
 use FreeDSx\Ldap\Server\SearchLimits;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
 use FreeDSx\Ldap\ServerOptions;
@@ -249,16 +251,14 @@ final class LdapServerCommand extends Command
             );
         }
 
-        $storage = $this->createStorage($storageType, $runner);
-
-        $options = (new ServerOptions())
+        $options = (new ServerOptions($this->createStorageConfig($storageType)))
             ->setPort($port)
             ->setTransport($transport)
             ->setUnixSocket(sys_get_temp_dir() . '/ldap.socket')
             ->setSslCert(self::SSL_CERT)
             ->setSslCertKey(self::SSL_KEY)
             ->setUseSsl($useSsl)
-            ->setUseSwooleRunner($runner === 'swoole')
+            ->setRunner($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl)
             ->setAllowAnonymous($allowAnonymous)
             ->setSocketAcceptTimeout(0.1)
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
@@ -282,7 +282,13 @@ final class LdapServerCommand extends Command
             $options->setConfigReloader(new FileFlagConfigReloader($reloadFlagFile));
         }
 
-        $server = new LdapServer($options);
+        $container = Container::forServer($options);
+        $server = new LdapServer(
+            $options,
+            $container,
+        );
+        // Raw import (no schema validation) so tests can seed synthetic fixtures such as the paging `foo` attribute.
+        $storage = $container->get(EntryStorageInterface::class);
 
         if ($sasl) {
             $options->setSaslMechanisms(
@@ -350,8 +356,6 @@ final class LdapServerCommand extends Command
             ));
         }
 
-        $server->getOptions()->setStorage($storage);
-
         $loadData = function () use ($server, $storage, $seedFile, $entries, $changesFile, $dumpFile): void {
             if ($seedFile !== '') {
                 $server->seed(new FileLdifLoader($seedFile));
@@ -379,12 +383,8 @@ final class LdapServerCommand extends Command
         return Command::SUCCESS;
     }
 
-    private function createStorage(
-        string $storageType,
-        string $runner,
-    ): EntryStorageInterface {
-        $swoole = $runner === 'swoole';
-
+    private function createStorageConfig(string $storageType): StorageConfigInterface
+    {
         if ($storageType === 'json') {
             $filePath = sys_get_temp_dir() . '/ldap_test_server.json';
 
@@ -392,9 +392,7 @@ final class LdapServerCommand extends Command
                 unlink($filePath);
             }
 
-            return $swoole
-                ? JsonFileStorage::forSwoole($filePath)
-                : JsonFileStorage::forPcntl($filePath);
+            return JsonStorageConfig::forFile($filePath);
         }
 
         if ($storageType === 'sqlite') {
@@ -406,9 +404,7 @@ final class LdapServerCommand extends Command
                 }
             }
 
-            return $swoole
-                ? PdoStorageFactory::forSwoole(PdoConfig::forSqlite($dbPath))
-                : PdoStorageFactory::forPcntl(PdoConfig::forSqlite($dbPath));
+            return PdoConfig::forSqlite($dbPath);
         }
 
         if ($storageType === 'mysql') {
@@ -427,12 +423,10 @@ final class LdapServerCommand extends Command
             $cleanup->exec('DROP TABLE IF EXISTS entries');
             unset($cleanup);
 
-            return $swoole
-                ? PdoStorageFactory::forSwoole(PdoConfig::forMysql($dsn, $user, $password))
-                : PdoStorageFactory::forPcntl(PdoConfig::forMysql($dsn, $user, $password));
+            return PdoConfig::forMysql($dsn, $user, $password);
         }
 
-        return new InMemoryStorage();
+        return InMemoryStorageConfig::withEntries();
     }
 
     /**

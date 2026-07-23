@@ -50,7 +50,7 @@ final class ProtocolHandlerProviderTest extends TestCase
 
     protected function setUp(): void
     {
-        $container = Container::forServer((new ServerOptions())->useInMemoryStorage());
+        $container = Container::forServer(new ServerOptions());
 
         $this->subject = new ProtocolHandlerProvider(
             routeResolver: $container->get(ServerProtocolHandlerFactory::class),
@@ -200,7 +200,7 @@ final class ProtocolHandlerProviderTest extends TestCase
     #[DataProvider('handlerIdProvider')]
     public function test_every_route_has_a_registered_factory(HandlerId $handlerId): void
     {
-        $container = Container::forServer((new ServerOptions())->useInMemoryStorage());
+        $container = Container::forServer(new ServerOptions());
 
         self::assertInstanceOf(
             ServerProtocolHandlerInterface::class,

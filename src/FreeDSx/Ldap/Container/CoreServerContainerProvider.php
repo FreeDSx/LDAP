@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Container;
 
 use Closure;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
@@ -21,6 +22,12 @@ use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
@@ -81,6 +88,7 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
             SocketServerFactory::class => $this->makeSocketServerFactory(...),
             HandlerFactoryInterface::class => $this->makeHandlerFactory(...),
             FilterEvaluatorInterface::class => $this->makeFilterEvaluator(...),
+            EntryStorageInterface::class => $this->makeStorage(...),
             WritableStorageBackend::class => $this->makeBackend(...),
             ServerProtocolFactory::class => $this->makeServerProtocolFactory(...),
             ServerProtocolFactoryInterface::class => $this->makeServerProtocolFactoryInterface(...),
@@ -121,7 +129,7 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
      */
     private function makeSleeper(Container $container): SleeperInterface
     {
-        return $container->get(ServerOptions::class)->getUseSwooleRunner()
+        return $container->get(ServerOptions::class)->getRunner() === RunnerMode::Swoole
             ? new CoroutineSleeper()
             : new BlockingSleeper();
     }
@@ -145,30 +153,56 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
     private function backendOrFail(Container $container): WritableStorageBackend
     {
         return $this->backendOrNull($container)
-            ?? throw new RuntimeException('No storage is configured; set ServerOptions::setStorage().');
+            ?? throw new RuntimeException('No storage is configured; set ServerOptions::setStorageConfig().');
     }
 
     /**
-     * The configured backend, or null when no storage is set (the proxy path has none).
+     * The assembled backend, or null on the proxy path which serves no local directory.
      */
     private function backendOrNull(Container $container): ?WritableStorageBackend
     {
-        return $container->get(ServerOptions::class)->getStorage() !== null
-            ? $container->get(WritableStorageBackend::class)
-            : null;
+        return $container->has(ProxyOptions::class)
+            ? null
+            : $container->get(WritableStorageBackend::class);
     }
 
     /**
-     * Assemble the writable backend from the configured storage; only invoked when storage is set.
+     * Build the runner-appropriate storage backend from the configured StorageConfigInterface.
+     */
+    private function makeStorage(Container $container): EntryStorageInterface
+    {
+        $options = $container->get(ServerOptions::class);
+        $config = $options->getStorageConfig();
+        $swoole = $options->getRunner() === RunnerMode::Swoole;
+
+        return match (true) {
+            $config instanceof PdoConfig => $swoole
+                ? PdoStorageFactory::forSwoole($config)
+                : PdoStorageFactory::forPcntl($config),
+            $config instanceof JsonStorageConfig => $swoole
+                ? JsonFileStorage::forSwoole(
+                    $config->path(),
+                    logger: $config->logger(),
+                )
+                : JsonFileStorage::forPcntl(
+                    $config->path(),
+                    logger: $config->logger(),
+                ),
+            $config instanceof InMemoryStorageConfig => new InMemoryStorage($config->entries()),
+            default => throw new RuntimeException(sprintf(
+                'Unsupported storage config "%s".',
+                $config::class,
+            )),
+        };
+    }
+
+    /**
+     * Assemble the writable backend from the container-built storage; only invoked when storage is configured.
      */
     private function makeBackend(Container $container): WritableStorageBackend
     {
         $options = $container->get(ServerOptions::class);
-        $storage = $options->getStorage();
-
-        if ($storage === null) {
-            throw new RuntimeException('No storage is configured; set ServerOptions::setStorage().');
-        }
+        $storage = $container->get(EntryStorageInterface::class);
 
         $schema = $options->getSchemaValidationMode() !== SchemaValidationMode::Off
             ? $options->getSchema()
@@ -240,7 +274,7 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
         $protocolFactoryProvider = $this->makeProtocolFactoryProvider($container);
         $metricsRecorder = $container->get(MetricsRecorderInterface::class);
 
-        if ($options->getUseSwooleRunner()) {
+        if ($options->getRunner() === RunnerMode::Swoole) {
             return new SwooleServerRunner(
                 serverProtocolFactory: $protocolFactoryProvider($options),
                 options: $options,
@@ -287,7 +321,7 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
         return RetentionSweeper::isSweepable(
             $policy,
             $journal,
-            $options->getUseSwooleRunner(),
+            $options->getRunner() === RunnerMode::Swoole,
         )
             ? $policy
             : null;
@@ -436,11 +470,12 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
     ): ?LdapReplica {
         $options = $container->get(ServerOptions::class);
         $config = $options->getReplicaConfig();
-        $storage = $options->getStorage();
 
-        if ($config === null || $storage === null) {
+        if ($config === null) {
             return null;
         }
+
+        $storage = $container->get(EntryStorageInterface::class);
 
         // Pair reconciliation with forwarding: the store drops forwarded state once the primary's entry replicates back.
         $passwordStateStore = $options->isPasswordPolicyEnabled()
@@ -532,7 +567,7 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
     {
         $options = $container->get(ServerOptions::class);
 
-        if (!$options->getUseSwooleRunner()) {
+        if ($options->getRunner() !== RunnerMode::Swoole) {
             return new FileSnapshotProvider($options->getMonitorSnapshotPath());
         }
 
@@ -549,8 +584,10 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
         $proxyOptions = $container->has(ProxyOptions::class)
             ? $container->get(ProxyOptions::class)
             : null;
-        // Carry the backend across reloads so a SIGHUP does not drop the configured storage.
+        // Carry the backend and its storage across reloads so a SIGHUP does not drop or rebuild the configured storage;
+        // sharing the exact instance keeps the backend, replica daemon, and replica ppolicy store on one storage.
         $backend = $this->backendOrNull($container);
+        $storage = $backend?->getStorage();
 
         // Share the metrics state across reloads so SIGHUP does not reset the counters or detach cn=monitor. The rollup
         // coordinator is shared so a reloaded middleware streams to the same channel the (persistent) runner bound.

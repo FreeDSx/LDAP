@@ -28,6 +28,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 /**
  * Array-backed storage; safe under Swoole or as a pre-seeded read-only fixture under PCNTL (child writes are not shared).
  *
+ * @internal built from InMemoryStorageConfig via ServerOptions::setStorageConfig()
+ *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingInterface

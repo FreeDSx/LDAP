@@ -12,8 +12,8 @@ Schema Validation
 * [Operational Attributes](#operational-attributes)
 * [String Matching and Internationalization (RFC 4518)](#string-matching-and-internationalization-rfc-4518)
 
-Calling `LdapServer::useStorage()` automatically enables schema validation using the built-in RFC 4519
-schema in `Strict` mode.
+Configuring backend storage automatically enables schema validation using the built-in RFC 4519 schema in
+`Strict` mode.
 
 ## Default Behavior
 
@@ -21,7 +21,7 @@ schema in `Strict` mode.
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\ServerOptions;
 
-$server = new LdapServer((new ServerOptions())->useInMemoryStorage());
+$server = new LdapServer(new ServerOptions());
 ```
 
 ## What Gets Validated
@@ -90,13 +90,11 @@ otherwise make unmodifiable.
 ```php
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\ServerOptions;
 
 $server = new LdapServer(
     (new ServerOptions())
         ->setSchemaValidationMode(SchemaValidationMode::Lenient)
-        ->setStorage(new InMemoryStorage())
 );
 ```
 
@@ -143,9 +141,9 @@ $options = (new ServerOptions())->setSchema($schema);
 
 ## Operational Attributes
 
-`useStorage()` automatically populates and maintains server-managed operational attributes on every write. Clients
-cannot modify these — they are flagged `NO-USER-MODIFICATION` in the schema and client attempts are rejected with
-`constraintViolation`.
+The storage backend automatically populates and maintains server-managed operational attributes on every write.
+Clients cannot modify these. They are flagged `NO-USER-MODIFICATION` in the schema and client attempts are rejected
+with `constraintViolation`.
 
 **Set on `add`:**
 

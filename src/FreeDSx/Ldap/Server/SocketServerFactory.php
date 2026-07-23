@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server;
 
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\SocketServer;
@@ -41,7 +42,7 @@ class SocketServerFactory
             $this->removeExistingSocketIfNeeded($resource);
         }
 
-        $writeTimeoutEnforcer = $this->options->getUseSwooleRunner()
+        $writeTimeoutEnforcer = $this->options->getRunner() === RunnerMode::Swoole
             ? new SwooleTimerEnforcer()
             : new BlockingSelectEnforcer();
 

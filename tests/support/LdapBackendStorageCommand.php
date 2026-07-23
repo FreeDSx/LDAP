@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
@@ -13,10 +15,10 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
 use FreeDSx\Ldap\Schema\NisSchemaProvider;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
@@ -273,10 +275,8 @@ final class LdapBackendStorageCommand extends Command
             ));
         }
 
-        $server = new LdapServer($serverOptions);
-
         if ($storage === 'memory') {
-            $server->getOptions()->setStorage(new InMemoryStorage($entries));
+            $config = InMemoryStorageConfig::withEntries($entries);
         } elseif ($storage === 'json') {
             $filePath = sys_get_temp_dir() . '/ldap_test_backend_storage.json';
 
@@ -284,19 +284,7 @@ final class LdapBackendStorageCommand extends Command
                 unlink($filePath);
             }
 
-            $adapter = $runner === 'swoole'
-                ? JsonFileStorage::forSwoole($filePath)
-                : JsonFileStorage::forPcntl($filePath);
-
-            $importer = new LdapImporter($adapter);
-
-            if ($runner === 'swoole') {
-                \Swoole\Coroutine\run(fn() => $importer->importEntries($entries));
-            } else {
-                $importer->importEntries($entries);
-            }
-
-            $server->getOptions()->setStorage($adapter);
+            $config = JsonStorageConfig::forFile($filePath);
         } elseif ($storage === 'sqlite') {
             $dbPath = sys_get_temp_dir() . '/ldap_test_backend_storage.sqlite';
 
@@ -306,19 +294,7 @@ final class LdapBackendStorageCommand extends Command
                 }
             }
 
-            $adapter = $runner === 'swoole'
-                ? PdoStorageFactory::forSwoole(PdoConfig::forSqlite($dbPath))
-                : PdoStorageFactory::forPcntl(PdoConfig::forSqlite($dbPath));
-
-            $importer = new LdapImporter($adapter);
-
-            if ($runner === 'swoole') {
-                \Swoole\Coroutine\run(fn() => $importer->importEntries($entries));
-            } else {
-                $importer->importEntries($entries);
-            }
-
-            $server->getOptions()->setStorage($adapter);
+            $config = PdoConfig::forSqlite($dbPath);
         } else {
             $dsn = getenv('MYSQL_DSN') ?: 'mysql:host=127.0.0.1;port=3306;dbname=freedsx';
             $user = getenv('MYSQL_USER') ?: 'root';
@@ -336,23 +312,28 @@ final class LdapBackendStorageCommand extends Command
             $cleanup->exec('DROP TABLE IF EXISTS entries');
             unset($cleanup);
 
-            $adapter = $runner === 'swoole'
-                ? PdoStorageFactory::forSwoole(PdoConfig::forMysql($dsn, $user, $password))
-                : PdoStorageFactory::forPcntl(PdoConfig::forMysql($dsn, $user, $password));
+            $config = PdoConfig::forMysql($dsn, $user, $password);
+        }
 
-            $importer = new LdapImporter($adapter);
+        $serverOptions
+            ->setStorageConfig($config)
+            ->setRunner($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl);
+
+        $container = Container::forServer($serverOptions);
+        $server = new LdapServer(
+            $serverOptions,
+            $container,
+        );
+
+        // The in-memory config carries its seed entries; other backends get a raw import (no schema validation).
+        if ($storage !== 'memory') {
+            $importer = new LdapImporter($container->get(EntryStorageInterface::class));
 
             if ($runner === 'swoole') {
                 \Swoole\Coroutine\run(fn() => $importer->importEntries($entries));
             } else {
                 $importer->importEntries($entries);
             }
-
-            $server->getOptions()->setStorage($adapter);
-        }
-
-        if ($runner === 'swoole') {
-            $server->getOptions()->setUseSwooleRunner(true);
         }
 
         $server->run();

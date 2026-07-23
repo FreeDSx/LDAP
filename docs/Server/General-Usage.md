@@ -61,12 +61,12 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 $passwordHash = '{SHA}' . base64_encode(sha1('secret', true));
 
-$options = (new ServerOptions())->setStorage(new InMemoryStorage([
+$options = new ServerOptions(InMemoryStorageConfig::withEntries([
     new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
     new Entry(
         new Dn('cn=admin,dc=example,dc=com'),
@@ -91,12 +91,12 @@ searching for an entry where the `uid` attribute matches.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 $options = (new ServerOptions())
     ->setSaslMechanisms(ServerOptions::SASL_PLAIN)
-    ->setStorage(JsonFileStorage::forPcntl('/var/lib/myapp/ldap.json'));
+    ->setStorageConfig(JsonStorageConfig::forFile('/var/lib/myapp/ldap.json'));
 
 $server = new LdapServer($options);
 $server->run();
@@ -119,7 +119,7 @@ For full control over credential storage, such as delegating to an external user
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Sasl\Mechanism\MechanismName;
@@ -155,7 +155,7 @@ $options = (new ServerOptions())
         ServerOptions::SASL_PLAIN,
         ServerOptions::SASL_SCRAM_SHA_256,
     )
-    ->setStorage(JsonFileStorage::forPcntl('/var/lib/myapp/ldap.json'))
+    ->setStorageConfig(JsonStorageConfig::forFile('/var/lib/myapp/ldap.json'))
     ->setPasswordAuthenticator(new MyAuthenticator());
 
 $server = new LdapServer($options);
@@ -169,14 +169,15 @@ about the other.
 
 ## Running The Server
 
-In its simplest form you construct the server with storage and call `run()`. A non-proxy server started without
-storage throws at startup rather than silently serving an empty directory.
+In its simplest form you construct the server and call `run()`. `ServerOptions` defaults to a transient in-memory
+backend when no storage config is given. This default is for testing only. In production supply a persistent
+backend config such as `PdoConfig::forSqlite()`.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\ServerOptions;
 
-$server = new LdapServer((new ServerOptions())->useInMemoryStorage());
+$server = new LdapServer(new ServerOptions());
 $server->run();
 ```
 
@@ -217,7 +218,7 @@ use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\ServerOptions;
 
 $options = (new ServerOptions())
-    ->setStorage($storage)
+    ->setStorageConfig($storageConfig)
     ->setConfigReloader(new FileConfigReloader('/etc/myapp/ldap.json'));
 
 $server = new LdapServer($options);
@@ -289,38 +290,43 @@ single configured upstream.
 
 ## Providing a Backend
 
-For storage-backed servers, provide an `EntryStorageInterface` implementation via `useStorage()`. FreeDSx LDAP
-wraps it in `WritableStorageBackend`, which handles all LDAP semantics — validation, error codes, scope checking,
-and entry transformation. Your storage implementation handles only raw persistence.
+Configure backend storage via `setStorageConfig()` or pass a config to the `ServerOptions` constructor
+(`new ServerOptions(StorageConfigInterface $config)`). Pick the config that matches your persistence needs: in-memory,
+JSON file, PDO-SQLite, or PDO-MySQL. When no config is given the server uses a transient in-memory backend, which is
+for testing only.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 
-$server = new LdapServer((new ServerOptions())->setStorage(new InMemoryStorage($entries)));
+$server = new LdapServer(new ServerOptions(InMemoryStorageConfig::withEntries($entries)));
 $server->run();
 ```
 
-For a custom source that a bundled adapter cannot model, implement `EntryStorageInterface` yourself and pass
-it to `useStorage()`. `WritableStorageBackend` still handles LDAP semantics (validation, error codes, scope
-and DN handling, operational attributes) on top of your storage, so you only implement entry read/write.
+Each config is a value object. The container builds the runner-appropriate storage for the runner set on
+`ServerOptions`, so the same config works under both the PCNTL and Swoole runners.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 
-$server = new LdapServer((new ServerOptions())->setStorage(new MyEntryStorage()));
+$server = new LdapServer(new ServerOptions(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')));
 $server->run();
 ```
 
-All client LDAP operations — search, add, delete, modify, rename, compare — are routed to the backend.
-Paging is handled automatically: a PHP generator is stored per connection and resumes it for each page
-request. Your `search()` implementation simply yields entries.
+All client LDAP operations (search, add, delete, modify, rename, compare) are routed to the backend.
+Paging is handled automatically: a PHP generator is stored per connection and resumes it for each page request.
 
 Authentication is a separate concern handled by `PasswordAuthenticatableInterface`. See [Authentication](#authentication).
 
 ### Built-In Storage Implementations
 
-Four storage implementations are included for common use cases. All are used via `useStorage()`.
+Four storage backends are included, each selected via a config object passed to `setStorageConfig()`:
+
+- **SQLite** (`PdoConfig::forSqlite()`): recommended for most deployments. It is the most optimized backend and gives durable persistence with concurrent access.
+- **MySQL** (`PdoConfig::forMysql()`): durable persistence backed by a shared MySQL/MariaDB server.
+- **JsonFileStorage** (`JsonStorageConfig::forFile()`): a single JSON file, useful for small directories.
+- **InMemoryStorage** (`InMemoryStorageConfig::withEntries()`): non-persistent, ideal for testing or read-only PCNTL data seeded before `run()`.
 
 #### InMemoryStorage
 
@@ -334,19 +340,19 @@ An in-memory, array-backed storage implementation. Suitable for:
 > Under the PCNTL runner, `InMemoryStorage` is **not safe for multi-client write workloads**. Each forked child receives
 > its own copy of the store at fork time. Written data is not propagated.
 >
-> Use `JsonFileStorage` or a `PdoStorage` (via `PdoStorageFactory` with a SQLite/MySQL `PdoConfig`) if you need write behavior and use PCNTL.
+> Use `JsonStorageConfig` or a SQLite/MySQL `PdoConfig` if you need write behavior under the PCNTL runner.
 
 ```php
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 $passwordHash = '{SHA}' . base64_encode(sha1('secret', true));
 
-$options = (new ServerOptions())->setStorage(new InMemoryStorage([
+$options = new ServerOptions(InMemoryStorageConfig::withEntries([
     new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
     new Entry(
         new Dn('cn=admin,dc=example,dc=com'),
@@ -364,19 +370,16 @@ $server->run();
 A file-backed storage implementation that persists the directory as a JSON file. Safe for PCNTL (write operations are
 serialised with `flock(LOCK_EX)` and the in-memory read cache is invalidated via `filemtime` checks).
 
-Use the named constructor that matches your server runner:
+Pass a `JsonStorageConfig::forFile()` to the `ServerOptions` constructor. The container selects the PCNTL
+implementation (`flock()` serialised writes) or the Swoole implementation (coroutine Channel mutex, non-blocking file
+I/O) to match the configured runner:
 
 ```php
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\ServerOptions;
 
-// PCNTL runner — uses flock() to serialise writes across forked processes
-$server = new LdapServer((new ServerOptions())->setStorage(JsonFileStorage::forPcntl('/var/lib/myapp/ldap.json')));
-$server->run();
-
-// Swoole runner — uses a coroutine Channel mutex and non-blocking file I/O
-$server = new LdapServer((new ServerOptions())->setStorage(JsonFileStorage::forSwoole('/var/lib/myapp/ldap.json')));
+$server = new LdapServer(new ServerOptions(JsonStorageConfig::forFile('/var/lib/myapp/ldap.json')));
 $server->run();
 ```
 
@@ -402,56 +405,38 @@ use cases that need durable persistence across restarts with support for concurr
 - **PCNTL**: a single shared PDO connection is inherited by all forked child processes. SQLite WAL mode handles concurrent access at the OS level.
 - **Swoole**: each coroutine gets its own PDO connection to avoid blocking.
 
-Build a `PdoConfig::forSqlite()` and pass it to the `PdoStorageFactory` method that matches your server runner:
+Pass a `PdoConfig::forSqlite()` to the `ServerOptions` constructor. The container builds the shared-connection
+(PCNTL) or per-coroutine (Swoole) storage to match the configured runner, both using WAL journal mode:
 
 ```php
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 use FreeDSx\Ldap\ServerOptions;
 
-// PCNTL runner — WAL journal mode, shared connection
-$server = new LdapServer((new ServerOptions())->setStorage(
-    PdoStorageFactory::forPcntl(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite'))
-));
-$server->run();
-
-// Swoole runner — WAL journal mode, per-coroutine connection
-$server = new LdapServer((new ServerOptions())->setStorage(
-    PdoStorageFactory::forSwoole(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite'))
-));
+$server = new LdapServer(new ServerOptions(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')));
 $server->run();
 ```
 
 Use `:memory:` as the path to run a non-persistent, in-process SQLite database (useful for testing):
 
 ```php
-$server = new LdapServer((new ServerOptions())->setStorage(
-    PdoStorageFactory::forPcntl(PdoConfig::forSqlite(':memory:'))
-));
+$server = new LdapServer(new ServerOptions(PdoConfig::forSqlite(':memory:')));
 ```
 
 #### MySQL
 
 A MySQL/MariaDB-backed `PdoStorage`. Requires MySQL 8.0+ or MariaDB 10.6+.
 
-Build a `PdoConfig::forMysql()` and pass it to the `PdoStorageFactory` method that matches your server runner:
+Pass a `PdoConfig::forMysql()` to the `ServerOptions` constructor. The container builds the shared-connection (PCNTL)
+or per-coroutine (Swoole) storage to match the configured runner:
 
 ```php
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 use FreeDSx\Ldap\ServerOptions;
 
-// PCNTL runner — shared connection across forked processes
-$server = new LdapServer((new ServerOptions())->setStorage(
-    PdoStorageFactory::forPcntl(PdoConfig::forMysql('mysql:host=localhost;dbname=ldap', 'user', 'secret'))
-));
-$server->run();
-
-// Swoole runner — per-coroutine connection
-$server = new LdapServer((new ServerOptions())->setStorage(
-    PdoStorageFactory::forSwoole(PdoConfig::forMysql('mysql:host=localhost;dbname=ldap', 'user', 'secret'))
+$server = new LdapServer(new ServerOptions(
+    PdoConfig::forMysql('mysql:host=localhost;dbname=ldap', 'user', 'secret'),
 ));
 $server->run();
 ```
@@ -468,7 +453,6 @@ extension, then tune the rest with the setters. Your dialect's `createFilterTran
 
 ```php
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 
 $config = PdoConfig::forDriver(
     new MyPostgresDialect(),
@@ -478,9 +462,10 @@ $config = PdoConfig::forDriver(
     ->setUsername('user')
     ->setPassword('secret')
     ->setSessionStatements(["SET client_encoding = 'UTF8'"]);
-
-$storage = PdoStorageFactory::forPcntl($config);
 ```
+
+`PdoConfig` implements `StorageConfigInterface`, so pass `$config` to `setStorageConfig()` or the `ServerOptions`
+constructor like any other backend config.
 
 ## LDIF Data
 
@@ -492,19 +477,19 @@ other source (database, remote URL, gzip stream, etc.). LDIF output uses the par
 ### Seeding Initial Entries
 
 `LdapServer::seed()` bulk-imports RFC 2849 LDIF content records into the storage configured via
-`ServerOptions::setStorage()` in one atomic transaction, with schema validation and operational-attribute stamping
-(`createTimestamp`, `entryUUID`, etc.) applied. Use it to populate a persistent storage backend before `$server->run()`.
+`ServerOptions::setStorageConfig()` in one atomic transaction, with schema validation and operational-attribute
+stamping (`createTimestamp`, `entryUUID`, etc.) applied. Use it to populate a persistent storage backend before
+`$server->run()`.
 
 ```php
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 use FreeDSx\Ldap\ServerOptions;
 
 $server = new LdapServer(
-    (new ServerOptions())->setStorage(PdoStorageFactory::forPcntl(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite'))),
+    new ServerOptions(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')),
 );
 $server->seed(
     new FileLdifLoader('/etc/myapp/initial-data.ldif'),
@@ -514,14 +499,14 @@ $server->seed(
 $server->run();
 ```
 
-The optional second argument is the creator DN, stamped as `creatorsName`/`modifiersName` on each imported entry —
-defaults to the empty (anonymous) DN.
+The optional second argument is the creator DN, stamped as `creatorsName`/`modifiersName` on each imported entry.
+It defaults to the empty (anonymous) DN.
 
 `seed()` accepts only content records (entries without `changetype:`) and requires depth-first input (parents first,
 then children entries). LDIF produced by `dump()` is already in this order. The operation itself is an upsert that overwrites.
 
-For Swoole factories (`::forSwoole()`), call `seed()` inside `Swoole\Coroutine\run()` so the adapter's
-coroutine-scoped connection is available during import.
+When using the Swoole runner (`setRunner(RunnerMode::Swoole)`), call `seed()` inside `Swoole\Coroutine\run()` so the
+storage adapter's per-coroutine connection is available during import.
 
 ### Replaying LDIF Changelogs
 
@@ -551,7 +536,7 @@ use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\ServerOptions;
 
-$server = new LdapServer((new ServerOptions())->setStorage($storage));
+$server = new LdapServer(new ServerOptions($storageConfig));
 $server->seed(new FileLdifLoader('/etc/myapp/initial-data.ldif'))
     ->applyChanges(new FileLdifLoader('/etc/myapp/changes-today.ldif'))
     ->run();
@@ -571,11 +556,10 @@ entries exactly as they were.
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Output\FileLdifOutput;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 use FreeDSx\Ldap\ServerOptions;
 
 $server = new LdapServer(
-    (new ServerOptions())->setStorage(PdoStorageFactory::forPcntl(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite'))),
+    new ServerOptions(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')),
 );
 $server->dump(new FileLdifOutput('/var/backups/ldap-snapshot.ldif'));
 ```

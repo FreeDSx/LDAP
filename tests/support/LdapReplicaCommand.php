@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\ReplicaConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageConfigInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use FreeDSx\Ldap\ServerOptions;
@@ -88,11 +88,13 @@ final class LdapReplicaCommand extends Command
         ));
 
         $server = new LdapServer(
-            ServerOptions::forReplica($replicaConfig)
+            ServerOptions::forReplica(
+                $replicaConfig,
+                $this->createReplicaStorageConfig($storageType),
+            )
                 ->setPort($port)
                 ->setTransport($transport)
-                ->setUseSwooleRunner($runner === 'swoole')
-                ->setStorage($this->createReplicaStorage($storageType, $runner))
+                ->setRunner($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl)
                 ->setPasswordPolicy(new PasswordPolicy(
                     lockout: new PasswordLockoutRules(
                         enabled: true,
@@ -150,12 +152,8 @@ final class LdapReplicaCommand extends Command
         return $provider;
     }
 
-    private function createReplicaStorage(
-        string $storageType,
-        string $runner,
-    ): EntryStorageInterface {
-        $swoole = $runner === 'swoole';
-
+    private function createReplicaStorageConfig(string $storageType): StorageConfigInterface
+    {
         if ($storageType === 'json') {
             $filePath = sys_get_temp_dir() . '/ldap_replica.json';
 
@@ -163,9 +161,7 @@ final class LdapReplicaCommand extends Command
                 unlink($filePath);
             }
 
-            return $swoole
-                ? JsonFileStorage::forSwoole($filePath)
-                : JsonFileStorage::forPcntl($filePath);
+            return JsonStorageConfig::forFile($filePath);
         }
 
         $dbPath = sys_get_temp_dir() . '/ldap_replica.sqlite';
@@ -176,8 +172,6 @@ final class LdapReplicaCommand extends Command
             }
         }
 
-        return $swoole
-            ? PdoStorageFactory::forSwoole(PdoConfig::forSqlite($dbPath))
-            : PdoStorageFactory::forPcntl(PdoConfig::forSqlite($dbPath));
+        return PdoConfig::forSqlite($dbPath);
     }
 }
