@@ -39,8 +39,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInt
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\ReplicaPasswordStateStoreProviderInterface;
-use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
@@ -58,7 +56,7 @@ use Throwable;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class PdoStorage implements EntryStorageInterface, ResettableInterface, ChangeJournalingInterface, ReplicaPasswordStateStoreProviderInterface, RowLockableInterface
+final class PdoStorage implements EntryStorageInterface, ResettableInterface, ChangeJournalingInterface, RowLockableInterface
 {
     use ChangeJournalingTrait;
 
@@ -301,14 +299,6 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             $this->transactor->pdo(),
             'entries',
             $dn->normalize()->toString(),
-        );
-    }
-
-    public function replicaPasswordStateStore(): ReplicaPasswordStateStoreInterface
-    {
-        return new PdoReplicaPasswordStateStore(
-            $this->transactor,
-            $this->dialect,
         );
     }
 

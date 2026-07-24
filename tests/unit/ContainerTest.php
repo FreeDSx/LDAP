@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
@@ -49,6 +50,8 @@ use FreeDSx\Ldap\Server\Middleware\MetricsMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuthorizationMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ResourceLimitMiddleware;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\PasswordPolicyBindStrategyInterface;
+use FreeDSx\Ldap\Server\PasswordPolicy\Replica\InMemoryReplicaPasswordStateStore;
+use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitResolver;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
@@ -118,6 +121,26 @@ class ContainerTest extends TestCase
         self::assertSame(
             $this->subject->get(EntryStorageInterface::class),
             $this->subject->get(EntryStorageInterface::class),
+        );
+    }
+
+    public function test_the_replica_password_store_is_pdo_backed_for_a_pdo_config(): void
+    {
+        $container = Container::forServer(
+            new ServerOptions(PdoConfig::forSqlite(':memory:')),
+        );
+
+        self::assertInstanceOf(
+            PdoReplicaPasswordStateStore::class,
+            $container->get(ReplicaPasswordStateStoreInterface::class),
+        );
+    }
+
+    public function test_the_replica_password_store_is_in_memory_for_a_non_pdo_config(): void
+    {
+        self::assertInstanceOf(
+            InMemoryReplicaPasswordStateStore::class,
+            $this->subject->get(ReplicaPasswordStateStoreInterface::class),
         );
     }
 
