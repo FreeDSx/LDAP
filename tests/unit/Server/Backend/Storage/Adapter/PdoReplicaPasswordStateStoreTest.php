@@ -20,7 +20,9 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\SharedPdoConnectionProvider;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
@@ -46,15 +48,22 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
             $this->pdo,
             new SqliteDialect(),
         );
+        $provider = new SharedPdoConnectionProvider(
+            $this->pdo,
+            fn(): PDO => $this->pdo,
+        );
         $this->storage = new PdoStorage(
-            new SharedPdoConnectionProvider(
-                $this->pdo,
-                fn(): PDO => $this->pdo,
-            ),
+            $provider,
             new SqliteFilterTranslator(),
             new SqliteDialect(),
         );
-        $this->subject = $this->storage->replicaPasswordStateStore();
+        $this->subject = new PdoReplicaPasswordStateStore(
+            new PdoTransactor(
+                $provider,
+                new SqliteDialect(),
+            ),
+            new SqliteDialect(),
+        );
     }
 
     public function test_load_is_empty_when_nothing_was_recorded(): void

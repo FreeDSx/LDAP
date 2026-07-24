@@ -13,16 +13,12 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
-use Closure;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SwooleWriterQueue;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use PDO;
 
 /**
- * Builds a PdoStorage from a PdoConfig, selecting the runner: forPcntl() (shared) or forSwoole() (per-coroutine).
+ * Low-level PDO connection and storage primitives; {@see PdoBackendBuilder} composes these plus the replica store.
  *
  * @internal the container builds storage from PdoConfig via ServerOptions::setStorageConfig()
  *
@@ -32,45 +28,33 @@ final class PdoStorageFactory
 {
     public static function forPcntl(PdoConfig $config): PdoStorage
     {
-        return self::shared($config);
-    }
-
-    public static function forSwoole(PdoConfig $config): EntryStorageInterface
-    {
-        if (!$config->getSerializeSwooleWrites()) {
-            return self::perCoroutine($config);
-        }
-
-        $writes = self::shared($config);
-
-        return new WriteSerializingStorage(
-            reads: self::perCoroutine($config),
-            writes: $writes,
-            queue: new SwooleWriterQueue(
-                batchWrapper: static fn(Closure $cb) => $writes->atomic(static fn() => $cb()),
-            ),
+        return self::storageOn(
+            $config,
+            self::sharedProvider($config),
         );
     }
 
-    private static function shared(PdoConfig $config): PdoStorage
+    public static function sharedProvider(PdoConfig $config): SharedPdoConnectionProvider
     {
         $open = static fn(): PDO => self::open($config);
 
-        return new PdoStorage(
-            new SharedPdoConnectionProvider(
-                $open(),
-                $open,
-            ),
-            $config->getDialect()->createFilterTranslator($config->getSubstringIndex()),
-            $config->getDialect(),
-            $config->getSubstringIndex(),
+        return new SharedPdoConnectionProvider(
+            $open(),
+            $open,
         );
     }
 
-    private static function perCoroutine(PdoConfig $config): PdoStorage
+    public static function coroutineProvider(PdoConfig $config): CoroutinePdoConnectionProvider
     {
+        return new CoroutinePdoConnectionProvider(static fn(): PDO => self::open($config));
+    }
+
+    public static function storageOn(
+        PdoConfig $config,
+        PdoConnectionProviderInterface $provider,
+    ): PdoStorage {
         return new PdoStorage(
-            new CoroutinePdoConnectionProvider(static fn(): PDO => self::open($config)),
+            $provider,
             $config->getDialect()->createFilterTranslator($config->getSubstringIndex()),
             $config->getDialect(),
             $config->getSubstringIndex(),

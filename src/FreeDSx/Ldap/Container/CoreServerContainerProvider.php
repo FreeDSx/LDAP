@@ -24,8 +24,8 @@ use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackendBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -89,6 +89,7 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
             HandlerFactoryInterface::class => $this->makeHandlerFactory(...),
             FilterEvaluatorInterface::class => $this->makeFilterEvaluator(...),
             EntryStorageInterface::class => $this->makeStorage(...),
+            PdoBackendBuilder::class => $this->makePdoBackendBuilder(...),
             WritableStorageBackend::class => $this->makeBackend(...),
             ServerProtocolFactory::class => $this->makeServerProtocolFactory(...),
             ServerProtocolFactoryInterface::class => $this->makeServerProtocolFactoryInterface(...),
@@ -176,9 +177,7 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
         $swoole = $options->getRunner() === RunnerMode::Swoole;
 
         return match (true) {
-            $config instanceof PdoConfig => $swoole
-                ? PdoStorageFactory::forSwoole($config)
-                : PdoStorageFactory::forPcntl($config),
+            $config instanceof PdoConfig => $container->get(PdoBackendBuilder::class)->storage(),
             $config instanceof JsonStorageConfig => $swoole
                 ? JsonFileStorage::forSwoole(
                     $config->path(),
@@ -194,6 +193,24 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
                 $config::class,
             )),
         };
+    }
+
+    /**
+     * The PDO backend assembly (storage + replica password-state store on one connection)
+     */
+    private function makePdoBackendBuilder(Container $container): PdoBackendBuilder
+    {
+        $options = $container->get(ServerOptions::class);
+        $config = $options->getStorageConfig();
+
+        if (!$config instanceof PdoConfig) {
+            throw new RuntimeException('The PDO backend builder requires a PdoConfig storage config.');
+        }
+
+        return new PdoBackendBuilder(
+            $config,
+            $options->getRunner(),
+        );
     }
 
     /**
@@ -584,40 +601,12 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
         $proxyOptions = $container->has(ProxyOptions::class)
             ? $container->get(ProxyOptions::class)
             : null;
-        // Carry the backend and its storage across reloads so a SIGHUP does not drop or rebuild the configured storage;
-        // sharing the exact instance keeps the backend, replica daemon, and replica ppolicy store on one storage.
-        $backend = $this->backendOrNull($container);
-        $storage = $backend?->getStorage();
-
-        // Share the metrics state across reloads so SIGHUP does not reset the counters or detach cn=monitor. The rollup
-        // coordinator is shared so a reloaded middleware streams to the same channel the (persistent) runner bound.
-        $metricsRecorder = $container->get(MetricsRecorderInterface::class);
-        $metricsSnapshots = $container->get(MetricsSnapshotProvider::class);
-        $inMemoryMetrics = $container->get(InMemoryMetricsRecorder::class);
-        $operationRollup = $this->makeOperationRollup($container);
+        $sharedInstances = $this->reloadSharedInstances($container);
 
         return static function (ServerOptions $options) use (
             $proxyOptions,
-            $backend,
-            $metricsRecorder,
-            $metricsSnapshots,
-            $inMemoryMetrics,
-            $operationRollup,
+            $sharedInstances,
         ): ServerProtocolFactoryInterface {
-            $sharedInstances = [
-                MetricsRecorderInterface::class => $metricsRecorder,
-                MetricsSnapshotProvider::class => $metricsSnapshots,
-                InMemoryMetricsRecorder::class => $inMemoryMetrics,
-            ];
-
-            if ($backend !== null) {
-                $sharedInstances[WritableStorageBackend::class] = $backend;
-            }
-
-            if ($operationRollup !== null) {
-                $sharedInstances[OperationRollupCoordinator::class] = $operationRollup;
-            }
-
             $container = $proxyOptions !== null
                 ? Container::forProxy(
                     $options,
@@ -631,5 +620,51 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
 
             return $container->get(ServerProtocolFactoryInterface::class);
         };
+    }
+
+    /**
+     * Services carried verbatim across a SIGHUP reload so their live state survives into the fresh container.
+     *
+     * @return array<class-string, object>
+     */
+    private function reloadSharedInstances(Container $container): array
+    {
+        $shared = [
+            MetricsRecorderInterface::class => $container->get(MetricsRecorderInterface::class),
+            MetricsSnapshotProvider::class => $container->get(MetricsSnapshotProvider::class),
+            InMemoryMetricsRecorder::class => $container->get(InMemoryMetricsRecorder::class),
+        ];
+
+        $operationRollup = $this->makeOperationRollup($container);
+        if ($operationRollup !== null) {
+            $shared[OperationRollupCoordinator::class] = $operationRollup;
+        }
+
+        return $shared + $this->reloadStorageInstances($container);
+    }
+
+    /**
+     * The storage services to carry across a reload (empty on the proxy path, which has no local directory).
+     *
+     * @return array<class-string, object>
+     */
+    private function reloadStorageInstances(Container $container): array
+    {
+        $backend = $this->backendOrNull($container);
+        if ($backend === null) {
+            return [];
+        }
+
+        $shared = [
+            WritableStorageBackend::class => $backend,
+            EntryStorageInterface::class => $backend->getStorage(),
+        ];
+
+        // On the PDO path, share the builder so the reloaded replica store stays on the storage's connection.
+        if ($container->get(ServerOptions::class)->getStorageConfig() instanceof PdoConfig) {
+            $shared[PdoBackendBuilder::class] = $container->get(PdoBackendBuilder::class);
+        }
+
+        return $shared;
     }
 }

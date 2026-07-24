@@ -396,22 +396,9 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         WriteContext $context,
     ): void {
         $this->writeAtomic(function (EntryStorageInterface $storage) use ($command, $context): void {
-            $dn = $command->dn->normalize();
-            $entry = $this->findOrFail($storage, $dn);
-            $updated = $this->entryHandler->apply($entry, $command);
-            $this->validateForModify(
-                $command,
-                $updated,
-                $context,
-            );
-            $this->operationalAttrs->applyForModify(
-                $updated,
-                $context,
-            );
-            $storage->store($updated);
-            $this->changeRecorder?->recordModify(
+            $this->applyUpdate(
                 $storage,
-                $updated,
+                $command,
                 $context,
             );
         });
@@ -444,7 +431,10 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 return;
             }
 
-            $this->update(
+            // Apply on the already-open storage rather than re-entering writeAtomic, which would re-enter the
+            // serialized writer under Swoole and deadlock.
+            $this->applyUpdate(
+                $storage,
                 new UpdateCommand(
                     $dn,
                     $changes,
@@ -499,6 +489,36 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 $context,
             );
         });
+    }
+
+    /**
+     * Applies a modify within an already-open write; the caller owns the transaction.
+     *
+     * @throws OperationException
+     */
+    private function applyUpdate(
+        EntryStorageInterface $storage,
+        UpdateCommand $command,
+        WriteContext $context,
+    ): void {
+        $dn = $command->dn->normalize();
+        $entry = $this->findOrFail($storage, $dn);
+        $updated = $this->entryHandler->apply($entry, $command);
+        $this->validateForModify(
+            $command,
+            $updated,
+            $context,
+        );
+        $this->operationalAttrs->applyForModify(
+            $updated,
+            $context,
+        );
+        $storage->store($updated);
+        $this->changeRecorder?->recordModify(
+            $storage,
+            $updated,
+            $context,
+        );
     }
 
     /**

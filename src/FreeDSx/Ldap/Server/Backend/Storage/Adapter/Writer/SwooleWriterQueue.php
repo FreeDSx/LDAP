@@ -27,6 +27,11 @@ use Throwable;
 final class SwooleWriterQueue implements WriterQueueInterface
 {
     /**
+     * Idle seconds before the writer exits cleanly so it never outlives the coroutine scope it was spawned in.
+     */
+    private const IDLE_TIMEOUT_SECONDS = 1.0;
+
+    /**
      * @var Channel<array{Closure, Channel<mixed>}>|null
      */
     private ?Channel $jobs = null;
@@ -133,38 +138,45 @@ final class SwooleWriterQueue implements WriterQueueInterface
     {
         $batchWrapper = $this->batchWrapper;
         $executeBatch = self::executeBatch(...);
+        $onExit = function (): void {
+            $this->started = false;
+        };
 
-        Coroutine::create(static function () use ($jobs, $batchWrapper, $executeBatch): void {
-            while (true) {
-                $first = $jobs->pop();
-                if ($first === false) {
-                    return;
-                }
-
-                $batch = [$first];
-                while (!$jobs->isEmpty()) {
-                    $next = $jobs->pop();
-                    if ($next === false) {
-                        break;
+        Coroutine::create(function () use ($jobs, $batchWrapper, $executeBatch, $onExit): void {
+            try {
+                while (true) {
+                    $first = $jobs->pop(self::IDLE_TIMEOUT_SECONDS);
+                    if ($first === false) {
+                        return;
                     }
-                    $batch[] = $next;
-                }
 
-                if (count($batch) === 1 || $batchWrapper === null) {
-                    foreach ($batch as [$closure, $reply]) {
-                        try {
-                            $closure();
-                            $reply->push(true);
-                        } catch (Throwable $e) {
-                            $reply->push($e);
+                    $batch = [$first];
+                    while (!$jobs->isEmpty()) {
+                        $next = $jobs->pop();
+                        if ($next === false) {
+                            break;
                         }
+                        $batch[] = $next;
                     }
-                } else {
-                    $executeBatch(
-                        $batch,
-                        $batchWrapper,
-                    );
+
+                    if (count($batch) === 1 || $batchWrapper === null) {
+                        foreach ($batch as [$closure, $reply]) {
+                            try {
+                                $closure();
+                                $reply->push(true);
+                            } catch (Throwable $e) {
+                                $reply->push($e);
+                            }
+                        }
+                    } else {
+                        $executeBatch(
+                            $batch,
+                            $batchWrapper,
+                        );
+                    }
                 }
+            } finally {
+                $onExit();
             }
         });
     }
