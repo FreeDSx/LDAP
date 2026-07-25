@@ -253,6 +253,52 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         self::assertTrue($this->subject->load(new Dn(self::DN))->isEmpty());
     }
 
+    public function test_a_change_after_forwarding_re_lists_at_a_higher_sequence(): void
+    {
+        $this->applyFailure('20260520120000Z');
+        $this->subject->markForwarded(
+            new Dn(self::DN),
+            1,
+        );
+        $this->applyFailure('20260520120500Z');
+
+        $pending = $this->subject->listUnforwarded();
+
+        self::assertCount(
+            1,
+            $pending,
+        );
+        self::assertSame(
+            2,
+            $pending[0]->sequence,
+        );
+    }
+
+    public function test_discard_keeps_local_state_when_the_success_predates_the_failure(): void
+    {
+        $this->applyFailure('20260520120000Z');
+
+        $this->subject->discardIfSuperseded(
+            new Dn(self::DN),
+            new UserPasswordState(lastSuccess: GeneralizedTime::parse('20260520115500Z')),
+        );
+
+        self::assertFalse($this->subject->load(new Dn(self::DN))->isEmpty());
+    }
+
+    public function test_state_is_keyed_by_the_canonical_dn(): void
+    {
+        $this->applyChanges(
+            new Dn('CN=Foo,DC=Example,DC=Com'),
+            OperationalChanges::of(Change::replace(
+                PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
+                '20260520120000Z',
+            )),
+        );
+
+        self::assertFalse($this->subject->load(new Dn(self::DN))->isEmpty());
+    }
+
     private function applyFailure(string $time): void
     {
         $this->applyChanges(

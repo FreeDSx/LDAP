@@ -23,7 +23,8 @@ use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\ForwardStateSenderInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\PasswordPolicyForwardWorker;
-use FreeDSx\Ldap\Server\PasswordPolicy\Replica\InMemoryReplicaPasswordStateStore;
+use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
+use Tests\Support\FreeDSx\Ldap\Server\PasswordPolicy\Replica\SqliteReplicaPasswordStateStoreFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -31,7 +32,7 @@ final class PasswordPolicyForwardWorkerTest extends TestCase
 {
     private const DN = 'cn=foo,dc=example,dc=com';
 
-    private InMemoryReplicaPasswordStateStore $store;
+    private ReplicaPasswordStateStoreInterface $store;
 
     private ForwardStateSenderInterface&MockObject $sender;
 
@@ -49,7 +50,7 @@ final class PasswordPolicyForwardWorkerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->store = new InMemoryReplicaPasswordStateStore();
+        $this->store = SqliteReplicaPasswordStateStoreFactory::inMemory();
         $this->sent = [];
         $this->slept = [];
         $this->sender = $this->createMock(ForwardStateSenderInterface::class);

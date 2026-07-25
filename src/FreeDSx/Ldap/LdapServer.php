@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
-use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
@@ -27,7 +26,7 @@ use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
 use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
-use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageType;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
@@ -158,7 +157,7 @@ class LdapServer
 
     private function init(): void
     {
-        $this->requireSharedStorageForForkingReplica();
+        $this->requirePdoStorageForReplica();
         // Wrap once so a privileged manager token bypasses whichever policy resolved, and inject the backend into it.
         $this->options->setAccessControl($this->injectBackendIfNeeded(
             new PrivilegedBypassAccessControl($this->resolveAccessControl()),
@@ -166,23 +165,20 @@ class LdapServer
     }
 
     /**
-     * A forking replica's daemon and connection workers are separate processes, so its storage must be shared;
-     * the in-memory adapter is not.
+     * A replica's write-heavy apply path and cross-process password-policy state both require PDO storage.
      */
-    private function requireSharedStorageForForkingReplica(): void
+    private function requirePdoStorageForReplica(): void
     {
-        if ($this->options->getReplicaConfig() === null || $this->options->getRunner() === RunnerMode::Swoole) {
+        $storageConfig = $this->options->getStorageConfig();
+
+        if ($this->options->getReplicaConfig() === null || $storageConfig instanceof PdoConfig) {
             return;
         }
 
-        if ($this->options->getStorageConfig()->type() !== StorageType::InMemory) {
-            return;
-        }
-
-        throw new RuntimeException(
-            'A forking (PCNTL) replica requires process-shared storage, but InMemoryStorage is not shared across the '
-            . 'daemon and connection workers. Use PDO/SQLite storage, or run under Swoole.',
-        );
+        throw new RuntimeException(sprintf(
+            'A read-only replica requires PDO storage, but "%s" is configured.',
+            $storageConfig::class,
+        ));
     }
 
     /**

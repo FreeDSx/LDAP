@@ -10,8 +10,6 @@ use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\ReplicaConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
@@ -32,8 +30,6 @@ final class LdapReplicaCommand extends Command
 
     private const SEED = __DIR__ . '/../resources/seed/sync-seed.ldif';
 
-    private const VALID_STORAGE = ['json', 'sqlite'];
-
     protected function configure(): void
     {
         $this
@@ -43,7 +39,6 @@ final class LdapReplicaCommand extends Command
             ->addOption('port', null, InputOption::VALUE_REQUIRED, 'The replica listen port.', '10389')
             ->addOption('provider-port', null, InputOption::VALUE_REQUIRED, 'The provider listen port.', '10391')
             ->addOption('runner', null, InputOption::VALUE_REQUIRED, 'The server runner (pcntl/swoole).', 'pcntl')
-            ->addOption('storage', null, InputOption::VALUE_REQUIRED, 'Process-shared storage (json/sqlite).', 'sqlite')
             ->addOption('forward', null, InputOption::VALUE_NONE, 'Enable ppolicy-state forwarding to the provider.');
     }
 
@@ -56,13 +51,6 @@ final class LdapReplicaCommand extends Command
         $port = (int) $this->getStringOption($input, 'port');
         $providerPort = (int) $this->getStringOption($input, 'provider-port');
         $runner = $this->getStringOption($input, 'runner');
-        $storageType = $this->getStringOption($input, 'storage');
-
-        if (!in_array($storageType, self::VALID_STORAGE, true)) {
-            $io->error("Invalid --storage value: {$storageType}. Expected one of: " . implode(', ', self::VALID_STORAGE) . '.');
-
-            return Command::FAILURE;
-        }
 
         if (!in_array($runner, ['pcntl', 'swoole'], true)) {
             $io->error("Invalid --runner value: {$runner}. Expected one of: pcntl, swoole.");
@@ -97,7 +85,7 @@ final class LdapReplicaCommand extends Command
         $server = new LdapServer(
             ServerOptions::forReplica(
                 $replicaConfig,
-                $this->createReplicaStorageConfig($storageType),
+                $this->createReplicaStorageConfig(),
             )
                 ->setNetworkConfig($network)
                 ->setRunner($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl)
@@ -156,18 +144,8 @@ final class LdapReplicaCommand extends Command
         return $provider;
     }
 
-    private function createReplicaStorageConfig(string $storageType): StorageConfigInterface
+    private function createReplicaStorageConfig(): PdoConfig
     {
-        if ($storageType === 'json') {
-            $filePath = sys_get_temp_dir() . '/ldap_replica.json';
-
-            if (file_exists($filePath)) {
-                unlink($filePath);
-            }
-
-            return JsonStorageConfig::forFile($filePath);
-        }
-
         $dbPath = sys_get_temp_dir() . '/ldap_replica.sqlite';
 
         foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $path) {

@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\DefaultPasswordQualityChecker;
 use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\PasswordQualityCheckerInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
@@ -563,11 +564,11 @@ final class ServerOptions implements ServerListenerOptionsInterface
     /**
      * Named constructor for a read-only replica that mirrors an upstream primary over RFC 4533.
      *
-     * @param StorageConfigInterface $storageConfig Persistent storage for the replica.
+     * @param PdoConfig $storageConfig Persistent storage for the replica; PDO is required.
      */
     public static function forReplica(
         ReplicaConfig $replicaConfig,
-        StorageConfigInterface $storageConfig,
+        PdoConfig $storageConfig,
     ): self {
         return (new self($storageConfig))->setReplicaConfig($replicaConfig);
     }
