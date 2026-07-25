@@ -17,9 +17,9 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Schema\Text;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\PdoListQueryBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
@@ -35,7 +35,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\RowLockableInterface;
@@ -80,15 +79,18 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     private readonly PdoStatementPool $statements;
 
+    private readonly EntryIndexWriter $indexes;
+
     /**
      * @param ?PdoStatementPool $statements Must draw from $provider; defaults to a pool of its own over that connection.
+     * @param ?EntryIndexWriter $indexes Must share $statements; defaults to one with no substring index attached.
      */
     public function __construct(
         private readonly PdoConnectionProviderInterface $provider,
         private readonly FilterTranslatorInterface $translator,
         private readonly PdoDialectInterface $dialect,
-        private readonly ?SubstringIndexInterface $substringIndex = null,
         ?PdoStatementPool $statements = null,
+        ?EntryIndexWriter $indexes = null,
     ) {
         if (!extension_loaded('mbstring')) {
             throw new RuntimeException(
@@ -102,6 +104,10 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             $dialect,
         );
         $this->statements = $statements ?? new PdoStatementPool($provider);
+        $this->indexes = $indexes ?? new EntryIndexWriter(
+            $dialect,
+            $this->statements,
+        );
     }
 
     public function reset(): void
@@ -219,8 +225,10 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         );
     }
 
-    public function store(Entry $entry): void
-    {
+    public function store(
+        Entry $entry,
+        bool $rebuildIndexes = false,
+    ): void {
         $normDn = $entry->getDn()->normalize();
         $dnString = $entry->getDn()->toString();
 
@@ -228,7 +236,13 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
         $lcDn = $normDn->toString();
 
-        $this->atomic(function () use ($entry, $lcDn, $dnString, $normDn): void {
+        $this->atomic(function () use ($entry, $lcDn, $dnString, $normDn, $rebuildIndexes): void {
+            // Read the row we are about to overwrite under its write lock, so the diff is against what is actually
+            // stored; a second writer then repairs whatever the first left behind instead of drifting from it.
+            $current = $rebuildIndexes
+                ? null
+                : $this->currentForDiff($normDn);
+
             $this->statements->execute($this->dialect->queryUpsert(), [
                 $lcDn,
                 $dnString,
@@ -236,25 +250,16 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
                 $this->encodeAttributes($entry),
             ]);
 
-            $this->statements->execute(
-                $this->dialect->querySidecarDelete(),
-                [$lcDn],
-            );
+            if ($current === null) {
+                $this->indexes->rewrite($lcDn, $entry);
 
-            $this->insertSidecarRows(
+                return;
+            }
+
+            $this->indexes->update(
                 $lcDn,
                 $entry,
-            );
-
-            $this->substringIndex?->maintain(
-                $lcDn,
-                $entry,
-                function (string $sql, array $params): void {
-                    $this->statements->execute(
-                        $sql,
-                        $params,
-                    );
-                },
+                $current,
             );
         });
     }
@@ -439,71 +444,18 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         }
     }
 
-    private function insertSidecarRows(
-        string $lcDn,
-        Entry $entry,
-    ): void {
-        $rows = $this->buildSidecarRows($lcDn, $entry);
-        if ($rows === []) {
-            return;
-        }
-
-        $tuple = '(?, ?, ?, ?)';
-        $placeholders = implode(
-            ', ',
-            array_fill(0, count($rows), $tuple),
-        );
-        $params = [];
-        foreach ($rows as $row) {
-            $params[] = $row[0];
-            $params[] = $row[1];
-            $params[] = $row[2];
-            $params[] = $row[3];
-        }
-
-        $this->statements->execute(
-            $this->dialect->querySidecarInsertPrefix() . $placeholders,
-            $params,
-        );
-    }
-
     /**
-     * @return list<array{string, string, string, string}> (entry_lc_dn, attr_name_lower, value_lower, value_original)
+     * The stored entry, locked for the rest of this transaction, or null when there is nothing to diff against.
      */
-    private function buildSidecarRows(
-        string $lcDn,
-        Entry $entry,
-    ): array {
-        $rows = [];
-
-        foreach ($entry->getAttributes() as $attribute) {
-            $attrNameLower = strtolower($attribute->getName());
-
-            foreach ($attribute->getValues() as $value) {
-                $rows[] = [
-                    $lcDn,
-                    $attrNameLower,
-                    $this->buildSidecarValueLower($value),
-                    $value,
-                ];
-            }
-        }
-
-        return $rows;
-    }
-
-    private function buildSidecarValueLower(string $value): string
+    private function currentForDiff(Dn $normDn): ?Entry
     {
-        if (!Text::isUtf8($value)) {
-            return '';
-        }
-
-        return mb_substr(
-            mb_strtolower($value, 'UTF-8'),
-            0,
-            SqlFilterUtility::MAX_INDEXED_VALUE_CHARS,
-            'UTF-8',
+        $this->dialect->lockRowForWrite(
+            $this->transactor->pdo(),
+            'entries',
+            $normDn->toString(),
         );
+
+        return $this->find($normDn);
     }
 
     /**

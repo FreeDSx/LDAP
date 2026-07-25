@@ -108,8 +108,10 @@ final class JsonFileStorage implements EntryStorageInterface, ChangeJournalingIn
         );
     }
 
-    public function store(Entry $entry): void
-    {
+    public function store(
+        Entry $entry,
+        bool $rebuildIndexes = false,
+    ): void {
         $this->withMutation(function (string $contents) use ($entry): string {
             $data = $this->decodeContents($contents);
             $data[$entry->getDn()->normalize()->toString()] = $this->entryToArray($entry);

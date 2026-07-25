@@ -76,8 +76,10 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
         );
     }
 
-    public function store(Entry $entry): void
-    {
+    public function store(
+        Entry $entry,
+        bool $rebuildIndexes = false,
+    ): void {
         $this->entries[$entry->getDn()->normalize()->toString()] = $entry;
     }
 

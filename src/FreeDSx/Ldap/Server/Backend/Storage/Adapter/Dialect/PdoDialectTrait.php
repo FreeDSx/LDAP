@@ -147,6 +147,20 @@ trait PdoDialectTrait
         SQL;
     }
 
+    public function querySidecarDeleteNames(int $count): string
+    {
+        $markers = implode(
+            ', ',
+            array_fill(0, $count, '?'),
+        );
+
+        return <<<SQL
+            DELETE FROM entry_attribute_values
+            WHERE entry_lc_dn = ?
+              AND attr_name_lower IN ($markers)
+        SQL;
+    }
+
     public function querySidecarInsertPrefix(): string
     {
         return 'INSERT INTO entry_attribute_values (entry_lc_dn, attr_name_lower, value_lower, value_original) VALUES ';

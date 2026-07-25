@@ -18,6 +18,8 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexReindexer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
@@ -42,14 +44,21 @@ final class SubstringIndexReindexerTest extends TestCase
             $index,
         );
 
+        $provider = new SharedPdoConnectionProvider(
+            $this->pdo,
+            fn(): PDO => $this->pdo,
+        );
+        $statements = new PdoStatementPool($provider);
         $this->storage = new PdoStorage(
-            new SharedPdoConnectionProvider(
-                $this->pdo,
-                fn(): PDO => $this->pdo,
-            ),
+            $provider,
             (new SqliteDialect())->createFilterTranslator($index),
             new SqliteDialect(),
-            $index,
+            $statements,
+            new EntryIndexWriter(
+                new SqliteDialect(),
+                $statements,
+                $index,
+            ),
         );
 
         $this->dn = new Dn('cn=Smith,dc=example,dc=com');
