@@ -294,7 +294,10 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 $command->entry,
                 $context,
             );
-            $storage->store($command->entry);
+            $storage->store(
+                $command->entry,
+                rebuildIndexes: true,
+            );
             $this->changeRecorder?->recordAdd(
                 $storage,
                 $command->entry,
@@ -477,7 +480,10 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 $context,
             );
             $storage->remove($normOld);
-            $storage->store($newEntry);
+            $storage->store(
+                $newEntry,
+                rebuildIndexes: true,
+            );
             $this->changeRecorder?->recordModRdn(
                 $storage,
                 $newEntry,

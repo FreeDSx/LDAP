@@ -84,6 +84,11 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
         return $dialect->schemaStatementsNamed(self::SCHEMA_NAME);
     }
 
+    public function indexes(string $attributeLower): bool
+    {
+        return isset($this->attributes[$attributeLower]);
+    }
+
     public function maintain(
         string $lcDn,
         Entry $entry,

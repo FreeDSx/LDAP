@@ -31,7 +31,9 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
@@ -225,6 +227,62 @@ final class PdoStorageTest extends TestCase
         self::assertFalse($this->storage->exists(new Dn('cn=b1200,dc=example,dc=com')));
     }
 
+    public function test_a_modified_value_stops_matching_its_old_value_and_starts_matching_the_new(): void
+    {
+        $dn = new Dn('cn=drift,dc=example,dc=com');
+        $this->storage->store(new Entry(
+            $dn,
+            new Attribute('cn', 'drift'),
+            new Attribute('sn', 'before'),
+            new Attribute('description', 'untouched'),
+        ));
+
+        $this->storage->store(new Entry(
+            $dn,
+            new Attribute('cn', 'drift'),
+            new Attribute('sn', 'after'),
+            new Attribute('description', 'untouched'),
+        ));
+
+        self::assertSame(
+            [],
+            $this->dnsMatching(Filters::equal('sn', 'before')),
+        );
+        self::assertSame(
+            ['cn=drift,dc=example,dc=com'],
+            $this->dnsMatching(Filters::equal('sn', 'after')),
+        );
+        // An attribute nobody touched must survive the partial rewrite.
+        self::assertSame(
+            ['cn=drift,dc=example,dc=com'],
+            $this->dnsMatching(Filters::equal('description', 'untouched')),
+        );
+    }
+
+    public function test_a_removed_attribute_stops_matching_after_a_modify(): void
+    {
+        $dn = new Dn('cn=shrink,dc=example,dc=com');
+        $this->storage->store(new Entry(
+            $dn,
+            new Attribute('cn', 'shrink'),
+            new Attribute('sn', 'gone'),
+        ));
+
+        $this->storage->store(new Entry(
+            $dn,
+            new Attribute('cn', 'shrink'),
+        ));
+
+        self::assertSame(
+            [],
+            $this->dnsMatching(Filters::equal('sn', 'gone')),
+        );
+        self::assertSame(
+            [],
+            $this->dnsMatching(Filters::present('sn')),
+        );
+    }
+
     public function test_initialize_creates_the_baseline_schema(): void
     {
         $pdo = new PDO('sqlite::memory:');
@@ -305,14 +363,21 @@ final class PdoStorageTest extends TestCase
             $index,
         );
 
+        $provider = new SharedPdoConnectionProvider(
+            $pdo,
+            fn(): PDO => $pdo,
+        );
+        $statements = new PdoStatementPool($provider);
         $storage = new PdoStorage(
-            new SharedPdoConnectionProvider(
-                $pdo,
-                fn(): PDO => $pdo,
-            ),
+            $provider,
             new SqliteFilterTranslator(),
             new SqliteDialect(),
-            $index,
+            $statements,
+            new EntryIndexWriter(
+                new SqliteDialect(),
+                $statements,
+                $index,
+            ),
         );
         $storage->store(new Entry(
             new Dn('cn=Smith,dc=example,dc=com'),
@@ -1340,6 +1405,25 @@ final class PdoStorageTest extends TestCase
         }
 
         return null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function dnsMatching(FilterInterface $filter): array
+    {
+        $entries = $this->storage->list(new StorageListOptions(
+            baseDn: new Dn('dc=example,dc=com'),
+            subtree: true,
+            filter: $filter,
+        ))->entries;
+
+        $dns = [];
+        foreach ($entries as $entry) {
+            $dns[] = $entry->getDn()->toString();
+        }
+
+        return $dns;
     }
 
     /**

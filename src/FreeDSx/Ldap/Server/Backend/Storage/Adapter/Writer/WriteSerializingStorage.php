@@ -58,9 +58,14 @@ final readonly class WriteSerializingStorage implements EntryStorageInterface, R
         return $this->reads->list($options);
     }
 
-    public function store(Entry $entry): void
-    {
-        $this->queue->run(fn() => $this->writes->store($entry));
+    public function store(
+        Entry $entry,
+        bool $rebuildIndexes = false,
+    ): void {
+        $this->queue->run(fn() => $this->writes->store(
+            $entry,
+            $rebuildIndexes,
+        ));
     }
 
     public function remove(Dn $dn): void

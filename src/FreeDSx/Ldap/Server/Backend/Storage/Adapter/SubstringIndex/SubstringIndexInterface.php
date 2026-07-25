@@ -32,6 +32,11 @@ interface SubstringIndexInterface
     public function schemaStatements(PdoDialectInterface $dialect): array;
 
     /**
+     * Whether this strategy indexes the attribute, so a write can skip re-indexing when none of its own changed.
+     */
+    public function indexes(string $attributeLower): bool;
+
+    /**
      * Re-index one entry, running each write through the executor inside the caller's transaction.
      *
      * @param callable(string $sql, list<string> $params): void $execute

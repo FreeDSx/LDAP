@@ -44,7 +44,10 @@ final readonly class SubstringIndexReindexer
                     continue;
                 }
 
-                $this->storage->store($entry);
+                $this->storage->store(
+                    $entry,
+                    rebuildIndexes: true,
+                );
             }
         });
     }

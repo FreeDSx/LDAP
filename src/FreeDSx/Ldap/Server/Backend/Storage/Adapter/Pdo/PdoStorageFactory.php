@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\CoroutinePdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use PDO;
 
@@ -56,11 +57,19 @@ final class PdoStorageFactory
         PdoConfig $config,
         PdoConnectionProviderInterface $provider,
     ): PdoStorage {
+        // Storage and its index writer share one statement pool, so both draw from the same connection and cache.
+        $statements = new PdoStatementPool($provider);
+
         return new PdoStorage(
             $provider,
             $config->getDialect()->createFilterTranslator($config->getSubstringIndex()),
             $config->getDialect(),
-            $config->getSubstringIndex(),
+            $statements,
+            new EntryIndexWriter(
+                $config->getDialect(),
+                $statements,
+                $config->getSubstringIndex(),
+            ),
         );
     }
 

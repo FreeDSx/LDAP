@@ -104,6 +104,11 @@ interface PdoEntryDialectInterface
     public function querySidecarDelete(): string;
 
     /**
+     * The same restricted to $count attribute names. Parameters: [entry_lc_dn, attr_name_lower, ...]
+     */
+    public function querySidecarDeleteNames(int $count): string;
+
+    /**
      * INSERT prefix for the sidecar; caller appends `(?, ?, ?, ?)` tuples for (entry_lc_dn, attr_name_lower, value_lower, value_original).
      */
     public function querySidecarInsertPrefix(): string;

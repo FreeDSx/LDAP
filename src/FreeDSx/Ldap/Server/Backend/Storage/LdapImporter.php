@@ -68,7 +68,10 @@ final readonly class LdapImporter
                     $entry,
                     $this->creatorDn->toString(),
                 );
-                $storage->store($entry);
+                $storage->store(
+                    $entry,
+                    rebuildIndexes: true,
+                );
             }
         });
     }

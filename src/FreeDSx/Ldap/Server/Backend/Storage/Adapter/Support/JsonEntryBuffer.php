@@ -77,8 +77,10 @@ final class JsonEntryBuffer implements EntryStorageInterface, ChangeAppenderInte
         return new EntryStream($this->generateEntries($options));
     }
 
-    public function store(Entry $entry): void
-    {
+    public function store(
+        Entry $entry,
+        bool $rebuildIndexes = false,
+    ): void {
         $this->data[$entry->getDn()->normalize()->toString()] = ($this->fromEntry)($entry);
     }
 
