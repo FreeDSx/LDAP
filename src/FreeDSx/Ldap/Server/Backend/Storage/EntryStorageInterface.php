@@ -57,6 +57,13 @@ interface EntryStorageInterface
     public function remove(Dn $dn): void;
 
     /**
+     * Remove every given entry, ignoring any that are already gone.
+     *
+     * @param list<Dn> $dns
+     */
+    public function removeAll(array $dns): void;
+
+    /**
      * Execute $operation as an atomic read-modify-write cycle; implementations must hold an exclusive lock or transaction.
      *
      * @param callable(EntryStorageInterface): void $operation

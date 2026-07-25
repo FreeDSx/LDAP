@@ -184,6 +184,47 @@ final class PdoStorageTest extends TestCase
         );
     }
 
+    public function test_remove_all_deletes_every_given_entry_and_ignores_missing_ones(): void
+    {
+        foreach (range(1, 3) as $i) {
+            $this->storage->store(new Entry(
+                new Dn("cn=e{$i},dc=example,dc=com"),
+                new Attribute('cn', "e{$i}"),
+            ));
+        }
+
+        $this->storage->removeAll([
+            (new Dn('cn=e1,dc=example,dc=com'))->normalize(),
+            (new Dn('cn=gone,dc=example,dc=com'))->normalize(),
+            (new Dn('cn=e3,dc=example,dc=com'))->normalize(),
+        ]);
+
+        self::assertFalse($this->storage->exists(new Dn('cn=e1,dc=example,dc=com')));
+        self::assertTrue($this->storage->exists(new Dn('cn=e2,dc=example,dc=com')));
+        self::assertFalse($this->storage->exists(new Dn('cn=e3,dc=example,dc=com')));
+    }
+
+    public function test_remove_all_spans_more_entries_than_one_batch(): void
+    {
+        $dns = [];
+        $this->storage->atomic(function () use (&$dns): void {
+            foreach (range(1, 1200) as $i) {
+                $dn = new Dn("cn=b{$i},dc=example,dc=com");
+                $this->storage->store(new Entry(
+                    $dn,
+                    new Attribute('cn', "b{$i}"),
+                ));
+                $dns[] = $dn->normalize();
+            }
+        });
+
+        $this->storage->removeAll($dns);
+
+        self::assertFalse($this->storage->exists(new Dn('cn=b1,dc=example,dc=com')));
+        self::assertFalse($this->storage->exists(new Dn('cn=b600,dc=example,dc=com')));
+        self::assertFalse($this->storage->exists(new Dn('cn=b1200,dc=example,dc=com')));
+    }
+
     public function test_initialize_creates_the_baseline_schema(): void
     {
         $pdo = new PDO('sqlite::memory:');

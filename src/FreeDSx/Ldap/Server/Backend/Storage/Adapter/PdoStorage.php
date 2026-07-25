@@ -69,6 +69,11 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
      */
     private const COMPOSED_DRIVER_PROBE_LIMIT = 128;
 
+    /**
+     * DNs per batched delete, well inside the placeholder limits of every supported driver.
+     */
+    private const DELETE_BATCH_SIZE = 500;
+
     private readonly PdoListQueryBuilder $queryBuilder;
 
     private readonly PdoTransactor $transactor;
@@ -260,6 +265,22 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             $this->dialect->queryDelete(),
             [$dn->normalize()->toString()],
         );
+    }
+
+    /**
+     * Chunked so the placeholder count stays inside driver limits and full chunks share one prepared statement.
+     */
+    public function removeAll(array $dns): void
+    {
+        foreach (array_chunk($dns, self::DELETE_BATCH_SIZE) as $chunk) {
+            $this->statements->execute(
+                $this->dialect->queryDeleteIn(count($chunk)),
+                array_map(
+                    static fn(Dn $dn): string => $dn->normalize()->toString(),
+                    $chunk,
+                ),
+            );
+        }
     }
 
     public function hasChildren(Dn $dn): bool

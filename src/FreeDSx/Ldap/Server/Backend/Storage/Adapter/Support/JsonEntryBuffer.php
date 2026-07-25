@@ -87,6 +87,13 @@ final class JsonEntryBuffer implements EntryStorageInterface, ChangeAppenderInte
         unset($this->data[$dn->toString()]);
     }
 
+    public function removeAll(array $dns): void
+    {
+        foreach ($dns as $dn) {
+            $this->remove($dn);
+        }
+    }
+
     public function atomic(callable $operation): void
     {
         $operation($this);

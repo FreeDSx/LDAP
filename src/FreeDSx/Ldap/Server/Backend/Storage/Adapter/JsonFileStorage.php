@@ -128,6 +128,16 @@ final class JsonFileStorage implements EntryStorageInterface, ChangeJournalingIn
         });
     }
 
+    /**
+     * One mutation for the whole set, rather than rewriting the file once per DN.
+     */
+    public function removeAll(array $dns): void
+    {
+        $this->atomic(static function (EntryStorageInterface $storage) use ($dns): void {
+            $storage->removeAll($dns);
+        });
+    }
+
     public function atomic(callable $operation): void
     {
         $buffer = $this->newBuffer([]);

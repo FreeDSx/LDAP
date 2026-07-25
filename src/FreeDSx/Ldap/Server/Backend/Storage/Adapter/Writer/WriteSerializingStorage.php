@@ -60,26 +60,22 @@ final readonly class WriteSerializingStorage implements EntryStorageInterface, R
 
     public function store(Entry $entry): void
     {
-        $writes = $this->writes;
-        $this->queue->run(static function () use ($writes, $entry): void {
-            $writes->store($entry);
-        });
+        $this->queue->run(fn() => $this->writes->store($entry));
     }
 
     public function remove(Dn $dn): void
     {
-        $writes = $this->writes;
-        $this->queue->run(static function () use ($writes, $dn): void {
-            $writes->remove($dn);
-        });
+        $this->queue->run(fn() => $this->writes->remove($dn));
+    }
+
+    public function removeAll(array $dns): void
+    {
+        $this->queue->run(fn() => $this->writes->removeAll($dns));
     }
 
     public function atomic(callable $operation): void
     {
-        $writes = $this->writes;
-        $this->queue->run(static function () use ($writes, $operation): void {
-            $writes->atomic($operation);
-        });
+        $this->queue->run(fn() => $this->writes->atomic($operation));
     }
 
     public function namingContexts(): array
