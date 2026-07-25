@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\PdoListQueryBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\SqlQuery;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SidecarLeaf;
@@ -44,8 +45,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use Generator;
 use PDO;
-use PDOStatement;
-use Throwable;
 
 /**
  * PDO-backed storage; the container builds it from a PdoConfig set via ServerOptions::setStorageConfig().
@@ -65,27 +64,26 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
      */
     public const SCHEMA_VERSION = 2;
 
-    private const STATEMENT_CACHE_MAX = 64;
-
     /**
      * Match ceiling for a composed AND's drivable leaf: below it the leaf is a cheap, complete driver via a near-free probe.
      */
     private const COMPOSED_DRIVER_PROBE_LIMIT = 128;
 
-    /**
-     * @var array<int, array<string, list<PDOStatement>>> Per-PDO pools keyed by spl_object_id; reset() clears it on connection drop.
-     */
-    private array $statementCache = [];
-
     private readonly PdoListQueryBuilder $queryBuilder;
 
     private readonly PdoTransactor $transactor;
 
+    private readonly PdoStatementPool $statements;
+
+    /**
+     * @param ?PdoStatementPool $statements Must draw from $provider; defaults to a pool of its own over that connection.
+     */
     public function __construct(
         private readonly PdoConnectionProviderInterface $provider,
         private readonly FilterTranslatorInterface $translator,
         private readonly PdoDialectInterface $dialect,
         private readonly ?SubstringIndexInterface $substringIndex = null,
+        ?PdoStatementPool $statements = null,
     ) {
         if (!extension_loaded('mbstring')) {
             throw new RuntimeException(
@@ -98,12 +96,13 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             $provider,
             $dialect,
         );
+        $this->statements = $statements ?? new PdoStatementPool($provider);
     }
 
     public function reset(): void
     {
         $this->provider->reset();
-        $this->statementCache = [];
+        $this->statements->reset();
     }
 
     public static function initialize(
@@ -140,7 +139,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function find(Dn $dn): ?Entry
     {
-        $stmt = $this->prepareAndExecute(
+        $stmt = $this->statements->execute(
             $this->dialect->queryFetchEntry(),
             [$dn->normalize()->toString()],
         );
@@ -153,7 +152,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function exists(Dn $dn): bool
     {
-        $stmt = $this->prepareAndExecute(
+        $stmt = $this->statements->execute(
             $this->dialect->queryExists(),
             [$dn->normalize()->toString()],
         );
@@ -177,7 +176,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         if ($composed !== null) {
             return new EntryStream(
                 $this->generateRows(
-                    $this->prepareAndExecute(
+                    $this->statements->execute(
                         $composed->sql,
                         $composed->params,
                     ),
@@ -207,7 +206,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
         return new EntryStream(
             $this->generateRows(
-                $this->prepareAndExecute($query->sql, $query->params),
+                $this->statements->execute($query->sql, $query->params),
                 $deadline,
                 $options->attributes,
             ),
@@ -225,14 +224,14 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         $lcDn = $normDn->toString();
 
         $this->atomic(function () use ($entry, $lcDn, $dnString, $normDn): void {
-            $this->prepareAndExecute($this->dialect->queryUpsert(), [
+            $this->statements->execute($this->dialect->queryUpsert(), [
                 $lcDn,
                 $dnString,
                 $normDn->getParent()?->toString() ?? '',
                 $this->encodeAttributes($entry),
             ]);
 
-            $this->prepareAndExecute(
+            $this->statements->execute(
                 $this->dialect->querySidecarDelete(),
                 [$lcDn],
             );
@@ -246,7 +245,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
                 $lcDn,
                 $entry,
                 function (string $sql, array $params): void {
-                    $this->prepareAndExecute(
+                    $this->statements->execute(
                         $sql,
                         $params,
                     );
@@ -257,7 +256,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function remove(Dn $dn): void
     {
-        $this->prepareAndExecute(
+        $this->statements->execute(
             $this->dialect->queryDelete(),
             [$dn->normalize()->toString()],
         );
@@ -265,7 +264,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function hasChildren(Dn $dn): bool
     {
-        $stmt = $this->prepareAndExecute(
+        $stmt = $this->statements->execute(
             $this->dialect->queryHasChildren(),
             [$dn->normalize()->toString()],
         );
@@ -275,7 +274,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function namingContexts(): array
     {
-        $stmt = $this->prepareAndExecute($this->dialect->queryNamingContexts());
+        $stmt = $this->statements->execute($this->dialect->queryNamingContexts());
 
         $contexts = [];
         while (($row = $stmt->fetch()) !== false) {
@@ -307,6 +306,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         return new PdoChangeJournal(
             $this->transactor,
             $this->dialect,
+            $this->statements,
             $config->origin,
         );
     }
@@ -378,7 +378,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             ) probe
             SQL;
 
-        $row = $this->prepareAndExecute($sql, $leaf->params)->fetch();
+        $row = $this->statements->execute($sql, $leaf->params)->fetch();
         $count = is_array($row)
             ? ($row['c'] ?? 0)
             : 0;
@@ -440,7 +440,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             $params[] = $row[3];
         }
 
-        $this->prepareAndExecute(
+        $this->statements->execute(
             $this->dialect->querySidecarInsertPrefix() . $placeholders,
             $params,
         );
@@ -565,62 +565,5 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             new Dn($dn),
             $attributes,
         );
-    }
-
-    /**
-     * @param list<string> $params
-     */
-    private function prepareAndExecute(
-        string $query,
-        array $params = [],
-    ): PooledStatement {
-        $pdo = $this->provider->get();
-        $key = spl_object_id($pdo);
-        $pools = &$this->statementCache[$key];
-        $pools ??= [];
-
-        if (isset($pools[$query]) && $pools[$query] !== []) {
-            $stmt = array_pop($pools[$query]);
-        } else {
-            if (!isset($pools[$query]) && count($pools) >= self::STATEMENT_CACHE_MAX) {
-                array_shift($pools);
-            }
-
-            $stmt = $pdo->prepare($query);
-            if ($stmt === false) {
-                throw new StorageIoException('Failed to prepare SQL statement.');
-            }
-
-            if (!isset($pools[$query])) {
-                $pools[$query] = [];
-            }
-        }
-
-        $stmt->execute($params);
-
-        return new PooledStatement(
-            $stmt,
-            function (PDOStatement $released) use ($key, $query): void {
-                $this->returnToPool($key, $query, $released);
-            },
-        );
-    }
-
-    private function returnToPool(
-        int $key,
-        string $query,
-        PDOStatement $stmt,
-    ): void {
-        try {
-            $stmt->closeCursor();
-        } catch (Throwable) {
-            return;
-        }
-
-        if (!isset($this->statementCache[$key][$query])) {
-            return;
-        }
-
-        $this->statementCache[$key][$query][] = $stmt;
     }
 }

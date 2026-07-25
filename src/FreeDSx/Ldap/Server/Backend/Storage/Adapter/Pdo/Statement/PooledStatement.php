@@ -53,4 +53,21 @@ final class PooledStatement
     {
         return $this->statement->fetch();
     }
+
+    /**
+     * The first column of the next row, or null when there is no row or it holds no number.
+     */
+    public function fetchIntColumn(): ?int
+    {
+        $value = $this->statement->fetchColumn();
+
+        return is_numeric($value)
+            ? (int) $value
+            : null;
+    }
+
+    public function rowCount(): int
+    {
+        return $this->statement->rowCount();
+    }
 }

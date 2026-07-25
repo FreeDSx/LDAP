@@ -18,6 +18,8 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoJournalDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
@@ -25,8 +27,6 @@ use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\Clock\EpochMicroseconds;
 use FreeDSx\Ldap\Server\Clock\SystemClock;
 use Generator;
-use PDO;
-use PDOStatement;
 
 /**
  * Change journal persisting records to the same database and transaction as its PdoStorage.
@@ -38,6 +38,7 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
     public function __construct(
         private PdoTransactor $transactor,
         private PdoJournalDialectInterface $dialect,
+        private PdoStatementPool $statements,
         private ReplicaId $origin = new ReplicaId('local'),
         private ClockInterface $clock = new SystemClock(),
     ) {}
@@ -48,15 +49,12 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
         $normDn = $change->dn->normalize();
         $seq = 0;
 
-        $this->transactor->atomic(function () use ($change, $normDn, $createdAt, &$seq): void {
-            $pdo = $this->transactor->pdo();
-            $pdo->prepare($this->dialect->queryJournalSeqBump())->execute();
+        // Joins the write transaction that a journaled change already runs in, rather than nesting a savepoint in it.
+        $this->transactor->joinAtomic(function () use ($change, $normDn, $createdAt, &$seq): void {
+            $this->statements->execute($this->dialect->queryJournalSeqBump());
+            $seq = $this->latestSeq();
 
-            $read = $pdo->prepare($this->dialect->queryJournalSeqRead());
-            $read->execute();
-            $seq = (int) $read->fetchColumn();
-
-            $pdo->prepare($this->dialect->queryJournalInsert())->execute([
+            $this->statements->execute($this->dialect->queryJournalInsert(), [
                 $seq,
                 (string) $this->origin,
                 EpochMicroseconds::fromDateTime($createdAt),
@@ -81,32 +79,31 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
 
     public function read(int $afterSeq = 0): iterable
     {
-        $stmt = $this->transactor->pdo()->prepare($this->dialect->queryJournalReadSince());
-        $stmt->execute([$afterSeq]);
-
-        return $this->streamRecords($stmt);
+        return $this->streamRecords($this->statements->execute(
+            $this->dialect->queryJournalReadSince(),
+            [$afterSeq],
+        ));
     }
 
     public function latestSeq(): int
     {
-        $stmt = $this->transactor->pdo()->prepare($this->dialect->queryJournalSeqRead());
-        $stmt->execute();
-
-        return (int) $stmt->fetchColumn();
+        return $this->statements
+            ->execute($this->dialect->queryJournalSeqRead())
+            ->fetchIntColumn() ?? 0;
     }
 
     public function retainsSince(int $afterSeq): bool
     {
-        $stmt = $this->transactor->pdo()->prepare($this->dialect->queryJournalMinSeq());
-        $stmt->execute();
-        $minSeq = $stmt->fetchColumn();
+        $minSeq = $this->statements
+            ->execute($this->dialect->queryJournalMinSeq())
+            ->fetchIntColumn();
 
         // Empty journal: only a consumer already at the high-water mark is retained (mirrors InMemoryChangeJournal).
-        if ($minSeq === null || $minSeq === false) {
+        if ($minSeq === null) {
             return $afterSeq >= $this->latestSeq();
         }
 
-        return $afterSeq + 1 >= (int) $minSeq;
+        return $afterSeq + 1 >= $minSeq;
     }
 
     public function prune(RetentionPolicy $policy): int
@@ -138,29 +135,35 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
 
     private function pruneToRecordCap(int $maxRecords): int
     {
-        $pdo = $this->transactor->pdo();
-        $floor = $pdo->prepare($this->dialect->queryJournalKeepFloor());
-        $floor->bindValue(1, $maxRecords - 1, PDO::PARAM_INT);
-        $floor->execute();
-        $keepFrom = $floor->fetchColumn();
+        $keepFrom = $this->statements
+            ->execute(
+                $this->dialect->queryJournalKeepFloor(),
+                [$maxRecords - 1],
+            )
+            ->fetchIntColumn();
 
-        if ($keepFrom === false || $keepFrom === null) {
+        if ($keepFrom === null) {
             return 0;
         }
 
-        $delete = $pdo->prepare($this->dialect->queryJournalDeleteBelow());
-        $delete->execute([$keepFrom]);
-
-        return $delete->rowCount();
+        return $this->statements
+            ->execute(
+                $this->dialect->queryJournalDeleteBelow(),
+                [$keepFrom],
+            )
+            ->rowCount();
     }
 
     private function pruneToAgeWindow(int $maxAgeSeconds): int
     {
         $cutoff = EpochMicroseconds::fromSeconds($this->clock->now()->getTimestamp() - $maxAgeSeconds);
-        $delete = $this->transactor->pdo()->prepare($this->dialect->queryJournalDeleteByAge());
-        $delete->execute([$cutoff]);
 
-        return $delete->rowCount();
+        return $this->statements
+            ->execute(
+                $this->dialect->queryJournalDeleteByAge(),
+                [$cutoff],
+            )
+            ->rowCount();
     }
 
     /**
@@ -248,7 +251,7 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
     /**
      * @return Generator<ChangeRecord>
      */
-    private function streamRecords(PDOStatement $stmt): Generator
+    private function streamRecords(PooledStatement $stmt): Generator
     {
         while (($row = $stmt->fetch()) !== false) {
             if (is_array($row)) {
