@@ -35,6 +35,22 @@ final readonly class PdoTransactor
     }
 
     /**
+     * Runs within the caller's open transaction, starting one only when none is active.
+     *
+     * @param callable(): void $operation
+     */
+    public function joinAtomic(callable $operation): void
+    {
+        if ($this->provider->txState()->depth === 0) {
+            $this->atomic($operation);
+
+            return;
+        }
+
+        $operation();
+    }
+
+    /**
      * @param callable(): void $operation
      */
     public function atomic(callable $operation): void

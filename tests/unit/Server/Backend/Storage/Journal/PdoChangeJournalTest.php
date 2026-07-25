@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
@@ -28,6 +29,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use PDO;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
 
 final class PdoChangeJournalTest extends TestCase
@@ -44,13 +46,15 @@ final class PdoChangeJournalTest extends TestCase
         $pdo = new PDO('sqlite::memory:');
         $dialect = new SqliteDialect();
         PdoStorage::initialize($pdo, $dialect);
+        $provider = new SharedPdoConnectionProvider($pdo);
 
         $this->subject = new PdoChangeJournal(
             new PdoTransactor(
-                new SharedPdoConnectionProvider($pdo),
+                $provider,
                 $dialect,
             ),
             $dialect,
+            new PdoStatementPool($provider),
             new ReplicaId('node-a'),
             $this->clock,
         );
@@ -245,6 +249,43 @@ final class PdoChangeJournalTest extends TestCase
 
         self::assertFalse($this->subject->retainsSince(1));
         self::assertTrue($this->subject->retainsSince(2));
+    }
+
+    public function test_appending_within_an_open_transaction_does_not_nest_a_savepoint(): void
+    {
+        $pdo = new RecordingPdo('sqlite::memory:');
+        $dialect = new SqliteDialect();
+        PdoStorage::initialize($pdo, $dialect);
+        $provider = new SharedPdoConnectionProvider($pdo);
+        $transactor = new PdoTransactor(
+            $provider,
+            $dialect,
+        );
+        $journal = new PdoChangeJournal(
+            $transactor,
+            $dialect,
+            new PdoStatementPool($provider),
+            new ReplicaId('node-a'),
+            $this->clock,
+        );
+
+        $transactor->atomic(static function () use ($journal): void {
+            $journal->append(new PendingChange(
+                changeType: ChangeType::Add,
+                dn: new Dn('cn=a,dc=example,dc=com'),
+                entryUuid: self::UUID,
+                authzId: AuthzId::anonymous(),
+            ));
+        });
+
+        self::assertSame(
+            [],
+            $pdo->executedMatching('SAVEPOINT'),
+        );
+        self::assertCount(
+            1,
+            iterator_to_array($journal->read()),
+        );
     }
 
     private function change(string $dn): PendingChange

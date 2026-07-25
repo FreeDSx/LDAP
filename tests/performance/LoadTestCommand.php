@@ -253,6 +253,12 @@ final class LoadTestCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Max entries examined per search before adminLimitExceeded (0 = unbounded; default mirrors the server).',
                 (string) Config::DEFAULT_MAX_SEARCH_LOOKTHROUGH,
+            )
+            ->addOption(
+                'journal',
+                null,
+                InputOption::VALUE_NONE,
+                'Enable the change journal on the spawned server so every write appends a change record.',
             );
     }
 
@@ -466,6 +472,7 @@ final class LoadTestCommand extends Command
             attributesOnly: (bool) $input->getOption('attributes-only'),
             seedAttributes: $this->requireInt($input, 'seed-attributes'),
             maxSearchLookthrough: $this->requireInt($input, 'max-search-lookthrough'),
+            journal: (bool) $input->getOption('journal'),
         );
     }
 

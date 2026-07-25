@@ -119,6 +119,12 @@ final class LdapBackendStorageCommand extends Command
                 'Enable the cn=monitor entry',
             )
             ->addOption(
+                'journal',
+                null,
+                InputOption::VALUE_NONE,
+                'Enable sync so every write appends a change-journal record',
+            )
+            ->addOption(
                 'max-search-lookthrough',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -242,6 +248,7 @@ final class LdapBackendStorageCommand extends Command
             ->setSchemaValidationMode($validationMode)
             ->setSchema(StandardSchemaProvider::buildCore()->merge(NisSchemaProvider::build()))
             ->setMonitorEnabled((bool) $input->getOption('monitor'))
+            ->setSyncEnabled((bool) $input->getOption('journal'))
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
             ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));
 

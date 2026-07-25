@@ -65,6 +65,10 @@ final class ServerManager
             $command[] = '--monitor';
         }
 
+        if ($this->config->journal) {
+            $command[] = '--journal';
+        }
+
         $this->process = new Process($command);
 
         $this->process->start();
