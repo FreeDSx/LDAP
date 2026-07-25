@@ -68,7 +68,7 @@ trait PdoDialectTrait
     public function queryFetchAll(): string
     {
         return <<<SQL
-            SELECT dn, attributes
+            SELECT {$this->listColumns()}
             FROM entries
         SQL;
     }
@@ -76,7 +76,7 @@ trait PdoDialectTrait
     public function queryFetchChildren(): string
     {
         return <<<SQL
-            SELECT dn, attributes
+            SELECT {$this->listColumns()}
             FROM entries
             WHERE lc_parent_dn = ?
         SQL;
@@ -94,7 +94,7 @@ trait PdoDialectTrait
                 FROM entries e
                 INNER JOIN subtree s ON e.lc_parent_dn = s.lc_dn
             )
-            SELECT dn, attributes FROM subtree
+            SELECT {$this->listColumns()} FROM subtree
         SQL;
     }
 
@@ -155,7 +155,7 @@ trait PdoDialectTrait
             $projections[] = <<<SQL
                 (SELECT MIN(eav.value_lower)
                  FROM entry_attribute_values eav
-                 WHERE eav.entry_lc_dn = LOWER(__base.dn)
+                 WHERE eav.entry_lc_dn = __base.lc_dn
                    AND eav.attr_name_lower = ?) AS {$alias}
                 SQL;
             $orderTerms[] = "{$alias} IS NULL {$sortKey->direction}, {$alias} {$sortKey->direction}";
@@ -182,5 +182,13 @@ trait PdoDialectTrait
                 $baseParams,
             ),
         );
+    }
+
+    /**
+     * Columns every list query selects; the portable sort projects lc_dn so it can correlate on the canonical DN.
+     */
+    protected function listColumns(): string
+    {
+        return 'lc_dn, dn, attributes';
     }
 }

@@ -91,7 +91,7 @@ final class SqliteDialect implements PdoDialectInterface
             $terms[] = <<<SQL
                 (SELECT MIN(eav.value_lower)
                  FROM entry_attribute_values eav
-                 WHERE eav.entry_lc_dn = LOWER(dn)
+                 WHERE eav.entry_lc_dn = lc_dn
                    AND eav.attr_name_lower = ?) {$sortKey->direction} {$nulls}
                 SQL;
             $sortParams[] = $sortKey->attributeLower;
@@ -104,6 +104,14 @@ final class SqliteDialect implements PdoDialectInterface
                 $sortParams,
             ),
         );
+    }
+
+    /**
+     * Sorting reads lc_dn straight off the row source rather than a derived table, so it need not be selected.
+     */
+    protected function listColumns(): string
+    {
+        return 'dn, attributes';
     }
 
     protected function schemaName(): string
