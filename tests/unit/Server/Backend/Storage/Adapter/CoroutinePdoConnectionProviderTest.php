@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\CoroutinePdoConnectionProvider;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoTxState;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\CoroutinePdoConnectionProvider;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTxState;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Swoole\Coroutine;
