@@ -534,6 +534,15 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         $dn = isset($row['dn']) && is_string($row['dn'])
             ? $row['dn']
             : '';
+
+        // A projection that materializes nothing, such as a 1.1 request, never reads the blob.
+        if ($allowed === []) {
+            return Entry::raw(
+                new Dn($dn),
+                [],
+            );
+        }
+
         $attributesBlob = isset($row['attributes']) && is_string($row['attributes'])
             ? $row['attributes']
             : 'a:0:{}';

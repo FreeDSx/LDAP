@@ -155,6 +155,35 @@ final class PdoStorageTest extends TestCase
         );
     }
 
+    public function test_a_projection_that_materializes_nothing_still_yields_the_dns(): void
+    {
+        $this->storage->store(new Entry(
+            new Dn('cn=bob,dc=example,dc=com'),
+            new Attribute('cn', 'bob'),
+            new Attribute('sn', 'x'),
+        ));
+
+        $entries = iterator_to_array($this->storage->list(new StorageListOptions(
+            baseDn: new Dn('dc=example,dc=com'),
+            subtree: true,
+            filter: Filters::equal('sn', 'x'),
+            attributes: [],
+        ))->entries);
+
+        self::assertCount(
+            1,
+            $entries,
+        );
+        self::assertSame(
+            'cn=bob,dc=example,dc=com',
+            $entries[0]->getDn()->toString(),
+        );
+        self::assertSame(
+            [],
+            $entries[0]->toArray(),
+        );
+    }
+
     public function test_initialize_creates_the_baseline_schema(): void
     {
         $pdo = new PDO('sqlite::memory:');
