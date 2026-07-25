@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoEntryDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
@@ -23,7 +24,6 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaForwardState;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordState;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
-use PDO;
 
 use function is_array;
 use function json_decode;
@@ -44,6 +44,7 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
     public function __construct(
         private PdoTransactor $transactor,
         private PdoEntryDialectInterface $dialect,
+        private PdoStatementPool $statements,
     ) {}
 
     public function load(Dn $dn): ReplicaPasswordState
@@ -82,17 +83,18 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
 
     public function listUnforwarded(int $limit = 100): array
     {
-        $statement = $this->transactor
-            ->pdo()
-            ->prepare(
-                'SELECT lc_dn, state, seq, forwarded_seq FROM ' . self::TABLE
-                . ' WHERE seq > forwarded_seq ORDER BY seq ASC LIMIT ' . max(0, $limit),
-            );
-        $statement->execute();
+        $statement = $this->statements->execute(
+            'SELECT lc_dn, state, seq, forwarded_seq FROM ' . self::TABLE
+            . ' WHERE seq > forwarded_seq ORDER BY seq ASC LIMIT ?',
+            [max(0, $limit)],
+        );
 
         $pending = [];
-        /** @var array<string, mixed> $row */
-        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        while (($row = $statement->fetch()) !== false) {
+            if (!is_array($row)) {
+                continue;
+            }
+
             $pending[] = new ReplicaForwardState(
                 new Dn($this->stringColumn($row['lc_dn'])),
                 $this->decode($this->stringColumn($row['state'])),
@@ -108,18 +110,16 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
         Dn $dn,
         int $sequence,
     ): void {
-        $this->transactor
-            ->pdo()
-            ->prepare(
-                'UPDATE ' . self::TABLE
-                . ' SET forwarded_seq = ? WHERE lc_dn = ? AND forwarded_seq < ? AND seq >= ?',
-            )
-            ->execute([
+        $this->statements->execute(
+            'UPDATE ' . self::TABLE
+            . ' SET forwarded_seq = ? WHERE lc_dn = ? AND forwarded_seq < ? AND seq >= ?',
+            [
                 $sequence,
                 $this->key($dn),
                 $sequence,
                 $sequence,
-            ]);
+            ],
+        );
     }
 
     /**
@@ -143,28 +143,31 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
                 return;
             }
 
-            $this->transactor
-                ->pdo()
-                ->prepare('DELETE FROM ' . self::TABLE . ' WHERE lc_dn = ?')
-                ->execute([$this->key($dn)]);
+            $this->deleteRow($dn);
         });
     }
 
     public function discard(Dn $dn): void
     {
-        $this->transactor
-            ->pdo()
-            ->prepare('DELETE FROM ' . self::TABLE . ' WHERE lc_dn = ?')
-            ->execute([$this->key($dn)]);
+        $this->deleteRow($dn);
+    }
+
+    private function deleteRow(Dn $dn): void
+    {
+        $this->statements->execute(
+            'DELETE FROM ' . self::TABLE . ' WHERE lc_dn = ?',
+            [$this->key($dn)],
+        );
     }
 
     private function loadRecord(Dn $dn): ReplicaForwardState
     {
-        $statement = $this->transactor
-            ->pdo()
-            ->prepare('SELECT state, seq, forwarded_seq FROM ' . self::TABLE . ' WHERE lc_dn = ?');
-        $statement->execute([$this->key($dn)]);
-        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        $row = $this->statements
+            ->execute(
+                'SELECT state, seq, forwarded_seq FROM ' . self::TABLE . ' WHERE lc_dn = ?',
+                [$this->key($dn)],
+            )
+            ->fetch();
         if (!is_array($row)) {
             return ReplicaForwardState::initial($dn);
         }
@@ -179,18 +182,16 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
 
     private function upsert(ReplicaForwardState $record): void
     {
-        $key = $this->key($record->dn);
-        $pdo = $this->transactor->pdo();
-
-        $pdo->prepare('DELETE FROM ' . self::TABLE . ' WHERE lc_dn = ?')
-            ->execute([$key]);
-        $pdo->prepare('INSERT INTO ' . self::TABLE . ' (lc_dn, state, seq, forwarded_seq) VALUES (?, ?, ?, ?)')
-            ->execute([
-                $key,
+        $this->deleteRow($record->dn);
+        $this->statements->execute(
+            'INSERT INTO ' . self::TABLE . ' (lc_dn, state, seq, forwarded_seq) VALUES (?, ?, ?, ?)',
+            [
+                $this->key($record->dn),
                 $this->encode($record->state),
                 $record->sequence,
                 $record->forwarded,
-            ]);
+            ],
+        );
     }
 
     private function key(Dn $dn): string
