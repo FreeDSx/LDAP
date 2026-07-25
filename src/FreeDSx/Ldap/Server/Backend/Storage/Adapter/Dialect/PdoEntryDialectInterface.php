@@ -111,7 +111,7 @@ interface PdoEntryDialectInterface
     /**
      * Rewrites the base entry query with an ORDER BY for the sort keys, NULL/missing values ordered per RFC 2891 §2.2.
      *
-     * @param list<string> $baseParams
+     * @param list<string|int> $baseParams
      * @param list<SortKeySpec> $sortKeys
      */
     public function sortedQuery(

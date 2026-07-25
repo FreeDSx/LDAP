@@ -21,7 +21,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query;
 final readonly class SqlQuery
 {
     /**
-     * @param list<string> $params
+     * @param list<string|int> $params
      */
     public function __construct(
         public string $sql,
@@ -31,7 +31,7 @@ final readonly class SqlQuery
     /**
      * Returns a new instance with the given SQL appended and params merged.
      *
-     * @param list<string> $additionalParams
+     * @param list<string|int> $additionalParams
      */
     public function appending(
         string $sql,

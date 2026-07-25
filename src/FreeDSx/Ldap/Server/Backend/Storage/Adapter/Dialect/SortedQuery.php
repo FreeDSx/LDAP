@@ -21,7 +21,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 final readonly class SortedQuery
 {
     /**
-     * @param list<string> $params
+     * @param list<string|int> $params
      */
     public function __construct(
         public string $sql,

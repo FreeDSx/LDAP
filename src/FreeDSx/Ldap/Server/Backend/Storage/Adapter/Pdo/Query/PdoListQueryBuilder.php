@@ -65,8 +65,12 @@ final readonly class PdoListQueryBuilder
             );
         }
 
+        // Bound rather than inlined: an inlined limit makes every distinct client size limit its own prepared statement.
         if ($sqlLimit !== null) {
-            $query = $query->appending(' LIMIT ' . $sqlLimit);
+            $query = $query->appending(
+                ' LIMIT ?',
+                [$sqlLimit],
+            );
         }
 
         return $query;
@@ -91,18 +95,20 @@ final readonly class PdoListQueryBuilder
             $inner = <<<SQL
                 SELECT DISTINCT s.entry_lc_dn AS d FROM entry_attribute_values s
                     WHERE $sidecarCondition
-                    LIMIT $sqlLimit
+                    LIMIT ?
                 SQL;
         } else {
             $inner = <<<SQL
                 SELECT DISTINCT s.entry_lc_dn AS d FROM entry_attribute_values s
                     WHERE $sidecarCondition
                       AND (s.entry_lc_dn = ? OR s.entry_lc_dn LIKE ? ESCAPE '!')
-                    LIMIT $sqlLimit
+                    LIMIT ?
                 SQL;
             $params[] = $base;
             $params[] = '%,' . SqlFilterUtility::escape($base);
         }
+
+        $params[] = $sqlLimit;
 
         return new SqlQuery(
             "$fetchAll WHERE lc_dn IN (SELECT t.d FROM ($inner) t)",
