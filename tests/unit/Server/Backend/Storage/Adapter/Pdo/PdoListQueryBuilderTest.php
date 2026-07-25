@@ -155,7 +155,7 @@ final class PdoListQueryBuilderTest extends TestCase
             $query->sql,
         );
         self::assertStringContainsString(
-            'LIMIT 500',
+            'LIMIT ?',
             $query->sql,
         );
         self::assertStringNotContainsString(
@@ -163,7 +163,7 @@ final class PdoListQueryBuilderTest extends TestCase
             $query->sql,
         );
         self::assertSame(
-            ['smith', 'ou=people,dc=foo,dc=bar', '%,ou=people,dc=foo,dc=bar'],
+            ['smith', 'ou=people,dc=foo,dc=bar', '%,ou=people,dc=foo,dc=bar', 500],
             $query->params,
         );
     }
@@ -187,7 +187,7 @@ final class PdoListQueryBuilderTest extends TestCase
             $query->sql,
         );
         self::assertSame(
-            ['smith'],
+            ['smith', 500],
             $query->params,
         );
     }
@@ -263,8 +263,12 @@ final class PdoListQueryBuilderTest extends TestCase
             $query->sql,
         );
         self::assertStringContainsString(
-            ' LIMIT 500',
+            ' LIMIT ?',
             $query->sql,
+        );
+        self::assertSame(
+            ['x', 'y', 'ou=people,dc=foo,dc=bar', '%,ou=people,dc=foo,dc=bar', 500],
+            $query->params,
         );
     }
 
@@ -345,7 +349,7 @@ final class PdoListQueryBuilderTest extends TestCase
     }
 
     /**
-     * @return array{0: string, 1: list<string>}
+     * @return array{0: string, 1: list<string|int>}
      */
     private function rootQuery(
         PdoListQueryBuilder $builder,

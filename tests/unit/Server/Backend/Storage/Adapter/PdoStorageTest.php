@@ -52,6 +52,7 @@ use PDO;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
 
 final class PdoStorageTest extends TestCase
@@ -116,6 +117,41 @@ final class PdoStorageTest extends TestCase
                 static fn(Entry $entry): string => $entry->getDn()->toString(),
                 $entries,
             ),
+        );
+    }
+
+    public function test_searches_differing_only_in_size_limit_share_one_prepared_statement(): void
+    {
+        $pdo = new RecordingPdo('sqlite::memory:');
+        PdoStorage::initialize(
+            $pdo,
+            new SqliteDialect(),
+        );
+        $storage = new PdoStorage(
+            new SharedPdoConnectionProvider($pdo),
+            new SqliteFilterTranslator(),
+            new SqliteDialect(),
+        );
+        foreach (range(1, 3) as $i) {
+            $storage->store(new Entry(
+                new Dn("cn=e{$i},dc=example,dc=com"),
+                new Attribute('cn', "e{$i}"),
+                new Attribute('sn', 'x'),
+            ));
+        }
+
+        foreach ([1, 2, 3] as $sizeLimit) {
+            iterator_count($storage->list(new StorageListOptions(
+                baseDn: new Dn('dc=example,dc=com'),
+                subtree: true,
+                filter: Filters::equal('sn', 'x'),
+                sizeLimit: $sizeLimit,
+            ))->entries);
+        }
+
+        self::assertCount(
+            1,
+            $pdo->preparedMatching('LIMIT ?'),
         );
     }
 
