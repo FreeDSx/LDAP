@@ -26,7 +26,8 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyBindGuard;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
-use FreeDSx\Ldap\Server\PasswordPolicy\Replica\InMemoryReplicaPasswordStateStore;
+use Tests\Support\FreeDSx\Ldap\Server\PasswordPolicy\Replica\SqliteReplicaPasswordStateStoreFactory;
+use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 use PHPUnit\Framework\TestCase;
@@ -40,7 +41,7 @@ final class ReplicaBindStrategyTest extends TestCase
 
     private const DN = 'cn=foo,dc=example,dc=com';
 
-    private InMemoryReplicaPasswordStateStore $store;
+    private ReplicaPasswordStateStoreInterface $store;
 
     private PasswordPolicyContext $context;
 
@@ -50,7 +51,7 @@ final class ReplicaBindStrategyTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->store = new InMemoryReplicaPasswordStateStore();
+        $this->store = SqliteReplicaPasswordStateStoreFactory::inMemory();
         $this->context = new PasswordPolicyContext();
         $this->sleeper = new RecordingSleeper();
 

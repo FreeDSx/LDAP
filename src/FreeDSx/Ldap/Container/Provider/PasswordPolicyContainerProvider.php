@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Container\Provider;
 
 use FreeDSx\Ldap\Container;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackendBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
@@ -29,7 +30,6 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\QualityConstraint;
 use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\SafeModifyConstraint;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyComponentFactory;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
-use FreeDSx\Ldap\Server\PasswordPolicy\Replica\InMemoryReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\UniquePolicyTimeFactory;
 use FreeDSx\Ldap\ServerOptions;
@@ -77,13 +77,20 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
     }
 
     /**
-     * The replica-local password-policy state store, persisted by the storage backend when it can, else in memory.
+     * The replica-local password-policy state store, persisted alongside the entries on the storage connection.
      */
     private function makeReplicaPasswordStateStore(Container $container): ReplicaPasswordStateStoreInterface
     {
-        return $container->get(ServerOptions::class)->getStorageConfig() instanceof PdoConfig
-            ? $container->get(PdoBackendBuilder::class)->replicaPasswordStateStore()
-            : new InMemoryReplicaPasswordStateStore();
+        $storageConfig = $container->get(ServerOptions::class)->getStorageConfig();
+
+        if (!$storageConfig instanceof PdoConfig) {
+            throw new RuntimeException(sprintf(
+                'The replica password-policy state store requires PDO storage, but "%s" is configured.',
+                $storageConfig::class,
+            ));
+        }
+
+        return $container->get(PdoBackendBuilder::class)->replicaPasswordStateStore();
     }
 
     private function makePasswordModifyTargetResolver(Container $container): PasswordModifyTargetResolver

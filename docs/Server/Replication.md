@@ -220,9 +220,11 @@ Reads, binds, compares, and StartTLS are served normally.
 
 ### Storage Requirement
 
-Under the PCNTL runner the sync daemon and the connection workers are separate processes, so the replica's storage must
-be shared across processes (SQLite, MySQL, or JSON file); a forking replica on in-memory storage fails at startup. Under
-Swoole (one process) any storage works.
+A replica requires PDO storage (SQLite or MySQL) on either runner. Any other storage fails at startup. The reasons:
+
+* The sync daemon writes continuously, and only PDO storage updates a single entry without rewriting the rest.
+* Password-policy state is written and read by different processes, so it needs storage they share.
+* A replica is expected to keep its copy across restarts rather than refresh from scratch.
 
 ### Security: Two Gates, and ACLs Do Not Replicate
 
@@ -245,8 +247,7 @@ To turn this on:
 - Enable a password policy on both the provider and the replica with `setPasswordPolicy(...)`.
 - On the provider, grant the replica's bind identity with `withReplicaGrants(...)`. It sets up everything a replica
   identity needs, so use it in place of the sync-only grant from the Quick Start.
-- Give the replica PDO storage (SQLite or MySQL). JSON-file storage is not yet supported for replica password-policy
-  state or forwarding.
+- Give the replica PDO storage (SQLite or MySQL), as every replica requires.
 
 ```php
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;

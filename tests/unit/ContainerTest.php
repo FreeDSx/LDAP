@@ -50,7 +50,7 @@ use FreeDSx\Ldap\Server\Middleware\MetricsMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuthorizationMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ResourceLimitMiddleware;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\PasswordPolicyBindStrategyInterface;
-use FreeDSx\Ldap\Server\PasswordPolicy\Replica\InMemoryReplicaPasswordStateStore;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitResolver;
 use FreeDSx\Ldap\ProxyOptions;
@@ -140,12 +140,11 @@ class ContainerTest extends TestCase
         );
     }
 
-    public function test_the_replica_password_store_is_in_memory_for_a_non_pdo_config(): void
+    public function test_the_replica_password_store_is_refused_for_a_non_pdo_config(): void
     {
-        self::assertInstanceOf(
-            InMemoryReplicaPasswordStateStore::class,
-            $this->subject->get(ReplicaPasswordStateStoreInterface::class),
-        );
+        $this->expectException(RuntimeException::class);
+
+        $this->subject->get(ReplicaPasswordStateStoreInterface::class);
     }
 
     public function test_a_proxy_container_uses_the_proxy_protocol_factory(): void

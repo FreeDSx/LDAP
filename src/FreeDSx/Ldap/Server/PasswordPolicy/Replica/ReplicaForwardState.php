@@ -38,33 +38,6 @@ final readonly class ReplicaForwardState
         );
     }
 
-    /**
-     * Whether the state has advanced past the last-forwarded watermark and is awaiting forward.
-     */
-    public function isPending(): bool
-    {
-        return $this->sequence > $this->forwarded;
-    }
-
-    /**
-     * Whether the forwarded watermark may advance to $sequence: it is newer than the last forward, but not newer than
-     * the state actually recorded.
-     */
-    public function canAdvanceTo(int $sequence): bool
-    {
-        return $sequence > $this->forwarded && $sequence <= $this->sequence;
-    }
-
-    public function advancedTo(int $sequence): self
-    {
-        return new self(
-            $this->dn,
-            $this->state,
-            $this->sequence,
-            $sequence,
-        );
-    }
-
     public function applied(ReplicaPasswordState $state): self
     {
         return new self(

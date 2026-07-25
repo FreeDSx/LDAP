@@ -699,7 +699,8 @@ configure the rest.
 A `ServerOptions` setter that puts the server into read-only replica mode against the given `ReplicaConfig`. Client
 writes are refused and a background daemon keeps the local storage in step with the provider.
 `ServerOptions::forReplica($replicaConfig, $storageConfig)` is a shortcut that constructs the options with this
-already set, taking the replica config and the backend storage config for the local mirror.
+already set, taking the replica config and the backend storage config for the local mirror. A replica requires PDO
+storage; see [Storage Requirement](Replication.md#storage-requirement).
 
 **Default**: `null` (the server is a normal read-write directory).
 

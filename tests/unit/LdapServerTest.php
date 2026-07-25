@@ -20,14 +20,19 @@ use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
 use FreeDSx\Ldap\Ldif\Output\StringLdifOutput;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\ReplicaConfig;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\ServerOptions;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -77,15 +82,63 @@ class LdapServerTest extends TestCase
         $this->subject->run();
     }
 
-    public function test_run_throws_for_a_forking_replica_on_in_memory_storage(): void
-    {
+    #[DataProvider('nonPdoReplicaStorageDataProvider')]
+    public function test_run_throws_for_a_replica_on_non_pdo_storage(
+        StorageConfigInterface $storageConfig,
+        RunnerMode $runner,
+    ): void {
         $this->options
             ->setReplicaConfig(new ReplicaConfig(new ClientOptions()))
-            ->setStorageConfig(InMemoryStorageConfig::withEntries());
+            ->setStorageConfig($storageConfig)
+            ->setRunner($runner);
 
         $this->expectException(RuntimeException::class);
 
         $this->subject->run();
+    }
+
+    public function test_run_does_not_throw_for_a_replica_on_pdo_storage(): void
+    {
+        $this->options
+            ->setReplicaConfig(new ReplicaConfig(new ClientOptions()))
+            ->setStorageConfig(PdoConfig::forSqlite(':memory:'));
+
+        $this->mockServerRunner
+            ->expects(self::once())
+            ->method('run');
+
+        $this->subject->run();
+    }
+
+    #[DataProvider('nonPdoReplicaStorageDataProvider')]
+    public function test_run_does_not_throw_for_a_non_replica_on_non_pdo_storage(
+        StorageConfigInterface $storageConfig,
+        RunnerMode $runner,
+    ): void {
+        $this->options
+            ->setStorageConfig($storageConfig)
+            ->setRunner($runner);
+
+        $this->mockServerRunner
+            ->expects(self::once())
+            ->method('run');
+
+        $this->subject->run();
+    }
+
+    /**
+     * @return array<string, array{StorageConfigInterface, RunnerMode}>
+     */
+    public static function nonPdoReplicaStorageDataProvider(): array
+    {
+        $jsonPath = sys_get_temp_dir() . '/ldap_server_test_replica.json';
+
+        return [
+            'in-memory under pcntl' => [InMemoryStorageConfig::withEntries(), RunnerMode::Pcntl],
+            'in-memory under swoole' => [InMemoryStorageConfig::withEntries(), RunnerMode::Swoole],
+            'json under pcntl' => [JsonStorageConfig::forFile($jsonPath), RunnerMode::Pcntl],
+            'json under swoole' => [JsonStorageConfig::forFile($jsonPath), RunnerMode::Swoole],
+        ];
     }
 
     public function test_it_does_not_throw_for_sasl_mechanisms_without_a_sasl_backend(): void
