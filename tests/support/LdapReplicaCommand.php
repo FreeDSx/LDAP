@@ -12,6 +12,7 @@ use FreeDSx\Ldap\ReplicaConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageConfigInterface;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use FreeDSx\Ldap\ServerOptions;
@@ -87,13 +88,18 @@ final class LdapReplicaCommand extends Command
             '12345',
         ));
 
+        $network = (new NetworkConfig())
+            ->setPort($port)
+            ->setTransport($transport)
+            ->setSocketAcceptTimeout(0.1)
+            ->setShutdownTimeout(0);
+
         $server = new LdapServer(
             ServerOptions::forReplica(
                 $replicaConfig,
                 $this->createReplicaStorageConfig($storageType),
             )
-                ->setPort($port)
-                ->setTransport($transport)
+                ->setNetworkConfig($network)
                 ->setRunner($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl)
                 ->setPasswordPolicy(new PasswordPolicy(
                     lockout: new PasswordLockoutRules(
@@ -101,8 +107,6 @@ final class LdapReplicaCommand extends Command
                         maxFailure: 2,
                     ),
                 ))
-                ->setSocketAcceptTimeout(0.1)
-                ->setShutdownTimeout(0)
                 ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL)),
         );
 

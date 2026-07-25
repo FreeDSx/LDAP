@@ -10,6 +10,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\ServerOptions;
 use Symfony\Component\Console\Command\Command;
@@ -76,11 +77,13 @@ final class LdapPasswordPolicyCommand extends Command
             ),
         ];
 
+        $network = (new NetworkConfig())
+            ->setPort($port)
+            ->setTransport($transport)
+            ->setSocketAcceptTimeout(0.1);
+
         $server = new LdapServer(
-            (new ServerOptions())
-                ->setPort($port)
-                ->setTransport($transport)
-                ->setSocketAcceptTimeout(0.1)
+            (new ServerOptions(network: $network))
                 ->setPasswordPolicy(new PasswordPolicy())
                 ->setSaslMechanisms(ServerOptions::SASL_PLAIN)
                 ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL)),

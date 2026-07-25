@@ -5,6 +5,7 @@ declare(strict_types=1);
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\ProxyOptions;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\ServerOptions;
 use Symfony\Component\Process\Process;
 
@@ -42,11 +43,11 @@ $server = LdapServer::makeProxy(
             ->setSslValidateCert(false)
             ->setSslAllowSelfSigned(true),
     ),
-    (new ServerOptions())
+    (new ServerOptions(network: (new NetworkConfig())
         ->setPort(10389)
         ->setSslCert(__DIR__ . '/../resources/cert/slapd.crt')
         ->setSslCertKey(__DIR__ . '/../resources/cert/slapd.key')
-        ->setSocketAcceptTimeout(0.1)
+        ->setSocketAcceptTimeout(0.1)))
         ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL)),
 );
 

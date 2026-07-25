@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Server\ServerRunner;
 use Closure;
 use FreeDSx\Ldap\Server\Configuration\ReloadCoordinator;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
-use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
 /**
  * Holds a runner's live configuration and adopts a reloaded one when the ReloadCoordinator produces it.
@@ -25,12 +25,12 @@ use FreeDSx\Ldap\ServerOptions;
  */
 trait ReloadsConfigurationTrait
 {
-    private ServerOptions $options;
+    private ServerListenerOptionsInterface $options;
 
     private ServerProtocolFactoryInterface $serverProtocolFactory;
 
     /**
-     * @var Closure(ServerOptions): ServerProtocolFactoryInterface
+     * @var Closure(ServerListenerOptionsInterface): ServerProtocolFactoryInterface
      */
     private Closure $protocolFactoryProvider;
 

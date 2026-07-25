@@ -50,7 +50,7 @@ final class ServerStartTlsHandlerTest extends TestCase
 
     public function test_it_should_handle_a_start_tls_request(): void
     {
-        $this->options->setSslCert('foo');
+        $this->options->getNetworkConfig()->setSslCert('foo');
 
         $this->mockConnection
             ->method('isEncrypted')
@@ -86,7 +86,7 @@ final class ServerStartTlsHandlerTest extends TestCase
 
     public function test_it_should_send_back_an_error_if_the_queue_is_already_encrypted(): void
     {
-        $this->options->setSslCert('foo');
+        $this->options->getNetworkConfig()->setSslCert('foo');
 
         $this->mockConnection
             ->method('isEncrypted')

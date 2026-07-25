@@ -13,9 +13,9 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server;
 
-use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Socket\SocketServer;
 use FreeDSx\Socket\SocketServerOptions;
 use FreeDSx\Socket\Timeout\BlockingSelectEnforcer;
@@ -27,45 +27,46 @@ use Psr\Log\LogLevel;
 class SocketServerFactory
 {
     public function __construct(
-        private readonly ServerOptions $options,
+        private readonly NetworkConfig $network,
+        private readonly RunnerMode $runner,
         private readonly ?LoggerInterface $logger,
     ) {}
 
     public function makeAndBind(): SocketServer
     {
-        $isUnixSocket = $this->options->getTransport() === 'unix';
+        $isUnixSocket = $this->network->getTransport() === 'unix';
         $resource = $isUnixSocket
-            ? $this->options->getUnixSocket()
-            : $this->options->getIp();
+            ? $this->network->getUnixSocket()
+            : $this->network->getIp();
 
         if ($isUnixSocket) {
             $this->removeExistingSocketIfNeeded($resource);
         }
 
-        $writeTimeoutEnforcer = $this->options->getRunner() === RunnerMode::Swoole
+        $writeTimeoutEnforcer = $this->runner === RunnerMode::Swoole
             ? new SwooleTimerEnforcer()
             : new BlockingSelectEnforcer();
 
         $socketServerOptions = (new SocketServerOptions())
-            ->setTransport(Transport::from($this->options->getTransport()))
-            ->setIdleTimeout($this->options->getIdleTimeout())
-            ->setWriteTimeout($this->options->getWriteTimeout())
+            ->setTransport(Transport::from($this->network->getTransport()))
+            ->setIdleTimeout($this->network->getIdleTimeout())
+            ->setWriteTimeout($this->network->getWriteTimeout())
             ->setWriteTimeoutEnforcer($writeTimeoutEnforcer)
-            ->setUseSsl($this->options->isUseSsl())
-            ->setSslCert($this->options->getSslCert())
-            ->setSslCertKey($this->options->getSslCertKey())
-            ->setSslCertPassphrase($this->options->getSslCertPassphrase())
-            ->setSslCryptoMethod($this->options->getMinTlsVersion()->toServerCryptoMethod())
-            ->setSslCiphers($this->options->getSslCiphers())
-            ->setSslValidateCert($this->options->isSslValidateCert())
-            ->setSslAllowSelfSigned($this->options->getSslAllowSelfSigned())
-            ->setSslCaCert($this->options->getSslCaCert());
+            ->setUseSsl($this->network->isUseSsl())
+            ->setSslCert($this->network->getSslCert())
+            ->setSslCertKey($this->network->getSslCertKey())
+            ->setSslCertPassphrase($this->network->getSslCertPassphrase())
+            ->setSslCryptoMethod($this->network->getMinTlsVersion()->toServerCryptoMethod())
+            ->setSslCiphers($this->network->getSslCiphers())
+            ->setSslValidateCert($this->network->isSslValidateCert())
+            ->setSslAllowSelfSigned($this->network->getSslAllowSelfSigned())
+            ->setSslCaCert($this->network->getSslCaCert());
 
         return SocketServer::bind(
             $resource,
             $isUnixSocket
                 ? null
-                : $this->options->getPort(),
+                : $this->network->getPort(),
             $socketServerOptions,
         );
     }

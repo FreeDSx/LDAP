@@ -29,7 +29,7 @@ use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareChain;
 use FreeDSx\Ldap\Server\Middleware\RequestValidationMiddleware;
 use FreeDSx\Ldap\Server\ServerConnectionScaffoldingTrait;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
-use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use FreeDSx\Socket\Socket;
 
 /**
@@ -42,7 +42,7 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
     use ServerConnectionScaffoldingTrait;
 
     public function __construct(
-        private readonly ServerOptions $options,
+        private readonly ServerListenerOptionsInterface $options,
         private readonly ProxyOptions $proxyOptions,
     ) {}
 
@@ -103,7 +103,7 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
         );
     }
 
-    protected function serverOptions(): ServerOptions
+    protected function serverOptions(): ServerListenerOptionsInterface
     {
         return $this->options;
     }

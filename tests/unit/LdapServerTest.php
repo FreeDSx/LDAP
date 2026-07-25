@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\ReplicaConfig;
 use FreeDSx\Ldap\ProxyOptions;
@@ -58,8 +59,7 @@ class LdapServerTest extends TestCase
     {
         $this->mockServerRunner = $this->createMock(ServerRunnerInterface::class);
 
-        $this->options = (new ServerOptions())
-            ->setPort(33389)
+        $this->options = (new ServerOptions(network: NetworkConfig::withPort(33389)))
             ->setServerRunner($this->mockServerRunner);
 
         $this->container = Container::forServer($this->options);
@@ -87,38 +87,6 @@ class LdapServerTest extends TestCase
         $this->expectException(RuntimeException::class);
 
         $this->subject->run();
-    }
-
-    public function test_it_should_get_the_default_options(): void
-    {
-        self::assertEquals(
-            [
-                'ip' => '0.0.0.0',
-                'port' => 33389,
-                'unix_socket' => '/var/run/ldap.socket',
-                'transport' => 'tcp',
-                'idle_timeout' => 600,
-                'require_authentication' => true,
-                'allow_anonymous' => false,
-                'logger' => null,
-                'use_ssl' => false,
-                'ssl_cert' => null,
-                'ssl_cert_key' => null,
-                'ssl_cert_passphrase' => null,
-                'min_tls_version' => '1.2',
-                'ssl_ciphers' => 'DEFAULT',
-                'ssl_validate_cert' => false,
-                'ssl_allow_self_signed' => null,
-                'ssl_ca_cert' => null,
-                'monitor_enabled' => false,
-                'monitor_snapshot_path' => null,
-                'dse_alt_server' => null,
-                'dse_vendor_name' => 'FreeDSx',
-                'dse_vendor_version' => null,
-                'sasl_mechanisms' => [],
-            ],
-            $this->subject->getOptions()->toArray(),
-        );
     }
 
     public function test_it_does_not_throw_for_sasl_mechanisms_without_a_sasl_backend(): void

@@ -15,6 +15,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\ServerOptions;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -89,11 +90,13 @@ class LdapAclCommand extends Command
             ),
         ];
 
+        $network = (new NetworkConfig())
+            ->setPort(10389)
+            ->setTransport($transport)
+            ->setSocketAcceptTimeout(0.1);
+
         $server = new LdapServer(
-            (new ServerOptions())
-                ->setPort(10389)
-                ->setTransport($transport)
-                ->setSocketAcceptTimeout(0.1)
+            (new ServerOptions(network: $network))
                 ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL))
                 ->setAclRules(
                     (AclRules::fromEmpty())

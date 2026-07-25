@@ -20,7 +20,7 @@ use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
-use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use FreeDSx\Socket\Socket;
 
 /**
@@ -30,7 +30,7 @@ use FreeDSx\Socket\Socket;
  */
 trait ServerConnectionScaffoldingTrait
 {
-    abstract protected function serverOptions(): ServerOptions;
+    abstract protected function serverOptions(): ServerListenerOptionsInterface;
 
     /**
      * @param ResponseInterceptor[] $interceptors applied to every outgoing response, in order.
@@ -42,7 +42,7 @@ trait ServerConnectionScaffoldingTrait
     ): ServerQueue {
         return new ServerQueue(
             $socket,
-            maxReceiveSize: $this->serverOptions()->getMaxRequestSize(),
+            maxReceiveSize: $this->serverOptions()->getNetworkConfig()->getMaxRequestSize(),
             interceptors: $interceptors,
             metricsRecorder: $metricsRecorder,
         );

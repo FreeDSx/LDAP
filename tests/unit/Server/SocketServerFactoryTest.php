@@ -13,10 +13,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server;
 
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\Server\TlsVersion;
-use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Timeout\BlockingSelectEnforcer;
 use FreeDSx\Socket\Timeout\SwooleTimerEnforcer;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -45,8 +45,8 @@ final class SocketServerFactoryTest extends TestCase
         $this->mockLogger = $this->createMock(LoggerInterface::class);
 
         $this->subject = new SocketServerFactory(
-            (new ServerOptions())
-                ->setPort(3390),
+            NetworkConfig::withPort(3390),
+            RunnerMode::Pcntl,
             $this->mockLogger,
         );
     }
@@ -66,9 +66,10 @@ final class SocketServerFactoryTest extends TestCase
     public function test_it_uses_the_blocking_select_enforcer_for_the_pcntl_runner(): void
     {
         $subject = new SocketServerFactory(
-            (new ServerOptions())
+            (new NetworkConfig())
                 ->setPort(3391)
                 ->setWriteTimeout(45),
+            RunnerMode::Pcntl,
             $this->mockLogger,
         );
 
@@ -87,10 +88,10 @@ final class SocketServerFactoryTest extends TestCase
     public function test_it_uses_the_swoole_timer_enforcer_for_the_swoole_runner(): void
     {
         $subject = new SocketServerFactory(
-            (new ServerOptions())
+            (new NetworkConfig())
                 ->setPort(3392)
-                ->setWriteTimeout(45)
-                ->setRunner(RunnerMode::Swoole),
+                ->setWriteTimeout(45),
+            RunnerMode::Swoole,
             $this->mockLogger,
         );
 
@@ -109,13 +110,14 @@ final class SocketServerFactoryTest extends TestCase
     public function test_it_flows_the_tls_settings_to_the_socket_server(): void
     {
         $subject = new SocketServerFactory(
-            (new ServerOptions())
+            (new NetworkConfig())
                 ->setPort(3393)
                 ->setMinTlsVersion(TlsVersion::Tls1_3)
                 ->setSslCiphers('ECDHE-RSA-AES128-GCM-SHA256')
                 ->setSslValidateCert(true)
                 ->setSslAllowSelfSigned(true)
                 ->setSslCaCert('/path/to/ca.pem'),
+            RunnerMode::Pcntl,
             $this->mockLogger,
         );
 
@@ -145,9 +147,10 @@ final class SocketServerFactoryTest extends TestCase
         self::expectNotToPerformAssertions();
 
         $this->subject = new SocketServerFactory(
-            (new ServerOptions())
+            (new NetworkConfig())
                 ->setUnixSocket($this->tmpUnixSocketFilePath)
                 ->setTransport('unix'),
+            RunnerMode::Pcntl,
             $this->mockLogger,
         );
 

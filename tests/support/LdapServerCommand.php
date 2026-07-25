@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\ServerOptions;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\FileFlagConfigReloader;
 use PDO;
@@ -251,20 +252,22 @@ final class LdapServerCommand extends Command
             );
         }
 
-        $options = (new ServerOptions($this->createStorageConfig($storageType)))
+        $network = (new NetworkConfig())
             ->setPort($port)
             ->setTransport($transport)
             ->setUnixSocket(sys_get_temp_dir() . '/ldap.socket')
             ->setSslCert(self::SSL_CERT)
             ->setSslCertKey(self::SSL_KEY)
             ->setUseSsl($useSsl)
+            ->setSocketAcceptTimeout(0.1)
+            ->setShutdownTimeout(0);
+
+        $options = (new ServerOptions($this->createStorageConfig($storageType), $network))
             ->setRunner($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl)
             ->setAllowAnonymous($allowAnonymous)
-            ->setSocketAcceptTimeout(0.1)
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
             ->setMaxSearchPagedLookthrough((int) $this->getStringOption($input, 'max-search-paged-lookthrough'))
             ->setSyncEnabled(true)
-            ->setShutdownTimeout(0)
             ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));
 
         $authenticatedLookthrough = (int) $this->getStringOption($input, 'authenticated-lookthrough');
@@ -299,10 +302,10 @@ final class LdapServerCommand extends Command
         }
 
         if ($external) {
-            $options
+            $options->getNetworkConfig()
                 ->setSslValidateCert(true)
-                ->setSslCaCert(self::EXTERNAL_CA_CERT)
-                ->setSaslMechanisms(ServerOptions::SASL_EXTERNAL);
+                ->setSslCaCert(self::EXTERNAL_CA_CERT);
+            $options->setSaslMechanisms(ServerOptions::SASL_EXTERNAL);
         }
 
         if ($external && $input->getOption('external-allow-proxy') === true) {
