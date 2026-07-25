@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Configuration;
 
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
-use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
 /**
  * The configuration a runner should adopt for new connections after a successful reload.
@@ -24,7 +24,7 @@ use FreeDSx\Ldap\ServerOptions;
 final readonly class ReloadResult
 {
     public function __construct(
-        public ServerOptions $options,
+        public ServerListenerOptionsInterface $options,
         public ServerProtocolFactoryInterface $protocolFactory,
     ) {}
 }

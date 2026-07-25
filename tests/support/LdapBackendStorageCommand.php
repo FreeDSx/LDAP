@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
 use FreeDSx\Ldap\Schema\NisSchemaProvider;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\ServerOptions;
 use PDO;
 use Symfony\Component\Console\Command\Command;
@@ -232,10 +233,12 @@ final class LdapBackendStorageCommand extends Command
             );
         }
 
-        $serverOptions = (new ServerOptions())
+        $network = (new NetworkConfig())
             ->setPort($port)
             ->setTransport($transport)
-            ->setSocketAcceptTimeout(0.1)
+            ->setSocketAcceptTimeout(0.1);
+
+        $serverOptions = (new ServerOptions(network: $network))
             ->setSchemaValidationMode($validationMode)
             ->setSchema(StandardSchemaProvider::buildCore()->merge(NisSchemaProvider::build()))
             ->setMonitorEnabled((bool) $input->getOption('monitor'))

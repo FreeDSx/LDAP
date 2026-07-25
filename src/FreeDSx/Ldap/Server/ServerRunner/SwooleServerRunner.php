@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\SwooleBackgroundTasks;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\SocketServerFactory;
-use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
 use Closure;
@@ -81,7 +81,7 @@ class SwooleServerRunner implements CoroutineServerRunnerInterface
 
     public function __construct(
         ServerProtocolFactoryInterface $serverProtocolFactory,
-        ServerOptions $options,
+        ServerListenerOptionsInterface $options,
         private readonly SocketServerFactory $socketServerFactory,
         Closure $protocolFactoryProvider,
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
@@ -171,7 +171,7 @@ class SwooleServerRunner implements CoroutineServerRunnerInterface
                 return;
             }
 
-            $allClosed = $this->waitGroup->wait((float) $this->options->getShutdownTimeout());
+            $allClosed = $this->waitGroup->wait((float) $this->options->getNetworkConfig()->getShutdownTimeout());
 
             if ($allClosed) {
                 return;
@@ -195,7 +195,7 @@ class SwooleServerRunner implements CoroutineServerRunnerInterface
             $this->backgroundTasks->tick();
 
             try {
-                $socket = $this->server->accept($this->options->getSocketAcceptTimeout());
+                $socket = $this->server->accept($this->options->getNetworkConfig()->getSocketAcceptTimeout());
             } catch (Throwable $e) {
                 $this->logAcceptError($e);
 
@@ -206,7 +206,7 @@ class SwooleServerRunner implements CoroutineServerRunnerInterface
                 continue;
             }
 
-            $maxConnections = $this->options->getMaxConnections();
+            $maxConnections = $this->options->getNetworkConfig()->getMaxConnections();
             if ($maxConnections > 0 && count($this->activeSockets) >= $maxConnections) {
                 $this->logConnectionLimitReached(['max_connections' => $maxConnections]);
                 $this->metricsRecorder->connectionObserved(ConnectionObservation::Rejected);

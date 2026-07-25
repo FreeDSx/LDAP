@@ -15,7 +15,9 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Configuration;
 
 use FreeDSx\Ldap\Server\Configuration\ConfigReloaderInterface;
 use FreeDSx\Ldap\Server\Configuration\ReloadCoordinator;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
+use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -36,7 +38,7 @@ final class ReloadCoordinatorTest extends TestCase
 
     public function test_reload_returns_the_new_options_and_a_factory_rebuilt_from_them(): void
     {
-        $newOptions = (new ServerOptions())->setMaxConnections(123);
+        $newOptions = new ServerOptions(network: (new NetworkConfig())->setMaxConnections(123));
         $reloader = $this->createMock(ConfigReloaderInterface::class);
         $reloader
             ->expects(self::once())
@@ -46,7 +48,7 @@ final class ReloadCoordinatorTest extends TestCase
         $rebuiltFrom = null;
         $result = $this->subject->reload(
             (new ServerOptions())->setConfigReloader($reloader),
-            function (ServerOptions $options) use (&$rebuiltFrom): ServerProtocolFactoryInterface {
+            function (ServerListenerOptionsInterface $options) use (&$rebuiltFrom): ServerProtocolFactoryInterface {
                 $rebuiltFrom = $options;
 
                 return $this->reloadedFactory;
@@ -82,7 +84,7 @@ final class ReloadCoordinatorTest extends TestCase
 
         $result = $this->subject->reload(
             (new ServerOptions())->setLogger($logger),
-            fn(ServerOptions $options) => $this->reloadedFactory,
+            fn(ServerListenerOptionsInterface $options) => $this->reloadedFactory,
         );
 
         self::assertNull($result);
@@ -109,7 +111,7 @@ final class ReloadCoordinatorTest extends TestCase
             (new ServerOptions())
                 ->setLogger($logger)
                 ->setConfigReloader($reloader),
-            fn(ServerOptions $options) => $this->reloadedFactory,
+            fn(ServerListenerOptionsInterface $options) => $this->reloadedFactory,
         );
 
         self::assertNull($result);

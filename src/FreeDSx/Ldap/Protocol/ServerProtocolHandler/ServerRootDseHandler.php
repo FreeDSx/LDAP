@@ -96,7 +96,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
                 ExtendedRequest::OID_PPOLICY_STATE_FORWARD,
             );
         }
-        if ($this->options->getSslCert()) {
+        if ($this->options->getNetworkConfig()->getSslCert()) {
             $entry->add(
                 'supportedExtension',
                 ExtendedRequest::OID_START_TLS,

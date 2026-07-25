@@ -101,14 +101,14 @@ final class ExternalMechanismOptionsBuilder implements MechanismOptionsBuilderIn
     private function assertSecureChannel(): void
     {
         // LDAPS connections are encrypted from accept (the StartTLS-only isEncrypted flag is not set for them).
-        if (!$this->options->isUseSsl() && !$this->queue->isEncrypted()) {
+        if (!$this->options->getNetworkConfig()->isUseSsl() && !$this->queue->isEncrypted()) {
             throw new OperationException(
                 'SASL EXTERNAL requires a TLS-protected connection.',
                 ResultCode::CONFIDENTIALITY_REQUIRED,
             );
         }
 
-        if (!$this->options->isSslValidateCert()) {
+        if (!$this->options->getNetworkConfig()->isSslValidateCert()) {
             throw new OperationException(
                 'SASL EXTERNAL requires client certificate validation to be enabled.',
                 ResultCode::INAPPROPRIATE_AUTHENTICATION,

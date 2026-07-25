@@ -25,7 +25,7 @@ use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
 use function extension_loaded;
 
@@ -39,7 +39,7 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
     private static ?bool $hasOpenssl = null;
 
     public function __construct(
-        private readonly ServerOptions $options,
+        private readonly ServerListenerOptionsInterface $options,
         private readonly ConnectionControl $connection,
         private readonly EventLogger $eventLogger = new EventLogger(null),
     ) {
@@ -53,7 +53,7 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
     ): ResponseStream {
         # RFC 4511 §4.14.2: return unavailable (not protocolError) when the server cannot negotiate TLS.
-        if ($this->options->getSslCert() === null || !self::$hasOpenssl) {
+        if ($this->options->getNetworkConfig()->getSslCert() === null || !self::$hasOpenssl) {
             return $this->failure(
                 $message,
                 ResultCode::UNAVAILABLE,

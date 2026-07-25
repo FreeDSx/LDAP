@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Configuration;
 
 use Closure;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
+use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use FreeDSx\Ldap\ServerOptions;
 use Psr\Log\LogLevel;
 use Throwable;
@@ -29,14 +30,24 @@ final class ReloadCoordinator
     /**
      * Returns the options and factory to adopt for new connections, or null on a no-op (no reloader) or failure.
      *
-     * @param Closure(ServerOptions): ServerProtocolFactoryInterface $protocolFactoryProvider
+     * @param Closure(ServerListenerOptionsInterface): ServerProtocolFactoryInterface $protocolFactoryProvider
      * @param array<string, mixed> $context
      */
     public function reload(
-        ServerOptions $current,
+        ServerListenerOptionsInterface $current,
         Closure $protocolFactoryProvider,
         array $context = [],
     ): ?ReloadResult {
+        if (!$current instanceof ServerOptions) {
+            $current->getLogger()?->log(
+                LogLevel::INFO,
+                'Received a reload signal, but the current server type does not support reloading. Ignoring.',
+                $context,
+            );
+
+            return null;
+        }
+
         $reloader = $current->getConfigReloader();
 
         if ($reloader === null) {

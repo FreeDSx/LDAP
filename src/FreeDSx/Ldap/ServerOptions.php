@@ -36,23 +36,19 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Configuration\ConfigReloaderInterface;
-use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
-use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
-use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRules;
 use FreeDSx\Ldap\Server\SearchLimits;
-use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
-use FreeDSx\Ldap\Server\TlsVersion;
-use Psr\Log\LoggerInterface;
-use Closure;
 
 /**
  * @api
  */
-final class ServerOptions
+final class ServerOptions implements ServerListenerOptionsInterface
 {
+    use ServerListenerOptionsTrait;
+
     public const SASL_PLAIN = 'PLAIN';
 
     public const SASL_CRAM_MD5 = 'CRAM-MD5';
@@ -103,48 +99,6 @@ final class ServerOptions
         self::SASL_SCRAM_SHA3_512,
         self::SASL_SCRAM_SHA3_512_PLUS,
     ];
-
-    private string $ip = '0.0.0.0';
-
-    private int $port = 389;
-
-    private string $unixSocket = '/var/run/ldap.socket';
-
-    private string $transport = 'tcp';
-
-    private int $idleTimeout = 600;
-
-    /**
-     * Disconnect a client whose response send makes no progress for this many seconds (a stalled reader).
-     */
-    private int $writeTimeout = 600;
-
-    /**
-     * The largest incoming request PDU accepted, in bytes (5 MiB); 0 disables the limit.
-     */
-    private int $maxRequestSize = 5_242_880;
-
-    private bool $requireAuthentication = true;
-
-    private bool $allowAnonymous = false;
-
-    private bool $useSsl = false;
-
-    private ?string $sslCert = null;
-
-    private ?string $sslCertKey = null;
-
-    private ?string $sslCertPassphrase = null;
-
-    private TlsVersion $minTlsVersion = TlsVersion::Tls1_2;
-
-    private string $sslCiphers = 'DEFAULT';
-
-    private bool $sslValidateCert = false;
-
-    private ?bool $sslAllowSelfSigned = null;
-
-    private ?string $sslCaCert = null;
 
     private ?string $dseAltServer = null;
 
@@ -204,27 +158,13 @@ final class ServerOptions
 
     private ?PasswordQualityCheckerInterface $passwordQualityChecker = null;
 
-    private ?LoggerInterface $logger = null;
-
-    private ?EventLogPolicy $eventLogPolicy = null;
-
     private ?ServerRunnerInterface $serverRunner = null;
-
-    private RunnerMode $runner = RunnerMode::Pcntl;
-
-    private bool $monitorEnabled = false;
 
     private bool $syncEnabled = false;
 
     private ?ChangeJournalConfig $changeJournalConfig = null;
 
     private ?ReplicaConfig $replicaConfig = null;
-
-    private ?string $monitorSnapshotPath = null;
-
-    private ?MetricsRecorderInterface $metricsRecorder = null;
-
-    private int $maxConnections = 0;
 
     private int $maxSearchSize = 1000;
 
@@ -238,13 +178,7 @@ final class ServerOptions
 
     private ?SearchLimitRules $searchLimitRules = null;
 
-    private ?Closure $onServerReady = null;
-
     private ?ConfigReloaderInterface $configReloader = null;
-
-    private int $shutdownTimeout = 15;
-
-    private float $socketAcceptTimeout = 0.5;
 
     /**
      * @var string[]
@@ -253,226 +187,14 @@ final class ServerOptions
 
     /**
      * @param ?StorageConfigInterface $storageConfig Storage backend; a transient in-memory directory when omitted.
+     * @param ?NetworkConfig $network Listener and TLS settings; defaults to a plaintext listener on 0.0.0.0:389.
      */
-    public function __construct(?StorageConfigInterface $storageConfig = null)
-    {
+    public function __construct(
+        ?StorageConfigInterface $storageConfig = null,
+        ?NetworkConfig $network = null,
+    ) {
         $this->storageConfig = $storageConfig ?? InMemoryStorageConfig::withEntries();
-    }
-
-    public function getIp(): string
-    {
-        return $this->ip;
-    }
-
-    public function setIp(string $ip): self
-    {
-        $this->ip = $ip;
-
-        return $this;
-    }
-
-    public function getPort(): int
-    {
-        return $this->port;
-    }
-
-    public function setPort(int $port): self
-    {
-        $this->port = $port;
-
-        return $this;
-    }
-
-    public function getUnixSocket(): string
-    {
-        return $this->unixSocket;
-    }
-
-    public function setUnixSocket(string $unixSocket): self
-    {
-        $this->unixSocket = $unixSocket;
-
-        return $this;
-    }
-
-    public function getTransport(): string
-    {
-        return $this->transport;
-    }
-
-    public function setTransport(string $transport): self
-    {
-        $this->transport = $transport;
-
-        return $this;
-    }
-
-    public function getIdleTimeout(): int
-    {
-        return $this->idleTimeout;
-    }
-
-    public function setIdleTimeout(int $idleTimeout): self
-    {
-        $this->idleTimeout = $idleTimeout;
-
-        return $this;
-    }
-
-    public function getWriteTimeout(): int
-    {
-        return $this->writeTimeout;
-    }
-
-    public function setWriteTimeout(int $writeTimeout): self
-    {
-        $this->writeTimeout = $writeTimeout;
-
-        return $this;
-    }
-
-    public function getMaxRequestSize(): int
-    {
-        return $this->maxRequestSize;
-    }
-
-    public function setMaxRequestSize(int $maxRequestSize): self
-    {
-        $this->maxRequestSize = $maxRequestSize;
-
-        return $this;
-    }
-
-    public function isRequireAuthentication(): bool
-    {
-        return $this->requireAuthentication;
-    }
-
-    public function setRequireAuthentication(bool $requireAuthentication): self
-    {
-        $this->requireAuthentication = $requireAuthentication;
-
-        return $this;
-    }
-
-    public function isAllowAnonymous(): bool
-    {
-        return $this->allowAnonymous;
-    }
-
-    public function setAllowAnonymous(bool $allowAnonymous): self
-    {
-        $this->allowAnonymous = $allowAnonymous;
-
-        return $this;
-    }
-
-    public function isUseSsl(): bool
-    {
-        return $this->useSsl;
-    }
-
-    public function setUseSsl(bool $useSsl): self
-    {
-        $this->useSsl = $useSsl;
-
-        return $this;
-    }
-
-    public function getSslCertKey(): ?string
-    {
-        return $this->sslCertKey;
-    }
-
-    public function setSslCertKey(?string $sslCertKey): self
-    {
-        $this->sslCertKey = $sslCertKey;
-
-        return $this;
-    }
-
-    public function getSslCert(): ?string
-    {
-        return $this->sslCert;
-    }
-
-    public function setSslCert(?string $sslCert): self
-    {
-        $this->sslCert = $sslCert;
-
-        return $this;
-    }
-
-    public function getSslCertPassphrase(): ?string
-    {
-        return $this->sslCertPassphrase;
-    }
-
-    public function setSslCertPassphrase(?string $sslCertPassphrase): self
-    {
-        $this->sslCertPassphrase = $sslCertPassphrase;
-
-        return $this;
-    }
-
-    public function getMinTlsVersion(): TlsVersion
-    {
-        return $this->minTlsVersion;
-    }
-
-    public function setMinTlsVersion(TlsVersion $minTlsVersion): self
-    {
-        $this->minTlsVersion = $minTlsVersion;
-
-        return $this;
-    }
-
-    public function getSslCiphers(): string
-    {
-        return $this->sslCiphers;
-    }
-
-    public function setSslCiphers(string $sslCiphers): self
-    {
-        $this->sslCiphers = $sslCiphers;
-
-        return $this;
-    }
-
-    public function isSslValidateCert(): bool
-    {
-        return $this->sslValidateCert;
-    }
-
-    public function setSslValidateCert(bool $sslValidateCert): self
-    {
-        $this->sslValidateCert = $sslValidateCert;
-
-        return $this;
-    }
-
-    public function getSslAllowSelfSigned(): ?bool
-    {
-        return $this->sslAllowSelfSigned;
-    }
-
-    public function setSslAllowSelfSigned(?bool $sslAllowSelfSigned): self
-    {
-        $this->sslAllowSelfSigned = $sslAllowSelfSigned;
-
-        return $this;
-    }
-
-    public function getSslCaCert(): ?string
-    {
-        return $this->sslCaCert;
-    }
-
-    public function setSslCaCert(?string $sslCaCert): self
-    {
-        $this->sslCaCert = $sslCaCert;
-
-        return $this;
+        $this->network = $network ?? new NetworkConfig();
     }
 
     public function getDseAltServer(): ?string
@@ -777,30 +499,6 @@ final class ServerOptions
         return $this;
     }
 
-    public function getLogger(): ?LoggerInterface
-    {
-        return $this->logger;
-    }
-
-    public function setLogger(?LoggerInterface $logger): self
-    {
-        $this->logger = $logger;
-
-        return $this;
-    }
-
-    public function getEventLogPolicy(): EventLogPolicy
-    {
-        return $this->eventLogPolicy ??= EventLogPolicy::default();
-    }
-
-    public function setEventLogPolicy(EventLogPolicy $policy): self
-    {
-        $this->eventLogPolicy = $policy;
-
-        return $this;
-    }
-
     /**
      * @return string[]
      */
@@ -836,42 +534,6 @@ final class ServerOptions
     public function getServerRunner(): ?ServerRunnerInterface
     {
         return $this->serverRunner;
-    }
-
-    public function setRunner(RunnerMode $runner): self
-    {
-        $this->runner = $runner;
-
-        return $this;
-    }
-
-    /**
-     * The maximum number of concurrent connections the server will accept.
-     *
-     * Zero (the default) means no limit.
-     */
-    public function getMaxConnections(): int
-    {
-        return $this->maxConnections;
-    }
-
-    public function setMaxConnections(int $maxConnections): self
-    {
-        $this->maxConnections = $maxConnections;
-
-        return $this;
-    }
-
-    public function isMonitorEnabled(): bool
-    {
-        return $this->monitorEnabled;
-    }
-
-    public function setMonitorEnabled(bool $monitorEnabled): self
-    {
-        $this->monitorEnabled = $monitorEnabled;
-
-        return $this;
     }
 
     public function isSyncEnabled(): bool
@@ -928,34 +590,6 @@ final class ServerOptions
     public function isReadOnly(): bool
     {
         return $this->replicaConfig !== null;
-    }
-
-    /**
-     * The configured cn=monitor snapshot path, or a per-port default under the system temp directory.
-     */
-    public function getMonitorSnapshotPath(): string
-    {
-        return $this->monitorSnapshotPath
-            ?? sys_get_temp_dir() . '/freedsx_ldap_monitor_' . $this->port . '.json';
-    }
-
-    public function setMonitorSnapshotPath(?string $monitorSnapshotPath): self
-    {
-        $this->monitorSnapshotPath = $monitorSnapshotPath;
-
-        return $this;
-    }
-
-    public function getMetricsRecorder(): MetricsRecorderInterface
-    {
-        return $this->metricsRecorder ??= new NullMetricsRecorder();
-    }
-
-    public function setMetricsRecorder(MetricsRecorderInterface $metricsRecorder): self
-    {
-        $this->metricsRecorder = $metricsRecorder;
-
-        return $this;
     }
 
     /**
@@ -1058,53 +692,6 @@ final class ServerOptions
         );
     }
 
-    /**
-     * Seconds to wait for active connections to close gracefully before forcing them closed on shutdown.
-     */
-    public function getShutdownTimeout(): int
-    {
-        return $this->shutdownTimeout;
-    }
-
-    public function setShutdownTimeout(int $shutdownTimeout): self
-    {
-        $this->shutdownTimeout = $shutdownTimeout;
-
-        return $this;
-    }
-
-    /**
-     * Seconds (fractional) to wait for a new client connection before re-checking server state.
-     */
-    public function getSocketAcceptTimeout(): float
-    {
-        return $this->socketAcceptTimeout;
-    }
-
-    public function setSocketAcceptTimeout(float $socketAcceptTimeout): self
-    {
-        $this->socketAcceptTimeout = $socketAcceptTimeout;
-
-        return $this;
-    }
-
-    public function getRunner(): RunnerMode
-    {
-        return $this->runner;
-    }
-
-    public function getOnServerReady(): ?Closure
-    {
-        return $this->onServerReady;
-    }
-
-    public function setOnServerReady(?Closure $onServerReady): self
-    {
-        $this->onServerReady = $onServerReady;
-
-        return $this;
-    }
-
     public function getConfigReloader(): ?ConfigReloaderInterface
     {
         return $this->configReloader;
@@ -1115,37 +702,5 @@ final class ServerOptions
         $this->configReloader = $configReloader;
 
         return $this;
-    }
-
-    /**
-     * @return array{ip: string, port: int, unix_socket: string, transport: string, idle_timeout: int, require_authentication: bool, allow_anonymous: bool, logger: ?LoggerInterface, use_ssl: bool, ssl_cert: ?string, ssl_cert_key: ?string, ssl_cert_passphrase: ?string, min_tls_version: string, ssl_ciphers: string, ssl_validate_cert: bool, ssl_allow_self_signed: ?bool, ssl_ca_cert: ?string, monitor_enabled: bool, monitor_snapshot_path: ?string, dse_alt_server: ?string, dse_vendor_name: string, dse_vendor_version: ?string, sasl_mechanisms: string[]}
-     */
-    public function toArray(): array
-    {
-        return [
-            'ip' => $this->getIp(),
-            'port' => $this->getPort(),
-            'unix_socket' => $this->getUnixSocket(),
-            'transport' => $this->getTransport(),
-            'idle_timeout' => $this->getIdleTimeout(),
-            'require_authentication' => $this->isRequireAuthentication(),
-            'allow_anonymous' => $this->isAllowAnonymous(),
-            'logger' => $this->getLogger(),
-            'use_ssl' => $this->isUseSsl(),
-            'ssl_cert' => $this->getSslCert(),
-            'ssl_cert_key' => $this->getSslCertKey(),
-            'ssl_cert_passphrase' => $this->getSslCertPassphrase(),
-            'min_tls_version' => $this->getMinTlsVersion()->value,
-            'ssl_ciphers' => $this->getSslCiphers(),
-            'ssl_validate_cert' => $this->isSslValidateCert(),
-            'ssl_allow_self_signed' => $this->getSslAllowSelfSigned(),
-            'ssl_ca_cert' => $this->getSslCaCert(),
-            'monitor_enabled' => $this->isMonitorEnabled(),
-            'monitor_snapshot_path' => $this->monitorSnapshotPath,
-            'dse_alt_server' => $this->getDseAltServer(),
-            'dse_vendor_name' => $this->getDseVendorName(),
-            'dse_vendor_version' => $this->getDseVendorVersion(),
-            'sasl_mechanisms' => $this->getSaslMechanisms(),
-        ];
     }
 }

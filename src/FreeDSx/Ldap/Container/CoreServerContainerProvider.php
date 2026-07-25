@@ -110,8 +110,9 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
         $serverOptions = $container->get(ServerOptions::class);
 
         return new SocketServerFactory(
-            options: $serverOptions,
-            logger: $serverOptions->getLogger(),
+            $serverOptions->getNetworkConfig(),
+            $serverOptions->getRunner(),
+            $serverOptions->getLogger(),
         );
     }
 
@@ -447,7 +448,7 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
             periodicTasks: $periodicTasks,
             longLivedTasks: $longLivedTasks,
             logger: $options->getLogger(),
-            gracefulStopSeconds: $options->getShutdownTimeout(),
+            gracefulStopSeconds: $options->getNetworkConfig()->getShutdownTimeout(),
         );
     }
 

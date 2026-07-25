@@ -31,7 +31,7 @@ use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
-use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use Closure;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
@@ -86,7 +86,7 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     public function __construct(
         ServerProtocolFactoryInterface $serverProtocolFactory,
-        ServerOptions $options,
+        ServerListenerOptionsInterface $options,
         private readonly SocketServerFactory $socketServerFactory,
         Closure $protocolFactoryProvider,
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
@@ -268,7 +268,7 @@ class PcntlServerRunner implements ServerRunnerInterface
 
         do {
             $this->backgroundTasks->tick();
-            $socket = $this->server->accept($this->options->getSocketAcceptTimeout());
+            $socket = $this->server->accept($this->options->getNetworkConfig()->getSocketAcceptTimeout());
 
             if ($this->isShuttingDown) {
                 if ($socket) {
@@ -286,7 +286,7 @@ class PcntlServerRunner implements ServerRunnerInterface
                 continue;
             }
 
-            $maxConnections = $this->options->getMaxConnections();
+            $maxConnections = $this->options->getNetworkConfig()->getMaxConnections();
             if ($maxConnections > 0 && count($this->childProcesses) >= $maxConnections) {
                 $this->logConnectionLimitReached($this->defaultContext);
                 $this->metricsRecorder->connectionObserved(ConnectionObservation::Rejected);
@@ -417,7 +417,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         $waitTime = 0;
         while (!empty($this->childProcesses)) {
             // If we reach the shutdown timeout, attempt to force end them and then stop.
-            if ($waitTime >= $this->options->getShutdownTimeout()) {
+            if ($waitTime >= $this->options->getNetworkConfig()->getShutdownTimeout()) {
                 $this->forceEndChildProcesses();
 
                 break;

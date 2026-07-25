@@ -24,7 +24,7 @@ use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
 /**
  * Abstracts out some of the server authorization logic.
@@ -34,7 +34,7 @@ use FreeDSx\Ldap\ServerOptions;
 class ServerAuthorization
 {
     public function __construct(
-        private readonly ServerOptions $options,
+        private readonly ServerListenerOptionsInterface $options,
         private TokenInterface $token = new AnonToken(),
     ) {}
 
