@@ -1842,6 +1842,44 @@ final class WritableStorageBackendTest extends TestCase
         );
     }
 
+    public function test_delete_subtree_journals_every_entry_with_its_pre_image(): void
+    {
+        [$backend, $journal] = $this->journalingBackend();
+        foreach ([
+            new Entry(new Dn('ou=people,dc=example,dc=com'), new Attribute('ou', 'people')),
+            new Entry(new Dn('cn=alice,ou=people,dc=example,dc=com'), new Attribute('cn', 'alice')),
+            new Entry(new Dn('cn=bob,ou=people,dc=example,dc=com'), new Attribute('cn', 'bob')),
+        ] as $entry) {
+            $backend->add(
+                new AddCommand($entry),
+                $this->context(),
+            );
+        }
+
+        $backend->deleteSubtree(
+            new DeleteCommand(new Dn('ou=people,dc=example,dc=com')),
+            $this->context(),
+            static function (Dn $dn): void {},
+        );
+
+        $deletes = array_values(array_filter(
+            iterator_to_array($journal->read()),
+            static fn(ChangeRecord $record): bool => $record->change->changeType === ChangeType::Delete,
+        ));
+
+        self::assertSame(
+            [
+                'cn=alice,ou=people,dc=example,dc=com',
+                'cn=bob,ou=people,dc=example,dc=com',
+                'ou=people,dc=example,dc=com',
+            ],
+            $this->sortedDns($deletes),
+        );
+        foreach ($deletes as $record) {
+            self::assertNotNull($record->change->preImage);
+        }
+    }
+
     public function test_add_is_journaled_when_a_recorder_is_set(): void
     {
         [$backend, $journal] = $this->journalingBackend();
@@ -2065,5 +2103,21 @@ final class WritableStorageBackendTest extends TestCase
     private function makeGenerator(Entry ...$entries): Generator
     {
         yield from $entries;
+    }
+
+    /**
+     * @param list<ChangeRecord> $records
+     *
+     * @return list<string>
+     */
+    private function sortedDns(array $records): array
+    {
+        $dns = array_map(
+            static fn(ChangeRecord $record): string => $record->change->dn->toString(),
+            $records,
+        );
+        sort($dns);
+
+        return $dns;
     }
 }

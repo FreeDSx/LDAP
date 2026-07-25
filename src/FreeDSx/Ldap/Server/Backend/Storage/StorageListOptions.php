@@ -56,16 +56,21 @@ final class StorageListOptions
     /**
      * Match-all options for internal callers (e.g. hasChildren) and tests that do not need a meaningful filter.
      */
+    /**
+     * @param list<string>|null $attributes Lowercase base attribute names to materialize, or null for all.
+     */
     public static function matchAll(
         Dn $baseDn,
         bool $subtree,
         int $timeLimit = 0,
+        ?array $attributes = null,
     ): self {
         return new self(
             baseDn: $baseDn,
             subtree: $subtree,
             filter: new AndFilter(),
             timeLimit: $timeLimit,
+            attributes: $attributes,
         );
     }
 }

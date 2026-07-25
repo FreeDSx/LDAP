@@ -370,19 +370,15 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
 
         foreach (array_chunk($dns, self::SUBTREE_DELETE_BATCH_SIZE) as $batch) {
             $this->writeAtomic(function (EntryStorageInterface $storage) use ($batch, $context): void {
-                foreach ($batch as $dn) {
-                    $entry = $this->changeRecorder !== null
-                        ? $storage->find($dn)
-                        : null;
-                    $storage->remove($dn);
+                $preImages = $this->preImagesFor($storage, $batch);
+                $storage->removeAll($batch);
 
-                    if ($entry !== null) {
-                        $this->changeRecorder->recordDelete(
-                            $storage,
-                            $entry,
-                            $context,
-                        );
-                    }
+                foreach ($preImages as $entry) {
+                    $this->changeRecorder?->recordDelete(
+                        $storage,
+                        $entry,
+                        $context,
+                    );
                 }
             });
         }
@@ -489,6 +485,32 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 $context,
             );
         });
+    }
+
+    /**
+     * Entries the journal needs a pre-image of, read before they are removed; none when nothing is journaling.
+     *
+     * @param list<Dn> $batch
+     *
+     * @return list<Entry>
+     */
+    private function preImagesFor(
+        EntryStorageInterface $storage,
+        array $batch,
+    ): array {
+        if ($this->changeRecorder === null) {
+            return [];
+        }
+
+        $entries = [];
+        foreach ($batch as $dn) {
+            $entry = $storage->find($dn);
+            if ($entry !== null) {
+                $entries[] = $entry;
+            }
+        }
+
+        return $entries;
     }
 
     /**
@@ -646,7 +668,13 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
     private function collectSubtreeDnsDeepestFirst(Dn $base): array
     {
         $dns = [];
-        foreach ($this->storage->list(StorageListOptions::matchAll($base, subtree: true))->entries as $entry) {
+        $options = StorageListOptions::matchAll(
+            $base,
+            subtree: true,
+            attributes: [],
+        );
+
+        foreach ($this->storage->list($options)->entries as $entry) {
             $dns[] = $entry->getDn()->normalize();
         }
         usort(

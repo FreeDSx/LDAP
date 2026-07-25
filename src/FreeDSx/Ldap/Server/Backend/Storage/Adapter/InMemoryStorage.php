@@ -86,6 +86,13 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
         unset($this->entries[$dn->normalize()->toString()]);
     }
 
+    public function removeAll(array $dns): void
+    {
+        foreach ($dns as $dn) {
+            $this->remove($dn);
+        }
+    }
+
     public function atomic(callable $operation): void
     {
         $operation($this);

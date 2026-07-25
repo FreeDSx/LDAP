@@ -94,6 +94,11 @@ interface PdoEntryDialectInterface
     public function queryDelete(): string;
 
     /**
+     * `DELETE FROM entries WHERE lc_dn IN (?, ...)` with $count markers. Parameters: [lc_dn, ...]
+     */
+    public function queryDeleteIn(int $count): string;
+
+    /**
      * `DELETE FROM entry_attribute_values WHERE entry_lc_dn = ?`. Parameters: [entry_lc_dn]
      */
     public function querySidecarDelete(): string;

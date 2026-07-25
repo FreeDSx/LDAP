@@ -126,6 +126,19 @@ trait PdoDialectTrait
         SQL;
     }
 
+    public function queryDeleteIn(int $count): string
+    {
+        $markers = implode(
+            ', ',
+            array_fill(0, $count, '?'),
+        );
+
+        return <<<SQL
+            DELETE FROM entries
+            WHERE lc_dn IN ($markers)
+        SQL;
+    }
+
     public function querySidecarDelete(): string
     {
         return <<<SQL
