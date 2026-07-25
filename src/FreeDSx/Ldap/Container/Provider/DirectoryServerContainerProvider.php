@@ -11,15 +11,13 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Container;
+namespace FreeDSx\Ldap\Container\Provider;
 
-use Closure;
-use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Container;
+use FreeDSx\Ldap\Container\Contributor\DirectoryListenerContributor;
+use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
-use FreeDSx\Ldap\Protocol\ServerAuthorization;
-use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
@@ -45,127 +43,60 @@ use FreeDSx\Ldap\Server\Clock\SystemClock;
 use FreeDSx\Ldap\Server\ConnectionHandlerBuilderInterface;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
-use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotProvider;
-use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotWriter;
-use FreeDSx\Ldap\Server\Metrics\File\SnapshotPublisher;
-use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
-use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
-use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
-use FreeDSx\Ldap\Server\Metrics\Recorder\MetricsRecorderChain;
-use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
-use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\LdapClientForwardStateSender;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\PasswordPolicyForwardWorker;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
+use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\LongLivedTask;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PeriodicTask;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\SwooleBackgroundTasks;
 use FreeDSx\Ldap\Server\Process\Signals\PcntlShutdownSignals;
-use FreeDSx\Ldap\Server\Proxy\ProxyProtocolFactory;
 use FreeDSx\Ldap\Server\RequestHandler\HandlerFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
-use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
-use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
-use FreeDSx\Ldap\Server\ServerRunner\SwooleServerRunner;
-use FreeDSx\Ldap\Server\SocketServerFactory;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Sync\Consumer\LdapReplica;
 use FreeDSx\Ldap\Sync\Consumer\PrimaryConnectionFactory;
 use Psr\Log\NullLogger;
 
 /**
- * Registers the core server services: sockets, backend, protocol factory, runner, metrics, and clock.
+ * Registers the local-directory services.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class CoreServerContainerProvider implements ContainerProviderInterface
+final class DirectoryServerContainerProvider implements ContainerProviderInterface
 {
     public function factories(): array
     {
         return [
-            SocketServerFactory::class => $this->makeSocketServerFactory(...),
             HandlerFactoryInterface::class => $this->makeHandlerFactory(...),
             FilterEvaluatorInterface::class => $this->makeFilterEvaluator(...),
             EntryStorageInterface::class => $this->makeStorage(...),
             PdoBackendBuilder::class => $this->makePdoBackendBuilder(...),
             WritableStorageBackend::class => $this->makeBackend(...),
             ServerProtocolFactory::class => $this->makeServerProtocolFactory(...),
-            ServerProtocolFactoryInterface::class => $this->makeServerProtocolFactoryInterface(...),
-            ServerRunnerInterface::class => $this->makeServerRunner(...),
-            ServerAuthorization::class => $this->makeServerAuthorizer(...),
+            ServerProtocolFactoryInterface::class => static fn(Container $c): ServerProtocolFactoryInterface => $c->get(ServerProtocolFactory::class),
+            ServerProtocolHandlerFactory::class => $this->makeServerProtocolHandlerFactory(...),
             ClockInterface::class => static fn(): ClockInterface => new SystemClock(),
             SleeperInterface::class => $this->makeSleeper(...),
-            ServerProtocolHandlerFactory::class => $this->makeServerProtocolHandlerFactory(...),
-            InMemoryMetricsRecorder::class => static fn(): InMemoryMetricsRecorder => new InMemoryMetricsRecorder(),
-            MetricsRecorderInterface::class => $this->makeMetricsRecorder(...),
-            MetricsSnapshotProvider::class => $this->makeMetricsSnapshotProvider(...),
-            OperationRollupCoordinator::class => $this->makeOperationRollupCoordinator(...),
+            BackgroundTasksInterface::class => $this->makeBackgroundTasks(...),
+            ListenerContributorInterface::class => $this->makeListenerContributor(...),
         ];
-    }
-
-    private function makeSocketServerFactory(Container $container): SocketServerFactory
-    {
-        $serverOptions = $container->get(ServerOptions::class);
-
-        return new SocketServerFactory(
-            $serverOptions->getNetworkConfig(),
-            $serverOptions->getRunner(),
-            $serverOptions->getLogger(),
-        );
-    }
-
-    private function makeServerAuthorizer(Container $container): ServerAuthorization
-    {
-        return new ServerAuthorization($container->get(ServerOptions::class));
-    }
-
-    private function makeServerProtocolHandlerFactory(Container $container): ServerProtocolHandlerFactory
-    {
-        return new ServerProtocolHandlerFactory($container->get(ServerOptions::class));
-    }
-
-    /**
-     * The runner-appropriate sleeper: a coroutine-aware sleeper under Swoole, else a blocking one.
-     */
-    private function makeSleeper(Container $container): SleeperInterface
-    {
-        return $container->get(ServerOptions::class)->getRunner() === RunnerMode::Swoole
-            ? new CoroutineSleeper()
-            : new BlockingSleeper();
     }
 
     private function makeHandlerFactory(Container $container): HandlerFactory
     {
         return new HandlerFactory(
             $container->get(ServerOptions::class),
-            $this->backendOrFail($container),
+            $container->get(WritableStorageBackend::class),
         );
     }
 
     private function makeFilterEvaluator(Container $container): FilterEvaluator
     {
         return new FilterEvaluator($container->get(ServerOptions::class)->getSchema());
-    }
-
-    /**
-     * The configured backend; only reached on the non-proxy path, where LdapServer's startup check guarantees one.
-     */
-    private function backendOrFail(Container $container): WritableStorageBackend
-    {
-        return $this->backendOrNull($container)
-            ?? throw new RuntimeException('No storage is configured; set ServerOptions::setStorageConfig().');
-    }
-
-    /**
-     * The assembled backend, or null on the proxy path which serves no local directory.
-     */
-    private function backendOrNull(Container $container): ?WritableStorageBackend
-    {
-        return $container->has(ProxyOptions::class)
-            ? null
-            : $container->get(WritableStorageBackend::class);
     }
 
     /**
@@ -197,7 +128,7 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
     }
 
     /**
-     * The PDO backend assembly (storage + replica password-state store on one connection)
+     * The PDO backend assembly (storage + replica password-state store on one connection).
      */
     private function makePdoBackendBuilder(Container $container): PdoBackendBuilder
     {
@@ -214,9 +145,6 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
         );
     }
 
-    /**
-     * Assemble the writable backend from the container-built storage; only invoked when storage is configured.
-     */
     private function makeBackend(Container $container): WritableStorageBackend
     {
         $options = $container->get(ServerOptions::class);
@@ -274,45 +202,45 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
         return new ServerProtocolFactory($container->get(ConnectionHandlerBuilderInterface::class));
     }
 
-    private function makeServerProtocolFactoryInterface(Container $container): ServerProtocolFactoryInterface
+    private function makeServerProtocolHandlerFactory(Container $container): ServerProtocolHandlerFactory
     {
-        if ($container->has(ProxyOptions::class)) {
-            return new ProxyProtocolFactory(
-                $container->get(ServerOptions::class),
-                $container->get(ProxyOptions::class),
-            );
-        }
-
-        return $container->get(ServerProtocolFactory::class);
+        return new ServerProtocolHandlerFactory($container->get(ServerOptions::class));
     }
 
-    private function makeServerRunner(Container $container): ServerRunnerInterface
+    /**
+     * The runner-appropriate sleeper: a coroutine-aware sleeper under Swoole, else a blocking one.
+     */
+    private function makeSleeper(Container $container): SleeperInterface
     {
-        $options = $container->get(ServerOptions::class);
-        $protocolFactoryProvider = $this->makeProtocolFactoryProvider($container);
-        $metricsRecorder = $container->get(MetricsRecorderInterface::class);
+        return $container->get(ServerOptions::class)->getRunner() === RunnerMode::Swoole
+            ? new CoroutineSleeper()
+            : new BlockingSleeper();
+    }
 
-        if ($options->getRunner() === RunnerMode::Swoole) {
-            return new SwooleServerRunner(
-                serverProtocolFactory: $protocolFactoryProvider($options),
-                options: $options,
-                socketServerFactory: $container->get(SocketServerFactory::class),
-                protocolFactoryProvider: $protocolFactoryProvider,
-                metricsRecorder: $metricsRecorder,
-                backgroundTasks: $this->makeSwooleBackgroundTasks($container),
-            );
+    private function makeBackgroundTasks(Container $container): BackgroundTasksInterface
+    {
+        return $container->get(ServerOptions::class)->getRunner() === RunnerMode::Swoole
+            ? $this->makeSwooleBackgroundTasks($container)
+            : $this->makePcntlBackgroundTasks($container);
+    }
+
+    private function makeListenerContributor(Container $container): ListenerContributorInterface
+    {
+        $backend = $container->get(WritableStorageBackend::class);
+
+        $instances = [
+            WritableStorageBackend::class => $backend,
+            EntryStorageInterface::class => $backend->getStorage(),
+        ];
+
+        // On the PDO path, share the builder so the reloaded replica store stays on the storage's connection.
+        if ($container->get(ServerOptions::class)->getStorageConfig() instanceof PdoConfig) {
+            $instances[PdoBackendBuilder::class] = $container->get(PdoBackendBuilder::class);
         }
 
-        return new PcntlServerRunner(
-            serverProtocolFactory: $protocolFactoryProvider($options),
-            options: $options,
-            socketServerFactory: $container->get(SocketServerFactory::class),
-            protocolFactoryProvider: $protocolFactoryProvider,
-            metricsRecorder: $metricsRecorder,
-            snapshotPublisher: $this->makeSnapshotPublisher($container),
-            operationRollup: $this->makeOperationRollup($container),
-            backend: $this->backendOrNull($container),
-            backgroundTasks: $this->makePcntlBackgroundTasks($container),
+        return new DirectoryListenerContributor(
+            $backend,
+            $instances,
         );
     }
 
@@ -322,13 +250,12 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
     private function journalRetentionPolicyIfSweepable(Container $container): ?RetentionPolicy
     {
         $options = $container->get(ServerOptions::class);
-        $backend = $this->backendOrNull($container);
 
-        if ($backend === null || !$options->isSyncEnabled()) {
+        if (!$options->isSyncEnabled()) {
             return null;
         }
 
-        $journal = $backend->changeJournal();
+        $journal = $container->get(WritableStorageBackend::class)->changeJournal();
 
         if ($journal === null) {
             return null;
@@ -354,7 +281,7 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
         }
 
         // Safe to resolve now: a non-null policy means sync is enabled and the journal is configured.
-        $journal = $this->backendOrNull($container)?->changeJournal();
+        $journal = $container->get(WritableStorageBackend::class)->changeJournal();
 
         if ($journal === null) {
             return null;
@@ -514,158 +441,5 @@ final class CoreServerContainerProvider implements ContainerProviderInterface
                 $options->getLogger(),
                 passwordStateStore: $passwordStateStore,
             );
-    }
-
-    /**
-     * The child-to-parent operation rollup for the forking runner, over the shared in-memory recorder; built only when
-     * cn=monitor is enabled.
-     */
-    private function makeOperationRollup(Container $container): ?OperationRollupCoordinator
-    {
-        if (!$container->get(ServerOptions::class)->isMonitorEnabled()) {
-            return null;
-        }
-
-        return $container->get(OperationRollupCoordinator::class);
-    }
-
-    private function makeOperationRollupCoordinator(Container $container): OperationRollupCoordinator
-    {
-        return new OperationRollupCoordinator($container->get(InMemoryMetricsRecorder::class));
-    }
-
-    /**
-     * The PCNTL parent publishes connection metrics to a file for forked children (serving cn=monitor) to read; built
-     * only when cn=monitor is enabled.
-     */
-    private function makeSnapshotPublisher(Container $container): ?SnapshotPublisher
-    {
-        $options = $container->get(ServerOptions::class);
-
-        if (!$options->isMonitorEnabled()) {
-            return null;
-        }
-
-        return new SnapshotPublisher(
-            $container->get(InMemoryMetricsRecorder::class),
-            new FileSnapshotWriter($options->getMonitorSnapshotPath()),
-        );
-    }
-
-    /**
-     * The process metrics recorder: an in-memory recorder when cn=monitor is enabled (chained with a user recorder if
-     * set), otherwise just the user recorder (a no-op by default).
-     */
-    private function makeMetricsRecorder(Container $container): MetricsRecorderInterface
-    {
-        $options = $container->get(ServerOptions::class);
-        $userRecorder = $options->getMetricsRecorder();
-
-        if (!$options->isMonitorEnabled()) {
-            return $userRecorder;
-        }
-
-        $inMemory = $container->get(InMemoryMetricsRecorder::class);
-
-        if ($userRecorder instanceof NullMetricsRecorder) {
-            return $inMemory;
-        }
-
-        return new MetricsRecorderChain(
-            $inMemory,
-            $userRecorder,
-        );
-    }
-
-    /**
-     * The snapshot source for cn=monitor: the live in-memory recorder under Swoole, or the parent-published file under
-     * the forking PCNTL runner.
-     */
-    private function makeMetricsSnapshotProvider(Container $container): MetricsSnapshotProvider
-    {
-        $options = $container->get(ServerOptions::class);
-
-        if ($options->getRunner() !== RunnerMode::Swoole) {
-            return new FileSnapshotProvider($options->getMonitorSnapshotPath());
-        }
-
-        return $container->get(InMemoryMetricsRecorder::class);
-    }
-
-    /**
-     * Builds a protocol factory from a (possibly reloaded) set of options via a fresh container.
-     *
-     * @return Closure(ServerOptions): ServerProtocolFactoryInterface
-     */
-    private function makeProtocolFactoryProvider(Container $container): Closure
-    {
-        $proxyOptions = $container->has(ProxyOptions::class)
-            ? $container->get(ProxyOptions::class)
-            : null;
-        $sharedInstances = $this->reloadSharedInstances($container);
-
-        return static function (ServerOptions $options) use (
-            $proxyOptions,
-            $sharedInstances,
-        ): ServerProtocolFactoryInterface {
-            $container = $proxyOptions !== null
-                ? Container::forProxy(
-                    $options,
-                    $proxyOptions,
-                    $sharedInstances,
-                )
-                : Container::forServer(
-                    $options,
-                    $sharedInstances,
-                );
-
-            return $container->get(ServerProtocolFactoryInterface::class);
-        };
-    }
-
-    /**
-     * Services carried verbatim across a SIGHUP reload so their live state survives into the fresh container.
-     *
-     * @return array<class-string, object>
-     */
-    private function reloadSharedInstances(Container $container): array
-    {
-        $shared = [
-            MetricsRecorderInterface::class => $container->get(MetricsRecorderInterface::class),
-            MetricsSnapshotProvider::class => $container->get(MetricsSnapshotProvider::class),
-            InMemoryMetricsRecorder::class => $container->get(InMemoryMetricsRecorder::class),
-        ];
-
-        $operationRollup = $this->makeOperationRollup($container);
-        if ($operationRollup !== null) {
-            $shared[OperationRollupCoordinator::class] = $operationRollup;
-        }
-
-        return $shared + $this->reloadStorageInstances($container);
-    }
-
-    /**
-     * The storage services to carry across a reload (empty on the proxy path, which has no local directory).
-     *
-     * @return array<class-string, object>
-     */
-    private function reloadStorageInstances(Container $container): array
-    {
-        $backend = $this->backendOrNull($container);
-        if ($backend === null) {
-            return [];
-        }
-
-        $shared = [
-            WritableStorageBackend::class => $backend,
-            EntryStorageInterface::class => $backend->getStorage(),
-        ];
-
-        // On the PDO path, share the builder so the reloaded replica store stays on the storage's connection.
-        if ($container->get(ServerOptions::class)->getStorageConfig() instanceof PdoConfig) {
-            $shared[PdoBackendBuilder::class] = $container->get(PdoBackendBuilder::class);
-        }
-
-        return $shared;
     }
 }

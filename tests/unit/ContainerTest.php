@@ -53,7 +53,11 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\PasswordPolicyBindStra
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\InMemoryReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitResolver;
+use FreeDSx\Ldap\ProxyOptions;
+use FreeDSx\Ldap\ProxyServerOptions;
+use FreeDSx\Ldap\Server\Proxy\ProxyProtocolFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
+use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerOptions;
@@ -141,6 +145,16 @@ class ContainerTest extends TestCase
         self::assertInstanceOf(
             InMemoryReplicaPasswordStateStore::class,
             $this->subject->get(ReplicaPasswordStateStoreInterface::class),
+        );
+    }
+
+    public function test_a_proxy_container_uses_the_proxy_protocol_factory(): void
+    {
+        $container = Container::forProxy(new ProxyOptions(new ProxyServerOptions()));
+
+        self::assertInstanceOf(
+            ProxyProtocolFactory::class,
+            $container->get(ServerProtocolFactoryInterface::class),
         );
     }
 

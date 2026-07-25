@@ -96,8 +96,9 @@ $ldap = new LdapServer(
 
 ## Constructing a Proxy Server
 
-When instantiating an `LdapServer` instance with `LdapServer::makeProxy()`, options are now an options object instead
-of an associative array.
+A proxy is now a dedicated `LdapProxyServer` constructed with a single `ProxyOptions` object, instead of
+`LdapServer::makeProxy()` with associative arrays. `ProxyOptions` carries the proxy's own listener config
+(`ProxyServerOptions`) and the upstream `ClientOptions`.
 
 **Before**:
 
@@ -122,22 +123,22 @@ $server = LdapServer::makeProxy(
 **After**:
 
 ```php
-use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\ClientOptions;
-use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\LdapProxyServer;
+use FreeDSx\Ldap\ProxyOptions;
+use FreeDSx\Ldap\ProxyServerOptions;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 
-$server = LdapServer::makeProxy(
-    // The LDAP server to proxy connections to...
-    'ldap.example.com',
-    // Any additional LdapClient options for the proxy...
-    (new ClientOptions)
-        // Perhaps the server to proxy is on some non-standard port?
-        ->setPort(3389)
-    ,
-    // Any additional LdapServer options. In this case, also run this server over port 3389
-    (new ServerOptions)
-        ->setPort(3389)
-);
+$server = new LdapProxyServer(new ProxyOptions(
+    // The proxy's own listener (its port, downstream TLS, etc.).
+    serverOptions: new ProxyServerOptions(
+        (new NetworkConfig())->setPort(3389),
+    ),
+    // The upstream LDAP server to forward connections to.
+    clientOptions: (new ClientOptions())
+        ->setServers(['ldap.example.com'])
+        ->setPort(3389),
+));
 ```
 
 ## Using a Custom ServerRunner
@@ -431,21 +432,5 @@ attribute of the RootDSE is populated automatically when a backend is configured
 
 ### Proxy server
 
-`ProxyRequestHandler` has been replaced by `ProxyBackend`. Extend it and provide an `LdapClient` instance:
-
-```php
-use FreeDSx\Ldap\ClientOptions;
-use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\RequestHandler\ProxyBackend;
-
-$server = (new LdapServer())
-    ->useBackend(new ProxyBackend(
-        (new ClientOptions)->setServers(['ldap.example.com'])
-    ));
-```
-
-Or use the convenience factory (unchanged from 0.x):
-
-```php
-$server = LdapServer::makeProxy('ldap.example.com');
-```
+A forwarding proxy is now its own `LdapProxyServer` constructed from a `ProxyOptions` object. See
+[Constructing a Proxy Server](#constructing-a-proxy-server) above.

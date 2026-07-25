@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap;
 
 /**
- * Options for a forwarding proxy server.
+ * The complete configuration for a forwarding proxy server: its own listener config plus the upstream connection.
  *
  * @api
  *
@@ -23,9 +23,18 @@ namespace FreeDSx\Ldap;
 final class ProxyOptions
 {
     public function __construct(
+        private ProxyServerOptions $serverOptions,
         private ClientOptions $clientOptions = new ClientOptions(),
         private bool $useStartTls = false,
     ) {}
+
+    /**
+     * The proxy's own server config (listener, TLS, auth-gating).
+     */
+    public function getServerOptions(): ProxyServerOptions
+    {
+        return $this->serverOptions;
+    }
 
     /**
      * The client options used for the upstream connection (servers, TLS, timeouts).
