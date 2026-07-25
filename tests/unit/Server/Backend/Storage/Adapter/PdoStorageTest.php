@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -82,6 +83,39 @@ final class PdoStorageTest extends TestCase
         $this->subject->add(
             new AddCommand($this->alice),
             $this->context(),
+        );
+    }
+
+    /**
+     * Canonicalizing drops the space in "cn=spaced, dc=..." where LOWER() keeps it, so keying the sort off the
+     * lowercased DN rather than lc_dn misses this entry's sidecar rows and sorts it as if the attribute were unset.
+     */
+    public function test_sorting_keys_off_a_dn_whose_canonical_form_differs_from_its_literal_case(): void
+    {
+        $this->storage->store(new Entry(
+            new Dn('cn=spaced, dc=example,dc=com'),
+            new Attribute('cn', 'spaced'),
+            new Attribute('sn', 'aaa'),
+        ));
+        $this->storage->store(new Entry(
+            new Dn('cn=plain,dc=example,dc=com'),
+            new Attribute('cn', 'plain'),
+            new Attribute('sn', 'bbb'),
+        ));
+
+        $entries = iterator_to_array($this->storage->list(new StorageListOptions(
+            baseDn: new Dn('dc=example,dc=com'),
+            subtree: true,
+            filter: Filters::present('sn'),
+            sortKeys: [new SortKey('sn')],
+        ))->entries);
+
+        self::assertSame(
+            ['cn=spaced, dc=example,dc=com', 'cn=plain,dc=example,dc=com'],
+            array_map(
+                static fn(Entry $entry): string => $entry->getDn()->toString(),
+                $entries,
+            ),
         );
     }
 
