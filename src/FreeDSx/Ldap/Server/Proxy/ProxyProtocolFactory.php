@@ -41,10 +41,13 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
 {
     use ServerConnectionScaffoldingTrait;
 
+    private readonly ServerListenerOptionsInterface $options;
+
     public function __construct(
-        private readonly ServerListenerOptionsInterface $options,
         private readonly ProxyOptions $proxyOptions,
-    ) {}
+    ) {
+        $this->options = $proxyOptions->getServerOptions();
+    }
 
     public function make(
         Socket $socket,

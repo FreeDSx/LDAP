@@ -13,12 +13,15 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
-use FreeDSx\Ldap\Container\ClientContainerProvider;
-use FreeDSx\Ldap\Container\ConnectionGraphContainerProvider;
-use FreeDSx\Ldap\Container\ContainerProviderInterface;
-use FreeDSx\Ldap\Container\CoreServerContainerProvider;
-use FreeDSx\Ldap\Container\HandlerContainerProvider;
-use FreeDSx\Ldap\Container\PasswordPolicyContainerProvider;
+use FreeDSx\Ldap\Container\ContainerReloadFactory;
+use FreeDSx\Ldap\Container\Provider\ClientContainerProvider;
+use FreeDSx\Ldap\Container\Provider\ConnectionGraphContainerProvider;
+use FreeDSx\Ldap\Container\Provider\ContainerProviderInterface;
+use FreeDSx\Ldap\Container\Provider\DirectoryServerContainerProvider;
+use FreeDSx\Ldap\Container\Provider\HandlerContainerProvider;
+use FreeDSx\Ldap\Container\Provider\PasswordPolicyContainerProvider;
+use FreeDSx\Ldap\Container\Provider\ProxyServerContainerProvider;
+use FreeDSx\Ldap\Container\Provider\ServerListenerContainerProvider;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
@@ -88,20 +91,43 @@ class Container
         ServerOptions $options,
         array $sharedInstances = [],
     ): self {
-        return new self([ServerOptions::class => $options] + $sharedInstances);
+        return new self([
+            ServerListenerOptionsInterface::class => $options,
+            ServerOptions::class => $options,
+            ContainerReloadFactory::class => new ContainerReloadFactory(
+                static fn(ServerListenerOptionsInterface $reloaded, array $shared): self => self::forServer(
+                    $reloaded instanceof ServerOptions
+                        ? $reloaded
+                        : throw new RuntimeException('A directory server can only reload into ServerOptions.'),
+                    $shared,
+                ),
+            ),
+        ] + $sharedInstances);
     }
 
     /**
      * @param array<class-string, object> $sharedInstances services carried into this generation (e.g. across a reload).
      */
     public static function forProxy(
-        ServerOptions $options,
-        ProxyOptions $proxyOptions,
+        ProxyOptions $options,
         array $sharedInstances = [],
     ): self {
         return new self([
-            ServerOptions::class => $options,
-            ProxyOptions::class => $proxyOptions,
+            ServerListenerOptionsInterface::class => $options->getServerOptions(),
+            ProxyServerOptions::class => $options->getServerOptions(),
+            ProxyOptions::class => $options,
+            ContainerReloadFactory::class => new ContainerReloadFactory(
+                static fn(ServerListenerOptionsInterface $reloaded, array $shared): self => self::forProxy(
+                    new ProxyOptions(
+                        $reloaded instanceof ProxyServerOptions
+                            ? $reloaded
+                            : throw new RuntimeException('A proxy server can only reload into ProxyServerOptions.'),
+                        $options->getClientOptions(),
+                        $options->getUseStartTls(),
+                    ),
+                    $shared,
+                ),
+            ),
         ] + $sharedInstances);
     }
 
@@ -139,16 +165,7 @@ class Container
     }
 
     /**
-     * @param class-string $className
-     */
-    public function has(string $className): bool
-    {
-        return isset($this->instances[$className])
-            || isset($this->instanceFactory[$className]);
-    }
-
-    /**
-     * The providers whose factories apply to the seeded options (client and/or server).
+     * The providers whose factories apply to the seeded options (client, directory server, or proxy server).
      *
      * @return ContainerProviderInterface[]
      */
@@ -161,10 +178,16 @@ class Container
         }
 
         if (isset($this->instances[ServerOptions::class])) {
-            $providers[] = new CoreServerContainerProvider();
+            $providers[] = new ServerListenerContainerProvider();
+            $providers[] = new DirectoryServerContainerProvider();
             $providers[] = new PasswordPolicyContainerProvider();
             $providers[] = new ConnectionGraphContainerProvider();
             $providers[] = new HandlerContainerProvider();
+        }
+
+        if (isset($this->instances[ProxyOptions::class])) {
+            $providers[] = new ServerListenerContainerProvider();
+            $providers[] = new ProxyServerContainerProvider();
         }
 
         return $providers;

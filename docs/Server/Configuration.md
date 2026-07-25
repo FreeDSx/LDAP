@@ -2,16 +2,28 @@ LDAP Server Configuration
 ================
 
 * [General Options](#general-options)
-    * [ServerOptions:setIp](#setip)
-    * [ServerOptions:setPort](#setport)
-    * [ServerOptions:setUnixSocket](#setunixsocket)
-    * [ServerOptions:setTransport](#settransport)
     * [ServerOptions:setLogger](#setlogger)
     * [ServerOptions:setEventLogPolicy](#seteventlogpolicy)
-    * [ServerOptions:setIdleTimeout](#setidletimeout)
     * [ServerOptions:setRequireAuthentication](#setrequireauthentication)
     * [ServerOptions:setAllowAnonymous](#setallowanonymous)
-    * [ServerOptions:setSocketAcceptTimeout](#setsocketaccepttimeout)
+* [Network Configuration](#network-configuration)
+    * [NetworkConfig:setIp](#setip)
+    * [NetworkConfig:setPort](#setport)
+    * [NetworkConfig:setUnixSocket](#setunixsocket)
+    * [NetworkConfig:setTransport](#settransport)
+    * [NetworkConfig:setIdleTimeout](#setidletimeout)
+    * [NetworkConfig:setWriteTimeout](#setwritetimeout)
+    * [NetworkConfig:setSocketAcceptTimeout](#setsocketaccepttimeout)
+    * [TLS](#tls)
+        * [NetworkConfig:setUseSsl](#setusessl)
+        * [NetworkConfig:setSslCert](#setsslcert)
+        * [NetworkConfig:setSslCertKey](#setsslcertkey)
+        * [NetworkConfig:setSslCertPassphrase](#setsslcertpassphrase)
+        * [NetworkConfig:setMinTlsVersion](#setmintlsversion)
+        * [NetworkConfig:setSslCiphers](#setsslciphers)
+        * [NetworkConfig:setSslValidateCert](#setsslvalidatecert)
+        * [NetworkConfig:setSslAllowSelfSigned](#setsslallowselfsigned)
+        * [NetworkConfig:setSslCaCert](#setsslcacert)
 * [Access Control](#access-control)
     * [ServerOptions:setAclRules](#setaclrules)
     * [ServerOptions:setAccessControl](#setaccesscontrol)
@@ -26,15 +38,6 @@ LDAP Server Configuration
     * [ServerOptions:setDseAltServer](#setdsealtserver)
     * [ServerOptions:setDseVendorName](#setdsevendorname)
     * [ServerOptions:setDseVendorVersion](#setdsevendorversion)
-* [SSL and TLS Options](#ssl-and-tls-options)
-    * [ServerOptions:setSslCert](#setsslcert)
-    * [ServerOptions:setSslCertKey](#setsslcertkey)
-    * [ServerOptions:setSslCertPassphrase](#setsslcertpassphrase)
-    * [ServerOptions:setMinTlsVersion](#setmintlsversion)
-    * [ServerOptions:setSslCiphers](#setsslciphers)
-    * [ServerOptions:setSslValidateCert](#setsslvalidatecert)
-    * [ServerOptions:setSslAllowSelfSigned](#setsslallowselfsigned)
-    * [ServerOptions:setSslCaCert](#setsslcacert)
 * [Search Limits](#search-limits)
     * [ServerOptions:setMaxSearchSize](#setmaxsearchsize)
     * [ServerOptions:setMaxSearchTimeLimit](#setmaxsearchtimelimit)
@@ -62,10 +65,10 @@ on construction:
 ```php
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 
-$options = (new ServerOptions)
-  ->setDseAltServer('dc2.local')
-  ->setPort(33389);
+$options = (new ServerOptions(network: NetworkConfig::withPort(33389)))
+  ->setDseAltServer('dc2.local');
 
 $ldap = new LdapServer($options);
 ```
@@ -73,42 +76,6 @@ $ldap = new LdapServer($options);
 The following documents these various configuration options and how they impact the server.
 
 ## General Options
-
-------------------
-#### setIp
-
-The IP address to bind and listen to while the server is running. By default it will bind to `0.0.0.0`, which will listen
-on all IP addresses of the machine.
-
-**Default**: `0.0.0.0`
-
-------------------
-#### setPort
-
-The port to bind to and accept client connections on. By default this is port 389. Since this port is underneath the
-first 1024 ports, it will require administrative access when running the server. You can change this to something higher
-than 1024 instead if needed.
-
-**Default**: `389`
-
-------------------
-#### setUnixSocket
-
-When using `unix` as the transport type, this is the full path to the socket file the client must interact with.
-
-**Default**: `/var/run/ldap.socket`
-
-------------------
-#### setTransport
-
-The transport mechanism for the server to use. Use either:
-
-* `tcp`
-* `unix`
-
-If using `unix` for the transport you can change set the `unix_socket` to a file path representing the unix socket the clients must connect to.
-
-**Default**: `tcp`
 
 ------------------
 #### setLogger
@@ -150,6 +117,83 @@ the policy API.
 **Default**: `EventLogPolicy::default()`
 
 ------------------
+#### setRequireAuthentication
+
+Whether authentication (bind) should be required before an operation is allowed.
+
+**Note**: Certain LDAP operations implicitly do not require authentication: StartTLS, RootDSE requests, WhoAmI
+
+**Default**: `true`
+
+------------------
+#### setAllowAnonymous
+
+Whether anonymous binds should be allowed.
+
+**Default**: `false`
+
+## Network Configuration
+
+The listen socket, timeouts, and TLS settings live on `FreeDSx\Ldap\Server\Config\NetworkConfig`, not on
+`ServerOptions`. Reach it either by passing a `NetworkConfig` as the second constructor argument (the storage config is
+first), or through `getNetworkConfig()` on an existing options instance. `ProxyServerOptions` exposes the same
+`getNetworkConfig()` accessor and `new ProxyServerOptions(NetworkConfig)` constructor.
+
+```php
+use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
+
+// On construction, as the second argument.
+$options = new ServerOptions(
+    network: (new NetworkConfig())
+        ->setPort(636)
+        ->setUseSsl(true),
+);
+
+// Or on an existing options instance.
+$options->getNetworkConfig()->setPort(636);
+```
+
+`NetworkConfig::withPort(int $port): self` is a shortcut for the common port-only case:
+`new ServerOptions(network: NetworkConfig::withPort(10389))`.
+
+------------------
+#### setIp
+
+The IP address to bind and listen to while the server is running. By default it will bind to `0.0.0.0`, which will listen
+on all IP addresses of the machine.
+
+**Default**: `0.0.0.0`
+
+------------------
+#### setPort
+
+The port to bind to and accept client connections on. By default this is port 389. Since this port is underneath the
+first 1024 ports, it will require administrative access when running the server. You can change this to something higher
+than 1024 instead if needed.
+
+**Default**: `389`
+
+------------------
+#### setUnixSocket
+
+When using `unix` as the transport type, this is the full path to the socket file the client must interact with.
+
+**Default**: `/var/run/ldap.socket`
+
+------------------
+#### setTransport
+
+The transport mechanism for the server to use. Use either:
+
+* `tcp`
+* `unix`
+
+If using `unix` for the transport you can change set the `unix_socket` to a file path representing the unix socket the clients must connect to.
+
+**Default**: `tcp`
+
+------------------
 #### setIdleTimeout
 
 Consider an idle client to timeout after this period of time (in seconds) and disconnect their LDAP session. If set to
@@ -166,22 +210,6 @@ Set to `0` to disable.
 **Default**: `600`
 
 ------------------
-#### setRequireAuthentication
-
-Whether authentication (bind) should be required before an operation is allowed.
-
-**Note**: Certain LDAP operations implicitly do not require authentication: StartTLS, RootDSE requests, WhoAmI
-
-**Default**: `true`
-
-------------------
-#### setAllowAnonymous
-
-Whether anonymous binds should be allowed.
-
-**Default**: `false`
-
-------------------
 #### setSocketAcceptTimeout
 
 The number of seconds (fractional) to wait for a new client connection before re-checking server state. Lower values
@@ -190,6 +218,102 @@ in the accept loop.
 
 **Default**: `0.5`
 
+### TLS
+
+The StartTLS and LDAPS settings below are also part of `NetworkConfig`. Configure them on the network config passed to
+the `ServerOptions` constructor, or via `getNetworkConfig()`.
+
+```php
+use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
+
+$options = new ServerOptions(
+    network: (new NetworkConfig())
+        ->setUseSsl(true)
+        ->setSslCert('/path/to/cert.pem')
+        ->setSslCertKey('/path/to/key.pem'),
+);
+```
+
+------------------
+#### setUseSsl
+
+If set to true, and the transport is `tcp`, the server will use an SSL stream to bind to the IP address. This forces clients
+to use an encrypted stream only for communication to the server.
+
+**Note**: LDAP over SSL, commonly referred to as LDAPS, is not an official LDAP standard. Support is dependent on the client / server specific implementations.
+
+**Default**: `false`
+
+------------------
+#### setSslCert
+
+The server certificate to use for clients issuing StartTLS commands to encrypt their TCP session.
+
+**Note**: If no certificate is provided clients will be unable to issue a StartTLS operation.
+
+**Default**: `(null)`
+
+------------------
+#### setSslCertKey
+
+The server certificate private key. This can also be bundled with the certificate in the `NetworkConfig::setSslCert` option.
+
+**Default**: `(null)`
+
+------------------
+#### setSslCertPassphrase
+
+The passphrase needed for the server certificate's private key.
+
+**Default**: `(null)`
+
+------------------
+#### setMinTlsVersion
+
+The minimum TLS protocol version the server will negotiate for StartTLS and LDAPS sessions. Provide a
+`FreeDSx\Ldap\Server\TlsVersion` case (`Tls1_0`, `Tls1_1`, `Tls1_2`, `Tls1_3`); the server accepts that version and any
+higher one. The default rejects the deprecated TLS 1.0 and 1.1 (RFC 8996); lower it explicitly only for legacy clients.
+
+```php
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\TlsVersion;
+
+$network = (new NetworkConfig())
+    ->setMinTlsVersion(TlsVersion::Tls1_3);
+```
+
+**Default**: `TlsVersion::Tls1_2`
+
+------------------
+#### setSslCiphers
+
+The OpenSSL cipher list (in OpenSSL cipher-string format) offered during the TLS handshake.
+
+**Default**: `DEFAULT`
+
+------------------
+#### setSslValidateCert
+
+Whether the server requires and verifies a client certificate (mutual TLS). When enabled, provide the trust anchors via
+`setSslCaCert` so client certificates can be validated.
+
+**Default**: `false`
+
+------------------
+#### setSslAllowSelfSigned
+
+Whether a self-signed client certificate is accepted when `setSslValidateCert` is enabled. `null` leaves the underlying
+default (not allowed).
+
+**Default**: `(null)`
+
+------------------
+#### setSslCaCert
+
+Path to a CA certificate bundle used to verify client certificates when `setSslValidateCert` is enabled.
+
+**Default**: `(null)`
 
 ## Access Control
 
@@ -431,88 +555,6 @@ The vendorName attribute for the RootDSE.
 #### setDseVendorVersion
 
 The vendorVersion attribute for the RootDSE.
-
-**Default**: `(null)`
-
-## SSL and TLS Options
-
-------------------
-#### setSslCert
-
-The server certificate to use for clients issuing StartTLS commands to encrypt their TCP session.
-
-**Note**: If no certificate is provided clients will be unable to issue a StartTLS operation.
-
-**Default**: `(null)`
-
-------------------
-#### setSslCertKey
-
-The server certificate private key. This can also be bundled with the certificate in the `ServerOptions::setSslCert` option.
-
-**Default**: `(null)`
-
-------------------
-#### setSslCertPassphrase
-
-The passphrase needed for the server certificate's private key.
-
-**Default**: `(null)`
-
-------------------
-#### setUseSsl
-
-If set to true, and the transport is `tcp`, the server will use an SSL stream to bind to the IP address. This forces clients
-to use an encrypted stream only for communication to the server.
-
-**Note**: LDAP over SSL, commonly referred to as LDAPS, is not an official LDAP standard. Support is dependent on the client / server specific implementations.
-
-**Default**: `false`
-
-------------------
-#### setMinTlsVersion
-
-The minimum TLS protocol version the server will negotiate for StartTLS and LDAPS sessions. Provide a
-`FreeDSx\Ldap\Server\TlsVersion` case (`Tls1_0`, `Tls1_1`, `Tls1_2`, `Tls1_3`); the server accepts that version and any
-higher one. The default rejects the deprecated TLS 1.0 and 1.1 (RFC 8996); lower it explicitly only for legacy clients.
-
-```php
-use FreeDSx\Ldap\ServerOptions;
-use FreeDSx\Ldap\Server\TlsVersion;
-
-$options = (new ServerOptions())
-    ->setMinTlsVersion(TlsVersion::Tls1_3);
-```
-
-**Default**: `TlsVersion::Tls1_2`
-
-------------------
-#### setSslCiphers
-
-The OpenSSL cipher list (in OpenSSL cipher-string format) offered during the TLS handshake.
-
-**Default**: `DEFAULT`
-
-------------------
-#### setSslValidateCert
-
-Whether the server requires and verifies a client certificate (mutual TLS). When enabled, provide the trust anchors via
-`setSslCaCert` so client certificates can be validated.
-
-**Default**: `false`
-
-------------------
-#### setSslAllowSelfSigned
-
-Whether a self-signed client certificate is accepted when `setSslValidateCert` is enabled. `null` leaves the underlying
-default (not allowed).
-
-**Default**: `(null)`
-
-------------------
-#### setSslCaCert
-
-Path to a CA certificate bundle used to verify client certificates when `setSslValidateCert` is enabled.
 
 **Default**: `(null)`
 

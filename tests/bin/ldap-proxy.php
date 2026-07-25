@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 use FreeDSx\Ldap\ClientOptions;
-use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\LdapProxyServer;
 use FreeDSx\Ldap\ProxyOptions;
+use FreeDSx\Ldap\ProxyServerOptions;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
-use FreeDSx\Ldap\ServerOptions;
 use Symfony\Component\Process\Process;
 
 require __DIR__ . '/../../vendor/autoload.php';
@@ -34,21 +34,19 @@ while ($upstream->isRunning()) {
 
 register_shutdown_function(static fn() => $upstream->stop());
 
-$server = LdapServer::makeProxy(
-    new ProxyOptions(
-        (new ClientOptions())
-            ->setServers(['127.0.0.1'])
-            ->setPort(10390)
-            ->setUseSsl(true)
-            ->setSslValidateCert(false)
-            ->setSslAllowSelfSigned(true),
-    ),
-    (new ServerOptions(network: (new NetworkConfig())
+$server = new LdapProxyServer(new ProxyOptions(
+    serverOptions: (new ProxyServerOptions((new NetworkConfig())
         ->setPort(10389)
         ->setSslCert(__DIR__ . '/../resources/cert/slapd.crt')
         ->setSslCertKey(__DIR__ . '/../resources/cert/slapd.key')
         ->setSocketAcceptTimeout(0.1)))
         ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL)),
-);
+    clientOptions: (new ClientOptions())
+        ->setServers(['127.0.0.1'])
+        ->setPort(10390)
+        ->setUseSsl(true)
+        ->setSslValidateCert(false)
+        ->setSslAllowSelfSigned(true),
+));
 
 $server->run();

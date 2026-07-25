@@ -249,41 +249,42 @@ reload is discarded rather than taking the server down.
 
 ## Creating a Proxy Server
 
-The server can act as a transparent proxy to an upstream LDAP server via `LdapServer::makeProxy()`.
+The server can act as a transparent proxy to an upstream LDAP server via a dedicated `LdapProxyServer`.
 
 **Note**: Each client connection gets its own upstream connection. Requests (with their controls) are relayed upstream and
 the responses (with their controls) relayed back. So the upstream is the authority. Works on all server runners.
 
 ```php
 use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\LdapProxyServer;
 use FreeDSx\Ldap\ProxyOptions;
-use FreeDSx\Ldap\ServerOptions;
-use FreeDSx\Ldap\LdapServer;
-
-// The upstream connection: servers + TLS live on the ClientOptions.
-$proxyOptions = new ProxyOptions(
-    (new ClientOptions())
-        ->setServers(['ldap.example.com'])
-        // Upstream TLS: LDAPS here, or $proxyOptions->setUseStartTls(true) for StartTLS.
-        ->setUseSsl(true),
-);
+use FreeDSx\Ldap\ProxyServerOptions;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 
 // The proxy's own listener: port/transport + downstream TLS cert.
-$serverOptions = (new ServerOptions())
-    ->setPort(3389)
-    ->setSslCert('/path/to/cert.pem')
-    ->setSslCertKey('/path/to/key.pem');
-
-$server = LdapServer::makeProxy(
-    $proxyOptions,
-    $serverOptions,
+$serverOptions = new ProxyServerOptions(
+    (new NetworkConfig())
+        ->setPort(3389)
+        ->setSslCert('/path/to/cert.pem')
+        ->setSslCertKey('/path/to/key.pem'),
 );
+
+// The upstream connection: servers + TLS live on the ClientOptions.
+$clientOptions = (new ClientOptions())
+    ->setServers(['ldap.example.com'])
+    // Upstream TLS: LDAPS here, or useStartTls: true for StartTLS.
+    ->setUseSsl(true);
+
+$server = new LdapProxyServer(new ProxyOptions(
+    serverOptions: $serverOptions,
+    clientOptions: $clientOptions,
+));
 $server->run();
 ```
 
 TLS terminates at each hop: configure the **upstream** hop on the `ClientOptions` (LDAPS via `setUseSsl`,
-or `ProxyOptions::setUseStartTls(true)`), and the **downstream** hop on the `ServerOptions` (LDAPS, or a
-client StartTLS upgrade using the configured server cert).
+or `ProxyOptions` `useStartTls: true`), and the **downstream** hop on the `ProxyServerOptions` network config
+(LDAPS, or a client StartTLS upgrade using the configured server cert).
 
 **Note**: only simple and anonymous binds are proxied (SASL is not), and every request is forwarded to the
 single configured upstream.
@@ -720,7 +721,7 @@ as `vendorName` come from `ServerOptions`. The entry always advertises:
 - `supportedExtension`: WhoAmI (RFC 4532), Password Modify (RFC 3062), and StartTLS (RFC 4511) if an SSL certificate is configured
 - `supportedLDAPVersion`: `3`
 
-A `makeProxy()` server forwards RootDSE requests to the upstream automatically.
+A proxy server forwards RootDSE requests to the upstream automatically.
 
 ## SASL Authentication
 
@@ -814,7 +815,8 @@ Adding the generated certs and keys on construction:
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
 
-$options = (new ServerOptions)
+$options = new ServerOptions();
+$options->getNetworkConfig()
     # The key can also be bundled in this cert
     ->setSslCert('/path/to/cert.pem')
     # The key for the cert. Not needed if bundled above.

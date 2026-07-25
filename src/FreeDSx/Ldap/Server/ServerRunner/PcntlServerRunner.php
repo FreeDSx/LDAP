@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Server\ServerRunner;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Metrics\File\SnapshotPublisher;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
@@ -92,7 +92,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
         private readonly ?SnapshotPublisher $snapshotPublisher = null,
         private readonly ?OperationRollupCoordinator $operationRollup = null,
-        private readonly ?WritableStorageBackend $backend = null,
+        private readonly ?ResettableInterface $resettable = null,
         BackgroundTasksInterface $backgroundTasks = new PcntlBackgroundTasks(
             periodicTasks: [],
             longLivedTasks: [],
@@ -489,7 +489,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         $context = ['pid' => $pid];
         $this->isMainProcess = false;
 
-        $this->backend?->reset();
+        $this->resettable?->reset();
 
         $serverProtocolHandler = $this->serverProtocolFactory->make(
             $socket,
@@ -524,7 +524,7 @@ class PcntlServerRunner implements ServerRunnerInterface
 
     /**
      * Prepare a freshly forked background-task child: drop the inherited server socket, channels and signal
-     * handlers, then reset the backend for a fresh connection.
+     * handlers, then reset inherited per-connection state.
      */
     private function enterChild(): void
     {
@@ -544,7 +544,7 @@ class PcntlServerRunner implements ServerRunnerInterface
             SIG_IGN,
         );
 
-        $this->backend?->reset();
+        $this->resettable?->reset();
     }
 
     /**

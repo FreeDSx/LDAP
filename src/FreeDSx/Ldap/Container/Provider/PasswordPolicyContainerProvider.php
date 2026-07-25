@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Container;
+namespace FreeDSx\Ldap\Container\Provider;
 
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;

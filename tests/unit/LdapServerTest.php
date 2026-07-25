@@ -26,7 +26,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\ReplicaConfig;
-use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -100,20 +99,6 @@ class LdapServerTest extends TestCase
         $this->expectNotToPerformAssertions();
     }
 
-    public function test_it_should_make_a_proxy_server(): void
-    {
-        $serverOptions = new ServerOptions();
-        $server = LdapServer::makeProxy(
-            new ProxyOptions(new ClientOptions(['localhost'])),
-            $serverOptions,
-        );
-
-        self::assertSame(
-            $serverOptions,
-            $server->getOptions(),
-        );
-    }
-
     public function test_it_should_seed_entries_into_the_configured_storage(): void
     {
         $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
@@ -161,16 +146,6 @@ class LdapServerTest extends TestCase
         );
     }
 
-    public function test_it_should_throw_when_seeding_on_a_proxy_server(): void
-    {
-        $proxy = LdapServer::makeProxy(new ProxyOptions(new ClientOptions(['localhost'])));
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('not available on a proxy server');
-
-        $proxy->seed(new StringLdifLoader(self::SEED_LDIF));
-    }
-
     public function test_it_should_reject_seeding_when_the_ldif_contains_change_records(): void
     {
         $this->expectException(RuntimeException::class);
@@ -202,26 +177,6 @@ class LdapServerTest extends TestCase
         ));
 
         self::assertNull($this->storage()->find(new Dn('cn=foo,dc=example,dc=com')));
-    }
-
-    public function test_it_should_throw_when_applying_changes_on_a_proxy_server(): void
-    {
-        $proxy = LdapServer::makeProxy(new ProxyOptions(new ClientOptions(['localhost'])));
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('not available on a proxy server');
-
-        $proxy->applyChanges(new StringLdifLoader("dn: cn=x,dc=x\nchangetype: delete\n"));
-    }
-
-    public function test_it_should_throw_when_dumping_on_a_proxy_server(): void
-    {
-        $proxy = LdapServer::makeProxy(new ProxyOptions(new ClientOptions(['localhost'])));
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('not available on a proxy server');
-
-        $proxy->dump(new StringLdifOutput());
     }
 
     public function test_it_should_dump_seeded_entries_to_the_given_output(): void
