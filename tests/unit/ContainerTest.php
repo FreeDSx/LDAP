@@ -282,6 +282,10 @@ class ContainerTest extends TestCase
 
     public function test_the_snapshot_provider_is_the_live_recorder_under_swoole(): void
     {
+        if (!extension_loaded('swoole')) {
+            self::markTestSkipped('The swoole extension is required to construct the shared metrics table.');
+        }
+
         $container = $this->containerFor(
             (new ServerOptions())
                 ->setMonitorEnabled(true)
