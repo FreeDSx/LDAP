@@ -30,6 +30,7 @@ class SocketServerFactory
         private readonly NetworkConfig $network,
         private readonly RunnerMode $runner,
         private readonly ?LoggerInterface $logger,
+        private readonly bool $reusePort = false,
     ) {}
 
     public function makeAndBind(): SocketServer
@@ -60,7 +61,8 @@ class SocketServerFactory
             ->setSslCiphers($this->network->getSslCiphers())
             ->setSslValidateCert($this->network->isSslValidateCert())
             ->setSslAllowSelfSigned($this->network->getSslAllowSelfSigned())
-            ->setSslCaCert($this->network->getSslCaCert());
+            ->setSslCaCert($this->network->getSslCaCert())
+            ->setReusePort($this->reusePort);
 
         return SocketServer::bind(
             $resource,
