@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\RunnerConfig;
 
 /**
  * The forwarding proxy's own server config (its listener, TLS, auth-gating, logging, runner), separate from the upstream
@@ -25,9 +26,12 @@ final class ProxyServerOptions implements ServerListenerOptionsInterface
 {
     use ServerListenerOptionsTrait;
 
-    public function __construct(?NetworkConfig $network = null)
-    {
+    public function __construct(
+        ?NetworkConfig $network = null,
+        ?RunnerConfig $runner = null,
+    ) {
         $this->network = $network ?? new NetworkConfig();
+        $this->runner = $runner ?? new RunnerConfig();
     }
 
     /**

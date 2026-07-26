@@ -30,13 +30,15 @@ services:
     image: freedsx-profile:latest
     container_name: freedsx-profile-server
     cpus: ${PROFILE_CPUS:-4}
+    cpuset: ${SERVER_CPUSET:-}
     ports:
       - "10389:10389"
     volumes:
       - ../..:/app:rw
     working_dir: /app
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     environment:
       MYSQL_DSN: "mysql:host=mysql;port=3306;dbname=freedsx"
       MYSQL_USER: "root"
@@ -46,8 +48,9 @@ services:
       - -lc
       - >
         test -f vendor/autoload.php || composer install --no-interaction --no-progress;
-        exec php -d opcache.enable_cli=1 -d opcache.jit_buffer_size=100M -d opcache.jit=function tests/bin/ldap-backend-storage.php
+        exec php -d opcache.enable_cli=1 -d opcache.jit_buffer_size=100M -d opcache.jit=${FREEDSX_JIT:-function} tests/bin/ldap-backend-storage.php
         --transport=tcp --storage=${FREEDSX_STORAGE:-sqlite} --runner=${FREEDSX_RUNNER:-pcntl}
+        --swoole-workers=${SWOOLE_WORKERS:-1}
         --port=10389 --seed-entries=${SEED_ENTRIES:-25000}
     # Ready only once seeding finishes and the server listens, so `up --wait` blocks until then.
     healthcheck:
@@ -66,6 +69,12 @@ services:
     command:
       - --innodb-buffer-pool-size=512M
       - --max_connections=200
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -uroot -proot --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
     tmpfs:
       - /var/lib/mysql
 

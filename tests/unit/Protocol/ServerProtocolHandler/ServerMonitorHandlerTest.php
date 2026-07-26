@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\OperationType;
@@ -305,7 +306,7 @@ final class ServerMonitorHandlerTest extends TestCase
         $this->metrics->operationStarted(OperationType::Search);
 
         $subject = new ServerMonitorHandler(
-            options: (new ServerOptions())->setRunner(RunnerMode::Swoole),
+            options: (new ServerOptions())->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
             snapshots: $this->metrics,
         );
 

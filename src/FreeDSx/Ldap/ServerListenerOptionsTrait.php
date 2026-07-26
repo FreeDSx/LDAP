@@ -15,10 +15,11 @@ namespace FreeDSx\Ldap;
 
 use Closure;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\RunnerConfig;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
-use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -37,7 +38,7 @@ trait ServerListenerOptionsTrait
 
     private ?EventLogPolicy $eventLogPolicy = null;
 
-    private RunnerMode $runner = RunnerMode::Pcntl;
+    private RunnerConfig $runner;
 
     private bool $monitorEnabled = false;
 
@@ -110,16 +111,21 @@ trait ServerListenerOptionsTrait
         return $this;
     }
 
-    public function setRunner(RunnerMode $runner): self
+    public function setRunnerConfig(RunnerConfig $runner): self
     {
         $this->runner = $runner;
 
         return $this;
     }
 
-    public function getRunner(): RunnerMode
+    public function getRunnerConfig(): RunnerConfig
     {
         return $this->runner;
+    }
+
+    public function isRunnerMode(RunnerMode $mode): bool
+    {
+        return $this->runner->getMode() === $mode;
     }
 
     public function isMonitorEnabled(): bool

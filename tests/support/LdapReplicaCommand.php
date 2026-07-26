@@ -11,6 +11,7 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\ReplicaConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use FreeDSx\Ldap\ServerOptions;
@@ -88,7 +89,7 @@ final class LdapReplicaCommand extends Command
                 $this->createReplicaStorageConfig(),
             )
                 ->setNetworkConfig($network)
-                ->setRunner($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl)
+                ->setRunnerConfig(new RunnerConfig($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl))
                 ->setPasswordPolicy(new PasswordPolicy(
                     lockout: new PasswordLockoutRules(
                         enabled: true,

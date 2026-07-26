@@ -25,4 +25,15 @@ enum StorageType
     case Json;
 
     case InMemory;
+
+    /**
+     * Whether entries live outside the process, so several of them can serve the same directory.
+     */
+    public function isMultiProcessSafe(): bool
+    {
+        return match ($this) {
+            self::Pdo, self::Json => true,
+            self::InMemory => false,
+        };
+    }
 }

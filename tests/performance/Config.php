@@ -106,6 +106,7 @@ final class Config
         public readonly int $seedAttributes = 0,
         public readonly int $maxSearchLookthrough = self::DEFAULT_MAX_SEARCH_LOOKTHROUGH,
         public readonly bool $journal = false,
+        public readonly int $swooleWorkers = 0,
     ) {
         $this->assertEnum('backend', $backend, self::BACKENDS);
         $this->assertEnum('runner', $runner, self::RUNNERS);
@@ -119,6 +120,7 @@ final class Config
         $this->assertNonNegative('search-sort-size-limit', $searchSortSizeLimit);
         $this->assertNonNegative('seed-attributes', $seedAttributes);
         $this->assertNonNegative('max-search-lookthrough', $maxSearchLookthrough);
+        $this->assertNonNegative('swoole-workers', $swooleWorkers);
 
         if ($duration !== null) {
             $this->assertPositive('duration', $duration);

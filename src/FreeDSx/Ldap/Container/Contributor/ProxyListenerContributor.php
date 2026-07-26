@@ -27,6 +27,14 @@ final class ProxyListenerContributor implements ListenerContributorInterface
         return null;
     }
 
+    /**
+     * Every connection gets its own upstream client, so nothing is shared between workers.
+     */
+    public function supportsMultipleWorkers(): bool
+    {
+        return true;
+    }
+
     public function reloadInstances(): array
     {
         return [];

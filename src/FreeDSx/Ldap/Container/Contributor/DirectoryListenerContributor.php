@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Container\Contributor;
 
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageType;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 
 /**
@@ -21,19 +22,25 @@ use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class DirectoryListenerContributor implements ListenerContributorInterface
+final readonly class DirectoryListenerContributor implements ListenerContributorInterface
 {
     /**
      * @param array<class-string, object> $reloadInstances
      */
     public function __construct(
-        private readonly WritableStorageBackend $backend,
-        private readonly array $reloadInstances,
+        private WritableStorageBackend $backend,
+        private array $reloadInstances,
+        private StorageType $storageType,
     ) {}
 
     public function forkResettable(): ResettableInterface
     {
         return $this->backend;
+    }
+
+    public function supportsMultipleWorkers(): bool
+    {
+        return $this->storageType->isMultiProcessSafe();
     }
 
     public function reloadInstances(): array

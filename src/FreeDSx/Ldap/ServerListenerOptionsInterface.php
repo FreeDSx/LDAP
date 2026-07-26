@@ -15,9 +15,10 @@ namespace FreeDSx\Ldap;
 
 use Closure;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\RunnerConfig;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
-use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -43,7 +44,9 @@ interface ServerListenerOptionsInterface
 
     public function getEventLogPolicy(): EventLogPolicy;
 
-    public function getRunner(): RunnerMode;
+    public function getRunnerConfig(): RunnerConfig;
+
+    public function isRunnerMode(RunnerMode $mode): bool;
 
     public function isMonitorEnabled(): bool;
 

@@ -56,6 +56,7 @@ final class ServerManager
         $command[] = '--transport=tcp';
         $command[] = '--storage=' . $this->config->backend;
         $command[] = '--runner=' . $this->config->runner;
+        $command[] = '--swoole-workers=' . $this->config->swooleWorkers;
         $command[] = '--port=' . $this->config->port;
         $command[] = '--seed-entries=' . $this->config->seedEntries;
         $command[] = '--seed-attributes=' . $this->config->seedAttributes;

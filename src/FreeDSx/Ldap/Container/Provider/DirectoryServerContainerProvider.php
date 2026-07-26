@@ -106,7 +106,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     {
         $options = $container->get(ServerOptions::class);
         $config = $options->getStorageConfig();
-        $swoole = $options->getRunner() === RunnerMode::Swoole;
+        $swoole = $options->isRunnerMode(RunnerMode::Swoole);
 
         return match (true) {
             $config instanceof PdoConfig => $container->get(PdoBackendBuilder::class)->storage(),
@@ -141,7 +141,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
         return new PdoBackendBuilder(
             $config,
-            $options->getRunner(),
+            $options->getRunnerConfig()->getMode(),
             $container->get(SleeperInterface::class),
         );
     }
@@ -213,14 +213,14 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
      */
     private function makeSleeper(Container $container): SleeperInterface
     {
-        return $container->get(ServerOptions::class)->getRunner() === RunnerMode::Swoole
+        return $container->get(ServerOptions::class)->isRunnerMode(RunnerMode::Swoole)
             ? new CoroutineSleeper()
             : new BlockingSleeper();
     }
 
     private function makeBackgroundTasks(Container $container): BackgroundTasksInterface
     {
-        return $container->get(ServerOptions::class)->getRunner() === RunnerMode::Swoole
+        return $container->get(ServerOptions::class)->isRunnerMode(RunnerMode::Swoole)
             ? $this->makeSwooleBackgroundTasks($container)
             : $this->makePcntlBackgroundTasks($container);
     }
@@ -242,6 +242,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return new DirectoryListenerContributor(
             $backend,
             $instances,
+            $container->get(ServerOptions::class)->getStorageConfig()->type(),
         );
     }
 
@@ -267,7 +268,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return RetentionSweeper::isSweepable(
             $policy,
             $journal,
-            $options->getRunner() === RunnerMode::Swoole,
+            $options->isRunnerMode(RunnerMode::Swoole),
         )
             ? $policy
             : null;

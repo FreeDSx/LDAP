@@ -29,6 +29,11 @@ interface ListenerContributorInterface
     public function forkResettable(): ?ResettableInterface;
 
     /**
+     * Whether this server keeps no state in the process, so several workers can serve it at once.
+     */
+    public function supportsMultipleWorkers(): bool;
+
+    /**
      * Live services to seed into the reloaded container so their state survives the reload.
      *
      * @return array<class-string, object>

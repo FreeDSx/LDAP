@@ -45,7 +45,7 @@ final class ProxyServerContainerProvider implements ContainerProviderInterface
     {
         $options = $container->get(ProxyServerOptions::class);
 
-        if ($options->getRunner() === RunnerMode::Swoole) {
+        if ($options->isRunnerMode(RunnerMode::Swoole)) {
             return new SwooleBackgroundTasks(
                 [],
                 [],

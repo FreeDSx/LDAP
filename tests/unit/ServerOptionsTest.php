@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
+use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\DefaultPasswordQualityChecker;
 use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\PasswordQualityCheckerInterface;
@@ -414,22 +415,27 @@ final class ServerOptionsTest extends TestCase
         );
     }
 
-    public function test_the_runner_defaults_to_pcntl(): void
+    public function test_the_runner_defaults_to_pcntl_on_a_single_worker(): void
     {
         self::assertSame(
             RunnerMode::Pcntl,
-            $this->subject->getRunner(),
+            $this->subject->getRunnerConfig()->getMode(),
+        );
+        self::assertSame(
+            1,
+            $this->subject->getRunnerConfig()->getWorkers(),
         );
     }
 
     public function test_it_can_set_the_runner(): void
     {
-        $this->subject->setRunner(RunnerMode::Swoole);
+        $this->subject->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole));
 
         self::assertSame(
             RunnerMode::Swoole,
-            $this->subject->getRunner(),
+            $this->subject->getRunnerConfig()->getMode(),
         );
+        self::assertTrue($this->subject->isRunnerMode(RunnerMode::Swoole));
     }
 
     public function test_on_server_ready_is_null_by_default(): void
