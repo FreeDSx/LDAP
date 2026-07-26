@@ -26,9 +26,7 @@ use FreeDSx\Ldap\Server\Metrics\Snapshot\OperationMetrics;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\TrafficMetrics;
 use Swoole\Table;
 
-use function is_array;
 use function is_int;
-use function is_string;
 use function max;
 use function str_starts_with;
 use function strlen;
@@ -94,15 +92,18 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
     private const SEARCH_SCOPE = 'scope.';
 
     /**
-     * @param Table $table Must be created before the pool forks, so every worker shares the one mapping.
+     * @param Table<array{v: int}> $table Must be created before the pool forks, so every worker shares the one mapping.
      */
     public function __construct(private readonly Table $table) {}
 
     /**
      * Builds the shared table; call before starting a worker pool.
+     *
+     * @return Table<array{v: int}>
      */
     public static function createTable(int $rows = 4096): Table
     {
+        /** @var Table<array{v: int}> $table */
         $table = new Table($rows);
         $table->column(
             self::COLUMN,
@@ -230,11 +231,7 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
         $inProgress = [];
 
         foreach ($this->table as $key => $row) {
-            if (!is_string($key)) {
-                continue;
-            }
-
-            $value = $this->rowValue($row);
+            $value = $row[self::COLUMN];
 
             match (true) {
                 str_starts_with($key, self::OPERATION_COUNT)
@@ -348,21 +345,5 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
         string $prefix,
     ): string {
         return substr($key, strlen($prefix));
-    }
-
-    /**
-     * Reads a counter out of an iterated row, which the table hands back untyped.
-     */
-    private function rowValue(mixed $row): int
-    {
-        if (!is_array($row)) {
-            return 0;
-        }
-
-        $value = $row[self::COLUMN] ?? null;
-
-        return is_int($value)
-            ? $value
-            : 0;
     }
 }
