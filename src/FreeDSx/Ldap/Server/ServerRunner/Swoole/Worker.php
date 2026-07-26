@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Server\ServerRunner\ReloadsConfigurationTrait;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerLoggerTrait;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
+use FreeDSx\Ldap\ServerOptions;
 use Psr\Log\LoggerInterface;
 use Swoole\Coroutine;
 use Swoole\Process;
@@ -69,6 +70,7 @@ class Worker
     public function run(array $context = []): void
     {
         Runtime::enableCoroutine(SWOOLE_HOOK_ALL);
+        $this->adoptCurrentConfiguration($context);
 
         $acceptor = new ConnectionAcceptor(
             $this->serverProtocolFactory,
@@ -87,6 +89,20 @@ class Worker
         });
 
         $this->logShutdownCompleted($context);
+    }
+
+    /**
+     * Keeps a worker respawned after a crash on the configuration its siblings already reloaded.
+     *
+     * @param array<string, scalar> $context
+     */
+    private function adoptCurrentConfiguration(array $context): void
+    {
+        if (!$this->options instanceof ServerOptions || $this->options->getConfigReloader() === null) {
+            return;
+        }
+
+        $this->reloadConfiguration($context);
     }
 
     private function getRunnerLogger(): ?LoggerInterface

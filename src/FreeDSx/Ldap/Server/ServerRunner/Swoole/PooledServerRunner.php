@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\ServerRunner\Swoole;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\ServerRunner\CoroutineServerRunnerInterface;
+use Swoole\Process;
 use Swoole\Process\Pool;
 
 use function extension_loaded;
@@ -56,6 +57,13 @@ class PooledServerRunner implements CoroutineServerRunnerInterface
         $pool->on(
             'WorkerStart',
             fn(Pool $pool, int $workerId): null => $this->runWorker($workerId),
+        );
+
+        // The pool reloads on SIGUSR1 and leaves SIGHUP unhandled, which would terminate the master and orphan
+        // every worker. Registering here only suppresses that default, since the master never dispatches it.
+        Process::signal(
+            SIGHUP,
+            static fn(): null => null,
         );
 
         $pool->start();
