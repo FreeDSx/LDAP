@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterf
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\MysqlFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use PDO;
+use PDOException;
 
 /**
  * MySQL/MariaDB SQL for PdoStorage; requires MySQL 8.0+ or MariaDB 10.6+.
@@ -29,9 +30,30 @@ final class MysqlDialect implements PdoDialectInterface
     use PdoJournalDialectTrait;
     use PdoSchemaTrait;
 
+    /**
+     * Deadlock found when trying to get lock. The transaction has already been rolled back.
+     */
+    private const ERROR_DEADLOCK = 1213;
+
+    /**
+     * Lock wait timeout exceeded.
+     */
+    private const ERROR_LOCK_WAIT_TIMEOUT = 1205;
+
     public function createFilterTranslator(?SubstringIndexInterface $substringIndex): FilterTranslatorInterface
     {
         return new MysqlFilterTranslator($substringIndex);
+    }
+
+    /**
+     * InnoDB resolves lock conflicts by failing one transaction, which is then safe to reissue unchanged.
+     */
+    public function isRetryableConflict(PDOException $exception): bool
+    {
+        $driverCode = $exception->errorInfo[1] ?? null;
+
+        return $driverCode === self::ERROR_DEADLOCK
+            || $driverCode === self::ERROR_LOCK_WAIT_TIMEOUT;
     }
 
     public function lockRowForWrite(

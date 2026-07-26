@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProv
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use PDO;
 
 /**
@@ -56,6 +57,7 @@ final class PdoStorageFactory
     public static function storageOn(
         PdoConfig $config,
         PdoConnectionProviderInterface $provider,
+        ?SleeperInterface $sleeper = null,
     ): PdoStorage {
         // Storage and its index writer share one statement pool, so both draw from the same connection and cache.
         $statements = new PdoStatementPool($provider);
@@ -70,6 +72,7 @@ final class PdoStorageFactory
                 $statements,
                 $config->getSubstringIndex(),
             ),
+            $sleeper,
         );
     }
 

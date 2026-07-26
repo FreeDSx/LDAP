@@ -274,6 +274,13 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         AddCommand $command,
         WriteContext $context,
     ): void {
+        // Validated up front: the entry is the caller's, and applying operational attributes below mutates it, so a
+        // replayed transaction would otherwise re-validate an entry that now carries them.
+        $this->validateForAdd(
+            $command,
+            $context,
+        );
+
         $this->writeAtomic(function (EntryStorageInterface $storage) use ($command, $context): void {
             $dn = $command->entry->getDn()->normalize();
             $this->assertParentExists(
@@ -286,10 +293,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 $this->throwEntryAlreadyExists($command->entry->getDn());
             }
 
-            $this->validateForAdd(
-                $command,
-                $context,
-            );
             $this->operationalAttrs->applyForAdd(
                 $command->entry,
                 $context,

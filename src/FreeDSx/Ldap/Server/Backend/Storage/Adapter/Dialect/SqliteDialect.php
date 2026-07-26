@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterf
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use PDO;
+use PDOException;
 
 /**
  * SQLite-specific SQL for PdoStorage.
@@ -29,9 +30,30 @@ final class SqliteDialect implements PdoDialectInterface
     use PdoJournalDialectTrait;
     use PdoSchemaTrait;
 
+    /**
+     * The database file is locked by another writer.
+     */
+    private const ERROR_BUSY = 5;
+
+    /**
+     * A table in the database is locked, which the busy handler is never invoked for.
+     */
+    private const ERROR_LOCKED = 6;
+
     public function createFilterTranslator(?SubstringIndexInterface $substringIndex): FilterTranslatorInterface
     {
         return new SqliteFilterTranslator($substringIndex);
+    }
+
+    /**
+     * `busy_timeout` absorbs most contention by waiting, but it still gives up once the timeout is exhausted.
+     */
+    public function isRetryableConflict(PDOException $exception): bool
+    {
+        $driverCode = $exception->errorInfo[1] ?? null;
+
+        return $driverCode === self::ERROR_BUSY
+            || $driverCode === self::ERROR_LOCKED;
     }
 
     /**

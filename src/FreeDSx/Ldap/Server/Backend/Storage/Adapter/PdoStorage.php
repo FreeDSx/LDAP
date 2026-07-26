@@ -23,6 +23,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\PdoListQueryBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
+use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
+use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\SqlQuery;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SidecarLeaf;
@@ -91,6 +93,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         private readonly PdoDialectInterface $dialect,
         ?PdoStatementPool $statements = null,
         ?EntryIndexWriter $indexes = null,
+        ?SleeperInterface $sleeper = null,
     ) {
         if (!extension_loaded('mbstring')) {
             throw new RuntimeException(
@@ -102,6 +105,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         $this->transactor = new PdoTransactor(
             $provider,
             $dialect,
+            $sleeper ?? new BlockingSleeper(),
         );
         $this->statements = $statements ?? new PdoStatementPool($provider);
         $this->indexes = $indexes ?? new EntryIndexWriter(
