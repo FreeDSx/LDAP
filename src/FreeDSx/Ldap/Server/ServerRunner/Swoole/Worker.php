@@ -101,15 +101,15 @@ class Worker
     {
         Process::signal(
             SIGTERM,
-            fn(int $signal): null => $this->handleShutdownSignal($signal, $context)
+            fn(int $signal): null => $this->handleShutdownSignal($signal, $context),
         );
         Process::signal(
             SIGINT,
-            fn(int $signal): null => $this->handleShutdownSignal($signal, $context)
+            fn(int $signal): null => $this->handleShutdownSignal($signal, $context),
         );
         Process::signal(
             SIGQUIT,
-            fn(int $signal): null => $this->handleShutdownSignal($signal, $context)
+            fn(int $signal): null => $this->handleShutdownSignal($signal, $context),
         );
         Process::signal(
             SIGHUP,
