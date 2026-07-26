@@ -19,16 +19,18 @@ concurrency:
 jobs:
   load-test:
     runs-on: ubuntu-latest
-    name: ${{ matrix.backend }} + ${{ matrix.runner }}
+    name: ${{ matrix.profile }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { backend: memory, runner: swoole, profile: 'memory:swoole' }
-          - { backend: json,   runner: pcntl,  profile: 'json:pcntl' }
-          - { backend: json,   runner: swoole, profile: 'json:swoole' }
-          - { backend: sqlite, runner: pcntl,  profile: 'sqlite:pcntl' }
-          - { backend: sqlite, runner: swoole, profile: 'sqlite:swoole' }
+          - { id: memory-swoole,      backend: memory, runner: swoole, profile: 'memory:swoole',      workers: 1 }
+          - { id: json-pcntl,         backend: json,   runner: pcntl,  profile: 'json:pcntl',         workers: 1 }
+          - { id: json-swoole,        backend: json,   runner: swoole, profile: 'json:swoole',        workers: 1 }
+          - { id: sqlite-pcntl,       backend: sqlite, runner: pcntl,  profile: 'sqlite:pcntl',       workers: 1 }
+          - { id: sqlite-swoole,      backend: sqlite, runner: swoole, profile: 'sqlite:swoole',      workers: 1 }
+          # Worker count left to auto-detect, so the pool is exercised on whatever cores the runner has.
+          - { id: sqlite-swoole-pool, backend: sqlite, runner: swoole, profile: 'sqlite:swoole-pool', workers: 0 }
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -70,16 +72,17 @@ jobs:
               --backend=${{ matrix.backend }} \
               --runner=${{ matrix.runner }} \
               --ci-profile=${{ matrix.profile }} \
+              --swoole-workers=${{ matrix.workers }} \
               --duration=15 --warmup=3 --clients=16 --rng-seed=1 \
               --output=json \
-              --threshold-report=threshold-${{ matrix.backend }}-${{ matrix.runner }}.json \
-              > raw-${{ matrix.backend }}-${{ matrix.runner }}.json
+              --threshold-report=threshold-${{ matrix.id }}.json \
+              > raw-${{ matrix.id }}.json
 
       - name: Upload load-test artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: load-test-${{ matrix.backend }}-${{ matrix.runner }}
+          name: load-test-${{ matrix.id }}
           path: |
             raw-*.json
             threshold-*.json
@@ -149,6 +152,7 @@ jobs:
               --backend=mysql \
               --runner=${{ matrix.runner }} \
               --ci-profile=mysql:${{ matrix.runner }} \
+              --swoole-workers=1 \
               --duration=15 --warmup=3 --clients=16 --rng-seed=1 \
               --output=json \
               --threshold-report=threshold-mysql-${{ matrix.runner }}.json \

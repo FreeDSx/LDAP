@@ -56,6 +56,45 @@ final class RunnerConfigTest extends TestCase
         );
     }
 
+    public function test_it_builds_a_coroutine_runner_that_uses_every_cpu_by_default(): void
+    {
+        $subject = RunnerConfig::forSwoole();
+
+        self::assertSame(
+            RunnerMode::Swoole,
+            $subject->getMode(),
+        );
+        self::assertSame(
+            RunnerConfig::AUTO_DETECT_WORKERS,
+            $subject->getWorkers(),
+        );
+    }
+
+    public function test_it_builds_a_coroutine_runner_with_a_fixed_worker_count(): void
+    {
+        $subject = RunnerConfig::forSwoole(4);
+
+        self::assertSame(
+            RunnerMode::Swoole,
+            $subject->getMode(),
+        );
+        self::assertSame(
+            4,
+            $subject->getWorkers(),
+        );
+    }
+
+    public function test_it_builds_a_forking_runner(): void
+    {
+        $subject = RunnerConfig::forPcntl();
+
+        self::assertSame(
+            RunnerMode::Pcntl,
+            $subject->getMode(),
+        );
+        self::assertFalse($subject->isSingleProcess());
+    }
+
     public function test_the_forking_runner_is_never_a_single_process(): void
     {
         self::assertFalse($this->subject->isSingleProcess());

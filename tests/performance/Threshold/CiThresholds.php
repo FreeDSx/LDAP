@@ -29,6 +29,7 @@ final class CiThresholds
         'json:swoole',
         'sqlite:pcntl',
         'sqlite:swoole',
+        'sqlite:swoole-pool',
         'mysql:pcntl',
         'mysql:swoole',
     ];
@@ -57,6 +58,12 @@ final class CiThresholds
                 maxP99Ms: 200.0,
             ),
             'sqlite:swoole' => new ThresholdSet(
+                maxErrors: 0,
+                minThroughput: 700.0,
+                maxP99Ms: 500.0,
+            ),
+            // Throughput matches the single-worker floor since runner core counts vary; the error ceiling is the guard.
+            'sqlite:swoole-pool' => new ThresholdSet(
                 maxErrors: 0,
                 minThroughput: 700.0,
                 maxP99Ms: 500.0,

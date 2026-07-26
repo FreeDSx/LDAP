@@ -23,6 +23,11 @@ use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
  */
 final class RunnerConfig
 {
+    /**
+     * Accept on one worker per available CPU.
+     */
+    public const AUTO_DETECT_WORKERS = 0;
+
     private int $workers;
 
     public function __construct(
@@ -30,6 +35,25 @@ final class RunnerConfig
         int $workers = 1,
     ) {
         $this->setWorkers($workers);
+    }
+
+    /**
+     * Coroutine handling, accepting on $workers processes, or on one per available CPU when null.
+     */
+    public static function forSwoole(?int $workers = null): self
+    {
+        return new self(
+            RunnerMode::Swoole,
+            $workers ?? self::AUTO_DETECT_WORKERS,
+        );
+    }
+
+    /**
+     * A forked process per connection, which is Linux only.
+     */
+    public static function forPcntl(): self
+    {
+        return new self(RunnerMode::Pcntl);
     }
 
     public function getMode(): RunnerMode

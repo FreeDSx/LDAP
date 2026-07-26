@@ -132,6 +132,71 @@ Whether anonymous binds should be allowed.
 
 **Default**: `false`
 
+## Runner Configuration
+
+The process model lives on `FreeDSx\Ldap\Server\Config\RunnerConfig`, passed as the third constructor argument to
+`ServerOptions` or set with `setRunnerConfig()`. It selects the runner and, for Swoole, how many worker processes
+accept connections.
+
+```php
+use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\Server\Config\RunnerConfig;
+
+$options = new ServerOptions(
+    $storageConfig,
+    $networkConfig,
+    // One worker per available CPU. Pass a count for a fixed number, or 1 for a single process.
+    RunnerConfig::forSwoole(),
+);
+```
+
+`RunnerConfig::forPcntl()` selects the forking runner, which is also the default.
+
+#### setMode
+
+`RunnerMode::Pcntl` forks a process per connection and is Linux only. `RunnerMode::Swoole` handles each connection in
+its own coroutine and requires the Swoole extension.
+
+**Default**: `RunnerMode::Pcntl`
+
+#### setWorkers
+
+Worker processes the Swoole runner accepts on. `1` runs a single process. `0` auto-detects, honouring container CPU
+limits rather than the host total. The forking runner ignores this, since it already spans cores by forking.
+
+**Default**: `1`
+
+### Which backends can use more than one worker
+
+Workers are separate processes, so a directory can only be served by several of them when its entries live outside the
+process. Anything else is clamped back to a single worker with a logged warning.
+
+| Storage | Multiple workers | Why |
+| --- | --- | --- |
+| PDO (`PdoConfig`) | Yes | The database is the shared state |
+| JSON (`JsonStorageConfig`) | No | Cached in-process and rewritten whole, so writers lose each other's updates |
+| In-memory (`InMemoryStorageConfig`) | No | Entries never leave the process that holds them |
+
+A proxy has no local directory, so it can always use multiple workers.
+
+### Signals
+
+| Signal | Single process | Worker pool |
+| --- | --- | --- |
+| `SIGHUP` | Reloads configuration in place | Ignored by the pool master; send it to the **process group** to reload every worker in place |
+| `SIGUSR1` | Not used | Swoole restarts each worker in turn, which drops paged searches and sync streams; prefer `SIGHUP` |
+| `SIGTERM` / `SIGINT` / `SIGQUIT` | Drains, then exits | Every worker drains, then the pool exits |
+
+Reloading a pool in place means sending `SIGHUP` to the process group rather than to the master alone, because the pool
+master cannot forward signals:
+
+```bash
+kill -HUP -$(ps -o pgid= -p "$MASTER_PID" | tr -d ' ')
+```
+
+Each worker adopts the new configuration for subsequent connections while in-flight ones finish under the old one, so
+nothing is dropped. A worker that dies is respawned by the pool and reads the current configuration on start.
+
 ## Network Configuration
 
 The listen socket, timeouts, and TLS settings live on `FreeDSx\Ldap\Server\Config\NetworkConfig`, not on
