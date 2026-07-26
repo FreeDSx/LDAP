@@ -360,7 +360,7 @@ class ContainerTest extends TestCase
         }
 
         $container = $this->containerFor(
-            (new ServerOptions(JsonStorageConfig::forFile(sys_get_temp_dir() . '/freedsx_container_test.json')))
+            (new ServerOptions(PdoConfig::forSqlite(':memory:')))
                 ->setRunnerConfig(new RunnerConfig(
                     RunnerMode::Swoole,
                     4,
@@ -369,6 +369,26 @@ class ContainerTest extends TestCase
 
         self::assertInstanceOf(
             PooledServerRunner::class,
+            $container->get(ServerRunnerInterface::class),
+        );
+    }
+
+    public function test_several_workers_are_clamped_to_one_process_for_file_storage(): void
+    {
+        if (!extension_loaded('swoole')) {
+            self::markTestSkipped('The swoole extension is required.');
+        }
+
+        $container = $this->containerFor(
+            (new ServerOptions(JsonStorageConfig::forFile(sys_get_temp_dir() . '/freedsx_container_test.json')))
+                ->setRunnerConfig(new RunnerConfig(
+                    RunnerMode::Swoole,
+                    4,
+                )),
+        );
+
+        self::assertInstanceOf(
+            SwooleServerRunner::class,
             $container->get(ServerRunnerInterface::class),
         );
     }
