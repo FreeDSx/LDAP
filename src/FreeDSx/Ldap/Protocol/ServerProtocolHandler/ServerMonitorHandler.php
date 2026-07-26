@@ -25,7 +25,7 @@ use FreeDSx\Ldap\Server\Metrics\Snapshot\MetricsSnapshot;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 use FreeDSx\Ldap\Server\ServerRunner\CoroutineServerRunnerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
-use FreeDSx\Ldap\Server\ServerRunner\SwooleServerRunner;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -134,7 +134,7 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
             return $runner instanceof CoroutineServerRunnerInterface;
         }
 
-        return $this->options->getRunner() === RunnerMode::Swoole;
+        return $this->options->isRunnerMode(RunnerMode::Swoole);
     }
 
     /**
@@ -190,7 +190,7 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
             return $runner::class;
         }
 
-        return $this->options->getRunner() === RunnerMode::Swoole
+        return $this->options->isRunnerMode(RunnerMode::Swoole)
             ? SwooleServerRunner::class
             : PcntlServerRunner::class;
     }

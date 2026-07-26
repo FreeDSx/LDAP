@@ -38,6 +38,7 @@ use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\Configuration\ConfigReloaderInterface;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRules;
 use FreeDSx\Ldap\Server\SearchLimits;
@@ -193,9 +194,11 @@ final class ServerOptions implements ServerListenerOptionsInterface
     public function __construct(
         ?StorageConfigInterface $storageConfig = null,
         ?NetworkConfig $network = null,
+        ?RunnerConfig $runner = null,
     ) {
         $this->storageConfig = $storageConfig ?? InMemoryStorageConfig::withEntries();
         $this->network = $network ?? new NetworkConfig();
+        $this->runner = $runner ?? new RunnerConfig();
     }
 
     public function getDseAltServer(): ?string

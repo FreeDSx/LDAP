@@ -32,8 +32,11 @@ use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
-use FreeDSx\Ldap\Server\ServerRunner\SwooleServerRunner;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\PooledServerRunner;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\WorkerFactory;
 use FreeDSx\Ldap\Server\SocketServerFactory;
+use FreeDSx\Ldap\Server\Utility\CpuCount;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 
 /**
@@ -62,8 +65,9 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
 
         return new SocketServerFactory(
             $options->getNetworkConfig(),
-            $options->getRunner(),
+            $options->getRunnerConfig()->getMode(),
             $options->getLogger(),
+            $this->resolveWorkerCount($container) > 1,
         );
     }
 
@@ -78,8 +82,9 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         $protocolFactoryProvider = $this->makeProtocolFactoryProvider($container);
         $metricsRecorder = $container->get(MetricsRecorderInterface::class);
 
-        if ($options->getRunner() === RunnerMode::Swoole) {
-            return new SwooleServerRunner(
+        if ($options->isRunnerMode(RunnerMode::Swoole)) {
+            $workers = $this->resolveWorkerCount($container);
+            $workerFactory = new WorkerFactory(
                 serverProtocolFactory: $protocolFactoryProvider($options),
                 options: $options,
                 socketServerFactory: $container->get(SocketServerFactory::class),
@@ -87,6 +92,14 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
                 metricsRecorder: $metricsRecorder,
                 backgroundTasks: $container->get(BackgroundTasksInterface::class),
             );
+
+            return $workers > 1
+                ? new PooledServerRunner(
+                    workerFactory: $workerFactory,
+                    workers: $workers,
+                    resettable: $container->get(ListenerContributorInterface::class)->forkResettable(),
+                )
+                : new SwooleServerRunner($workerFactory);
         }
 
         return new PcntlServerRunner(
@@ -100,6 +113,36 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             resettable: $container->get(ListenerContributorInterface::class)->forkResettable(),
             backgroundTasks: $container->get(BackgroundTasksInterface::class),
         );
+    }
+
+    /**
+     * The workers to actually accept on: the configured count, auto-detected from the CPUs when zero.
+     *
+     * This is clamped back to one when the server keeps state that cannot be shared between processes.
+     */
+    private function resolveWorkerCount(Container $container): int
+    {
+        $options = $container->get(ServerListenerOptionsInterface::class);
+
+        if (!$options->isRunnerMode(RunnerMode::Swoole)) {
+            return 1;
+        }
+
+        $configured = $options->getRunnerConfig()->getWorkers();
+        $workers = $configured > 0
+            ? $configured
+            : (new CpuCount())->available();
+
+        if ($workers === 1 || $container->get(ListenerContributorInterface::class)->supportsMultipleWorkers()) {
+            return $workers;
+        }
+
+        $options->getLogger()?->warning(
+            'The configured storage cannot be shared between processes; accepting on a single worker.',
+            ['requested_workers' => $workers],
+        );
+
+        return 1;
     }
 
     /**
@@ -206,7 +249,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
     {
         $options = $container->get(ServerListenerOptionsInterface::class);
 
-        if ($options->getRunner() !== RunnerMode::Swoole) {
+        if (!$options->isRunnerMode(RunnerMode::Swoole)) {
             return new FileSnapshotProvider($options->getMonitorSnapshotPath());
         }
 

@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Schema\NisSchemaProvider;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\StandardSchemaProvider;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\ServerOptions;
 use PDO;
 use Symfony\Component\Console\Command\Command;
@@ -65,6 +66,13 @@ final class LdapBackendStorageCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Server runner (pcntl, swoole)',
                 'pcntl',
+            )
+            ->addOption(
+                'swoole-workers',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Swoole worker processes: 1 for a single process, 0 to auto-detect the CPU count',
+                '1',
             )
             ->addOption(
                 'port',
@@ -327,7 +335,10 @@ final class LdapBackendStorageCommand extends Command
 
         $serverOptions
             ->setStorageConfig($config)
-            ->setRunner($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl);
+            ->setRunnerConfig(new RunnerConfig(
+                $runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl,
+                (int) $this->getStringOption($input, 'swoole-workers'),
+            ));
 
         $container = Container::forServer($serverOptions);
         $server = new LdapServer(

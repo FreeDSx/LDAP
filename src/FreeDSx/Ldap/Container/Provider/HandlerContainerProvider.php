@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Container\Provider;
 
-use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Protocol\Factory\HandlerContext;
 use FreeDSx\Ldap\Protocol\Factory\HandlerId;
@@ -178,10 +177,10 @@ final class HandlerContainerProvider implements ContainerProviderInterface
                 stream: $stream,
                 sleeper: $container->get(SleeperInterface::class),
             );
-            // Persist can only deliver writes made on other connections: a single process (Swoole)
-            // shares them in memory, otherwise the journal itself must be cross-process.
-            $persistSupported = $options->getRunner() === RunnerMode::Swoole
-                || $journal->sharesAcrossProcesses();
+            // Persist can only deliver writes made on other connections: one process shares them in memory,
+            // otherwise the journal itself must be cross-process.
+            $persistSupported = $journal->sharesAcrossProcesses()
+                || $options->getRunnerConfig()->isSingleProcess();
         }
 
         return new ServerSyncHandler(

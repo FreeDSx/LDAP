@@ -57,6 +57,13 @@ final class LoadTestCommand extends Command
                 'Server runner: ' . implode(' | ', Config::RUNNERS) . ' (memory REQUIRES swoole)',
             )
             ->addOption(
+                'swoole-workers',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Swoole worker processes: 0 auto-detects the CPU count, 1 pins it to a single process',
+                '0',
+            )
+            ->addOption(
                 'clients',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -473,6 +480,7 @@ final class LoadTestCommand extends Command
             seedAttributes: $this->requireInt($input, 'seed-attributes'),
             maxSearchLookthrough: $this->requireInt($input, 'max-search-lookthrough'),
             journal: (bool) $input->getOption('journal'),
+            swooleWorkers: $this->requireInt($input, 'swoole-workers'),
         );
     }
 

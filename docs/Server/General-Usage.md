@@ -506,8 +506,8 @@ It defaults to the empty (anonymous) DN.
 `seed()` accepts only content records (entries without `changetype:`) and requires depth-first input (parents first,
 then children entries). LDIF produced by `dump()` is already in this order. The operation itself is an upsert that overwrites.
 
-When using the Swoole runner (`setRunner(RunnerMode::Swoole)`), call `seed()` inside `Swoole\Coroutine\run()` so the
-storage adapter's per-coroutine connection is available during import.
+When using the Swoole runner (`setRunnerConfig(new RunnerConfig(RunnerMode::Swoole))`), call `seed()` inside
+`Swoole\Coroutine\run()` so the storage adapter's per-coroutine connection is available during import.
 
 ### Replaying LDIF Changelogs
 

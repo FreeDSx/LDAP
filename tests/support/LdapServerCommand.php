@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\ServerOptions;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\FileFlagConfigReloader;
 use PDO;
@@ -263,7 +264,7 @@ final class LdapServerCommand extends Command
             ->setShutdownTimeout(0);
 
         $options = (new ServerOptions($this->createStorageConfig($storageType), $network))
-            ->setRunner($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl)
+            ->setRunnerConfig(new RunnerConfig($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl))
             ->setAllowAnonymous($allowAnonymous)
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
             ->setMaxSearchPagedLookthrough((int) $this->getStringOption($input, 'max-search-paged-lookthrough'))

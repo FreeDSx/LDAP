@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\LdapClient;
@@ -59,6 +60,8 @@ use FreeDSx\Ldap\Server\Proxy\ProxyProtocolFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\PooledServerRunner;
+use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\SocketPool;
@@ -282,7 +285,7 @@ class ContainerTest extends TestCase
         $container = $this->containerFor(
             (new ServerOptions())
                 ->setMonitorEnabled(true)
-                ->setRunner(RunnerMode::Swoole),
+                ->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
         );
 
         self::assertSame(
@@ -322,11 +325,69 @@ class ContainerTest extends TestCase
         }
 
         $container = $this->containerFor(
-            $this->journalingOptions()->setRunner(RunnerMode::Swoole),
+            $this->journalingOptions()->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
         );
 
         self::assertInstanceOf(
             ServerRunnerInterface::class,
+            $container->get(ServerRunnerInterface::class),
+        );
+    }
+
+    public function test_a_single_worker_builds_the_one_process_coroutine_runner(): void
+    {
+        if (!extension_loaded('swoole')) {
+            self::markTestSkipped('The swoole extension is required.');
+        }
+
+        $container = $this->containerFor(
+            (new ServerOptions())->setRunnerConfig(new RunnerConfig(
+                RunnerMode::Swoole,
+                1,
+            )),
+        );
+
+        self::assertInstanceOf(
+            SwooleServerRunner::class,
+            $container->get(ServerRunnerInterface::class),
+        );
+    }
+
+    public function test_several_workers_build_the_pooled_runner_when_storage_can_be_shared(): void
+    {
+        if (!extension_loaded('swoole')) {
+            self::markTestSkipped('The swoole extension is required.');
+        }
+
+        $container = $this->containerFor(
+            (new ServerOptions(JsonStorageConfig::forFile(sys_get_temp_dir() . '/freedsx_container_test.json')))
+                ->setRunnerConfig(new RunnerConfig(
+                    RunnerMode::Swoole,
+                    4,
+                )),
+        );
+
+        self::assertInstanceOf(
+            PooledServerRunner::class,
+            $container->get(ServerRunnerInterface::class),
+        );
+    }
+
+    public function test_several_workers_are_clamped_to_one_process_for_in_memory_storage(): void
+    {
+        if (!extension_loaded('swoole')) {
+            self::markTestSkipped('The swoole extension is required.');
+        }
+
+        $container = $this->containerFor(
+            (new ServerOptions())->setRunnerConfig(new RunnerConfig(
+                RunnerMode::Swoole,
+                4,
+            )),
+        );
+
+        self::assertInstanceOf(
+            SwooleServerRunner::class,
             $container->get(ServerRunnerInterface::class),
         );
     }

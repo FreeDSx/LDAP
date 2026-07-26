@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\ReplicaConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
@@ -90,7 +91,7 @@ class LdapServerTest extends TestCase
         $this->options
             ->setReplicaConfig(new ReplicaConfig(new ClientOptions()))
             ->setStorageConfig($storageConfig)
-            ->setRunner($runner);
+            ->setRunnerConfig(new RunnerConfig($runner));
 
         $this->expectException(RuntimeException::class);
 
@@ -117,7 +118,7 @@ class LdapServerTest extends TestCase
     ): void {
         $this->options
             ->setStorageConfig($storageConfig)
-            ->setRunner($runner);
+            ->setRunnerConfig(new RunnerConfig($runner));
 
         $this->mockServerRunner
             ->expects(self::once())
