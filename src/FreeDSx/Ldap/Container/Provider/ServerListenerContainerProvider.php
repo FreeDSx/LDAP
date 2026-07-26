@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
 use FreeDSx\Ldap\Server\Metrics\Recorder\MetricsRecorderChain;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
+use FreeDSx\Ldap\Server\Metrics\Recorder\SwooleTableMetricsRecorder;
 use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
@@ -53,6 +54,10 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             ServerAuthorization::class => $this->makeServerAuthorizer(...),
             ServerRunnerInterface::class => $this->makeServerRunner(...),
             InMemoryMetricsRecorder::class => static fn(): InMemoryMetricsRecorder => new InMemoryMetricsRecorder(),
+            // A singleton, so the shared table is allocated once and every forked worker inherits that one mapping.
+            SwooleTableMetricsRecorder::class => static fn(): SwooleTableMetricsRecorder => new SwooleTableMetricsRecorder(
+                SwooleTableMetricsRecorder::createTable(),
+            ),
             MetricsRecorderInterface::class => $this->makeMetricsRecorder(...),
             MetricsSnapshotProvider::class => $this->makeMetricsSnapshotProvider(...),
             OperationRollupCoordinator::class => $this->makeOperationRollupCoordinator(...),
@@ -173,6 +178,11 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             InMemoryMetricsRecorder::class => $container->get(InMemoryMetricsRecorder::class),
         ];
 
+        // Carried so a reload keeps the one shared table rather than allocating a second, empty one.
+        if ($container->get(ServerListenerOptionsInterface::class)->isRunnerMode(RunnerMode::Swoole)) {
+            $shared[SwooleTableMetricsRecorder::class] = $container->get(SwooleTableMetricsRecorder::class);
+        }
+
         $operationRollup = $this->makeOperationRollup($container);
         if ($operationRollup !== null) {
             $shared[OperationRollupCoordinator::class] = $operationRollup;
@@ -229,14 +239,16 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             return $userRecorder;
         }
 
-        $inMemory = $container->get(InMemoryMetricsRecorder::class);
+        $recorder = $options->isRunnerMode(RunnerMode::Swoole)
+            ? $container->get(SwooleTableMetricsRecorder::class)
+            : $container->get(InMemoryMetricsRecorder::class);
 
         if ($userRecorder instanceof NullMetricsRecorder) {
-            return $inMemory;
+            return $recorder;
         }
 
         return new MetricsRecorderChain(
-            $inMemory,
+            $recorder,
             $userRecorder,
         );
     }
@@ -253,6 +265,6 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             return new FileSnapshotProvider($options->getMonitorSnapshotPath());
         }
 
-        return $container->get(InMemoryMetricsRecorder::class);
+        return $container->get(SwooleTableMetricsRecorder::class);
     }
 }
