@@ -142,6 +142,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return new PdoBackendBuilder(
             $config,
             $options->getRunner(),
+            $container->get(SleeperInterface::class),
         );
     }
 

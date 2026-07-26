@@ -21,6 +21,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SwooleWriterQueue;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
+use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\SerializingReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
@@ -38,9 +40,13 @@ final class PdoBackendBuilder
 
     private ReplicaPasswordStateStoreInterface $replicaPasswordStateStore;
 
+    /**
+     * @param SleeperInterface $sleeper Paces a retried transaction.
+     */
     public function __construct(
         private readonly PdoConfig $config,
         RunnerMode $runner,
+        private readonly SleeperInterface $sleeper = new BlockingSleeper(),
     ) {
         if ($runner === RunnerMode::Swoole && $config->getSerializeSwooleWrites()) {
             $this->assembleSerializedSwoole();
@@ -69,6 +75,7 @@ final class PdoBackendBuilder
         $this->storage = PdoStorageFactory::storageOn(
             $this->config,
             $provider,
+            $this->sleeper,
         );
         $this->replicaPasswordStateStore = $this->replicaStore($provider);
     }
@@ -83,6 +90,7 @@ final class PdoBackendBuilder
         $writeStorage = PdoStorageFactory::storageOn(
             $this->config,
             $writes,
+            $this->sleeper,
         );
         $queue = new SwooleWriterQueue(
             batchWrapper: static fn(Closure $cb) => $writeStorage->atomic(static fn() => $cb()),
@@ -92,6 +100,7 @@ final class PdoBackendBuilder
             reads: PdoStorageFactory::storageOn(
                 $this->config,
                 $reads,
+                $this->sleeper,
             ),
             writes: $writeStorage,
             queue: $queue,
@@ -109,6 +118,7 @@ final class PdoBackendBuilder
             new PdoTransactor(
                 $provider,
                 $this->config->getDialect(),
+                $this->sleeper,
             ),
             $this->config->getDialect(),
             new PdoStatementPool($provider),

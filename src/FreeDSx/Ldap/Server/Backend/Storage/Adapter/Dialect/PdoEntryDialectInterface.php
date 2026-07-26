@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 
 use PDO;
+use PDOException;
 
 /**
  * Database-specific SQL for the entry + sidecar tables, transactions, and sort keys.
@@ -47,6 +48,14 @@ interface PdoEntryDialectInterface
      * Roll back the current transaction started by beginTransaction().
      */
     public function rollBack(PDO $pdo): void;
+
+    /**
+     * Whether the database guarantees the failed transaction applied nothing, so reissuing it cannot double-apply.
+     *
+     * Being transient is not sufficient: a lost connection may have dropped after the commit was sent, leaving the
+     * outcome unknown, so only failures with a defined rollback belong here.
+     */
+    public function isRetryableConflict(PDOException $exception): bool;
 
     /**
      * Existence check: `SELECT 1 FROM entries WHERE lc_dn = ? LIMIT 1`. Parameters: [lc_dn]
