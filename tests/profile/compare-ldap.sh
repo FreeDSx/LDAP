@@ -8,6 +8,7 @@
 #   composer compare-ldap -- [--source=freedsx|openldap|opendj] [--target=freedsx|openldap|opendj]
 #       [--seed-entries=2000] [--cpus=4] [--storage=sqlite] [--runner=pcntl] [--mix=default]
 #       [--search-value=seed-1] [--duration=15] [--warmup=3] [--clients=8] [--driver-processes=1] [--keep-up]
+#       [--swoole-workers=0] [--server-cpuset=0-3] [--driver-cpuset=4-7]
 #
 # --storage/--runner apply only to a freedsx side.
 # --search-value is the cn prefix the subtree searches filter on (--search-value=seed- matches all).
@@ -38,6 +39,9 @@ WARMUP=3
 CLIENTS=8
 DRIVER_PROCS=1
 KEEP_UP=0
+WORKERS=0
+SERVER_CPUSET=0-3
+DRIVER_CPUSET=4-7
 
 for arg in "$@"; do
     case "$arg" in
@@ -53,6 +57,9 @@ for arg in "$@"; do
         --warmup=*)           WARMUP="${arg#*=}" ;;
         --clients=*)          CLIENTS="${arg#*=}" ;;
         --driver-processes=*) DRIVER_PROCS="${arg#*=}" ;;
+        --swoole-workers=*)   WORKERS="${arg#*=}" ;;
+        --server-cpuset=*)    SERVER_CPUSET="${arg#*=}" ;;
+        --driver-cpuset=*)    DRIVER_CPUSET="${arg#*=}" ;;
         --keep-up)            KEEP_UP=1 ;;
         -h|--help)            sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *)                    echo "unknown arg: $arg" >&2; exit 2 ;;
@@ -122,9 +129,10 @@ setup_opendj() {
     || echo "   (index-limit tweak skipped)"
 }
 
-echo "==> up $SRC_LABEL ($SRC_SVC) + $TGT_LABEL ($TGT_SVC) (cpus=$CPUS each, seed=$SEED)"
-# freedsx-server self-seeds via SEED_ENTRIES; here the bench seeds it over LDAP like any other side, so it starts empty.
+echo "==> up $SRC_LABEL ($SRC_SVC) + $TGT_LABEL ($TGT_SVC) (cpuset=$SERVER_CPUSET each, driver on $DRIVER_CPUSET, seed=$SEED)"
+# Sharing cores with the driver can reverse which server looks faster, so each side is pinned to its own.
 PROFILE_CPUS="$CPUS" FREEDSX_STORAGE="$STORAGE" FREEDSX_RUNNER="$RUNNER" SEED_ENTRIES=0 \
+SERVER_CPUSET="$SERVER_CPUSET" SWOOLE_WORKERS="$WORKERS" FREEDSX_JIT="$([[ "$RUNNER" == pcntl ]] && echo off || echo function)" \
     docker compose -f "$COMPOSE" up -d --wait "$SRC_SVC" "$TGT_SVC"
 
 [[ "$SRC_SETUP" == opendj ]] && setup_opendj "$SRC_BIND" "$SRC_PW" "$SRC_BASE"
@@ -133,7 +141,7 @@ PROFILE_CPUS="$CPUS" FREEDSX_STORAGE="$STORAGE" FREEDSX_RUNNER="$RUNNER" SEED_EN
 NET=$(docker inspect -f '{{range $k,$_ := .NetworkSettings.Networks}}{{$k}}{{end}}' "$SRC_CONT")
 
 echo "==> running comparison (driver container on '$NET')"
-docker run --rm --network "$NET" -v "$PWD":/app -w /app --entrypoint php \
+docker run --rm --network "$NET" --cpuset-cpus="$DRIVER_CPUSET" -v "$PWD":/app -w /app --entrypoint php \
     freedsx-profile:latest -d xdebug.mode=off -d opcache.enable_cli=1 -d opcache.jit=off \
     tests/bin/ldap-bench-compare.php \
     --source-host="$SRC_SVC" --source-port="$SRC_PORT" --source-bind-dn="$SRC_BIND" --source-bind-password="$SRC_PW" --source-base-dn="$SRC_BASE" --source-label="$SRC_LABEL" \
