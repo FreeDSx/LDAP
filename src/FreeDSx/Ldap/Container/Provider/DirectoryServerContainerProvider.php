@@ -22,6 +22,8 @@ use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\CoroutineLock;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackendBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
@@ -29,8 +31,13 @@ use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\FileChangeJournal;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionSweeper;
 use FreeDSx\Ldap\Server\Backend\Storage\OperationalAttributeGenerator;
@@ -68,6 +75,10 @@ use Psr\Log\NullLogger;
  */
 final class DirectoryServerContainerProvider implements ContainerProviderInterface
 {
+    private const JOURNAL_SUFFIX = '.journal.jsonl';
+
+    private const SEQ_SUFFIX = '.journal.seq';
+
     public function factories(): array
     {
         return [
@@ -104,27 +115,81 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
      */
     private function makeStorage(Container $container): EntryStorageInterface
     {
-        $options = $container->get(ServerOptions::class);
-        $config = $options->getStorageConfig();
-        $swoole = $options->isRunnerMode(RunnerMode::Swoole);
+        $config = $container->get(ServerOptions::class)->getStorageConfig();
+        $journalConfig = $this->journalConfig($container);
 
         return match (true) {
             $config instanceof PdoConfig => $container->get(PdoBackendBuilder::class)->storage(),
-            $config instanceof JsonStorageConfig => $swoole
-                ? JsonFileStorage::forSwoole(
-                    $config->path(),
-                    logger: $config->logger(),
-                )
-                : JsonFileStorage::forPcntl(
-                    $config->path(),
-                    logger: $config->logger(),
+            $config instanceof JsonStorageConfig => $this->makeJsonStorage(
+                $container,
+                $config,
+                $journalConfig,
+            ),
+            $config instanceof InMemoryStorageConfig => new InMemoryStorage(
+                $config->entries(),
+                $journalConfig === null ? null : AuditingChangeJournal::wrap(
+                    new InMemoryChangeJournal($journalConfig->origin),
+                    $journalConfig,
                 ),
-            $config instanceof InMemoryStorageConfig => new InMemoryStorage($config->entries()),
+            ),
             default => throw new RuntimeException(sprintf(
                 'Unsupported storage config "%s".',
                 $config::class,
             )),
         };
+    }
+
+    /**
+     * The journal and storage share one lock, so a journal append re-enters the write it belongs to.
+     */
+    private function makeJsonStorage(
+        Container $container,
+        JsonStorageConfig $config,
+        ?ChangeJournalConfig $journalConfig,
+    ): JsonFileStorage {
+        // Coroutines need a lock that yields rather than blocking the whole worker.
+        $lock = $container->get(ServerOptions::class)->isRunnerMode(RunnerMode::Swoole)
+            ? new CoroutineLock($config->path())
+            : new FileLock($config->path());
+
+        return new JsonFileStorage(
+            $config->path(),
+            $lock,
+            $journalConfig === null ? null : AuditingChangeJournal::wrap(
+                new FileChangeJournal(
+                    $lock,
+                    $config->path() . self::JOURNAL_SUFFIX,
+                    $config->path() . self::SEQ_SUFFIX,
+                    $journalConfig->origin,
+                ),
+                $journalConfig,
+            ),
+            $config->logger() ?? new NullLogger(),
+        );
+    }
+
+    /**
+     * The journal settings to build storage against, or null when journaling is off.
+     */
+    private function journalConfig(Container $container): ?ChangeJournalConfig
+    {
+        $options = $container->get(ServerOptions::class);
+
+        return $options->isSyncEnabled()
+            ? $options->getChangeJournalConfig()
+            : null;
+    }
+
+    /**
+     * The journal the storage was built with, or null when it has none.
+     */
+    private function changeJournal(Container $container): ?ChangeJournalInterface
+    {
+        $storage = $container->get(EntryStorageInterface::class);
+
+        return $storage instanceof ChangeJournalingInterface
+            ? $storage->changeJournal()
+            : null;
     }
 
     /**
@@ -143,6 +208,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             $config,
             $options->getRunnerConfig()->getMode(),
             $container->get(SleeperInterface::class),
+            $this->journalConfig($container),
         );
     }
 
@@ -181,7 +247,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     }
 
     /**
-     * Configure the storage's journal and return a recorder when sync is enabled and the storage can journal.
+     * A recorder when sync is enabled and the storage was built with a journal to append to.
      */
     private function changeRecorderFor(
         Container $container,
@@ -192,8 +258,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         if (!$options->isSyncEnabled() || !$storage instanceof ChangeJournalingInterface) {
             return null;
         }
-
-        $storage->configureJournal($options->getChangeJournalConfig());
 
         return new ChangeRecorder($options->getLogger() ?? new NullLogger());
     }
@@ -257,7 +321,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             return null;
         }
 
-        $journal = $container->get(WritableStorageBackend::class)->changeJournal();
+        $journal = $this->changeJournal($container);
 
         if ($journal === null) {
             return null;
@@ -282,8 +346,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             return null;
         }
 
-        // Safe to resolve now: a non-null policy means sync is enabled and the journal is configured.
-        $journal = $container->get(WritableStorageBackend::class)->changeJournal();
+        // Safe to resolve now: a non-null policy means sync is enabled and the storage was built with a journal.
+        $journal = $this->changeJournal($container);
 
         if ($journal === null) {
             return null;

@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Journal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditSinkInterface;
 
 /**
- * Central change-journal settings a journaling-capable storage builds its journal from.
+ * Central change-journal settings a storage backend builder assembles its journal from.
  *
  * @api
  *

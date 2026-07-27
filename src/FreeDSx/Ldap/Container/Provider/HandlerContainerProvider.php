@@ -35,6 +35,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnsupportedExtendedHandler
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerWhoAmIHandler;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
@@ -256,6 +257,10 @@ final class HandlerContainerProvider implements ContainerProviderInterface
             return null;
         }
 
-        return $backend->changeJournal();
+        $storage = $backend->getStorage();
+
+        return $storage instanceof ChangeJournalingInterface
+            ? $storage->changeJournal()
+            : null;
     }
 }

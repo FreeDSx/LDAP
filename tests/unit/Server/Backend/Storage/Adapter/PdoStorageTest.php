@@ -40,6 +40,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterfac
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
@@ -1359,8 +1360,12 @@ final class PdoStorageTest extends TestCase
 
     public function test_a_journal_append_rolls_back_with_the_enclosing_write_transaction(): void
     {
-        $storage = PdoStorageFactory::forPcntl(PdoConfig::forSqlite(':memory:'));
-        $storage->configureJournal(new ChangeJournalConfig());
+        $storage = PdoStorageFactory::storageOn(
+            $config = PdoConfig::forSqlite(':memory:'),
+            PdoStorageFactory::sharedProvider($config),
+            journalConfig: new ChangeJournalConfig(),
+        );
+        $journal = $storage->changeJournal() ?? self::fail('Expected the storage to have a journal.');
 
         try {
             $storage->atomic(function () use ($storage): void {
@@ -1378,17 +1383,24 @@ final class PdoStorageTest extends TestCase
 
         self::assertCount(
             0,
-            iterator_to_array($storage->changeJournal()->read()),
+            iterator_to_array($journal->read()),
         );
         self::assertSame(
             0,
-            $storage->changeJournal()->latestSeq(),
+            $journal->latestSeq(),
         );
     }
 
-    protected function makeJournalingStorage(): ChangeJournalingInterface
+    protected function makeJournalingStorage(?ChangeJournalInterface $journal = null): ChangeJournalingInterface
     {
-        return PdoStorageFactory::forPcntl(PdoConfig::forSqlite(':memory:'));
+        $config = PdoConfig::forSqlite(':memory:');
+
+        return new PdoStorage(
+            PdoStorageFactory::sharedProvider($config),
+            new SqliteFilterTranslator(),
+            $config->getDialect(),
+            journal: $journal,
+        );
     }
 
     /**

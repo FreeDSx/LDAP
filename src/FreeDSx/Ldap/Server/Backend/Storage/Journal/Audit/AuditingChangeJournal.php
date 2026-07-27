@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
@@ -37,6 +38,21 @@ final class AuditingChangeJournal implements ChangeJournalInterface
         private readonly AuditSinkInterface $sink,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {}
+
+    /**
+     * Decorates the journal only when the config carries a sink, so callers need no conditional of their own.
+     */
+    public static function wrap(
+        ChangeJournalInterface $journal,
+        ChangeJournalConfig $config,
+    ): ChangeJournalInterface {
+        return $config->auditSink === null
+            ? $journal
+            : new self(
+                $journal,
+                $config->auditSink,
+            );
+    }
 
     public function append(PendingChange $change): ChangeRecord
     {

@@ -20,9 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingTrait;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
@@ -49,9 +47,7 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
         array $entries = [],
         ?ChangeJournalInterface $journal = null,
     ) {
-        if ($journal !== null) {
-            $this->useJournal($journal);
-        }
+        $this->journal = $journal;
 
         foreach ($entries as $entry) {
             $this->entries[$entry->getDn()->normalize()->toString()] = $entry;
@@ -103,10 +99,5 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
     public function namingContexts(): array
     {
         return $this->namingContextsFromArray($this->entries);
-    }
-
-    protected function buildJournal(ChangeJournalConfig $config): ChangeJournalInterface
-    {
-        return new InMemoryChangeJournal($config->origin);
     }
 }

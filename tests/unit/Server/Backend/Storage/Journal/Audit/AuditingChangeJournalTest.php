@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use PHPUnit\Framework\TestCase;
@@ -27,6 +28,32 @@ use Tests\Support\FreeDSx\Ldap\Journal\Audit\FailingAuditSink;
 
 final class AuditingChangeJournalTest extends TestCase
 {
+    public function test_wrap_decorates_the_journal_when_the_config_carries_a_sink(): void
+    {
+        $wrapped = AuditingChangeJournal::wrap(
+            new InMemoryChangeJournal(),
+            new ChangeJournalConfig(auditSink: new CapturingAuditSink()),
+        );
+
+        self::assertInstanceOf(
+            AuditingChangeJournal::class,
+            $wrapped,
+        );
+    }
+
+    public function test_wrap_returns_the_journal_untouched_without_a_sink(): void
+    {
+        $journal = new InMemoryChangeJournal();
+
+        self::assertSame(
+            $journal,
+            AuditingChangeJournal::wrap(
+                $journal,
+                new ChangeJournalConfig(),
+            ),
+        );
+    }
+
     public function test_it_tees_each_appended_record_to_the_sink(): void
     {
         $sink = new CapturingAuditSink();
