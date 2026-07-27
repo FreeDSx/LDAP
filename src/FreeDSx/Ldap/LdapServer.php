@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
 use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
@@ -104,14 +105,10 @@ class LdapServer
         LdifLoaderInterface $loader,
         Dn $creatorDn = new Dn(''),
     ): self {
-        $backend = $this->backend();
-
-        (new LdapImporter(
-            $backend->getStorage(),
-            $backend->getOperationalAttributeGenerator(),
-            $backend->getSchemaValidator(),
+        $this->container->get(LdapImporter::class)->importEntries(
+            $this->streamSeedEntries($loader),
             $creatorDn,
-        ))->importEntries($this->streamSeedEntries($loader));
+        );
 
         return $this;
     }
@@ -144,11 +141,11 @@ class LdapServer
         LdifOutputInterface $output,
         DumpOptions $options = new DumpOptions(),
     ): self {
-        $backend = $this->backend();
+        $storage = $this->container->get(EntryStorageInterface::class);
 
         $output->write((new DirectoryDumper(
-            $backend,
-            $backend->namingContexts(),
+            $storage,
+            $storage->namingContexts(),
             $this->container->get(FilterEvaluatorInterface::class),
         ))->dump($options));
 

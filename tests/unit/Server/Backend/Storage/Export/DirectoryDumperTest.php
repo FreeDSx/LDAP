@@ -27,7 +27,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use PHPUnit\Framework\TestCase;
 
 final class DirectoryDumperTest extends TestCase
@@ -35,7 +34,7 @@ final class DirectoryDumperTest extends TestCase
     public function test_it_yields_the_version_header_first_when_enabled(): void
     {
         $dumper = new DirectoryDumper(
-            $this->backendWithEntries(),
+            $this->storageWithEntries(),
             [new Dn('dc=foo,dc=bar')],
         );
 
@@ -54,7 +53,7 @@ final class DirectoryDumperTest extends TestCase
     {
         $writer = new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false));
         $dumper = new DirectoryDumper(
-            $this->backendWithEntries(),
+            $this->storageWithEntries(),
             [new Dn('dc=foo,dc=bar')],
             writer: $writer,
         );
@@ -73,7 +72,7 @@ final class DirectoryDumperTest extends TestCase
     public function test_it_iterates_entries_across_naming_contexts_when_no_base_is_set(): void
     {
         $dumper = new DirectoryDumper(
-            $this->backendWithEntries(),
+            $this->storageWithEntries(),
             [new Dn('dc=foo,dc=bar')],
             writer: new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
         );
@@ -100,7 +99,7 @@ final class DirectoryDumperTest extends TestCase
     public function test_it_restricts_to_the_options_base_dn_when_set(): void
     {
         $dumper = new DirectoryDumper(
-            $this->backendWithEntries(),
+            $this->storageWithEntries(),
             [new Dn('dc=foo,dc=bar')],
             writer: new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
         );
@@ -149,7 +148,7 @@ final class DirectoryDumperTest extends TestCase
         );
 
         $dumper = new DirectoryDumper(
-            new WritableStorageBackend($storage),
+            $storage,
             [new Dn('dc=foo,dc=bar')],
             $evaluator,
             new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
@@ -184,7 +183,7 @@ final class DirectoryDumperTest extends TestCase
         $evaluator->expects(self::never())->method('evaluate');
 
         $dumper = new DirectoryDumper(
-            new WritableStorageBackend($storage),
+            $storage,
             [new Dn('dc=foo,dc=bar')],
             $evaluator,
             new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
@@ -212,7 +211,7 @@ final class DirectoryDumperTest extends TestCase
             ));
 
         $dumper = new DirectoryDumper(
-            new WritableStorageBackend($storage),
+            $storage,
             [new Dn('dc=foo,dc=bar')],
         );
 
@@ -222,9 +221,9 @@ final class DirectoryDumperTest extends TestCase
         );
     }
 
-    private function backendWithEntries(): WritableStorageBackend
+    private function storageWithEntries(): InMemoryStorage
     {
-        return new WritableStorageBackend(new InMemoryStorage([
+        return new InMemoryStorage([
             new Entry(
                 new Dn('dc=foo,dc=bar'),
                 new Attribute('dc', 'foo'),
@@ -239,6 +238,6 @@ final class DirectoryDumperTest extends TestCase
                 new Attribute('cn', 'bob'),
                 new Attribute('sn', 'Builder'),
             ),
-        ]));
+        ]);
     }
 }

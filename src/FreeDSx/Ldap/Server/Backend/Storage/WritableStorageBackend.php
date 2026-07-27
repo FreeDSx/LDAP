@@ -89,30 +89,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         }
     }
 
-    /**
-     * The underlying entry storage, e.g. for bulk seeding via {@see LdapImporter}.
-     */
-    public function getStorage(): EntryStorageInterface
-    {
-        return $this->storage;
-    }
-
-    /**
-     * The operational-attribute generator, e.g. so a bulk import can stamp the same managed attributes.
-     */
-    public function getOperationalAttributeGenerator(): OperationalAttributeGenerator
-    {
-        return $this->operationalAttrs;
-    }
-
-    /**
-     * The schema validator (null when validation is off), e.g. so a bulk import can apply the same rules.
-     */
-    public function getSchemaValidator(): ?SchemaValidator
-    {
-        return $this->validator;
-    }
-
     public function get(Dn $dn): ?Entry
     {
         return $this->storage->find($dn->normalize());

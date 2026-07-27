@@ -143,12 +143,12 @@ final class LdapImporterTest extends TestCase
     {
         $storage = new InMemoryStorage();
 
-        (new LdapImporter(
-            $storage,
+        (new LdapImporter($storage))->importEntries(
+            entries: [
+                new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
+            ],
             creatorDn: new Dn('cn=Importer,dc=example,dc=com'),
-        ))->importEntries([
-            new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
-        ]);
+        );
 
         self::assertSame(
             'cn=Importer,dc=example,dc=com',
@@ -156,13 +156,13 @@ final class LdapImporterTest extends TestCase
         );
     }
 
-    public function test_construction_throws_for_an_invalid_creator_dn(): void
+    public function test_importEntries_throws_for_an_invalid_creator_dn(): void
     {
         self::expectException(InvalidArgumentException::class);
         self::expectExceptionMessage('The import creator DN "not a dn" is not a valid DN.');
 
-        new LdapImporter(
-            new InMemoryStorage(),
+        (new LdapImporter(new InMemoryStorage()))->importEntries(
+            entries: [],
             creatorDn: new Dn('not a dn'),
         );
     }

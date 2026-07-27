@@ -34,12 +34,12 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnbindHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnsupportedExtendedHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerWhoAmIHandler;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
-use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
@@ -141,13 +141,10 @@ final class HandlerContainerProvider implements ContainerProviderInterface
 
     private function makeRootDseHandler(Container $container): ServerRootDseHandler
     {
-        $options = $container->get(ServerOptions::class);
-        $backend = $container->get(WritableStorageBackend::class);
-
         return new ServerRootDseHandler(
-            options: $options,
-            backend: $backend,
-            supportsSync: $this->syncJournalFor($container, $backend) !== null,
+            options: $container->get(ServerOptions::class),
+            backend: $container->get(WritableStorageBackend::class),
+            supportsSync: $this->syncJournalFor($container) !== null,
         );
     }
 
@@ -158,7 +155,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
     ): ServerSyncHandler {
         $options = $container->get(ServerOptions::class);
         $backend = $container->get(WritableStorageBackend::class);
-        $journal = $this->syncJournalFor($container, $backend);
+        $journal = $this->syncJournalFor($container);
         $projector = new SyncResultProjector(
             accessControl: $options->getAccessControl(),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
@@ -248,15 +245,13 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         );
     }
 
-    private function syncJournalFor(
-        Container $container,
-        WritableLdapBackendInterface $backend,
-    ): ?ChangeJournalInterface {
-        if (!$container->get(ServerOptions::class)->isSyncEnabled() || !$backend instanceof WritableStorageBackend) {
+    private function syncJournalFor(Container $container): ?ChangeJournalInterface
+    {
+        if (!$container->get(ServerOptions::class)->isSyncEnabled()) {
             return null;
         }
 
-        $storage = $backend->getStorage();
+        $storage = $container->get(EntryStorageInterface::class);
 
         return $storage instanceof ChangeJournalingInterface
             ? $storage->changeJournal()
