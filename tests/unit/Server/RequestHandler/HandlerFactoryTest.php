@@ -30,19 +30,6 @@ final class HandlerFactoryTest extends TestCase
         $this->backend = $this->createMock(WritableLdapBackendInterface::class);
     }
 
-    public function test_it_returns_the_backend_it_was_built_with(): void
-    {
-        $subject = new HandlerFactory(
-            new ServerOptions(),
-            $this->backend,
-        );
-
-        self::assertSame(
-            $this->backend,
-            $subject->makeBackend(),
-        );
-    }
-
     public function test_it_returns_default_password_authenticator_when_none_is_configured(): void
     {
         $subject = new HandlerFactory(

@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\MetricsResponseInterceptor;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
-use FreeDSx\Ldap\Server\HandlerFactoryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
@@ -76,7 +76,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
 
         return new EntryBindStrategy(
             $engine,
-            $container->get(HandlerFactoryInterface::class)->makeBackend(),
+            $container->get(WritableStorageBackend::class),
         );
     }
 
@@ -87,7 +87,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
             $options->getSearchLimitRules(),
             $options->makeSearchLimits(),
         );
-        $resolver->setBackend($container->get(HandlerFactoryInterface::class)->makeBackend());
+        $resolver->setBackend($container->get(WritableStorageBackend::class));
 
         return $resolver;
     }
@@ -96,7 +96,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
     {
         return new AssertionEvaluator(
             $container->get(FilterEvaluatorInterface::class),
-            $container->get(HandlerFactoryInterface::class)->makeBackend(),
+            $container->get(WritableStorageBackend::class),
         );
     }
 

@@ -42,7 +42,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
-use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyService;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyTargetResolver;
@@ -134,7 +133,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
     private function makeForwardHandler(Container $container): ServerProtocolHandlerInterface
     {
         return new ServerPasswordPolicyForwardHandler(
-            backend: $container->get(HandlerFactoryInterface::class)->makeBackend(),
+            backend: $container->get(WritableStorageBackend::class),
             policyResolver: $container->get(PasswordPolicyComponentFactory::class)->makeResolver(),
             engine: $container->get(PasswordPolicyEngine::class),
         );
@@ -143,7 +142,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
     private function makeRootDseHandler(Container $container): ServerRootDseHandler
     {
         $options = $container->get(ServerOptions::class);
-        $backend = $container->get(HandlerFactoryInterface::class)->makeBackend();
+        $backend = $container->get(WritableStorageBackend::class);
 
         return new ServerRootDseHandler(
             options: $options,
@@ -158,7 +157,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         ?SearchLimits $searchLimits,
     ): ServerSyncHandler {
         $options = $container->get(ServerOptions::class);
-        $backend = $container->get(HandlerFactoryInterface::class)->makeBackend();
+        $backend = $container->get(WritableStorageBackend::class);
         $journal = $this->syncJournalFor($container, $backend);
         $projector = new SyncResultProjector(
             accessControl: $options->getAccessControl(),
@@ -198,18 +197,18 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         Container $container,
         HandlerContext $context,
     ): ServerDispatchHandler {
-        $handlerFactory = $container->get(HandlerFactoryInterface::class);
+        $backend = $container->get(WritableStorageBackend::class);
         $policyWriteHandler = $container->get(PasswordPolicyComponentFactory::class)->makeWriteHandler(
             $context->eventLogger,
             $context->passwordPolicyContext,
         );
 
         return new ServerDispatchHandler(
-            backend: $handlerFactory->makeBackend(),
+            backend: $backend,
             writeDispatcher: $policyWriteHandler !== null
                 ? new WriteOperationDispatcher(
                     $policyWriteHandler,
-                    $handlerFactory->makeBackend(),
+                    $backend,
                 )
                 : $container->get(WriteOperationDispatcher::class),
             accessControl: $container->get(ServerOptions::class)->getAccessControl(),
@@ -224,7 +223,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         $options = $container->get(ServerOptions::class);
 
         return new ServerSearchHandler(
-            backend: $container->get(HandlerFactoryInterface::class)->makeBackend(),
+            backend: $container->get(WritableStorageBackend::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
             accessControl: $options->getAccessControl(),
             schema: $options->getSchema(),
@@ -240,7 +239,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         $options = $container->get(ServerOptions::class);
 
         return new ServerPagingHandler(
-            backend: $container->get(HandlerFactoryInterface::class)->makeBackend(),
+            backend: $container->get(WritableStorageBackend::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
             accessControl: $options->getAccessControl(),
             requestHistory: $context->requestHistory,

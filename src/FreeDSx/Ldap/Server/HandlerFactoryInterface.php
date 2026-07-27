@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Server;
 
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
-use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 
 /**
  * Responsible for instantiating classes needed by the core server logic.
@@ -24,11 +23,6 @@ use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
  */
 interface HandlerFactoryInterface
 {
-    /**
-     * Return the configured backend.
-     */
-    public function makeBackend(): WritableLdapBackendInterface;
-
     /**
      * Return a PasswordAuthenticatableInterface for simple-bind and SASL PLAIN.
      *

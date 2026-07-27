@@ -43,6 +43,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordPolicyAwareAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslBindPolicyEnforcer;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -100,7 +101,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         $metricsRecorder = $this->container->get(MetricsRecorderInterface::class);
 
         $eventLogger = $this->makeEventLogger($context);
-        $backend = $handlerFactory->makeBackend();
+        $backend = $this->container->get(WritableStorageBackend::class);
         $passwordAuthenticator = $handlerFactory->makePasswordAuthenticator();
 
         $policyContext = null;

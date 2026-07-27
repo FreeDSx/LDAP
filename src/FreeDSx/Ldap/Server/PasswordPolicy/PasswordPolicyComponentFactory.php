@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Server\Backend\Write\SystemChange\NullSystemChangeWriter;
 use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriter;
 use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriterInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
-use FreeDSx\Ldap\Server\HandlerFactoryInterface;
+use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyChangeGuard;
 use FreeDSx\Ldap\ServerOptions;
@@ -32,7 +32,7 @@ use FreeDSx\Ldap\ServerOptions;
 final readonly class PasswordPolicyComponentFactory
 {
     public function __construct(
-        private HandlerFactoryInterface $handlerFactory,
+        private WritableLdapBackendInterface $backend,
         private ServerOptions $options,
         private WriteOperationDispatcher $writeDispatcher,
         private PasswordPolicyEngine $passwordPolicyEngine,
@@ -52,7 +52,7 @@ final readonly class PasswordPolicyComponentFactory
         }
 
         return new PasswordPolicyWriteHandler(
-            $this->handlerFactory->makeBackend(),
+            $this->backend,
             $guard,
             $this->makeSystemChangeWriter(),
         );
@@ -77,7 +77,7 @@ final readonly class PasswordPolicyComponentFactory
     public function makeResolver(): PasswordPolicyResolver
     {
         return new PasswordPolicyResolver(
-            $this->handlerFactory->makeBackend(),
+            $this->backend,
             $this->options->getDefaultPasswordPolicyDn(),
             $this->options->getPasswordPolicy(),
         );
