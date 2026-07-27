@@ -21,7 +21,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
@@ -100,17 +99,6 @@ final readonly class WriteSerializingStorage implements EntryStorageInterface, R
     }
 
     /**
-     * Configures the journal on both storages.
-     *
-     * The writer captures changes and the reader serves sync polls.
-     */
-    public function configureJournal(ChangeJournalConfig $config): void
-    {
-        $this->journaling($this->writes)->configureJournal($config);
-        $this->journaling($this->reads)->configureJournal($config);
-    }
-
-    /**
      * Defensive delegate.
      *
      * The journal appends actually run on the write storage.
@@ -123,7 +111,7 @@ final readonly class WriteSerializingStorage implements EntryStorageInterface, R
     /**
      * Reads through the per-coroutine storage so sync polls never contend with the serialized writer.
      */
-    public function changeJournal(): ChangeJournalInterface
+    public function changeJournal(): ?ChangeJournalInterface
     {
         return $this->journaling($this->reads)->changeJournal();
     }

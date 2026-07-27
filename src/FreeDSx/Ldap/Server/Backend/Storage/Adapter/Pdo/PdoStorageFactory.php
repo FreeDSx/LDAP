@@ -16,9 +16,14 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\CoroutinePdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoChangeJournal;
+use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use PDO;
 
@@ -54,13 +59,23 @@ final class PdoStorageFactory
         return new CoroutinePdoConnectionProvider(static fn(): PDO => self::open($config));
     }
 
+    /**
+     * @param ?ChangeJournalConfig $journalConfig Attaches a journal on this connection when journaling is enabled.
+     */
     public static function storageOn(
         PdoConfig $config,
         PdoConnectionProviderInterface $provider,
         ?SleeperInterface $sleeper = null,
+        ?ChangeJournalConfig $journalConfig = null,
     ): PdoStorage {
         // Storage and its index writer share one statement pool, so both draw from the same connection and cache.
         $statements = new PdoStatementPool($provider);
+        // The journal shares the transactor so an append joins the write transaction it belongs to.
+        $transactor = new PdoTransactor(
+            $provider,
+            $config->getDialect(),
+            $sleeper ?? new BlockingSleeper(),
+        );
 
         return new PdoStorage(
             $provider,
@@ -72,7 +87,16 @@ final class PdoStorageFactory
                 $statements,
                 $config->getSubstringIndex(),
             ),
-            $sleeper,
+            $transactor,
+            $journalConfig === null ? null : AuditingChangeJournal::wrap(
+                new PdoChangeJournal(
+                    $transactor,
+                    $config->getDialect(),
+                    $statements,
+                    $journalConfig->origin,
+                ),
+                $journalConfig,
+            ),
         );
     }
 

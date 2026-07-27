@@ -17,8 +17,6 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\CoroutineLock;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\StorageLockInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\ArrayEntryStorageTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\JsonEntryBuffer;
@@ -27,9 +25,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\FileChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Logging\ExceptionLogging;
 use Psr\Log\LoggerInterface;
@@ -37,7 +33,7 @@ use Psr\Log\NullLogger;
 use Throwable;
 
 /**
- * JSON-file storage; the container picks forPcntl()/forSwoole() locking from JsonStorageConfig. Reads are lock-free; writes go through atomic() which loads, mutates, and rewrites the file under lock.
+ * JSON-file storage; JsonBackendBuilder picks the runner-appropriate lock. Reads are lock-free; writes go through atomic() which loads, mutates, and rewrites the file under lock.
  *
  * File format: { "cn=x,dc=y": { "dn": "cn=x,dc=y", "attributes": { "cn": ["x"] } } }
  *
@@ -50,10 +46,6 @@ final class JsonFileStorage implements EntryStorageInterface, ChangeJournalingIn
     use ArrayEntryStorageTrait;
     use ChangeJournalingTrait;
 
-    private const JOURNAL_SUFFIX = '.journal.jsonl';
-
-    private const SEQ_SUFFIX = '.journal.seq';
-
     /**
      * @var array<string, Entry>|null
      */
@@ -64,34 +56,16 @@ final class JsonFileStorage implements EntryStorageInterface, ChangeJournalingIn
      */
     private string $cacheStamp = '';
 
-    private function __construct(
+    /**
+     * @param ?ChangeJournalInterface $journal Must share $lock so an append re-enters it rather than deadlocking.
+     */
+    public function __construct(
         private readonly string $filePath,
         private readonly StorageLockInterface $lock,
+        ?ChangeJournalInterface $journal = null,
         private readonly LoggerInterface $logger = new NullLogger(),
-    ) {}
-
-    public static function forPcntl(
-        string $filePath,
-        ?StorageLockInterface $lock = null,
-        ?LoggerInterface $logger = null,
-    ): self {
-        return new self(
-            $filePath,
-            $lock ?? new FileLock($filePath),
-            $logger ?? new NullLogger(),
-        );
-    }
-
-    public static function forSwoole(
-        string $filePath,
-        ?StorageLockInterface $lock = null,
-        ?LoggerInterface $logger = null,
-    ): self {
-        return new self(
-            $filePath,
-            $lock ?? new CoroutineLock($filePath),
-            $logger ?? new NullLogger(),
-        );
+    ) {
+        $this->journal = $journal;
     }
 
     /**
@@ -177,16 +151,6 @@ final class JsonFileStorage implements EntryStorageInterface, ChangeJournalingIn
     public function namingContexts(): array
     {
         return $this->namingContextsFromArray($this->read());
-    }
-
-    protected function buildJournal(ChangeJournalConfig $config): ChangeJournalInterface
-    {
-        return new FileChangeJournal(
-            $this->lock,
-            $this->filePath . self::JOURNAL_SUFFIX,
-            $this->filePath . self::SEQ_SUFFIX,
-            $config->origin,
-        );
     }
 
     /**

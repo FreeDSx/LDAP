@@ -18,13 +18,15 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeAppenderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\FileChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
@@ -35,6 +37,7 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
 
@@ -65,7 +68,7 @@ final class JsonFileStorageTest extends TestCase
             new Attribute('userPassword', 'secret'),
         );
 
-        $this->storage = JsonFileStorage::forPcntl($this->tempFile);
+        $this->storage = $this->makeStorage($this->tempFile);
         $this->subject = new WritableStorageBackend($this->storage);
         $this->subject->add(
             new AddCommand(
@@ -150,7 +153,7 @@ final class JsonFileStorageTest extends TestCase
 
     public function test_get_on_nonexistent_file_returns_null(): void
     {
-        $storage = JsonFileStorage::forPcntl($this->tempFile . '.nonexistent');
+        $storage = $this->makeStorage($this->tempFile . '.nonexistent');
         $backend = new WritableStorageBackend($storage);
 
         self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
@@ -159,7 +162,7 @@ final class JsonFileStorageTest extends TestCase
     public function test_get_on_empty_file_returns_null(): void
     {
         file_put_contents($this->tempFile, '');
-        $storage = JsonFileStorage::forPcntl($this->tempFile);
+        $storage = $this->makeStorage($this->tempFile);
         $backend = new WritableStorageBackend($storage);
 
         self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
@@ -168,7 +171,7 @@ final class JsonFileStorageTest extends TestCase
     public function test_get_on_invalid_json_returns_null(): void
     {
         file_put_contents($this->tempFile, 'not valid json {{{');
-        $storage = JsonFileStorage::forPcntl($this->tempFile);
+        $storage = $this->makeStorage($this->tempFile);
         $backend = new WritableStorageBackend($storage);
 
         self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
@@ -183,7 +186,7 @@ final class JsonFileStorageTest extends TestCase
         );
 
         // A second independent backend reading the same file should see the new entry.
-        $backend2 = new WritableStorageBackend(JsonFileStorage::forPcntl($this->tempFile));
+        $backend2 = new WritableStorageBackend($this->makeStorage($this->tempFile));
 
         self::assertNotNull($backend2->get(new Dn('cn=Persistent,dc=example,dc=com')));
     }
@@ -195,7 +198,7 @@ final class JsonFileStorageTest extends TestCase
             $this->context(),
         );
 
-        $backend2 = new WritableStorageBackend(JsonFileStorage::forPcntl($this->tempFile));
+        $backend2 = new WritableStorageBackend($this->makeStorage($this->tempFile));
 
         self::assertNull($backend2->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
@@ -206,7 +209,7 @@ final class JsonFileStorageTest extends TestCase
         $this->storage->find(new Dn('cn=alice,dc=example,dc=com'));
         file_put_contents($this->tempFile, 'corrupted');
 
-        $storage2 = JsonFileStorage::forPcntl($this->tempFile);
+        $storage2 = $this->makeStorage($this->tempFile);
 
         // Prime the cache on first call (returns null from corrupted file).
         $storage2->find(new Dn('cn=alice,dc=example,dc=com'));
@@ -219,7 +222,7 @@ final class JsonFileStorageTest extends TestCase
 
     public function test_cache_is_invalidated_after_write(): void
     {
-        $storage = JsonFileStorage::forPcntl($this->tempFile);
+        $storage = $this->makeStorage($this->tempFile);
         $backend = new WritableStorageBackend($storage);
 
         // Prime the cache with a valid file (contains Alice).
@@ -344,8 +347,7 @@ final class JsonFileStorageTest extends TestCase
 
     public function test_a_recorded_write_is_journaled_through_the_buffer(): void
     {
-        $storage = JsonFileStorage::forPcntl($this->registerTemp());
-        $storage->configureJournal(new ChangeJournalConfig());
+        $storage = $this->makeJournaledStorage($this->registerTemp());
         $backend = new WritableStorageBackend(
             storage: $storage,
             changeRecorder: new ChangeRecorder(),
@@ -362,14 +364,13 @@ final class JsonFileStorageTest extends TestCase
 
         self::assertCount(
             1,
-            iterator_to_array($storage->changeJournal()->read()),
+            iterator_to_array($this->journalOf($storage)->read()),
         );
     }
 
     public function test_a_failed_write_records_nothing_in_the_journal(): void
     {
-        $storage = JsonFileStorage::forPcntl($this->registerTemp());
-        $storage->configureJournal(new ChangeJournalConfig());
+        $storage = $this->makeJournaledStorage($this->registerTemp());
 
         try {
             $storage->atomic(function (EntryStorageInterface $buffer): void {
@@ -390,11 +391,11 @@ final class JsonFileStorageTest extends TestCase
 
         self::assertCount(
             0,
-            iterator_to_array($storage->changeJournal()->read()),
+            iterator_to_array($this->journalOf($storage)->read()),
         );
         self::assertSame(
             0,
-            $storage->changeJournal()->latestSeq(),
+            $this->journalOf($storage)->latestSeq(),
         );
     }
 
@@ -408,12 +409,10 @@ final class JsonFileStorageTest extends TestCase
         $logger->expects($this->once())
             ->method('error');
 
-        $storage = JsonFileStorage::forPcntl(
+        $storage = $this->makeJournaledStorage(
             $base,
-            null,
             $logger,
         );
-        $storage->configureJournal(new ChangeJournalConfig());
         $backend = new WritableStorageBackend(
             storage: $storage,
             changeRecorder: new ChangeRecorder(),
@@ -438,9 +437,54 @@ final class JsonFileStorageTest extends TestCase
         self::assertNotNull($backend->get(new Dn('dc=example,dc=com')));
     }
 
-    protected function makeJournalingStorage(): ChangeJournalingInterface
+    protected function makeJournalingStorage(?ChangeJournalInterface $journal = null): ChangeJournalingInterface
     {
-        return JsonFileStorage::forPcntl($this->registerTemp());
+        return $this->makeStorage(
+            $this->registerTemp(),
+            $journal,
+        );
+    }
+
+    /**
+     * The journal shares the storage lock, so an append re-enters the write it belongs to.
+     */
+    private function makeStorage(
+        string $path,
+        ?ChangeJournalInterface $journal = null,
+        ?LoggerInterface $logger = null,
+    ): JsonFileStorage {
+        return new JsonFileStorage(
+            $path,
+            new FileLock($path),
+            $journal,
+            $logger ?? new NullLogger(),
+        );
+    }
+
+    /**
+     * Storage and a file-backed journal on one lock, matching how the container wires them.
+     */
+    private function makeJournaledStorage(
+        string $path,
+        ?LoggerInterface $logger = null,
+    ): JsonFileStorage {
+        $lock = new FileLock($path);
+
+        return new JsonFileStorage(
+            $path,
+            $lock,
+            new FileChangeJournal(
+                $lock,
+                $path . '.journal.jsonl',
+                $path . '.journal.seq',
+            ),
+            $logger ?? new NullLogger(),
+        );
+    }
+
+    private function journalOf(JsonFileStorage $storage): ChangeJournalInterface
+    {
+        return $storage->changeJournal() ?? self::fail('Expected the storage to have a journal.');
     }
 
     private function registerTemp(): string

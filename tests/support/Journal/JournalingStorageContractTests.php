@@ -14,13 +14,12 @@ declare(strict_types=1);
 namespace Tests\Support\FreeDSx\Ldap\Journal;
 
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditSinkInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 
 /**
  * Shared ChangeJournalingTrait contract tests.
@@ -29,45 +28,42 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
  */
 trait JournalingStorageContractTests
 {
-    public function test_append_change_records_to_the_configured_journal(): void
+    public function test_an_appended_change_reaches_the_injected_journal(): void
     {
-        $storage = $this->makeJournalingStorage();
-        $storage->configureJournal(new ChangeJournalConfig());
-        $storage->appendChange($this->journalingChange());
+        $journal = new InMemoryChangeJournal();
+        $this->makeJournalingStorage($journal)
+            ->appendChange($this->journalingChange());
 
         self::assertCount(
             1,
-            iterator_to_array($storage->changeJournal()->read()),
+            iterator_to_array($journal->read()),
         );
     }
 
-    public function test_configure_journal_tees_appends_to_the_audit_sink(): void
+    public function test_the_injected_journal_is_the_one_exposed(): void
     {
-        $sink = $this->createMock(AuditSinkInterface::class);
-        $sink->expects($this->once())
-            ->method('write');
-        $storage = $this->makeJournalingStorage();
-        $storage->configureJournal(new ChangeJournalConfig(auditSink: $sink));
+        $journal = new InMemoryChangeJournal();
 
-        $storage->appendChange($this->journalingChange());
+        self::assertSame(
+            $journal,
+            $this->makeJournalingStorage($journal)->changeJournal(),
+        );
     }
 
-    public function test_the_journal_can_only_be_configured_once(): void
+    public function test_there_is_no_journal_when_none_is_injected(): void
     {
-        $storage = $this->makeJournalingStorage();
-        $storage->configureJournal(new ChangeJournalConfig());
-
-        $this->expectException(InvalidArgumentException::class);
-        $storage->configureJournal(new ChangeJournalConfig());
+        self::assertNull($this->makeJournalingStorage()->changeJournal());
     }
 
-    public function test_reading_the_journal_before_it_is_configured_throws(): void
+    public function test_appending_without_a_journal_does_nothing(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        $this->makeJournalingStorage()->changeJournal();
+        $this->expectNotToPerformAssertions();
+
+        $this->makeJournalingStorage()
+            ->appendChange($this->journalingChange());
     }
 
-    abstract protected function makeJournalingStorage(): ChangeJournalingInterface;
+    abstract protected function makeJournalingStorage(?ChangeJournalInterface $journal = null): ChangeJournalingInterface;
 
     private function journalingChange(): PendingChange
     {

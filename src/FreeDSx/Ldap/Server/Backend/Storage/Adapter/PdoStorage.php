@@ -24,16 +24,13 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\PdoListQueryBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
-use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\SqlQuery;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SidecarLeaf;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingTrait;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
@@ -86,6 +83,8 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     /**
      * @param ?PdoStatementPool $statements Must draw from $provider; defaults to a pool of its own over that connection.
      * @param ?EntryIndexWriter $indexes Must share $statements; defaults to one with no substring index attached.
+     * @param ?PdoTransactor $transactor Must draw from $provider; defaults to one of its own over that connection.
+     * @param ?ChangeJournalInterface $journal Must share $transactor so an append joins the write it belongs to.
      */
     public function __construct(
         private readonly PdoConnectionProviderInterface $provider,
@@ -93,7 +92,8 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         private readonly PdoDialectInterface $dialect,
         ?PdoStatementPool $statements = null,
         ?EntryIndexWriter $indexes = null,
-        ?SleeperInterface $sleeper = null,
+        ?PdoTransactor $transactor = null,
+        ?ChangeJournalInterface $journal = null,
     ) {
         if (!extension_loaded('mbstring')) {
             throw new RuntimeException(
@@ -102,16 +102,17 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         }
 
         $this->queryBuilder = new PdoListQueryBuilder($dialect);
-        $this->transactor = new PdoTransactor(
+        $this->transactor = $transactor ?? new PdoTransactor(
             $provider,
             $dialect,
-            $sleeper ?? new BlockingSleeper(),
+            new BlockingSleeper(),
         );
         $this->statements = $statements ?? new PdoStatementPool($provider);
         $this->indexes = $indexes ?? new EntryIndexWriter(
             $dialect,
             $this->statements,
         );
+        $this->journal = $journal;
     }
 
     public function reset(): void
@@ -328,16 +329,6 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             $this->transactor->pdo(),
             'entries',
             $dn->normalize()->toString(),
-        );
-    }
-
-    protected function buildJournal(ChangeJournalConfig $config): ChangeJournalInterface
-    {
-        return new PdoChangeJournal(
-            $this->transactor,
-            $this->dialect,
-            $this->statements,
-            $config->origin,
         );
     }
 

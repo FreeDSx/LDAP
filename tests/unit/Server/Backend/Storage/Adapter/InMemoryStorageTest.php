@@ -16,10 +16,9 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
@@ -318,26 +317,21 @@ final class InMemoryStorageTest extends TestCase
         );
     }
 
-    public function test_configure_journal_builds_a_journal_stamped_with_the_config_origin(): void
-    {
-        $this->subject->configureJournal(new ChangeJournalConfig(new ReplicaId('node-x')));
-
-        self::assertTrue($this->subject->changeJournal()->origin()->equals(new ReplicaId('node-x')));
-    }
-
-    public function test_a_constructor_injected_journal_cannot_also_be_configured(): void
+    public function test_the_injected_journal_keeps_the_origin_it_was_built_with(): void
     {
         $storage = new InMemoryStorage(
             [],
-            new InMemoryChangeJournal(),
+            new InMemoryChangeJournal(new ReplicaId('node-x')),
         );
 
-        $this->expectException(InvalidArgumentException::class);
-        $storage->configureJournal(new ChangeJournalConfig());
+        self::assertTrue($storage->changeJournal()?->origin()->equals(new ReplicaId('node-x')));
     }
 
-    protected function makeJournalingStorage(): ChangeJournalingInterface
+    protected function makeJournalingStorage(?ChangeJournalInterface $journal = null): ChangeJournalingInterface
     {
-        return new InMemoryStorage();
+        return new InMemoryStorage(
+            [],
+            $journal,
+        );
     }
 }
