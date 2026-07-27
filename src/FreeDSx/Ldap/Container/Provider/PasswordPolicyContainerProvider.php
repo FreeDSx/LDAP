@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
-use FreeDSx\Ldap\Server\HandlerFactoryInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyTargetResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\AllowUserChangeConstraint;
 use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\HistoryConstraint;
@@ -98,7 +98,7 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
     {
         return new PasswordModifyTargetResolver(
             $container->get(WritableStorageBackend::class),
-            $container->get(HandlerFactoryInterface::class)->makeIdentityResolverChain(),
+            $container->get(BindNameResolverInterface::class),
         );
     }
 

@@ -38,6 +38,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerAwareAuthenticator;
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordPolicyAwareAuthenticator;
@@ -97,12 +98,11 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         ConnectionContext $context = new ConnectionContext(),
     ): ServerProtocolHandler {
         $options = $this->serverOptions();
-        $handlerFactory = $this->container->get(HandlerFactoryInterface::class);
         $metricsRecorder = $this->container->get(MetricsRecorderInterface::class);
 
         $eventLogger = $this->makeEventLogger($context);
         $backend = $this->container->get(WritableStorageBackend::class);
-        $passwordAuthenticator = $handlerFactory->makePasswordAuthenticator();
+        $passwordAuthenticator = $this->container->get(PasswordAuthenticatableInterface::class);
 
         $policyContext = null;
         $interceptors = [];
@@ -140,7 +140,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         $authzIdResolver = new AuthzIdResolver(
             $options->getAccessControl(),
             $backend,
-            $handlerFactory->makeIdentityResolverChain(),
+            $this->container->get(BindNameResolverInterface::class),
             $eventLogger,
         );
 
@@ -215,7 +215,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
     ): PasswordPolicyAwareAuthenticator {
         return new PasswordPolicyAwareAuthenticator(
             $inner,
-            $this->container->get(HandlerFactoryInterface::class)->makeIdentityResolverChain(),
+            $this->container->get(BindNameResolverInterface::class),
             $backend,
             $this->container->get(PasswordPolicyComponentFactory::class)->makeResolver(),
             $this->makeBindGuard(
@@ -274,7 +274,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         EventLogger $eventLogger,
     ): SaslBindPolicyEnforcer {
         return new SaslBindPolicyEnforcer(
-            $this->container->get(HandlerFactoryInterface::class)->makeIdentityResolverChain(),
+            $this->container->get(BindNameResolverInterface::class),
             $backend,
             $this->container->get(PasswordPolicyComponentFactory::class)->makeResolver(),
             $this->makeBindGuard(

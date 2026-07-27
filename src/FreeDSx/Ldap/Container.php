@@ -24,7 +24,6 @@ use FreeDSx\Ldap\Container\Provider\ProxyServerContainerProvider;
 use FreeDSx\Ldap\Container\Provider\ServerListenerContainerProvider;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
-use FreeDSx\Ldap\Server\HandlerFactoryInterface;
 
 use function in_array;
 
@@ -34,7 +33,6 @@ class Container
      * These are classes that should never cache an instance when retrieved from the container.
      */
     private const FACTORY_ONLY = [
-        HandlerFactoryInterface::class,
         ServerAuthorization::class,
     ];
 

@@ -35,10 +35,10 @@ use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
-use FreeDSx\Ldap\Server\HandlerFactoryInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
@@ -77,14 +77,6 @@ class ContainerTest extends TestCase
         parent::setUp();
 
         $this->subject = Container::forServer(new ServerOptions());
-    }
-
-    public function test_it_assembles_the_backend_from_the_configured_storage(): void
-    {
-        self::assertInstanceOf(
-            WritableStorageBackend::class,
-            $this->subject->get(WritableStorageBackend::class),
-        );
     }
 
     public function test_it_builds_in_memory_storage_from_an_in_memory_config(): void
@@ -182,7 +174,8 @@ class ContainerTest extends TestCase
     {
         return [
             [ServerProtocolFactory::class],
-            [HandlerFactoryInterface::class],
+            [BindNameResolverInterface::class],
+            [PasswordAuthenticatableInterface::class],
             [ServerAuthorization::class],
             [SocketServerFactory::class],
             [MetricsRecorderInterface::class],

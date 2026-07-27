@@ -48,7 +48,12 @@ use FreeDSx\Ldap\Server\Clock\Sleeper\CoroutineSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Clock\SystemClock;
 use FreeDSx\Ldap\Server\ConnectionHandlerBuilderInterface;
-use FreeDSx\Ldap\Server\HandlerFactoryInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\AttributeSearchBindNameResolver;
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverChain;
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\LdapClientForwardStateSender;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\PasswordPolicyForwardWorker;
@@ -59,7 +64,6 @@ use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PeriodicTask;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\SwooleBackgroundTasks;
 use FreeDSx\Ldap\Server\Process\Signals\PcntlShutdownSignals;
-use FreeDSx\Ldap\Server\RequestHandler\HandlerFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
@@ -82,7 +86,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     public function factories(): array
     {
         return [
-            HandlerFactoryInterface::class => $this->makeHandlerFactory(...),
+            BindNameResolverInterface::class => $this->makeIdentityResolverChain(...),
+            PasswordAuthenticatableInterface::class => $this->makePasswordAuthenticator(...),
             FilterEvaluatorInterface::class => $this->makeFilterEvaluator(...),
             EntryStorageInterface::class => $this->makeStorage(...),
             PdoBackendBuilder::class => $this->makePdoBackendBuilder(...),
@@ -97,12 +102,29 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         ];
     }
 
-    private function makeHandlerFactory(Container $container): HandlerFactory
+    /**
+     * The configured resolver behind a DN resolver, which wins whenever the bind name already is a DN.
+     */
+    private function makeIdentityResolverChain(Container $container): BindNameResolverInterface
     {
-        return new HandlerFactory(
-            $container->get(ServerOptions::class),
-            $container->get(WritableStorageBackend::class),
-        );
+        $configured = $container->get(ServerOptions::class)->getIdentityResolver();
+
+        return new BindNameResolverChain([
+            new DnBindNameResolver(),
+            $configured ?? new AttributeSearchBindNameResolver(),
+        ]);
+    }
+
+    /**
+     * The configured authenticator, else one reading userPassword from entries the backend returns.
+     */
+    private function makePasswordAuthenticator(Container $container): PasswordAuthenticatableInterface
+    {
+        return $container->get(ServerOptions::class)->getPasswordAuthenticator()
+            ?? new PasswordAuthenticator(
+                $container->get(BindNameResolverInterface::class),
+                $container->get(WritableStorageBackend::class),
+            );
     }
 
     private function makeFilterEvaluator(Container $container): FilterEvaluator
