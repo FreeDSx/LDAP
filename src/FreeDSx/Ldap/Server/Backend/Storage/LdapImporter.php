@@ -31,10 +31,7 @@ final readonly class LdapImporter
         private EntryStorageInterface $storage,
         private OperationalAttributeGenerator $operationalAttrs = new OperationalAttributeGenerator(),
         private ?SchemaValidator $validator = null,
-        private Dn $creatorDn = new Dn(''),
-    ) {
-        $this->assertValidCreatorDn($creatorDn);
-    }
+    ) {}
 
     /**
      * Stream entries into storage under a single atomic write.
@@ -43,15 +40,19 @@ final readonly class LdapImporter
      * at the parent check.
      *
      * @param iterable<Entry> $entries
+     * @param Dn $creatorDn recorded as creatorsName/modifiersName on the imported entries.
      * @param bool $ignoreValidation when true, skips parent and schema checks. only do this if you know what you're doing.
-     * @throws InvalidArgumentException when a non-top-level entry's parent is not present in storage yet
+     * @throws InvalidArgumentException when the creator DN is malformed, or a non-top-level entry's parent is not present in storage yet
      * @throws OperationException when an entry violates the schema and validation mode is strict
      */
     public function importEntries(
         iterable $entries,
+        Dn $creatorDn = new Dn(''),
         bool $ignoreValidation = false,
     ): void {
-        $this->storage->atomic(function (EntryStorageInterface $storage) use ($entries, $ignoreValidation): void {
+        $this->assertValidCreatorDn($creatorDn);
+
+        $this->storage->atomic(function (EntryStorageInterface $storage) use ($entries, $creatorDn, $ignoreValidation): void {
             foreach ($entries as $entry) {
                 if (!$ignoreValidation) {
                     $this->assertParentExists(
@@ -66,7 +67,7 @@ final readonly class LdapImporter
                 );
                 $this->operationalAttrs->applyForBulkLoad(
                     $entry,
-                    $this->creatorDn->toString(),
+                    $creatorDn->toString(),
                 );
                 $storage->store(
                     $entry,

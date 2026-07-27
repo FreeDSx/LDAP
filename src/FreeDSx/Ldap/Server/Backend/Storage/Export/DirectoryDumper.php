@@ -18,14 +18,14 @@ use FreeDSx\Ldap\Ldif\LdifWriter;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use Generator;
 
 /**
- * Streams the entries of a writable storage backend as LDIF content-record chunks for backup/export.
+ * Streams the entries of a storage backend as LDIF content-record chunks for backup/export.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -35,7 +35,7 @@ final readonly class DirectoryDumper
      * @param list<Dn> $namingContexts dump roots when DumpOptions::baseDn is not set
      */
     public function __construct(
-        private WritableStorageBackend $backend,
+        private EntryStorageInterface $storage,
         private array $namingContexts,
         private FilterEvaluatorInterface $filterEvaluator = new FilterEvaluator(),
         private LdifWriter $writer = new LdifWriter(),
@@ -88,7 +88,7 @@ final readonly class DirectoryDumper
             subtree: true,
             filter: $filter ?? new AndFilter(),
         );
-        $stream = $this->backend->getStorage()->list($listOptions);
+        $stream = $this->storage->list($listOptions);
 
         foreach ($stream->entries as $entry) {
             if (!$stream->isPreFiltered && $filter !== null) {

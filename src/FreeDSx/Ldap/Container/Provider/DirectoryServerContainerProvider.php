@@ -40,6 +40,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\FileChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionSweeper;
+use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
 use FreeDSx\Ldap\Server\Backend\Storage\OperationalAttributeGenerator;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
@@ -90,6 +91,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             PasswordAuthenticatableInterface::class => $this->makePasswordAuthenticator(...),
             FilterEvaluatorInterface::class => $this->makeFilterEvaluator(...),
             EntryStorageInterface::class => $this->makeStorage(...),
+            OperationalAttributeGenerator::class => $this->makeOperationalAttributeGenerator(...),
+            LdapImporter::class => $this->makeLdapImporter(...),
             PdoBackendBuilder::class => $this->makePdoBackendBuilder(...),
             WritableStorageBackend::class => $this->makeBackend(...),
             ServerProtocolFactory::class => $this->makeServerProtocolFactory(...),
@@ -239,17 +242,39 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         $options = $container->get(ServerOptions::class);
         $storage = $container->get(EntryStorageInterface::class);
 
-        $schema = $options->getSchemaValidationMode() !== SchemaValidationMode::Off
-            ? $options->getSchema()
-            : null;
-
         return new WritableStorageBackend(
             storage: $storage,
             limits: $options->makeSearchLimits(),
             validator: $this->buildSchemaValidator($container),
-            operationalAttrs: new OperationalAttributeGenerator($schema),
+            operationalAttrs: $container->get(OperationalAttributeGenerator::class),
             changeRecorder: $this->changeRecorderFor($container, $storage),
             schema: $options->getSchema(),
+        );
+    }
+
+    /**
+     * Bulk loading writes straight to storage, so it stamps and validates with the same components the write path uses.
+     */
+    private function makeLdapImporter(Container $container): LdapImporter
+    {
+        return new LdapImporter(
+            $container->get(EntryStorageInterface::class),
+            $container->get(OperationalAttributeGenerator::class),
+            $this->buildSchemaValidator($container),
+        );
+    }
+
+    /**
+     * Schema-aware only when validation is on, so the generator stamps what the configured schema declares.
+     */
+    private function makeOperationalAttributeGenerator(Container $container): OperationalAttributeGenerator
+    {
+        $options = $container->get(ServerOptions::class);
+
+        return new OperationalAttributeGenerator(
+            $options->getSchemaValidationMode() !== SchemaValidationMode::Off
+                ? $options->getSchema()
+                : null,
         );
     }
 
@@ -317,7 +342,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
         $instances = [
             WritableStorageBackend::class => $backend,
-            EntryStorageInterface::class => $backend->getStorage(),
+            EntryStorageInterface::class => $container->get(EntryStorageInterface::class),
         ];
 
         // On the PDO path, share the builder so the reloaded replica store stays on the storage's connection.
