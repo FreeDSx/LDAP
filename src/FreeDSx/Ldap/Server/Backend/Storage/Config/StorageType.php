@@ -32,8 +32,8 @@ enum StorageType
     public function isMultiProcessSafe(): bool
     {
         return match ($this) {
-            self::Pdo => true,
-            self::Json, self::InMemory => false,
+            self::Pdo, self::Json => true,
+            self::InMemory => false,
         };
     }
 }

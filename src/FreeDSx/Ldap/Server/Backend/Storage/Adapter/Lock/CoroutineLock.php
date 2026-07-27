@@ -28,10 +28,22 @@ final class CoroutineLock implements StorageLockInterface
 
     private const DEPTH_KEY = '__freedsx_storage_lock_depth';
 
+    private const LOCK_SUFFIX = '.lock';
+
+    /**
+     * Waited out between attempts at the file lock, since holding it is never long.
+     */
+    private const RETRY_SECONDS = 0.001;
+
     /**
      * @var Channel<mixed>|null
      */
     private ?Channel $mutex = null;
+
+    /**
+     * @var resource|null
+     */
+    private $lockHandle = null;
 
     private function acquireLock(): void
     {
@@ -39,6 +51,7 @@ final class CoroutineLock implements StorageLockInterface
         $depth = $this->currentDepth();
         if ($depth === 0) {
             $this->getOrCreateMutex()->pop();
+            $this->acquireFileLock();
         }
 
         $this->setCurrentDepth($depth + 1);
@@ -54,8 +67,45 @@ final class CoroutineLock implements StorageLockInterface
         $this->setCurrentDepth($depth - 1);
 
         if ($depth === 1) {
+            $this->releaseFileLock();
             $this->mutex?->push(true);
         }
+    }
+
+    /**
+     * The coroutine mutex only covers this process, so worker processes would otherwise overwrite each other.
+     *
+     * Taken without blocking and retried, because a blocking wait would stall every other coroutine in the worker.
+     */
+    private function acquireFileLock(): void
+    {
+        $handle = fopen(
+            $this->filePath . self::LOCK_SUFFIX,
+            'c',
+        );
+
+        if ($handle === false) {
+            $this->mutex?->push(true);
+
+            throw new StorageIoException('Unable to open the storage backend lock.');
+        }
+
+        while (!flock($handle, LOCK_EX | LOCK_NB)) {
+            Coroutine::sleep(self::RETRY_SECONDS);
+        }
+
+        $this->lockHandle = $handle;
+    }
+
+    private function releaseFileLock(): void
+    {
+        if ($this->lockHandle === null) {
+            return;
+        }
+
+        flock($this->lockHandle, LOCK_UN);
+        fclose($this->lockHandle);
+        $this->lockHandle = null;
     }
 
     private function currentDepth(): int
