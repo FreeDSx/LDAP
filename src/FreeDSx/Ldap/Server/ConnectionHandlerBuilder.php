@@ -66,7 +66,7 @@ use FreeDSx\Ldap\Server\Middleware\RequestValidationMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ResourceLimitMiddleware;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\PasswordPolicyBindStrategyInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyBindGuard;
-use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyComponentFactory;
+use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordResetGate;
@@ -217,7 +217,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
             $inner,
             $this->container->get(BindNameResolverInterface::class),
             $backend,
-            $this->container->get(PasswordPolicyComponentFactory::class)->makeResolver(),
+            $this->container->get(PasswordPolicyResolver::class),
             $this->makeBindGuard(
                 $policyContext,
                 $eventLogger,
@@ -276,7 +276,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         return new SaslBindPolicyEnforcer(
             $this->container->get(BindNameResolverInterface::class),
             $backend,
-            $this->container->get(PasswordPolicyComponentFactory::class)->makeResolver(),
+            $this->container->get(PasswordPolicyResolver::class),
             $this->makeBindGuard(
                 $policyContext,
                 $eventLogger,

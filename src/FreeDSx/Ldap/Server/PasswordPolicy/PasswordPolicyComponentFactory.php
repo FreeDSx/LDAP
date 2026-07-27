@@ -36,6 +36,7 @@ final readonly class PasswordPolicyComponentFactory
         private ServerOptions $options,
         private WriteOperationDispatcher $writeDispatcher,
         private PasswordPolicyEngine $passwordPolicyEngine,
+        private PasswordPolicyResolver $policyResolver,
     ) {}
 
     public function makeWriteHandler(
@@ -68,22 +69,16 @@ final readonly class PasswordPolicyComponentFactory
 
         return new PasswordPolicyChangeGuard(
             $this->passwordPolicyEngine,
-            $this->makeResolver(),
+            $this->policyResolver,
             $passwordPolicyContext,
             $eventLogger,
         );
     }
 
-    public function makeResolver(): PasswordPolicyResolver
-    {
-        return new PasswordPolicyResolver(
-            $this->backend,
-            $this->options->getDefaultPasswordPolicyDn(),
-            $this->options->getPasswordPolicy(),
-        );
-    }
-
-    public function makeSystemChangeWriter(): SystemChangeWriterInterface
+    /**
+     * A read-only server has nothing to write the operational changes a policy decision produces back to.
+     */
+    private function makeSystemChangeWriter(): SystemChangeWriterInterface
     {
         if ($this->options->isReadOnly()) {
             return new NullSystemChangeWriter();

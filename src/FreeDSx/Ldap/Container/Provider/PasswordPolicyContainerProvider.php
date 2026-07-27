@@ -31,6 +31,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\QualityConstraint;
 use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\SafeModifyConstraint;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyComponentFactory;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
+use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\UniquePolicyTimeFactory;
 use FreeDSx\Ldap\ServerOptions;
@@ -49,6 +50,7 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
             ReplicaPasswordStateStoreInterface::class => $this->makeReplicaPasswordStateStore(...),
             PasswordModifyTargetResolver::class => $this->makePasswordModifyTargetResolver(...),
             PasswordHashService::class => $this->makePasswordHashService(...),
+            PasswordPolicyResolver::class => $this->makePasswordPolicyResolver(...),
             WriteOperationDispatcher::class => $this->makeWriteOperationDispatcher(...),
             PasswordPolicyComponentFactory::class => $this->makePasswordPolicyComponentFactory(...),
         ];
@@ -64,7 +66,7 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
             new SafeModifyConstraint(),
             new MinAgeConstraint($clock),
             new QualityConstraint($options->getPasswordQualityChecker()),
-            new HistoryConstraint(new PasswordHashService()),
+            new HistoryConstraint($container->get(PasswordHashService::class)),
         ]);
 
         return new PasswordPolicyEngine(
@@ -107,6 +109,17 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
         return new PasswordHashService($container->get(ServerOptions::class)->getPasswordHashScheme());
     }
 
+    private function makePasswordPolicyResolver(Container $container): PasswordPolicyResolver
+    {
+        $options = $container->get(ServerOptions::class);
+
+        return new PasswordPolicyResolver(
+            $container->get(WritableStorageBackend::class),
+            $options->getDefaultPasswordPolicyDn(),
+            $options->getPasswordPolicy(),
+        );
+    }
+
     private function makeWriteOperationDispatcher(Container $container): WriteOperationDispatcher
     {
         return new WriteOperationDispatcher($container->get(WritableStorageBackend::class));
@@ -119,6 +132,7 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
             options: $container->get(ServerOptions::class),
             writeDispatcher: $container->get(WriteOperationDispatcher::class),
             passwordPolicyEngine: $container->get(PasswordPolicyEngine::class),
+            policyResolver: $container->get(PasswordPolicyResolver::class),
         );
     }
 }
