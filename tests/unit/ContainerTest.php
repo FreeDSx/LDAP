@@ -377,7 +377,7 @@ class ContainerTest extends TestCase
         );
     }
 
-    public function test_several_workers_are_clamped_to_one_process_for_file_storage(): void
+    public function test_several_workers_build_the_pooled_runner_for_file_storage(): void
     {
         if (!extension_loaded('swoole')) {
             self::markTestSkipped('The swoole extension is required.');
@@ -392,7 +392,7 @@ class ContainerTest extends TestCase
         );
 
         self::assertInstanceOf(
-            SwooleServerRunner::class,
+            PooledServerRunner::class,
             $container->get(ServerRunnerInterface::class),
         );
     }

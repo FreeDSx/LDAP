@@ -174,7 +174,7 @@ process. Anything else is clamped back to a single worker with a logged warning.
 | Storage | Multiple workers | Why |
 | --- | --- | --- |
 | PDO (`PdoConfig`) | Yes | The database is the shared state |
-| JSON (`JsonStorageConfig`) | No | Cached in-process and rewritten whole, so writers lose each other's updates |
+| JSON (`JsonStorageConfig`) | Yes | Writes serialize on a file lock, so throughput is far below PDO |
 | In-memory (`InMemoryStorageConfig`) | No | Entries never leave the process that holds them |
 
 A proxy has no local directory, so it can always use multiple workers.

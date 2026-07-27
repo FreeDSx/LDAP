@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\CoroutineLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\StorageLockInterface;
@@ -44,7 +45,7 @@ use Throwable;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class JsonFileStorage implements EntryStorageInterface, ChangeJournalingInterface
+final class JsonFileStorage implements EntryStorageInterface, ChangeJournalingInterface, ResettableInterface
 {
     use ArrayEntryStorageTrait;
     use ChangeJournalingTrait;
@@ -58,7 +59,10 @@ final class JsonFileStorage implements EntryStorageInterface, ChangeJournalingIn
      */
     private ?array $cache = null;
 
-    private int $cacheMtime = 0;
+    /**
+     * Identifies the file the cache was built from; see fileStamp().
+     */
+    private string $cacheStamp = '';
 
     private function __construct(
         private readonly string $filePath,
@@ -88,6 +92,15 @@ final class JsonFileStorage implements EntryStorageInterface, ChangeJournalingIn
             $lock ?? new CoroutineLock($filePath),
             $logger ?? new NullLogger(),
         );
+    }
+
+    /**
+     * Drops what a forked child inherited, so it reads the file rather than its parent's snapshot.
+     */
+    public function reset(): void
+    {
+        $this->cache = null;
+        $this->cacheStamp = '';
     }
 
     public function find(Dn $dn): ?Entry
@@ -215,16 +228,19 @@ final class JsonFileStorage implements EntryStorageInterface, ChangeJournalingIn
      */
     private function read(): array
     {
-        if (!file_exists($this->filePath)) {
+        // Without this PHP keeps answering from the stat it took on the first read, so a write by another process
+        // is never noticed and this cache is served indefinitely.
+        clearstatcache(true, $this->filePath);
+        $stamp = $this->fileStamp();
+
+        if ($stamp === '') {
             $this->cache = [];
-            $this->cacheMtime = 0;
+            $this->cacheStamp = '';
 
             return $this->cache;
         }
 
-        $mtime = (int) filemtime($this->filePath);
-
-        if ($this->cache !== null && $this->cacheMtime === $mtime) {
+        if ($this->cache !== null && $this->cacheStamp === $stamp) {
             return $this->cache;
         }
 
@@ -232,7 +248,7 @@ final class JsonFileStorage implements EntryStorageInterface, ChangeJournalingIn
 
         if ($contents === false || $contents === '') {
             $this->cache = [];
-            $this->cacheMtime = $mtime;
+            $this->cacheStamp = $stamp;
 
             return $this->cache;
         }
@@ -243,9 +259,28 @@ final class JsonFileStorage implements EntryStorageInterface, ChangeJournalingIn
         }
 
         $this->cache = $entries;
-        $this->cacheMtime = $mtime;
+        $this->cacheStamp = $stamp;
 
         return $this->cache;
+    }
+
+    /**
+     * Identifies the published file, or an empty string when there is none yet.
+     */
+    private function fileStamp(): string
+    {
+        $stat = @stat($this->filePath);
+
+        if ($stat === false) {
+            return '';
+        }
+
+        return sprintf(
+            '%d:%d:%d',
+            $stat['ino'],
+            $stat['size'],
+            $stat['mtime'],
+        );
     }
 
     /**
