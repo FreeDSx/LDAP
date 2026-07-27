@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackendBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\HandlerFactoryInterface;
@@ -95,11 +96,9 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
 
     private function makePasswordModifyTargetResolver(Container $container): PasswordModifyTargetResolver
     {
-        $handlerFactory = $container->get(HandlerFactoryInterface::class);
-
         return new PasswordModifyTargetResolver(
-            $handlerFactory->makeBackend(),
-            $handlerFactory->makeIdentityResolverChain(),
+            $container->get(WritableStorageBackend::class),
+            $container->get(HandlerFactoryInterface::class)->makeIdentityResolverChain(),
         );
     }
 
@@ -110,15 +109,13 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
 
     private function makeWriteOperationDispatcher(Container $container): WriteOperationDispatcher
     {
-        return new WriteOperationDispatcher(
-            $container->get(HandlerFactoryInterface::class)->makeBackend(),
-        );
+        return new WriteOperationDispatcher($container->get(WritableStorageBackend::class));
     }
 
     private function makePasswordPolicyComponentFactory(Container $container): PasswordPolicyComponentFactory
     {
         return new PasswordPolicyComponentFactory(
-            handlerFactory: $container->get(HandlerFactoryInterface::class),
+            backend: $container->get(WritableStorageBackend::class),
             options: $container->get(ServerOptions::class),
             writeDispatcher: $container->get(WriteOperationDispatcher::class),
             passwordPolicyEngine: $container->get(PasswordPolicyEngine::class),

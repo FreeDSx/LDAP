@@ -83,7 +83,7 @@ class ContainerTest extends TestCase
     {
         self::assertInstanceOf(
             WritableStorageBackend::class,
-            $this->subject->get(HandlerFactoryInterface::class)->makeBackend(),
+            $this->subject->get(WritableStorageBackend::class),
         );
     }
 

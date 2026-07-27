@@ -39,14 +39,6 @@ class HandlerFactory implements HandlerFactoryInterface
     /**
      * @inheritDoc
      */
-    public function makeBackend(): WritableLdapBackendInterface
-    {
-        return $this->backend;
-    }
-
-    /**
-     * @inheritDoc
-     */
     public function makePasswordAuthenticator(): PasswordAuthenticatableInterface
     {
         return $this->options->getPasswordAuthenticator()
