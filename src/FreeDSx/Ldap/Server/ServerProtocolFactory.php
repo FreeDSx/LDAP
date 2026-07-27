@@ -22,10 +22,10 @@ use FreeDSx\Socket\Socket;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ServerProtocolFactory implements ServerProtocolFactoryInterface
+readonly class ServerProtocolFactory implements ServerProtocolFactoryInterface
 {
     public function __construct(
-        private readonly ConnectionHandlerBuilderInterface $builder,
+        private ConnectionHandlerBuilderInterface $builder,
     ) {}
 
     public function make(

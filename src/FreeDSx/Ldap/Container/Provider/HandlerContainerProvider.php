@@ -46,6 +46,7 @@ use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyService;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyTargetResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyComponentFactory;
+use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\ServerOptions;
@@ -134,7 +135,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
     {
         return new ServerPasswordPolicyForwardHandler(
             backend: $container->get(WritableStorageBackend::class),
-            policyResolver: $container->get(PasswordPolicyComponentFactory::class)->makeResolver(),
+            policyResolver: $container->get(PasswordPolicyResolver::class),
             engine: $container->get(PasswordPolicyEngine::class),
         );
     }
