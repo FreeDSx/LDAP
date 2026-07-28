@@ -173,6 +173,33 @@ class LdapBackendStorageTest extends ServerTestCase
         self::assertCount(0, $entries);
     }
 
+    public function testSearchFilterAppliesTheSchemaDeclaredMatchingRule(): void
+    {
+        $this->authenticateUser();
+
+        $exact = $this->ldapClient()->search(
+            Operations::search(Filters::equal('employeeNumber', 'A1b2C3'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+        // The schema matches employeeNumber case-exactly. Storage post-filters results itself, so a case-folded
+        // value matching here would mean that path evaluated without the schema.
+        $caseFolded = $this->ldapClient()->search(
+            Operations::search(Filters::equal('employeeNumber', 'a1b2c3'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            1,
+            $exact,
+        );
+        self::assertCount(
+            0,
+            $caseFolded,
+        );
+    }
+
     public function testAddStoresEntry(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');

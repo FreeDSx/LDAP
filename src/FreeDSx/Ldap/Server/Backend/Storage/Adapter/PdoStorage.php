@@ -185,6 +185,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         $filterResult = $this->translator->translate(
             $options->filter,
             $options->isIntegerOrdered(...),
+            $options->isCaseInsensitive(...),
         );
 
         // A composed filter with a selective drivable leaf streams off that leaf; PHP re-evaluates the full filter.

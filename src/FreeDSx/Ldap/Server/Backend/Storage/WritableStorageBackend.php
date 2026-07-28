@@ -70,10 +70,13 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         private readonly WriteEntryOperationHandler $entryHandler = new WriteEntryOperationHandler(),
         private readonly ?ChangeRecorder $changeRecorder = null,
         private readonly ?Schema $schema = null,
+        ?SearchStreamBuilder $searchStream = null,
     ) {
-        $this->searchStream = new SearchStreamBuilder(
-            $this->storage,
-            $this->limits,
+        // Falling back to the schema this backend was given, so post-filtering never silently drops matching rules.
+        $this->searchStream = $searchStream ?? new SearchStreamBuilder(
+            $storage,
+            $limits,
+            new FilterEvaluator($schema),
         );
     }
 
@@ -175,6 +178,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             lookthroughLimit: $limits->maxSearchLookthrough,
             attributes: $this->materializedAttributes($request),
             isIntegerOrderedResolver: fn(string $attribute): ?bool => $this->schema?->isIntegerOrdered($attribute),
+            isCaseInsensitiveResolver: fn(string $attribute): ?bool => $this->schema?->isCaseInsensitiveMatched($attribute),
         );
 
         try {

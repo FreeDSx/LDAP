@@ -42,6 +42,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionSweeper;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
 use FreeDSx\Ldap\Server\Backend\Storage\OperationalAttributeGenerator;
+use FreeDSx\Ldap\Server\Backend\Storage\SearchStreamBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
@@ -92,6 +93,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             FilterEvaluatorInterface::class => $this->makeFilterEvaluator(...),
             EntryStorageInterface::class => $this->makeStorage(...),
             OperationalAttributeGenerator::class => $this->makeOperationalAttributeGenerator(...),
+            SearchStreamBuilder::class => $this->makeSearchStreamBuilder(...),
             LdapImporter::class => $this->makeLdapImporter(...),
             PdoBackendBuilder::class => $this->makePdoBackendBuilder(...),
             WritableStorageBackend::class => $this->makeBackend(...),
@@ -249,6 +251,19 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             operationalAttrs: $container->get(OperationalAttributeGenerator::class),
             changeRecorder: $this->changeRecorderFor($container, $storage),
             schema: $options->getSchema(),
+            searchStream: $container->get(SearchStreamBuilder::class),
+        );
+    }
+
+    /**
+     * Streams search results, post-filtering on the shared evaluator so matching rules follow the configured schema.
+     */
+    private function makeSearchStreamBuilder(Container $container): SearchStreamBuilder
+    {
+        return new SearchStreamBuilder(
+            $container->get(EntryStorageInterface::class),
+            $container->get(ServerOptions::class)->makeSearchLimits(),
+            $container->get(FilterEvaluatorInterface::class),
         );
     }
 

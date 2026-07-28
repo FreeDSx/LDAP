@@ -218,6 +218,8 @@ final class LdapBackendStorageCommand extends Command
                 new Attribute('sn', 'Smith'),
                 new Attribute('mail', 'alice@foo.bar'),
                 new Attribute('uidNumber', '99'),
+                // Matched case-exactly by the schema, so searches on it prove the configured schema is in play.
+                new Attribute('employeeNumber', 'A1b2C3'),
             ),
             new Entry(
                 new Dn('cn=nosn,dc=foo,dc=bar'),

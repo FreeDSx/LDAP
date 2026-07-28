@@ -43,13 +43,21 @@ trait SqlFilterTranslatorTrait
     private ?Closure $integerOrderedResolver = null;
 
     /**
+     * @var (\Closure(string): (bool|null))|null Resolves whether an attribute ignores case, for the current call.
+     */
+    private ?Closure $caseInsensitiveResolver = null;
+
+    /**
      * @param (\Closure(string): (bool|null))|null $isIntegerOrdered Resolves numeric ordering; null = unknown.
+     * @param (\Closure(string): (bool|null))|null $isCaseInsensitive Resolves case-insensitive matching; null = unknown.
      */
     public function translate(
         FilterInterface $filter,
         ?Closure $isIntegerOrdered = null,
+        ?Closure $isCaseInsensitive = null,
     ): ?SqlFilterResult {
         $this->integerOrderedResolver = $isIntegerOrdered;
+        $this->caseInsensitiveResolver = $isCaseInsensitive;
 
         return $this->dispatch($filter);
     }
@@ -129,7 +137,9 @@ trait SqlFilterTranslatorTrait
         return new SqlFilterResult(
             $this->buildValueExists($attribute, "$alias = ?"),
             [$this->prepareMatchValue($value)],
-            isExact: $this->isExactEquality($value) && !$this->attributeHasOption($filter->getAttribute()),
+            isExact: $this->isExactEquality($value)
+                && $this->matchesCaseFolded($attribute)
+                && !$this->attributeHasOption($filter->getAttribute()),
             referencedAttributes: [$attribute],
             sidecarCondition: $this->sidecarCondition(
                 $attribute,
@@ -149,7 +159,9 @@ trait SqlFilterTranslatorTrait
         return new SqlFilterResult(
             $this->buildValueExists($attribute, "$alias = ?"),
             [$this->prepareMatchValue($value)],
-            isExact: $this->isExactEquality($value) && !$this->attributeHasOption($filter->getAttribute()),
+            isExact: $this->isExactEquality($value)
+                && $this->matchesCaseFolded($attribute)
+                && !$this->attributeHasOption($filter->getAttribute()),
             referencedAttributes: [$attribute],
             sidecarCondition: $this->sidecarCondition(
                 $attribute,
@@ -220,7 +232,10 @@ trait SqlFilterTranslatorTrait
         return new SqlFilterResult(
             $this->buildValueExists($attribute, $condition),
             [$this->prepareMatchValue($value)],
-            isExact: $lexicalCanBeExact && $this->isExactOrdered($value) && !$hasOption,
+            isExact: $lexicalCanBeExact
+                && $this->isExactOrdered($value)
+                && $this->matchesCaseFolded($attribute)
+                && !$hasOption,
             referencedAttributes: [$attribute],
             sidecarCondition: $this->sidecarCondition(
                 $attribute,
@@ -275,11 +290,15 @@ trait SqlFilterTranslatorTrait
             );
         }
 
-        $isExact = $this->isExactSubstring(
+        $fragmentsAreExact = $this->isExactSubstring(
             $startsWith,
             $contains,
             $endsWith,
-        ) && !$this->attributeHasOption($filter->getAttribute());
+        );
+
+        $isExact = $fragmentsAreExact
+            && $this->matchesCaseFolded($attribute)
+            && !$this->attributeHasOption($filter->getAttribute());
 
         return new SqlFilterResult(
             $sql,
@@ -337,6 +356,20 @@ trait SqlFilterTranslatorTrait
         return Text::isAscii($value)
             && Text::isUtf8($value)
             && Text::lengthOf($value) <= SqlFilterUtility::MAX_INDEXED_VALUE_CHARS;
+    }
+
+    /**
+     * Values are indexed and compared case-folded, so a case-sensitive attribute needs the caller to re-check.
+     *
+     * Unresolved attributes fall back to true, keeping the schema-less behaviour the in-process evaluator also has.
+     */
+    private function matchesCaseFolded(string $attribute): bool
+    {
+        if ($this->caseInsensitiveResolver === null) {
+            return true;
+        }
+
+        return ($this->caseInsensitiveResolver)($attribute) ?? true;
     }
 
     /**

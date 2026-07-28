@@ -29,6 +29,14 @@ use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 final class Schema
 {
     /**
+     * Equality rules that ignore case, so a case-folded comparison is equivalent to them.
+     */
+    private const CASE_INSENSITIVE_EQUALITY_OIDS = [
+        MatchingRuleOid::OID_CASE_IGNORE_MATCH,
+        MatchingRuleOid::OID_CASE_IGNORE_IA5_MATCH,
+    ];
+
+    /**
      * @var array<string, AttributeType>
      */
     private array $attributeTypes = [];
@@ -108,6 +116,24 @@ final class Schema
         }
 
         return $attributeType->syntaxOid === SyntaxOid::OID_INTEGER;
+    }
+
+    /**
+     * Whether the attribute matches without regard to case, or null when it is not defined here.
+     */
+    public function isCaseInsensitiveMatched(string $nameOrOid): ?bool
+    {
+        $attributeType = $this->getAttributeType($nameOrOid);
+
+        if ($attributeType?->equalityOid === null) {
+            return null;
+        }
+
+        return in_array(
+            $attributeType->equalityOid,
+            self::CASE_INSENSITIVE_EQUALITY_OIDS,
+            true,
+        );
     }
 
     public function getObjectClass(string $nameOrOid): ?ObjectClass
