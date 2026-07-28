@@ -28,9 +28,11 @@ interface FilterTranslatorInterface
 {
     /**
      * @param (\Closure(string): (bool|null))|null $isIntegerOrdered Resolves whether an attribute orders numerically.
+     * @param (\Closure(string): (bool|null))|null $isCaseInsensitive Resolves whether an attribute matches without regard to case.
      */
     public function translate(
         FilterInterface $filter,
         ?Closure $isIntegerOrdered = null,
+        ?Closure $isCaseInsensitive = null,
     ): ?SqlFilterResult;
 }

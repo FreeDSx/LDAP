@@ -30,10 +30,13 @@ use Generator;
  */
 final readonly class SearchStreamBuilder
 {
+    /**
+     * @param FilterEvaluatorInterface $filterEvaluator Must know the configured schema, or matching rules are ignored.
+     */
     public function __construct(
         private EntryStorageInterface $storage,
-        private SearchLimits $limits = new SearchLimits(),
-        private FilterEvaluatorInterface $filterEvaluator = new FilterEvaluator(),
+        private SearchLimits $limits,
+        private FilterEvaluatorInterface $filterEvaluator,
     ) {}
 
     public function effectiveTimeLimit(

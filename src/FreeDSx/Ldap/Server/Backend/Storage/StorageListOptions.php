@@ -30,6 +30,7 @@ final class StorageListOptions
      * @param SortKey[] $sortKeys
      * @param list<string>|null $attributes Lowercase base attribute names to materialize, or null for all.
      * @param (\Closure(string): (bool|null))|null $isIntegerOrderedResolver Resolves whether an attribute orders numerically.
+     * @param (\Closure(string): (bool|null))|null $isCaseInsensitiveResolver Resolves whether an attribute matches without regard to case.
      */
     public function __construct(
         public readonly Dn $baseDn,
@@ -41,6 +42,7 @@ final class StorageListOptions
         public readonly int $lookthroughLimit = 0,
         public readonly ?array $attributes = null,
         public readonly ?Closure $isIntegerOrderedResolver = null,
+        public readonly ?Closure $isCaseInsensitiveResolver = null,
     ) {}
 
     /**
@@ -50,6 +52,16 @@ final class StorageListOptions
     {
         return $this->isIntegerOrderedResolver !== null
             ? ($this->isIntegerOrderedResolver)($attribute)
+            : null;
+    }
+
+    /**
+     * Whether the attribute matches without regard to case. null when unresolved (no schema was supplied).
+     */
+    public function isCaseInsensitive(string $attribute): ?bool
+    {
+        return $this->isCaseInsensitiveResolver !== null
+            ? ($this->isCaseInsensitiveResolver)($attribute)
             : null;
     }
 
