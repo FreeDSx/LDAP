@@ -27,6 +27,7 @@ use function count;
 use function explode;
 use function implode;
 use function str_replace;
+use function strtok;
 use function strtolower;
 use function str_contains;
 
@@ -186,6 +187,14 @@ class Attribute implements IteratorAggregate, Countable, Stringable
         $this->values = $values;
 
         return $this;
+    }
+
+    /**
+     * The lowercased type portion of an attribute description, for matching a raw description against a name.
+     */
+    public static function normalizeName(string $description): string
+    {
+        return strtolower((string) strtok($description, ';'));
     }
 
     /**

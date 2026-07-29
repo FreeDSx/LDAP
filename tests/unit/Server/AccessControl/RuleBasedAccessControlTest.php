@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
@@ -599,5 +600,130 @@ final class RuleBasedAccessControlTest extends TestCase
         ));
 
         $subject->setBackend($mockBackend);
+    }
+
+    /**
+     * Without this a group grant silently never matches, since membership cannot be resolved.
+     */
+    public function test_set_backend_propagates_to_confidential_rule_subjects(): void
+    {
+        $mockBackend = $this->createMock(LdapBackendInterface::class);
+
+        /** @var SubjectMatcherInterface&BackendAwareInterface&MockObject $mockBackendAwareSubject */
+        $mockBackendAwareSubject = $this->createMockForIntersectionOfInterfaces([
+            SubjectMatcherInterface::class,
+            BackendAwareInterface::class,
+        ]);
+
+        $mockBackendAwareSubject
+            ->expects(self::once())
+            ->method('setBackend')
+            ->with($mockBackend);
+
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            confidential: [ConfidentialAccessRule::allowAny($mockBackendAwareSubject)],
+        ));
+
+        $subject->setBackend($mockBackend);
+    }
+
+    public function test_confidential_access_is_denied_when_no_rule_grants_it(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty());
+
+        self::assertFalse($subject->hasConfidentialAccess(
+            $this->bindToken,
+            'userPassword',
+        ));
+    }
+
+    public function test_confidential_access_is_granted_by_a_rule_naming_the_attribute(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            confidential: [
+                ConfidentialAccessRule::allow(
+                    new AnySubjectMatcher(),
+                    'userPassword',
+                ),
+            ],
+        ));
+
+        self::assertTrue($subject->hasConfidentialAccess(
+            $this->bindToken,
+            'userPassword',
+        ));
+    }
+
+    public function test_confidential_access_matches_the_attribute_regardless_of_case(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            confidential: [
+                ConfidentialAccessRule::allow(
+                    new AnySubjectMatcher(),
+                    'userpassword',
+                ),
+            ],
+        ));
+
+        self::assertTrue($subject->hasConfidentialAccess(
+            $this->bindToken,
+            'userPassword',
+        ));
+    }
+
+    public function test_confidential_access_does_not_extend_to_an_attribute_the_rule_omits(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            confidential: [
+                ConfidentialAccessRule::allow(
+                    new AnySubjectMatcher(),
+                    'employeeNumber',
+                ),
+            ],
+        ));
+
+        self::assertFalse($subject->hasConfidentialAccess(
+            $this->bindToken,
+            'userPassword',
+        ));
+    }
+
+    public function test_confidential_access_granted_to_any_attribute_covers_every_one(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            confidential: [ConfidentialAccessRule::allowAny(new AnySubjectMatcher())],
+        ));
+
+        self::assertTrue($subject->hasConfidentialAccess(
+            $this->bindToken,
+            'userPassword',
+        ));
+    }
+
+    public function test_confidential_access_takes_the_first_matching_rule(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            confidential: [
+                ConfidentialAccessRule::deny(new AnySubjectMatcher()),
+                ConfidentialAccessRule::allowAny(new AnySubjectMatcher()),
+            ],
+        ));
+
+        self::assertFalse($subject->hasConfidentialAccess(
+            $this->bindToken,
+            'userPassword',
+        ));
+    }
+
+    public function test_confidential_access_is_denied_for_an_unauthenticated_token(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            confidential: [ConfidentialAccessRule::allowAny(new AnySubjectMatcher())],
+        ));
+
+        self::assertFalse($subject->hasConfidentialAccess(
+            new AnonToken(),
+            'userPassword',
+        ));
     }
 }

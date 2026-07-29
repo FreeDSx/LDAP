@@ -138,6 +138,22 @@ $schema = StandardSchemaProvider::buildCore()->merge(
 );
 
 $options = (new ServerOptions())->setSchema($schema);
+```
+
+An attribute carrying the `X-CONFIDENTIAL` extension is withheld from results and search filters unless the identity
+holds a grant for it:
+
+```php
+new AttributeType(
+    oid: '1.3.6.1.4.1.99999.3',
+    names: ['secretCode'],
+    equalityOid: '2.5.13.5',
+    extensions: [AttributeType::EXTENSION_CONFIDENTIAL => [AttributeType::EXTENSION_ENABLED_VALUE]],
+)
+```
+
+See [Confidential Attributes](Access-Control.md#confidential-attributes) for granting access. Note that replacing the
+standard `userPassword` definition without this extension drops its protection.
 
 ## Operational Attributes
 
@@ -161,7 +177,6 @@ attributes remain unchanged.
 
 **`hasSubordinates` (dynamic):** Never stored. Injected into search results when requested via the `+` shorthand
 or by name. Value is `TRUE` if the entry has at least one direct child, `FALSE` otherwise.
-```
 
 ## String Matching and Internationalization (RFC 4518)
 

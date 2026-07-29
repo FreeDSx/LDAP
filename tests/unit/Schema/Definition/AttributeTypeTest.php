@@ -121,4 +121,43 @@ final class AttributeTypeTest extends TestCase
             $attr->toDescriptionString(),
         );
     }
+
+    public function test_an_attribute_is_not_confidential_by_default(): void
+    {
+        $attr = new AttributeType(
+            oid: '2.5.4.3',
+            names: ['cn'],
+        );
+
+        self::assertFalse($attr->isConfidential());
+    }
+
+    public function test_an_attribute_is_confidential_when_the_extension_is_set(): void
+    {
+        $attr = new AttributeType(
+            oid: '2.5.4.35',
+            names: ['userPassword'],
+            extensions: [
+                AttributeType::EXTENSION_CONFIDENTIAL => [AttributeType::EXTENSION_ENABLED_VALUE],
+            ],
+        );
+
+        self::assertTrue($attr->isConfidential());
+    }
+
+    public function test_the_confidential_extension_round_trips_through_the_description_string(): void
+    {
+        $attr = new AttributeType(
+            oid: '2.5.4.35',
+            names: ['userPassword'],
+            extensions: [
+                AttributeType::EXTENSION_CONFIDENTIAL => [AttributeType::EXTENSION_ENABLED_VALUE],
+            ],
+        );
+
+        self::assertSame(
+            "( 2.5.4.35 NAME 'userPassword' X-CONFIDENTIAL 'TRUE' )",
+            $attr->toDescriptionString(),
+        );
+    }
 }

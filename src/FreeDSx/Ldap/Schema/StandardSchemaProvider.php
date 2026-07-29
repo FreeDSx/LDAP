@@ -308,6 +308,10 @@ final class StandardSchemaProvider
                 equalityOid: MatchingRuleOid::OID_OCTET_STRING_MATCH,
                 syntaxOid: SyntaxOid::OID_OCTET_STRING,
                 desc: AttributeTypeOid::DESC_USER_PASSWORD,
+                // Write-only to an ordinary client: settable, but never readable back through a result or a filter.
+                extensions: [
+                    AttributeType::EXTENSION_CONFIDENTIAL => [AttributeType::EXTENSION_ENABLED_VALUE],
+                ],
             ),
             new AttributeType(
                 AttributeTypeOid::OID_MEMBER,

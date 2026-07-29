@@ -529,7 +529,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         $attributes = [];
 
         foreach ($raw as $name => $values) {
-            if ($allowed !== null && !isset($allowed[strtolower((string) strtok($name, ';'))])) {
+            if ($allowed !== null && !isset($allowed[Attribute::normalizeName($name)])) {
                 continue;
             }
 

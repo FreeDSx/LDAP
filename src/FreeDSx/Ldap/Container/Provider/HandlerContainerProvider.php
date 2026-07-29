@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSyncHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnbindHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnsupportedExtendedHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerWhoAmIHandler;
+use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
@@ -119,7 +120,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         return new ServerPasswordModifyHandler(
             service: new PasswordModifyService(
                 targetResolver: $container->get(PasswordModifyTargetResolver::class),
-                accessControl: $container->get(ServerOptions::class)->getAccessControl(),
+                accessControl: $container->get(AccessControlInterface::class),
                 writeDispatcher: $container->get(WriteOperationDispatcher::class),
                 hashService: $container->get(PasswordHashService::class),
                 changeGuard: $policyComponentFactory->makeChangeGuard(
@@ -158,7 +159,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         $backend = $container->get(WritableStorageBackend::class);
         $journal = $this->syncJournalFor($container);
         $projector = new SyncResultProjector(
-            accessControl: $options->getAccessControl(),
+            accessControl: $container->get(AccessControlInterface::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
             eventLogger: $context->eventLogger,
         );
@@ -209,7 +210,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
                     $backend,
                 )
                 : $container->get(WriteOperationDispatcher::class),
-            accessControl: $container->get(ServerOptions::class)->getAccessControl(),
+            accessControl: $container->get(AccessControlInterface::class),
             schema: $container->get(ServerOptions::class)->getSchema(),
         );
     }
@@ -223,7 +224,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         return new ServerSearchHandler(
             backend: $container->get(WritableStorageBackend::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
-            accessControl: $options->getAccessControl(),
+            accessControl: $container->get(AccessControlInterface::class),
             schema: $options->getSchema(),
             limits: $searchLimits ?? $options->makeSearchLimits(),
         );
@@ -239,7 +240,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         return new ServerPagingHandler(
             backend: $container->get(WritableStorageBackend::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
-            accessControl: $options->getAccessControl(),
+            accessControl: $container->get(AccessControlInterface::class),
             requestHistory: $context->requestHistory,
             schema: $options->getSchema(),
             limits: $searchLimits ?? $options->makeSearchLimits(),

@@ -21,7 +21,11 @@ use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
+use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributePolicy;
+use FreeDSx\Ldap\Server\AccessControl\ConfidentialFilterRewriter;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
+use FreeDSx\Ldap\Server\Middleware\ConfidentialAttributeMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
 use FreeDSx\Ldap\Server\Middleware\MetricsMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuthorizationMiddleware;
@@ -55,6 +59,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
             MetricsMiddleware::class => $this->makeMetricsMiddleware(...),
             CriticalControlMiddleware::class => $this->makeCriticalControlMiddleware(...),
             OperationAuthorizationMiddleware::class => $this->makeOperationAuthorizationMiddleware(...),
+            ConfidentialAttributeMiddleware::class => $this->makeConfidentialAttributeMiddleware(...),
             AssertionMiddleware::class => $this->makeAssertionMiddleware(...),
             ResourceLimitMiddleware::class => $this->makeResourceLimitMiddleware(...),
         ];
@@ -128,10 +133,20 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
 
         return new OperationAuthorizationMiddleware(
             $container->get(ServerProtocolHandlerFactory::class),
-            $options->getAccessControl(),
+            $container->get(AccessControlInterface::class),
             $options->getPrivilegedControls(),
             $options->getPrivilegedExtendedOps(),
         );
+    }
+
+    private function makeConfidentialAttributeMiddleware(Container $container): ConfidentialAttributeMiddleware
+    {
+        return new ConfidentialAttributeMiddleware(new ConfidentialFilterRewriter(
+            new ConfidentialAttributePolicy(
+                $container->get(AccessControlInterface::class),
+                $container->get(ServerOptions::class)->getSchema(),
+            ),
+        ));
     }
 
     private function makeAssertionMiddleware(Container $container): AssertionMiddleware

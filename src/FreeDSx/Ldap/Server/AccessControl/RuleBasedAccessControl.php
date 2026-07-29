@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
+use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;
@@ -48,6 +49,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
             ...$this->rules->attributes,
             ...$this->rules->controls,
             ...$this->rules->extendedOps,
+            ...$this->rules->confidential,
         ];
 
         foreach ($allRules as $rule) {
@@ -139,6 +141,22 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
         }
 
         return false;
+    }
+
+    /**
+     * Denied unless granted: a confidential attribute is withheld from anyone holding no rule for it.
+     */
+    public function hasConfidentialAccess(
+        TokenInterface $token,
+        string $attribute,
+    ): bool {
+        return $this->resolveSubjectEffect(
+            $this->rules->confidential,
+            $this->confidentialMatches(...),
+            $attribute,
+            $token,
+            Effect::Deny,
+        ) === Effect::Allow;
     }
 
     public function filterEntry(
@@ -238,6 +256,23 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
             || in_array($controlOid, $rule->controlOids, true);
     }
 
+    private function confidentialMatches(
+        ConfidentialAccessRule $rule,
+        string $attribute,
+    ): bool {
+        if ($rule->attributes === []) {
+            return true;
+        }
+
+        foreach ($rule->attributes as $name) {
+            if (strcasecmp($name, $attribute) === 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Extended operations are target-independent, so the subject is matched against the token's own resolved DN.
      */
@@ -245,12 +280,38 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
         string $oid,
         TokenInterface $token,
     ): bool {
+        return $this->resolveSubjectEffect(
+            $this->rules->extendedOps,
+            $this->extendedOperationMatches(...),
+            $oid,
+            $token,
+            $this->rules->defaultExtendedOpEffect,
+        ) === Effect::Allow;
+    }
+
+    /**
+     * The {@see resolveEffect} counterpart for rules carrying no target, so the subject is matched against the
+     * token's own resolved DN. Anonymous identities never match, as they cannot hold a grant.
+     *
+     * @template TRule of ConfidentialAccessRule|ExtendedOperationRule
+     * @template TValue
+     * @param TRule[] $rules
+     * @param callable(TRule, TValue): bool $selectorMatches
+     * @param TValue $selectorValue
+     */
+    private function resolveSubjectEffect(
+        array $rules,
+        callable $selectorMatches,
+        mixed $selectorValue,
+        TokenInterface $token,
+        Effect $default,
+    ): Effect {
         if (!$token instanceof AuthenticatedTokenInterface) {
-            return false;
+            return Effect::Deny;
         }
 
-        foreach ($this->rules->extendedOps as $rule) {
-            if (!$this->extendedOperationMatches($rule, $oid)) {
+        foreach ($rules as $rule) {
+            if (!$selectorMatches($rule, $selectorValue)) {
                 continue;
             }
 
@@ -258,10 +319,10 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
                 continue;
             }
 
-            return $rule->effect === Effect::Allow;
+            return $rule->effect;
         }
 
-        return $this->rules->defaultExtendedOpEffect === Effect::Allow;
+        return $default;
     }
 
     private function extendedOperationMatches(

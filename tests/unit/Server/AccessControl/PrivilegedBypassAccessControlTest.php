@@ -113,6 +113,35 @@ final class PrivilegedBypassAccessControlTest extends TestCase
         ));
     }
 
+    public function test_privileged_token_has_confidential_access_without_consulting_the_inner_policy(): void
+    {
+        $this->inner
+            ->expects(self::never())
+            ->method('hasConfidentialAccess');
+
+        self::assertTrue($this->subject->hasConfidentialAccess(
+            $this->manager,
+            'userPassword',
+        ));
+    }
+
+    public function test_non_privileged_confidential_access_delegates_to_the_inner_policy(): void
+    {
+        $this->inner
+            ->expects(self::once())
+            ->method('hasConfidentialAccess')
+            ->with(
+                $this->user,
+                'userPassword',
+            )
+            ->willReturn(false);
+
+        self::assertFalse($this->subject->hasConfidentialAccess(
+            $this->user,
+            'userPassword',
+        ));
+    }
+
     public function test_non_privileged_token_delegates_to_the_inner_policy(): void
     {
         $this->inner

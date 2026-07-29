@@ -23,10 +23,6 @@ use FreeDSx\Ldap\Ldif\LdifParser;
 use FreeDSx\Ldap\Ldif\Loader\LdifLoaderInterface;
 use FreeDSx\Ldap\Ldif\Output\LdifOutputInterface;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
-use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
-use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
@@ -49,8 +45,6 @@ class LdapServer
 {
     private Container $container;
 
-    private ?AccessControlInterface $accessControl = null;
-
     public function __construct(
         private readonly ServerOptions $options = new ServerOptions(),
         ?Container $container = null,
@@ -65,21 +59,9 @@ class LdapServer
      */
     public function run(): void
     {
-        $this->init();
-
         $runner = $this->options->getServerRunner() ?? $this->container->get(ServerRunnerInterface::class);
 
         $runner->run();
-    }
-
-    /**
-     * Specify a fully custom access control implementation; rare — prefer ServerOptions rules instead.
-     */
-    public function useAccessControl(AccessControlInterface $acl): self
-    {
-        $this->accessControl = $acl;
-
-        return $this;
     }
 
     /**
@@ -152,56 +134,12 @@ class LdapServer
         return $this;
     }
 
-    private function init(): void
-    {
-        $this->requirePdoStorageForReplica();
-        // Wrap once so a privileged manager token bypasses whichever policy resolved, and inject the backend into it.
-        $this->options->setAccessControl($this->injectBackendIfNeeded(
-            new PrivilegedBypassAccessControl($this->resolveAccessControl()),
-        ));
-    }
-
-    /**
-     * A replica's write-heavy apply path and cross-process password-policy state both require PDO storage.
-     */
-    private function requirePdoStorageForReplica(): void
-    {
-        $storageConfig = $this->options->getStorageConfig();
-
-        if ($this->options->getReplicaConfig() === null || $storageConfig instanceof PdoConfig) {
-            return;
-        }
-
-        throw new RuntimeException(sprintf(
-            'A read-only replica requires PDO storage, but "%s" is configured.',
-            $storageConfig::class,
-        ));
-    }
-
     /**
      * The assembled storage backend from the container.
      */
     private function backend(): WritableStorageBackend
     {
         return $this->container->get(WritableStorageBackend::class);
-    }
-
-    private function resolveAccessControl(): AccessControlInterface
-    {
-        if ($this->accessControl !== null) {
-            return $this->injectBackendIfNeeded($this->accessControl);
-        }
-
-        return $this->injectBackendIfNeeded($this->options->getAccessControl());
-    }
-
-    private function injectBackendIfNeeded(AccessControlInterface $acl): AccessControlInterface
-    {
-        if ($acl instanceof BackendAwareInterface) {
-            $acl->setBackend($this->backend());
-        }
-
-        return $acl;
     }
 
     /**

@@ -13,11 +13,11 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Search\Filter;
 
+use FreeDSx\Ldap\Entry\Attribute;
+
 use function array_merge;
 use function array_unique;
 use function array_values;
-use function strtok;
-use function strtolower;
 
 /**
  * Collects the base attribute names a filter references, so a reader can materialize just those for evaluation.
@@ -64,7 +64,7 @@ final class FilterAttributes
             return null;
         }
 
-        return [strtolower((string) strtok($attribute, ';'))];
+        return [Attribute::normalizeName($attribute)];
     }
 
     /**
