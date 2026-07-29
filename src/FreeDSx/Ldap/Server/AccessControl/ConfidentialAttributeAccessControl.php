@@ -18,17 +18,21 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\Token\PrivilegedTokenInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
+use function count;
+
 /**
- * Wraps an access-control policy so a privileged (manager) token bypasses every check.
+ * Wraps a policy so withheld confidential attributes are stripped from results whatever its own rules allow.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class PrivilegedBypassAccessControl implements AccessControlInterface, BackendAwareInterface
+final readonly class ConfidentialAttributeAccessControl implements AccessControlInterface, BackendAwareInterface
 {
-    public function __construct(private AccessControlInterface $inner) {}
+    public function __construct(
+        private AccessControlInterface $inner,
+        private ConfidentialAttributePolicy $policy,
+    ) {}
 
     public function setBackend(LdapBackendInterface $backend): void
     {
@@ -37,15 +41,22 @@ final readonly class PrivilegedBypassAccessControl implements AccessControlInter
         }
     }
 
+    public function filterEntry(
+        TokenInterface $token,
+        Entry $entry,
+    ): ?Entry {
+        $filtered = $this->inner->filterEntry($token, $entry);
+
+        return $filtered === null
+            ? null
+            : $this->stripWithheld($filtered, $token);
+    }
+
     public function authorizeOperation(
         OperationType $operation,
         TokenInterface $token,
         Dn $dn,
     ): void {
-        if ($token instanceof PrivilegedTokenInterface) {
-            return;
-        }
-
         $this->inner->authorizeOperation(
             $operation,
             $token,
@@ -59,10 +70,6 @@ final readonly class PrivilegedBypassAccessControl implements AccessControlInter
         string $attribute,
         AttributeAccess $access,
     ): void {
-        if ($token instanceof PrivilegedTokenInterface) {
-            return;
-        }
-
         $this->inner->authorizeAttribute(
             $token,
             $dn,
@@ -74,16 +81,12 @@ final readonly class PrivilegedBypassAccessControl implements AccessControlInter
     public function authorizeControl(
         TokenInterface $token,
         Dn $dn,
-        string $controlOid,
+        string $oid,
     ): void {
-        if ($token instanceof PrivilegedTokenInterface) {
-            return;
-        }
-
         $this->inner->authorizeControl(
             $token,
             $dn,
-            $controlOid,
+            $oid,
         );
     }
 
@@ -91,10 +94,6 @@ final readonly class PrivilegedBypassAccessControl implements AccessControlInter
         TokenInterface $token,
         string $oid,
     ): void {
-        if ($token instanceof PrivilegedTokenInterface) {
-            return;
-        }
-
         $this->inner->authorizeExtendedOperation(
             $token,
             $oid,
@@ -105,35 +104,19 @@ final readonly class PrivilegedBypassAccessControl implements AccessControlInter
         TokenInterface $token,
         string $controlOid,
     ): bool {
-        return $token instanceof PrivilegedTokenInterface
-            || $this->inner->mayUseControl(
-                $token,
-                $controlOid,
-            );
+        return $this->inner->mayUseControl(
+            $token,
+            $controlOid,
+        );
     }
 
     public function hasConfidentialAccess(
         TokenInterface $token,
         string $attribute,
     ): bool {
-        return $token instanceof PrivilegedTokenInterface
-            || $this->inner->hasConfidentialAccess(
-                $token,
-                $attribute,
-            );
-    }
-
-    public function filterEntry(
-        TokenInterface $token,
-        Entry $entry,
-    ): ?Entry {
-        if ($token instanceof PrivilegedTokenInterface) {
-            return $entry;
-        }
-
-        return $this->inner->filterEntry(
+        return $this->inner->hasConfidentialAccess(
             $token,
-            $entry,
+            $attribute,
         );
     }
 
@@ -141,13 +124,32 @@ final readonly class PrivilegedBypassAccessControl implements AccessControlInter
         TokenInterface $token,
         Entry $entry,
     ): bool {
-        if ($token instanceof PrivilegedTokenInterface) {
-            return true;
+        return $this->inner->isEntryVisible($token, $entry);
+    }
+
+    /**
+     * The entry itself is returned when nothing was withheld, so a caller can still tell it went untouched.
+     */
+    private function stripWithheld(
+        Entry $entry,
+        TokenInterface $token,
+    ): Entry {
+        $all = $entry->getAttributes();
+        $kept = [];
+
+        foreach ($all as $attribute) {
+            if (!$this->policy->isWithheld($attribute->getName(), $token)) {
+                $kept[] = $attribute;
+            }
         }
 
-        return $this->inner->isEntryVisible(
-            $token,
-            $entry,
+        if (count($kept) === count($all)) {
+            return $entry;
+        }
+
+        return Entry::raw(
+            $entry->getDn(),
+            $kept,
         );
     }
 }

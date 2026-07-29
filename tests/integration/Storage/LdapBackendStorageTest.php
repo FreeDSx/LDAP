@@ -173,6 +173,80 @@ class LdapBackendStorageTest extends ServerTestCase
         self::assertCount(0, $entries);
     }
 
+    public function testUserPasswordIsNotReturnedUnderTheDefaultAcl(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'user'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope()
+                ->setAttributes('cn', 'userPassword'),
+        );
+
+        // The shipped default marks userPassword confidential and grants nobody access to it.
+        $user = $entries->first();
+        self::assertNotNull($user);
+        self::assertNull($user->get('userPassword'));
+    }
+
+    public function testFilteringOnUserPasswordMatchesNothingUnderTheDefaultAcl(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('userPassword', '{SHA}' . base64_encode(sha1('12345', true))))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            0,
+            $entries,
+        );
+    }
+
+    public function testNegatingAWithheldAssertionMatchesEveryEntry(): void
+    {
+        $this->authenticateUser();
+
+        $all = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+        // Withheld reads as absent, so negating it holds for every entry rather than none.
+        $negated = $this->ldapClient()->search(
+            Operations::search(Filters::not(Filters::equal('userPassword', 'anything')))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            count($all),
+            $negated,
+        );
+    }
+
+    public function testAConjunctionWithAWithheldAssertionMatchesNothing(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::and(
+                Filters::equal('cn', 'user'),
+                Filters::equal('userPassword', 'anything'),
+            ))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            0,
+            $entries,
+        );
+    }
+
     public function testSearchFilterAppliesTheSchemaDeclaredMatchingRule(): void
     {
         $this->authenticateUser();
@@ -440,6 +514,54 @@ class LdapBackendStorageTest extends ServerTestCase
         self::assertCount(
             5,
             $allEntries,
+        );
+    }
+
+    public function testPagingWithholdsConfidentialAttributes(): void
+    {
+        $this->authenticateUser();
+
+        // Paging strips results on its own loop, separate from the one a plain search uses.
+        $search = Operations::search(Filters::present('objectClass'))
+            ->base('dc=foo,dc=bar')
+            ->useSubtreeScope()
+            ->setAttributes('cn', 'userPassword');
+
+        $paging = $this->ldapClient()->paging($search, 2);
+        $withPassword = 0;
+
+        while ($paging->hasEntries()) {
+            foreach ($paging->getEntries() as $entry) {
+                if ($entry->get('userPassword') !== null) {
+                    $withPassword++;
+                }
+            }
+        }
+
+        self::assertSame(
+            0,
+            $withPassword,
+        );
+    }
+
+    public function testPagingOnAWithheldFilterReturnsNothing(): void
+    {
+        $this->authenticateUser();
+
+        $search = Operations::search(Filters::equal('userPassword', 'anything'))
+            ->base('dc=foo,dc=bar')
+            ->useSubtreeScope();
+
+        $paging = $this->ldapClient()->paging($search, 2);
+        $found = 0;
+
+        while ($paging->hasEntries()) {
+            $found += count($paging->getEntries());
+        }
+
+        self::assertSame(
+            0,
+            $found,
         );
     }
 

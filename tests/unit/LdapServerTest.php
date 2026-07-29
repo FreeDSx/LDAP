@@ -83,19 +83,26 @@ class LdapServerTest extends TestCase
         $this->subject->run();
     }
 
+    /**
+     * Rejected while the runner is assembled, which is before it binds anything.
+     */
     #[DataProvider('nonPdoReplicaStorageDataProvider')]
-    public function test_run_throws_for_a_replica_on_non_pdo_storage(
+    public function test_building_the_runner_throws_for_a_replica_on_non_pdo_storage(
         StorageConfigInterface $storageConfig,
         RunnerMode $runner,
     ): void {
-        $this->options
+        if ($runner === RunnerMode::Swoole && !extension_loaded('swoole')) {
+            self::markTestSkipped('The swoole extension is required to construct the Swoole runner.');
+        }
+
+        $options = (new ServerOptions(network: NetworkConfig::withPort(33389)))
             ->setReplicaConfig(new ReplicaConfig(new ClientOptions()))
             ->setStorageConfig($storageConfig)
             ->setRunnerConfig(new RunnerConfig($runner));
 
         $this->expectException(RuntimeException::class);
 
-        $this->subject->run();
+        Container::forServer($options)->get(ServerRunnerInterface::class);
     }
 
     public function test_run_does_not_throw_for_a_replica_on_pdo_storage(): void

@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;
@@ -40,6 +41,7 @@ final readonly class AclRules
      * @param AttributeRule[] $attributes Evaluated per attribute in order; first match wins.
      * @param ControlRule[] $controls Evaluated per control in order; first match wins.
      * @param ExtendedOperationRule[] $extendedOps Evaluated per extended operation in order; first match wins.
+     * @param ConfidentialAccessRule[] $confidential Evaluated per confidential attribute in order; first match wins.
      * @param Effect $defaultOperationEffect Applied when no operation rule matches.
      * @param Effect $defaultControlEffect Applied when no control rule matches (controls are gated, so Deny).
      * @param Effect $defaultExtendedOpEffect Applied when no extended-operation rule matches (gated, so Deny).
@@ -49,6 +51,7 @@ final readonly class AclRules
         public array $attributes = [],
         public array $controls = [],
         public array $extendedOps = [],
+        public array $confidential = [],
         public Effect $defaultOperationEffect = Effect::Deny,
         public Effect $defaultControlEffect = Effect::Deny,
         public Effect $defaultExtendedOpEffect = Effect::Deny,
@@ -63,12 +66,14 @@ final readonly class AclRules
      * @param AttributeRule[] $attributes
      * @param ControlRule[] $controls
      * @param ExtendedOperationRule[] $extendedOps
+     * @param ConfidentialAccessRule[] $confidential
      */
     public static function fromEmpty(
         array $operations = [],
         array $attributes = [],
         array $controls = [],
         array $extendedOps = [],
+        array $confidential = [],
         Effect $defaultOperationEffect = Effect::Deny,
         Effect $defaultControlEffect = Effect::Deny,
         Effect $defaultExtendedOpEffect = Effect::Deny,
@@ -78,6 +83,7 @@ final readonly class AclRules
             $attributes,
             $controls,
             $extendedOps,
+            $confidential,
             $defaultOperationEffect,
             $defaultControlEffect,
             $defaultExtendedOpEffect,
@@ -91,6 +97,7 @@ final readonly class AclRules
             $this->attributes,
             $this->controls,
             $this->extendedOps,
+            $this->confidential,
             $this->defaultOperationEffect,
             $this->defaultControlEffect,
             $this->defaultExtendedOpEffect,
@@ -104,6 +111,7 @@ final readonly class AclRules
             $attributes,
             $this->controls,
             $this->extendedOps,
+            $this->confidential,
             $this->defaultOperationEffect,
             $this->defaultControlEffect,
             $this->defaultExtendedOpEffect,
@@ -117,6 +125,7 @@ final readonly class AclRules
             $this->attributes,
             $controls,
             $this->extendedOps,
+            $this->confidential,
             $this->defaultOperationEffect,
             $this->defaultControlEffect,
             $this->defaultExtendedOpEffect,
@@ -130,6 +139,7 @@ final readonly class AclRules
             $this->attributes,
             $this->controls,
             $extendedOps,
+            $this->confidential,
             $this->defaultOperationEffect,
             $this->defaultControlEffect,
             $this->defaultExtendedOpEffect,
@@ -137,8 +147,25 @@ final readonly class AclRules
     }
 
     /**
-     * Grant a replica's bind identity the two privileged capabilities it needs: the content-sync control over $target,
-     * and the password-policy forward extended operation.
+     * Rules gating reads of schema attributes marked X-CONFIDENTIAL; nothing may read them without a grant.
+     */
+    public function withConfidentialAccess(ConfidentialAccessRule ...$confidential): self
+    {
+        return new self(
+            $this->operations,
+            $this->attributes,
+            $this->controls,
+            $this->extendedOps,
+            $confidential,
+            $this->defaultOperationEffect,
+            $this->defaultControlEffect,
+            $this->defaultExtendedOpEffect,
+        );
+    }
+
+    /**
+     * Grant a replica's bind identity the privileged capabilities it needs: the content-sync control over $target,
+     * the password-policy forward extended operation, and confidential attributes so those replicate.
      */
     public function withReplicaGrants(
         SubjectMatcherInterface $replica,
@@ -162,6 +189,10 @@ final readonly class AclRules
                     ExtendedRequest::OID_PPOLICY_STATE_FORWARD,
                 ),
             ],
+            [
+                ...$this->confidential,
+                ConfidentialAccessRule::allowAny($replica),
+            ],
             $this->defaultOperationEffect,
             $this->defaultControlEffect,
             $this->defaultExtendedOpEffect,
@@ -175,6 +206,7 @@ final readonly class AclRules
             $this->attributes,
             $this->controls,
             $this->extendedOps,
+            $this->confidential,
             $effect,
             $this->defaultControlEffect,
             $this->defaultExtendedOpEffect,
@@ -188,6 +220,7 @@ final readonly class AclRules
             $this->attributes,
             $this->controls,
             $this->extendedOps,
+            $this->confidential,
             $this->defaultOperationEffect,
             $effect,
             $this->defaultExtendedOpEffect,
@@ -201,6 +234,7 @@ final readonly class AclRules
             $this->attributes,
             $this->controls,
             $this->extendedOps,
+            $this->confidential,
             $this->defaultOperationEffect,
             $this->defaultControlEffect,
             $effect,
@@ -284,6 +318,7 @@ final readonly class AclRules
             attributes: [...$userPassword, ...$this->attributes],
             controls: [...$controls, ...$this->controls],
             extendedOps: [...$extendedOps, ...$this->extendedOps],
+            confidential: $this->confidential,
             defaultOperationEffect: $this->defaultOperationEffect,
             defaultControlEffect: $this->defaultControlEffect,
             defaultExtendedOpEffect: $this->defaultExtendedOpEffect,

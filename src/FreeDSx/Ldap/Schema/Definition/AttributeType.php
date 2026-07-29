@@ -21,6 +21,16 @@ final readonly class AttributeType
     use DefinitionStringTrait;
 
     /**
+     * Marks values readable only by a subject holding a confidential-access grant; RFC 4512 §4.1 vendor extension.
+     */
+    public const EXTENSION_CONFIDENTIAL = 'X-CONFIDENTIAL';
+
+    /**
+     * The value an extension carries when it is set; extension values are qdstrings, not booleans.
+     */
+    public const EXTENSION_ENABLED_VALUE = 'TRUE';
+
+    /**
      * @param list<string> $names
      * @param array<string, list<string>> $extensions
      */
@@ -40,6 +50,18 @@ final readonly class AttributeType
         public bool $obsolete = false,
         public array $extensions = [],
     ) {}
+
+    /**
+     * Whether values are withheld from anyone without a confidential-access grant, in results and in filters.
+     */
+    public function isConfidential(): bool
+    {
+        return in_array(
+            self::EXTENSION_ENABLED_VALUE,
+            $this->extensions[self::EXTENSION_CONFIDENTIAL] ?? [],
+            true,
+        );
+    }
 
     /**
      * Produces the description string used in the subschema attributeTypes attribute.

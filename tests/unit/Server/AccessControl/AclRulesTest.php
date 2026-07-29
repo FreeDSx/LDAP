@@ -85,6 +85,34 @@ final class AclRulesTest extends TestCase
         );
     }
 
+    public function test_withReplicaGrants_allows_confidential_attributes_so_those_replicate(): void
+    {
+        $rules = AclRules::fromEmpty()->withReplicaGrants(Subject::dn('cn=replica,dc=foo,dc=bar'));
+
+        $confidential = $rules->confidential[0];
+        self::assertSame(
+            Effect::Allow,
+            $confidential->effect,
+        );
+        // An empty attribute list covers every confidential attribute, not none of them.
+        self::assertSame(
+            [],
+            $confidential->attributes,
+        );
+    }
+
+    public function test_withCredentialProtection_keeps_confidential_grants_made_earlier(): void
+    {
+        $rules = AclRules::fromEmpty()
+            ->withReplicaGrants(Subject::dn('cn=replica,dc=foo,dc=bar'))
+            ->withCredentialProtection();
+
+        self::assertCount(
+            1,
+            $rules->confidential,
+        );
+    }
+
     public function test_withReplicaGrants_appends_to_existing_control_rules(): void
     {
         $existing = ControlRule::allow(Subject::dn(self::ADMIN_DN));

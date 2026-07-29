@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\LdapAclCommand;
 
 /**
  * End-to-end tests for RuleBasedAccessControl.
@@ -272,7 +273,7 @@ final class AclIntegrationTest extends ServerTestCase
         self::assertNull($alice->get('userPassword'));
     }
 
-    public function testUserPasswordVisibleToSelf(): void
+    public function testUserPasswordHiddenFromSelf(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
 
@@ -285,7 +286,7 @@ final class AclIntegrationTest extends ServerTestCase
 
         $user = $results->first();
         self::assertNotNull($user);
-        self::assertNotNull($user->get('userPassword'));
+        self::assertNull($user->get('userPassword'));
     }
 
     public function testUserPasswordVisibleToGroupMember(): void
@@ -302,5 +303,158 @@ final class AclIntegrationTest extends ServerTestCase
         $alice = $results->first();
         self::assertNotNull($alice);
         self::assertNotNull($alice->get('userPassword'));
+    }
+
+    public function testFilteringOnAnotherUsersPasswordMatchesNothing(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        // Confirming a guessed value must not be possible when the value cannot be read.
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::equal('userPassword', self::alicePasswordHash()))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            0,
+            $results,
+        );
+    }
+
+    public function testFilteringOnAPasswordPrefixMatchesNothing(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        // Substrings would otherwise recover the value one character at a time.
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::startsWith('userPassword', substr(self::alicePasswordHash(), 0, 6)))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            0,
+            $results,
+        );
+    }
+
+    public function testFilteringOnAPasswordMatchesForAGrantedSubject(): void
+    {
+        $this->ldapClient()->bind('cn=admin,dc=foo,dc=bar', 'adminpass');
+
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::equal('userPassword', self::alicePasswordHash()))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            1,
+            $results,
+        );
+        self::assertSame(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            $results->first()?->getDn()->toString(),
+        );
+    }
+
+    public function testADisjunctionKeepsTheBranchThatIsNotWithheld(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::or(
+                Filters::equal('cn', 'alice'),
+                Filters::equal('userPassword', self::alicePasswordHash()),
+            ))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            1,
+            $results,
+        );
+    }
+
+    public function testComparingAConfidentialAttributeIsFalse(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        // No attribute rule denies secretCode, so this reaches the confidential gate rather than an access error.
+        self::assertFalse($this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'secretCode',
+            LdapAclCommand::SECRET_CODE,
+        ));
+    }
+
+    public function testComparingAnotherUsersPasswordIsDenied(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'userPassword',
+            self::alicePasswordHash(),
+        );
+    }
+
+    public function testACustomConfidentialAttributeIsHiddenWithoutAGrant(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'alice'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope()
+                ->setAttributes('cn', 'secretCode'),
+        );
+
+        $alice = $results->first();
+        self::assertNotNull($alice);
+        self::assertNull($alice->get('secretCode'));
+    }
+
+    public function testFilteringOnACustomConfidentialAttributeMatchesNothing(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::equal('secretCode', LdapAclCommand::SECRET_CODE))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            0,
+            $results,
+        );
+    }
+
+    public function testAGrantDoesNotExtendToOtherConfidentialAttributes(): void
+    {
+        $this->ldapClient()->bind('cn=admin,dc=foo,dc=bar', 'adminpass');
+
+        // The group is granted userPassword by name, which must not carry over to secretCode.
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'alice'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope()
+                ->setAttributes('cn', 'secretCode'),
+        );
+
+        $alice = $results->first();
+        self::assertNotNull($alice);
+        self::assertNull($alice->get('secretCode'));
+    }
+
+    private static function alicePasswordHash(): string
+    {
+        return '{SHA}' . base64_encode(sha1('alicepass', true));
     }
 }

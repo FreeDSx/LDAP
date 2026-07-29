@@ -11,6 +11,7 @@ Access Control
 * [Subject Reference](#subject-reference)
 * [Target Reference](#target-reference)
 * [Attribute Rules](#attribute-rules)
+* [Confidential Attributes](#confidential-attributes)
 * [Control Rules](#control-rules)
 * [Extended Operation Rules](#extended-operation-rules)
 * [Custom Access Control](#custom-access-control)
@@ -259,11 +260,61 @@ Attribute rules are enforced in three places:
 )
 ```
 
+## Confidential Attributes
+
+An attribute the schema marks `X-CONFIDENTIAL` is withheld from anyone without an explicit grant, both in results and
+in search filters. `userPassword` ships this way, so out of the box it is writable by its owner and readable by no one.
+
+A withheld attribute behaves as though it is not present on the entry. Filtering on one matches nothing, and it never
+appears in a result:
+
+```
+(userPassword=x)                -> no entries
+(&(cn=alice)(userPassword=x))   -> no entries
+(|(cn=alice)(userPassword=x))   -> the cn=alice branch still matches
+```
+
+Access is granted with a subject-only rule:
+
+```php
+(new AclRules())->withConfidentialAccess(
+    // Named attributes, or ConfidentialAccessRule::allowAny() for every confidential attribute.
+    ConfidentialAccessRule::allow(
+        Subject::group('cn=admins,dc=example,dc=com'),
+        'userPassword',
+    ),
+)
+```
+
+Mark your own attributes confidential with the extension:
+
+```php
+new AttributeType(
+    '1.3.6.1.4.1.99999.1.1',
+    ['secretCode'],
+    equalityOid: MatchingRuleOid::OID_CASE_EXACT_MATCH,
+    syntaxOid: SyntaxOid::OID_DIRECTORY_STRING,
+    extensions: [AttributeType::EXTENSION_CONFIDENTIAL => [AttributeType::EXTENSION_ENABLED_VALUE]],
+)
+```
+
+Four things to keep in mind:
+
+- A grant is required in addition to read access. A permissive `AttributeRule` cannot re-expose a confidential
+  attribute.
+- Administrators are locked out too until granted. Only the break-glass manager bypasses this.
+- Writes are unaffected, which is what keeps `userPassword` settable by its owner while unreadable.
+- A custom schema must carry the extension. Supplying your own `userPassword` definition through
+  `ServerOptions::setSchema()` without it silently drops the protection.
+
+A replica needs to read confidential attributes in order to replicate them, so `AclRules::withReplicaGrants()`
+includes that grant along with the sync control.
+
 ## Control Rules
 
 Privileged request controls are gated per identity with `ControlRule`s (same subject/target/first-match-wins structure,
 keyed on control OID; empty OID list matches all). They are **denied by default**. A control does nothing unless a
-rule grants it. `SimpleAccessControl` denies all controls, so this requires `RuleBasedAccessControl`.
+rule grants it.
 
 The gated controls are:
 
@@ -309,7 +360,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;
 ## Custom Access Control
 
 For cases where the built-in rule system is insufficient, implement `AccessControlInterface` and pass it via
-`LdapServer::useAccessControl()`:
+`ServerOptions::setAccessControl()`:
 
 ```php
 use FreeDSx\Ldap\Entry\Dn;
@@ -369,7 +420,17 @@ class MyAccessControl implements AccessControlInterface
     ): ?Entry {
         return $entry;
     }
+
+    /**
+     * Return false to withhold an attribute the schema marks X-CONFIDENTIAL.
+     */
+    public function hasConfidentialAccess(
+        TokenInterface $token,
+        string $attribute,
+    ): bool {
+        return false;
+    }
 }
 
-$server->useAccessControl(new MyAccessControl());
+$options->setAccessControl(new MyAccessControl());
 ```

@@ -409,7 +409,7 @@ $server = new LdapServer(
 See [Access Control](Access-Control.md) for rule evaluation, subject/target matchers, attribute rules, and the
 control-rule grants for privileged controls (e.g. Relax Rules).
 
-**Default**: no rules — `SimpleAccessControl` denies anonymous operations and allows authenticated ones.
+**Default**: `AclRules::secureDefault()`. See [Access Control](Access-Control.md).
 
 ------------------
 #### setAccessControl
@@ -417,7 +417,7 @@ control-rule grants for privileged controls (e.g. Relax Rules).
 Provide a fully custom `FreeDSx\Ldap\Server\AccessControl\AccessControlInterface` implementation, used instead of the
 rule engine. Prefer `setAclRules()` unless the built-in rules are insufficient.
 
-**Default**: `SimpleAccessControl`.
+**Default**: `RuleBasedAccessControl` over the rules from `setAclRules()`.
 
 ------------------
 #### setPrivilegedControls

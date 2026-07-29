@@ -82,6 +82,17 @@ interface AccessControlInterface
     ): bool;
 
     /**
+     * Whether $token holds a grant over an attribute the schema marks X-CONFIDENTIAL. Separate from attribute read
+     * access, and required in addition to it.
+     *
+     * Target-independent by design: this is answered before a search runs, when no entry is in hand yet.
+     */
+    public function hasConfidentialAccess(
+        TokenInterface $token,
+        string $attribute,
+    ): bool;
+
+    /**
      * Return $entry with unreadable attributes removed, or null to suppress the entry entirely.
      */
     public function filterEntry(

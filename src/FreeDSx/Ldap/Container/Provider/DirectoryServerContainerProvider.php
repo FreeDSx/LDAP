@@ -20,6 +20,10 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
+use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributeAccessControl;
+use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributePolicy;
+use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\CoroutineLock;
@@ -88,6 +92,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     public function factories(): array
     {
         return [
+            AccessControlInterface::class => $this->makeAccessControl(...),
             BindNameResolverInterface::class => $this->makeIdentityResolverChain(...),
             PasswordAuthenticatableInterface::class => $this->makePasswordAuthenticator(...),
             FilterEvaluatorInterface::class => $this->makeFilterEvaluator(...),
@@ -105,6 +110,28 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             BackgroundTasksInterface::class => $this->makeBackgroundTasks(...),
             ListenerContributorInterface::class => $this->makeListenerContributor(...),
         ];
+    }
+
+    /**
+     * The configured policy, wrapped so a privileged token bypasses it and confidential attributes are withheld.
+     */
+    private function makeAccessControl(Container $container): AccessControlInterface
+    {
+        $options = $container->get(ServerOptions::class);
+        $configured = $options->getAccessControl();
+
+        $acl = new PrivilegedBypassAccessControl(new ConfidentialAttributeAccessControl(
+            $configured,
+            new ConfidentialAttributePolicy(
+                $configured,
+                $options->getSchema(),
+            ),
+        ));
+
+        // Both wrappers pass this inward, so the configured policy is the one that actually receives it.
+        $acl->setBackend($container->get(WritableStorageBackend::class));
+
+        return $acl;
     }
 
     /**
@@ -346,9 +373,32 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeBackgroundTasks(Container $container): BackgroundTasksInterface
     {
-        return $container->get(ServerOptions::class)->isRunnerMode(RunnerMode::Swoole)
+        $options = $container->get(ServerOptions::class);
+        $this->requirePdoStorageForReplica($options);
+
+        return $options->isRunnerMode(RunnerMode::Swoole)
             ? $this->makeSwooleBackgroundTasks($container)
             : $this->makePcntlBackgroundTasks($container);
+    }
+
+    /**
+     * Checked here rather than where the daemon is built, since the PCNTL runner only builds it after forking.
+     *
+     * @throws RuntimeException when a replica is configured without a database behind it
+     */
+    private function requirePdoStorageForReplica(ServerOptions $options): void
+    {
+        $storageConfig = $options->getStorageConfig();
+
+        if ($options->getReplicaConfig() === null || $storageConfig instanceof PdoConfig) {
+            return;
+        }
+
+        // The write-heavy apply path and the cross-process password-policy state both need a database.
+        throw new RuntimeException(sprintf(
+            'A read-only replica requires PDO storage, but "%s" is configured.',
+            $storageConfig::class,
+        ));
     }
 
     private function makeListenerContributor(Container $container): ListenerContributorInterface

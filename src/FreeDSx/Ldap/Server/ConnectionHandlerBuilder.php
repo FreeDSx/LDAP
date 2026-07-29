@@ -37,6 +37,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerAwareAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
@@ -54,6 +55,7 @@ use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AuthorizationResolutionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\BindMiddleware;
+use FreeDSx\Ldap\Server\Middleware\ConfidentialAttributeMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
 use FreeDSx\Ldap\Server\Middleware\MetricsMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuditMiddleware;
@@ -138,7 +140,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         );
 
         $authzIdResolver = new AuthzIdResolver(
-            $options->getAccessControl(),
+            $this->container->get(AccessControlInterface::class),
             $backend,
             $this->container->get(BindNameResolverInterface::class),
             $eventLogger,
@@ -400,7 +402,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                 new ResponseWriterMiddleware(
                     new ResponseWriter($queue),
                     $backend,
-                    $options->getAccessControl(),
+                    $this->container->get(AccessControlInterface::class),
                 ),
                 // Only present on a read-only replica; sits below the writer so its referral is drained,
                 // and before the ACL loop so a write short-circuits early.
@@ -409,6 +411,8 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                     : []),
                 $this->container->get(CriticalControlMiddleware::class),
                 $this->container->get(OperationAuthorizationMiddleware::class),
+                // Below the authorization gate, so an assertion the identity cannot satisfy never reaches storage.
+                $this->container->get(ConfidentialAttributeMiddleware::class),
                 $this->container->get(AssertionMiddleware::class),
             ],
             new HandlerInvoker($handlerProvider),
