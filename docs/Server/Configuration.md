@@ -594,7 +594,8 @@ See [Validation Mode](Schema.md#validation-mode).
 #### setSchema
 
 Replaces the active schema used for validation and operational attributes. See
-[Custom Schema](Schema.md#custom-schema).
+[Custom Schema](Schema.md#custom-schema), or [Loading Schema](Schema.md#loading-schema) to read definitions from
+LDIF rather than building them in PHP.
 
 **Default**: `StandardSchemaProvider::buildCore()`
 

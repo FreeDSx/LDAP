@@ -51,7 +51,7 @@ trait DefinitionStringTrait
     }
 
     /**
-     * Formats one or more quoted descriptor strings per RFC 4512 §1.4.
+     * Formats one or more quoted descriptor strings per RFC 4512 §1.4, which separates them by space.
      *
      * @param list<string> $values
      */
@@ -66,11 +66,11 @@ trait DefinitionStringTrait
             $values,
         );
 
-        return '( ' . implode(' $ ', $quoted) . ' )';
+        return '( ' . implode(' ', $quoted) . ' )';
     }
 
     /**
-     * Formats one or more OIDs per RFC 4512 §1.4.
+     * Formats one or more OIDs per RFC 4512 §1.4, which separates them by a dollar sign.
      *
      * @param list<string> $oids
      */

@@ -287,6 +287,65 @@ final class SchemaTest extends TestCase
         );
     }
 
+    public function test_merge_carries_forward_an_extension_the_incoming_definition_omits(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.35',
+            names: ['userPassword'],
+            extensions: [AttributeType::EXTENSION_CONFIDENTIAL => [AttributeType::EXTENSION_ENABLED_VALUE]],
+        ));
+
+        $other = (new Schema())->addAttributeType(new AttributeType(
+            oid: '2.5.4.35',
+            names: ['userPassword'],
+            desc: 'from another directory',
+        ));
+        $userPassword = $this->subject->merge($other)
+            ->getAttributeType('userPassword');
+
+        self::assertNotNull($userPassword);
+        self::assertTrue($userPassword->isConfidential());
+        self::assertSame(
+            'from another directory',
+            $userPassword->desc,
+        );
+    }
+
+    public function test_merge_lets_the_incoming_definition_override_an_extension_value(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.35',
+            names: ['userPassword'],
+            extensions: [AttributeType::EXTENSION_CONFIDENTIAL => [AttributeType::EXTENSION_ENABLED_VALUE]],
+        ));
+
+        $other = (new Schema())->addAttributeType(new AttributeType(
+            oid: '2.5.4.35',
+            names: ['userPassword'],
+            extensions: [AttributeType::EXTENSION_CONFIDENTIAL => ['FALSE']],
+        ));
+        $merged = $this->subject->merge($other);
+
+        self::assertFalse($merged->getAttributeType('userPassword')?->isConfidential());
+    }
+
+    public function test_merge_leaves_a_definition_alone_when_nothing_it_replaces_has_extensions(): void
+    {
+        $this->subject->addAttributeType($this->cn);
+
+        $override = new AttributeType(
+            oid: '2.5.4.3',
+            names: ['cn'],
+            extensions: ['X-ORIGIN' => ['RFC 4519']],
+        );
+        $merged = $this->subject->merge((new Schema())->addAttributeType($override));
+
+        self::assertSame(
+            $override,
+            $merged->getAttributeType('cn'),
+        );
+    }
+
     public function test_fluent_add_methods_return_same_instance(): void
     {
         $schema = new Schema();

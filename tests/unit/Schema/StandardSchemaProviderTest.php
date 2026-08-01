@@ -39,7 +39,7 @@ final class StandardSchemaProviderTest extends TestCase
     public function test_has_expected_syntax_count(): void
     {
         self::assertCount(
-            14,
+            22,
             $this->schema->getLdapSyntaxes(),
         );
     }
@@ -47,7 +47,7 @@ final class StandardSchemaProviderTest extends TestCase
     public function test_has_expected_matching_rule_count(): void
     {
         self::assertCount(
-            18,
+            20,
             $this->schema->getMatchingRules(),
         );
     }
@@ -55,7 +55,7 @@ final class StandardSchemaProviderTest extends TestCase
     public function test_has_expected_attribute_type_count(): void
     {
         self::assertCount(
-            38,
+            46,
             $this->schema->getAttributeTypes(),
         );
     }
