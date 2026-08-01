@@ -669,6 +669,42 @@ class LdapBackendStorageTest extends ServerTestCase
         );
     }
 
+    /**
+     * uidNumber declares the INTEGER syntax, so '99' is below '100' rather than above it bytewise.
+     */
+    public function testGteOnAnIntegerAttributeOrdersNumerically(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::gte('uidNumber', '100'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(0, $entries);
+    }
+
+    /**
+     * Bytewise, '99' would sort above '100' and be excluded.
+     */
+    public function testLteOnAnIntegerAttributeOrdersNumerically(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::lte('uidNumber', '100'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            $entries->first()?->getDn()->toString(),
+        );
+    }
+
     public function testNotEqualityExcludesMatches(): void
     {
         $this->authenticateUser();
