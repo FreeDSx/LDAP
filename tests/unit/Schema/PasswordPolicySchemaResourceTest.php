@@ -17,18 +17,21 @@ use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
-use FreeDSx\Ldap\Schema\PasswordPolicySchemaProvider;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-final class PasswordPolicySchemaProviderTest extends TestCase
+/**
+ * Verifies the definitions shipped in resources/ldap-schema/ppolicy.ldif.
+ */
+final class PasswordPolicySchemaResourceTest extends TestCase
 {
     private Schema $schema;
 
     protected function setUp(): void
     {
-        $this->schema = PasswordPolicySchemaProvider::build();
+        $this->schema = SchemaResource::PasswordPolicy->load();
     }
 
     public function test_registers_all_30_attribute_types(): void

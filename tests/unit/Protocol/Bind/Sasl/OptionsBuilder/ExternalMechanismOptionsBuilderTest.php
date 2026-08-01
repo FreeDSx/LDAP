@@ -161,7 +161,7 @@ final class ExternalMechanismOptionsBuilderTest extends TestCase
 
         return new ExternalMechanismOptionsBuilder(
             $queue,
-            new ServerOptions(network: (new NetworkConfig())->setSslValidateCert($validateCert)),
+            new ServerOptions(networkConfig: (new NetworkConfig())->setSslValidateCert($validateCert)),
             $mapper,
             $this->authzIdResolver,
         );

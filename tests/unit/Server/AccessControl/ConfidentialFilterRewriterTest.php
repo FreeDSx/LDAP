@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\AccessControl;
 
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
@@ -38,7 +38,7 @@ final class ConfidentialFilterRewriterTest extends TestCase
         $this->token = BindToken::fromDn('cn=user,dc=foo,dc=bar');
         $this->subject = new ConfidentialFilterRewriter(new ConfidentialAttributePolicy(
             new RuleBasedAccessControl(AclRules::fromEmpty()),
-            StandardSchemaProvider::buildCore(),
+            SchemaResource::Core->load(),
         ));
     }
 
@@ -152,7 +152,7 @@ final class ConfidentialFilterRewriterTest extends TestCase
             new RuleBasedAccessControl(AclRules::fromEmpty(
                 confidential: [ConfidentialAccessRule::allowAny(Subject::authenticated())],
             )),
-            StandardSchemaProvider::buildCore(),
+            SchemaResource::Core->load(),
         ));
         $filter = Filters::equal('userPassword', 'secret');
 

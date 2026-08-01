@@ -16,17 +16,17 @@ namespace FreeDSx\Ldap\Schema;
 use FreeDSx\Ldap\Exception\SchemaParseException;
 
 /**
- * Builds the draft-behera-ldap-password-policy-10 definitions, read from resources/ldap-schema/ppolicy.ldif.
+ * Something the server can read schema definitions from.
+ *
+ * Definitions are returned as parsed; cross-references are checked once the sources have been merged, so a source
+ * may reference definitions another source provides.
+ *
+ * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class PasswordPolicySchemaProvider
+interface SchemaSourceInterface
 {
-    private function __construct() {}
-
     /**
      * @throws SchemaParseException
      */
-    public static function build(): Schema
-    {
-        return SchemaResource::PasswordPolicy->load();
-    }
+    public function load(): Schema;
 }

@@ -25,7 +25,7 @@ use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use PHPUnit\Framework\TestCase;
@@ -37,7 +37,7 @@ final class SchemaValidatorTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = new SchemaValidator(
-            StandardSchemaProvider::buildCore(),
+            SchemaResource::Core->load(),
             SchemaValidationMode::Strict,
         );
     }
@@ -51,7 +51,7 @@ final class SchemaValidatorTest extends TestCase
         self::assertSame(
             SchemaValidationMode::Lenient,
             (new SchemaValidator(
-                StandardSchemaProvider::buildCore(),
+                SchemaResource::Core->load(),
                 SchemaValidationMode::Lenient,
             ))->mode(),
         );
@@ -197,7 +197,7 @@ final class SchemaValidatorTest extends TestCase
     public function test_off_mode_does_not_throw_on_violations(): void
     {
         $subject = new SchemaValidator(
-            StandardSchemaProvider::buildCore(),
+            SchemaResource::Core->load(),
             SchemaValidationMode::Off,
         );
 

@@ -6,14 +6,14 @@ Schema Validation
 * [Entry Requirements](#entry-requirements)
     * [extensibleObject](#extensibleobject)
 * [Validation Mode](#validation-mode)
-    * [ServerOptions:setSchemaValidationMode](#setschemavalidationmode)
+    * [SchemaConfig:setValidationMode](#schemaconfigsetvalidationmode)
 * [Custom Schema](#custom-schema)
-    * [ServerOptions:setSchema](#setschema)
-    * [Loading Schema](#loading-schema)
+    * [SchemaConfig](#schemaconfig)
+    * [Adding a Schema](#adding-a-schema)
+    * [Custom Sources](#custom-sources)
         * [What Is Not Read](#what-is-not-read)
         * [SchemaLoadMode](#schemaloadmode)
     * [Confidential Attributes](#confidential-attributes)
-    * [Building Definitions in PHP](#building-definitions-in-php)
 * [Operational Attributes](#operational-attributes)
 * [String Matching and Internationalization (RFC 4518)](#string-matching-and-internationalization-rfc-4518)
 
@@ -78,7 +78,7 @@ $entry = Entry::fromArray(
 ## Validation Mode
 
 ------------------
-#### setSchemaValidationMode
+#### SchemaConfig:setValidationMode
 
 **Default**: `SchemaValidationMode::Strict`
 
@@ -95,12 +95,13 @@ otherwise make unmodifiable.
 ```php
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
+use FreeDSx\Ldap\Server\Config\SchemaConfig;
 use FreeDSx\Ldap\ServerOptions;
 
-$server = new LdapServer(
-    (new ServerOptions())
-        ->setSchemaValidationMode(SchemaValidationMode::Lenient)
-);
+$schemaConfig = (new SchemaConfig())
+    ->setValidationMode(SchemaValidationMode::Lenient);
+
+$server = new LdapServer(new ServerOptions(schemaConfig: $schemaConfig));
 ```
 
 Beyond the server-wide mode, an authorized client can relax validation for a *single* Add/Modify with the Relax Rules
@@ -109,31 +110,69 @@ control (logged with `validation_mode: relaxed`). It is ACL-gated — see [Contr
 ## Custom Schema
 
 ------------------
-#### setSchema
+#### SchemaConfig
 
-Replaces the active schema. Use `StandardSchemaProvider::buildCore()->merge(...)` to extend the
-standard definitions rather than replace them.
+The schema is declared as an ordered list of sources on a `SchemaConfig`, passed to `ServerOptions`
+alongside the other configuration objects. Sources are read once, when the schema is first needed.
 
-**Default**: `StandardSchemaProvider::buildCore()`
+**Default**: `[SchemaResource::Core, SchemaResource::Nis, SchemaResource::PasswordPolicy]`
+
+The shipped schemas are the RFC 4519/4512 core, the RFC 2307 NIS definitions, and the password policy
+definitions. All three are on by default.
 
 Schema is written in RFC 4512 description strings, which is the form every directory publishes and the form
 `.schema` and `.ldif` schema files use. Load those directly rather than transcribing them. Building definitions in
 PHP is for adding a handful of your own.
 
-### Loading Schema
+### Adding a Schema
 
-`SubschemaLoader` reads definitions from a subschema entry in LDIF. The file can be one you maintain yourself:
+`addSource()` appends to the shipped set, so it does not have to be restated:
 
 ```php
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
-use FreeDSx\Ldap\Schema\SubschemaLoader;
+use FreeDSx\Ldap\Schema\LdifSchemaSource;
+use FreeDSx\Ldap\Server\Config\SchemaConfig;
 use FreeDSx\Ldap\ServerOptions;
 
-$loaded = (new SubschemaLoader())->fromLdifFile('/path/to/schema.ldif');
+$schemaConfig = (new SchemaConfig())
+    ->addSource(new LdifSchemaSource('/path/to/schema.ldif'));
 
-$options = (new ServerOptions())->setSchema(
-    StandardSchemaProvider::buildCore()->merge($loaded),
-);
+$options = new ServerOptions(schemaConfig: $schemaConfig);
+```
+
+`ServerOptions::getSchemaConfig()` returns the config in use, so the same can be done without constructing one:
+
+```php
+$options = new ServerOptions();
+
+$options->getSchemaConfig()
+    ->addSource(new LdifSchemaSource('/path/to/schema.ldif'));
+```
+
+To run a minimal directory instead, replace the list outright with `setSources()`:
+
+```php
+$schemaConfig = (new SchemaConfig())->setSources(SchemaResource::Core);
+```
+
+Sources merge in order, so a later one overrides an earlier one on OID or name collision. Vendor extensions an
+overriding definition omits are carried forward, so protections such as `X-CONFIDENTIAL` survive.
+
+### Custom Sources
+
+Schema that comes from somewhere else, such as a database or a generated definition set, is provided by
+implementing `SchemaSourceInterface`. It is read at resolve time rather than when it is configured:
+
+```php
+use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Schema\SchemaSourceInterface;
+
+final class DatabaseSchemaSource implements SchemaSourceInterface
+{
+    public function load(): Schema
+    {
+        // Build and return a Schema.
+    }
+}
 ```
 
 Definitions go on the entry under `attributeTypes`, `objectClasses` and `ldapSyntaxes`:
@@ -147,7 +186,8 @@ objectClasses: ( 1.3.6.1.4.1.99999.2.1 NAME 'myCustomClass' SUP top STRUCTURAL
   MUST myCustomAttr )
 ```
 
-To adopt the schema of an existing directory instead, read its subschema entry and pass that:
+To adopt the schema of an existing directory instead, read its subschema entry with `SubschemaLoader` and
+supply the result as a source:
 
 ```php
 $entry = (new LdapClient())->readOrFail('cn=Subschema', ['+']);
@@ -206,29 +246,6 @@ standard `userPassword` definition without this extension drops its protection.
 
 Extensions are carried forward on merge. A definition replacing one that carries `X-CONFIDENTIAL` keeps that extension
 unless it sets a different value for it, so merging schema read from elsewhere cannot silently drop the protection.
-
-### Building Definitions in PHP
-
-Definitions are also constructible directly, which suits schema generated at runtime. `AttributeType`, `ObjectClass`
-and `LdapSyntax` map one to one onto the description string fields:
-
-```php
-use FreeDSx\Ldap\Schema\Definition\AttributeType;
-use FreeDSx\Ldap\Schema\Schema;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
-use FreeDSx\Ldap\ServerOptions;
-
-$schema = StandardSchemaProvider::buildCore()->merge(
-    (new Schema())->addAttributeType(new AttributeType(
-        oid: '1.3.6.1.4.1.99999.1.1',
-        names: ['myCustomAttr'],
-        equalityOid: '2.5.13.2',
-        syntaxOid: '1.3.6.1.4.1.1466.115.121.1.15',
-    )),
-);
-
-$options = (new ServerOptions())->setSchema($schema);
-```
 
 ## Operational Attributes
 

@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\SchemaParseException;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
 use FreeDSx\Ldap\Schema\SchemaLoadMode;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\SubschemaLoader;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -110,7 +110,7 @@ final class SubschemaLoaderTest extends TestCase
 
     public function test_a_subschema_this_library_publishes_loads_in_strict_mode(): void
     {
-        $core = StandardSchemaProvider::buildCore();
+        $core = SchemaResource::Core->load();
 
         $loaded = $this->subject->fromLdifString($this->publishedSubschema());
 
@@ -258,7 +258,7 @@ final class SubschemaLoaderTest extends TestCase
      */
     private function publishedSubschema(): string
     {
-        $core = StandardSchemaProvider::buildCore();
+        $core = SchemaResource::Core->load();
         $lines = ['dn: cn=Subschema'];
 
         foreach ($core->getLdapSyntaxes() as $syntax) {

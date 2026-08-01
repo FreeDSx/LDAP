@@ -17,10 +17,9 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
-use FreeDSx\Ldap\Schema\PasswordPolicySchemaProvider;
+use FreeDSx\Ldap\Exception\SchemaParseException;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Sasl\External\ExternalCredentialMapperInterface;
@@ -39,6 +38,7 @@ use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
+use FreeDSx\Ldap\Server\Config\SchemaConfig;
 use FreeDSx\Ldap\Server\Configuration\ConfigReloaderInterface;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRules;
 use FreeDSx\Ldap\Server\SearchLimits;
@@ -104,8 +104,6 @@ final class ServerOptions implements ServerListenerOptionsInterface
 
     private ?string $dseAltServer = null;
 
-    private ?Dn $subschemaEntry = null;
-
     private string $dseVendorName = 'FreeDSx';
 
     private ?string $dseVendorVersion = null;
@@ -122,9 +120,7 @@ final class ServerOptions implements ServerListenerOptionsInterface
 
     private ?ExternalCredentialMapperInterface $externalCredentialMapper = null;
 
-    private ?Schema $schema = null;
-
-    private SchemaValidationMode $schemaValidationMode = SchemaValidationMode::Strict;
+    private SchemaConfig $schemaConfig;
 
     private ?AccessControlInterface $accessControl = null;
 
@@ -189,16 +185,19 @@ final class ServerOptions implements ServerListenerOptionsInterface
 
     /**
      * @param ?StorageConfigInterface $storageConfig Storage backend; a transient in-memory directory when omitted.
-     * @param ?NetworkConfig $network Listener and TLS settings; defaults to a plaintext listener on 0.0.0.0:389.
+     * @param ?NetworkConfig $networkConfig Listener and TLS settings; defaults to a plaintext listener on 0.0.0.0:389.
+     * @param ?SchemaConfig $schemaConfig Schema sources and validation; defaults to the schemas this package ships.
      */
     public function __construct(
         ?StorageConfigInterface $storageConfig = null,
-        ?NetworkConfig $network = null,
-        ?RunnerConfig $runner = null,
+        ?NetworkConfig $networkConfig = null,
+        ?RunnerConfig $runnerConfig = null,
+        ?SchemaConfig $schemaConfig = null,
     ) {
         $this->storageConfig = $storageConfig ?? InMemoryStorageConfig::withEntries();
-        $this->network = $network ?? new NetworkConfig();
-        $this->runner = $runner ?? new RunnerConfig();
+        $this->networkConfig = $networkConfig ?? new NetworkConfig();
+        $this->runnerConfig = $runnerConfig ?? new RunnerConfig();
+        $this->schemaConfig = $schemaConfig ?? new SchemaConfig();
     }
 
     public function getDseAltServer(): ?string
@@ -215,14 +214,7 @@ final class ServerOptions implements ServerListenerOptionsInterface
 
     public function getSubschemaEntry(): Dn
     {
-        return $this->subschemaEntry ?? new Dn('cn=Subschema');
-    }
-
-    public function setSubschemaEntry(Dn $subschemaEntry): self
-    {
-        $this->subschemaEntry = $subschemaEntry;
-
-        return $this;
+        return $this->schemaConfig->getSubschemaEntry();
     }
 
     public function getDseVendorName(): string
@@ -333,37 +325,31 @@ final class ServerOptions implements ServerListenerOptionsInterface
         return $this;
     }
 
-    public function getSchema(): Schema
+    public function getSchemaConfig(): SchemaConfig
     {
-        if ($this->schema !== null) {
-            return $this->schema;
-        }
-
-        $base = StandardSchemaProvider::buildCore();
-        $this->schema = $this->isPasswordPolicyEnabled()
-            ? $base->merge(PasswordPolicySchemaProvider::build())
-            : $base;
-
-        return $this->schema;
+        return $this->schemaConfig;
     }
 
-    public function setSchema(Schema $schema): self
+    public function setSchemaConfig(SchemaConfig $schemaConfig): self
     {
-        $this->schema = $schema;
+        $this->schemaConfig = $schemaConfig;
 
         return $this;
+    }
+
+    /**
+     * The schema every configured source resolves to; read once and reused.
+     *
+     * @throws SchemaParseException
+     */
+    public function getSchema(): Schema
+    {
+        return $this->schemaConfig->resolve();
     }
 
     public function getSchemaValidationMode(): SchemaValidationMode
     {
-        return $this->schemaValidationMode;
-    }
-
-    public function setSchemaValidationMode(SchemaValidationMode $mode): self
-    {
-        $this->schemaValidationMode = $mode;
-
-        return $this;
+        return $this->schemaConfig->getValidationMode();
     }
 
     public function getAccessControl(): AccessControlInterface

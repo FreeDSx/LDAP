@@ -24,11 +24,11 @@ use Psr\Log\LoggerInterface;
 
 /**
  * The listener config (network/TLS, auth-gating, logging, runner, metrics) shared by ServerOptions and
- * ProxyServerOptions; using classes initialize $network in their constructor.
+ * ProxyServerOptions; using classes initialize $networkConfig in their constructor.
  */
 trait ServerListenerOptionsTrait
 {
-    private NetworkConfig $network;
+    private NetworkConfig $networkConfig;
 
     private bool $requireAuthentication = true;
 
@@ -38,7 +38,7 @@ trait ServerListenerOptionsTrait
 
     private ?EventLogPolicy $eventLogPolicy = null;
 
-    private RunnerConfig $runner;
+    private RunnerConfig $runnerConfig;
 
     private bool $monitorEnabled = false;
 
@@ -50,12 +50,12 @@ trait ServerListenerOptionsTrait
 
     public function getNetworkConfig(): NetworkConfig
     {
-        return $this->network;
+        return $this->networkConfig;
     }
 
-    public function setNetworkConfig(NetworkConfig $network): self
+    public function setNetworkConfig(NetworkConfig $networkConfig): self
     {
-        $this->network = $network;
+        $this->networkConfig = $networkConfig;
 
         return $this;
     }
@@ -111,21 +111,21 @@ trait ServerListenerOptionsTrait
         return $this;
     }
 
-    public function setRunnerConfig(RunnerConfig $runner): self
+    public function setRunnerConfig(RunnerConfig $runnerConfig): self
     {
-        $this->runner = $runner;
+        $this->runnerConfig = $runnerConfig;
 
         return $this;
     }
 
     public function getRunnerConfig(): RunnerConfig
     {
-        return $this->runner;
+        return $this->runnerConfig;
     }
 
     public function isRunnerMode(RunnerMode $mode): bool
     {
-        return $this->runner->getMode() === $mode;
+        return $this->runnerConfig->getMode() === $mode;
     }
 
     public function isMonitorEnabled(): bool
@@ -146,7 +146,7 @@ trait ServerListenerOptionsTrait
     public function getMonitorSnapshotPath(): string
     {
         return $this->monitorSnapshotPath
-            ?? sys_get_temp_dir() . '/freedsx_ldap_monitor_' . $this->network->getPort() . '.json';
+            ?? sys_get_temp_dir() . '/freedsx_ldap_monitor_' . $this->networkConfig->getPort() . '.json';
     }
 
     public function setMonitorSnapshotPath(?string $monitorSnapshotPath): self

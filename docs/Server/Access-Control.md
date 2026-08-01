@@ -305,7 +305,7 @@ Four things to keep in mind:
 - Administrators are locked out too until granted. Only the break-glass manager bypasses this.
 - Writes are unaffected, which is what keeps `userPassword` settable by its owner while unreadable.
 - A custom schema must carry the extension. Supplying your own `userPassword` definition through
-  `ServerOptions::setSchema()` without it silently drops the protection.
+  a schema source without it silently drops the protection.
 
 A replica needs to read confidential attributes in order to replicate them, so `AclRules::withReplicaGrants()`
 includes that grant along with the sync control.

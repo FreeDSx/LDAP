@@ -24,8 +24,7 @@ use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Schema\NisSchemaProvider;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use PHPUnit\Framework\TestCase;
 
@@ -880,7 +879,7 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_equality_uses_octet_string_match_for_userpassword(): void
     {
-        $subject = new FilterEvaluator(StandardSchemaProvider::buildCore());
+        $subject = new FilterEvaluator(SchemaResource::Core->load());
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),
             new Attribute('userPassword', 'Secret'),
@@ -908,7 +907,7 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_equality_collapses_whitespace_for_cn(): void
     {
-        $subject = new FilterEvaluator(StandardSchemaProvider::buildCore());
+        $subject = new FilterEvaluator(SchemaResource::Core->load());
         $entry = new Entry(
             new Dn('cn=Foo  Bar,dc=example,dc=com'),
             new Attribute('cn', 'Foo  Bar'),
@@ -924,7 +923,7 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_substring_matches_across_collapsed_spaces(): void
     {
-        $subject = new FilterEvaluator(StandardSchemaProvider::buildCore());
+        $subject = new FilterEvaluator(SchemaResource::Core->load());
         $entry = new Entry(
             new Dn('cn=Foo  Bar Baz,dc=example,dc=com'),
             new Attribute('cn', 'Foo  Bar Baz'),
@@ -940,7 +939,7 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_matching_rule_filter_resolves_non_hardcoded_oid(): void
     {
-        $subject = new FilterEvaluator(StandardSchemaProvider::buildCore());
+        $subject = new FilterEvaluator(SchemaResource::Core->load());
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),
             new Attribute('uidNumber', '1001'),
@@ -969,7 +968,7 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_gte_uses_digit_heuristic_for_attribute_unknown_to_schema(): void
     {
-        $subject = new FilterEvaluator(StandardSchemaProvider::buildCore());
+        $subject = new FilterEvaluator(SchemaResource::Core->load());
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),
             new Attribute('uidNumber', '99'),
@@ -988,7 +987,7 @@ final class FilterEvaluatorTest extends TestCase
     public function test_schema_gte_infers_numeric_ordering_from_integer_syntax(): void
     {
         $subject = new FilterEvaluator(
-            StandardSchemaProvider::buildCore()->merge(NisSchemaProvider::build()),
+            SchemaResource::Core->load()->merge(SchemaResource::Nis->load()),
         );
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),

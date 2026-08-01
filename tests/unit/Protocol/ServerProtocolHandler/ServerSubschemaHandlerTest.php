@@ -69,7 +69,8 @@ final class ServerSubschemaHandlerTest extends TestCase
 
     public function test_it_uses_the_configured_subschema_entry_dn(): void
     {
-        $this->options->setSubschemaEntry(new Dn('cn=schema,dc=example,dc=com'));
+        $this->options->getSchemaConfig()
+            ->setSubschemaEntry(new Dn('cn=schema,dc=example,dc=com'));
 
         $entry = $this->handleAndCaptureEntry();
 

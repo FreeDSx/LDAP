@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AttributeProjection;
 use FreeDSx\Ldap\Schema\Schema;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use PHPUnit\Framework\TestCase;
 
 final class AttributeProjectionTest extends TestCase
@@ -29,7 +29,7 @@ final class AttributeProjectionTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->schema = StandardSchemaProvider::buildCore();
+        $this->schema = SchemaResource::Core->load();
         $this->entry = new Entry(
             new Dn('cn=Alice,dc=example,dc=com'),
             new Attribute('cn', 'Alice'),

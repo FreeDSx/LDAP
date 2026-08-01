@@ -8,11 +8,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Schema\Definition\AttributeType;
-use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
-use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
-use FreeDSx\Ldap\Schema\Schema;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Schema\LdifSchemaSource;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
@@ -22,6 +18,7 @@ use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\SchemaConfig;
 use FreeDSx\Ldap\ServerOptions;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -32,12 +29,12 @@ class LdapAclCommand extends Command
 {
     use ConsoleOptionsTrait;
 
-    /**
-     * A confidential attribute of the operator's own, so the mechanism is covered beyond userPassword.
-     */
-    public const SECRET_CODE_OID = '1.3.6.1.4.1.99999.1.1';
-
     public const SECRET_CODE = 'S3CR3T-alice';
+
+    /**
+     * Defines secretCode as confidential; loaded so the harness exercises the same path an operator would.
+     */
+    private const SECRET_CODE_SCHEMA = __DIR__ . '/../resources/schema/acl-secret-code.ldif';
 
     protected function configure(): void
     {
@@ -110,9 +107,13 @@ class LdapAclCommand extends Command
             ->setSocketAcceptTimeout(0.1);
 
         $server = new LdapServer(
-            (new ServerOptions(network: $network))
+            (new ServerOptions(
+                networkConfig: $network,
+                schemaConfig: (new SchemaConfig())->addSource(
+                    new LdifSchemaSource(self::SECRET_CODE_SCHEMA),
+                ),
+            ))
                 ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL))
-                ->setSchema($this->schemaWithSecretCode())
                 ->setAclRules(
                     (AclRules::fromEmpty())
                         ->withOperationRules(
@@ -169,21 +170,5 @@ class LdapAclCommand extends Command
         $server->run();
 
         return Command::SUCCESS;
-    }
-
-    /**
-     * The standard schema plus an operator-defined confidential attribute.
-     */
-    private function schemaWithSecretCode(): Schema
-    {
-        return StandardSchemaProvider::buildCore()->addAttributeType(new AttributeType(
-            self::SECRET_CODE_OID,
-            ['secretCode'],
-            equalityOid: MatchingRuleOid::OID_CASE_EXACT_MATCH,
-            syntaxOid: SyntaxOid::OID_DIRECTORY_STRING,
-            extensions: [
-                AttributeType::EXTENSION_CONFIDENTIAL => [AttributeType::EXTENSION_ENABLED_VALUE],
-            ],
-        ));
     }
 }

@@ -24,7 +24,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -1107,7 +1107,7 @@ final class WritableStorageBackendTest extends TestCase
         $backend = new WritableStorageBackend(
             storage: new InMemoryStorage([$this->base]),
             validator: new SchemaValidator(
-                StandardSchemaProvider::buildCore(),
+                SchemaResource::Core->load(),
                 SchemaValidationMode::Strict,
             ),
         );
@@ -1129,7 +1129,7 @@ final class WritableStorageBackendTest extends TestCase
         $backend = new WritableStorageBackend(
             storage: new InMemoryStorage([$this->base]),
             validator: new SchemaValidator(
-                StandardSchemaProvider::buildCore(),
+                SchemaResource::Core->load(),
                 SchemaValidationMode::Strict,
             ),
         );
@@ -1158,7 +1158,7 @@ final class WritableStorageBackendTest extends TestCase
         $backend = new WritableStorageBackend(
             storage: new InMemoryStorage([$this->base, $valid]),
             validator: new SchemaValidator(
-                StandardSchemaProvider::buildCore(),
+                SchemaResource::Core->load(),
                 SchemaValidationMode::Strict,
             ),
         );
@@ -1180,7 +1180,7 @@ final class WritableStorageBackendTest extends TestCase
         $backend = new WritableStorageBackend(
             storage: new InMemoryStorage([$this->base]),
             validator: new SchemaValidator(
-                StandardSchemaProvider::buildCore(),
+                SchemaResource::Core->load(),
                 SchemaValidationMode::Lenient,
             ),
         );
@@ -1226,7 +1226,7 @@ final class WritableStorageBackendTest extends TestCase
         $backend = new WritableStorageBackend(
             storage: new InMemoryStorage([$this->base, $valid]),
             validator: new SchemaValidator(
-                StandardSchemaProvider::buildCore(),
+                SchemaResource::Core->load(),
                 SchemaValidationMode::Lenient,
             ),
         );
@@ -1268,7 +1268,7 @@ final class WritableStorageBackendTest extends TestCase
         $backend = new WritableStorageBackend(
             storage: new InMemoryStorage([$this->base]),
             validator: new SchemaValidator(
-                StandardSchemaProvider::buildCore(),
+                SchemaResource::Core->load(),
                 SchemaValidationMode::Strict,
             ),
         );
@@ -1300,7 +1300,7 @@ final class WritableStorageBackendTest extends TestCase
         $backend = new WritableStorageBackend(
             storage: new InMemoryStorage([$this->base]),
             validator: new SchemaValidator(
-                StandardSchemaProvider::buildCore(),
+                SchemaResource::Core->load(),
                 SchemaValidationMode::Strict,
             ),
         );
@@ -1344,7 +1344,7 @@ final class WritableStorageBackendTest extends TestCase
         $backend = new WritableStorageBackend(
             storage: new InMemoryStorage([$this->base]),
             validator: new SchemaValidator(
-                StandardSchemaProvider::buildCore(),
+                SchemaResource::Core->load(),
                 SchemaValidationMode::Lenient,
             ),
         );
@@ -1394,7 +1394,7 @@ final class WritableStorageBackendTest extends TestCase
         $backend = new WritableStorageBackend(
             storage: new InMemoryStorage([$this->base, $valid]),
             validator: new SchemaValidator(
-                StandardSchemaProvider::buildCore(),
+                SchemaResource::Core->load(),
                 SchemaValidationMode::Strict,
             ),
         );
@@ -1429,7 +1429,7 @@ final class WritableStorageBackendTest extends TestCase
         $backend = new WritableStorageBackend(
             storage: new InMemoryStorage([$this->base, $valid]),
             validator: new SchemaValidator(
-                StandardSchemaProvider::buildCore(),
+                SchemaResource::Core->load(),
                 SchemaValidationMode::Strict,
             ),
         );

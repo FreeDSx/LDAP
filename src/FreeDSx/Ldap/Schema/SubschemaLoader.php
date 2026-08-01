@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Ldif\Loader\LdifLoaderInterface;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Schema\Parser\SubschemaEntryParser;
+use FreeDSx\Ldap\Schema\Validation\SchemaReferenceValidator;
 
 /**
  * Builds a schema from the subschema entry a directory publishes, given a source to read that entry from.
@@ -32,10 +33,20 @@ use FreeDSx\Ldap\Schema\Parser\SubschemaEntryParser;
  */
 final readonly class SubschemaLoader
 {
+    private SubschemaEntryParser $parser;
+
+    /**
+     * @param ?SubschemaEntryParser $parser omit to check references against the core schema, which is what reading
+     *                                      a subschema on its own needs
+     */
     public function __construct(
         private SchemaLoadMode $mode = SchemaLoadMode::Strict,
-        private SubschemaEntryParser $parser = new SubschemaEntryParser(),
-    ) {}
+        ?SubschemaEntryParser $parser = null,
+    ) {
+        $this->parser = $parser ?? new SubschemaEntryParser(
+            references: new SchemaReferenceValidator(SchemaResource::Core->load()),
+        );
+    }
 
     /**
      * Reads an LDIF file, such as the output of a base search for "+" on cn=subschema.
