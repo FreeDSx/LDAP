@@ -15,6 +15,8 @@ namespace FreeDSx\Ldap\Schema\Definition;
 
 /**
  * OIDs and descriptions for standard LDAP syntaxes (RFC 4517).
+ *
+ * @api
  */
 final class SyntaxOid
 {
