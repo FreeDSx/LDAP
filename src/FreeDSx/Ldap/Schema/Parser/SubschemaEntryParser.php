@@ -25,8 +25,8 @@ use function array_values;
 /**
  * Turns the definitions published on a subschema entry into a schema.
  *
- * The matchingRules and matchingRuleUse attributes are ignored; a matching rule carries a comparator that a
- * description string cannot express.
+ * A matching rule is only read when a comparator implements it, since a description string names a rule but cannot
+ * express how it compares. The matchingRuleUse attribute is derived from attribute types and is not read.
  *
  * @api
  *
@@ -56,6 +56,20 @@ final readonly class SubschemaEntryParser
         );
         foreach ($syntaxes as $syntax) {
             $schema->addSyntax($syntax);
+        }
+
+        $rules = $this->parseAll(
+            $entry,
+            AttributeTypeOid::NAME_MATCHING_RULES,
+            $this->definitions->parseMatchingRule(...),
+            $mode,
+        );
+        foreach ($rules as $rule) {
+            if ($rule === null) {
+                continue;
+            }
+
+            $schema->addMatchingRule($rule);
         }
 
         $types = $this->parseAll(
@@ -89,7 +103,7 @@ final readonly class SubschemaEntryParser
     /**
      * Parses every value of an attribute, dropping the ones that fail when the mode allows it.
      *
-     * @template T of object
+     * @template T
      * @param callable(string): T $parse
      * @return list<T>
      * @throws SchemaParseException
