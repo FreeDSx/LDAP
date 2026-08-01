@@ -75,6 +75,16 @@ final class SchemaDefinitionParser
     ];
 
     /**
+     * @var array<string, KeywordKind>
+     */
+    private const MATCHING_RULE_KEYWORDS = [
+        DefinitionKeyword::NAME => KeywordKind::QdStrings,
+        DefinitionKeyword::DESC => KeywordKind::QdString,
+        DefinitionKeyword::OBSOLETE => KeywordKind::Flag,
+        DefinitionKeyword::SYNTAX => KeywordKind::Oid,
+    ];
+
+    /**
      * @throws SchemaParseException
      */
     public function parseAttributeType(string $definition): AttributeType

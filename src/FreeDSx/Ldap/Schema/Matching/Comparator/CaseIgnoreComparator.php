@@ -11,9 +11,11 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Schema\Matching;
+namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
-use FreeDSx\Ldap\Schema\Matching\Prep\StringPrep;
+use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
+use FreeDSx\Ldap\Schema\Matching\StringPrep;
+use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 
 /**
  * Case-insensitive string comparator (caseIgnoreMatch / caseIgnoreSubstringsMatch / caseIgnoreOrderingMatch).

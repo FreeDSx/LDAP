@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Schema\Definition;
 
 use FreeDSx\Ldap\Schema\Definition\MatchingRule;
-use FreeDSx\Ldap\Schema\Matching\CaseIgnoreComparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
 use PHPUnit\Framework\TestCase;
 
 final class MatchingRuleTest extends TestCase

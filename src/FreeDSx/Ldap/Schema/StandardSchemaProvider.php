@@ -23,16 +23,16 @@ use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
-use FreeDSx\Ldap\Schema\Matching\BitMaskComparator;
-use FreeDSx\Ldap\Schema\Matching\BooleanComparator;
-use FreeDSx\Ldap\Schema\Matching\CaseExactComparator;
-use FreeDSx\Ldap\Schema\Matching\CaseIgnoreComparator;
-use FreeDSx\Ldap\Schema\Matching\CaseIgnoreIa5Comparator;
-use FreeDSx\Ldap\Schema\Matching\DistinguishedNameComparator;
-use FreeDSx\Ldap\Schema\Matching\GeneralizedTimeComparator;
-use FreeDSx\Ldap\Schema\Matching\IntegerComparator;
-use FreeDSx\Ldap\Schema\Matching\OctetStringComparator;
-use FreeDSx\Ldap\Schema\Matching\TelephoneNumberComparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\BitMaskComparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\BooleanComparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\CaseExactComparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreIa5Comparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\DistinguishedNameComparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\GeneralizedTimeComparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\IntegerComparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\OctetStringComparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\TelephoneNumberComparator;
 
 /**
  * Builds the core Schema with RFC 4517/4519/4512 standard definitions.

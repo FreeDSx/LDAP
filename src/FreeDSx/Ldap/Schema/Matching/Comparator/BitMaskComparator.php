@@ -11,18 +11,27 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Schema\Matching;
+namespace FreeDSx\Ldap\Schema\Matching\Comparator;
+
+use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
+use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 
 /**
- * Integer comparator (integerMatch / integerOrderingMatch): compares string representations as integers.
+ * Bit-mask comparator for bitwise AND (bitAndMatch) and OR (bitOrMatch) matching rules.
  */
-final class IntegerComparator implements MatchingRuleComparatorInterface
+final readonly class BitMaskComparator implements MatchingRuleComparatorInterface
 {
+    public function __construct(private bool $requireAllBits) {}
+
     public function equals(
         string $a,
         string $b,
     ): bool {
-        return (int) $a === (int) $b;
+        $mask = (int) $b;
+
+        return $this->requireAllBits
+            ? ((int) $a & $mask) === $mask
+            : ((int) $a & $mask) !== 0;
     }
 
     public function compare(

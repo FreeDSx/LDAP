@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Entry;
 
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\UnexpectedValueException;
-use FreeDSx\Ldap\Schema\Matching\Prep\StringPrep;
+use FreeDSx\Ldap\Schema\Matching\StringPrep;
 use FreeDSx\Ldap\Schema\Text;
 
 use function count;

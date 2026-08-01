@@ -11,7 +11,10 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Schema\Matching;
+namespace FreeDSx\Ldap\Schema\Matching\Comparator;
+
+use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
+use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 
 /**
  * Boolean comparator (booleanMatch): compares RFC 4517 boolean literals TRUE/FALSE case-insensitively.

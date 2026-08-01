@@ -11,19 +11,22 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Schema\Matching;
+namespace FreeDSx\Ldap\Schema\Matching\Comparator;
+
+use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
+use FreeDSx\Ldap\Schema\Matching\StringPrep;
+use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 
 /**
- * Case-insensitive IA5 (ASCII) string comparator (caseIgnoreIA5Match / caseIgnoreIA5SubstringsMatch).
- * Behaviorally identical to CaseIgnoreComparator since IA5 is a subset of ASCII.
+ * Case-sensitive comparator (caseExactMatch / caseExactSubstringsMatch / caseExactOrderingMatch) using RFC 4518 prep without case folding.
  */
-final readonly class CaseIgnoreIa5Comparator implements MatchingRuleComparatorInterface
+final readonly class CaseExactComparator implements MatchingRuleComparatorInterface
 {
-    private CaseIgnoreComparator $inner;
+    private PreparedStringComparator $inner;
 
     public function __construct()
     {
-        $this->inner = new CaseIgnoreComparator();
+        $this->inner = new PreparedStringComparator(new StringPrep(foldCase: false));
     }
 
     public function equals(
