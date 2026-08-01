@@ -40,7 +40,7 @@ final class AttributeTypeTest extends TestCase
         );
 
         self::assertSame(
-            "( 2.5.4.3 NAME ( 'cn' \$ 'commonName' ) )",
+            "( 2.5.4.3 NAME ( 'cn' 'commonName' ) )",
             $attr->toDescriptionString(),
         );
     }

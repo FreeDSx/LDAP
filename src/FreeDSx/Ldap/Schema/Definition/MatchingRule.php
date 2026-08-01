@@ -37,6 +37,26 @@ final readonly class MatchingRule
     ) {}
 
     /**
+     * Returns a copy carrying the given extensions in place of the current ones.
+     *
+     * @param array<string, list<string>> $extensions
+     *
+     * @api
+     */
+    public function withExtensions(array $extensions): self
+    {
+        return new self(
+            oid: $this->oid,
+            names: $this->names,
+            syntaxOid: $this->syntaxOid,
+            comparator: $this->comparator,
+            desc: $this->desc,
+            obsolete: $this->obsolete,
+            extensions: $extensions,
+        );
+    }
+
+    /**
      * Produces the matchingRuleUse description string for this rule and the attribute types that reference it.
      *
      * @param list<string> $appliesTo attribute type OIDs or names

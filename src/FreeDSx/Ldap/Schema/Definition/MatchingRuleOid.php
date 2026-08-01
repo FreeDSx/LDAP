@@ -100,5 +100,13 @@ final class MatchingRuleOid
 
     public const NAME_BIT_OR_MATCH = 'bitOrMatch';
 
+    public const OID_INTEGER_FIRST_COMPONENT_MATCH = '2.5.13.29';
+
+    public const NAME_INTEGER_FIRST_COMPONENT_MATCH = 'integerFirstComponentMatch';
+
+    public const OID_OBJECT_IDENTIFIER_FIRST_COMPONENT_MATCH = '2.5.13.30';
+
+    public const NAME_OBJECT_IDENTIFIER_FIRST_COMPONENT_MATCH = 'objectIdentifierFirstComponentMatch';
+
     private function __construct() {}
 }

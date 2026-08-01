@@ -194,24 +194,72 @@ final class Schema
 
     /**
      * Merges another schema into a new instance; definitions from $other override on OID/name collision.
+     *
+     * Vendor extensions the incoming definition omits are carried forward, so merging schema parsed from another
+     * directory cannot silently drop protections such as X-CONFIDENTIAL. Override an extension by giving it a
+     * different value rather than by omitting it.
      */
     public function merge(Schema $other): static
     {
         $merged = clone $this;
         foreach ($other->getAttributeTypes() as $type) {
-            $merged->addAttributeType($type);
+            $merged->addAttributeType($this->carriedAttributeType($type));
         }
         foreach ($other->getObjectClasses() as $class) {
-            $merged->addObjectClass($class);
+            $merged->addObjectClass($this->carriedObjectClass($class));
         }
         foreach ($other->getMatchingRules() as $rule) {
-            $merged->addMatchingRule($rule);
+            $merged->addMatchingRule($this->carriedMatchingRule($rule));
         }
         foreach ($other->getLdapSyntaxes() as $syntax) {
-            $merged->addSyntax($syntax);
+            $merged->addSyntax($this->carriedSyntax($syntax));
         }
 
         return $merged;
+    }
+
+    private function carriedAttributeType(AttributeType $incoming): AttributeType
+    {
+        $existing = $this->getAttributeType($incoming->oid);
+
+        if ($existing === null || $existing->extensions === []) {
+            return $incoming;
+        }
+
+        return $incoming->withExtensions($incoming->extensions + $existing->extensions);
+    }
+
+    private function carriedObjectClass(ObjectClass $incoming): ObjectClass
+    {
+        $existing = $this->getObjectClass($incoming->oid);
+
+        if ($existing === null || $existing->extensions === []) {
+            return $incoming;
+        }
+
+        return $incoming->withExtensions($incoming->extensions + $existing->extensions);
+    }
+
+    private function carriedMatchingRule(MatchingRule $incoming): MatchingRule
+    {
+        $existing = $this->getMatchingRule($incoming->oid);
+
+        if ($existing === null || $existing->extensions === []) {
+            return $incoming;
+        }
+
+        return $incoming->withExtensions($incoming->extensions + $existing->extensions);
+    }
+
+    private function carriedSyntax(LdapSyntax $incoming): LdapSyntax
+    {
+        $existing = $this->getSyntax($incoming->oid);
+
+        if ($existing === null || $existing->extensions === []) {
+            return $incoming;
+        }
+
+        return $incoming->withExtensions($incoming->extensions + $existing->extensions);
     }
 
     /**

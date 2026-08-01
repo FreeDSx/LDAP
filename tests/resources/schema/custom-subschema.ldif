@@ -1,0 +1,11 @@
+dn: cn=Subschema
+objectClass: top
+objectClass: subschema
+cn: Subschema
+attributeTypes: ( 1.3.6.1.4.1.99999.1.1 NAME 'projectCode' DESC 'Project this
+  record belongs to' EQUALITY 2.5.13.2 SUBSTR 2.5.13.4 SYNTAX 1.3.6.1.4.1.1466
+ .115.121.1.15 SINGLE-VALUE )
+attributeTypes: ( 1.3.6.1.4.1.99999.1.2 NAME 'projectNotes' EQUALITY 2.5.13.2
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+objectClasses: ( 1.3.6.1.4.1.99999.2.1 NAME 'projectRecord' DESC 'A project re
+ cord' SUP top STRUCTURAL MUST ( cn $ projectCode ) MAY projectNotes )

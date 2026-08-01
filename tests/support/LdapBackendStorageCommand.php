@@ -20,9 +20,12 @@ use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
+use FreeDSx\Ldap\Exception\SchemaParseException;
 use FreeDSx\Ldap\Schema\NisSchemaProvider;
+use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Schema\SubschemaLoader;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\ServerOptions;
@@ -101,6 +104,13 @@ final class LdapBackendStorageCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Schema validation mode (strict, lenient, off)',
                 'strict',
+            )
+            ->addOption(
+                'schema-ldif',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Path to a subschema LDIF file whose definitions are merged into the schema',
+                '',
             )
             ->addOption(
                 'allow-relax',
@@ -256,7 +266,7 @@ final class LdapBackendStorageCommand extends Command
 
         $serverOptions = (new ServerOptions(network: $network))
             ->setSchemaValidationMode($validationMode)
-            ->setSchema(StandardSchemaProvider::buildCore()->merge(NisSchemaProvider::build()))
+            ->setSchema($this->buildSchema($this->getStringOption($input, 'schema-ldif')))
             ->setMonitorEnabled((bool) $input->getOption('monitor'))
             ->setSyncEnabled((bool) $input->getOption('journal'))
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
@@ -362,5 +372,22 @@ final class LdapBackendStorageCommand extends Command
         $server->run();
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * @throws SchemaParseException
+     */
+    private function buildSchema(string $schemaLdif = ''): Schema
+    {
+        $schema = StandardSchemaProvider::buildCore()
+            ->merge(NisSchemaProvider::build());
+
+        if ($schemaLdif === '') {
+            return $schema;
+        }
+
+        return $schema->merge(
+            (new SubschemaLoader())->fromLdifFile($schemaLdif),
+        );
     }
 }

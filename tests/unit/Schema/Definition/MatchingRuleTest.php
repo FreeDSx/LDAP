@@ -51,7 +51,7 @@ final class MatchingRuleTest extends TestCase
         );
 
         self::assertSame(
-            "( 2.5.13.2 NAME ( 'caseIgnoreMatch' \$ 'caseIgnore' ) SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )",
+            "( 2.5.13.2 NAME ( 'caseIgnoreMatch' 'caseIgnore' ) SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )",
             $rule->toDescriptionString(),
         );
     }

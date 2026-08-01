@@ -9,6 +9,11 @@ Schema Validation
     * [ServerOptions:setSchemaValidationMode](#setschemavalidationmode)
 * [Custom Schema](#custom-schema)
     * [ServerOptions:setSchema](#setschema)
+    * [Loading Schema](#loading-schema)
+        * [What Is Not Read](#what-is-not-read)
+        * [SchemaLoadMode](#schemaloadmode)
+    * [Confidential Attributes](#confidential-attributes)
+    * [Building Definitions in PHP](#building-definitions-in-php)
 * [Operational Attributes](#operational-attributes)
 * [String Matching and Internationalization (RFC 4518)](#string-matching-and-internationalization-rfc-4518)
 
@@ -111,49 +116,119 @@ standard definitions rather than replace them.
 
 **Default**: `StandardSchemaProvider::buildCore()`
 
+Schema is written in RFC 4512 description strings, which is the form every directory publishes and the form
+`.schema` and `.ldif` schema files use. Load those directly rather than transcribing them. Building definitions in
+PHP is for adding a handful of your own.
+
+### Loading Schema
+
+`SubschemaLoader` reads definitions from a subschema entry in LDIF. The file can be one you maintain yourself:
+
+```php
+use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Schema\SubschemaLoader;
+use FreeDSx\Ldap\ServerOptions;
+
+$loaded = (new SubschemaLoader())->fromLdifFile('/path/to/schema.ldif');
+
+$options = (new ServerOptions())->setSchema(
+    StandardSchemaProvider::buildCore()->merge($loaded),
+);
+```
+
+Definitions go on the entry under `attributeTypes`, `objectClasses` and `ldapSyntaxes`:
+
+```
+dn: cn=Subschema
+ldapSyntaxes: ( 1.3.6.1.4.1.99999.3.1 DESC 'Vendor Syntax' )
+attributeTypes: ( 1.3.6.1.4.1.99999.1.1 NAME 'myCustomAttr' EQUALITY 2.5.13.2
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALUE )
+objectClasses: ( 1.3.6.1.4.1.99999.2.1 NAME 'myCustomClass' SUP top STRUCTURAL
+  MUST myCustomAttr )
+```
+
+To adopt the schema of an existing directory instead, read its subschema entry and pass that:
+
+```php
+$entry = (new LdapClient())->readOrFail('cn=Subschema', ['+']);
+
+$loaded = (new SubschemaLoader())->fromEntry($entry);
+```
+
+The subschema DN varies by vendor (eg. `cn=Subschema` or `cn=schema`). Read it from the Root DSE
+`subschemaSubentry` attribute when it is not known ahead of time. A string source is handled by
+`fromLdifString()`.
+
+#### What Is Not Read
+
+Matching rules are skipped, since a matching rule carries the comparator that implements it and a description string
+cannot express one. A loaded schema uses the comparators of the schema it is merged into.
+
+An attribute keeps its `EQUALITY`, `ORDERING` and `SUBSTR` values even when no rule of that name is registered.
+Filters against such an attribute fall back to byte-exact comparison rather than failing.
+
+------------------
+#### SchemaLoadMode
+
+Decides what happens when a definition cannot be parsed, or references something that does not exist.
+
+**Default**: `SchemaLoadMode::Strict`
+
+| Mode | Malformed definition | Unresolved `SUP`, `SYNTAX`, `MUST` or `MAY` |
+| --- | --- | --- |
+| `Strict` | fails the load | fails the load |
+| `Lenient` | skipped | kept as-is |
+
+Strict suits schema you control. A subschema read from another directory often needs `Lenient`, because RFC 4512
+§4.2 makes publishing `ldapSyntaxes` optional and servers do reference syntaxes they never declare.
+
+```php
+use FreeDSx\Ldap\Schema\SchemaLoadMode;
+
+$loaded = (new SubschemaLoader(SchemaLoadMode::Lenient))
+    ->fromEntry($entry);
+```
+
+Unresolved matching rule references are never checked in either mode.
+
+### Confidential Attributes
+
+An attribute carrying the `X-CONFIDENTIAL` extension is withheld from results and search filters unless the identity
+holds a grant for it:
+
+```
+attributeTypes: ( 1.3.6.1.4.1.99999.1.2 NAME 'secretCode' EQUALITY 2.5.13.5
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 X-CONFIDENTIAL 'TRUE' )
+```
+
+See [Confidential Attributes](Access-Control.md#confidential-attributes) for granting access. Note that replacing the
+standard `userPassword` definition without this extension drops its protection.
+
+Extensions are carried forward on merge. A definition replacing one that carries `X-CONFIDENTIAL` keeps that extension
+unless it sets a different value for it, so merging schema read from elsewhere cannot silently drop the protection.
+
+### Building Definitions in PHP
+
+Definitions are also constructible directly, which suits schema generated at runtime. `AttributeType`, `ObjectClass`
+and `LdapSyntax` map one to one onto the description string fields:
+
 ```php
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
-use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
-use FreeDSx\Ldap\Schema\Definition\ObjectClass;
-use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\StandardSchemaProvider;
 use FreeDSx\Ldap\ServerOptions;
 
 $schema = StandardSchemaProvider::buildCore()->merge(
-    (new Schema())
-        ->addAttributeType(new AttributeType(
-            oid: '1.3.6.1.4.1.99999.1',
-            names: ['myCustomAttr'],
-            equalityOid: '2.5.13.2',
-            usage: AttributeUsage::UserApplications,
-        ))
-        ->addObjectClass(new ObjectClass(
-            oid: '1.3.6.1.4.1.99999.2',
-            names: ['myCustomClass'],
-            type: ObjectClassType::StructuralClass,
-            superClassOids: ['2.5.6.6'],
-            must: ['myCustomAttr'],
-        ))
+    (new Schema())->addAttributeType(new AttributeType(
+        oid: '1.3.6.1.4.1.99999.1.1',
+        names: ['myCustomAttr'],
+        equalityOid: '2.5.13.2',
+        syntaxOid: '1.3.6.1.4.1.1466.115.121.1.15',
+    )),
 );
 
 $options = (new ServerOptions())->setSchema($schema);
 ```
-
-An attribute carrying the `X-CONFIDENTIAL` extension is withheld from results and search filters unless the identity
-holds a grant for it:
-
-```php
-new AttributeType(
-    oid: '1.3.6.1.4.1.99999.3',
-    names: ['secretCode'],
-    equalityOid: '2.5.13.5',
-    extensions: [AttributeType::EXTENSION_CONFIDENTIAL => [AttributeType::EXTENSION_ENABLED_VALUE]],
-)
-```
-
-See [Confidential Attributes](Access-Control.md#confidential-attributes) for granting access. Note that replacing the
-standard `userPassword` definition without this extension drops its protection.
 
 ## Operational Attributes
 

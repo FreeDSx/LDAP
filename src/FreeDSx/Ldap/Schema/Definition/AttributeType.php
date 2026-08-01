@@ -64,6 +64,33 @@ final readonly class AttributeType
     }
 
     /**
+     * Returns a copy carrying the given extensions in place of the current ones.
+     *
+     * @param array<string, list<string>> $extensions
+     *
+     * @api
+     */
+    public function withExtensions(array $extensions): self
+    {
+        return new self(
+            oid: $this->oid,
+            names: $this->names,
+            equalityOid: $this->equalityOid,
+            orderingOid: $this->orderingOid,
+            substringOid: $this->substringOid,
+            syntaxOid: $this->syntaxOid,
+            singleValue: $this->singleValue,
+            collective: $this->collective,
+            noUserModification: $this->noUserModification,
+            usage: $this->usage,
+            superTypeOid: $this->superTypeOid,
+            desc: $this->desc,
+            obsolete: $this->obsolete,
+            extensions: $extensions,
+        );
+    }
+
+    /**
      * Produces the description string used in the subschema attributeTypes attribute.
      */
     public function toDescriptionString(): string

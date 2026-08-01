@@ -30,6 +30,22 @@ final readonly class LdapSyntax
     ) {}
 
     /**
+     * Returns a copy carrying the given extensions in place of the current ones.
+     *
+     * @param array<string, list<string>> $extensions
+     *
+     * @api
+     */
+    public function withExtensions(array $extensions): self
+    {
+        return new self(
+            oid: $this->oid,
+            desc: $this->desc,
+            extensions: $extensions,
+        );
+    }
+
+    /**
      * Produces the description string used in the subschema ldapSyntaxes attribute.
      */
     public function toDescriptionString(): string

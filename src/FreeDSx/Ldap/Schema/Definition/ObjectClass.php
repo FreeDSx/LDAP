@@ -40,6 +40,28 @@ final readonly class ObjectClass
     ) {}
 
     /**
+     * Returns a copy carrying the given extensions in place of the current ones.
+     *
+     * @param array<string, list<string>> $extensions
+     *
+     * @api
+     */
+    public function withExtensions(array $extensions): self
+    {
+        return new self(
+            oid: $this->oid,
+            names: $this->names,
+            type: $this->type,
+            superClassOids: $this->superClassOids,
+            must: $this->must,
+            may: $this->may,
+            desc: $this->desc,
+            obsolete: $this->obsolete,
+            extensions: $extensions,
+        );
+    }
+
+    /**
      * Produces the description string used in the subschema objectClasses attribute.
      */
     public function toDescriptionString(): string

@@ -74,5 +74,37 @@ final class SyntaxOid
 
     public const DESC_JPEG = 'JPEG';
 
+    public const OID_ATTRIBUTE_TYPE_DESCRIPTION = '1.3.6.1.4.1.1466.115.121.1.3';
+
+    public const DESC_ATTRIBUTE_TYPE_DESCRIPTION = 'Attribute Type Description';
+
+    public const OID_DIT_CONTENT_RULE_DESCRIPTION = '1.3.6.1.4.1.1466.115.121.1.16';
+
+    public const DESC_DIT_CONTENT_RULE_DESCRIPTION = 'DIT Content Rule Description';
+
+    public const OID_DIT_STRUCTURE_RULE_DESCRIPTION = '1.3.6.1.4.1.1466.115.121.1.17';
+
+    public const DESC_DIT_STRUCTURE_RULE_DESCRIPTION = 'DIT Structure Rule Description';
+
+    public const OID_MATCHING_RULE_DESCRIPTION = '1.3.6.1.4.1.1466.115.121.1.30';
+
+    public const DESC_MATCHING_RULE_DESCRIPTION = 'Matching Rule Description';
+
+    public const OID_MATCHING_RULE_USE_DESCRIPTION = '1.3.6.1.4.1.1466.115.121.1.31';
+
+    public const DESC_MATCHING_RULE_USE_DESCRIPTION = 'Matching Rule Use Description';
+
+    public const OID_NAME_FORM_DESCRIPTION = '1.3.6.1.4.1.1466.115.121.1.35';
+
+    public const DESC_NAME_FORM_DESCRIPTION = 'Name Form Description';
+
+    public const OID_OBJECT_CLASS_DESCRIPTION = '1.3.6.1.4.1.1466.115.121.1.37';
+
+    public const DESC_OBJECT_CLASS_DESCRIPTION = 'Object Class Description';
+
+    public const OID_LDAP_SYNTAX_DESCRIPTION = '1.3.6.1.4.1.1466.115.121.1.54';
+
+    public const DESC_LDAP_SYNTAX_DESCRIPTION = 'LDAP Syntax Description';
+
     private function __construct() {}
 }

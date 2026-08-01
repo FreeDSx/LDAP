@@ -81,6 +81,20 @@ final class StandardSchemaProvider
             new LdapSyntax(SyntaxOid::OID_PRINTABLE_STRING, SyntaxOid::DESC_PRINTABLE_STRING),
             new LdapSyntax(SyntaxOid::OID_POSTAL_ADDRESS, SyntaxOid::DESC_POSTAL_ADDRESS),
             new LdapSyntax(SyntaxOid::OID_JPEG, SyntaxOid::DESC_JPEG),
+            new LdapSyntax(SyntaxOid::OID_ATTRIBUTE_TYPE_DESCRIPTION, SyntaxOid::DESC_ATTRIBUTE_TYPE_DESCRIPTION),
+            new LdapSyntax(SyntaxOid::OID_OBJECT_CLASS_DESCRIPTION, SyntaxOid::DESC_OBJECT_CLASS_DESCRIPTION),
+            new LdapSyntax(SyntaxOid::OID_MATCHING_RULE_DESCRIPTION, SyntaxOid::DESC_MATCHING_RULE_DESCRIPTION),
+            new LdapSyntax(
+                SyntaxOid::OID_MATCHING_RULE_USE_DESCRIPTION,
+                SyntaxOid::DESC_MATCHING_RULE_USE_DESCRIPTION,
+            ),
+            new LdapSyntax(SyntaxOid::OID_LDAP_SYNTAX_DESCRIPTION, SyntaxOid::DESC_LDAP_SYNTAX_DESCRIPTION),
+            new LdapSyntax(
+                SyntaxOid::OID_DIT_STRUCTURE_RULE_DESCRIPTION,
+                SyntaxOid::DESC_DIT_STRUCTURE_RULE_DESCRIPTION,
+            ),
+            new LdapSyntax(SyntaxOid::OID_DIT_CONTENT_RULE_DESCRIPTION, SyntaxOid::DESC_DIT_CONTENT_RULE_DESCRIPTION),
+            new LdapSyntax(SyntaxOid::OID_NAME_FORM_DESCRIPTION, SyntaxOid::DESC_NAME_FORM_DESCRIPTION),
         ];
     }
 
@@ -100,6 +114,18 @@ final class StandardSchemaProvider
                 [MatchingRuleOid::NAME_DISTINGUISHED_NAME_MATCH],
                 SyntaxOid::OID_DISTINGUISHED_NAME,
                 new DistinguishedNameComparator(),
+            ),
+            new MatchingRule(
+                MatchingRuleOid::OID_UNIQUE_MEMBER_MATCH,
+                [MatchingRuleOid::NAME_UNIQUE_MEMBER_MATCH],
+                SyntaxOid::OID_DISTINGUISHED_NAME,
+                new DistinguishedNameComparator(),
+            ),
+            new MatchingRule(
+                MatchingRuleOid::OID_OBJECT_IDENTIFIER_MATCH,
+                [MatchingRuleOid::NAME_OBJECT_IDENTIFIER_MATCH],
+                SyntaxOid::OID_OID,
+                $caseIgnore,
             ),
             new MatchingRule(
                 MatchingRuleOid::OID_CASE_IGNORE_MATCH,
@@ -567,7 +593,89 @@ final class StandardSchemaProvider
                 usage: AttributeUsage::DirectoryOperation,
                 desc: AttributeTypeOid::DESC_ENTRY_DN,
             ),
+            ...self::subschemaAttributeTypes(),
         ];
+    }
+
+    /**
+     * The subschema description attributes published on the subschema entry, per RFC 4512 §4.2.
+     *
+     * @return list<AttributeType>
+     */
+    private static function subschemaAttributeTypes(): array
+    {
+        return [
+            self::subschemaDescription(
+                AttributeTypeOid::OID_ATTRIBUTE_TYPES,
+                AttributeTypeOid::NAME_ATTRIBUTE_TYPES,
+                AttributeTypeOid::DESC_ATTRIBUTE_TYPES,
+                SyntaxOid::OID_ATTRIBUTE_TYPE_DESCRIPTION,
+            ),
+            self::subschemaDescription(
+                AttributeTypeOid::OID_OBJECT_CLASSES,
+                AttributeTypeOid::NAME_OBJECT_CLASSES,
+                AttributeTypeOid::DESC_OBJECT_CLASSES,
+                SyntaxOid::OID_OBJECT_CLASS_DESCRIPTION,
+            ),
+            self::subschemaDescription(
+                AttributeTypeOid::OID_MATCHING_RULES,
+                AttributeTypeOid::NAME_MATCHING_RULES,
+                AttributeTypeOid::DESC_MATCHING_RULES,
+                SyntaxOid::OID_MATCHING_RULE_DESCRIPTION,
+            ),
+            self::subschemaDescription(
+                AttributeTypeOid::OID_MATCHING_RULE_USE,
+                AttributeTypeOid::NAME_MATCHING_RULE_USE,
+                AttributeTypeOid::DESC_MATCHING_RULE_USE,
+                SyntaxOid::OID_MATCHING_RULE_USE_DESCRIPTION,
+            ),
+            self::subschemaDescription(
+                AttributeTypeOid::OID_LDAP_SYNTAXES,
+                AttributeTypeOid::NAME_LDAP_SYNTAXES,
+                AttributeTypeOid::DESC_LDAP_SYNTAXES,
+                SyntaxOid::OID_LDAP_SYNTAX_DESCRIPTION,
+            ),
+            self::subschemaDescription(
+                AttributeTypeOid::OID_DIT_CONTENT_RULES,
+                AttributeTypeOid::NAME_DIT_CONTENT_RULES,
+                AttributeTypeOid::DESC_DIT_CONTENT_RULES,
+                SyntaxOid::OID_DIT_CONTENT_RULE_DESCRIPTION,
+            ),
+            self::subschemaDescription(
+                AttributeTypeOid::OID_NAME_FORMS,
+                AttributeTypeOid::NAME_NAME_FORMS,
+                AttributeTypeOid::DESC_NAME_FORMS,
+                SyntaxOid::OID_NAME_FORM_DESCRIPTION,
+            ),
+            self::subschemaDescription(
+                AttributeTypeOid::OID_DIT_STRUCTURE_RULES,
+                AttributeTypeOid::NAME_DIT_STRUCTURE_RULES,
+                AttributeTypeOid::DESC_DIT_STRUCTURE_RULES,
+                SyntaxOid::OID_DIT_STRUCTURE_RULE_DESCRIPTION,
+                MatchingRuleOid::OID_INTEGER_FIRST_COMPONENT_MATCH,
+            ),
+        ];
+    }
+
+    /**
+     * A multi-valued, server-maintained schema description attribute.
+     */
+    private static function subschemaDescription(
+        string $oid,
+        string $name,
+        string $desc,
+        string $syntaxOid,
+        string $equalityOid = MatchingRuleOid::OID_OBJECT_IDENTIFIER_FIRST_COMPONENT_MATCH,
+    ): AttributeType {
+        return new AttributeType(
+            $oid,
+            [$name],
+            equalityOid: $equalityOid,
+            syntaxOid: $syntaxOid,
+            noUserModification: true,
+            usage: AttributeUsage::DirectoryOperation,
+            desc: $desc,
+        );
     }
 
     /**
