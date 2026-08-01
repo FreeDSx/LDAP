@@ -18,8 +18,10 @@ use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
 use FreeDSx\Ldap\Schema\Definition\DefinitionKeyword;
 use FreeDSx\Ldap\Schema\Definition\LdapSyntax;
+use FreeDSx\Ldap\Schema\Definition\MatchingRule;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
+use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorRegistry;
 
 use function count;
 use function sprintf;
@@ -84,6 +86,16 @@ final class SchemaDefinitionParser
         DefinitionKeyword::SYNTAX => KeywordKind::Oid,
     ];
 
+    private readonly MatchingRuleComparatorRegistry $comparators;
+
+    /**
+     * @param ?MatchingRuleComparatorRegistry $comparators the comparators available to matching rules read from text
+     */
+    public function __construct(?MatchingRuleComparatorRegistry $comparators = null)
+    {
+        $this->comparators = $comparators ?? MatchingRuleComparatorRegistry::default();
+    }
+
     /**
      * @throws SchemaParseException
      */
@@ -141,6 +153,44 @@ final class SchemaDefinitionParser
             superClassOids: $body->values(DefinitionKeyword::SUP),
             must: $body->values(DefinitionKeyword::MUST),
             may: $body->values(DefinitionKeyword::MAY),
+            desc: $body->string(DefinitionKeyword::DESC),
+            obsolete: $body->flag(DefinitionKeyword::OBSOLETE),
+            extensions: $body->extensions(),
+        );
+    }
+
+    /**
+     * Parses a matching rule, or returns null when no comparator implements it.
+     *
+     * A description string names a rule but cannot express how it compares, so the comparator comes from the registry.
+     *
+     * @throws SchemaParseException
+     */
+    public function parseMatchingRule(string $definition): ?MatchingRule
+    {
+        $reader = new SchemaDefinitionReader($definition);
+        $oid = $this->readHeader($reader);
+        $body = ParsedDefinitionBody::read(
+            $reader,
+            self::MATCHING_RULE_KEYWORDS,
+        );
+        $this->assertComplete($reader);
+
+        $syntaxOid = $body->string(DefinitionKeyword::SYNTAX);
+        if ($syntaxOid === null) {
+            $reader->error('A matching rule requires a SYNTAX');
+        }
+
+        $comparator = $this->comparators->get($oid);
+        if ($comparator === null) {
+            return null;
+        }
+
+        return new MatchingRule(
+            oid: $oid,
+            names: $body->values(DefinitionKeyword::NAME),
+            syntaxOid: $syntaxOid,
+            comparator: $comparator,
             desc: $body->string(DefinitionKeyword::DESC),
             obsolete: $body->flag(DefinitionKeyword::OBSOLETE),
             extensions: $body->extensions(),
