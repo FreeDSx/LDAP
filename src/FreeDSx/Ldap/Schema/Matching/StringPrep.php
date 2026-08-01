@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Schema\Matching\Prep;
+namespace FreeDSx\Ldap\Schema\Matching;
 
 use FreeDSx\Ldap\Schema\Text;
 use Normalizer;

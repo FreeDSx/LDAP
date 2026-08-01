@@ -11,9 +11,9 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Unit\FreeDSx\Ldap\Schema\Matching;
+namespace Tests\Unit\FreeDSx\Ldap\Schema\Matching\Comparator;
 
-use FreeDSx\Ldap\Schema\Matching\CaseExactComparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\CaseExactComparator;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 use PHPUnit\Framework\TestCase;
 

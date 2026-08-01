@@ -11,10 +11,10 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Unit\FreeDSx\Ldap\Schema\Matching;
+namespace Tests\Unit\FreeDSx\Ldap\Schema\Matching\Comparator;
 
+use FreeDSx\Ldap\Schema\Matching\Comparator\TelephoneNumberComparator;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
-use FreeDSx\Ldap\Schema\Matching\TelephoneNumberComparator;
 use PHPUnit\Framework\TestCase;
 
 final class TelephoneNumberComparatorTest extends TestCase

@@ -11,9 +11,9 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Unit\FreeDSx\Ldap\Schema\Matching\Prep;
+namespace Tests\Unit\FreeDSx\Ldap\Schema\Matching;
 
-use FreeDSx\Ldap\Schema\Matching\Prep\StringPrep;
+use FreeDSx\Ldap\Schema\Matching\StringPrep;
 use PHPUnit\Framework\TestCase;
 
 final class StringPrepTest extends TestCase

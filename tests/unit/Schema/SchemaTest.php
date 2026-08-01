@@ -19,7 +19,7 @@ use FreeDSx\Ldap\Schema\Definition\MatchingRule;
 use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
-use FreeDSx\Ldap\Schema\Matching\CaseIgnoreComparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
 use FreeDSx\Ldap\Schema\Schema;
 use PHPUnit\Framework\TestCase;
 
