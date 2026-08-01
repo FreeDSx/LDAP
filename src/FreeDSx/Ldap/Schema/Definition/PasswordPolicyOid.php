@@ -15,6 +15,8 @@ namespace FreeDSx\Ldap\Schema\Definition;
 
 /**
  * OIDs, names, and descriptions for draft-behera-ldap-password-policy-10 attributes and object classes.
+ *
+ * @api
  */
 final class PasswordPolicyOid
 {

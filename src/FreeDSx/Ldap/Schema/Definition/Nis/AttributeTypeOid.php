@@ -15,6 +15,8 @@ namespace FreeDSx\Ldap\Schema\Definition\Nis;
 
 /**
  * OIDs, names, and descriptions for the RFC 2307 POSIX account/group/shadow attribute types.
+ *
+ * @api
  */
 final class AttributeTypeOid
 {

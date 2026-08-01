@@ -185,16 +185,16 @@ final class SubschemaLoaderTest extends TestCase
     }
 
     #[DataProvider('vendorSubschemaProvider')]
-    public function test_a_real_subschema_never_yields_matching_rules(
+    public function test_a_real_subschema_yields_only_the_matching_rules_this_library_implements(
         string $fixture,
         SchemaLoadMode $mode,
     ): void {
         $schema = (new SubschemaLoader($mode))->fromLdifFile($fixture);
 
-        self::assertSame(
-            [],
-            $schema->getMatchingRules(),
-        );
+        // Both vendors publish rules this library has no comparator for, such as numericStringMatch.
+        self::assertNotEmpty($schema->getMatchingRules());
+        self::assertNotNull($schema->getMatchingRule('2.5.13.2'));
+        self::assertNull($schema->getMatchingRule('2.5.13.8'));
     }
 
     /**

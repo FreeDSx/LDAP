@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Schema\Parser;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\SchemaParseException;
+use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
 use FreeDSx\Ldap\Schema\Parser\SubschemaEntryParser;
 use FreeDSx\Ldap\Schema\SchemaLoadMode;
 use PHPUnit\Framework\TestCase;
@@ -61,11 +62,47 @@ final class SubschemaEntryParserTest extends TestCase
         );
     }
 
-    public function test_matching_rules_are_not_read(): void
+    public function test_a_matching_rule_is_read_when_a_comparator_implements_it(): void
     {
         $schema = $this->subject->parse(
             $this->entry([
                 'matchingRules' => ["( 2.5.13.2 NAME 'caseIgnoreMatch' SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )"],
+            ]),
+            SchemaLoadMode::Strict,
+        );
+
+        $rule = $schema->getMatchingRule('2.5.13.2');
+
+        self::assertNotNull($rule);
+        self::assertSame(
+            ['caseIgnoreMatch'],
+            $rule->names,
+        );
+        self::assertInstanceOf(
+            CaseIgnoreComparator::class,
+            $rule->comparator,
+        );
+    }
+
+    public function test_a_matching_rule_without_a_comparator_is_skipped(): void
+    {
+        $schema = $this->subject->parse(
+            $this->entry([
+                'matchingRules' => ["( 2.5.13.8 NAME 'numericStringMatch' SYNTAX 1.3.6.1.4.1.1466.115.121.1.36 )"],
+            ]),
+            SchemaLoadMode::Strict,
+        );
+
+        self::assertSame(
+            [],
+            $schema->getMatchingRules(),
+        );
+    }
+
+    public function test_matching_rule_use_is_not_read(): void
+    {
+        $schema = $this->subject->parse(
+            $this->entry([
                 'matchingRuleUse' => ["( 2.5.13.2 NAME 'caseIgnoreMatch' APPLIES cn )"],
             ]),
             SchemaLoadMode::Strict,

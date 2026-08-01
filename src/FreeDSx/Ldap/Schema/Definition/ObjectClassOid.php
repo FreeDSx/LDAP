@@ -15,6 +15,8 @@ namespace FreeDSx\Ldap\Schema\Definition;
 
 /**
  * OIDs, names, and descriptions for standard LDAP object classes (RFC 4519 + RFC 4512).
+ *
+ * @api
  */
 final class ObjectClassOid
 {
