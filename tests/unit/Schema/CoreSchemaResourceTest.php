@@ -18,19 +18,22 @@ use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\Schema;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use PHPUnit\Framework\TestCase;
 
-final class StandardSchemaProviderTest extends TestCase
+/**
+ * Verifies the definitions shipped in resources/ldap-schema/core.ldif.
+ */
+final class CoreSchemaResourceTest extends TestCase
 {
     private Schema $schema;
 
     protected function setUp(): void
     {
-        $this->schema = StandardSchemaProvider::buildCore();
+        $this->schema = SchemaResource::Core->load();
     }
 
-    public function test_build_core_returns_non_empty_schema(): void
+    public function test_it_loads_a_non_empty_schema(): void
     {
         self::assertNotEmpty($this->schema->getAttributeTypes());
         self::assertNotEmpty($this->schema->getObjectClasses());

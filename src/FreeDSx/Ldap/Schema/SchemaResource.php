@@ -16,14 +16,13 @@ namespace FreeDSx\Ldap\Schema;
 use FreeDSx\Ldap\Exception\SchemaParseException;
 use FreeDSx\Ldap\Resources;
 use FreeDSx\Ldap\Schema\Parser\SubschemaEntryParser;
-use FreeDSx\Ldap\Schema\Validation\SchemaReferenceValidator;
 
 /**
  * The schema definition files shipped with this package.
  *
- * @internal
+ * @api
  */
-enum SchemaResource: string
+enum SchemaResource: string implements SchemaSourceInterface
 {
     case Core = 'core.ldif';
 
@@ -34,25 +33,15 @@ enum SchemaResource: string
     private const DIRECTORY = 'ldap-schema/';
 
     /**
+     * Definitions are parsed strictly, but references are left for whoever merges the sources; the optional
+     * schemas build on the core one, so neither resolves on its own.
+     *
      * @throws SchemaParseException
      */
     public function load(): Schema
     {
-        $parser = new SubschemaEntryParser(
-            references: new SchemaReferenceValidator($this->validationBase()),
-        );
+        $loader = new SubschemaLoader(parser: new SubschemaEntryParser());
 
-        return (new SubschemaLoader(parser: $parser))
-            ->fromLdifFile(Resources::path(self::DIRECTORY . $this->value));
-    }
-
-    /**
-     * The core schema resolves against itself alone; the optional ones build on it.
-     */
-    private function validationBase(): Schema
-    {
-        return $this === self::Core
-            ? new Schema()
-            : self::Core->load();
+        return $loader->fromLdifFile(Resources::path(self::DIRECTORY . $this->value));
     }
 }

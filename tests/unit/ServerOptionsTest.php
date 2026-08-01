@@ -17,7 +17,10 @@ use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
+use FreeDSx\Ldap\Schema\Definition\Nis\AttributeTypeOid as NisAttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
@@ -274,9 +277,10 @@ final class ServerOptionsTest extends TestCase
         );
     }
 
-    public function test_it_can_set_subschema_entry(): void
+    public function test_the_subschema_entry_comes_from_the_schema_config(): void
     {
-        $this->subject->setSubschemaEntry(new Dn('cn=Subschema,dc=example,dc=com'));
+        $this->subject->getSchemaConfig()
+            ->setSubschemaEntry(new Dn('cn=Subschema,dc=example,dc=com'));
 
         self::assertSame(
             'cn=Subschema,dc=example,dc=com',
@@ -617,22 +621,58 @@ final class ServerOptionsTest extends TestCase
         );
     }
 
-    public function test_schema_omits_password_policy_attributes_when_feature_disabled(): void
+    public function test_the_default_schema_ships_the_expected_schemas(): void
     {
         $schema = $this->subject->getSchema();
 
-        self::assertNull($schema->getAttributeType(PasswordPolicyOid::NAME_PWD_MIN_LENGTH));
-        self::assertNull($schema->getObjectClass(PasswordPolicyOid::NAME_PWD_POLICY));
-    }
-
-    public function test_schema_includes_password_policy_attributes_when_feature_enabled(): void
-    {
-        $this->subject->setPasswordPolicy(new PasswordPolicy());
-
-        $schema = $this->subject->getSchema();
-
+        self::assertNotNull($schema->getAttributeType(AttributeTypeOid::NAME_CN));
+        self::assertNotNull($schema->getAttributeType(NisAttributeTypeOid::NAME_UID_NUMBER));
         self::assertNotNull($schema->getAttributeType(PasswordPolicyOid::NAME_PWD_MIN_LENGTH));
         self::assertNotNull($schema->getObjectClass(PasswordPolicyOid::NAME_PWD_POLICY));
+    }
+
+    /**
+     * The password policy schema is unconditional, so the order configuration happens in cannot change it.
+     */
+    public function test_the_schema_carries_password_policy_whenever_a_policy_is_configured(): void
+    {
+        $this->subject->getSchema();
+        $this->subject->setPasswordPolicy(new PasswordPolicy());
+
+        self::assertNotNull(
+            $this->subject->getSchema()
+                ->getAttributeType(PasswordPolicyOid::NAME_PWD_CHANGED_TIME),
+        );
+    }
+
+    public function test_a_custom_source_list_still_carries_password_policy(): void
+    {
+        $this->subject->setPasswordPolicy(new PasswordPolicy());
+        $this->subject->getSchemaConfig()
+            ->setSources(SchemaResource::Core, SchemaResource::PasswordPolicy);
+
+        self::assertNotNull(
+            $this->subject->getSchema()
+                ->getAttributeType(PasswordPolicyOid::NAME_PWD_CHANGED_TIME),
+        );
+    }
+
+    public function test_the_resolved_schema_is_reused_until_the_sources_change(): void
+    {
+        $first = $this->subject->getSchema();
+
+        self::assertSame(
+            $first,
+            $this->subject->getSchema(),
+        );
+
+        $this->subject->getSchemaConfig()
+            ->addSource(SchemaResource::Core);
+
+        self::assertNotSame(
+            $first,
+            $this->subject->getSchema(),
+        );
     }
 
     public function test_password_hash_scheme_defaults_to_bcrypt(): void

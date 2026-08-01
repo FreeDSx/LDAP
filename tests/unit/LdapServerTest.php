@@ -64,7 +64,7 @@ class LdapServerTest extends TestCase
     {
         $this->mockServerRunner = $this->createMock(ServerRunnerInterface::class);
 
-        $this->options = (new ServerOptions(network: NetworkConfig::withPort(33389)))
+        $this->options = (new ServerOptions(networkConfig: NetworkConfig::withPort(33389)))
             ->setServerRunner($this->mockServerRunner);
 
         $this->container = Container::forServer($this->options);
@@ -95,7 +95,7 @@ class LdapServerTest extends TestCase
             self::markTestSkipped('The swoole extension is required to construct the Swoole runner.');
         }
 
-        $options = (new ServerOptions(network: NetworkConfig::withPort(33389)))
+        $options = (new ServerOptions(networkConfig: NetworkConfig::withPort(33389)))
             ->setReplicaConfig(new ReplicaConfig(new ClientOptions()))
             ->setStorageConfig($storageConfig)
             ->setRunnerConfig(new RunnerConfig($runner));

@@ -34,9 +34,13 @@ use function array_values;
  */
 final readonly class SubschemaEntryParser
 {
+    /**
+     * @param ?SchemaReferenceValidator $references omit to leave cross-references to whoever merges the result,
+     *                                              which is what a schema that is only part of a whole needs
+     */
     public function __construct(
         private SchemaDefinitionParser $definitions = new SchemaDefinitionParser(),
-        private SchemaReferenceValidator $references = new SchemaReferenceValidator(),
+        private ?SchemaReferenceValidator $references = null,
     ) {}
 
     /**
@@ -92,7 +96,7 @@ final readonly class SubschemaEntryParser
             $schema->addObjectClass($class);
         }
 
-        $this->references->validate(
+        $this->references?->validate(
             $schema,
             $mode,
         );

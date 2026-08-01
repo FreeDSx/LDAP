@@ -32,8 +32,10 @@ LDAP Server Configuration
     * [ServerOptions:setPasswordAuthenticator](#setpasswordauthenticator)
     * [ServerOptions:setIdentityResolver](#setidentityresolver)
 * [Schema](#schema)
-    * [ServerOptions:setSchemaValidationMode](#setschemavalidationmode)
-    * [ServerOptions:setSchema](#setschema)
+    * [SchemaConfig:setSources](#schemaconfigsetsources)
+    * [SchemaConfig:setValidationMode](#schemaconfigsetvalidationmode)
+    * [SchemaConfig:setLoadMode](#schemaconfigsetloadmode)
+    * [SchemaConfig:setSubschemaEntry](#schemaconfigsetsubschemaentry)
 * [RootDSE Options](#rootdse-options)
     * [ServerOptions:setDseAltServer](#setdsealtserver)
     * [ServerOptions:setDseVendorName](#setdsevendorname)
@@ -574,11 +576,37 @@ Password Modify requests.
 
 ## Schema
 
-These configure schema validation for storage-backend writes. For full documentation, see
-[Schema Validation](Schema.md).
+The schema is configured with a `SchemaConfig`, passed to `ServerOptions` alongside the other configuration
+objects. For full documentation, see [Schema Validation](Schema.md).
+
+```php
+use FreeDSx\Ldap\Server\Config\SchemaConfig;
+use FreeDSx\Ldap\ServerOptions;
+
+$schemaConfig = new SchemaConfig();
+
+$options = new ServerOptions(schemaConfig: $schemaConfig);
+```
+
+`getSchemaConfig()` returns the config in use, so the defaults can be adjusted without constructing one:
+
+```php
+$options = new ServerOptions();
+
+$options->getSchemaConfig()
+    ->addSource(new LdifSchemaSource('/path/to/schema.ldif'));
+```
 
 ------------------
-#### setSchemaValidationMode
+#### SchemaConfig:setSources
+
+The schemas the server enforces and publishes, merged in the order given. See
+[Custom Schema](Schema.md#custom-schema). Use `addSource()` to append to the shipped set rather than replace it.
+
+**Default**: `[SchemaResource::Core, SchemaResource::Nis, SchemaResource::PasswordPolicy]`
+
+------------------
+#### SchemaConfig:setValidationMode
 
 How `add`/`modify` writes are validated:
 
@@ -591,13 +619,19 @@ See [Validation Mode](Schema.md#validation-mode).
 **Default**: `SchemaValidationMode::Strict`
 
 ------------------
-#### setSchema
+#### SchemaConfig:setLoadMode
 
-Replaces the active schema used for validation and operational attributes. See
-[Custom Schema](Schema.md#custom-schema), or [Loading Schema](Schema.md#loading-schema) to read definitions from
-LDIF rather than building them in PHP.
+Whether a definition referencing something no source provides fails the load. See
+[SchemaLoadMode](Schema.md#schemaloadmode).
 
-**Default**: `StandardSchemaProvider::buildCore()`
+**Default**: `SchemaLoadMode::Strict`
+
+------------------
+#### SchemaConfig:setSubschemaEntry
+
+The entry the schema is published on.
+
+**Default**: `cn=Subschema`
 
 ## RootDSE Options
 

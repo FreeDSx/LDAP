@@ -19,7 +19,7 @@ use FreeDSx\Ldap\Schema\Definition\LdapSyntax;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaLoadMode;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\Validation\SchemaReferenceValidator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -30,7 +30,8 @@ final class SchemaReferenceValidatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new SchemaReferenceValidator();
+        // No base, so a definition resolves only against the schema it is checked with.
+        $this->subject = new SchemaReferenceValidator(new Schema());
     }
 
     public function test_a_schema_with_resolvable_references_passes(): void
@@ -143,12 +144,12 @@ final class SchemaReferenceValidatorTest extends TestCase
         );
     }
 
-    public function test_the_standard_schema_resolves_its_own_references(): void
+    public function test_the_core_schema_resolves_its_own_references(): void
     {
         $this->expectNotToPerformAssertions();
 
         $this->subject->validate(
-            StandardSchemaProvider::buildCore(),
+            SchemaResource::Core->load(),
             SchemaLoadMode::Strict,
         );
     }

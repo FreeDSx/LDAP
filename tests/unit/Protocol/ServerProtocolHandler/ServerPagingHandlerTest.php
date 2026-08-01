@@ -32,7 +32,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingHandler;
 use FreeDSx\Ldap\Schema\Schema;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
@@ -80,7 +80,7 @@ class ServerPagingHandlerTest extends TestCase
         $this->mockFilterEvaluator = $this->createMock(FilterEvaluatorInterface::class);
         $this->mockAccessControl = $this->createMock(AccessControlInterface::class);
         $this->requestHistory = new RequestHistory();
-        $this->schema = StandardSchemaProvider::buildCore();
+        $this->schema = SchemaResource::Core->load();
         $this->sentMessages = [];
 
         $this->mockFilterEvaluator

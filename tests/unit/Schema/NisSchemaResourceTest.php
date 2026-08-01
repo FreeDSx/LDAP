@@ -18,17 +18,20 @@ use FreeDSx\Ldap\Schema\Definition\Nis\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\Nis\ObjectClassOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
-use FreeDSx\Ldap\Schema\NisSchemaProvider;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\Schema;
 use PHPUnit\Framework\TestCase;
 
-final class NisSchemaProviderTest extends TestCase
+/**
+ * Verifies the definitions shipped in resources/ldap-schema/nis.ldif.
+ */
+final class NisSchemaResourceTest extends TestCase
 {
     private Schema $schema;
 
     protected function setUp(): void
     {
-        $this->schema = NisSchemaProvider::build();
+        $this->schema = SchemaResource::Nis->load();
     }
 
     public function test_registers_all_13_attribute_types(): void

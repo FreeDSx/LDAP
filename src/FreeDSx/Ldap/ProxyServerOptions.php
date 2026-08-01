@@ -27,11 +27,11 @@ final class ProxyServerOptions implements ServerListenerOptionsInterface
     use ServerListenerOptionsTrait;
 
     public function __construct(
-        ?NetworkConfig $network = null,
-        ?RunnerConfig $runner = null,
+        ?NetworkConfig $networkConfig = null,
+        ?RunnerConfig $runnerConfig = null,
     ) {
-        $this->network = $network ?? new NetworkConfig();
-        $this->runner = $runner ?? new RunnerConfig();
+        $this->networkConfig = $networkConfig ?? new NetworkConfig();
+        $this->runnerConfig = $runnerConfig ?? new RunnerConfig();
     }
 
     /**

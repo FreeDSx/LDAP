@@ -18,11 +18,9 @@ use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
-use FreeDSx\Ldap\Schema\NisSchemaProvider;
 use FreeDSx\Ldap\Schema\Parser\SchemaDefinitionParser;
-use FreeDSx\Ldap\Schema\PasswordPolicySchemaProvider;
 use FreeDSx\Ldap\Schema\Schema;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -579,7 +577,7 @@ final class SchemaDefinitionParserTest extends TestCase
 
     public function test_confidentiality_survives_a_round_trip(): void
     {
-        $userPassword = StandardSchemaProvider::buildCore()
+        $userPassword = SchemaResource::Core->load()
             ->getAttributeType(AttributeTypeOid::NAME_USER_PASSWORD);
 
         self::assertNotNull($userPassword);
@@ -596,9 +594,9 @@ final class SchemaDefinitionParserTest extends TestCase
     private static function shippedSchemas(): array
     {
         return [
-            'standard' => StandardSchemaProvider::buildCore(),
-            'nis' => NisSchemaProvider::build(),
-            'ppolicy' => PasswordPolicySchemaProvider::build(),
+            'standard' => SchemaResource::Core->load(),
+            'nis' => SchemaResource::Nis->load(),
+            'ppolicy' => SchemaResource::PasswordPolicy->load(),
         ];
     }
 }

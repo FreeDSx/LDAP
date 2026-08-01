@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributePolicy;
@@ -49,7 +49,7 @@ final class ConfidentialAttributeMiddlewareTest extends TestCase
         $this->subject = new ConfidentialAttributeMiddleware(new ConfidentialFilterRewriter(
             new ConfidentialAttributePolicy(
                 new RuleBasedAccessControl(AclRules::fromEmpty()),
-                StandardSchemaProvider::buildCore(),
+                SchemaResource::Core->load(),
             ),
         ));
     }

@@ -19,7 +19,6 @@ use FreeDSx\Ldap\Schema\Definition\DefinitionKeyword;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaLoadMode;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
 
 use function sprintf;
 
@@ -35,15 +34,11 @@ use function sprintf;
  */
 final readonly class SchemaReferenceValidator
 {
-    private Schema $base;
-
     /**
-     * @param ?Schema $base the schema parsed definitions may also resolve against, defaulting to the standard one
+     * @param Schema $base an additional schema the definitions may resolve against, beyond their own; pass an empty
+     *                     schema when what is being checked is already complete
      */
-    public function __construct(?Schema $base = null)
-    {
-        $this->base = $base ?? StandardSchemaProvider::buildCore();
-    }
+    public function __construct(private Schema $base) {}
 
     /**
      * @throws SchemaParseException

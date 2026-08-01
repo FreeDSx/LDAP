@@ -38,7 +38,7 @@ final class ReloadCoordinatorTest extends TestCase
 
     public function test_reload_returns_the_new_options_and_a_factory_rebuilt_from_them(): void
     {
-        $newOptions = new ServerOptions(network: (new NetworkConfig())->setMaxConnections(123));
+        $newOptions = new ServerOptions(networkConfig: (new NetworkConfig())->setMaxConnections(123));
         $reloader = $this->createMock(ConfigReloaderInterface::class);
         $reloader
             ->expects(self::once())

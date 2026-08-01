@@ -18,6 +18,8 @@ use FreeDSx\Ldap\Exception\SchemaParseException;
 use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
 use FreeDSx\Ldap\Schema\Parser\SubschemaEntryParser;
 use FreeDSx\Ldap\Schema\SchemaLoadMode;
+use FreeDSx\Ldap\Schema\SchemaResource;
+use FreeDSx\Ldap\Schema\Validation\SchemaReferenceValidator;
 use PHPUnit\Framework\TestCase;
 
 final class SubschemaEntryParserTest extends TestCase
@@ -26,7 +28,9 @@ final class SubschemaEntryParserTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new SubschemaEntryParser();
+        $this->subject = new SubschemaEntryParser(
+            references: new SchemaReferenceValidator(SchemaResource::Core->load()),
+        );
     }
 
     public function test_it_reads_each_kind_of_definition(): void

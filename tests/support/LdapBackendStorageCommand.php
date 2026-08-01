@@ -20,14 +20,11 @@ use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
-use FreeDSx\Ldap\Exception\SchemaParseException;
-use FreeDSx\Ldap\Schema\NisSchemaProvider;
-use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Schema\LdifSchemaSource;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
-use FreeDSx\Ldap\Schema\StandardSchemaProvider;
-use FreeDSx\Ldap\Schema\SubschemaLoader;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
+use FreeDSx\Ldap\Server\Config\SchemaConfig;
 use FreeDSx\Ldap\ServerOptions;
 use PDO;
 use Symfony\Component\Console\Command\Command;
@@ -264,9 +261,13 @@ final class LdapBackendStorageCommand extends Command
             ->setTransport($transport)
             ->setSocketAcceptTimeout(0.1);
 
-        $serverOptions = (new ServerOptions(network: $network))
-            ->setSchemaValidationMode($validationMode)
-            ->setSchema($this->buildSchema($this->getStringOption($input, 'schema-ldif')))
+        $serverOptions = (new ServerOptions(
+            networkConfig: $network,
+            schemaConfig: $this->buildSchemaConfig(
+                $validationMode,
+                $this->getStringOption($input, 'schema-ldif'),
+            ),
+        ))
             ->setMonitorEnabled((bool) $input->getOption('monitor'))
             ->setSyncEnabled((bool) $input->getOption('journal'))
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
@@ -374,20 +375,17 @@ final class LdapBackendStorageCommand extends Command
         return Command::SUCCESS;
     }
 
-    /**
-     * @throws SchemaParseException
-     */
-    private function buildSchema(string $schemaLdif = ''): Schema
-    {
-        $schema = StandardSchemaProvider::buildCore()
-            ->merge(NisSchemaProvider::build());
+    private function buildSchemaConfig(
+        SchemaValidationMode $validationMode,
+        string $schemaLdif,
+    ): SchemaConfig {
+        $config = (new SchemaConfig())
+            ->setValidationMode($validationMode);
 
-        if ($schemaLdif === '') {
-            return $schema;
+        if ($schemaLdif !== '') {
+            $config->addSource(new LdifSchemaSource($schemaLdif));
         }
 
-        return $schema->merge(
-            (new SubschemaLoader())->fromLdifFile($schemaLdif),
-        );
+        return $config;
     }
 }

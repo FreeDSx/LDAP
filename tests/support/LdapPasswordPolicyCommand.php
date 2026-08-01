@@ -83,7 +83,7 @@ final class LdapPasswordPolicyCommand extends Command
             ->setSocketAcceptTimeout(0.1);
 
         $server = new LdapServer(
-            (new ServerOptions(network: $network))
+            (new ServerOptions(networkConfig: $network))
                 ->setPasswordPolicy(new PasswordPolicy())
                 ->setSaslMechanisms(ServerOptions::SASL_PLAIN)
                 ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL)),
