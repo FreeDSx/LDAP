@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Bind\Sasl;
 
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
@@ -27,9 +28,11 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Sasl\Challenge\ChallengeInterface;
+use FreeDSx\Sasl\Mechanism\CramMD5Mechanism;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\SaslContext;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -222,6 +225,41 @@ final class SaslExchangeTest extends TestCase
         self::expectExceptionCode(ResultCode::PROTOCOL_ERROR);
 
         $this->subject->run($this->makeInput());
+    }
+
+    public function test_cram_md5_credentials_in_the_initial_bind_do_not_authenticate(): void
+    {
+        $password = '12345';
+        $authenticator = $this->createMock(PasswordAuthenticatableInterface::class);
+        $authenticator->method('getSaslIdentity')
+            ->willReturn(new SaslIdentity(
+                $password,
+                new Dn('cn=user,dc=foo,dc=bar'),
+            ));
+
+        $subject = new SaslExchange(
+            queue: $this->mockQueue,
+            responseFactory: new ResponseFactory(),
+            optionsBuilderFactory: new MechanismOptionsBuilderFactory($authenticator),
+            authzIdResolver: new AuthzIdResolver(
+                $this->createMock(AccessControlInterface::class),
+                $this->createMock(LdapBackendInterface::class),
+                $this->createMock(BindNameResolverInterface::class),
+                new EventLogger(null),
+            ),
+        );
+
+        // A digest computed offline over an empty challenge, sent before the server issued one.
+        $forged = 'user ' . hash_hmac('md5', '', $password);
+
+        $result = $subject->run(new SaslExchangeInput(
+            challenge: (new CramMD5Mechanism())->challenge(serverMode: true),
+            mechName: MechanismName::CRAM_MD5,
+            initialMessage: new LdapMessageRequest(1, new SaslBindRequest('CRAM-MD5', $forged)),
+            initialCredentials: $forged,
+        ));
+
+        self::assertFalse($result->getContext()->isAuthenticated());
     }
 
     private function makeInput(?string $initialCredentials = null): SaslExchangeInput
