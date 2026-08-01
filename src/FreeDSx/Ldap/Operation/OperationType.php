@@ -19,8 +19,8 @@ use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
+use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
-use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
@@ -62,9 +62,11 @@ enum OperationType: string
     {
         return self::fromRequest($request) ?? match (true) {
             $request instanceof BindRequest => self::Bind,
-            $request instanceof PasswordModifyRequest => self::PasswordModify,
             $request instanceof UnbindRequest => self::Unbind,
             $request instanceof AbandonRequest => self::Abandon,
+            // Decoded from the wire this is a plain extended request, so only the OID identifies it.
+            $request instanceof ExtendedRequest
+                && $request->getName() === ExtendedRequest::OID_PWD_MODIFY => self::PasswordModify,
             default => self::Extended,
         };
     }

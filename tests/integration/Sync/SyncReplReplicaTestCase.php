@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operations;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Throwable;
 
@@ -93,6 +94,29 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
                     'cn' => 'nope',
                     'sn' => 'Nope',
                 ],
+            ));
+        } finally {
+            $client->unbind();
+        }
+    }
+
+    public function test_a_password_modify_on_the_replica_is_referred_to_the_provider(): void
+    {
+        $target = 'cn=user,dc=foo,dc=bar';
+        self::assertNotNull($this->waitForReplica($target));
+
+        $client = $this->buildClient('tcp');
+        $client->bind(
+            $target,
+            '12345',
+        );
+
+        try {
+            $this->expectException(ReferralException::class);
+            $client->sendAndReceive(Operations::passwordModify(
+                $target,
+                '12345',
+                'localonly',
             ));
         } finally {
             $client->unbind();
