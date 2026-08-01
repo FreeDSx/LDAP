@@ -17,6 +17,7 @@ use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\LdapResult;
+use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\AddResponse;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
@@ -82,6 +83,11 @@ final class ReadOnlyMiddlewareTest extends TestCase
             ],
             'passwordModify' => [
                 Operations::passwordModify('cn=foo,dc=example,dc=com', 'old', 'new'),
+                ExtendedResponse::class,
+            ],
+            // The wire form the server actually receives; the decoder never rebuilds the subclass above.
+            'passwordModify decoded from the wire' => [
+                new ExtendedRequest(ExtendedRequest::OID_PWD_MODIFY),
                 ExtendedResponse::class,
             ],
         ];
