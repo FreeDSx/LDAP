@@ -21,11 +21,11 @@ existing database to a newer schema; it only brings a fresh one up to the curren
 
 ## The Schema Files
 
-The schema ships in the package under `resources/schema`:
+The schema ships in the package under `resources/pdo-schema`:
 
-* `resources/schema/<dialect>/baseline.sql` is the current full schema. Applying it to a fresh database produces a
+* `resources/pdo-schema/<dialect>/baseline.sql` is the current full schema. Applying it to a fresh database produces a
   working directory, and applying it again is a no-op.
-* `resources/schema/<dialect>/migrations/` holds versioned delta files, named `V<n>__<description>.sql`, added when the
+* `resources/pdo-schema/<dialect>/migrations/` holds versioned delta files, named `V<n>__<description>.sql`, added when the
   schema changes.
 
 Point your migration tool at these files, or copy them into your project. If you would rather get the baseline as a
