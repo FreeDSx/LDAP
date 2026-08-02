@@ -7,5 +7,15 @@ attributeTypes: ( 1.3.6.1.4.1.99999.1.1 NAME 'projectCode' DESC 'Project this
  .115.121.1.15 SINGLE-VALUE )
 attributeTypes: ( 1.3.6.1.4.1.99999.1.2 NAME 'projectNotes' EQUALITY 2.5.13.2
   SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+attributeTypes: ( 1.3.6.1.4.1.99999.1.3 NAME 'projectSerial' EQUALITY 2.5.13.8 ORDERING 2.5.13.9 SUBSTR 2.5.13.10 SYNTAX 1.3.6.1.4.1.1466.115.121.1.36 SINGLE-VALUE )
+attributeTypes: ( 1.3.6.1.4.1.99999.1.4 NAME 'projectFlags' EQUALITY 2.5.13.16 SYNTAX 1.3.6.1.4.1.1466.115.121.1.6 SINGLE-VALUE )
+attributeTypes: ( 1.3.6.1.4.1.99999.1.5 NAME 'projectPhone' EQUALITY 2.5.13.20 SUBSTR 2.5.13.21 SYNTAX 1.3.6.1.4.1.1466.115.121.1.50 SINGLE-VALUE )
+attributeTypes: ( 1.3.6.1.4.1.99999.1.6 NAME 'projectMail' EQUALITY 1.3.6.1.4.1.1466.109.114.2 SUBSTR 1.3.6.1.4.1.1466.109.114.3 SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributeTypes: ( 1.3.6.1.4.1.99999.1.7 NAME 'projectUuid' EQUALITY 1.3.6.1.1.16.2 ORDERING 1.3.6.1.1.16.3 SYNTAX 1.3.6.1.1.16.1 SINGLE-VALUE )
+attributeTypes: ( 1.3.6.1.4.1.99999.1.8 NAME 'projectAddress' EQUALITY 2.5.13.11 SUBSTR 2.5.13.12 SYNTAX 1.3.6.1.4.1.1466.115.121.1.41 SINGLE-VALUE )
+attributeTypes: ( 1.3.6.1.4.1.99999.1.9 NAME 'projectClassDef' EQUALITY 2.5.13.30 SYNTAX 1.3.6.1.4.1.1466.115.121.1.37 SINGLE-VALUE )
+attributeTypes: ( 1.3.6.1.4.1.99999.1.10 NAME 'projectRuleDef' EQUALITY 2.5.13.29 SYNTAX 1.3.6.1.4.1.1466.115.121.1.17 SINGLE-VALUE )
 objectClasses: ( 1.3.6.1.4.1.99999.2.1 NAME 'projectRecord' DESC 'A project re
- cord' SUP top STRUCTURAL MUST ( cn $ projectCode ) MAY projectNotes )
+ cord' SUP top STRUCTURAL MUST ( cn $ projectCode ) MAY ( projectNotes $ proje
+ ctSerial $ projectFlags $ projectPhone $ projectMail $ projectUuid $ projectA
+ ddress $ projectClassDef $ projectRuleDef ) )
