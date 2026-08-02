@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSubschemaHandler;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -43,6 +44,7 @@ final class ServerSubschemaHandlerTest extends TestCase
 
         $this->subject = new ServerSubschemaHandler(
             options: $this->options,
+            filterEvaluator: new FilterEvaluator($this->options->getSchema()),
         );
     }
 

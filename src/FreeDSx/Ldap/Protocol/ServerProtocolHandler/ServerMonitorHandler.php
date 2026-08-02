@@ -15,14 +15,11 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Operation\Response\SearchResultDone;
-use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
-use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\MetricsSnapshot;
-use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 use FreeDSx\Ldap\Server\ServerRunner\CoroutineServerRunnerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
@@ -42,11 +39,14 @@ use function time;
  */
 class ServerMonitorHandler implements ServerProtocolHandlerInterface
 {
+    use ServerSynthesizedEntryTrait;
+
     public const DN = 'cn=monitor';
 
     public function __construct(
         private readonly ServerOptions $options,
         private readonly MetricsSnapshotProvider $snapshots,
+        private readonly FilterEvaluatorInterface $filterEvaluator,
     ) {}
 
     public function handleRequest(
@@ -58,11 +58,15 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
             $this->attributes($this->snapshots->snapshot()),
         );
 
-        return ResponseStream::reply(
+        $matches = $this->matchesRequestFilter(
             $message,
-            OperationOutcomeResult::succeeded(),
-            new SearchResultEntry($entry),
-            new SearchResultDone(ResultCode::SUCCESS),
+            $entry,
+            $this->filterEvaluator,
+        );
+
+        return $this->replyWithEntry(
+            $message,
+            $matches ? $entry : null,
         );
     }
 

@@ -92,11 +92,15 @@ final class HandlerContainerProvider implements ContainerProviderInterface
             HandlerId::RootDse->value => fn(): ServerProtocolHandlerInterface
                 => $this->makeRootDseHandler($container),
             HandlerId::Subschema->value => static fn(): ServerProtocolHandlerInterface
-                => new ServerSubschemaHandler($container->get(ServerOptions::class)),
+                => new ServerSubschemaHandler(
+                    options: $container->get(ServerOptions::class),
+                    filterEvaluator: $container->get(FilterEvaluatorInterface::class),
+                ),
             HandlerId::Monitor->value => static fn(): ServerProtocolHandlerInterface
                 => new ServerMonitorHandler(
                     options: $container->get(ServerOptions::class),
                     snapshots: $container->get(MetricsSnapshotProvider::class),
+                    filterEvaluator: $container->get(FilterEvaluatorInterface::class),
                 ),
             HandlerId::Paging->value => fn(HandlerContext $context, ?SearchLimits $limits): ServerProtocolHandlerInterface
                 => $this->makePagingHandler($container, $context, $limits),
@@ -146,6 +150,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         return new ServerRootDseHandler(
             options: $container->get(ServerOptions::class),
             backend: $container->get(WritableStorageBackend::class),
+            filterEvaluator: $container->get(FilterEvaluatorInterface::class),
             supportsSync: $this->syncJournalFor($container) !== null,
         );
     }

@@ -17,14 +17,12 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
-use FreeDSx\Ldap\Operation\Response\SearchResultDone;
-use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
-use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
-use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
+use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -37,6 +35,8 @@ use function count;
  */
 class ServerRootDseHandler implements ServerProtocolHandlerInterface
 {
+    use ServerSynthesizedEntryTrait;
+
     /**
      * RFC 3673 §3 — return all operational attributes via the "+" attribute description.
      */
@@ -50,6 +50,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
     public function __construct(
         private readonly ServerOptions $options,
         private readonly LdapBackendInterface $backend,
+        private readonly FilterEvaluatorInterface $filterEvaluator,
         private readonly bool $supportsSync = false,
     ) {}
 
@@ -58,6 +59,8 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
     ): ResponseStream {
         $entry = Entry::fromArray('', [
+            // Clients discover the Root DSE with the "(objectClass=*)" filter of RFC 4512 section 5.1.
+            'objectClass' => [ObjectClassOid::NAME_TOP],
             'namingContexts' => array_map(
                 fn(Dn $dn): string => $dn->toString(),
                 $this->backend->namingContexts(),
@@ -112,15 +115,20 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
             $entry->set('altServer', (string) $this->options->getDseAltServer());
         }
 
+        if (!$this->matchesRequestFilter($message, $entry, $this->filterEvaluator)) {
+            return $this->replyWithEntry(
+                $message,
+                null,
+            );
+        }
+
         /** @var SearchRequest $request */
         $request = $message->getRequest();
         $this->filterEntryAttributes($request, $entry);
 
-        return ResponseStream::reply(
+        return $this->replyWithEntry(
             $message,
-            OperationOutcomeResult::succeeded(),
-            new SearchResultEntry($entry),
-            new SearchResultDone(ResultCode::SUCCESS),
+            $entry,
         );
     }
 

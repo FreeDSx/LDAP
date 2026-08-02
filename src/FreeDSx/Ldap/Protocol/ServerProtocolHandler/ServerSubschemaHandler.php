@@ -14,15 +14,12 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Operation\Response\SearchResultDone;
-use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
-use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Schema\Schema;
-use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -33,7 +30,12 @@ use FreeDSx\Ldap\ServerOptions;
  */
 class ServerSubschemaHandler implements ServerProtocolHandlerInterface
 {
-    public function __construct(private readonly ServerOptions $options) {}
+    use ServerSynthesizedEntryTrait;
+
+    public function __construct(
+        private readonly ServerOptions $options,
+        private readonly FilterEvaluatorInterface $filterEvaluator,
+    ) {}
 
     public function handleRequest(
         LdapMessageRequest $message,
@@ -71,11 +73,15 @@ class ServerSubschemaHandler implements ServerProtocolHandlerInterface
             ]),
         );
 
-        return ResponseStream::reply(
+        $matches = $this->matchesRequestFilter(
             $message,
-            OperationOutcomeResult::succeeded(),
-            new SearchResultEntry($entry),
-            new SearchResultDone(ResultCode::SUCCESS),
+            $entry,
+            $this->filterEvaluator,
+        );
+
+        return $this->replyWithEntry(
+            $message,
+            $matches ? $entry : null,
         );
     }
 

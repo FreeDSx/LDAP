@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerRootDseHandler;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -66,6 +67,7 @@ final class ServerRootDseHandlerTest extends TestCase
         $this->assertEquals(
             [
                 new LdapMessageResponse(1, new SearchResultEntry(Entry::create('', [
+                    'objectClass' => ['top'],
                     'namingContexts' => 'dc=Foo,dc=Bar',
                     'subschemaSubentry' => ['cn=Subschema'],
                     'supportedControl' => [
@@ -123,6 +125,7 @@ final class ServerRootDseHandlerTest extends TestCase
         $this->subject = new ServerRootDseHandler(
             $this->options,
             $this->mockBackend,
+            new FilterEvaluator($this->options->getSchema()),
             true,
         );
 
@@ -196,6 +199,7 @@ final class ServerRootDseHandlerTest extends TestCase
         $this->assertEquals(
             [
                 new LdapMessageResponse(1, new SearchResultEntry(Entry::create('', [
+                    'objectClass' => [],
                     'namingContexts' => [],
                     'subschemaSubentry' => [],
                     'supportedControl' => [],
@@ -263,7 +267,12 @@ final class ServerRootDseHandlerTest extends TestCase
         );
 
         # The reset below is needed, unfortunately, to properly test due to how the objects change...
-        $entry = Entry::create('', ['namingContexts' => 'dc=Foo,dc=Bar', ]);
+        # objectClass is built first and then dropped, which is what leaves namingContexts at its index.
+        $entry = Entry::create('', [
+            'objectClass' => 'top',
+            'namingContexts' => 'dc=Foo,dc=Bar',
+        ]);
+        $entry->reset('objectClass');
         $entry->changes()->reset();
         $entry->get('namingContexts')?->equals(new Attribute('foo'));
 
@@ -300,6 +309,7 @@ final class ServerRootDseHandlerTest extends TestCase
         $this->subject = new ServerRootDseHandler(
             $this->options,
             $this->mockBackend,
+            new FilterEvaluator($this->options->getSchema()),
         );
     }
 }
