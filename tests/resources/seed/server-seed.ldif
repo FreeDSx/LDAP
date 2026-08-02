@@ -1,0 +1,23 @@
+version: 1
+
+# Fixed seed for the ldap-server harness. The --entries entries are generated in the command itself,
+# since their count is a run-time option.
+
+# Domain root
+dn: dc=foo,dc=bar
+objectClass: domain
+dc: foo
+
+# Bind identity for suites that do not need to write
+dn: cn=user,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: user
+sn: User
+userPassword: {SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=
+
+# Writes are denied by default, so suites that write bind as this identity
+dn: cn=admin,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: admin
+sn: Admin
+userPassword: {SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=

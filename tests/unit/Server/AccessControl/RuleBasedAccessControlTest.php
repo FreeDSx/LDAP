@@ -24,7 +24,6 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
-use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
@@ -87,12 +86,12 @@ final class RuleBasedAccessControlTest extends TestCase
         );
     }
 
-    public function test_it_should_deny_when_no_rules_match_and_default_effect_is_deny(): void
+    public function test_it_should_deny_when_no_rules_match(): void
     {
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
 
-        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(defaultOperationEffect: Effect::Deny));
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty());
 
         $subject->authorizeOperation(
             OperationType::Search,
@@ -101,11 +100,13 @@ final class RuleBasedAccessControlTest extends TestCase
         );
     }
 
-    public function test_it_should_allow_when_no_rules_match_and_default_effect_is_allow(): void
+    public function test_it_should_allow_when_a_rule_permits_anyone(): void
     {
         $this->expectNotToPerformAssertions();
 
-        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(defaultOperationEffect: Effect::Allow));
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            operations: [OperationRule::allow(new AnySubjectMatcher())],
+        ));
 
         $subject->authorizeOperation(
             OperationType::Search,
@@ -126,7 +127,6 @@ final class RuleBasedAccessControlTest extends TestCase
                     OperationType::Add,
                 ),
             ],
-            defaultOperationEffect: Effect::Deny,
         ));
 
         $subject->authorizeOperation(
@@ -468,9 +468,10 @@ final class RuleBasedAccessControlTest extends TestCase
         ));
     }
 
-    public function test_authorize_attribute_access_does_not_throw_when_no_deny_rule_matches(): void
+    public function test_authorize_attribute_write_throws_when_no_rule_allows_it(): void
     {
-        $this->expectNotToPerformAssertions();
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
 
         $subject = new RuleBasedAccessControl(AclRules::fromEmpty());
 
@@ -479,6 +480,20 @@ final class RuleBasedAccessControlTest extends TestCase
             $this->dn,
             'userPassword',
             AttributeAccess::Write,
+        );
+    }
+
+    public function test_authorize_attribute_read_does_not_throw_when_no_rule_matches(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty());
+
+        $subject->authorizeAttribute(
+            $this->bindToken,
+            $this->dn,
+            'cn',
+            AttributeAccess::Read,
         );
     }
 

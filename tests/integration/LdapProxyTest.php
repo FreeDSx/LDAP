@@ -68,7 +68,7 @@ final class LdapProxyTest extends ServerTestCase
 
     public function testItForwardsWritesToUpstream(): void
     {
-        $this->authenticate();
+        $this->authenticateAdmin();
         $client = $this->ldapClient();
         $dn = 'cn=written,dc=foo,dc=bar';
 
@@ -115,15 +115,16 @@ final class LdapProxyTest extends ServerTestCase
             $entries->add(...$paging->getEntries()->toArray());
         }
 
+        // Upstream seeds 12 generated entries plus cn=user and cn=admin.
         self::assertCount(
-            13,
+            14,
             $entries,
         );
     }
 
     public function testItForwardsAResponseControlFromUpstream(): void
     {
-        $this->authenticate();
+        $this->authenticateAdmin();
 
         $response = $this->ldapClient()->send(
             Operations::add(Entry::fromArray(

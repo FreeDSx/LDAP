@@ -56,7 +56,10 @@ final class Config
 
     public const DEFAULT_MIX = 'bind=5,search-read=50,search-eq=25,search-sub=10,search-list=5,search-sort=3,add=2,modify=2,delete=1';
 
-    public const DEFAULT_BIND_DN = 'cn=user,dc=foo,dc=bar';
+    /**
+     * The write mixes need an identity the harness treats as an administrator.
+     */
+    public const DEFAULT_BIND_DN = 'cn=admin,dc=foo,dc=bar';
 
     public const DEFAULT_BIND_PASSWORD = '12345';
 

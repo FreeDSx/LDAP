@@ -104,7 +104,7 @@ class LdapBackendStorageTest extends ServerTestCase
         );
 
         self::assertCount(
-            3,
+            5,
             $entries,
         );
     }
@@ -276,7 +276,7 @@ class LdapBackendStorageTest extends ServerTestCase
 
     public function testAddStoresEntry(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
             'cn=charlie,dc=foo,dc=bar',
@@ -293,7 +293,7 @@ class LdapBackendStorageTest extends ServerTestCase
 
     public function testAddPreservesAttributeOptionsOnRoundTrip(): void
     {
-        $this->authenticateUser();
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
             'cn=tagged,dc=foo,dc=bar',
@@ -325,7 +325,7 @@ class LdapBackendStorageTest extends ServerTestCase
 
     public function testInexactFilterOnUnrequestedAttributeStillMatchesAndProjects(): void
     {
-        $this->authenticateUser();
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
             'cn=hazard,dc=foo,dc=bar',
@@ -361,7 +361,7 @@ class LdapBackendStorageTest extends ServerTestCase
 
     public function testNoAttributesRequestStillMatchesAnInexactFilter(): void
     {
-        $this->authenticateUser();
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
             'cn=noattr,dc=foo,dc=bar',
@@ -393,7 +393,7 @@ class LdapBackendStorageTest extends ServerTestCase
 
     public function testAddDuplicateDnFails(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::ENTRY_ALREADY_EXISTS);
@@ -406,7 +406,7 @@ class LdapBackendStorageTest extends ServerTestCase
 
     public function testDeleteRemovesEntry(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
         $this->ldapClient()->delete('cn=alice,ou=people,dc=foo,dc=bar');
 
         $entries = $this->ldapClient()->search(
@@ -419,7 +419,7 @@ class LdapBackendStorageTest extends ServerTestCase
 
     public function testDeleteNonLeafEntryFails(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::NOT_ALLOWED_ON_NON_LEAF);
@@ -430,7 +430,7 @@ class LdapBackendStorageTest extends ServerTestCase
 
     public function testModifyReplacesAttributeValue(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $entry = Entry::fromArray('cn=alice,ou=people,dc=foo,dc=bar');
         $entry->set('sn', 'Jones');
@@ -447,7 +447,7 @@ class LdapBackendStorageTest extends ServerTestCase
 
     public function testRenameChangesRdn(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
         $this->ldapClient()->rename('cn=alice,ou=people,dc=foo,dc=bar', 'cn=bob', true);
 
         $found = $this->ldapClient()->search(
@@ -512,7 +512,7 @@ class LdapBackendStorageTest extends ServerTestCase
         }
 
         self::assertCount(
-            5,
+            7,
             $allEntries,
         );
     }
@@ -738,9 +738,9 @@ class LdapBackendStorageTest extends ServerTestCase
             $entries->toArray(),
         );
 
-        // Seed: cn=user (sn=Admin), cn=alice (sn=Smith). Admin < Smith ascending.
+        // Seed: cn=user and cn=admin (sn=Admin), cn=alice (sn=Smith). Admin < Smith ascending.
         self::assertSame(
-            ['Admin', 'Smith'],
+            ['Admin', 'Admin', 'Smith'],
             $sns,
         );
     }
@@ -761,9 +761,9 @@ class LdapBackendStorageTest extends ServerTestCase
             $entries->toArray(),
         );
 
-        // Seed: cn=user (sn=Admin), cn=alice (sn=Smith). Smith > Admin descending.
+        // Seed: cn=user and cn=admin (sn=Admin), cn=alice (sn=Smith). Smith > Admin descending.
         self::assertSame(
-            ['Smith', 'Admin'],
+            ['Smith', 'Admin', 'Admin'],
             $sns,
         );
     }
@@ -779,12 +779,9 @@ class LdapBackendStorageTest extends ServerTestCase
             new SortingControl(SortKey::ascending('sn')),
         )->toArray();
 
-        $last = $entries[count($entries) - 1];
-        self::assertNull($last->get('sn'));
-        self::assertSame(
-            'nosn',
-            $last->get('cn')?->getValues()[0],
-        );
+        // More than one seed entry lacks 'sn', so assert the ordering rather than which of them sorts last.
+        self::assertNull($entries[count($entries) - 1]->get('sn'));
+        self::assertNotNull($entries[0]->get('sn'));
     }
 
     public function testSortControlPlacesMissingAttributeFirstWhenDescending(): void
@@ -798,12 +795,9 @@ class LdapBackendStorageTest extends ServerTestCase
             new SortingControl(SortKey::descending('sn')),
         )->toArray();
 
-        $first = $entries[0];
-        self::assertNull($first->get('sn'));
-        self::assertSame(
-            'nosn',
-            $first->get('cn')?->getValues()[0],
-        );
+        // More than one seed entry lacks 'sn', so assert the ordering rather than which of them sorts first.
+        self::assertNull($entries[0]->get('sn'));
+        self::assertNotNull($entries[count($entries) - 1]->get('sn'));
     }
 
     public function testInexactSearchTripsLookthroughLimit(): void
@@ -833,7 +827,7 @@ class LdapBackendStorageTest extends ServerTestCase
     {
         $this->stopServer();
         $this->createServerProcess('tcp', static::storageExtraArgs());
-        $this->authenticateUser();
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray('cn=ref,dc=foo,dc=bar', [
             'objectClass' => ['top', 'alias', 'extensibleObject'],

@@ -218,6 +218,17 @@ class ServerTestCase extends LdapTestCase
         );
     }
 
+    /**
+     * Binds as an identity the harness configures as an administrator, for tests that write.
+     */
+    protected function authenticateAdmin(): void
+    {
+        $this->ldapClient()->bind(
+            'cn=admin,dc=foo,dc=bar',
+            '12345',
+        );
+    }
+
     protected function setServerMode(string $mode): void
     {
         $this->serverMode = $mode;

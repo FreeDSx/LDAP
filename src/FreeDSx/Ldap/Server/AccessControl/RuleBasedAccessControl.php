@@ -86,6 +86,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
             $dn,
             strtolower($attribute),
             $access,
+            $this->defaultEffectFor($access),
         );
 
         if ($effect === Effect::Deny) {
@@ -182,6 +183,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
                 $dn,
                 strtolower($attribute->getName()),
                 AttributeAccess::Read,
+                Effect::Allow,
             );
 
             if ($effect !== Effect::Deny) {
@@ -210,6 +212,16 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
         );
     }
 
+    /**
+     * Writes require a rule to permit them; reads are permitted unless a rule denies.
+     */
+    private function defaultEffectFor(AttributeAccess $access): Effect
+    {
+        return $access === AttributeAccess::Write
+            ? Effect::Deny
+            : Effect::Allow;
+    }
+
     private function isAllowed(
         OperationType $operation,
         TokenInterface $token,
@@ -221,7 +233,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
             $operation,
             $token,
             $dn,
-            $this->rules->defaultOperationEffect,
+            Effect::Deny,
         ) === Effect::Allow;
     }
 
@@ -244,7 +256,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
             $controlOid,
             $token,
             $dn,
-            $this->rules->defaultControlEffect,
+            Effect::Deny,
         ) === Effect::Allow;
     }
 
@@ -285,7 +297,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
             $this->extendedOperationMatches(...),
             $oid,
             $token,
-            $this->rules->defaultExtendedOpEffect,
+            Effect::Deny,
         ) === Effect::Allow;
     }
 
@@ -374,7 +386,8 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
         Dn $dn,
         string $attrName,
         AttributeAccess $access,
-    ): ?Effect {
+        Effect $default,
+    ): Effect {
         foreach ($this->rules->attributes as $rule) {
             if (!$rule->access->includes($access)) {
                 continue;
@@ -395,7 +408,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
             return $rule->effect;
         }
 
-        return null;
+        return $default;
     }
 
     /**

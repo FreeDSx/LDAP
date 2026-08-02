@@ -155,6 +155,15 @@ class LdapAclCommand extends Command
                                 Target::any(),
                                 'userPassword',
                             ),
+                            // Writes are denied unless a rule allows them, so mirror the operation grants above.
+                            AttributeRule::allow(
+                                Subject::group('cn=admins,dc=foo,dc=bar'),
+                                Target::any(),
+                            )->forWrite(),
+                            AttributeRule::allow(
+                                Subject::self(),
+                                Target::any(),
+                            )->forWrite(),
                         )
                         // userPassword ships confidential, so reading it needs a grant on top of the rules above.
                         ->withConfidentialAccess(

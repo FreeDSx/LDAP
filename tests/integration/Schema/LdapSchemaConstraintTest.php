@@ -55,7 +55,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_add_with_invalid_attribute_syntax_is_rejected(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
@@ -73,7 +73,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_add_with_two_unrelated_structural_classes_is_rejected(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);
@@ -91,7 +91,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_add_missing_a_required_attribute_of_a_built_in_class_is_rejected(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);
@@ -108,7 +108,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_modify_adding_an_attribute_the_class_does_not_permit_is_rejected(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
             'cn=strict-modify,dc=foo,dc=bar',
@@ -130,7 +130,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_add_with_two_values_for_a_single_valued_attribute_is_rejected(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
@@ -149,7 +149,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_modify_adding_a_second_value_to_a_single_valued_attribute_is_rejected(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
             'cn=single-value-modify,dc=foo,dc=bar',
@@ -171,7 +171,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_add_writing_a_no_user_modification_attribute_is_rejected(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
@@ -190,7 +190,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_modify_writing_a_no_user_modification_attribute_is_rejected(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
             'cn=operational-modify,dc=foo,dc=bar',
@@ -211,7 +211,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_add_with_a_non_numeric_value_for_an_integer_attribute_is_rejected(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
@@ -229,7 +229,7 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_add_with_a_non_boolean_value_for_a_boolean_attribute_is_rejected(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
@@ -249,12 +249,12 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
     public function test_the_nis_schema_is_usable_end_to_end(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
-            'cn=admins,dc=foo,dc=bar',
+            'cn=posix-users,dc=foo,dc=bar',
             [
-                'cn' => 'admins',
+                'cn' => 'posix-users',
                 'objectClass' => 'posixGroup',
                 'gidNumber' => '5000',
                 'memberUid' => ['alice', 'bob'],
@@ -269,14 +269,14 @@ final class LdapSchemaConstraintTest extends ServerTestCase
 
         self::assertCount(1, $entries);
         self::assertSame(
-            'admins',
+            'posix-users',
             $entries->first()?->get('cn')?->firstValue(),
         );
     }
 
     public function test_a_posix_group_missing_its_required_gid_is_rejected(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);

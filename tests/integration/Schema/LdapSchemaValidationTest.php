@@ -53,7 +53,7 @@ final class LdapSchemaValidationTest extends ServerTestCase
 
     public function test_lenient_mode_allows_add_with_disallowed_attribute(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         // 'mail' is not permitted by the 'person' object class; rejected under Strict.
         $this->ldapClient()->create(Entry::fromArray(
@@ -81,7 +81,7 @@ final class LdapSchemaValidationTest extends ServerTestCase
 
     public function test_lenient_mode_allows_modify_into_violating_state(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
             'cn=drift-modify,dc=foo,dc=bar',

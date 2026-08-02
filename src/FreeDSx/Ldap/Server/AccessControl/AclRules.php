@@ -19,7 +19,6 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
-use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
@@ -37,14 +36,27 @@ use FreeDSx\Ldap\Server\AccessControl\Target\TargetMatcherInterface;
 final readonly class AclRules
 {
     /**
+     * Personal attributes an identity may change on its own entry, so callers can extend rather than retype them.
+     *
+     * @var list<string>
+     *
+     * @see self::withSelfServiceWrites()
+     */
+    public const SELF_WRITABLE_ATTRIBUTES = [
+        'description',
+        'displayName',
+        'givenName',
+        'initials',
+        'jpegPhoto',
+        'labeledURI',
+    ];
+
+    /**
      * @param OperationRule[] $operations Evaluated in order; first match wins.
      * @param AttributeRule[] $attributes Evaluated per attribute in order; first match wins.
      * @param ControlRule[] $controls Evaluated per control in order; first match wins.
      * @param ExtendedOperationRule[] $extendedOps Evaluated per extended operation in order; first match wins.
      * @param ConfidentialAccessRule[] $confidential Evaluated per confidential attribute in order; first match wins.
-     * @param Effect $defaultOperationEffect Applied when no operation rule matches.
-     * @param Effect $defaultControlEffect Applied when no control rule matches (controls are gated, so Deny).
-     * @param Effect $defaultExtendedOpEffect Applied when no extended-operation rule matches (gated, so Deny).
      */
     private function __construct(
         public array $operations = [],
@@ -52,13 +64,10 @@ final readonly class AclRules
         public array $controls = [],
         public array $extendedOps = [],
         public array $confidential = [],
-        public Effect $defaultOperationEffect = Effect::Deny,
-        public Effect $defaultControlEffect = Effect::Deny,
-        public Effect $defaultExtendedOpEffect = Effect::Deny,
     ) {}
 
     /**
-     * A blank ruleset (deny-by-default) to build up with the with* methods.
+     * A blank ruleset to build up with the with* methods; anything left unmatched is denied.
      *
      * Unlike secureDefault() it adds no credential protection, so any userPassword rule is yours to add.
      *
@@ -74,9 +83,6 @@ final readonly class AclRules
         array $controls = [],
         array $extendedOps = [],
         array $confidential = [],
-        Effect $defaultOperationEffect = Effect::Deny,
-        Effect $defaultControlEffect = Effect::Deny,
-        Effect $defaultExtendedOpEffect = Effect::Deny,
     ): self {
         return new self(
             $operations,
@@ -84,9 +90,6 @@ final readonly class AclRules
             $controls,
             $extendedOps,
             $confidential,
-            $defaultOperationEffect,
-            $defaultControlEffect,
-            $defaultExtendedOpEffect,
         );
     }
 
@@ -98,9 +101,6 @@ final readonly class AclRules
             $this->controls,
             $this->extendedOps,
             $this->confidential,
-            $this->defaultOperationEffect,
-            $this->defaultControlEffect,
-            $this->defaultExtendedOpEffect,
         );
     }
 
@@ -112,9 +112,6 @@ final readonly class AclRules
             $this->controls,
             $this->extendedOps,
             $this->confidential,
-            $this->defaultOperationEffect,
-            $this->defaultControlEffect,
-            $this->defaultExtendedOpEffect,
         );
     }
 
@@ -126,9 +123,6 @@ final readonly class AclRules
             $controls,
             $this->extendedOps,
             $this->confidential,
-            $this->defaultOperationEffect,
-            $this->defaultControlEffect,
-            $this->defaultExtendedOpEffect,
         );
     }
 
@@ -140,9 +134,6 @@ final readonly class AclRules
             $this->controls,
             $extendedOps,
             $this->confidential,
-            $this->defaultOperationEffect,
-            $this->defaultControlEffect,
-            $this->defaultExtendedOpEffect,
         );
     }
 
@@ -157,9 +148,6 @@ final readonly class AclRules
             $this->controls,
             $this->extendedOps,
             $confidential,
-            $this->defaultOperationEffect,
-            $this->defaultControlEffect,
-            $this->defaultExtendedOpEffect,
         );
     }
 
@@ -193,64 +181,120 @@ final readonly class AclRules
                 ...$this->confidential,
                 ConfidentialAccessRule::allowAny($replica),
             ],
-            $this->defaultOperationEffect,
-            $this->defaultControlEffect,
-            $this->defaultExtendedOpEffect,
-        );
-    }
-
-    public function withDefaultOperationEffect(Effect $effect): self
-    {
-        return new self(
-            $this->operations,
-            $this->attributes,
-            $this->controls,
-            $this->extendedOps,
-            $this->confidential,
-            $effect,
-            $this->defaultControlEffect,
-            $this->defaultExtendedOpEffect,
-        );
-    }
-
-    public function withDefaultControlEffect(Effect $effect): self
-    {
-        return new self(
-            $this->operations,
-            $this->attributes,
-            $this->controls,
-            $this->extendedOps,
-            $this->confidential,
-            $this->defaultOperationEffect,
-            $effect,
-            $this->defaultExtendedOpEffect,
-        );
-    }
-
-    public function withDefaultExtendedOpEffect(Effect $effect): self
-    {
-        return new self(
-            $this->operations,
-            $this->attributes,
-            $this->controls,
-            $this->extendedOps,
-            $this->confidential,
-            $this->defaultOperationEffect,
-            $this->defaultControlEffect,
-            $effect,
         );
     }
 
     /**
-     * The secure default.
+     * The secure default. Reads are open to authenticated identities, writes require a grant:
      *
+     * - Search and Compare are allowed to any authenticated identity, on any entry.
+     * - An identity may Modify its own entry, limited to a set of personal attributes.
+     * - Everything else is left to the administrator, when one is configured.
+     *
+     * Nothing can grant itself group membership or edit another entry without an explicit rule.
+     *
+     * @param list<string> $selfWritableAttributes Attributes an identity may change on its own entry.
+     *
+     * @see self::withSelfServiceWrites()
      * @see self::withCredentialProtection()
      */
-    public static function secureDefault(?SubjectMatcherInterface $administrators = null): self
-    {
-        $base = new self(operations: [OperationRule::allow(Subject::authenticated())]);
+    public static function secureDefault(
+        ?SubjectMatcherInterface $administrators = null,
+        array $selfWritableAttributes = self::SELF_WRITABLE_ATTRIBUTES,
+    ): self {
+        $anyTarget = new AnyTargetMatcher();
 
-        return $base->withCredentialProtection($administrators);
+        $rules = self::fromEmpty(
+            operations: [
+                OperationRule::allow(
+                    Subject::authenticated(),
+                    $anyTarget,
+                    OperationType::Search,
+                    OperationType::Compare,
+                ),
+            ],
+        )->withSelfServiceWrites($selfWritableAttributes);
+
+        if ($administrators !== null) {
+            $rules = $rules->withFullAccess($administrators);
+        }
+
+        return $rules->withCredentialProtection($administrators);
+    }
+
+    /**
+     * Append a grant of every operation and every attribute write for a subject over $target.
+     *
+     * Controls, extended operations, and confidential attributes are gated separately and are not included.
+     *
+     * @see self::withCredentialProtection()
+     * @see self::withConfidentialAccess()
+     */
+    public function withFullAccess(
+        SubjectMatcherInterface $subject,
+        TargetMatcherInterface $target = new AnyTargetMatcher(),
+    ): self {
+        return new self(
+            operations: [
+                ...$this->operations,
+                OperationRule::allow(
+                    $subject,
+                    $target,
+                ),
+            ],
+            attributes: [
+                ...$this->attributes,
+                AttributeRule::allow(
+                    $subject,
+                    $target,
+                )->forWrite(),
+            ],
+            controls: $this->controls,
+            extendedOps: $this->extendedOps,
+            confidential: $this->confidential,
+        );
+    }
+
+    /**
+     * Append the self-service rules to this rule set, letting an identity modify its own entry.
+     *
+     * The default set leaves out anything carrying authorization, identity, or account recovery, since self-service
+     * on those is a route to escalation or account takeover. Widen it only with that in mind.
+     *
+     * @param list<string> $attributes Attributes writable on one's own entry; an empty list grants no attribute write.
+     */
+    public function withSelfServiceWrites(array $attributes = self::SELF_WRITABLE_ATTRIBUTES): self
+    {
+        $anyTarget = new AnyTargetMatcher();
+
+        // An AttributeRule with no attributes named matches every attribute, so an empty list must add no rule at all.
+        $selfWrites = $attributes === []
+            ? []
+            : [
+                AttributeRule::allow(
+                    Subject::self(),
+                    $anyTarget,
+                    ...$attributes,
+                )->forWrite(),
+            ];
+
+        return new self(
+            operations: [
+                ...$this->operations,
+                OperationRule::allow(
+                    Subject::self(),
+                    $anyTarget,
+                    OperationType::Modify,
+                ),
+            ],
+            attributes: [
+                ...$this->attributes,
+                ...$selfWrites,
+            ],
+            controls: $this->controls,
+            extendedOps: $this->extendedOps,
+            confidential: $this->confidential,
+        );
     }
 
     /**
@@ -319,9 +363,6 @@ final readonly class AclRules
             controls: [...$controls, ...$this->controls],
             extendedOps: [...$extendedOps, ...$this->extendedOps],
             confidential: $this->confidential,
-            defaultOperationEffect: $this->defaultOperationEffect,
-            defaultControlEffect: $this->defaultControlEffect,
-            defaultExtendedOpEffect: $this->defaultExtendedOpEffect,
         );
     }
 }

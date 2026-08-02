@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
+use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Schema\LdifSchemaSource;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
@@ -40,6 +41,11 @@ final class LdapBackendStorageCommand extends Command
     public const MANAGER_DN = 'cn=manager';
 
     public const MANAGER_PASSWORD = 'manager-pass';
+
+    /**
+     * The fixed directory content every suite using this harness starts from.
+     */
+    private const SEED_LDIF = __DIR__ . '/../resources/seed/backend-storage-seed.ldif';
 
     protected function configure(): void
     {
@@ -198,43 +204,8 @@ final class LdapBackendStorageCommand extends Command
             return Command::FAILURE;
         }
 
-        $passwordHash = '{SHA}' . base64_encode(sha1('12345', true));
-
-        $entries = [
-            new Entry(
-                new Dn('dc=foo,dc=bar'),
-                new Attribute('dc', 'foo'),
-                new Attribute('objectClass', 'domain'),
-            ),
-            new Entry(
-                new Dn('cn=user,dc=foo,dc=bar'),
-                new Attribute('cn', 'user'),
-                new Attribute('sn', 'Admin'),
-                new Attribute('objectClass', 'inetOrgPerson'),
-                new Attribute('userPassword', $passwordHash),
-            ),
-            new Entry(
-                new Dn('ou=people,dc=foo,dc=bar'),
-                new Attribute('ou', 'people'),
-                new Attribute('objectClass', 'organizationalUnit'),
-            ),
-            new Entry(
-                new Dn('cn=alice,ou=people,dc=foo,dc=bar'),
-                new Attribute('cn', 'alice'),
-                new Attribute('objectClass', 'inetOrgPerson', 'extensibleObject'),
-                new Attribute('sn', 'Smith'),
-                new Attribute('mail', 'alice@foo.bar'),
-                new Attribute('uidNumber', '99'),
-                // Matched case-exactly by the schema, so searches on it prove the configured schema is in play.
-                new Attribute('employeeNumber', 'A1b2C3'),
-            ),
-            new Entry(
-                new Dn('cn=nosn,dc=foo,dc=bar'),
-                new Attribute('cn', 'nosn'),
-                new Attribute('objectClass', 'groupOfNames'),
-                new Attribute('member', 'cn=user,dc=foo,dc=bar'),
-            ),
-        ];
+        // The fixed content comes from SEED_LDIF; only the generated entries are built here.
+        $entries = [];
 
         for ($i = 1; $i <= $seedEntries; $i++) {
             $attributes = [
@@ -268,6 +239,7 @@ final class LdapBackendStorageCommand extends Command
                 $this->getStringOption($input, 'schema-ldif'),
             ),
         ))
+            ->setAdministrators(Subject::group('cn=admins,dc=foo,dc=bar'))
             ->setMonitorEnabled((bool) $input->getOption('monitor'))
             ->setSyncEnabled((bool) $input->getOption('journal'))
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
@@ -307,7 +279,7 @@ final class LdapBackendStorageCommand extends Command
         }
 
         if ($storage === 'memory') {
-            $config = InMemoryStorageConfig::withEntries($entries);
+            $config = InMemoryStorageConfig::withEntries();
         } elseif ($storage === 'json') {
             $filePath = sys_get_temp_dir() . '/ldap_test_backend_storage.json';
 
@@ -359,15 +331,20 @@ final class LdapBackendStorageCommand extends Command
             $container,
         );
 
-        // The in-memory config carries its seed entries; other backends get a raw import (no schema validation).
-        if ($storage !== 'memory') {
-            $importer = new LdapImporter($container->get(EntryStorageInterface::class));
+        $seed = function () use ($server, $entries, $container): void {
+            $server->seed(new FileLdifLoader(self::SEED_LDIF));
 
-            if ($runner === 'swoole') {
-                \Swoole\Coroutine\run(fn() => $importer->importEntries($entries));
-            } else {
-                $importer->importEntries($entries);
+            // The generated entries stay a raw import, since they exist to widen the return path rather than to
+            // be valid directory content.
+            if ($entries !== []) {
+                (new LdapImporter($container->get(EntryStorageInterface::class)))->importEntries($entries);
             }
+        };
+
+        if ($runner === 'swoole') {
+            \Swoole\Coroutine\run($seed);
+        } else {
+            $seed();
         }
 
         $server->run();

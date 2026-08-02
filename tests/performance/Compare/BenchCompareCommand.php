@@ -32,7 +32,10 @@ final class BenchCompareCommand extends Command
 
     private const DEFAULT_SOURCE_PORT = 10389;
 
-    private const DEFAULT_SOURCE_BIND_DN = 'cn=user,dc=foo,dc=bar';
+    /**
+     * The write mixes need an identity the harness treats as an administrator.
+     */
+    private const DEFAULT_SOURCE_BIND_DN = 'cn=admin,dc=foo,dc=bar';
 
     private const DEFAULT_SOURCE_BIND_PASSWORD = '12345';
 

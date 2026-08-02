@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
@@ -174,7 +175,7 @@ final class AclRulesTest extends TestCase
         );
     }
 
-    public function test_secureDefault_allows_authenticated_general_operations(): void
+    public function test_secureDefault_allows_authenticated_reads_of_any_entry(): void
     {
         $this->subject->authorizeOperation(
             OperationType::Search,
@@ -182,12 +183,150 @@ final class AclRulesTest extends TestCase
             new Dn(self::OTHER_DN),
         );
         $this->subject->authorizeOperation(
-            OperationType::Modify,
+            OperationType::Compare,
             $this->user(),
             new Dn(self::OTHER_DN),
         );
 
         $this->addToAssertionCount(1);
+    }
+
+    public function test_secureDefault_allows_an_identity_to_modify_its_own_entry(): void
+    {
+        $this->subject->authorizeOperation(
+            OperationType::Modify,
+            $this->user(),
+            new Dn(self::USER_DN),
+        );
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_secureDefault_denies_modifying_another_entry(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->subject->authorizeOperation(
+            OperationType::Modify,
+            $this->user(),
+            new Dn(self::OTHER_DN),
+        );
+    }
+
+    /**
+     * Writing member on a group entry would otherwise let an identity grant itself that group's rules.
+     */
+    public function test_secureDefault_denies_granting_yourself_group_membership(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->subject->authorizeAttribute(
+            $this->user(),
+            new Dn('cn=admins,dc=foo,dc=bar'),
+            'member',
+            AttributeAccess::Write,
+        );
+    }
+
+    public function test_secureDefault_allows_self_service_on_personal_attributes(): void
+    {
+        $this->subject->authorizeAttribute(
+            $this->user(),
+            new Dn(self::USER_DN),
+            'displayName',
+            AttributeAccess::Write,
+        );
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_secureDefault_denies_self_service_on_anything_else(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->subject->authorizeAttribute(
+            $this->user(),
+            new Dn(self::USER_DN),
+            'mail',
+            AttributeAccess::Write,
+        );
+    }
+
+    public function test_secureDefault_honors_an_overridden_self_writable_attribute_set(): void
+    {
+        $acl = new RuleBasedAccessControl(AclRules::secureDefault(
+            Subject::dn(self::ADMIN_DN),
+            ['mail'],
+        ));
+
+        $acl->authorizeAttribute(
+            $this->user(),
+            new Dn(self::USER_DN),
+            'mail',
+            AttributeAccess::Write,
+        );
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_secureDefault_denies_a_default_attribute_when_the_set_is_overridden(): void
+    {
+        $acl = new RuleBasedAccessControl(AclRules::secureDefault(
+            Subject::dn(self::ADMIN_DN),
+            ['mail'],
+        ));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $acl->authorizeAttribute(
+            $this->user(),
+            new Dn(self::USER_DN),
+            'displayName',
+            AttributeAccess::Write,
+        );
+    }
+
+    /**
+     * An AttributeRule naming no attributes matches every attribute, so an empty set must grant nothing.
+     */
+    public function test_secureDefault_with_an_empty_self_writable_set_grants_no_self_write(): void
+    {
+        $acl = new RuleBasedAccessControl(AclRules::secureDefault(
+            Subject::dn(self::ADMIN_DN),
+            [],
+        ));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $acl->authorizeAttribute(
+            $this->user(),
+            new Dn(self::USER_DN),
+            'displayName',
+            AttributeAccess::Write,
+        );
+    }
+
+    public function test_secureDefault_with_an_empty_self_writable_set_still_denies_sensitive_attributes(): void
+    {
+        $acl = new RuleBasedAccessControl(AclRules::secureDefault(
+            Subject::dn(self::ADMIN_DN),
+            [],
+        ));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $acl->authorizeAttribute(
+            $this->user(),
+            new Dn(self::USER_DN),
+            'objectClass',
+            AttributeAccess::Write,
+        );
     }
 
     public function test_secureDefault_denies_anonymous(): void

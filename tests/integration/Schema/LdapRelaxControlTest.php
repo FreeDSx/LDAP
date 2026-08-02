@@ -57,7 +57,7 @@ final class LdapRelaxControlTest extends ServerTestCase
 
     public function test_relax_control_allows_a_schema_violating_add(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         // 'mail' is not permitted by the 'person' object class; rejected under Strict without the control.
         $this->ldapClient()->create(
@@ -88,7 +88,7 @@ final class LdapRelaxControlTest extends ServerTestCase
 
     public function test_same_add_is_rejected_under_strict_without_the_control(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);
@@ -106,7 +106,7 @@ final class LdapRelaxControlTest extends ServerTestCase
 
     public function test_relax_control_does_not_bypass_invalid_attribute_syntax(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);

@@ -400,7 +400,7 @@ use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 $server = new LdapServer(
     (new ServerOptions())
         ->setAclRules(
-            (new AclRules())->withOperationRules(
+            AclRules::fromEmpty()->withOperationRules(
                 OperationRule::allow(Subject::authenticated()),
                 OperationRule::deny(Subject::anyone()),
             ),
