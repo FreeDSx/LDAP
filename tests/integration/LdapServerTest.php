@@ -179,6 +179,9 @@ final class LdapServerTest extends ServerTestCase
         $this->assertNotNull($rootDse);
         $this->assertSame(
             [
+                'objectClass' => [
+                    'top',
+                ],
                 'namingContexts' => [
                     'dc=foo,dc=bar',
                 ],

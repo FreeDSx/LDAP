@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Entry\Entry;
@@ -51,6 +52,7 @@ final class ServerMonitorHandlerTest extends TestCase
         $this->subject = new ServerMonitorHandler(
             options: new ServerOptions(),
             snapshots: $this->metrics,
+            filterEvaluator: new FilterEvaluator(),
         );
     }
 
@@ -308,6 +310,7 @@ final class ServerMonitorHandlerTest extends TestCase
         $subject = new ServerMonitorHandler(
             options: (new ServerOptions())->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
             snapshots: $this->metrics,
+            filterEvaluator: new FilterEvaluator(),
         );
 
         $entry = $this->handleAndCaptureEntry($subject);
