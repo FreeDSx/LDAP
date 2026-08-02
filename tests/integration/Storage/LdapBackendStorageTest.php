@@ -863,9 +863,4 @@ class LdapBackendStorageTest extends ServerTestCase
     {
         return [];
     }
-
-    protected function authenticateUser(): void
-    {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
-    }
 }

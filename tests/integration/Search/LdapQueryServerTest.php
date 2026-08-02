@@ -57,7 +57,7 @@ final class LdapQueryServerTest extends ServerTestCase
     {
         $this->setServerMode('ldap-server');
         parent::setUp();
-        $this->authenticate();
+        $this->authenticateUser();
         $this->subject = $this->ldapClient()
             ->query()
             ->from(self::BASE_DN);

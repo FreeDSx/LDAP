@@ -48,7 +48,7 @@ final class LdapSeedServerTest extends ServerTestCase
 
         parent::setUp();
 
-        $this->authenticate();
+        $this->authenticateUser();
     }
 
     public function test_it_serves_a_seeded_entry_with_its_attributes(): void
