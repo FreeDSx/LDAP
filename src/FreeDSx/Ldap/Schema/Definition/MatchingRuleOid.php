@@ -52,6 +52,26 @@ final class MatchingRuleOid
 
     public const NAME_CASE_EXACT_SUBSTRINGS_MATCH = 'caseExactSubstringsMatch';
 
+    public const OID_NUMERIC_STRING_MATCH = '2.5.13.8';
+
+    public const NAME_NUMERIC_STRING_MATCH = 'numericStringMatch';
+
+    public const OID_NUMERIC_STRING_ORDERING_MATCH = '2.5.13.9';
+
+    public const NAME_NUMERIC_STRING_ORDERING_MATCH = 'numericStringOrderingMatch';
+
+    public const OID_NUMERIC_STRING_SUBSTRINGS_MATCH = '2.5.13.10';
+
+    public const NAME_NUMERIC_STRING_SUBSTRINGS_MATCH = 'numericStringSubstringsMatch';
+
+    public const OID_CASE_IGNORE_LIST_MATCH = '2.5.13.11';
+
+    public const NAME_CASE_IGNORE_LIST_MATCH = 'caseIgnoreListMatch';
+
+    public const OID_CASE_IGNORE_LIST_SUBSTRINGS_MATCH = '2.5.13.12';
+
+    public const NAME_CASE_IGNORE_LIST_SUBSTRINGS_MATCH = 'caseIgnoreListSubstringsMatch';
+
     public const OID_BOOLEAN_MATCH = '2.5.13.13';
 
     public const NAME_BOOLEAN_MATCH = 'booleanMatch';
@@ -63,6 +83,10 @@ final class MatchingRuleOid
     public const OID_INTEGER_ORDERING_MATCH = '2.5.13.15';
 
     public const NAME_INTEGER_ORDERING_MATCH = 'integerOrderingMatch';
+
+    public const OID_BIT_STRING_MATCH = '2.5.13.16';
+
+    public const NAME_BIT_STRING_MATCH = 'bitStringMatch';
 
     public const OID_OCTET_STRING_MATCH = '2.5.13.17';
 
@@ -80,6 +104,10 @@ final class MatchingRuleOid
 
     public const NAME_TELEPHONE_NUMBER_MATCH = 'telephoneNumberMatch';
 
+    public const OID_TELEPHONE_NUMBER_SUBSTRINGS_MATCH = '2.5.13.21';
+
+    public const NAME_TELEPHONE_NUMBER_SUBSTRINGS_MATCH = 'telephoneNumberSubstringsMatch';
+
     public const OID_UNIQUE_MEMBER_MATCH = '2.5.13.23';
 
     public const NAME_UNIQUE_MEMBER_MATCH = 'uniqueMemberMatch';
@@ -91,6 +119,18 @@ final class MatchingRuleOid
     public const OID_CASE_IGNORE_IA5_MATCH = '1.3.6.1.4.1.1466.109.114.2';
 
     public const NAME_CASE_IGNORE_IA5_MATCH = 'caseIgnoreIA5Match';
+
+    public const OID_CASE_IGNORE_IA5_SUBSTRINGS_MATCH = '1.3.6.1.4.1.1466.109.114.3';
+
+    public const NAME_CASE_IGNORE_IA5_SUBSTRINGS_MATCH = 'caseIgnoreIA5SubstringsMatch';
+
+    public const OID_UUID_MATCH = '1.3.6.1.1.16.2';
+
+    public const NAME_UUID_MATCH = 'uuidMatch';
+
+    public const OID_UUID_ORDERING_MATCH = '1.3.6.1.1.16.3';
+
+    public const NAME_UUID_ORDERING_MATCH = 'uuidOrderingMatch';
 
     public const OID_BIT_AND_MATCH = '1.2.840.113556.1.4.803';
 

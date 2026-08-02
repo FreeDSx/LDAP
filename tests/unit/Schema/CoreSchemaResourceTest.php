@@ -39,10 +39,37 @@ final class CoreSchemaResourceTest extends TestCase
         self::assertNotEmpty($this->schema->getObjectClasses());
     }
 
+    /**
+     * A rule an attribute names but the schema cannot resolve silently falls back to case-insensitive matching.
+     */
+    public function test_every_matching_rule_an_attribute_names_resolves_to_a_comparator(): void
+    {
+        $unresolved = [];
+
+        foreach ($this->schema->getAttributeTypes() as $attributeType) {
+            $rules = [
+                $attributeType->equalityOid,
+                $attributeType->orderingOid,
+                $attributeType->substringOid,
+            ];
+
+            foreach (array_filter($rules) as $ruleOid) {
+                if ($this->schema->getComparator($ruleOid) === null) {
+                    $unresolved[$ruleOid] = true;
+                }
+            }
+        }
+
+        self::assertSame(
+            [],
+            array_keys($unresolved),
+        );
+    }
+
     public function test_has_expected_syntax_count(): void
     {
         self::assertCount(
-            22,
+            24,
             $this->schema->getLdapSyntaxes(),
         );
     }
@@ -50,7 +77,7 @@ final class CoreSchemaResourceTest extends TestCase
     public function test_has_expected_matching_rule_count(): void
     {
         self::assertCount(
-            20,
+            32,
             $this->schema->getMatchingRules(),
         );
     }

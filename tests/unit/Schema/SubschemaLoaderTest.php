@@ -191,10 +191,10 @@ final class SubschemaLoaderTest extends TestCase
     ): void {
         $schema = (new SubschemaLoader($mode))->fromLdifFile($fixture);
 
-        // Both vendors publish rules this library has no comparator for, such as numericStringMatch.
+        // Both vendors publish rules this library has no comparator for, such as certificateExactMatch.
         self::assertNotEmpty($schema->getMatchingRules());
         self::assertNotNull($schema->getMatchingRule('2.5.13.2'));
-        self::assertNull($schema->getMatchingRule('2.5.13.8'));
+        self::assertNull($schema->getMatchingRule('2.5.13.34'));
     }
 
     /**

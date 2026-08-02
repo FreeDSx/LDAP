@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 
@@ -145,6 +146,156 @@ final class LdapLoadedSchemaTest extends ServerTestCase
         );
     }
 
+    public function test_object_identifier_first_component_matches_by_the_leading_oid(): void
+    {
+        $this->createRecord(
+            'first-component',
+            ['projectClassDef' => "( 2.5.6.6 NAME 'person' SUP 2.5.6.0 STRUCTURAL )"],
+        );
+
+        self::assertSame(
+            'first-component',
+            $this->findOne(Filters::equal('projectClassDef', '2.5.6.6')),
+        );
+    }
+
+    public function test_object_identifier_first_component_ignores_an_oid_appearing_later(): void
+    {
+        $this->createRecord(
+            'first-component-sup',
+            ['projectClassDef' => "( 2.5.6.7 NAME 'organization' SUP 2.5.6.0 STRUCTURAL )"],
+        );
+
+        // 2.5.6.0 is the SUP, not the first component.
+        self::assertNull($this->findOne(Filters::equal('projectClassDef', '2.5.6.0')));
+    }
+
+    public function test_integer_first_component_matches_by_the_leading_number(): void
+    {
+        $this->createRecord(
+            'integer-first-component',
+            ['projectRuleDef' => "( 12 NAME 'structureRule' FORM nameForm )"],
+        );
+
+        self::assertSame(
+            'integer-first-component',
+            $this->findOne(Filters::equal('projectRuleDef', '12')),
+        );
+    }
+
+    public function test_numeric_string_treats_spaces_as_insignificant(): void
+    {
+        $this->createRecord(
+            'numeric-string',
+            ['projectSerial' => '1 555 867'],
+        );
+
+        self::assertSame(
+            'numeric-string',
+            $this->findOne(Filters::equal('projectSerial', '1555867')),
+        );
+    }
+
+    public function test_numeric_string_substring_spans_a_space(): void
+    {
+        $this->createRecord(
+            'numeric-string-substring',
+            ['projectSerial' => '1 555 867'],
+        );
+
+        self::assertSame(
+            'numeric-string-substring',
+            $this->findOne(Filters::contains('projectSerial', '5558')),
+        );
+    }
+
+    public function test_bit_string_matches_a_bare_bit_sequence(): void
+    {
+        $this->createRecord(
+            'bit-string',
+            ['projectFlags' => "'0101'B"],
+        );
+
+        // A plain string comparison would not match the quoted form.
+        self::assertSame(
+            'bit-string',
+            $this->findOne(Filters::equal('projectFlags', '0101')),
+        );
+    }
+
+    public function test_bit_string_does_not_match_different_bits(): void
+    {
+        $this->createRecord(
+            'bit-string-differs',
+            ['projectFlags' => "'0101'B"],
+        );
+
+        self::assertNull($this->findOne(Filters::equal('projectFlags', "'0110'B")));
+    }
+
+    public function test_telephone_number_substring_ignores_spaces_and_hyphens(): void
+    {
+        $this->createRecord(
+            'telephone-substring',
+            ['projectPhone' => '+1 800 555-1234'],
+        );
+
+        self::assertSame(
+            'telephone-substring',
+            $this->findOne(Filters::contains('projectPhone', '8005551234')),
+        );
+    }
+
+    public function test_case_ignore_ia5_substring_folds_case(): void
+    {
+        $this->createRecord(
+            'ia5-substring',
+            ['projectMail' => 'Alice@Example.COM'],
+        );
+
+        self::assertSame(
+            'ia5-substring',
+            $this->findOne(Filters::contains('projectMail', 'example.com')),
+        );
+    }
+
+    public function test_case_ignore_list_folds_case(): void
+    {
+        $this->createRecord(
+            'ignore-list',
+            ['projectAddress' => '1 High Street$Springfield'],
+        );
+
+        self::assertSame(
+            'ignore-list',
+            $this->findOne(Filters::equal('projectAddress', '1 high street$springfield')),
+        );
+    }
+
+    public function test_uuid_matches_exactly(): void
+    {
+        $this->createRecord(
+            'uuid-exact',
+            ['projectUuid' => '597ae2f6-16a6-1027-98f4-d28b5365dc14'],
+        );
+
+        self::assertSame(
+            'uuid-exact',
+            $this->findOne(Filters::equal('projectUuid', '597ae2f6-16a6-1027-98f4-d28b5365dc14')),
+        );
+    }
+
+    public function test_uuid_is_case_sensitive(): void
+    {
+        $this->createRecord(
+            'uuid-case',
+            ['projectUuid' => '597ae2f6-16a6-1027-98f4-d28b5365dc14'],
+        );
+
+        // RFC 4530 defines uuidMatch as octetStringMatch, so case-insensitive matching would be wrong.
+        self::assertNull($this->findOne(Filters::equal('projectUuid', '597AE2F6-16A6-1027-98F4-D28B5365DC14')));
+    }
+
     public function test_the_standard_schema_still_applies_alongside_loaded_definitions(): void
     {
         $this->authenticateAdmin();
@@ -165,5 +316,41 @@ final class LdapLoadedSchemaTest extends ServerTestCase
         );
 
         self::assertCount(1, $entries);
+    }
+
+    /**
+     * @param array<string, string> $attributes
+     */
+    private function createRecord(
+        string $cn,
+        array $attributes,
+    ): void {
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(Entry::fromArray(
+            "cn={$cn},dc=foo,dc=bar",
+            [
+                'cn' => $cn,
+                'objectClass' => 'projectRecord',
+                'projectCode' => 'Matching',
+                ...$attributes,
+            ],
+        ));
+    }
+
+    /**
+     * The cn of the single matching entry, or null when the filter matches nothing.
+     */
+    private function findOne(FilterInterface $filter): ?string
+    {
+        $entries = $this->ldapClient()->search(
+            Operations::search($filter)
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        return $entries->first()
+            ?->get('cn')
+            ?->firstValue();
     }
 }

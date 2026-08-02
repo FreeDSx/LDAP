@@ -92,7 +92,7 @@ final class SubschemaEntryParserTest extends TestCase
     {
         $schema = $this->subject->parse(
             $this->entry([
-                'matchingRules' => ["( 2.5.13.8 NAME 'numericStringMatch' SYNTAX 1.3.6.1.4.1.1466.115.121.1.36 )"],
+                'matchingRules' => ["( 2.5.13.32 NAME 'wordMatch' SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )"],
             ]),
             SchemaLoadMode::Strict,
         );
