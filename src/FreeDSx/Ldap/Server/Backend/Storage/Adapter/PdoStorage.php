@@ -58,7 +58,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     use ChangeJournalingTrait;
 
     /**
-     * The current schema revision shipped in resources/schema.
+     * The current schema revision shipped in resources/pdo-schema.
      */
     public const SCHEMA_VERSION = 2;
 

@@ -49,14 +49,14 @@ trait PdoSchemaTrait
     }
 
     /**
-     * The dialect's resource directory name under resources/schema.
+     * The dialect's resource directory name under resources/pdo-schema.
      */
     abstract protected function schemaName(): string;
 
     private function schemaFile(string $name): SchemaFile
     {
         return new SchemaFile(Resources::path(
-            'schema/' . $this->schemaName() . '/' . $name . '.sql',
+            'pdo-schema/' . $this->schemaName() . '/' . $name . '.sql',
         ));
     }
 }
