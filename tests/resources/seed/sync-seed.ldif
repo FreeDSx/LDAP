@@ -11,6 +11,13 @@ cn: user
 sn: User
 userPassword: {SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=
 
+# Writes are denied by default, so suites that write to the provider bind as this identity
+dn: cn=admin,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: admin
+sn: Admin
+userPassword: {SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=
+
 dn: ou=people,dc=foo,dc=bar
 objectClass: organizationalUnit
 ou: people

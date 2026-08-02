@@ -230,7 +230,7 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
 
         try {
             $provider->bind(
-                'cn=user,dc=foo,dc=bar',
+                'cn=admin,dc=foo,dc=bar',
                 '12345',
             );
             $write($provider);

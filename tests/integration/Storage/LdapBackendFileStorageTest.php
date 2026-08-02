@@ -72,7 +72,7 @@ final class LdapBackendFileStorageTest extends LdapBackendStorageTest
 
     public function testWritesPersistAcrossConnections(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
             'cn=persistent,dc=foo,dc=bar',

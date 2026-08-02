@@ -73,7 +73,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testItPerformsAnAdd(): void
     {
-        $this->authenticate();
+        $this->authenticateAdmin();
         $this->ldapClient()->create(Entry::fromArray(
             'cn=added,dc=foo,dc=bar',
             ['cn' => 'added', 'sn' => 'Test', 'objectClass' => 'inetOrgPerson'],
@@ -89,7 +89,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testItPerformsDelete(): void
     {
-        $this->authenticate();
+        $this->authenticateAdmin();
         $this->ldapClient()->create(Entry::fromArray(
             'cn=todelete,dc=foo,dc=bar',
             ['cn' => 'todelete', 'sn' => 'Delete', 'objectClass' => 'inetOrgPerson'],
@@ -103,7 +103,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testItPerformsModify(): void
     {
-        $this->authenticate();
+        $this->authenticateAdmin();
         $this->ldapClient()->create(Entry::fromArray(
             'cn=tomodify,dc=foo,dc=bar',
             ['cn' => 'tomodify', 'sn' => 'Before', 'mail' => 'before@example.com', 'objectClass' => 'inetOrgPerson'],
@@ -153,7 +153,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testItCanModifyDn(): void
     {
-        $this->authenticate();
+        $this->authenticateAdmin();
         $this->ldapClient()->create(Entry::fromArray(
             'cn=tomove,dc=foo,dc=bar',
             ['cn' => 'tomove', 'sn' => 'Move', 'objectClass' => 'inetOrgPerson'],
@@ -453,7 +453,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testRenameWithoutDeleteKeepsOldRdn(): void
     {
-        $this->authenticate();
+        $this->authenticateAdmin();
         $this->ldapClient()->create(Entry::fromArray(
             'cn=torenameold,dc=foo,dc=bar',
             [

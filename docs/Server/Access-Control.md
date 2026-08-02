@@ -8,6 +8,8 @@ Access Control
 * [Rule-Based Access Control](#rule-based-access-control)
     * [Rule Evaluation Order](#rule-evaluation-order)
     * [Default Effect](#default-effect)
+    * [Grant Helpers](#grant-helpers)
+    * [Self-Service Attributes](#self-service-attributes)
 * [Subject Reference](#subject-reference)
 * [Target Reference](#target-reference)
 * [Attribute Rules](#attribute-rules)
@@ -40,7 +42,9 @@ Bind, WhoAmI, and StartTLS are handled before access control and are always perm
 With no access control configured, the server applies a secure default (`AclRules::secureDefault()`). It configures:
 
 - Anonymous clients are denied.
-- Authenticated clients may perform general operations.
+- Authenticated clients may search and compare any entry.
+- Writes require a grant. An identity may modify its own entry, limited to a small set of personal attributes.
+- Everything else is left to the administrator, when one is configured.
 - `userPassword` can be changed only by the entry owner and the administrator, and is never returned in search results.
 - Password Modify (RFC 3062) is limited to self and the administrator.
 - Privileged controls and extended operations are limited to the administrator.
@@ -50,19 +54,33 @@ methods. This is the recommended way to extend access control, for example to gr
 
 ```php
 AclRules::secureDefault()
-    ->withControlRules(ControlRule::allow(
+    ->withReplicaGrants(Subject::dn('cn=replica,dc=example,dc=com'));
+```
+
+The two families of method behave differently. The [grant helpers](#grant-helpers) such as `withReplicaGrants()` append
+to the current rules. The `with*Rules()` setters replace a whole category, so `withControlRules()` called on
+`secureDefault()` discards the control grants the secure default installed for the administrator. To add to a
+category with a setter, spread the existing rules first:
+
+```php
+$rules = AclRules::secureDefault(Subject::group('cn=admins,ou=groups,dc=example,dc=com'));
+
+$rules = $rules->withControlRules(
+    ...$rules->controls,
+    ...[ControlRule::allow(
         Subject::dn('cn=replica,dc=example,dc=com'),
         Target::subtree('dc=example,dc=com'),
         Control::OID_SYNC_REQUEST,
-    ));
+    )],
+);
 ```
 
-Building from `new AclRules()` instead gives a blank policy with no credential protection, so a `userPassword` rule is
-then yours to add. Composing on `secureDefault()` is the safe default. To apply just the credential protection to a
+Building from `AclRules::fromEmpty()` instead gives a blank policy with no credential protection, so a `userPassword`
+rule is then yours to add. Composing on `secureDefault()` is the safe default. To apply just the credential protection to a
 policy you build from scratch, use `AclRules::withCredentialProtection()`:
 
 ```php
-(new AclRules())
+AclRules::fromEmpty()
     ->withOperationRules(/* your rules */)
     ->withCredentialProtection(Subject::group('cn=admins,ou=groups,dc=example,dc=com'));
 ```
@@ -115,7 +133,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 $server = new LdapServer(
     (new ServerOptions())
         ->setAclRules(
-            (new AclRules())
+            AclRules::fromEmpty()
                 ->withOperationRules(
                     // Admin group can do anything.
                     OperationRule::allow(
@@ -165,26 +183,97 @@ Rules are evaluated in definition order. For each rule:
 | Operation type | Rule has no operations listed, **or** current operation is in the list | Skip to next rule                                                   |
 | Target DN      | Target matcher returns true for the entry DN                           | Skip to next rule                                                   |
 | Subject        | Subject matcher returns true for the bound user                        | Skip to next rule                                                   |
-| Effect         | —                                                                      | `Allow` → permit; `Deny` → reject with `INSUFFICIENT_ACCESS_RIGHTS` |
+| Effect         | Always reached once the checks above pass                              | `Allow` → permit; `Deny` → reject with `INSUFFICIENT_ACCESS_RIGHTS` |
 
 If no rule matches, the [default effect](#default-effect) is applied.
 
-For attribute rules the same logic applies per attribute. Any attribute that matches no rule is kept (default allow).
+For attribute rules the same logic applies per attribute, but the fallback differs by direction. An attribute write
+that matches no rule is denied. An attribute read that matches no rule is kept.
 
 ### Default Effect
 
-When no operation rule matches, `AclRules::$defaultOperationEffect` determines the outcome (default: `Effect::Deny`).
-Control rules have their own `$defaultControlEffect`, also `Effect::Deny`. Privileged controls are off unless granted.
+The defaults are fixed rather than configurable:
+
+- Operations that match no rule are denied.
+- Attribute writes that match no rule are denied.
+- Attribute reads that match no rule are allowed, so a search still returns attributes you wrote no rule for.
+- Controls and extended operations that match no rule are denied, so privileged controls are off unless granted.
+
+Because writes are denied by default, granting an operation is not enough on its own. A rule that allows `Add` or
+`Modify` still needs a matching attribute rule for the attributes being written, otherwise the operation is
+allowed and then every attribute in it is refused.
 
 ```php
-use FreeDSx\Ldap\Server\AccessControl\AclRules;
-use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
+use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 
-// Allow everything not explicitly matched (open policy).
-(new ServerOptions())->setAclRules(
-    new AclRules(defaultOperationEffect: Effect::Allow),
+OperationRule::allow(
+    Subject::group('cn=admins,dc=example,dc=com'),
+),
+// Without this the operation above is permitted but writes no attributes.
+AttributeRule::allow(
+    Subject::group('cn=admins,dc=example,dc=com'),
+    Target::any(),
+)->forWrite(),
+```
+
+`withFullAccess()` writes that pair for you. See [Grant Helpers](#grant-helpers).
+
+### Grant Helpers
+
+These methods bundle grants that are awkward to spell out rule by rule. They append to the current rules rather than
+replacing them, so they compose on `secureDefault()` or on a policy built from `fromEmpty()`.
+
+| Method                                                    | Grants                                                                            |
+|-----------------------------------------------------------|-----------------------------------------------------------------------------------|
+| `withFullAccess($subject, $target = new AnyTargetMatcher())`   | Every operation and every attribute write over the target                         |
+| `withSelfServiceWrites($attributes = AclRules::SELF_WRITABLE_ATTRIBUTES)` | Modify on an identity's own entry, limited to the given attributes |
+| `withCredentialProtection($administrators = null)`        | The `userPassword` and Password Modify rules, plus privileged controls and extended operations for the administrator |
+| `withReplicaGrants($replica, $target = new AnyTargetMatcher())` | The content-sync control, the ppolicy-forward extended operation, and confidential attribute reads |
+
+`AclRules::secureDefault()` is built from the first three. `withFullAccess()` is what it applies to the configured
+[administrator](#administrators), so reaching for it directly is how you grant a second identity the same rights.
+
+It covers operations and attribute writes only. Controls, extended operations, and confidential attributes are gated
+separately, which is why an administrator gets those from `withCredentialProtection()` rather than from this method.
+
+```php
+// A provisioning account with full rights over one subtree.
+AclRules::secureDefault(Subject::group('cn=admins,ou=groups,dc=example,dc=com'))
+    ->withFullAccess(
+        Subject::dn('cn=provisioning,dc=example,dc=com'),
+        Target::subtree('ou=people,dc=example,dc=com'),
+    );
+```
+
+Rule order still applies. These helpers append, so a grant added this way is reached only after the rules already in
+the set. A `deny` sitting earlier continues to win.
+
+### Self-Service Attributes
+
+The secure default lets an identity change a small set of personal attributes on its own entry, listed in
+`AclRules::SELF_WRITABLE_ATTRIBUTES`. Attributes carrying authorization, identity, or account recovery are left out,
+because self-service on those is a route to privilege escalation or account takeover.
+
+Pass a second argument to `secureDefault()` to change the set without rebuilding the policy. Spread the constant to
+keep the defaults and add to them.
+
+```php
+// The shipped set, plus one more.
+AclRules::secureDefault(
+    Subject::group('cn=admins,ou=groups,dc=example,dc=com'),
+    [...AclRules::SELF_WRITABLE_ATTRIBUTES, 'preferredLanguage'],
+);
+
+// Self-service on nothing but the password, which withCredentialProtection still allows.
+AclRules::secureDefault(
+    Subject::group('cn=admins,ou=groups,dc=example,dc=com'),
+    [],
 );
 ```
+
+Widen the set with care. Granting `member` or `memberOf` lets an identity add itself to a group, and granting
+`objectClass` lets it change which attributes its own entry may hold.
 
 ## Subject Reference
 
@@ -240,7 +329,7 @@ Attribute rules are enforced in three places:
 - **Add / Modify**: the request is rejected if the bound user is denied access to any attribute being written.
 
 ```php
-(new AclRules())->withAttributeRules(
+AclRules::fromEmpty()->withAttributeRules(
     // Only admins can see or write userPassword.
     AttributeRule::allow(
         Subject::group('cn=admins,dc=example,dc=com'),
@@ -277,7 +366,7 @@ appears in a result:
 Access is granted with a subject-only rule:
 
 ```php
-(new AclRules())->withConfidentialAccess(
+AclRules::fromEmpty()->withConfidentialAccess(
     // Named attributes, or ConfidentialAccessRule::allowAny() for every confidential attribute.
     ConfidentialAccessRule::allow(
         Subject::group('cn=admins,dc=example,dc=com'),
@@ -329,7 +418,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 
 // Only the admin group may relax schema constraints, and only under ou=migrate.
-(new AclRules())->withControlRules(
+AclRules::fromEmpty()->withControlRules(
     ControlRule::allow(
         Subject::group('cn=admins,dc=example,dc=com'),
         Target::subtree('ou=migrate,dc=example,dc=com'),
@@ -349,7 +438,7 @@ list matches all). They are denied by default. The set of gated OIDs is configur
 ```php
 use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;
 
-(new AclRules())->withExtendedOperationRules(
+AclRules::fromEmpty()->withExtendedOperationRules(
     ExtendedOperationRule::allow(
         Subject::group('cn=admins,ou=groups,dc=example,dc=com'),
         '1.3.6.1.4.1....',

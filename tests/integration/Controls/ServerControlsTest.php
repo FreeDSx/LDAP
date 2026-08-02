@@ -60,7 +60,7 @@ final class ServerControlsTest extends ServerTestCase
 
     public function test_assertion_allows_a_modify_when_it_matches(): void
     {
-        $this->bind();
+        $this->authenticateAdmin();
         $dn = $this->createPerson('assert-ok');
 
         $this->ldapClient()->send(
@@ -73,7 +73,7 @@ final class ServerControlsTest extends ServerTestCase
 
     public function test_assertion_fails_a_modify_when_it_does_not_match(): void
     {
-        $this->bind();
+        $this->authenticateAdmin();
         $dn = $this->createPerson('assert-no');
 
         try {
@@ -124,7 +124,7 @@ final class ServerControlsTest extends ServerTestCase
 
     public function test_pre_read_and_post_read_capture_state_around_a_modify(): void
     {
-        $this->bind();
+        $this->authenticateAdmin();
         $dn = $this->createPerson('prepost');
 
         $response = $this->ldapClient()->send(
@@ -143,7 +143,7 @@ final class ServerControlsTest extends ServerTestCase
 
     public function test_pre_read_returns_the_entry_on_delete(): void
     {
-        $this->bind();
+        $this->authenticateAdmin();
         $dn = $this->createPerson('del-preread');
 
         $response = $this->ldapClient()->send(
@@ -158,7 +158,7 @@ final class ServerControlsTest extends ServerTestCase
 
     public function test_post_read_returns_the_entry_on_add(): void
     {
-        $this->bind();
+        $this->authenticateAdmin();
         $dn = 'cn=add-postread,ou=people,dc=foo,dc=bar';
 
         $response = $this->ldapClient()->send(
@@ -173,7 +173,7 @@ final class ServerControlsTest extends ServerTestCase
 
     public function test_subtree_delete_removes_the_whole_subtree(): void
     {
-        $this->bind();
+        $this->authenticateAdmin();
         $this->ldapClient()->create(Entry::fromArray('ou=del-tree,dc=foo,dc=bar', [
             'objectClass' => ['organizationalUnit'],
             'ou' => ['del-tree'],
@@ -202,7 +202,7 @@ final class ServerControlsTest extends ServerTestCase
 
     public function test_deleting_a_non_leaf_without_the_control_is_rejected(): void
     {
-        $this->bind();
+        $this->authenticateAdmin();
         $this->ldapClient()->create(Entry::fromArray('ou=non-leaf,dc=foo,dc=bar', [
             'objectClass' => ['organizationalUnit'],
             'ou' => ['non-leaf'],

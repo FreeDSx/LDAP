@@ -211,7 +211,7 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
         $writer = $this->buildClient('tcp');
 
         try {
-            $writer->bind('cn=user,dc=foo,dc=bar', '12345');
+            $writer->bind('cn=admin,dc=foo,dc=bar', '12345');
             $do($writer);
         } finally {
             $writer->unbind();

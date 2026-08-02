@@ -23,6 +23,11 @@ final class LdapQueryServerTest extends ServerTestCase
 {
     private const ENTRY_COUNT = 5;
 
+    /**
+     * The fixed seed adds cn=user and cn=admin on top of the generated entries.
+     */
+    private const SEEDED_PERSON_COUNT = 2;
+
     private const BASE_DN = 'dc=foo,dc=bar';
 
     private LdapQuery $subject;
@@ -66,7 +71,7 @@ final class LdapQueryServerTest extends ServerTestCase
             ->get();
 
         $this->assertCount(
-            self::ENTRY_COUNT + 1,
+            self::ENTRY_COUNT + self::SEEDED_PERSON_COUNT,
             $entries,
         );
     }
@@ -166,7 +171,7 @@ final class LdapQueryServerTest extends ServerTestCase
         }
 
         $this->assertCount(
-            self::ENTRY_COUNT + 1,
+            self::ENTRY_COUNT + self::SEEDED_PERSON_COUNT,
             $entries,
         );
     }
@@ -189,7 +194,7 @@ final class LdapQueryServerTest extends ServerTestCase
         }
 
         $this->assertSame(
-            self::ENTRY_COUNT + 1,
+            self::ENTRY_COUNT + self::SEEDED_PERSON_COUNT,
             $count,
         );
     }

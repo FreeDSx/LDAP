@@ -70,6 +70,7 @@ final class SyncReplNativeTest extends ServerTestCase
         // A cookieless poll runs the present phase: the whole subtree comes across, nothing more.
         self::assertSame(
             [
+                'cn=admin,dc=foo,dc=bar',
                 'cn=alice,ou=people,dc=foo,dc=bar',
                 'cn=bob,ou=people,dc=foo,dc=bar',
                 'cn=carol,ou=people,dc=foo,dc=bar',
@@ -99,7 +100,8 @@ final class SyncReplNativeTest extends ServerTestCase
 
     public function testAnIncrementalPollWithACookieReturnsOnlyChangesSinceTheCookie(): void
     {
-        $this->authenticate();
+        // Writes below need an administrator, who also holds the privileged sync control.
+        $this->authenticateAdmin();
 
         $cookie = null;
         $initial = $this->syncRepl();

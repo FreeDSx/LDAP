@@ -57,7 +57,7 @@ final class LdapLoadedSchemaTest extends ServerTestCase
 
     public function test_an_entry_using_a_loaded_object_class_is_accepted(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
             'cn=loaded-ok,dc=foo,dc=bar',
@@ -84,7 +84,7 @@ final class LdapLoadedSchemaTest extends ServerTestCase
 
     public function test_a_loaded_object_class_enforces_its_required_attributes(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);
@@ -101,7 +101,7 @@ final class LdapLoadedSchemaTest extends ServerTestCase
 
     public function test_a_loaded_object_class_rejects_an_attribute_it_does_not_permit(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);
@@ -120,7 +120,7 @@ final class LdapLoadedSchemaTest extends ServerTestCase
 
     public function test_a_loaded_attribute_is_searchable_by_its_matching_rules(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
             'cn=loaded-search,dc=foo,dc=bar',
@@ -147,7 +147,7 @@ final class LdapLoadedSchemaTest extends ServerTestCase
 
     public function test_the_standard_schema_still_applies_alongside_loaded_definitions(): void
     {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
             'cn=loaded-standard,dc=foo,dc=bar',

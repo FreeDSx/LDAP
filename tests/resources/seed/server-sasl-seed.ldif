@@ -1,0 +1,23 @@
+version: 1
+
+# Fixed seed for the ldap-server harness under --sasl. Passwords stay cleartext, since the SASL
+# mechanisms need the original value rather than a hash.
+
+# Domain root
+dn: dc=foo,dc=bar
+objectClass: domain
+dc: foo
+
+dn: cn=user,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: user
+sn: User
+uid: user
+userPassword: 12345
+
+dn: cn=other,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: other
+sn: Other
+uid: other
+userPassword: secret

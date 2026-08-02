@@ -1,0 +1,47 @@
+version: 1
+
+# Fixed seed for the ldap-backend-storage harness. The --seed-entries entries are generated in the
+# command itself, since their count is a run-time option.
+
+# Domain root
+dn: dc=foo,dc=bar
+objectClass: domain
+dc: foo
+
+# Bind identity for suites that do not need to write
+dn: cn=user,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: user
+sn: Admin
+userPassword: {SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=
+
+# Administrator, a member of the group the harness configures via setAdministrators()
+dn: cn=admin,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: admin
+sn: Admin
+userPassword: {SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=
+
+dn: cn=admins,dc=foo,dc=bar
+objectClass: groupOfNames
+cn: admins
+member: cn=admin,dc=foo,dc=bar
+
+dn: ou=people,dc=foo,dc=bar
+objectClass: organizationalUnit
+ou: people
+
+dn: cn=alice,ou=people,dc=foo,dc=bar
+objectClass: inetOrgPerson
+objectClass: extensibleObject
+cn: alice
+sn: Smith
+mail: alice@foo.bar
+uidNumber: 99
+# Matched case-exactly by the schema, so searches on it prove the configured schema is in play.
+employeeNumber: A1b2C3
+
+dn: cn=nosn,dc=foo,dc=bar
+objectClass: groupOfNames
+cn: nosn
+member: cn=user,dc=foo,dc=bar

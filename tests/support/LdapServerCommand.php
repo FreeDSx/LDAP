@@ -50,6 +50,15 @@ final class LdapServerCommand extends Command
 
     public const MANAGER_PASSWORD = 'manager-pass';
 
+    /**
+     * Writes are denied by default, so tests that write bind as this identity.
+     */
+    private const ADMIN_DN = 'cn=admin,dc=foo,dc=bar';
+
+    private const SEED_LDIF = __DIR__ . '/../resources/seed/server-seed.ldif';
+
+    private const SASL_SEED_LDIF = __DIR__ . '/../resources/seed/server-sasl-seed.ldif';
+
     private const SSL_KEY = __DIR__ . '/../resources/cert/slapd.key';
 
     private const SSL_CERT = __DIR__ . '/../resources/cert/slapd.crt';
@@ -227,7 +236,7 @@ final class LdapServerCommand extends Command
             $useSsl = true;
         }
 
-        $entries = $sasl ? $this->buildSaslEntries() : $this->buildDefaultEntries();
+        $entries = [];
 
         if ($external) {
             // Subject "/DC=bar/DC=foo/CN=extuser" maps (reversed) to this DN via SubjectDnCredentialMapper.
@@ -266,6 +275,7 @@ final class LdapServerCommand extends Command
         $options = (new ServerOptions($this->createStorageConfig($storageType), $network))
             ->setRunnerConfig(new RunnerConfig($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl))
             ->setAllowAnonymous($allowAnonymous)
+            ->setAdministrators(Subject::dn(self::ADMIN_DN))
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
             ->setMaxSearchPagedLookthrough((int) $this->getStringOption($input, 'max-search-paged-lookthrough'))
             ->setSyncEnabled(true)
@@ -310,32 +320,36 @@ final class LdapServerCommand extends Command
         }
 
         if ($external && $input->getOption('external-allow-proxy') === true) {
-            // Compose on the current rules (the secure default): grant the EXTERNAL cert identity proxied-auth.
+            // The with* methods replace rather than append, so carry the existing rules through.
+            $rules = $options->getAclRules();
             $options->setAclRules(
-                $options->getAclRules()->withControlRules(
-                    ControlRule::allow(
+                $rules->withControlRules(
+                    ...$rules->controls,
+                    ...[ControlRule::allow(
                         Subject::dn('cn=extuser,dc=foo,dc=bar'),
                         Target::subtree('dc=foo,dc=bar'),
                         Control::OID_PROXY_AUTHORIZATION,
-                    ),
+                    )],
                 ),
             );
         }
 
         if ($input->getOption('allow-sync') === true) {
-            // Compose on the current rules (the secure default) and add the one sync-specific grant.
+            $rules = $options->getAclRules();
             $options->setAclRules(
-                $options->getAclRules()->withControlRules(
-                    ControlRule::allow(
+                $rules->withControlRules(
+                    ...$rules->controls,
+                    ...[ControlRule::allow(
                         Subject::dn('cn=user,dc=foo,dc=bar'),
                         Target::subtree('dc=foo,dc=bar'),
                         Control::OID_SYNC_REQUEST,
-                    ),
+                    )],
                 ),
             );
         }
 
         if ($input->getOption('allow-ppolicy-forward') === true) {
+            $rules = $options->getAclRules();
             $options
                 ->setPasswordPolicy(new PasswordPolicy(
                     lockout: new PasswordLockoutRules(
@@ -344,11 +358,12 @@ final class LdapServerCommand extends Command
                     ),
                 ))
                 ->setAclRules(
-                    $options->getAclRules()->withExtendedOperationRules(
-                        ExtendedOperationRule::allow(
+                    $rules->withExtendedOperationRules(
+                        ...$rules->extendedOps,
+                        ...[ExtendedOperationRule::allow(
                             Subject::dn('cn=user,dc=foo,dc=bar'),
                             ExtendedRequest::OID_PPOLICY_STATE_FORWARD,
-                        ),
+                        )],
                     ),
                 );
         }
@@ -360,10 +375,15 @@ final class LdapServerCommand extends Command
             ));
         }
 
-        $loadData = function () use ($server, $storage, $seedFile, $entries, $changesFile, $dumpFile): void {
-            if ($seedFile !== '') {
-                $server->seed(new FileLdifLoader($seedFile));
-            } else {
+        $fixedSeed = $sasl
+            ? self::SASL_SEED_LDIF
+            : self::SEED_LDIF;
+
+        $loadData = function () use ($server, $storage, $seedFile, $fixedSeed, $entries, $changesFile, $dumpFile): void {
+            $server->seed(new FileLdifLoader($seedFile !== '' ? $seedFile : $fixedSeed));
+
+            // The generated and cert-mapped entries stay a raw import, since they carry synthetic attributes.
+            if ($entries !== []) {
                 (new LdapImporter($storage))->importEntries($entries);
             }
 
@@ -431,66 +451,5 @@ final class LdapServerCommand extends Command
         }
 
         return InMemoryStorageConfig::withEntries();
-    }
-
-    /**
-     * @return list<Entry>
-     */
-    private function buildDefaultEntries(): array
-    {
-        $passwordHash = '{SHA}' . base64_encode(sha1('12345', true));
-
-        return [
-            Entry::fromArray(
-                'dc=foo,dc=bar',
-                [
-                    'dc' => 'foo',
-                    'objectClass' => 'domain',
-                ],
-            ),
-            Entry::fromArray(
-                'cn=user,dc=foo,dc=bar',
-                [
-                    'cn' => 'user',
-                    'sn' => 'User',
-                    'objectClass' => 'inetOrgPerson',
-                    'userPassword' => $passwordHash,
-                ],
-            ),
-        ];
-    }
-
-    /**
-     * @return list<Entry>
-     */
-    private function buildSaslEntries(): array
-    {
-        return [
-            Entry::fromArray(
-                'dc=foo,dc=bar',
-                [
-                    'dc' => 'foo',
-                    'objectClass' => 'domain',
-                ],
-            ),
-            Entry::fromArray(
-                'cn=user,dc=foo,dc=bar',
-                [
-                    'objectClass' => 'inetOrgPerson',
-                    'cn' => 'user',
-                    'uid' => 'user',
-                    'userPassword' => '12345',
-                ],
-            ),
-            Entry::fromArray(
-                'cn=other,dc=foo,dc=bar',
-                [
-                    'objectClass' => 'inetOrgPerson',
-                    'cn' => 'other',
-                    'uid' => 'other',
-                    'userPassword' => 'secret',
-                ],
-            ),
-        ];
     }
 }
