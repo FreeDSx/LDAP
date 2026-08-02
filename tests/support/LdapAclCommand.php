@@ -56,7 +56,7 @@ class LdapAclCommand extends Command
     ): int {
         $transport = $this->getStringOption($input, 'transport');
 
-        $adminPasswordHash = '{SHA}' . base64_encode(sha1('adminpass', true));
+        $adminPasswordHash = '{SHA}' . base64_encode(sha1('12345', true));
         $userPasswordHash = '{SHA}' . base64_encode(sha1('12345', true));
         $alicePasswordHash = '{SHA}' . base64_encode(sha1('alicepass', true));
 

@@ -53,7 +53,7 @@ final class LdapApplyChangesServerTest extends ServerTestCase
 
         parent::setUp();
 
-        $this->authenticate();
+        $this->authenticateUser();
     }
 
     public function test_a_modify_change_replaces_the_attribute_value(): void

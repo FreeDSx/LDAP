@@ -60,7 +60,7 @@ final class SyncReplNativeTest extends ServerTestCase
 
     public function testItStreamsEveryEntryOnAFreshRefreshOnlyPoll(): void
     {
-        $this->authenticate();
+        $this->authenticateUser();
 
         $dns = $this->collectPoll(
             $this->syncRepl(),
@@ -86,7 +86,7 @@ final class SyncReplNativeTest extends ServerTestCase
 
     public function testAPollWithAFilterOnlyStreamsMatchingEntries(): void
     {
-        $this->authenticate();
+        $this->authenticateUser();
 
         $dns = $this->collectPoll(
             $this->syncRepl(Filters::equal('objectClass', 'organizationalUnit')),

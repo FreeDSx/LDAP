@@ -160,7 +160,7 @@ final class AclIntegrationTest extends ServerTestCase
 
     public function testGroupMemberCanAddEntry(): void
     {
-        $this->ldapClient()->bind('cn=admin,dc=foo,dc=bar', 'adminpass');
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
             'cn=acl-temp-add,dc=foo,dc=bar',
@@ -180,7 +180,7 @@ final class AclIntegrationTest extends ServerTestCase
 
     public function testGroupMemberCanDeleteEntry(): void
     {
-        $this->ldapClient()->bind('cn=admin,dc=foo,dc=bar', 'adminpass');
+        $this->authenticateAdmin();
 
         $this->ldapClient()->create(Entry::fromArray(
             'cn=acl-temp-delete,dc=foo,dc=bar',
@@ -200,7 +200,7 @@ final class AclIntegrationTest extends ServerTestCase
 
     public function testGroupMemberCanModifyAnyEntry(): void
     {
-        $this->ldapClient()->bind('cn=admin,dc=foo,dc=bar', 'adminpass');
+        $this->authenticateAdmin();
 
         $entry = Entry::fromArray('cn=alice,ou=people,dc=foo,dc=bar');
         $entry->set('sn', 'AdminModified');
@@ -216,6 +216,43 @@ final class AclIntegrationTest extends ServerTestCase
 
         $revert = Entry::fromArray('cn=alice,ou=people,dc=foo,dc=bar');
         $revert->set('sn', 'Smith');
+        $this->ldapClient()->update($revert);
+    }
+
+    public function testUserCannotWriteAnotherEntryPwdReset(): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $entry = Entry::fromArray('cn=alice,ou=people,dc=foo,dc=bar');
+        $entry->set('pwdReset', 'TRUE');
+        $this->ldapClient()->update($entry);
+    }
+
+    public function testAdminCanWriteAnotherEntryPwdReset(): void
+    {
+        $this->authenticateAdmin();
+
+        $entry = Entry::fromArray('cn=alice,ou=people,dc=foo,dc=bar');
+        $entry->set('pwdReset', 'TRUE');
+        $this->ldapClient()->update($entry);
+
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'alice'))
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope()
+                ->select('pwdReset'),
+        );
+
+        self::assertSame(
+            ['TRUE'],
+            $results->first()?->get('pwdReset')?->getValues(),
+        );
+
+        $revert = Entry::fromArray('cn=alice,ou=people,dc=foo,dc=bar');
+        $revert->reset('pwdReset');
         $this->ldapClient()->update($revert);
     }
 
@@ -291,7 +328,7 @@ final class AclIntegrationTest extends ServerTestCase
 
     public function testUserPasswordVisibleToGroupMember(): void
     {
-        $this->ldapClient()->bind('cn=admin,dc=foo,dc=bar', 'adminpass');
+        $this->authenticateAdmin();
 
         $results = $this->ldapClient()->search(
             Operations::search(Filters::equal('cn', 'alice'))
@@ -341,7 +378,7 @@ final class AclIntegrationTest extends ServerTestCase
 
     public function testFilteringOnAPasswordMatchesForAGrantedSubject(): void
     {
-        $this->ldapClient()->bind('cn=admin,dc=foo,dc=bar', 'adminpass');
+        $this->authenticateAdmin();
 
         $results = $this->ldapClient()->search(
             Operations::search(Filters::equal('userPassword', self::alicePasswordHash()))
@@ -438,7 +475,7 @@ final class AclIntegrationTest extends ServerTestCase
 
     public function testAGrantDoesNotExtendToOtherConfidentialAttributes(): void
     {
-        $this->ldapClient()->bind('cn=admin,dc=foo,dc=bar', 'adminpass');
+        $this->authenticateAdmin();
 
         // The group is granted userPassword by name, which must not carry over to secretCode.
         $results = $this->ldapClient()->search(

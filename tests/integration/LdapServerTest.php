@@ -128,7 +128,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testItPerformsSearches(): void
     {
-        $this->authenticate();
+        $this->authenticateUser();
 
         $result = $this->ldapClient()->read('cn=user,dc=foo,dc=bar');
         $this->assertNotNull($result);
@@ -140,7 +140,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testItCanPerformCompare(): void
     {
-        $this->authenticate();
+        $this->authenticateUser();
 
         $this->assertTrue(
             $this->ldapClient()->compare(
@@ -282,7 +282,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testWhoAmIWhenAuthenticated(): void
     {
-        $this->authenticate();
+        $this->authenticateUser();
         $output = $this->ldapClient()->whoami();
 
         $this->assertSame(
@@ -302,7 +302,7 @@ final class LdapServerTest extends ServerTestCase
     {
         $this->stopServer();
         $this->createServerProcess('tcp', ['--entries=5000', '--max-search-lookthrough=0']);
-        $this->authenticate();
+        $this->authenticateUser();
 
         $allEntries = [];
         $iterations = 0;
@@ -331,7 +331,7 @@ final class LdapServerTest extends ServerTestCase
             '--max-search-lookthrough=10',
             '--max-search-paged-lookthrough=100000',
         ]);
-        $this->authenticate();
+        $this->authenticateUser();
 
         $search = Operations::search(Filters::raw('(foo=*)'))->base('dc=foo,dc=bar');
         $paging = $this->ldapClient()->paging($search);
@@ -355,7 +355,7 @@ final class LdapServerTest extends ServerTestCase
             '--max-search-lookthrough=10',
             '--max-search-paged-lookthrough=0',
         ]);
-        $this->authenticate();
+        $this->authenticateUser();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
@@ -375,7 +375,7 @@ final class LdapServerTest extends ServerTestCase
             '--max-search-lookthrough=5000',
             '--authenticated-lookthrough=5',
         ]);
-        $this->authenticate();
+        $this->authenticateUser();
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
@@ -387,7 +387,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testItDoesASearchWhenPagingIsNotMarkedAsCritical(): void
     {
-        $this->authenticate();
+        $this->authenticateUser();
 
         $search = Operations::search(Filters::raw('(cn=user)'))->base('dc=foo,dc=bar');
         $paging = $this->ldapClient()->paging($search);
@@ -484,7 +484,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testSetOptionsForceDisconnectsClient(): void
     {
-        $this->authenticate();
+        $this->authenticateUser();
         $this->ldapClient()->setOptions(
             options: new ClientOptions(),
             forceDisconnect: true,
@@ -495,7 +495,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testItCanEndPagingEarly(): void
     {
-        $this->authenticate();
+        $this->authenticateUser();
 
         $search = Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar');
         $paging = $this->ldapClient()->paging($search);
@@ -513,7 +513,7 @@ final class LdapServerTest extends ServerTestCase
             $this->markTestSkipped('The posix extension is required to send signals.');
         }
 
-        $this->authenticate();
+        $this->authenticateUser();
         $this->assertSame(
             'dn:cn=user,dc=foo,dc=bar',
             $this->ldapClient()->whoami(),

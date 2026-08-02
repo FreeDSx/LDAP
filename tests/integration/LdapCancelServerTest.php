@@ -31,7 +31,7 @@ final class LdapCancelServerTest extends ServerTestCase
             'tcp',
             ['--entries=5000'],
         );
-        $this->authenticate();
+        $this->authenticateUser();
     }
 
     public function testMidStreamCancelStopsSearchAndReturnsSuccess(): void

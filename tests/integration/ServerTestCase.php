@@ -210,7 +210,10 @@ class ServerTestCase extends LdapTestCase
         return $process?->isRunning() ?? false;
     }
 
-    protected function authenticate(): void
+    /**
+     * Binds as an ordinary identity with no administrative rights.
+     */
+    protected function authenticateUser(): void
     {
         $this->ldapClient()->bind(
             'cn=user,dc=foo,dc=bar',

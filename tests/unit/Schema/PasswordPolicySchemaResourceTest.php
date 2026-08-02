@@ -85,7 +85,6 @@ final class PasswordPolicySchemaResourceTest extends TestCase
             'pwdFailureTime' => [PasswordPolicyOid::NAME_PWD_FAILURE_TIME],
             'pwdHistory' => [PasswordPolicyOid::NAME_PWD_HISTORY],
             'pwdGraceUseTime' => [PasswordPolicyOid::NAME_PWD_GRACE_USE_TIME],
-            'pwdReset' => [PasswordPolicyOid::NAME_PWD_RESET],
             'pwdPolicySubentry' => [PasswordPolicyOid::NAME_PWD_POLICY_SUBENTRY],
             'pwdStartTime' => [PasswordPolicyOid::NAME_PWD_START_TIME],
             'pwdEndTime' => [PasswordPolicyOid::NAME_PWD_END_TIME],

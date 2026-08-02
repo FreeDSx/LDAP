@@ -51,7 +51,7 @@ final class LdapProxyTest extends ServerTestCase
 
     public function testItBindsToTheProxy(): void
     {
-        $this->authenticate();
+        $this->authenticateUser();
 
         self::assertSame(
             'dn:cn=user,dc=foo,dc=bar',
@@ -61,7 +61,7 @@ final class LdapProxyTest extends ServerTestCase
 
     public function testItRetrievesTheRootDse(): void
     {
-        $this->authenticate();
+        $this->authenticateUser();
 
         self::assertNotEmpty($this->ldapClient()->readOrFail()->toArray());
     }
@@ -98,7 +98,7 @@ final class LdapProxyTest extends ServerTestCase
 
     public function testItPagesThroughForwardedResults(): void
     {
-        $this->authenticate();
+        $this->authenticateUser();
 
         $paging = $this->ldapClient()->paging(
             Operations::search(
@@ -151,7 +151,7 @@ final class LdapProxyTest extends ServerTestCase
     public function testItUpgradesTheDownstreamConnectionWithStartTls(): void
     {
         $this->ldapClient()->startTls();
-        $this->authenticate();
+        $this->authenticateUser();
 
         self::assertSame(
             'dn:cn=user,dc=foo,dc=bar',
