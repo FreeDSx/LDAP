@@ -107,6 +107,21 @@ class LdapAclCommand extends Command
                 new Attribute('userPassword', $alicePasswordHash),
                 new Attribute('secretCode', self::SECRET_CODE),
             ),
+            // RDN is uid, which is not writable under ou=people, so a rename that touches it must be refused.
+            new Entry(
+                new Dn('uid=bob,ou=people,dc=foo,dc=bar'),
+                new Attribute('uid', 'bob'),
+                new Attribute('cn', 'bob'),
+                new Attribute('sn', 'Bob'),
+                new Attribute('objectClass', 'inetOrgPerson'),
+            ),
+            new Entry(
+                new Dn('uid=bob2,ou=people,dc=foo,dc=bar'),
+                new Attribute('uid', 'bob2'),
+                new Attribute('cn', 'bob2'),
+                new Attribute('sn', 'Bob'),
+                new Attribute('objectClass', 'inetOrgPerson'),
+            ),
             new Entry(
                 new Dn(self::HIDDEN_DN),
                 new Attribute('cn', 'hidden'),
@@ -185,6 +200,12 @@ class LdapAclCommand extends Command
                             AttributeRule::allow(
                                 Subject::self(),
                                 Target::any(),
+                            )->forWrite(),
+                            // A rename writes the RDN attribute, so delegating renames means granting it too.
+                            AttributeRule::allow(
+                                Subject::authenticated(),
+                                Target::subtree('ou=people,dc=foo,dc=bar'),
+                                'cn',
                             )->forWrite(),
                         )
                         // userPassword ships confidential, so reading it needs a grant on top of the rules above.

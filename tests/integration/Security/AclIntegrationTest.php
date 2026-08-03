@@ -285,6 +285,93 @@ final class AclIntegrationTest extends ServerTestCase
         );
     }
 
+    public function testRenameCannotWriteAnRdnAttributeWithoutAGrant(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        // The rename itself is permitted over ou=people, but only cn is writable there.
+        $this->ldapClient()->rename(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'uid=alice-uid',
+            true,
+        );
+    }
+
+    public function testRenameLeavesTheEntryUntouchedWhenTheRdnAttributeIsDenied(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        try {
+            $this->ldapClient()->rename(
+                'cn=alice,ou=people,dc=foo,dc=bar',
+                'uid=alice-uid',
+                true,
+            );
+        } catch (OperationException) {
+        }
+
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'alice'))
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(1, $results);
+        self::assertNull($results->first()?->get('uid'));
+    }
+
+    public function testRenameDeletingTheOldRdnRequiresAWriteOfThatAttributeToo(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        // cn is writable here, but dropping the old RDN would delete a uid value that is not.
+        $this->ldapClient()->rename(
+            'uid=bob,ou=people,dc=foo,dc=bar',
+            'cn=bob-renamed',
+            true,
+        );
+    }
+
+    public function testTheSameRenameIsAllowedWhenTheOldRdnIsKept(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $this->ldapClient()->rename(
+            'uid=bob2,ou=people,dc=foo,dc=bar',
+            'cn=bob2-renamed',
+            false,
+        );
+
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'bob2-renamed'))
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(1, $results);
+    }
+
+    public function testRenameAuthorizesEveryComponentOfAMultivaluedRdn(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        // cn alone is writable, so pairing it with uid must not smuggle the second component through.
+        $this->ldapClient()->rename(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'cn=alice-multi+uid=alice-multi',
+            false,
+        );
+    }
+
     public function testUserCannotMoveEntryToRestrictedParent(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');

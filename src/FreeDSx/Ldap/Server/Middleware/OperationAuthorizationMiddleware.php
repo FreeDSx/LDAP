@@ -346,12 +346,53 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
     }
 
     /**
+     * Authorizes the attribute values a rename writes.
+     *
+     * A rename adds the new RDN's value to the entry, and removes the old one when deleteOldRdn is set, so it is an
+     * attribute write and must be authorized as one.
+     *
+     * @throws OperationException
+     */
+    private function authorizeRdnAttributes(
+        ModifyDnRequest $request,
+        TokenInterface $token,
+    ): void {
+        $dn = OperationTargetDn::resultOf($request);
+        $components = $request->getNewRdn()->getAll();
+
+        if ($request->getDeleteOldRdn()) {
+            $components = [
+                ...$components,
+                ...$request->getDn()->getRdn()->getAll(),
+            ];
+        }
+
+        foreach ($components as $component) {
+            $this->accessControl->authorizeAttribute(
+                $token,
+                $dn,
+                $component->getName(),
+                AttributeAccess::Write,
+            );
+        }
+    }
+
+    /**
      * @throws OperationException
      */
     private function authorizeWriteAttributes(
         RequestInterface $request,
         TokenInterface $token,
     ): void {
+        if ($request instanceof ModifyDnRequest) {
+            $this->authorizeRdnAttributes(
+                $request,
+                $token,
+            );
+
+            return;
+        }
+
         if ($request instanceof AddRequest) {
             $dn = $request->getEntry()->getDn();
             foreach ($request->getEntry()->getAttributes() as $attribute) {

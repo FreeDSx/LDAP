@@ -770,6 +770,114 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         );
     }
 
+    public function test_a_rename_authorizes_a_write_of_the_new_rdn_attribute_at_the_resulting_dn(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $seen = [];
+        $this->accessControl
+            ->method('authorizeAttribute')
+            ->willReturnCallback(
+                function (TokenInterface $token, Dn $dn, string $attribute, AttributeAccess $access) use (&$seen): void {
+                    $seen[] = $dn->toString() . '/' . $attribute . '/' . $access->name;
+                },
+            );
+
+        $this->subject->process(
+            $this->contextFor(new ModifyDnRequest(
+                'cn=foo,dc=bar',
+                'uid=bar',
+                false,
+            )),
+            $this->next,
+        );
+
+        self::assertSame(
+            ['uid=bar,dc=bar/uid/Write'],
+            $seen,
+        );
+    }
+
+    public function test_a_rename_deleting_the_old_rdn_authorizes_a_write_of_both_attributes(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $seen = [];
+        $this->accessControl
+            ->method('authorizeAttribute')
+            ->willReturnCallback(
+                function (TokenInterface $token, Dn $dn, string $attribute) use (&$seen): void {
+                    $seen[] = $attribute;
+                },
+            );
+
+        $this->subject->process(
+            $this->contextFor(new ModifyDnRequest(
+                'cn=foo,dc=bar',
+                'uid=bar',
+                true,
+            )),
+            $this->next,
+        );
+
+        self::assertSame(
+            ['uid', 'cn'],
+            $seen,
+        );
+    }
+
+    public function test_a_rename_authorizes_every_component_of_a_multivalued_rdn(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $seen = [];
+        $this->accessControl
+            ->method('authorizeAttribute')
+            ->willReturnCallback(
+                function (TokenInterface $token, Dn $dn, string $attribute) use (&$seen): void {
+                    $seen[] = $attribute;
+                },
+            );
+
+        $this->subject->process(
+            $this->contextFor(new ModifyDnRequest(
+                'cn=foo,dc=bar',
+                'cn=bar+uid=baz',
+                false,
+            )),
+            $this->next,
+        );
+
+        self::assertSame(
+            ['cn', 'uid'],
+            $seen,
+        );
+    }
+
+    public function test_a_denied_rdn_attribute_write_blocks_the_rename(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $this->accessControl
+            ->method('authorizeAttribute')
+            ->willThrowException($this->denied());
+
+        try {
+            $this->subject->process(
+                $this->contextFor(new ModifyDnRequest(
+                    'cn=foo,dc=bar',
+                    'uid=bar',
+                    false,
+                )),
+                $this->next,
+            );
+            self::fail('Expected an OperationException.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNull($this->next->received);
+    }
+
     private function critical(Control $control): Control
     {
         return $control->setCriticality(true);
