@@ -56,6 +56,7 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
         $this->readEntryControlHandler = new ReadEntryControlHandler(
             $this->backend,
             $schema,
+            $this->accessControl,
         );
     }
 
@@ -127,7 +128,11 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
         SchemaViolations $schemaViolations,
     ): ResponseStream {
-        $preRead = $this->readEntryControlHandler->preReadFor($request, $controls);
+        $preRead = $this->readEntryControlHandler->preReadFor(
+            $request,
+            $controls,
+            $token,
+        );
 
         $this->dispatchWrite(
             $request,
@@ -136,7 +141,11 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
             $schemaViolations,
         );
 
-        $postRead = $this->readEntryControlHandler->postReadFor($request, $controls);
+        $postRead = $this->readEntryControlHandler->postReadFor(
+            $request,
+            $controls,
+            $token,
+        );
 
         return ResponseStream::of(
             [$this->responseFactory->getStandardResponse(

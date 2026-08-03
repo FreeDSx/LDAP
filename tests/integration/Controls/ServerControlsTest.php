@@ -171,6 +171,88 @@ final class ServerControlsTest extends ServerTestCase
         self::assertSame(['add-postread'], $postRead->getEntry()->get('cn')?->getValues());
     }
 
+    public function test_pre_read_withholds_an_attribute_the_identity_may_not_read(): void
+    {
+        $this->authenticateAdmin();
+
+        $response = $this->ldapClient()->send(
+            Operations::modify(
+                'cn=user,dc=foo,dc=bar',
+                Change::replace(
+                    'sn',
+                    'Read-Policy',
+                ),
+            ),
+            Controls::preRead(),
+        );
+
+        $preRead = $response?->controls()->get(Control::OID_PRE_READ);
+        self::assertInstanceOf(
+            PreReadResponseControl::class,
+            $preRead,
+        );
+        self::assertNull($preRead->getEntry()->get('userPassword'));
+        self::assertSame(
+            ['user'],
+            $preRead->getEntry()->get('cn')?->getValues(),
+        );
+    }
+
+    public function test_post_read_cannot_name_an_attribute_the_identity_may_not_read(): void
+    {
+        $this->authenticateAdmin();
+
+        $response = $this->ldapClient()->send(
+            Operations::modify(
+                'cn=user,dc=foo,dc=bar',
+                Change::replace(
+                    'sn',
+                    'Read-Policy-Named',
+                ),
+            ),
+            Controls::postRead('userPassword'),
+        );
+
+        $postRead = $response?->controls()->get(Control::OID_POST_READ);
+        self::assertInstanceOf(
+            PostReadResponseControl::class,
+            $postRead,
+        );
+        self::assertSame(
+            [],
+            $postRead->getEntry()->getAttributes(),
+        );
+    }
+
+    public function test_post_read_on_add_withholds_the_password_just_written(): void
+    {
+        $this->authenticateAdmin();
+        $entry = $this->person(
+            'cn=add-secret,ou=people,dc=foo,dc=bar',
+            'add-secret',
+        );
+        $entry->set(
+            'userPassword',
+            '{SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=',
+        );
+
+        $response = $this->ldapClient()->send(
+            Operations::add($entry),
+            Controls::postRead(),
+        );
+
+        $postRead = $response?->controls()->get(Control::OID_POST_READ);
+        self::assertInstanceOf(
+            PostReadResponseControl::class,
+            $postRead,
+        );
+        self::assertNull($postRead->getEntry()->get('userPassword'));
+        self::assertSame(
+            ['add-secret'],
+            $postRead->getEntry()->get('cn')?->getValues(),
+        );
+    }
+
     public function test_subtree_delete_removes_the_whole_subtree(): void
     {
         $this->authenticateAdmin();
