@@ -32,6 +32,13 @@ class LdapAclCommand extends Command
     public const SECRET_CODE = 'S3CR3T-alice';
 
     /**
+     * An identity that may modify its own entry but may not search it, so read policy and write policy diverge.
+     */
+    public const HIDDEN_DN = 'cn=hidden,ou=people,dc=foo,dc=bar';
+
+    public const HIDDEN_PASSWORD = 'hiddenpass';
+
+    /**
      * Defines secretCode as confidential; loaded so the harness exercises the same path an operator would.
      */
     private const SECRET_CODE_SCHEMA = __DIR__ . '/../resources/schema/acl-secret-code.ldif';
@@ -59,6 +66,7 @@ class LdapAclCommand extends Command
         $adminPasswordHash = '{SHA}' . base64_encode(sha1('12345', true));
         $userPasswordHash = '{SHA}' . base64_encode(sha1('12345', true));
         $alicePasswordHash = '{SHA}' . base64_encode(sha1('alicepass', true));
+        $hiddenPasswordHash = '{SHA}' . base64_encode(sha1(self::HIDDEN_PASSWORD, true));
 
         $entries = [
             new Entry(
@@ -99,6 +107,13 @@ class LdapAclCommand extends Command
                 new Attribute('userPassword', $alicePasswordHash),
                 new Attribute('secretCode', self::SECRET_CODE),
             ),
+            new Entry(
+                new Dn(self::HIDDEN_DN),
+                new Attribute('cn', 'hidden'),
+                new Attribute('sn', 'Hidden'),
+                new Attribute('objectClass', 'inetOrgPerson'),
+                new Attribute('userPassword', $hiddenPasswordHash),
+            ),
         ];
 
         $network = (new NetworkConfig())
@@ -119,6 +134,13 @@ class LdapAclCommand extends Command
                         ->withOperationRules(
                             OperationRule::allow(
                                 Subject::group('cn=admins,dc=foo,dc=bar'),
+                            ),
+                            // Ahead of the blanket search grant, so this entry stays writable by its own identity
+                            // while being unreadable to everyone but an administrator.
+                            OperationRule::deny(
+                                Subject::anyone(),
+                                Target::dn(self::HIDDEN_DN),
+                                OperationType::Search,
                             ),
                             OperationRule::allow(
                                 Subject::authenticated(),

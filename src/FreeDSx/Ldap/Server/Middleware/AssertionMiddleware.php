@@ -59,6 +59,7 @@ final readonly class AssertionMiddleware implements MiddlewareInterface
             $this->evaluator->assertSatisfied(
                 $target,
                 $message->controls(),
+                $context->tokenOrFail(),
             );
         }
 

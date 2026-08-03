@@ -30,6 +30,8 @@ use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
  */
 final class ServerControlsTest extends ServerTestCase
 {
+    private const SEEDED_PASSWORD_HASH = '{SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=';
+
     public static function setUpBeforeClass(): void
     {
         parent::setUpBeforeClass();
@@ -120,6 +122,99 @@ final class ServerControlsTest extends ServerTestCase
             Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'),
         );
         self::assertGreaterThan(0, $entries->count());
+    }
+
+    public function test_assertion_on_an_unreadable_attribute_cannot_match_its_value(): void
+    {
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('cn=user,dc=foo,dc=bar')
+                    ->useBaseScope(),
+                Controls::assertion(Filters::equal(
+                    'userPassword',
+                    self::SEEDED_PASSWORD_HASH,
+                )),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function test_assertion_substring_cannot_probe_an_unreadable_attribute(): void
+    {
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('cn=user,dc=foo,dc=bar')
+                    ->useBaseScope(),
+                Controls::assertion(Filters::startsWith(
+                    'userPassword',
+                    '{SHA}',
+                )),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function test_assertion_on_a_readable_attribute_still_matches(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'))
+                ->base('cn=user,dc=foo,dc=bar')
+                ->useBaseScope(),
+            Controls::assertion(Filters::equal(
+                'cn',
+                'user',
+            )),
+        );
+
+        self::assertCount(
+            1,
+            $entries,
+        );
+    }
+
+    public function test_assertion_on_an_unreadable_attribute_blocks_a_write_it_would_otherwise_gate(): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->send(
+                Operations::modify(
+                    'cn=user,dc=foo,dc=bar',
+                    Change::replace(
+                        'sn',
+                        'Asserted',
+                    ),
+                ),
+                Controls::assertion(Filters::equal(
+                    'userPassword',
+                    self::SEEDED_PASSWORD_HASH,
+                )),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
     }
 
     public function test_pre_read_and_post_read_capture_state_around_a_modify(): void

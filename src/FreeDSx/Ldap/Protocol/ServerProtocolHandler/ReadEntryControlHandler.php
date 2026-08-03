@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\OperationTargetDn;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
@@ -32,6 +33,11 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  *
  * The entry goes back to the client, so read policy applies to it as it would to a search result: a write privilege
  * over an entry must not disclose what the identity may not read.
+ *
+ * A critical control the identity cannot satisfy fails the operation before this runs; a non-critical one degrades
+ * to no control rather than failing an otherwise valid write.
+ *
+ * @see \FreeDSx\Ldap\Server\Middleware\OperationAuthorizationMiddleware::authorizeControlledReads()
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -125,12 +131,14 @@ final readonly class ReadEntryControlHandler
             return null;
         }
 
-        // Stripped before selection, so naming an unreadable attribute cannot pull it into the response. Entry-level
-        // visibility is settled by the write authorization that precedes this, so only attribute rules apply.
-        $readable = $this->accessControl->stripUnreadableAttributes(
+        $readable = $this->accessControl->filterEntry(
             $token,
             $entry,
         );
+
+        if ($readable === null) {
+            return null;
+        }
 
         $projection = AttributeProjection::forRequest(
             array_map(
@@ -160,22 +168,8 @@ final readonly class ReadEntryControlHandler
         return match (true) {
             $request instanceof Request\AddRequest => $request->getEntry()->getDn(),
             $request instanceof Request\ModifyRequest => $request->getDn(),
-            $request instanceof Request\ModifyDnRequest => $this->newDnFor($request),
+            $request instanceof Request\ModifyDnRequest => OperationTargetDn::resultOf($request),
             default => null,
         };
-    }
-
-    /**
-     * Resulting DN of a ModifyDN, mirroring the backend move semantics (new RDN under the new or existing parent).
-     */
-    private function newDnFor(Request\ModifyDnRequest $request): Dn
-    {
-        $parent = $request->getNewParentDn() ?? $request->getDn()->getParent();
-
-        if ($parent === null) {
-            return new Dn($request->getNewRdn()->toString());
-        }
-
-        return new Dn($request->getNewRdn()->toString() . ',' . $parent->toString());
     }
 }

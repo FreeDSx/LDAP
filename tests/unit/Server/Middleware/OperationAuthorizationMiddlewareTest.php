@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Middleware;
 
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -500,6 +501,161 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         yield 'unbind' => [HandlerId::Unbind];
     }
 
+    public function test_a_critical_pre_read_control_authorizes_a_read_of_the_target(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $this->accessControl
+            ->expects(self::atLeastOnce())
+            ->method('authorizeOperation')
+            ->willReturnCallback(function (OperationType $operation, TokenInterface $token, Dn $dn): void {
+                if ($operation === OperationType::Search) {
+                    self::assertSame(
+                        'cn=foo,dc=bar',
+                        $dn->toString(),
+                    );
+                }
+            });
+
+        $this->subject->process(
+            $this->contextFor(
+                new DeleteRequest('cn=foo,dc=bar'),
+                $this->critical(Controls::preRead()),
+            ),
+            $this->next,
+        );
+
+        self::assertNotNull($this->next->received);
+    }
+
+    public function test_a_critical_post_read_on_a_rename_authorizes_a_read_of_the_resulting_dn(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $seen = [];
+        $this->accessControl
+            ->method('authorizeOperation')
+            ->willReturnCallback(function (OperationType $operation, TokenInterface $token, Dn $dn) use (&$seen): void {
+                if ($operation === OperationType::Search) {
+                    $seen[] = $dn->toString();
+                }
+            });
+
+        $this->subject->process(
+            $this->contextFor(
+                new ModifyDnRequest(
+                    'cn=foo,dc=bar',
+                    'cn=bar',
+                    true,
+                ),
+                $this->critical(Controls::postRead()),
+            ),
+            $this->next,
+        );
+
+        self::assertSame(
+            ['cn=bar,dc=bar'],
+            $seen,
+        );
+    }
+
+    public function test_a_read_denial_blocks_a_write_carrying_a_critical_pre_read_control(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $this->accessControl
+            ->method('authorizeOperation')
+            ->willReturnCallback(function (OperationType $operation): void {
+                if ($operation === OperationType::Search) {
+                    throw $this->denied();
+                }
+            });
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->subject->process(
+            $this->contextFor(
+                new DeleteRequest('cn=foo,dc=bar'),
+                $this->critical(Controls::preRead()),
+            ),
+            $this->next,
+        );
+    }
+
+    public function test_a_non_critical_pre_read_control_authorizes_no_read(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $this->accessControl
+            ->method('authorizeOperation')
+            ->willReturnCallback(static function (OperationType $operation): void {
+                self::assertNotSame(
+                    OperationType::Search,
+                    $operation,
+                );
+            });
+
+        $this->subject->process(
+            $this->contextFor(
+                new DeleteRequest('cn=foo,dc=bar'),
+                Controls::preRead(),
+            ),
+            $this->next,
+        );
+
+        self::assertNotNull($this->next->received);
+    }
+
+    public function test_a_non_critical_assertion_still_authorizes_a_read_of_the_target(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $seen = [];
+        $this->accessControl
+            ->method('authorizeOperation')
+            ->willReturnCallback(function (OperationType $operation, TokenInterface $token, Dn $dn) use (&$seen): void {
+                if ($operation === OperationType::Search) {
+                    $seen[] = $dn->toString();
+                }
+            });
+        $assertion = Controls::assertion(Filters::equal('cn', 'foo'));
+        $assertion->setCriticality(false);
+
+        $this->subject->process(
+            $this->contextFor(
+                new DeleteRequest('cn=foo,dc=bar'),
+                $assertion,
+            ),
+            $this->next,
+        );
+
+        self::assertSame(
+            ['cn=foo,dc=bar'],
+            $seen,
+        );
+    }
+
+    public function test_a_request_without_a_read_bearing_control_authorizes_no_read(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $this->accessControl
+            ->method('authorizeOperation')
+            ->willReturnCallback(static function (OperationType $operation): void {
+                self::assertNotSame(
+                    OperationType::Search,
+                    $operation,
+                );
+            });
+
+        $this->subject->process(
+            $this->contextFor(new DeleteRequest('cn=foo,dc=bar')),
+            $this->next,
+        );
+
+        self::assertNotNull($this->next->received);
+    }
+
+    private function critical(Control $control): Control
+    {
+        return $control->setCriticality(true);
+    }
+
     private function routeResolvesTo(HandlerId $id): void
     {
         $this->resolver
@@ -507,10 +663,16 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
             ->willReturn($id);
     }
 
-    private function contextFor(RequestInterface $request): ServerRequestContext
-    {
+    private function contextFor(
+        RequestInterface $request,
+        Control ...$controls,
+    ): ServerRequestContext {
         return new ServerRequestContext(
-            new LdapMessageRequest(1, $request),
+            new LdapMessageRequest(
+                1,
+                $request,
+                ...$controls,
+            ),
             $this->token,
         );
     }

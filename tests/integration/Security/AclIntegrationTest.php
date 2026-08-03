@@ -13,6 +13,10 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Security;
 
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ReadEntry\PreReadResponseControl;
+use FreeDSx\Ldap\Controls;
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -488,6 +492,167 @@ final class AclIntegrationTest extends ServerTestCase
         $alice = $results->first();
         self::assertNotNull($alice);
         self::assertNull($alice->get('secretCode'));
+    }
+
+    public function testAnAssertionCannotProbeAnEntryTheIdentityCannotSearch(): void
+    {
+        $this->bindHidden();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->ldapClient()->send(
+            Operations::modify(
+                LdapAclCommand::HIDDEN_DN,
+                Change::replace(
+                    'description',
+                    'asserted',
+                ),
+            ),
+            Controls::assertion(Filters::equal(
+                'sn',
+                'Hidden',
+            )),
+        );
+    }
+
+    public function testTheSameModifySucceedsWithoutTheAssertion(): void
+    {
+        $this->bindHidden();
+
+        $this->ldapClient()->send(Operations::modify(
+            LdapAclCommand::HIDDEN_DN,
+            Change::replace(
+                'description',
+                'unasserted',
+            ),
+        ));
+
+        $this->authenticateAdmin();
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'hidden'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            'unasserted',
+            $results->first()?->get('description')?->firstValue(),
+        );
+    }
+
+    public function testAnAdministratorCanStillAssertOnTheSameEntry(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->send(
+            Operations::modify(
+                LdapAclCommand::HIDDEN_DN,
+                Change::replace(
+                    'description',
+                    'admin-asserted',
+                ),
+            ),
+            Controls::assertion(Filters::equal(
+                'sn',
+                'Hidden',
+            )),
+        );
+
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'hidden'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            'admin-asserted',
+            $results->first()?->get('description')?->firstValue(),
+        );
+    }
+
+    public function testANonCriticalPreReadOnAnUnreadableTargetIsOmittedAndTheWriteStands(): void
+    {
+        $this->bindHidden();
+
+        $response = $this->ldapClient()->send(
+            Operations::modify(
+                LdapAclCommand::HIDDEN_DN,
+                Change::replace(
+                    'description',
+                    'preread-probe',
+                ),
+            ),
+            Controls::preRead(),
+        );
+
+        self::assertNull($response?->controls()->get(Control::OID_PRE_READ));
+
+        $this->authenticateAdmin();
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'hidden'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+        self::assertSame(
+            'preread-probe',
+            $results->first()?->get('description')?->firstValue(),
+        );
+    }
+
+    public function testACriticalPreReadOnAnUnreadableTargetFailsTheOperation(): void
+    {
+        $this->bindHidden();
+        $preRead = Controls::preRead();
+        $preRead->setCriticality(true);
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->ldapClient()->send(
+            Operations::modify(
+                LdapAclCommand::HIDDEN_DN,
+                Change::replace(
+                    'description',
+                    'preread-critical',
+                ),
+            ),
+            $preRead,
+        );
+    }
+
+    public function testPreReadIsPermittedForAnIdentityThatCanSearchTheTarget(): void
+    {
+        $this->authenticateAdmin();
+
+        $response = $this->ldapClient()->send(
+            Operations::modify(
+                LdapAclCommand::HIDDEN_DN,
+                Change::replace(
+                    'description',
+                    'admin-preread',
+                ),
+            ),
+            Controls::preRead('cn'),
+        );
+
+        $preRead = $response?->controls()->get(Control::OID_PRE_READ);
+        self::assertInstanceOf(
+            PreReadResponseControl::class,
+            $preRead,
+        );
+        self::assertSame(
+            ['hidden'],
+            $preRead->getEntry()->get('cn')?->getValues(),
+        );
+    }
+
+    private function bindHidden(): void
+    {
+        $this->ldapClient()->bind(
+            LdapAclCommand::HIDDEN_DN,
+            LdapAclCommand::HIDDEN_PASSWORD,
+        );
     }
 
     private static function alicePasswordHash(): string
