@@ -23,10 +23,15 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
  * Builds RFC 4527 Pre-Read / Post-Read response controls from the entry state around a write.
+ *
+ * The entry goes back to the client, so read policy applies to it as it would to a search result: a write privilege
+ * over an entry must not disclose what the identity may not read.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -35,6 +40,7 @@ final readonly class ReadEntryControlHandler
     public function __construct(
         private LdapBackendInterface $backend,
         private Schema $schema,
+        private AccessControlInterface $accessControl,
     ) {}
 
     /**
@@ -43,11 +49,12 @@ final readonly class ReadEntryControlHandler
     public function preReadFor(
         Request\RequestInterface $request,
         ControlBag $controls,
+        TokenInterface $token,
     ): ?PreReadResponseControl {
         $dn = $this->preReadDn($request);
 
         return $dn !== null
-            ? $this->preRead($dn, $controls)
+            ? $this->preRead($dn, $controls, $token)
             : null;
     }
 
@@ -57,22 +64,25 @@ final readonly class ReadEntryControlHandler
     public function postReadFor(
         Request\RequestInterface $request,
         ControlBag $controls,
+        TokenInterface $token,
     ): ?PostReadResponseControl {
         $dn = $this->postReadDn($request);
 
         return $dn !== null
-            ? $this->postRead($dn, $controls)
+            ? $this->postRead($dn, $controls, $token)
             : null;
     }
 
     public function preRead(
         Dn $dn,
         ControlBag $controls,
+        TokenInterface $token,
     ): ?PreReadResponseControl {
         $entry = $this->readEntry(
             Control::OID_PRE_READ,
             $dn,
             $controls,
+            $token,
         );
 
         return $entry !== null
@@ -83,11 +93,13 @@ final readonly class ReadEntryControlHandler
     public function postRead(
         Dn $dn,
         ControlBag $controls,
+        TokenInterface $token,
     ): ?PostReadResponseControl {
         $entry = $this->readEntry(
             Control::OID_POST_READ,
             $dn,
             $controls,
+            $token,
         );
 
         return $entry !== null
@@ -99,6 +111,7 @@ final readonly class ReadEntryControlHandler
         string $oid,
         Dn $dn,
         ControlBag $controls,
+        TokenInterface $token,
     ): ?Entry {
         $control = $controls->get($oid);
 
@@ -112,6 +125,13 @@ final readonly class ReadEntryControlHandler
             return null;
         }
 
+        // Stripped before selection, so naming an unreadable attribute cannot pull it into the response. Entry-level
+        // visibility is settled by the write authorization that precedes this, so only attribute rules apply.
+        $readable = $this->accessControl->stripUnreadableAttributes(
+            $token,
+            $entry,
+        );
+
         $projection = AttributeProjection::forRequest(
             array_map(
                 static fn(string $name): Attribute => new Attribute($name),
@@ -122,7 +142,7 @@ final readonly class ReadEntryControlHandler
         );
 
         // Make a copy so live references don't leak.
-        return $projection->project($entry)->makeCopy();
+        return $projection->project($readable)->makeCopy();
     }
 
     private function preReadDn(Request\RequestInterface $request): ?Dn
