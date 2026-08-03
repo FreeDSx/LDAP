@@ -67,6 +67,7 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
         MiddlewareHandlerInterface $next,
     ): ResponseStream {
         $this->authorizePrivilegedExtendedOperation($context);
+        $this->authorizeControlledReads($context);
 
         $routeId = $this->routeResolver->routeIdFor(
             $context->message->getRequest(),
@@ -128,6 +129,74 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
             $context->tokenOrFail(),
             $request->getName(),
         );
+    }
+
+    /**
+     * Fails a request whose control cannot be honored without a read the identity is not allowed to perform.
+     *
+     * Only controls the client marked critical are enforced here, per RFC 4511 section 4.1.11. A non-critical
+     * read-entry control is left to be dropped from the response instead of failing an otherwise valid operation.
+     *
+     * An assertion is always enforced, critical or not, since ignoring a precondition would let a write land that
+     * the client conditioned on state it cannot verify.
+     *
+     * @see \FreeDSx\Ldap\Protocol\ServerProtocolHandler\ReadEntryControlHandler
+     *
+     * @throws OperationException
+     */
+    private function authorizeControlledReads(ServerRequestContext $context): void
+    {
+        $request = $context->message->getRequest();
+        $controls = $context->message->controls();
+
+        foreach ($this->enforcedReadTargetsFor($request, $controls) as $dn) {
+            $this->accessControl->authorizeOperation(
+                OperationType::Search,
+                $context->tokenOrFail(),
+                $dn,
+            );
+        }
+    }
+
+    /**
+     * The DNs a request's read-bearing controls will read, limited to the controls that must fail rather than degrade.
+     *
+     * @return list<Dn>
+     */
+    private function enforcedReadTargetsFor(
+        RequestInterface $request,
+        ControlBag $controls,
+    ): array {
+        $targets = [];
+
+        if ($controls->has(Control::OID_ASSERTION)) {
+            $targets[] = $request instanceof SearchRequest
+                ? $request->getBaseDn()
+                : OperationTargetDn::of($request);
+        }
+
+        // Pre-read has nothing to snapshot on an Add, since the entry does not exist yet.
+        if ($this->hasCritical($controls, Control::OID_PRE_READ) && !$request instanceof AddRequest) {
+            $targets[] = OperationTargetDn::of($request);
+        }
+
+        if ($this->hasCritical($controls, Control::OID_POST_READ)) {
+            $targets[] = $request instanceof ModifyDnRequest
+                ? OperationTargetDn::resultOf($request)
+                : OperationTargetDn::of($request);
+        }
+
+        return array_values(array_filter($targets));
+    }
+
+    /**
+     * Whether the control is present and the client marked it critical.
+     */
+    private function hasCritical(
+        ControlBag $controls,
+        string $oid,
+    ): bool {
+        return $controls->get($oid)?->getCriticality() === true;
     }
 
     /**

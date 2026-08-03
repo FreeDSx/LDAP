@@ -14,7 +14,9 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ReadEntryControlHandler;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
+use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
@@ -42,7 +44,7 @@ final class ReadEntryControlHandlerTest extends TestCase
         $this->subject = new ReadEntryControlHandler(
             $this->backend,
             new Schema(),
-            new RuleBasedAccessControl(AclRules::fromEmpty()),
+            new RuleBasedAccessControl(AclRules::fromEmpty(operations: self::searchAllowed())),
         );
     }
 
@@ -187,18 +189,54 @@ final class ReadEntryControlHandlerTest extends TestCase
         );
     }
 
+    public function test_no_control_is_returned_when_the_token_may_not_read_the_target(): void
+    {
+        $this->backend
+            ->method('get')
+            ->willReturn(Entry::fromArray('cn=foo,dc=ex,dc=com', ['cn' => ['foo']]));
+
+        $subject = new ReadEntryControlHandler(
+            $this->backend,
+            new Schema(),
+            new RuleBasedAccessControl(AclRules::fromEmpty()),
+        );
+
+        self::assertNull($subject->preRead(
+            $this->dn,
+            new ControlBag(new PreReadControl()),
+            $this->token,
+        ));
+    }
+
+    /**
+     * @return list<OperationRule>
+     */
+    private static function searchAllowed(): array
+    {
+        return [
+            OperationRule::allow(
+                Subject::anyone(),
+                Target::any(),
+                OperationType::Search,
+            ),
+        ];
+    }
+
     private function denyingUserPassword(): ReadEntryControlHandler
     {
         return new ReadEntryControlHandler(
             $this->backend,
             new Schema(),
-            new RuleBasedAccessControl(AclRules::fromEmpty(attributes: [
-                AttributeRule::deny(
-                    Subject::anyone(),
-                    Target::any(),
-                    'userPassword',
-                )->forRead(),
-            ])),
+            new RuleBasedAccessControl(AclRules::fromEmpty(
+                operations: self::searchAllowed(),
+                attributes: [
+                    AttributeRule::deny(
+                        Subject::anyone(),
+                        Target::any(),
+                        'userPassword',
+                    )->forRead(),
+                ],
+            )),
         );
     }
 }

@@ -29,12 +29,10 @@ final class MoveOperation
         Entry $entry,
         MoveCommand $command,
     ): Entry {
-        $parent = $command->newParent ?? $command->dn->getParent();
-        $newDnString = $parent !== null
-            ? $command->newRdn->toString() . ',' . $parent->toString()
-            : $command->newRdn->toString();
-
-        $newDn = new Dn($newDnString);
+        $newDn = Dn::fromRdn(
+            $command->newRdn,
+            $command->newParent ?? $command->dn->getParent(),
+        );
         $newEntry = new Entry($newDn, ...$entry->getAttributes());
 
         if ($command->deleteOldRdn) {

@@ -39,4 +39,15 @@ final class OperationTargetDn
             default => null,
         };
     }
+
+    /**
+     * Where a rename leaves the entry, derived the same way the backend derives it.
+     */
+    public static function resultOf(ModifyDnRequest $request): Dn
+    {
+        return Dn::fromRdn(
+            $request->getNewRdn(),
+            $request->getNewParentDn() ?? $request->getDn()->getParent(),
+        );
+    }
 }

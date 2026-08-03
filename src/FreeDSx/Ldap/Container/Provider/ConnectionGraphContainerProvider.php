@@ -102,6 +102,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
         return new AssertionEvaluator(
             $container->get(FilterEvaluatorInterface::class),
             $container->get(WritableStorageBackend::class),
+            $container->get(AccessControlInterface::class),
         );
     }
 

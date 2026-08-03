@@ -25,6 +25,8 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Server\AccessControl\AclRules;
+use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
@@ -56,6 +58,7 @@ final class AssertionMiddlewareTest extends TestCase
         $this->subject = new AssertionMiddleware(new AssertionEvaluator(
             new FilterEvaluator(),
             $this->backend,
+            new RuleBasedAccessControl(AclRules::fromEmpty()),
         ));
         $this->next = new RecordingMiddlewareHandler(new CallLog());
     }

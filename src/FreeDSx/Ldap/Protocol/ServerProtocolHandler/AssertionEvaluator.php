@@ -19,11 +19,21 @@ use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
  * Evaluates an RFC 4528 assertion control against the operation's target entry.
+ *
+ * The outcome is observable, so an assertion on an attribute the identity may not read would otherwise answer a
+ * question it may not ask. Matching against the readable entry makes a withheld attribute assert as absent, exactly
+ * as it does on the search path.
+ *
+ * Whether the target may be read at all is authorized before this runs.
+ *
+ * @see \FreeDSx\Ldap\Server\Middleware\OperationAuthorizationMiddleware::authorizeControlledReads()
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -32,6 +42,7 @@ final readonly class AssertionEvaluator
     public function __construct(
         private FilterEvaluatorInterface $filterEvaluator,
         private LdapBackendInterface $backend,
+        private AccessControlInterface $accessControl,
     ) {}
 
     /**
@@ -42,6 +53,7 @@ final readonly class AssertionEvaluator
     public function assertSatisfied(
         Dn $targetDn,
         ControlBag $controls,
+        TokenInterface $token,
     ): void {
         $control = $controls->get(Control::OID_ASSERTION);
 
@@ -55,7 +67,12 @@ final readonly class AssertionEvaluator
             return;
         }
 
-        if ($this->filterEvaluator->evaluate($entry, $control->getFilter())) {
+        $readable = $this->accessControl->stripUnreadableAttributes(
+            $token,
+            $entry,
+        );
+
+        if ($this->filterEvaluator->evaluate($readable, $control->getFilter())) {
             return;
         }
 

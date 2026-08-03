@@ -65,6 +65,18 @@ class Dn implements IteratorAggregate, Countable, Stringable
     }
 
     /**
+     * Where an RDN sits under $parent, or at the root when there is none.
+     */
+    public static function fromRdn(
+        Rdn $rdn,
+        ?Dn $parent = null,
+    ): self {
+        return $parent === null
+            ? new self($rdn->toString())
+            : new self($rdn->toString() . ',' . $parent->toString());
+    }
+
+    /**
      * @throws UnexpectedValueException
      */
     public function getRdn(): Rdn
