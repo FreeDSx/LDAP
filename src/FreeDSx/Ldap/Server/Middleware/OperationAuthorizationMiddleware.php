@@ -67,6 +67,7 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
         MiddlewareHandlerInterface $next,
     ): ResponseStream {
         $this->authorizePrivilegedExtendedOperation($context);
+        $this->authorizePrivilegedControls($context);
         $this->authorizeControlledReads($context);
 
         $routeId = $this->routeResolver->routeIdFor(
@@ -80,10 +81,8 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
                 $context->tokenOrFail(),
             );
         } elseif ($routeId === HandlerId::Sync) {
-            $this->authorizeSync(
-                $context->message,
-                $context->tokenOrFail(),
-            );
+            // No operation gate of its own. The privileged sync-request control is authorized above, and the handler
+            // settles what the identity may see per entry via isEntryVisible().
         } elseif ($routeId === HandlerId::Monitor) {
             $this->accessControl->authorizeOperation(
                 OperationType::Search,
@@ -132,6 +131,39 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
     }
 
     /**
+     * Authorize every privileged control on the request ahead of routing so that no route can omit the gate.
+     *
+     * @throws OperationException
+     */
+    private function authorizePrivilegedControls(ServerRequestContext $context): void
+    {
+        $controls = $context->message->controls();
+        $dn = $this->targetDnFor($context->message->getRequest()) ?? new Dn('');
+
+        foreach ($this->privilegedControls as $oid) {
+            if (!$controls->has($oid)) {
+                continue;
+            }
+
+            $this->accessControl->authorizeControl(
+                $context->tokenOrFail(),
+                $dn,
+                $oid,
+            );
+        }
+    }
+
+    /**
+     * The entry a request acts on: a search names it as its base, anything else as its target DN.
+     */
+    private function targetDnFor(RequestInterface $request): ?Dn
+    {
+        return $request instanceof SearchRequest
+            ? $request->getBaseDn()
+            : OperationTargetDn::of($request);
+    }
+
+    /**
      * Fails a request whose control cannot be honored without a read the identity is not allowed to perform.
      *
      * Only controls the client marked critical are enforced here, per RFC 4511 section 4.1.11. A non-critical
@@ -170,9 +202,7 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
         $targets = [];
 
         if ($controls->has(Control::OID_ASSERTION)) {
-            $targets[] = $request instanceof SearchRequest
-                ? $request->getBaseDn()
-                : OperationTargetDn::of($request);
+            $targets[] = $this->targetDnFor($request);
         }
 
         // Pre-read has nothing to snapshot on an Add, since the entry does not exist yet.
@@ -226,28 +256,6 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
     }
 
     /**
-     * Gates a content-synchronization search on the privileged sync-request control, targeted at its base DN.
-     *
-     * @throws OperationException
-     */
-    private function authorizeSync(
-        LdapMessageRequest $message,
-        TokenInterface $token,
-    ): void {
-        $request = $message->getRequest();
-
-        if (!$request instanceof SearchRequest) {
-            return;
-        }
-
-        $this->authorizeControls(
-            $request->getBaseDn(),
-            $message->controls(),
-            $token,
-        );
-    }
-
-    /**
      * @throws OperationException
      */
     private function authorizeDispatch(
@@ -273,15 +281,7 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
                 $this->attributeFromString($request->getFilter()->getAttribute())->getName(),
                 AttributeAccess::Read,
             );
-
-            return;
         }
-
-        $this->authorizeControls(
-            OperationTargetDn::of($request),
-            $message->controls(),
-            $token,
-        );
     }
 
     /**
@@ -385,32 +385,5 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
     private function attributeFromString(string $attribute): Attribute
     {
         return new Attribute($attribute);
-    }
-
-    /**
-     * Authorizes any privileged control attached to the request before it is dispatched.
-     *
-     * @throws OperationException
-     */
-    private function authorizeControls(
-        ?Dn $dn,
-        ControlBag $controls,
-        TokenInterface $token,
-    ): void {
-        if ($dn === null) {
-            return;
-        }
-
-        foreach ($this->privilegedControls as $oid) {
-            if (!$controls->has($oid)) {
-                continue;
-            }
-
-            $this->accessControl->authorizeControl(
-                $token,
-                $dn,
-                $oid,
-            );
-        }
     }
 }

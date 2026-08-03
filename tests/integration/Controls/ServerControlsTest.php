@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Controls;
 
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Operation\Response\CompareResponse;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
 use FreeDSx\Ldap\Control\ReadEntry\PreReadResponseControl;
 use FreeDSx\Ldap\Controls;
@@ -348,6 +349,93 @@ final class ServerControlsTest extends ServerTestCase
         );
     }
 
+    public function test_a_privileged_control_on_a_compare_is_denied_to_a_non_administrator(): void
+    {
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->send(
+                Operations::compare(
+                    'cn=user,dc=foo,dc=bar',
+                    'cn',
+                    'user',
+                ),
+                Controls::relaxRules(),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function test_a_privileged_control_on_an_extended_operation_is_denied_to_a_non_administrator(): void
+    {
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->send(
+                Operations::passwordModify(
+                    'cn=user,dc=foo,dc=bar',
+                    '12345',
+                    'newpass123',
+                ),
+                $this->nonCritical(Controls::relaxRules()),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function test_a_privileged_control_on_a_search_is_denied_to_a_non_administrator(): void
+    {
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+                $this->nonCritical(Controls::relaxRules()),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function test_an_administrator_may_use_a_privileged_control_on_a_compare(): void
+    {
+        $this->authenticateAdmin();
+
+        $response = $this->ldapClient()->send(
+            Operations::compare(
+                'cn=user,dc=foo,dc=bar',
+                'cn',
+                'user',
+            ),
+            Controls::relaxRules(),
+        );
+
+        self::assertInstanceOf(
+            CompareResponse::class,
+            $response?->getResponse(),
+        );
+        self::assertSame(
+            ResultCode::COMPARE_TRUE,
+            $response->getResponse()->getResultCode(),
+        );
+    }
+
     public function test_subtree_delete_removes_the_whole_subtree(): void
     {
         $this->authenticateAdmin();
@@ -390,6 +478,11 @@ final class ServerControlsTest extends ServerTestCase
         $this->expectExceptionCode(ResultCode::NOT_ALLOWED_ON_NON_LEAF);
 
         $this->ldapClient()->send(Operations::delete('ou=non-leaf,dc=foo,dc=bar'));
+    }
+
+    private function nonCritical(Control $control): Control
+    {
+        return $control->setCriticality(false);
     }
 
     private function bind(): void

@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
+use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -649,6 +650,124 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         );
 
         self::assertNotNull($this->next->received);
+    }
+
+    /**
+     * @return array<string, array{HandlerId, RequestInterface}>
+     */
+    public static function routesCarryingAPrivilegedControl(): array
+    {
+        return [
+            'compare' => [HandlerId::Dispatch, new CompareRequest('cn=foo,dc=bar', Filters::equal('cn', 'foo'))],
+            'extended' => [HandlerId::UnsupportedExtended, new ExtendedRequest('1.2.3.4')],
+            'search' => [HandlerId::Search, (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar')],
+            'paging' => [HandlerId::Paging, (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar')],
+            'sync' => [HandlerId::Sync, (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar')],
+        ];
+    }
+
+    #[DataProvider('routesCarryingAPrivilegedControl')]
+    public function test_a_privileged_control_is_gated_on_every_route(
+        HandlerId $routeId,
+        RequestInterface $request,
+    ): void {
+        $this->routeResolvesTo($routeId);
+        $this->accessControl
+            ->expects(self::once())
+            ->method('authorizeControl')
+            ->with(
+                $this->token,
+                self::isInstanceOf(Dn::class),
+                Control::OID_RELAX_RULES,
+            );
+
+        $this->subject->process(
+            $this->contextFor(
+                $request,
+                Controls::relaxRules(),
+            ),
+            $this->next,
+        );
+    }
+
+    #[DataProvider('routesCarryingAPrivilegedControl')]
+    public function test_a_privileged_control_denial_blocks_every_route(
+        HandlerId $routeId,
+        RequestInterface $request,
+    ): void {
+        $this->routeResolvesTo($routeId);
+        $this->accessControl
+            ->method('authorizeControl')
+            ->willThrowException($this->denied());
+
+        try {
+            $this->subject->process(
+                $this->contextFor(
+                    $request,
+                    Controls::relaxRules(),
+                ),
+                $this->next,
+            );
+            self::fail('Expected an OperationException.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNull(
+            $this->next->received,
+            'Dispatch must be blocked on denial.',
+        );
+    }
+
+    public function test_a_request_naming_no_entry_gates_the_control_against_the_root(): void
+    {
+        $this->routeResolvesTo(HandlerId::UnsupportedExtended);
+        $this->accessControl
+            ->expects(self::once())
+            ->method('authorizeControl')
+            ->with(
+                $this->token,
+                self::callback(static fn(Dn $dn): bool => $dn->toString() === ''),
+                Control::OID_RELAX_RULES,
+            );
+
+        $this->subject->process(
+            $this->contextFor(
+                new ExtendedRequest('1.2.3.4'),
+                Controls::relaxRules(),
+            ),
+            $this->next,
+        );
+    }
+
+    public function test_the_sync_control_is_gated_against_the_search_base(): void
+    {
+        $subject = new OperationAuthorizationMiddleware(
+            $this->resolver,
+            $this->accessControl,
+            new Dn(self::SUBSCHEMA_DN),
+            [Control::OID_SYNC_REQUEST],
+        );
+        $this->routeResolvesTo(HandlerId::Sync);
+        $this->accessControl
+            ->expects(self::once())
+            ->method('authorizeControl')
+            ->with(
+                $this->token,
+                self::callback(static fn(Dn $dn): bool => $dn->toString() === 'dc=foo,dc=bar'),
+                Control::OID_SYNC_REQUEST,
+            );
+
+        $subject->process(
+            $this->contextFor(
+                (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar'),
+                new Control(Control::OID_SYNC_REQUEST),
+            ),
+            $this->next,
+        );
     }
 
     private function critical(Control $control): Control
