@@ -19,7 +19,6 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Schema\Schema;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -30,11 +29,9 @@ use FreeDSx\Ldap\ServerOptions;
  */
 class ServerSubschemaHandler implements ServerProtocolHandlerInterface
 {
-    use ServerSynthesizedEntryTrait;
-
     public function __construct(
         private readonly ServerOptions $options,
-        private readonly FilterEvaluatorInterface $filterEvaluator,
+        private readonly GeneratedEntryResponder $responder,
     ) {}
 
     public function handleRequest(
@@ -73,15 +70,14 @@ class ServerSubschemaHandler implements ServerProtocolHandlerInterface
             ]),
         );
 
-        $matches = $this->matchesRequestFilter(
-            $message,
+        $entry = $this->responder->readable(
             $entry,
-            $this->filterEvaluator,
+            $token,
         );
 
-        return $this->replyWithEntry(
+        return $this->responder->reply(
             $message,
-            $matches ? $entry : null,
+            $this->responder->matches($message, $entry) ? $entry : null,
         );
     }
 

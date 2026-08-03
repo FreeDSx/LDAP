@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPasswordModifyHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPasswordPolicyForwardHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerProtocolHandlerInterface;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\GeneratedEntryResponder;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerRootDseHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSearchHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerStartTlsHandler;
@@ -91,16 +92,16 @@ final class HandlerContainerProvider implements ContainerProviderInterface
                 => new ServerUnsupportedExtendedHandler(),
             HandlerId::RootDse->value => fn(): ServerProtocolHandlerInterface
                 => $this->makeRootDseHandler($container),
-            HandlerId::Subschema->value => static fn(): ServerProtocolHandlerInterface
+            HandlerId::Subschema->value => fn(): ServerProtocolHandlerInterface
                 => new ServerSubschemaHandler(
                     options: $container->get(ServerOptions::class),
-                    filterEvaluator: $container->get(FilterEvaluatorInterface::class),
+                    responder: $this->makeGeneratedEntryResponder($container),
                 ),
-            HandlerId::Monitor->value => static fn(): ServerProtocolHandlerInterface
+            HandlerId::Monitor->value => fn(): ServerProtocolHandlerInterface
                 => new ServerMonitorHandler(
                     options: $container->get(ServerOptions::class),
                     snapshots: $container->get(MetricsSnapshotProvider::class),
-                    filterEvaluator: $container->get(FilterEvaluatorInterface::class),
+                    responder: $this->makeGeneratedEntryResponder($container),
                 ),
             HandlerId::Paging->value => fn(HandlerContext $context, ?SearchLimits $limits): ServerProtocolHandlerInterface
                 => $this->makePagingHandler($container, $context, $limits),
@@ -150,8 +151,16 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         return new ServerRootDseHandler(
             options: $container->get(ServerOptions::class),
             backend: $container->get(WritableStorageBackend::class),
-            filterEvaluator: $container->get(FilterEvaluatorInterface::class),
+            responder: $this->makeGeneratedEntryResponder($container),
             supportsSync: $this->syncJournalFor($container) !== null,
+        );
+    }
+
+    private function makeGeneratedEntryResponder(Container $container): GeneratedEntryResponder
+    {
+        return new GeneratedEntryResponder(
+            $container->get(AccessControlInterface::class),
+            $container->get(FilterEvaluatorInterface::class),
         );
     }
 

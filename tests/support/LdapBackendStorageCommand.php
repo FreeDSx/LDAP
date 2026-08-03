@@ -11,6 +11,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
@@ -126,6 +127,24 @@ final class LdapBackendStorageCommand extends Command
                 null,
                 InputOption::VALUE_NONE,
                 'Grant cn=user the Proxied Authorization control for identities under ou=people',
+            )
+            ->addOption(
+                'open-monitor',
+                null,
+                InputOption::VALUE_NONE,
+                'Loosen cn=monitor from the administrators-only default to any authenticated identity',
+            )
+            ->addOption(
+                'hide-rootdse-vendor',
+                null,
+                InputOption::VALUE_NONE,
+                'Deny reads of the Root DSE vendorName attribute, to exercise per-attribute policy on it',
+            )
+            ->addOption(
+                'admin-only-subschema',
+                null,
+                InputOption::VALUE_NONE,
+                'Tighten cn=Subschema from the authenticated default to the administrators group',
             )
             ->addOption(
                 'manager',
@@ -267,6 +286,35 @@ final class LdapBackendStorageCommand extends Command
                         Target::subtree('ou=people,dc=foo,dc=bar'),
                         Control::OID_PROXY_AUTHORIZATION,
                     ),
+                ),
+            );
+        }
+
+        if ($input->getOption('admin-only-subschema')) {
+            $serverOptions->setAclRules(
+                $serverOptions->getAclRules()->withSubschemaAccess(
+                    Subject::group('cn=admins,dc=foo,dc=bar'),
+                    $serverOptions->getSubschemaEntry(),
+                ),
+            );
+        }
+
+        if ($input->getOption('open-monitor')) {
+            $serverOptions->setAclRules(
+                $serverOptions->getAclRules()->withMonitorAccess(Subject::authenticated()),
+            );
+        }
+
+        if ($input->getOption('hide-rootdse-vendor')) {
+            $rules = $serverOptions->getAclRules();
+            $serverOptions->setAclRules(
+                $rules->withAttributeRules(
+                    ...[AttributeRule::deny(
+                        Subject::anyone(),
+                        Target::dn(''),
+                        'vendorName',
+                    )->forRead()],
+                    ...$rules->attributes,
                 ),
             );
         }

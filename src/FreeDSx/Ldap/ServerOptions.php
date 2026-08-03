@@ -35,6 +35,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
+use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
@@ -377,7 +378,12 @@ final class ServerOptions implements ServerListenerOptionsInterface
 
     public function getAclRules(): AclRules
     {
-        return $this->aclRules ?? ($this->defaultAclRules ??= AclRules::secureDefault($this->administrators));
+        // The subschema rule is applied here rather than in secureDefault(), since only this side knows the DN.
+        return $this->aclRules ?? ($this->defaultAclRules ??= AclRules::secureDefault($this->administrators)
+            ->withSubschemaAccess(
+                Subject::authenticated(),
+                $this->getSubschemaEntry(),
+            ));
     }
 
     /**

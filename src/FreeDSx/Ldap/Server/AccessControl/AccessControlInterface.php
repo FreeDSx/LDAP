@@ -101,6 +101,14 @@ interface AccessControlInterface
     ): ?Entry;
 
     /**
+     * Return $entry with unreadable attributes removed, for callers that have already settled visibility.
+     */
+    public function stripUnreadableAttributes(
+        TokenInterface $token,
+        Entry $entry,
+    ): Entry;
+
+    /**
      * Whether $token may see $entry at all, without stripping any attributes (the entry-level gate replication uses).
      */
     public function isEntryVisible(

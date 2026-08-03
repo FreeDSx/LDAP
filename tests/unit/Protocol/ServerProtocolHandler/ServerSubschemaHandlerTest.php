@@ -20,9 +20,12 @@ use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\GeneratedEntryResponder;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSubschemaHandler;
+use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
@@ -44,7 +47,7 @@ final class ServerSubschemaHandlerTest extends TestCase
 
         $this->subject = new ServerSubschemaHandler(
             options: $this->options,
-            filterEvaluator: new FilterEvaluator($this->options->getSchema()),
+            responder: $this->responder($this->options->getSchema()),
         );
     }
 
@@ -129,6 +132,14 @@ final class ServerSubschemaHandlerTest extends TestCase
         self::assertGreaterThan(
             0,
             count($entry->get('matchingRuleUse')?->getValues() ?? []),
+        );
+    }
+
+    private function responder(Schema $schema): GeneratedEntryResponder
+    {
+        return new GeneratedEntryResponder(
+            new RuleBasedAccessControl(),
+            new FilterEvaluator($schema),
         );
     }
 

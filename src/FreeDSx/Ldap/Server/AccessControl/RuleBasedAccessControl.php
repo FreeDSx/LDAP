@@ -164,11 +164,21 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
         TokenInterface $token,
         Entry $entry,
     ): ?Entry {
-        $dn = $entry->getDn();
-
         if (!$this->isEntryVisible($token, $entry)) {
             return null;
         }
+
+        return $this->stripUnreadableAttributes(
+            $token,
+            $entry,
+        );
+    }
+
+    public function stripUnreadableAttributes(
+        TokenInterface $token,
+        Entry $entry,
+    ): Entry {
+        $dn = $entry->getDn();
 
         if ($this->rules->attributes === []) {
             return $entry;

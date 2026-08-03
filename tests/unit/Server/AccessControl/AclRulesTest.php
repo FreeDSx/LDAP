@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerMonitorHandler;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
@@ -393,6 +394,101 @@ final class AclRulesTest extends TestCase
             'userPassword',
             AttributeAccess::Read,
         );
+    }
+
+    public function test_secureDefault_restricts_the_monitor_entry_to_the_administrator(): void
+    {
+        $this->subject->authorizeOperation(
+            OperationType::Search,
+            $this->admin(),
+            new Dn(ServerMonitorHandler::DN),
+        );
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_secureDefault_denies_the_monitor_entry_to_an_ordinary_identity(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->subject->authorizeOperation(
+            OperationType::Search,
+            $this->user(),
+            new Dn(ServerMonitorHandler::DN),
+        );
+    }
+
+    public function test_withMonitorAccess_can_loosen_the_default(): void
+    {
+        $acl = new RuleBasedAccessControl(
+            AclRules::secureDefault(Subject::dn(self::ADMIN_DN))
+                ->withMonitorAccess(Subject::authenticated()),
+        );
+
+        $acl->authorizeOperation(
+            OperationType::Search,
+            $this->user(),
+            new Dn(ServerMonitorHandler::DN),
+        );
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function test_withMonitorAccess_given_no_subject_denies_everyone(): void
+    {
+        $acl = new RuleBasedAccessControl(
+            AclRules::secureDefault(Subject::dn(self::ADMIN_DN))
+                ->withMonitorAccess(null),
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $acl->authorizeOperation(
+            OperationType::Search,
+            $this->admin(),
+            new Dn(ServerMonitorHandler::DN),
+        );
+    }
+
+    public function test_withSubschemaAccess_can_tighten_to_the_administrator(): void
+    {
+        $acl = new RuleBasedAccessControl(
+            AclRules::secureDefault(Subject::dn(self::ADMIN_DN))
+                ->withSubschemaAccess(
+                    Subject::dn(self::ADMIN_DN),
+                    new Dn('cn=Subschema'),
+                ),
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $acl->authorizeOperation(
+            OperationType::Search,
+            $this->user(),
+            new Dn('cn=Subschema'),
+        );
+    }
+
+    public function test_withSubschemaAccess_can_loosen_to_anyone(): void
+    {
+        $acl = new RuleBasedAccessControl(
+            AclRules::secureDefault(Subject::dn(self::ADMIN_DN))
+                ->withSubschemaAccess(
+                    Subject::anyone(),
+                    new Dn('cn=Subschema'),
+                ),
+        );
+
+        $acl->authorizeOperation(
+            OperationType::Search,
+            new AnonToken(),
+            new Dn('cn=Subschema'),
+        );
+
+        $this->addToAssertionCount(1);
     }
 
     private function user(): TokenInterface

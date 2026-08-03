@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Search;
 
 use FreeDSx\Ldap\Entry\Entries;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
@@ -135,7 +137,7 @@ final class LdapGeneratedEntryFilterTest extends ServerTestCase
 
     public function test_the_monitor_entry_is_returned_when_the_filter_matches(): void
     {
-        $this->authenticateUser();
+        $this->authenticateAdmin();
 
         self::assertCount(
             1,
@@ -145,12 +147,104 @@ final class LdapGeneratedEntryFilterTest extends ServerTestCase
 
     public function test_the_monitor_entry_is_withheld_when_the_filter_does_not_match(): void
     {
-        $this->authenticateUser();
+        $this->authenticateAdmin();
 
         self::assertCount(
             0,
             $this->searchBase(self::MONITOR_DN, Filters::equal('objectClass', 'banana')),
         );
+    }
+
+    public function test_an_unbound_client_may_read_the_root_dse(): void
+    {
+        // RFC 4513 section 5.2.1.5: discovery has to work before a bind, so this route is never gated.
+        self::assertCount(
+            1,
+            $this->searchBase('', Filters::present('objectClass')),
+        );
+    }
+
+    public function test_an_unbound_client_may_not_read_the_subschema_entry(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->searchBase(self::SUBSCHEMA_DN, Filters::present('objectClass'));
+    }
+
+    public function test_an_unbound_client_may_not_read_the_monitor_entry(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->searchBase(self::MONITOR_DN, Filters::present('objectClass'));
+    }
+
+    public function test_an_ordinary_identity_may_read_the_subschema_entry(): void
+    {
+        $this->authenticateUser();
+
+        self::assertCount(
+            1,
+            $this->searchBase(self::SUBSCHEMA_DN, Filters::present('objectClass')),
+        );
+    }
+
+    public function test_an_ordinary_identity_may_not_read_the_monitor_entry(): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->searchBase(self::MONITOR_DN, Filters::present('objectClass'));
+    }
+
+    public function test_an_administrator_may_read_the_monitor_entry(): void
+    {
+        $this->authenticateAdmin();
+
+        self::assertCount(
+            1,
+            $this->searchBase(self::MONITOR_DN, Filters::present('objectClass')),
+        );
+    }
+
+    public function test_the_monitor_default_can_be_loosened_to_any_authenticated_identity(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess('tcp', ['--monitor', '--open-monitor']);
+        $this->authenticateUser();
+
+        self::assertCount(
+            1,
+            $this->searchBase(self::MONITOR_DN, Filters::present('objectClass')),
+        );
+    }
+
+    public function test_the_subschema_default_can_be_tightened_to_the_administrator(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess('tcp', ['--monitor', '--admin-only-subschema']);
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->searchBase(self::SUBSCHEMA_DN, Filters::present('objectClass'));
+    }
+
+    public function test_a_denied_root_dse_attribute_is_stripped_but_the_entry_still_returns(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess('tcp', ['--monitor', '--hide-rootdse-vendor']);
+
+        $entries = $this->searchBase('', Filters::present('objectClass'));
+        $entry = $entries->first();
+
+        self::assertNotNull($entry);
+        self::assertNull($entry->get('vendorName'));
+        self::assertNotNull($entry->get('supportedSaslMechanisms') ?? $entry->get('namingContexts'));
     }
 
     /**

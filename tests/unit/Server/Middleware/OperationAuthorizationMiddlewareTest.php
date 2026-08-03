@@ -42,6 +42,8 @@ use Tests\Support\FreeDSx\Ldap\Middleware\RecordingMiddlewareHandler;
 
 final class OperationAuthorizationMiddlewareTest extends TestCase
 {
+    private const SUBSCHEMA_DN = 'cn=Subschema';
+
     private HandlerRouteResolverInterface&MockObject $resolver;
 
     private AccessControlInterface&MockObject $accessControl;
@@ -60,6 +62,7 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         $this->subject = new OperationAuthorizationMiddleware(
             $this->resolver,
             $this->accessControl,
+            new Dn(self::SUBSCHEMA_DN),
         );
         $this->next = new RecordingMiddlewareHandler(new CallLog());
     }
@@ -147,6 +150,66 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         }
 
         self::assertNull($this->next->received);
+    }
+
+    public function test_subschema_route_authorizes_a_search_against_the_configured_subschema_dn(): void
+    {
+        $this->routeResolvesTo(HandlerId::Subschema);
+        $this->accessControl
+            ->expects(self::once())
+            ->method('authorizeOperation')
+            ->with(
+                OperationType::Search,
+                $this->token,
+                self::callback(
+                    static fn(Dn $dn): bool => $dn->toString() === self::SUBSCHEMA_DN,
+                ),
+            );
+
+        $this->subject->process(
+            $this->contextFor((new SearchRequest(Filters::present('cn')))->base(self::SUBSCHEMA_DN)),
+            $this->next,
+        );
+
+        self::assertNotNull($this->next->received);
+    }
+
+    public function test_subschema_route_denial_blocks_dispatch(): void
+    {
+        $this->routeResolvesTo(HandlerId::Subschema);
+        $this->accessControl
+            ->method('authorizeOperation')
+            ->willThrowException($this->denied());
+
+        try {
+            $this->subject->process(
+                $this->contextFor((new SearchRequest(Filters::present('cn')))->base(self::SUBSCHEMA_DN)),
+                $this->next,
+            );
+            self::fail('Expected an OperationException.');
+        } catch (OperationException) {
+        }
+
+        self::assertNull($this->next->received);
+    }
+
+    /**
+     * RFC 4513 section 5.2.1.5 has servers let even anonymous clients read supportedSASLMechanisms before
+     * authenticating, so this route is exempt on purpose rather than by omission.
+     */
+    public function test_the_root_dse_route_is_deliberately_never_gated(): void
+    {
+        $this->routeResolvesTo(HandlerId::RootDse);
+        $this->accessControl
+            ->expects(self::never())
+            ->method('authorizeOperation');
+
+        $this->subject->process(
+            $this->contextFor((new SearchRequest(Filters::present('objectClass')))->base('')),
+            $this->next,
+        );
+
+        self::assertNotNull($this->next->received);
     }
 
     public function test_dispatch_route_authorizes_modify_dn_against_source_only(): void
@@ -292,6 +355,7 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         $subject = new OperationAuthorizationMiddleware(
             $this->resolver,
             $this->accessControl,
+            new Dn(self::SUBSCHEMA_DN),
             [Control::OID_SUBTREE_DELETE],
         );
         $this->routeResolvesTo(HandlerId::Dispatch);
@@ -344,6 +408,7 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         $subject = new OperationAuthorizationMiddleware(
             $this->resolver,
             $this->accessControl,
+            new Dn(self::SUBSCHEMA_DN),
             [Control::OID_SYNC_REQUEST],
         );
         $this->routeResolvesTo(HandlerId::Sync);
@@ -375,6 +440,7 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         $subject = new OperationAuthorizationMiddleware(
             $this->resolver,
             $this->accessControl,
+            new Dn(self::SUBSCHEMA_DN),
             [Control::OID_SYNC_REQUEST],
         );
         $this->routeResolvesTo(HandlerId::Sync);
@@ -428,8 +494,6 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
      */
     public static function unauthorizedRoutes(): iterable
     {
-        yield 'root dse' => [HandlerId::RootDse];
-        yield 'subschema' => [HandlerId::Subschema];
         yield 'whoami' => [HandlerId::WhoAmI];
         yield 'start tls' => [HandlerId::StartTls];
         yield 'cancel' => [HandlerId::Cancel];

@@ -54,6 +54,7 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
     public function __construct(
         private HandlerRouteResolverInterface $routeResolver,
         private AccessControlInterface $accessControl,
+        private Dn $subschemaEntry,
         private array $privilegedControls = [Control::OID_RELAX_RULES],
         private array $privilegedExtendedOps = [],
     ) {}
@@ -88,6 +89,16 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
                 $context->tokenOrFail(),
                 new Dn(ServerMonitorHandler::DN),
             );
+        } elseif ($routeId === HandlerId::Subschema) {
+            $this->accessControl->authorizeOperation(
+                OperationType::Search,
+                $context->tokenOrFail(),
+                $this->subschemaEntry,
+            );
+        } elseif ($routeId === HandlerId::RootDse) {
+            // Left ungated on purpose. RFC 4513 section 5.2.1.5 has servers allow all clients, including anonymous
+            // ones, to read supportedSASLMechanisms before authenticating, and comparing that list before and after a
+            // SASL exchange is how a client detects a downgrade attack. Per-attribute read rules still apply.
         } elseif ($routeId === HandlerId::Dispatch) {
             $this->authorizeDispatch(
                 $context->message,
