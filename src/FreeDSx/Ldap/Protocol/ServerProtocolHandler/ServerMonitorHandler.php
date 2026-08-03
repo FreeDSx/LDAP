@@ -17,7 +17,6 @@ use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\MetricsSnapshot;
 use FreeDSx\Ldap\Server\ServerRunner\CoroutineServerRunnerInterface;
@@ -39,34 +38,29 @@ use function time;
  */
 class ServerMonitorHandler implements ServerProtocolHandlerInterface
 {
-    use ServerSynthesizedEntryTrait;
-
     public const DN = 'cn=monitor';
 
     public function __construct(
         private readonly ServerOptions $options,
         private readonly MetricsSnapshotProvider $snapshots,
-        private readonly FilterEvaluatorInterface $filterEvaluator,
+        private readonly GeneratedEntryResponder $responder,
     ) {}
 
     public function handleRequest(
         LdapMessageRequest $message,
         TokenInterface $token,
     ): ResponseStream {
-        $entry = Entry::fromArray(
-            self::DN,
-            $this->attributes($this->snapshots->snapshot()),
+        $entry = $this->responder->readable(
+            Entry::fromArray(
+                self::DN,
+                $this->attributes($this->snapshots->snapshot()),
+            ),
+            $token,
         );
 
-        $matches = $this->matchesRequestFilter(
+        return $this->responder->reply(
             $message,
-            $entry,
-            $this->filterEvaluator,
-        );
-
-        return $this->replyWithEntry(
-            $message,
-            $matches ? $entry : null,
+            $this->responder->matches($message, $entry) ? $entry : null,
         );
     }
 

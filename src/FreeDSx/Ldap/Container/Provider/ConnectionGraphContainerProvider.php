@@ -134,6 +134,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
         return new OperationAuthorizationMiddleware(
             $container->get(ServerProtocolHandlerFactory::class),
             $container->get(AccessControlInterface::class),
+            $options->getSubschemaEntry(),
             $options->getPrivilegedControls(),
             $options->getPrivilegedExtendedOps(),
         );

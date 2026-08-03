@@ -137,6 +137,20 @@ final readonly class PrivilegedBypassAccessControl implements AccessControlInter
         );
     }
 
+    public function stripUnreadableAttributes(
+        TokenInterface $token,
+        Entry $entry,
+    ): Entry {
+        if ($token instanceof PrivilegedTokenInterface) {
+            return $entry;
+        }
+
+        return $this->inner->stripUnreadableAttributes(
+            $token,
+            $entry,
+        );
+    }
+
     public function isEntryVisible(
         TokenInterface $token,
         Entry $entry,

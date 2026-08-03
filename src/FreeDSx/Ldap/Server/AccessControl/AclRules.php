@@ -14,8 +14,10 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\AccessControl;
 
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerMonitorHandler;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
@@ -24,6 +26,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\AccessControl\Target\AnyTargetMatcher;
+use FreeDSx\Ldap\Server\AccessControl\Target\DnTargetMatcher;
 use FreeDSx\Ldap\Server\AccessControl\Target\TargetMatcherInterface;
 
 /**
@@ -188,6 +191,7 @@ final readonly class AclRules
      * The secure default. Reads are open to authenticated identities, writes require a grant:
      *
      * - Search and Compare are allowed to any authenticated identity, on any entry.
+     * - cn=monitor is limited to the administrator.
      * - An identity may Modify its own entry, limited to a set of personal attributes.
      * - Everything else is left to the administrator, when one is configured.
      *
@@ -196,6 +200,7 @@ final readonly class AclRules
      * @param list<string> $selfWritableAttributes Attributes an identity may change on its own entry.
      *
      * @see self::withSelfServiceWrites()
+     * @see self::withMonitorAccess()
      * @see self::withCredentialProtection()
      */
     public static function secureDefault(
@@ -219,7 +224,9 @@ final readonly class AclRules
             $rules = $rules->withFullAccess($administrators);
         }
 
-        return $rules->withCredentialProtection($administrators);
+        return $rules
+            ->withMonitorAccess($administrators)
+            ->withCredentialProtection($administrators);
     }
 
     /**
@@ -252,6 +259,30 @@ final readonly class AclRules
             controls: $this->controls,
             extendedOps: $this->extendedOps,
             confidential: $this->confidential,
+        );
+    }
+
+    /**
+     * Restrict searches of the subschema subentry to $subject, replacing any earlier rule for that entry.
+     */
+    public function withSubschemaAccess(
+        SubjectMatcherInterface $subject,
+        Dn $subschemaEntry,
+    ): self {
+        return $this->withGeneratedEntryAccess(
+            $subschemaEntry,
+            $subject,
+        );
+    }
+
+    /**
+     * Restrict searches of cn=monitor to $subject, or to nobody when it is null.
+     */
+    public function withMonitorAccess(?SubjectMatcherInterface $subject): self
+    {
+        return $this->withGeneratedEntryAccess(
+            new Dn(ServerMonitorHandler::DN),
+            $subject,
         );
     }
 
@@ -362,6 +393,42 @@ final readonly class AclRules
             attributes: [...$userPassword, ...$this->attributes],
             controls: [...$controls, ...$this->controls],
             extendedOps: [...$extendedOps, ...$this->extendedOps],
+            confidential: $this->confidential,
+        );
+    }
+
+    /**
+     * Prepend an allow plus a catch-all deny for one entry, so first-match-wins makes this authoritative.
+     */
+    private function withGeneratedEntryAccess(
+        Dn $dn,
+        ?SubjectMatcherInterface $subject,
+    ): self {
+        $target = new DnTargetMatcher($dn->toString());
+
+        $grant = $subject === null
+            ? []
+            : [
+                OperationRule::allow(
+                    $subject,
+                    $target,
+                    OperationType::Search,
+                ),
+            ];
+
+        return new self(
+            operations: [
+                ...$grant,
+                OperationRule::deny(
+                    Subject::anyone(),
+                    $target,
+                    OperationType::Search,
+                ),
+                ...$this->operations,
+            ],
+            attributes: $this->attributes,
+            controls: $this->controls,
+            extendedOps: $this->extendedOps,
             confidential: $this->confidential,
         );
     }

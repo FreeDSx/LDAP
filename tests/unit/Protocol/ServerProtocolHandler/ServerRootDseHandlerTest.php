@@ -23,8 +23,11 @@ use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\GeneratedEntryResponder;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerRootDseHandler;
+use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -125,7 +128,7 @@ final class ServerRootDseHandlerTest extends TestCase
         $this->subject = new ServerRootDseHandler(
             $this->options,
             $this->mockBackend,
-            new FilterEvaluator($this->options->getSchema()),
+            $this->responder($this->options->getSchema()),
             true,
         );
 
@@ -309,7 +312,15 @@ final class ServerRootDseHandlerTest extends TestCase
         $this->subject = new ServerRootDseHandler(
             $this->options,
             $this->mockBackend,
-            new FilterEvaluator($this->options->getSchema()),
+            $this->responder($this->options->getSchema()),
+        );
+    }
+
+    private function responder(Schema $schema): GeneratedEntryResponder
+    {
+        return new GeneratedEntryResponder(
+            new RuleBasedAccessControl(),
+            new FilterEvaluator($schema),
         );
     }
 }

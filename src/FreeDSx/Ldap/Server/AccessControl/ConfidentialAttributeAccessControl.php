@@ -52,6 +52,16 @@ final readonly class ConfidentialAttributeAccessControl implements AccessControl
             : $this->stripWithheld($filtered, $token);
     }
 
+    public function stripUnreadableAttributes(
+        TokenInterface $token,
+        Entry $entry,
+    ): Entry {
+        return $this->stripWithheld(
+            $this->inner->stripUnreadableAttributes($token, $entry),
+            $token,
+        );
+    }
+
     public function authorizeOperation(
         OperationType $operation,
         TokenInterface $token,

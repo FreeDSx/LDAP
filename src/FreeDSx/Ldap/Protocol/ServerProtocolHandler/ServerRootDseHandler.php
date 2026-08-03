@@ -22,7 +22,6 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -35,8 +34,6 @@ use function count;
  */
 class ServerRootDseHandler implements ServerProtocolHandlerInterface
 {
-    use ServerSynthesizedEntryTrait;
-
     /**
      * RFC 3673 §3 — return all operational attributes via the "+" attribute description.
      */
@@ -50,7 +47,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
     public function __construct(
         private readonly ServerOptions $options,
         private readonly LdapBackendInterface $backend,
-        private readonly FilterEvaluatorInterface $filterEvaluator,
+        private readonly GeneratedEntryResponder $responder,
         private readonly bool $supportsSync = false,
     ) {}
 
@@ -115,8 +112,14 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
             $entry->set('altServer', (string) $this->options->getDseAltServer());
         }
 
-        if (!$this->matchesRequestFilter($message, $entry, $this->filterEvaluator)) {
-            return $this->replyWithEntry(
+        $entry = $this->responder->readable(
+            $entry,
+            $token,
+        );
+
+        // Stripping and matching both precede attribute selection, since selecting must not change what matched.
+        if (!$this->responder->matches($message, $entry)) {
+            return $this->responder->reply(
                 $message,
                 null,
             );
@@ -126,7 +129,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
         $request = $message->getRequest();
         $this->filterEntryAttributes($request, $entry);
 
-        return $this->replyWithEntry(
+        return $this->responder->reply(
             $message,
             $entry,
         );

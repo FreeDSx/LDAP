@@ -24,7 +24,9 @@ use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\GeneratedEntryResponder;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerMonitorHandler;
+use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
 use FreeDSx\Ldap\Server\Metrics\Observation\OperationObservation;
@@ -52,7 +54,7 @@ final class ServerMonitorHandlerTest extends TestCase
         $this->subject = new ServerMonitorHandler(
             options: new ServerOptions(),
             snapshots: $this->metrics,
-            filterEvaluator: new FilterEvaluator(),
+            responder: $this->responder(),
         );
     }
 
@@ -310,7 +312,7 @@ final class ServerMonitorHandlerTest extends TestCase
         $subject = new ServerMonitorHandler(
             options: (new ServerOptions())->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
             snapshots: $this->metrics,
-            filterEvaluator: new FilterEvaluator(),
+            responder: $this->responder(),
         );
 
         $entry = $this->handleAndCaptureEntry($subject);
@@ -343,5 +345,13 @@ final class ServerMonitorHandlerTest extends TestCase
         $result = $messages[0]->getResponse();
 
         return $result->getEntry();
+    }
+
+    private function responder(): GeneratedEntryResponder
+    {
+        return new GeneratedEntryResponder(
+            new RuleBasedAccessControl(),
+            new FilterEvaluator(),
+        );
     }
 }
