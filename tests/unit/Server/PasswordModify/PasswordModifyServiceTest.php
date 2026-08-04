@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
@@ -299,6 +300,60 @@ final class PasswordModifyServiceTest extends TestCase
         self::assertSame(
             PwdPolicyError::CHANGE_AFTER_RESET,
             $this->context->getOutcome()?->errorCode,
+        );
+    }
+
+    public function test_a_missing_target_answers_as_forbidden_when_the_identity_holds_no_rights(): void
+    {
+        $this->resolver
+            ->method('resolve')
+            ->willReturn(null);
+        $this->accessControl
+            ->method('authorizeOperation')
+            ->willThrowException(new OperationException(
+                'Access denied.',
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+            ));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->subject->change(
+            new PasswordModifyRequest(
+                'cn=ghost,dc=foo,dc=bar',
+                null,
+                'newpass',
+            ),
+            $this->userToken,
+            new ControlBag(),
+        );
+    }
+
+    public function test_a_target_that_resolved_to_nothing_is_authorized_against_the_root(): void
+    {
+        $this->resolver
+            ->method('resolve')
+            ->willReturn(null);
+        $this->accessControl
+            ->expects(self::once())
+            ->method('authorizeOperation')
+            ->with(
+                OperationType::PasswordModify,
+                $this->userToken,
+                self::callback(static fn(Dn $dn): bool => $dn->toString() === ''),
+            );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
+
+        $this->subject->change(
+            new PasswordModifyRequest(
+                'cn=ghost,dc=foo,dc=bar',
+                null,
+                'newpass',
+            ),
+            $this->userToken,
+            new ControlBag(),
         );
     }
 

@@ -14,9 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\PasswordModify;
 
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
-use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
@@ -32,28 +30,21 @@ final readonly class PasswordModifyTargetResolver
     ) {}
 
     /**
-     * @throws OperationException when the target entry does not exist.
+     * The targeted entry, or null when nothing matches.
      */
-    public function resolve(
+    public function find(
         PasswordModifyRequest $request,
         AuthenticatedTokenInterface $token,
-    ): Entry {
+    ): ?Entry {
         $userIdentity = $request->getUsername();
 
-        $entry = $userIdentity === null || $userIdentity === ''
-            ? $this->backend->get($token->getResolvedDn())
-            : $this->identityResolver->resolve(
-                $userIdentity,
-                $this->backend,
-            );
-
-        if ($entry === null) {
-            throw new OperationException(
-                'The target entry does not exist.',
-                ResultCode::NO_SUCH_OBJECT,
-            );
+        if ($userIdentity === null || $userIdentity === '') {
+            return $this->backend->get($token->getResolvedDn());
         }
 
-        return $entry;
+        return $this->identityResolver->resolve(
+            $userIdentity,
+            $this->backend,
+        );
     }
 }
