@@ -275,7 +275,7 @@ final class RuleBasedAccessControlTest extends TestCase
         try {
             $subject->authorizeControl(
                 $this->bindToken,
-                $this->bindToken->getResolvedDn(),
+                new Dn('cn=foo,dc=foo,dc=bar'),
                 Control::OID_PROXY_AUTHORIZATION,
             );
         } catch (OperationException) {

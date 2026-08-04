@@ -13,7 +13,9 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Middleware;
 
+use FreeDSx\Ldap\Exception\InvalidDnSyntaxException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
@@ -58,6 +60,20 @@ final readonly class ResponseWriterMiddleware implements MiddlewareInterface
         } catch (OperationException $e) {
             $outcome = $this->writer->write(
                 $this->errorStream($context, $e),
+                $messageId,
+            );
+        } catch (InvalidDnSyntaxException $e) {
+            // A DN is only parsed once something needs its pieces, which is well past the decode. Answering it here
+            // keeps a malformed one from ending the session on its way out as an unhandled failure.
+            $outcome = $this->writer->write(
+                $this->errorStream(
+                    $context,
+                    new OperationException(
+                        $e->getMessage(),
+                        ResultCode::INVALID_DN_SYNTAX,
+                        $e,
+                    ),
+                ),
                 $messageId,
             );
         }

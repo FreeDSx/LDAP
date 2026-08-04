@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Entry;
 
-use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Exception\InvalidDnSyntaxException;
 use Stringable;
 
 use function array_keys;
@@ -111,6 +111,14 @@ class Rdn implements Stringable
         return null;
     }
 
+    /**
+     * Whether this holds a comma a DN would read as an RDN separator rather than as part of a value.
+     */
+    public function hasUnescapedComma(): bool
+    {
+        return preg_match('/(?<!\\\\),/', $this->toString()) === 1;
+    }
+
     public function toString(): string
     {
         $rdn = $this->name . '=' . $this->value;
@@ -123,7 +131,7 @@ class Rdn implements Stringable
     }
 
     /**
-     * @throws InvalidArgumentException
+     * @throws InvalidDnSyntaxException
      */
     public static function create(string $rdn): Rdn
     {
@@ -132,7 +140,7 @@ class Rdn implements Stringable
             $rdn,
         );
         if ($pieces === false) {
-            throw new InvalidArgumentException(sprintf(
+            throw new InvalidDnSyntaxException(sprintf(
                 'The RDN "%s" is invalid.',
                 $rdn,
             ));
@@ -147,7 +155,7 @@ class Rdn implements Stringable
                 limit: 2,
             );
             if (count($parts) !== 2) {
-                throw new InvalidArgumentException(sprintf(
+                throw new InvalidDnSyntaxException(sprintf(
                     'The RDN "%s" is invalid.',
                     $piece,
                 ));
@@ -166,7 +174,7 @@ class Rdn implements Stringable
         }
 
         if ($obj === null) {
-            throw new InvalidArgumentException(sprintf(
+            throw new InvalidDnSyntaxException(sprintf(
                 "The RDN '%s' is not valid.",
                 $rdn,
             ));
