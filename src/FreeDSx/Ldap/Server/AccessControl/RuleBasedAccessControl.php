@@ -123,25 +123,13 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
         TokenInterface $token,
         string $controlOid,
     ): bool {
-        if (!$token instanceof AuthenticatedTokenInterface) {
-            return false;
-        }
-
-        foreach ($this->rules->controls as $rule) {
-            if ($rule->effect !== Effect::Allow) {
-                continue;
-            }
-
-            if (!$this->controlMatches($rule, $controlOid)) {
-                continue;
-            }
-
-            if ($rule->subject->matches($token, $token->getResolvedDn())) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->resolveSubjectEffect(
+            $this->rules->controls,
+            $this->controlMatches(...),
+            $controlOid,
+            $token,
+            Effect::Deny,
+        ) === Effect::Allow;
     }
 
     /**
@@ -315,7 +303,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
      * The {@see resolveEffect} counterpart for rules carrying no target, so the subject is matched against the
      * token's own resolved DN. Anonymous identities never match, as they cannot hold a grant.
      *
-     * @template TRule of ConfidentialAccessRule|ExtendedOperationRule
+     * @template TRule of ConfidentialAccessRule|ControlRule|ExtendedOperationRule
      * @template TValue
      * @param TRule[] $rules
      * @param callable(TRule, TValue): bool $selectorMatches
