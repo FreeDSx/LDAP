@@ -13,10 +13,13 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\AccessControl\Subject;
 
+use DateTimeImmutable;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Clock\ClockInterface;
+use FreeDSx\Ldap\Server\Clock\SystemClock;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use LogicException;
@@ -24,7 +27,9 @@ use LogicException;
 /**
  * Matches when the bound DN is a member of the given LDAP group entry.
  *
- * The group entry is fetched from the backend once per token ID and cached.
+ * The group entry is read through a short-lived cache, since membership is re-checked for every entry a search
+ * returns. Dropping a member therefore takes effect within the cache lifetime rather than at once; nothing can be
+ * invalidated across processes, so time is the only bound that holds on every runner.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -32,22 +37,22 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
 {
     private readonly Dn $groupDn;
 
-    private readonly int $maxCacheSize;
-
     private ?LdapBackendInterface $backend = null;
 
-    /**
-     * @var array<string, ?Entry>
-     */
-    private array $cache = [];
+    private ?Entry $cached = null;
 
+    private ?DateTimeImmutable $cachedAt = null;
+
+    /**
+     * @param int $cacheTtl Seconds a membership read is reused for; zero reads the group entry every time.
+     */
     public function __construct(
         string $groupDn,
         private readonly string $memberAttribute = 'member',
-        int $maxCacheSize = 200,
+        private readonly int $cacheTtl = 5,
+        private readonly ClockInterface $clock = new SystemClock(),
     ) {
         $this->groupDn = new Dn($groupDn);
-        $this->maxCacheSize = $maxCacheSize;
     }
 
     public function setBackend(LdapBackendInterface $backend): void
@@ -67,7 +72,7 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
             return false;
         }
 
-        $entry = $this->getGroupEntry($token);
+        $entry = $this->groupEntry();
         if ($entry === null) {
             return false;
         }
@@ -88,19 +93,26 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
         return false;
     }
 
-    private function getGroupEntry(TokenInterface $token): ?Entry
+    private function groupEntry(): ?Entry
     {
-        if ($this->maxCacheSize === 0) {
+        if ($this->cacheTtl <= 0) {
             return $this->backend()->get($this->groupDn);
         }
 
-        $id = $token->getId();
-        if (!array_key_exists($id, $this->cache)) {
-            $this->evictOldestIfFull();
-            $this->cache[$id] = $this->backend()->get($this->groupDn);
+        $now = $this->clock->now();
+
+        if ($this->isCacheExpired($now)) {
+            $this->cached = $this->backend()->get($this->groupDn);
+            $this->cachedAt = $now;
         }
 
-        return $this->cache[$id];
+        return $this->cached;
+    }
+
+    private function isCacheExpired(DateTimeImmutable $now): bool
+    {
+        return $this->cachedAt === null
+            || ($now->getTimestamp() - $this->cachedAt->getTimestamp()) >= $this->cacheTtl;
     }
 
     private function backend(): LdapBackendInterface
@@ -110,20 +122,5 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
         }
 
         return $this->backend;
-    }
-
-    private function evictOldestIfFull(): void
-    {
-        if (count($this->cache) < $this->maxCacheSize) {
-            return;
-        }
-
-        $oldest = array_key_first($this->cache);
-
-        if ($oldest === null) {
-            return;
-        }
-
-        unset($this->cache[$oldest]);
     }
 }

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\AccessControl\Subject;
 
+use DateTimeImmutable;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\AccessControl\Subject\GroupSubjectMatcher;
@@ -21,6 +22,7 @@ use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
 
 final class GroupSubjectMatcherTest extends TestCase
 {
@@ -232,7 +234,7 @@ final class GroupSubjectMatcherTest extends TestCase
         );
     }
 
-    public function test_it_should_fetch_group_entry_separately_per_token_id(): void
+    public function test_it_should_share_one_read_across_separate_tokens(): void
     {
         $groupEntry = Entry::create(
             'cn=admins,dc=foo,dc=bar',
@@ -240,7 +242,7 @@ final class GroupSubjectMatcherTest extends TestCase
         );
 
         $this->mockBackend
-            ->expects(self::exactly(2))
+            ->expects(self::once())
             ->method('get')
             ->willReturn($groupEntry);
 
@@ -248,20 +250,75 @@ final class GroupSubjectMatcherTest extends TestCase
         $subject->setBackend($this->mockBackend);
 
         $subject->matches(
-            BindToken::fromDn(
-                'cn=admin,dc=foo,dc=bar',
-            ),
+            BindToken::fromDn('cn=admin,dc=foo,dc=bar'),
             $this->targetDn,
         );
         $subject->matches(
-            BindToken::fromDn(
-                'cn=admin,dc=foo,dc=bar',
-            ),
+            BindToken::fromDn('cn=admin,dc=foo,dc=bar'),
             $this->targetDn,
         );
     }
 
-    public function test_it_should_bypass_cache_when_max_cache_size_is_zero(): void
+    public function test_it_should_re_read_the_group_once_the_cache_lifetime_passes(): void
+    {
+        $clock = FrozenClock::fromString('2026-01-01 00:00:00');
+        $this->mockBackend
+            ->expects(self::exactly(2))
+            ->method('get')
+            ->willReturn(Entry::create(
+                'cn=admins,dc=foo,dc=bar',
+                ['member' => ['cn=admin,dc=foo,dc=bar']],
+            ));
+
+        $subject = new GroupSubjectMatcher(
+            'cn=admins,dc=foo,dc=bar',
+            'member',
+            5,
+            $clock,
+        );
+        $subject->setBackend($this->mockBackend);
+        $token = BindToken::fromDn('cn=admin,dc=foo,dc=bar');
+
+        $subject->matches($token, $this->targetDn);
+        $clock->setTo(new DateTimeImmutable('2026-01-01 00:00:04'));
+        $subject->matches($token, $this->targetDn);
+        $clock->setTo(new DateTimeImmutable('2026-01-01 00:00:05'));
+        $subject->matches($token, $this->targetDn);
+    }
+
+    public function test_a_removed_member_stops_matching_once_the_cache_lifetime_passes(): void
+    {
+        $clock = FrozenClock::fromString('2026-01-01 00:00:00');
+        $this->mockBackend
+            ->method('get')
+            ->willReturnOnConsecutiveCalls(
+                Entry::create(
+                    'cn=admins,dc=foo,dc=bar',
+                    ['member' => ['cn=admin,dc=foo,dc=bar']],
+                ),
+                Entry::create(
+                    'cn=admins,dc=foo,dc=bar',
+                    ['member' => []],
+                ),
+            );
+
+        $subject = new GroupSubjectMatcher(
+            'cn=admins,dc=foo,dc=bar',
+            'member',
+            5,
+            $clock,
+        );
+        $subject->setBackend($this->mockBackend);
+        $token = BindToken::fromDn('cn=admin,dc=foo,dc=bar');
+
+        self::assertTrue($subject->matches($token, $this->targetDn));
+
+        $clock->setTo(new DateTimeImmutable('2026-01-01 00:00:05'));
+
+        self::assertFalse($subject->matches($token, $this->targetDn));
+    }
+
+    public function test_it_should_read_every_time_when_the_cache_lifetime_is_zero(): void
     {
         $groupEntry = Entry::create(
             'cn=admins,dc=foo,dc=bar',
@@ -333,33 +390,41 @@ final class GroupSubjectMatcherTest extends TestCase
         ));
     }
 
-    public function test_it_should_evict_oldest_entry_when_cache_is_full(): void
+    public function test_it_should_read_once_per_lifetime_regardless_of_how_many_tokens_ask(): void
     {
+        $clock = FrozenClock::fromString('2026-01-01 00:00:00');
         $groupEntry = Entry::create(
             'cn=admins,dc=foo,dc=bar',
             ['member' => ['cn=admin,dc=foo,dc=bar']],
         );
 
         $this->mockBackend
-            ->expects(self::exactly(4))
+            ->expects(self::exactly(2))
             ->method('get')
             ->willReturn($groupEntry);
 
         $subject = new GroupSubjectMatcher(
             'cn=admins,dc=foo,dc=bar',
             'member',
-            2,
+            5,
+            $clock,
         );
         $subject->setBackend($this->mockBackend);
 
-        $token1 = BindToken::fromDn('cn=admin,dc=foo,dc=bar');
-        $token2 = BindToken::fromDn('cn=admin,dc=foo,dc=bar');
-        $token3 = BindToken::fromDn('cn=admin,dc=foo,dc=bar');
+        foreach (range(1, 5) as $ignored) {
+            $subject->matches(
+                BindToken::fromDn('cn=admin,dc=foo,dc=bar'),
+                $this->targetDn,
+            );
+        }
 
-        $subject->matches($token1, $this->targetDn);
-        $subject->matches($token2, $this->targetDn);
-        $subject->matches($token3, $this->targetDn);
-        $subject->matches($token2, $this->targetDn);
-        $subject->matches($token1, $this->targetDn);
+        $clock->setTo(new DateTimeImmutable('2026-01-01 00:00:06'));
+
+        foreach (range(1, 5) as $ignored) {
+            $subject->matches(
+                BindToken::fromDn('cn=admin,dc=foo,dc=bar'),
+                $this->targetDn,
+            );
+        }
     }
 }

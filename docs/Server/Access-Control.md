@@ -354,12 +354,15 @@ Use the `Subject` factory to build subject matchers.
 | `Subject::self()`                                                                                    | A client whose bound DN equals the target entry DN (case-insensitive) |
 | `Subject::dn(string $dn)`                                                                            | A client bound as the specific DN (case-insensitive)                  |
 | `Subject::dnSubtree(string $dn)`                                                                     | A client whose bound DN is within the given subtree                   |
-| `Subject::group(string $groupDn, string $memberAttribute = 'member', int $maxCacheSize = 200)` | A client whose bound DN appears in the group entry's member attribute |
+| `Subject::group(string $groupDn, string $memberAttribute = 'member', int $cacheTtl = 5)`             | A client whose bound DN appears in the group entry's member attribute |
 | `Subject::callback(Closure $fn)`                                                                     | Delegates to `fn(TokenInterface $token, Dn $targetDn): bool`          |
 
-**Group membership caching**: `Subject::group()` fetches the group entry once per connection. The cache size is
-controlled by `$maxCacheSize` (default: 200, FIFO; 0 to disable cache). Membership changes made after the first evaluation for a
-given connection are not visible until the client reconnects.
+**Group membership caching**: `Subject::group()` re-reads the group entry at most once per `$cacheTtl` seconds
+(default: 5, or 0 to read every time). Membership is checked for every entry a search returns, so reading it each
+time would mean one backend read per entry.
+
+The cache lifetime is also the revocation window: removing someone from a group takes effect within `$cacheTtl`
+seconds rather than immediately.
 
 **Group rename**: If a referenced group entry is renamed or deleted, the rule fails closed (access denied). Protect
 ACL group entries with their own rules to prevent unauthorized `ModifyDn` on them:
