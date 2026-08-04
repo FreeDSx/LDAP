@@ -24,10 +24,12 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerMonitorHandler;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
+use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
+use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -489,6 +491,85 @@ final class AclRulesTest extends TestCase
         );
 
         $this->addToAssertionCount(1);
+    }
+
+    public function test_replaceAttributeRules_discards_the_credential_protection(): void
+    {
+        $rules = AclRules::secureDefault(Subject::dn(self::ADMIN_DN))
+            ->replaceAttributeRules(AttributeRule::allow(
+                Subject::authenticated(),
+                Target::any(),
+                'description',
+            )->forWrite());
+
+        self::assertSame(
+            ['description'],
+            array_merge(...array_map(
+                static fn(AttributeRule $rule): array => $rule->attributes,
+                $rules->attributes,
+            )),
+        );
+    }
+
+    public function test_appendAttributeRules_keeps_the_credential_protection(): void
+    {
+        $rules = AclRules::secureDefault(Subject::dn(self::ADMIN_DN))
+            ->appendAttributeRules(AttributeRule::allow(
+                Subject::authenticated(),
+                Target::any(),
+                'description',
+            )->forWrite());
+
+        // userPassword must still be unreadable to everyone once another rule has been added.
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        (new RuleBasedAccessControl($rules))->authorizeAttribute(
+            $this->admin(),
+            new Dn(self::USER_DN),
+            'userPassword',
+            AttributeAccess::Read,
+        );
+    }
+
+    public function test_appendControlRules_leaves_existing_rules_matching_first(): void
+    {
+        $rules = AclRules::fromEmpty()
+            ->appendControlRules(ControlRule::deny(
+                Subject::anyone(),
+                Target::any(),
+                Control::OID_PROXY_AUTHORIZATION,
+            ))
+            ->appendControlRules(ControlRule::allow(
+                Subject::anyone(),
+                Target::any(),
+                Control::OID_PROXY_AUTHORIZATION,
+            ));
+
+        self::assertFalse((new RuleBasedAccessControl($rules))->mayUseControl(
+            $this->user(),
+            Control::OID_PROXY_AUTHORIZATION,
+        ));
+    }
+
+    public function test_prependControlRules_matches_ahead_of_existing_rules(): void
+    {
+        $rules = AclRules::fromEmpty()
+            ->appendControlRules(ControlRule::allow(
+                Subject::anyone(),
+                Target::any(),
+                Control::OID_PROXY_AUTHORIZATION,
+            ))
+            ->prependControlRules(ControlRule::deny(
+                Subject::anyone(),
+                Target::any(),
+                Control::OID_PROXY_AUTHORIZATION,
+            ));
+
+        self::assertFalse((new RuleBasedAccessControl($rules))->mayUseControl(
+            $this->user(),
+            Control::OID_PROXY_AUTHORIZATION,
+        ));
     }
 
     private function user(): TokenInterface

@@ -335,36 +335,26 @@ final class LdapServerCommand extends Command
         }
 
         if ($external && $input->getOption('external-allow-proxy') === true) {
-            // The with* methods replace rather than append, so carry the existing rules through.
-            $rules = $options->getAclRules();
             $options->setAclRules(
-                $rules->withControlRules(
-                    ...$rules->controls,
-                    ...[ControlRule::allow(
-                        Subject::dn('cn=extuser,dc=foo,dc=bar'),
-                        Target::subtree('dc=foo,dc=bar'),
-                        Control::OID_PROXY_AUTHORIZATION,
-                    )],
-                ),
+                $options->getAclRules()->appendControlRules(ControlRule::allow(
+                    Subject::dn('cn=extuser,dc=foo,dc=bar'),
+                    Target::subtree('dc=foo,dc=bar'),
+                    Control::OID_PROXY_AUTHORIZATION,
+                )),
             );
         }
 
         if ($input->getOption('allow-sync') === true) {
-            $rules = $options->getAclRules();
             $options->setAclRules(
-                $rules->withControlRules(
-                    ...$rules->controls,
-                    ...[ControlRule::allow(
-                        Subject::dn('cn=user,dc=foo,dc=bar'),
-                        Target::subtree('dc=foo,dc=bar'),
-                        Control::OID_SYNC_REQUEST,
-                    )],
-                ),
+                $options->getAclRules()->appendControlRules(ControlRule::allow(
+                    Subject::dn('cn=user,dc=foo,dc=bar'),
+                    Target::subtree('dc=foo,dc=bar'),
+                    Control::OID_SYNC_REQUEST,
+                )),
             );
         }
 
         if ($input->getOption('allow-ppolicy-forward') === true) {
-            $rules = $options->getAclRules();
             $options
                 ->setPasswordPolicy(new PasswordPolicy(
                     lockout: new PasswordLockoutRules(
@@ -373,12 +363,11 @@ final class LdapServerCommand extends Command
                     ),
                 ))
                 ->setAclRules(
-                    $rules->withExtendedOperationRules(
-                        ...$rules->extendedOps,
-                        ...[ExtendedOperationRule::allow(
+                    $options->getAclRules()->appendExtendedOperationRules(
+                        ExtendedOperationRule::allow(
                             Subject::dn('cn=user,dc=foo,dc=bar'),
                             ExtendedRequest::OID_PPOLICY_STATE_FORWARD,
-                        )],
+                        ),
                     ),
                 );
         }

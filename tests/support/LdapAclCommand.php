@@ -146,7 +146,7 @@ class LdapAclCommand extends Command
                 ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL))
                 ->setAclRules(
                     (AclRules::fromEmpty())
-                        ->withOperationRules(
+                        ->replaceOperationRules(
                             OperationRule::allow(
                                 Subject::group('cn=admins,dc=foo,dc=bar'),
                             ),
@@ -175,7 +175,7 @@ class LdapAclCommand extends Command
                             ),
                             OperationRule::deny(Subject::anyone()),
                         )
-                        ->withAttributeRules(
+                        ->replaceAttributeRules(
                             // Self may set its own password but never read it back.
                             AttributeRule::allow(
                                 Subject::self(),
@@ -209,7 +209,7 @@ class LdapAclCommand extends Command
                             )->forWrite(),
                         )
                         // userPassword ships confidential, so reading it needs a grant on top of the rules above.
-                        ->withConfidentialAccess(
+                        ->replaceConfidentialAccess(
                             ConfidentialAccessRule::allow(
                                 Subject::group('cn=admins,dc=foo,dc=bar'),
                                 'userPassword',
