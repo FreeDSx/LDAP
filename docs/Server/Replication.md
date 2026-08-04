@@ -42,7 +42,7 @@ $syncGrant = ControlRule::allow(
 );
 
 // Add that grant to your directory's AclRules (see the Access Control page for the rest).
-$aclRules = $myAclRules->withControlRules($syncGrant);
+$aclRules = $myAclRules->appendControlRules($syncGrant);
 
 // A storage config that is visible across connections (see Storage and Runner Requirements below).
 $storageConfig = PdoConfig::forSqlite('/var/lib/freedsx/directory.sqlite');

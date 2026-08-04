@@ -58,23 +58,41 @@ AclRules::secureDefault()
     ->withReplicaGrants(Subject::dn('cn=replica,dc=example,dc=com'));
 ```
 
-The two families of method behave differently. The [grant helpers](#grant-helpers) such as `withReplicaGrants()` append
-to the current rules. The `with*Rules()` setters replace a whole category, so `withControlRules()` called on
-`secureDefault()` discards the control grants the secure default installed for the administrator. To add to a
-category with a setter, spread the existing rules first:
+Each category has three setters. Rules are evaluated in order and the first match wins, so the one you pick decides
+precedence:
+
+| Setter        | Effect                                                        |
+|---------------|---------------------------------------------------------------|
+| `append*`     | Adds to the end, so existing rules match first.                |
+| `prepend*`    | Adds to the front, so the new rules match first.               |
+| `replace*`    | Discards the whole category, including the secure default's.   |
+
+`append*` is what you want when composing on `secureDefault()`:
 
 ```php
 $rules = AclRules::secureDefault(Subject::group('cn=admins,ou=groups,dc=example,dc=com'));
 
-$rules = $rules->withControlRules(
-    ...$rules->controls,
-    ...[ControlRule::allow(
-        Subject::dn('cn=replica,dc=example,dc=com'),
-        Target::subtree('dc=example,dc=com'),
-        Control::OID_SYNC_REQUEST,
-    )],
+$rules = $rules->appendControlRules(ControlRule::allow(
+    Subject::dn('cn=replica,dc=example,dc=com'),
+    Target::subtree('dc=example,dc=com'),
+    Control::OID_SYNC_REQUEST,
+));
+```
+
+A deny only takes effect if it is matched before anything that would allow the same thing, so use `prepend*` for it:
+
+```php
+$rules = $rules->prependAttributeRules(
+    AttributeRule::deny(
+        Subject::anyone(),
+        Target::any(),
+        'employeeNumber',
+    )->forRead(),
 );
 ```
+
+`replace*` drops what the secure default installed, including the `userPassword` protection, so reach for it only
+when you are defining a category from scratch.
 
 Building from `AclRules::fromEmpty()` instead gives a blank policy with no credential protection, so a `userPassword`
 rule is then yours to add. Composing on `secureDefault()` is the safe default. To apply just the credential protection to a
@@ -82,7 +100,7 @@ policy you build from scratch, use `AclRules::withCredentialProtection()`:
 
 ```php
 AclRules::fromEmpty()
-    ->withOperationRules(/* your rules */)
+    ->replaceOperationRules(/* your rules */)
     ->withCredentialProtection(Subject::group('cn=admins,ou=groups,dc=example,dc=com'));
 ```
 
@@ -118,7 +136,7 @@ read-only replica it bypasses access control for reads, but writes are still ref
 
 Bundle operation, attribute, and control rules in an `AclRules` object and set it on `ServerOptions`. Rules are
 evaluated in definition order (first match wins). If no rule matches, a configurable default effect applies (deny by
-default). `AclRules` is immutable; the `with*` methods are variadic and return a new instance.
+default). `AclRules` is immutable; every setter is variadic and returns a new instance.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
@@ -135,7 +153,7 @@ $server = new LdapServer(
     (new ServerOptions())
         ->setAclRules(
             AclRules::fromEmpty()
-                ->withOperationRules(
+                ->replaceOperationRules(
                     // Admin group can do anything.
                     OperationRule::allow(
                         Subject::group('cn=admins,dc=example,dc=com'),
@@ -156,7 +174,7 @@ $server = new LdapServer(
                     // Deny everything else.
                     OperationRule::deny(Subject::anyone()),
                 )
-                ->withAttributeRules(
+                ->replaceAttributeRules(
                     // Users can see their own userPassword.
                     AttributeRule::allow(
                         Subject::self(),
@@ -378,7 +396,7 @@ Attribute rules are enforced in three places:
 - **Add / Modify**: the request is rejected if the bound user is denied access to any attribute being written.
 
 ```php
-AclRules::fromEmpty()->withAttributeRules(
+AclRules::fromEmpty()->replaceAttributeRules(
     // Only admins can see or write userPassword.
     AttributeRule::allow(
         Subject::group('cn=admins,dc=example,dc=com'),
@@ -415,7 +433,7 @@ appears in a result:
 Access is granted with a subject-only rule:
 
 ```php
-AclRules::fromEmpty()->withConfidentialAccess(
+AclRules::fromEmpty()->replaceConfidentialAccess(
     // Named attributes, or ConfidentialAccessRule::allowAny() for every confidential attribute.
     ConfidentialAccessRule::allow(
         Subject::group('cn=admins,dc=example,dc=com'),
@@ -467,7 +485,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 
 // Only the admin group may relax schema constraints, and only under ou=migrate.
-AclRules::fromEmpty()->withControlRules(
+AclRules::fromEmpty()->replaceControlRules(
     ControlRule::allow(
         Subject::group('cn=admins,dc=example,dc=com'),
         Target::subtree('ou=migrate,dc=example,dc=com'),
@@ -487,7 +505,7 @@ list matches all). They are denied by default. The set of gated OIDs is configur
 ```php
 use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;
 
-AclRules::fromEmpty()->withExtendedOperationRules(
+AclRules::fromEmpty()->replaceExtendedOperationRules(
     ExtendedOperationRule::allow(
         Subject::group('cn=admins,ou=groups,dc=example,dc=com'),
         '1.3.6.1.4.1....',

@@ -96,7 +96,10 @@ final readonly class AclRules
         );
     }
 
-    public function withOperationRules(OperationRule ...$operations): self
+    /**
+     * Discards every operation rule already present, including any the secure default installed.
+     */
+    public function replaceOperationRules(OperationRule ...$operations): self
     {
         return new self(
             $operations,
@@ -107,7 +110,10 @@ final readonly class AclRules
         );
     }
 
-    public function withAttributeRules(AttributeRule ...$attributes): self
+    /**
+     * Discards every attribute rule already present, including the credential protection of the secure default.
+     */
+    public function replaceAttributeRules(AttributeRule ...$attributes): self
     {
         return new self(
             $this->operations,
@@ -118,7 +124,10 @@ final readonly class AclRules
         );
     }
 
-    public function withControlRules(ControlRule ...$controls): self
+    /**
+     * Discards every control rule already present, including any the secure default installed.
+     */
+    public function replaceControlRules(ControlRule ...$controls): self
     {
         return new self(
             $this->operations,
@@ -129,7 +138,10 @@ final readonly class AclRules
         );
     }
 
-    public function withExtendedOperationRules(ExtendedOperationRule ...$extendedOps): self
+    /**
+     * Discards every extended operation rule already present, including any the secure default installed.
+     */
+    public function replaceExtendedOperationRules(ExtendedOperationRule ...$extendedOps): self
     {
         return new self(
             $this->operations,
@@ -142,8 +154,10 @@ final readonly class AclRules
 
     /**
      * Rules gating reads of schema attributes marked X-CONFIDENTIAL; nothing may read them without a grant.
+     *
+     * Discards every confidential rule already present.
      */
-    public function withConfidentialAccess(ConfidentialAccessRule ...$confidential): self
+    public function replaceConfidentialAccess(ConfidentialAccessRule ...$confidential): self
     {
         return new self(
             $this->operations,
@@ -155,6 +169,116 @@ final readonly class AclRules
     }
 
     /**
+     * Append operation rules, so anything already present matches first.
+     */
+    public function appendOperationRules(OperationRule ...$operations): self
+    {
+        return $this->replaceOperationRules(
+            ...$this->operations,
+            ...$operations,
+        );
+    }
+
+    /**
+     * Append attribute rules, so anything already present matches first.
+     */
+    public function appendAttributeRules(AttributeRule ...$attributes): self
+    {
+        return $this->replaceAttributeRules(
+            ...$this->attributes,
+            ...$attributes,
+        );
+    }
+
+    /**
+     * Append control rules, so anything already present matches first.
+     */
+    public function appendControlRules(ControlRule ...$controls): self
+    {
+        return $this->replaceControlRules(
+            ...$this->controls,
+            ...$controls,
+        );
+    }
+
+    /**
+     * Append extended operation rules, so anything already present matches first.
+     */
+    public function appendExtendedOperationRules(ExtendedOperationRule ...$extendedOps): self
+    {
+        return $this->replaceExtendedOperationRules(
+            ...$this->extendedOps,
+            ...$extendedOps,
+        );
+    }
+
+    /**
+     * Append confidential access rules, so anything already present matches first.
+     */
+    public function appendConfidentialAccess(ConfidentialAccessRule ...$confidential): self
+    {
+        return $this->replaceConfidentialAccess(
+            ...$this->confidential,
+            ...$confidential,
+        );
+    }
+
+    /**
+     * Prepend operation rules, so these match ahead of anything already present.
+     */
+    public function prependOperationRules(OperationRule ...$operations): self
+    {
+        return $this->replaceOperationRules(
+            ...$operations,
+            ...$this->operations,
+        );
+    }
+
+    /**
+     * Prepend attribute rules, so these match ahead of anything already present.
+     */
+    public function prependAttributeRules(AttributeRule ...$attributes): self
+    {
+        return $this->replaceAttributeRules(
+            ...$attributes,
+            ...$this->attributes,
+        );
+    }
+
+    /**
+     * Prepend control rules, so these match ahead of anything already present.
+     */
+    public function prependControlRules(ControlRule ...$controls): self
+    {
+        return $this->replaceControlRules(
+            ...$controls,
+            ...$this->controls,
+        );
+    }
+
+    /**
+     * Prepend extended operation rules, so these match ahead of anything already present.
+     */
+    public function prependExtendedOperationRules(ExtendedOperationRule ...$extendedOps): self
+    {
+        return $this->replaceExtendedOperationRules(
+            ...$extendedOps,
+            ...$this->extendedOps,
+        );
+    }
+
+    /**
+     * Prepend confidential access rules, so these match ahead of anything already present.
+     */
+    public function prependConfidentialAccess(ConfidentialAccessRule ...$confidential): self
+    {
+        return $this->replaceConfidentialAccess(
+            ...$confidential,
+            ...$this->confidential,
+        );
+    }
+
+    /**
      * Grant a replica's bind identity the privileged capabilities it needs: the content-sync control over $target,
      * the password-policy forward extended operation, and confidential attributes so those replicate.
      */
@@ -162,29 +286,17 @@ final readonly class AclRules
         SubjectMatcherInterface $replica,
         TargetMatcherInterface $target = new AnyTargetMatcher(),
     ): self {
-        return new self(
-            $this->operations,
-            $this->attributes,
-            [
-                ...$this->controls,
-                ControlRule::allow(
-                    $replica,
-                    $target,
-                    Control::OID_SYNC_REQUEST,
-                ),
-            ],
-            [
-                ...$this->extendedOps,
-                ExtendedOperationRule::allow(
-                    $replica,
-                    ExtendedRequest::OID_PPOLICY_STATE_FORWARD,
-                ),
-            ],
-            [
-                ...$this->confidential,
-                ConfidentialAccessRule::allowAny($replica),
-            ],
-        );
+        return $this
+            ->appendControlRules(ControlRule::allow(
+                $replica,
+                $target,
+                Control::OID_SYNC_REQUEST,
+            ))
+            ->appendExtendedOperationRules(ExtendedOperationRule::allow(
+                $replica,
+                ExtendedRequest::OID_PPOLICY_STATE_FORWARD,
+            ))
+            ->appendConfidentialAccess(ConfidentialAccessRule::allowAny($replica));
     }
 
     /**
@@ -235,31 +347,21 @@ final readonly class AclRules
      * Controls, extended operations, and confidential attributes are gated separately and are not included.
      *
      * @see self::withCredentialProtection()
-     * @see self::withConfidentialAccess()
+     * @see self::replaceConfidentialAccess()
      */
     public function withFullAccess(
         SubjectMatcherInterface $subject,
         TargetMatcherInterface $target = new AnyTargetMatcher(),
     ): self {
-        return new self(
-            operations: [
-                ...$this->operations,
-                OperationRule::allow(
-                    $subject,
-                    $target,
-                ),
-            ],
-            attributes: [
-                ...$this->attributes,
-                AttributeRule::allow(
-                    $subject,
-                    $target,
-                )->forWrite(),
-            ],
-            controls: $this->controls,
-            extendedOps: $this->extendedOps,
-            confidential: $this->confidential,
-        );
+        return $this
+            ->appendOperationRules(OperationRule::allow(
+                $subject,
+                $target,
+            ))
+            ->appendAttributeRules(AttributeRule::allow(
+                $subject,
+                $target,
+            )->forWrite());
     }
 
     /**
@@ -309,23 +411,13 @@ final readonly class AclRules
                 )->forWrite(),
             ];
 
-        return new self(
-            operations: [
-                ...$this->operations,
-                OperationRule::allow(
-                    Subject::self(),
-                    $anyTarget,
-                    OperationType::Modify,
-                ),
-            ],
-            attributes: [
-                ...$this->attributes,
-                ...$selfWrites,
-            ],
-            controls: $this->controls,
-            extendedOps: $this->extendedOps,
-            confidential: $this->confidential,
-        );
+        return $this
+            ->appendOperationRules(OperationRule::allow(
+                Subject::self(),
+                $anyTarget,
+                OperationType::Modify,
+            ))
+            ->appendAttributeRules(...$selfWrites);
     }
 
     /**
@@ -388,13 +480,11 @@ final readonly class AclRules
             'userPassword',
         )->forRead();
 
-        return new self(
-            operations: [...$passwordModify, ...$this->operations],
-            attributes: [...$userPassword, ...$this->attributes],
-            controls: [...$controls, ...$this->controls],
-            extendedOps: [...$extendedOps, ...$this->extendedOps],
-            confidential: $this->confidential,
-        );
+        return $this
+            ->prependOperationRules(...$passwordModify)
+            ->prependAttributeRules(...$userPassword)
+            ->prependControlRules(...$controls)
+            ->prependExtendedOperationRules(...$extendedOps);
     }
 
     /**
@@ -416,20 +506,13 @@ final readonly class AclRules
                 ),
             ];
 
-        return new self(
-            operations: [
-                ...$grant,
-                OperationRule::deny(
-                    Subject::anyone(),
-                    $target,
-                    OperationType::Search,
-                ),
-                ...$this->operations,
-            ],
-            attributes: $this->attributes,
-            controls: $this->controls,
-            extendedOps: $this->extendedOps,
-            confidential: $this->confidential,
+        return $this->prependOperationRules(
+            ...$grant,
+            ...[OperationRule::deny(
+                Subject::anyone(),
+                $target,
+                OperationType::Search,
+            )],
         );
     }
 }

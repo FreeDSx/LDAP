@@ -265,9 +265,8 @@ final class LdapBackendStorageCommand extends Command
             ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));
 
         if ($input->getOption('allow-relax')) {
-            // Compose on the current rules (the secure default): grant the relax control.
             $serverOptions->setAclRules(
-                $serverOptions->getAclRules()->withControlRules(
+                $serverOptions->getAclRules()->appendControlRules(
                     ControlRule::allow(
                         Subject::authenticated(),
                         Target::any(),
@@ -278,9 +277,8 @@ final class LdapBackendStorageCommand extends Command
         }
 
         if ($input->getOption('allow-proxy')) {
-            // Compose on the current rules (the secure default): grant cn=user proxied-auth over ou=people.
             $serverOptions->setAclRules(
-                $serverOptions->getAclRules()->withControlRules(
+                $serverOptions->getAclRules()->appendControlRules(
                     ControlRule::allow(
                         Subject::dn('cn=user,dc=foo,dc=bar'),
                         Target::subtree('ou=people,dc=foo,dc=bar'),
@@ -306,14 +304,15 @@ final class LdapBackendStorageCommand extends Command
         }
 
         if ($input->getOption('hide-rootdse-vendor')) {
+            // Prepended rather than appended, since a deny only takes effect if it is matched first.
             $rules = $serverOptions->getAclRules();
             $serverOptions->setAclRules(
-                $rules->withAttributeRules(
-                    ...[AttributeRule::deny(
+                $rules->replaceAttributeRules(
+                    AttributeRule::deny(
                         Subject::anyone(),
                         Target::dn(''),
                         'vendorName',
-                    )->forRead()],
+                    )->forRead(),
                     ...$rules->attributes,
                 ),
             );
