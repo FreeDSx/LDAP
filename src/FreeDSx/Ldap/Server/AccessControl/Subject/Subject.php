@@ -78,19 +78,19 @@ final class Subject
      * Matches when the bound DN is a member of the given LDAP group entry.
      *
      * The backend is injected by the framework at server-start time.
-     * The group entry is cached per token ID. $maxCacheSize bounds the number of cached entries (FIFO).
      *
-     * @param int $maxCacheSize Max cached entries; 0 disables caching (always fetches fresh from the backend).
+     * @param int $cacheTtl Seconds a membership read is reused for, which is also how long dropping a member may take
+     *                      to bite; zero reads the group entry every time.
      */
     public static function group(
         string $groupDn,
         string $memberAttribute = 'member',
-        int $maxCacheSize = 200,
+        int $cacheTtl = 5,
     ): SubjectMatcherInterface {
         return new GroupSubjectMatcher(
             $groupDn,
             $memberAttribute,
-            $maxCacheSize,
+            $cacheTtl,
         );
     }
 
