@@ -230,6 +230,67 @@ final class RuleBasedAccessControlTest extends TestCase
         ));
     }
 
+    public function test_may_use_control_honours_an_earlier_deny_over_a_later_allow(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            controls: [
+                ControlRule::deny(
+                    new AnySubjectMatcher(),
+                    new AnyTargetMatcher(),
+                    Control::OID_PROXY_AUTHORIZATION,
+                ),
+                ControlRule::allow(
+                    new AnySubjectMatcher(),
+                    new AnyTargetMatcher(),
+                    Control::OID_PROXY_AUTHORIZATION,
+                ),
+            ],
+        ));
+
+        self::assertFalse($subject->mayUseControl(
+            $this->bindToken,
+            Control::OID_PROXY_AUTHORIZATION,
+        ));
+    }
+
+    public function test_may_use_control_agrees_with_authorize_control_on_the_same_rules(): void
+    {
+        $rules = AclRules::fromEmpty(
+            controls: [
+                ControlRule::deny(
+                    new AnySubjectMatcher(),
+                    new AnyTargetMatcher(),
+                    Control::OID_PROXY_AUTHORIZATION,
+                ),
+                ControlRule::allow(
+                    new AnySubjectMatcher(),
+                    new AnyTargetMatcher(),
+                    Control::OID_PROXY_AUTHORIZATION,
+                ),
+            ],
+        );
+        $subject = new RuleBasedAccessControl($rules);
+
+        $authorized = true;
+        try {
+            $subject->authorizeControl(
+                $this->bindToken,
+                $this->bindToken->getResolvedDn(),
+                Control::OID_PROXY_AUTHORIZATION,
+            );
+        } catch (OperationException) {
+            $authorized = false;
+        }
+
+        self::assertSame(
+            $authorized,
+            $subject->mayUseControl(
+                $this->bindToken,
+                Control::OID_PROXY_AUTHORIZATION,
+            ),
+        );
+    }
+
     public function test_may_use_control_is_false_for_an_unauthenticated_token(): void
     {
         $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
