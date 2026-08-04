@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap;
 
 use Closure;
+use FreeDSx\Ldap\Server\Config\ConfidentialityRequirement;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
@@ -34,6 +35,8 @@ interface ServerListenerOptionsInterface
     public function isRequireAuthentication(): bool;
 
     public function isAllowAnonymous(): bool;
+
+    public function getRequireConfidentiality(): ConfidentialityRequirement;
 
     /**
      * @return string[]

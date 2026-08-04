@@ -25,6 +25,7 @@ use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Middleware\AuthorizationResolutionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\BindMiddleware;
+use FreeDSx\Ldap\Server\Middleware\ConfidentialityMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareChain;
 use FreeDSx\Ldap\Server\Middleware\RequestValidationMiddleware;
 use FreeDSx\Ldap\Server\ServerConnectionScaffoldingTrait;
@@ -76,6 +77,11 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
         $pipeline = new MiddlewareChain(
             [
                 new RequestValidationMiddleware(),
+                // Ahead of the bind, so a credential is refused before it is read rather than after it is compared.
+                new ConfidentialityMiddleware(
+                    $this->options,
+                    $queue,
+                ),
                 new BindMiddleware(
                     $serverAuthorization,
                     new Authenticator($authenticators),

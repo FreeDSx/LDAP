@@ -56,6 +56,7 @@ use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AuthorizationResolutionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\BindMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ConfidentialAttributeMiddleware;
+use FreeDSx\Ldap\Server\Middleware\ConfidentialityMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
 use FreeDSx\Ldap\Server\Middleware\MetricsMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuditMiddleware;
@@ -386,6 +387,11 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                 // Order matters: AuthorizationResolutionMiddleware injects the token via withToken(), so
                 // every middleware after it may rely on tokenOrFail(). Keep token consumers below it.
                 new RequestValidationMiddleware(),
+                // Ahead of the bind, so a credential is refused before it is read rather than after it is compared.
+                new ConfidentialityMiddleware(
+                    $options,
+                    $queue,
+                ),
                 new BindMiddleware(
                     $authorization,
                     new Authenticator($authenticators),

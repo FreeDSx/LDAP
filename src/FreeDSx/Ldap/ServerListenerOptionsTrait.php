@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap;
 
 use Closure;
+use FreeDSx\Ldap\Server\Config\ConfidentialityRequirement;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
@@ -33,6 +34,8 @@ trait ServerListenerOptionsTrait
     private bool $requireAuthentication = true;
 
     private bool $allowAnonymous = false;
+
+    private ConfidentialityRequirement $requireConfidentiality = ConfidentialityRequirement::None;
 
     private ?LoggerInterface $logger = null;
 
@@ -80,6 +83,24 @@ trait ServerListenerOptionsTrait
     public function setAllowAnonymous(bool $allowAnonymous): self
     {
         $this->allowAnonymous = $allowAnonymous;
+
+        return $this;
+    }
+
+    public function getRequireConfidentiality(): ConfidentialityRequirement
+    {
+        return $this->requireConfidentiality;
+    }
+
+    /**
+     * Refuse to serve part or all of a session over an unprotected connection.
+     *
+     * A unix socket counts as protected, since the connection itself never traverses a network. Anything relaying a
+     * remote client into that socket is trusted to have protected the hop it terminated.
+     */
+    public function setRequireConfidentiality(ConfidentialityRequirement $requireConfidentiality): self
+    {
+        $this->requireConfidentiality = $requireConfidentiality;
 
         return $this;
     }

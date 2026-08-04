@@ -131,6 +131,14 @@ final class NetworkConfig
         return $this;
     }
 
+    /**
+     * Whether connections arrive over a local socket rather than a network.
+     */
+    public function isUnixSocket(): bool
+    {
+        return $this->transport === 'unix';
+    }
+
     public function getIdleTimeout(): int
     {
         return $this->idleTimeout;

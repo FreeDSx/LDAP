@@ -6,6 +6,7 @@ LDAP Server Configuration
     * [ServerOptions:setEventLogPolicy](#seteventlogpolicy)
     * [ServerOptions:setRequireAuthentication](#setrequireauthentication)
     * [ServerOptions:setAllowAnonymous](#setallowanonymous)
+    * [ServerOptions:setRequireConfidentiality](#setrequireconfidentiality)
 * [Network Configuration](#network-configuration)
     * [NetworkConfig:setIp](#setip)
     * [NetworkConfig:setPort](#setport)
@@ -133,6 +134,29 @@ Whether authentication (bind) should be required before an operation is allowed.
 Whether anonymous binds should be allowed.
 
 **Default**: `false`
+
+------------------
+#### setRequireConfidentiality
+
+How much of a session the server refuses to serve over an unprotected connection.
+
+```php
+use FreeDSx\Ldap\Server\Config\ConfidentialityRequirement;
+
+$options->setRequireConfidentiality(ConfidentialityRequirement::CredentialBind);
+```
+
+| Value            | Effect                                                                              |
+|------------------|-------------------------------------------------------------------------------------|
+| `None`           | Nothing is refused, including a password sent in the clear.                          |
+| `CredentialBind` | Refuses simple binds and SASL binds other than EXTERNAL. Anonymous reads still work. |
+| `AllOperations`  | Refuses every request apart from StartTLS, Unbind and Abandon.                       |
+
+A connection satisfies the requirement when it is encrypted, through either `setUseSsl` or a completed StartTLS, or
+when the transport is a unix socket. Configure [TLS](#tls) before turning this on, otherwise a unix transport is the
+only way left to satisfy it.
+
+**Default**: `ConfidentialityRequirement::None`
 
 ## Runner Configuration
 
