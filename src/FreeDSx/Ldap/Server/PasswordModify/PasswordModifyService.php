@@ -59,16 +59,27 @@ final readonly class PasswordModifyService
         AuthenticatedTokenInterface $token,
         ControlBag $controls,
     ): PasswordModifyResult {
-        $entry = $this->targetResolver->resolve(
+        $found = $this->targetResolver->find(
             $request,
             $token,
         );
-        $targetDn = $entry->getDn();
 
+        // Authorized ahead of reporting the absence, so a missing entry cannot be told from a forbidden one.
         $this->authorizeRequest(
             $token,
-            $targetDn,
+            $found?->getDn() ?? new Dn(''),
         );
+
+        if ($found === null) {
+            throw new OperationException(
+                'The target entry does not exist.',
+                ResultCode::NO_SUCH_OBJECT,
+            );
+        }
+
+        $entry = $found;
+        $targetDn = $entry->getDn();
+
         $this->verifyOldPassword(
             $request,
             $entry,

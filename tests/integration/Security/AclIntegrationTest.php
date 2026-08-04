@@ -734,6 +734,49 @@ final class AclIntegrationTest extends ServerTestCase
         );
     }
 
+    public function testPasswordModifyDoesNotRevealWhetherAForbiddenTargetExists(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $missing = $this->passwordModifyCodeFor('cn=ghost,ou=people,dc=foo,dc=bar');
+        $existing = $this->passwordModifyCodeFor('cn=alice,ou=people,dc=foo,dc=bar');
+
+        self::assertSame(
+            ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+            $missing,
+        );
+        self::assertSame(
+            $existing,
+            $missing,
+            'A forbidden target must answer the same whether or not it exists.',
+        );
+    }
+
+    public function testPasswordModifyStillReportsAMissingTargetToAnAuthorizedIdentity(): void
+    {
+        $this->authenticateAdmin();
+
+        self::assertSame(
+            ResultCode::NO_SUCH_OBJECT,
+            $this->passwordModifyCodeFor('cn=ghost,ou=people,dc=foo,dc=bar'),
+        );
+    }
+
+    private function passwordModifyCodeFor(string $dn): int
+    {
+        try {
+            $this->ldapClient()->send(Operations::passwordModify(
+                $dn,
+                'irrelevant',
+                'newpass123',
+            ));
+        } catch (OperationException $e) {
+            return $e->getCode();
+        }
+
+        self::fail('Expected an OperationException was not thrown.');
+    }
+
     private function bindHidden(): void
     {
         $this->ldapClient()->bind(
