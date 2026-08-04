@@ -286,6 +286,10 @@ TLS terminates at each hop: configure the **upstream** hop on the `ClientOptions
 or `ProxyOptions` `useStartTls: true`), and the **downstream** hop on the `ProxyServerOptions` network config
 (LDAPS, or a client StartTLS upgrade using the configured server cert).
 
+`ProxyServerOptions` also accepts
+[setRequireConfidentiality](Configuration.md#setrequireconfidentiality), which refuses proxied binds that would
+otherwise carry a password to the proxy in the clear.
+
 **Note**: only simple and anonymous binds are proxied (SASL is not), and every request is forwarded to the
 single configured upstream.
 

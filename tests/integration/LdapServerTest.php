@@ -426,6 +426,104 @@ final class LdapServerTest extends ServerTestCase
         $this->assertNotNull($result);
     }
 
+    public function testItRefusesASimpleBindInTheClearWhenConfidentialityIsRequired(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess('tcp', ['--require-confidentiality=bind']);
+
+        try {
+            $this->ldapClient()->bind(
+                'cn=user,dc=foo,dc=bar',
+                '12345',
+            );
+            $this->fail('Expected the bind to be refused.');
+        } catch (BindException $e) {
+            $this->assertSame(
+                ResultCode::CONFIDENTIALITY_REQUIRED,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function testItAcceptsTheSameBindAfterStartTLS(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess('tcp', ['--require-confidentiality=bind']);
+
+        $this->ldapClient()->startTls();
+        $this->ldapClient()->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+
+        $this->assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    public function testItAcceptsABindOverSSLWhenConfidentialityIsRequired(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess('ssl', ['--require-confidentiality=bind']);
+
+        $this->ldapClient()->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+
+        $this->assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    public function testAUnixSocketSatisfiesTheConfidentialityRequirement(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess('unix', ['--require-confidentiality=bind']);
+
+        $this->ldapClient()->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+
+        $this->assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    public function testRequiringAllOperationsRefusesASearchInTheClear(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess('tcp', ['--require-confidentiality=all']);
+
+        try {
+            $this->ldapClient()->read('');
+            $this->fail('Expected the search to be refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::CONFIDENTIALITY_REQUIRED,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function testRequiringAllOperationsStillPermitsStartTLS(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess('tcp', ['--require-confidentiality=all']);
+
+        $this->ldapClient()->startTls();
+        $this->ldapClient()->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+
+        $this->assertNotNull($this->ldapClient()->read(''));
+    }
+
     public function testItCanHandleMultipleClients(): void
     {
         $this->ldapClient()->read();

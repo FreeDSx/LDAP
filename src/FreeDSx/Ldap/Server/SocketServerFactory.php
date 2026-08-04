@@ -35,7 +35,7 @@ class SocketServerFactory
 
     public function makeAndBind(): SocketServer
     {
-        $isUnixSocket = $this->network->getTransport() === 'unix';
+        $isUnixSocket = $this->network->isUnixSocket();
         $resource = $isUnixSocket
             ? $this->network->getUnixSocket()
             : $this->network->getIp();

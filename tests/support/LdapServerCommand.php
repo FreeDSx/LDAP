@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
+use FreeDSx\Ldap\Server\Config\ConfidentialityRequirement;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\ServerOptions;
@@ -141,6 +142,13 @@ final class LdapServerCommand extends Command
                 'Allow anonymous bind',
             )
             ->addOption(
+                'require-confidentiality',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Refuse unprotected connections: none, bind (credential-bearing binds), or all (every operation)',
+                'none',
+            )
+            ->addOption(
                 'external',
                 null,
                 InputOption::VALUE_NONE,
@@ -236,6 +244,12 @@ final class LdapServerCommand extends Command
             $useSsl = true;
         }
 
+        $confidentiality = match ($this->getStringOption($input, 'require-confidentiality')) {
+            'bind' => ConfidentialityRequirement::CredentialBind,
+            'all' => ConfidentialityRequirement::AllOperations,
+            default => ConfidentialityRequirement::None,
+        };
+
         $entries = [];
 
         if ($external) {
@@ -275,6 +289,7 @@ final class LdapServerCommand extends Command
         $options = (new ServerOptions($this->createStorageConfig($storageType), $network))
             ->setRunnerConfig(new RunnerConfig($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl))
             ->setAllowAnonymous($allowAnonymous)
+            ->setRequireConfidentiality($confidentiality)
             ->setAdministrators(Subject::dn(self::ADMIN_DN))
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
             ->setMaxSearchPagedLookthrough((int) $this->getStringOption($input, 'max-search-paged-lookthrough'))
