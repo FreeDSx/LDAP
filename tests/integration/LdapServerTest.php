@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
@@ -524,6 +525,91 @@ final class LdapServerTest extends ServerTestCase
         $this->assertNotNull($this->ldapClient()->read(''));
     }
 
+    public function testAMalformedDnIsAnsweredRatherThanEndingTheSession(): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->send(Operations::rename(
+                'garbage-no-equals',
+                'cn=x',
+                true,
+            ));
+            $this->fail('Expected the rename to be refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::INVALID_DN_SYNTAX,
+                $e->getCode(),
+            );
+        }
+
+        // The session must survive: a malformed DN is one operation failing, not a protocol error.
+        $this->assertNotNull($this->ldapClient()->read(''));
+    }
+
+    public function testAnUnescapedCommaInANewRdnIsRefused(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create($this->personEntry('comma-src'));
+
+        try {
+            $this->ldapClient()->send(Operations::rename(
+                'cn=comma-src,dc=foo,dc=bar',
+                new Rdn('cn', 'Smith, John'),
+                true,
+            ));
+            $this->fail('Expected the rename to be refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::INVALID_DN_SYNTAX,
+                $e->getCode(),
+            );
+        }
+
+        $this->assertNotNull($this->ldapClient()->read('cn=comma-src,dc=foo,dc=bar'));
+    }
+
+    public function testAnAddWithAMalformedDnIsAnsweredRatherThanEndingTheSession(): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->send(Operations::add(Entry::fromArray('garbage-no-equals', [
+                'objectClass' => ['inetOrgPerson'],
+                'cn' => ['x'],
+                'sn' => ['y'],
+            ])));
+            $this->fail('Expected the add to be refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::INVALID_DN_SYNTAX,
+                $e->getCode(),
+            );
+        }
+
+        $this->assertNotNull($this->ldapClient()->read(''));
+    }
+
+    public function testASearchWithAMalformedBaseDnReportsNoSuchObject(): void
+    {
+        $this->authenticateAdmin();
+
+        // The search path only normalizes, which never decomposes the DN, so there is nothing to reject.
+        try {
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('garbage-no-equals')
+                    ->useSubtreeScope(),
+            );
+            $this->fail('Expected the search to be refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::NO_SUCH_OBJECT,
+                $e->getCode(),
+            );
+        }
+    }
+
     public function testItCanHandleMultipleClients(): void
     {
         $this->ldapClient()->read();
@@ -648,5 +734,14 @@ final class LdapServerTest extends ServerTestCase
                 // Connection may already be closed; ignore unbind failures.
             }
         }
+    }
+
+    private function personEntry(string $cn): Entry
+    {
+        return Entry::fromArray("cn={$cn},dc=foo,dc=bar", [
+            'objectClass' => ['inetOrgPerson'],
+            'cn' => [$cn],
+            'sn' => ['Test'],
+        ]);
     }
 }

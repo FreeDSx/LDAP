@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Entry;
 use ArrayIterator;
 use Countable;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Exception\InvalidDnSyntaxException;
 use FreeDSx\Ldap\Exception\UnexpectedValueException;
 use IteratorAggregate;
 use Stringable;
@@ -261,7 +262,7 @@ class Dn implements IteratorAggregate, Countable, Stringable
         $pieces = ($pieces === false) ? [] : $pieces;
 
         if (count($pieces) === 0) {
-            throw new UnexpectedValueException(sprintf(
+            throw new InvalidDnSyntaxException(sprintf(
                 'The DN value "%s" is not valid.',
                 $this->dn,
             ));

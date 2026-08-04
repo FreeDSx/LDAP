@@ -44,16 +44,34 @@ final class WriteCommandFactory
                 $request->getDn(),
                 $request->getChanges(),
             ),
-            $request instanceof ModifyDnRequest => new MoveCommand(
-                $request->getDn(),
-                $request->getNewRdn(),
-                $request->getDeleteOldRdn(),
-                $request->getNewParentDn(),
-            ),
+            $request instanceof ModifyDnRequest => $this->moveCommand($request),
             default => throw new OperationException(
                 'The requested operation is not supported.',
                 ResultCode::NO_SUCH_OPERATION,
             ),
         };
+    }
+
+    /**
+     * An unescaped comma parses without complaint and then reads as an RDN separator, which would land the entry
+     * under a name the client never asked for.
+     *
+     * @throws OperationException
+     */
+    private function moveCommand(ModifyDnRequest $request): MoveCommand
+    {
+        if ($request->getNewRdn()->hasUnescapedComma()) {
+            throw new OperationException(
+                'The new RDN contains an unescaped comma.',
+                ResultCode::INVALID_DN_SYNTAX,
+            );
+        }
+
+        return new MoveCommand(
+            $request->getDn(),
+            $request->getNewRdn(),
+            $request->getDeleteOldRdn(),
+            $request->getNewParentDn(),
+        );
     }
 }
