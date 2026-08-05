@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\AccessControl;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -84,7 +85,8 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
         $effect = $this->resolveAttributeEffect(
             $token,
             $dn,
-            strtolower($attribute),
+            // Options are stripped here, so a rule on the base type cannot be sidestepped by naming one.
+            Attribute::normalizeName($attribute),
             $access,
             $this->defaultEffectFor($access),
         );

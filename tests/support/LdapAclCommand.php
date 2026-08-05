@@ -39,6 +39,13 @@ class LdapAclCommand extends Command
     public const HIDDEN_PASSWORD = 'hiddenpass';
 
     /**
+     * Holds every attribute write under ou=people, so the userPassword deny is the only thing stopping it.
+     */
+    public const DELEGATE_DN = 'cn=delegate,dc=foo,dc=bar';
+
+    public const DELEGATE_PASSWORD = 'delegatepass';
+
+    /**
      * Defines secretCode as confidential; loaded so the harness exercises the same path an operator would.
      */
     private const SECRET_CODE_SCHEMA = __DIR__ . '/../resources/schema/acl-secret-code.ldif';
@@ -67,6 +74,7 @@ class LdapAclCommand extends Command
         $userPasswordHash = '{SHA}' . base64_encode(sha1('12345', true));
         $alicePasswordHash = '{SHA}' . base64_encode(sha1('alicepass', true));
         $hiddenPasswordHash = '{SHA}' . base64_encode(sha1(self::HIDDEN_PASSWORD, true));
+        $delegatePasswordHash = '{SHA}' . base64_encode(sha1(self::DELEGATE_PASSWORD, true));
 
         $entries = [
             new Entry(
@@ -121,6 +129,13 @@ class LdapAclCommand extends Command
                 new Attribute('cn', 'bob2'),
                 new Attribute('sn', 'Bob'),
                 new Attribute('objectClass', 'inetOrgPerson'),
+            ),
+            new Entry(
+                new Dn(self::DELEGATE_DN),
+                new Attribute('cn', 'delegate'),
+                new Attribute('sn', 'Delegate'),
+                new Attribute('objectClass', 'inetOrgPerson'),
+                new Attribute('userPassword', $delegatePasswordHash),
             ),
             new Entry(
                 new Dn(self::HIDDEN_DN),
@@ -206,6 +221,11 @@ class LdapAclCommand extends Command
                                 Subject::authenticated(),
                                 Target::subtree('ou=people,dc=foo,dc=bar'),
                                 'cn',
+                            )->forWrite(),
+                            // Every attribute write under ou=people, still under the userPassword deny above.
+                            AttributeRule::allow(
+                                Subject::dn(self::DELEGATE_DN),
+                                Target::subtree('ou=people,dc=foo,dc=bar'),
                             )->forWrite(),
                         )
                         // userPassword ships confidential, so reading it needs a grant on top of the rules above.
