@@ -544,6 +544,68 @@ final class RuleBasedAccessControlTest extends TestCase
         );
     }
 
+    public function test_a_deny_rule_governs_the_same_attribute_named_with_an_option(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(attributes: [
+            AttributeRule::deny(
+                new AnySubjectMatcher(),
+                new AnyTargetMatcher(),
+                'userPassword',
+            )->forRead(),
+        ]));
+
+        $subject->authorizeAttribute(
+            $this->bindToken,
+            $this->dn,
+            'userPassword;binary',
+            AttributeAccess::Read,
+        );
+    }
+
+    public function test_an_allow_rule_governs_the_same_attribute_named_with_an_option(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(attributes: [
+            AttributeRule::allow(
+                new AnySubjectMatcher(),
+                new AnyTargetMatcher(),
+                'userPassword',
+            )->forWrite(),
+        ]));
+
+        $subject->authorizeAttribute(
+            $this->bindToken,
+            $this->dn,
+            'userPassword;x',
+            AttributeAccess::Write,
+        );
+    }
+
+    public function test_an_option_does_not_widen_a_rule_to_a_different_attribute(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(attributes: [
+            AttributeRule::allow(
+                new AnySubjectMatcher(),
+                new AnyTargetMatcher(),
+                'userPassword',
+            )->forWrite(),
+        ]));
+
+        $subject->authorizeAttribute(
+            $this->bindToken,
+            $this->dn,
+            'userPasswordHistory',
+            AttributeAccess::Write,
+        );
+    }
+
     public function test_authorize_attribute_read_does_not_throw_when_no_rule_matches(): void
     {
         $this->expectNotToPerformAssertions();

@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Control\ReadEntry\PreReadResponseControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
@@ -355,6 +356,44 @@ final class AclIntegrationTest extends ServerTestCase
         );
 
         self::assertCount(1, $results);
+    }
+
+    public function testRenameCannotUseAnAttributeOptionToEvadeAWriteDeny(): void
+    {
+        $this->bindDelegate();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->ldapClient()->rename(
+            'uid=bob,ou=people,dc=foo,dc=bar',
+            new Rdn('userPassword;x', 'hunter2'),
+            false,
+        );
+    }
+
+    public function testAnEvadedRenameLeavesNoCredentialOnAPasswordlessEntry(): void
+    {
+        $this->bindDelegate();
+
+        try {
+            $this->ldapClient()->rename(
+                'uid=bob,ou=people,dc=foo,dc=bar',
+                new Rdn('userPassword;x', 'hunter2'),
+                false,
+            );
+        } catch (OperationException) {
+        }
+
+        $this->authenticateAdmin();
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::equal('uid', 'bob'))
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(1, $results);
+        self::assertNull($results->first()?->get('userPassword'));
     }
 
     public function testRenameAuthorizesEveryComponentOfAMultivaluedRdn(): void
@@ -775,6 +814,14 @@ final class AclIntegrationTest extends ServerTestCase
         }
 
         self::fail('Expected an OperationException was not thrown.');
+    }
+
+    private function bindDelegate(): void
+    {
+        $this->ldapClient()->bind(
+            LdapAclCommand::DELEGATE_DN,
+            LdapAclCommand::DELEGATE_PASSWORD,
+        );
     }
 
     private function bindHidden(): void
