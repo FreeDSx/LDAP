@@ -168,6 +168,31 @@ class DnTest extends TestCase
         );
     }
 
+    /**
+     * A doubled backslash escapes itself, so the comma after it separates RDNs.
+     */
+    public function test_an_escaped_backslash_ends_the_rdn_at_the_following_comma(): void
+    {
+        $dn = new Dn('cn=evil\\\\,ou=users,dc=example,dc=com');
+
+        self::assertCount(
+            4,
+            $dn,
+        );
+        self::assertSame(
+            'ou=users,dc=example,dc=com',
+            (string) $dn->getParent(),
+        );
+    }
+
+    public function test_parsing_and_descendancy_agree_on_an_escaped_backslash_boundary(): void
+    {
+        $dn = new Dn('cn=evil\\\\,ou=users,dc=example,dc=com');
+
+        self::assertTrue($dn->isChildOf(new Dn('ou=users,dc=example,dc=com')));
+        self::assertTrue($dn->isDescendantOf(new Dn('ou=users,dc=example,dc=com')));
+    }
+
     public function test_is_descendant_of_returns_true_for_direct_child(): void
     {
         self::assertTrue(

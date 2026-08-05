@@ -20,7 +20,6 @@ use function array_keys;
 use function array_values;
 use function count;
 use function explode;
-use function preg_split;
 use function str_replace;
 use function substr;
 use function substr_replace;
@@ -35,6 +34,7 @@ use function substr_replace;
 class Rdn implements Stringable
 {
     use EscapeTrait;
+    use UnescapedSeparatorTrait;
 
     public const ESCAPE_MAP = [
         '\\' => '\\5c',
@@ -116,7 +116,10 @@ class Rdn implements Stringable
      */
     public function hasUnescapedComma(): bool
     {
-        return preg_match('/(?<!\\\\),/', $this->toString()) === 1;
+        return self::hasUnescaped(
+            $this->toString(),
+            ',',
+        );
     }
 
     public function toString(): string
@@ -135,16 +138,10 @@ class Rdn implements Stringable
      */
     public static function create(string $rdn): Rdn
     {
-        $pieces = preg_split(
-            '/(?<!\\\\)\+/',
+        $pieces = self::splitOnUnescaped(
             $rdn,
+            '+',
         );
-        if ($pieces === false) {
-            throw new InvalidDnSyntaxException(sprintf(
-                'The RDN "%s" is invalid.',
-                $rdn,
-            ));
-        }
 
         // @todo Simplify this logic somehow?
         $obj = null;
