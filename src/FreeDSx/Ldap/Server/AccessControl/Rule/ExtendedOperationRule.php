@@ -18,12 +18,16 @@ use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 /**
  * An ordered access control rule gating use of a privileged extended operation by OID.
  *
+ * Extended operations name no entry, so this rule carries no target and can only depend on the subject.
+ *
  * @api
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final readonly class ExtendedOperationRule
 {
+    use TargetlessSubjectTrait;
+
     /**
      * @param string[] $extendedOpOids Extended operation request OIDs; empty matches all extended operations.
      */
@@ -31,7 +35,9 @@ final readonly class ExtendedOperationRule
         public Effect $effect,
         public SubjectMatcherInterface $subject,
         public array $extendedOpOids,
-    ) {}
+    ) {
+        self::assertSubjectNeedsNoTarget($subject);
+    }
 
     public static function allow(
         SubjectMatcherInterface $subject,

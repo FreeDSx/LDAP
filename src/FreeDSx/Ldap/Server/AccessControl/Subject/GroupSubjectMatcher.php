@@ -62,7 +62,7 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
 
     public function matches(
         TokenInterface $token,
-        Dn $targetDn,
+        ?Dn $targetDn,
     ): bool {
         if ($this->backend === null) {
             return false;

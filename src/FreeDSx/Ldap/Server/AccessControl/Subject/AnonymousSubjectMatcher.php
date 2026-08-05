@@ -26,7 +26,7 @@ final class AnonymousSubjectMatcher implements SubjectMatcherInterface
 {
     public function matches(
         TokenInterface $token,
-        Dn $targetDn,
+        ?Dn $targetDn,
     ): bool {
         return $token instanceof AnonToken;
     }

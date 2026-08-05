@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\SearchLimit;
 
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\SearchLimits;
@@ -24,11 +23,6 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 final class SearchLimitResolver implements SearchLimitResolverInterface, BackendAwareInterface
 {
-    /**
-     * Limit rules carry no target entry, so subject matchers that need one receive the bound DN (or root for anon).
-     */
-    private const NO_TARGET = '';
-
     public function __construct(
         private readonly SearchLimitRules $rules,
         private readonly SearchLimits $default,
@@ -45,10 +39,9 @@ final class SearchLimitResolver implements SearchLimitResolverInterface, Backend
 
     public function resolve(TokenInterface $token): SearchLimits
     {
-        $targetDn = new Dn(self::NO_TARGET);
-
         foreach ($this->rules->rules as $rule) {
-            if ($rule->subject->matches($token, $targetDn)) {
+            // Limit rules carry no target entry, so a subject needing one cannot match.
+            if ($rule->subject->matches($token, null)) {
                 return $rule->limits;
             }
         }

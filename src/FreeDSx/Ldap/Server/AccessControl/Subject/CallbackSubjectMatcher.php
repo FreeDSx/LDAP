@@ -23,7 +23,7 @@ use Throwable;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class CallbackSubjectMatcher implements SubjectMatcherInterface
+final class CallbackSubjectMatcher implements TargetDependentSubjectInterface
 {
     public function __construct(
         /** @var Closure(TokenInterface, Dn): bool */
@@ -32,8 +32,13 @@ final class CallbackSubjectMatcher implements SubjectMatcherInterface
 
     public function matches(
         TokenInterface $token,
-        Dn $targetDn,
+        ?Dn $targetDn,
     ): bool {
+        // The closure is handed a target to judge, so it cannot be consulted without one.
+        if ($targetDn === null) {
+            return false;
+        }
+
         try {
             return ($this->callback)($token, $targetDn);
         } catch (Throwable) {

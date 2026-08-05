@@ -34,7 +34,7 @@ final class DnSubtreeSubjectMatcher implements SubjectMatcherInterface
 
     public function matches(
         TokenInterface $token,
-        Dn $targetDn,
+        ?Dn $targetDn,
     ): bool {
         if (!$token instanceof AuthenticatedTokenInterface) {
             return false;
