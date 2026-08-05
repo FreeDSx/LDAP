@@ -42,6 +42,8 @@ final class LdapClientReferralTest extends ExternalLdapTestCase
             $this->client->unbind();
         } catch (Throwable) {
         }
+
+        parent::tearDown();
     }
 
     public function test_it_throws_a_referral_exception_when_an_operation_targets_a_referral_entry(): void

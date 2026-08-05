@@ -21,3 +21,12 @@ cn: other
 sn: Other
 uid: other
 userPassword: secret
+
+# Hashed on purpose ({SHA} of "hashedpass"): mechanisms keying on the stored value must refuse it outright
+# rather than treat the hash as the shared secret.
+dn: cn=hashed,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: hashed
+sn: Hashed
+uid: hashed
+userPassword: {SHA}JDjNt4ihTaLvLHpHhEFSdZmM1KM=

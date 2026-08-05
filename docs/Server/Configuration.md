@@ -502,6 +502,10 @@ It handles all password-based bind authentication through two methods:
 * `getSaslIdentity(string $username, MechanismName $mechanism): ?SaslIdentity` — called for all SASL mechanisms
   (PLAIN, CRAM-MD5, DIGEST-MD5, SCRAM-*). Returns the stored password and resolved DN, or `null` to reject.
 
+Every mechanism except PLAIN uses the returned value as the shared secret, so a hash would become the password. The
+built-in authenticator returns `null` for those mechanisms when the stored value is hashed, and a custom one should
+do the same.
+
 The server resolves an authenticator in this order:
 
 1. An explicit instance set via `setPasswordAuthenticator()`
