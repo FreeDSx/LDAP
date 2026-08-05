@@ -163,4 +163,31 @@ class RdnTest extends TestCase
             $rdn->getValueOf('uid'),
         );
     }
+
+    /**
+     * A doubled backslash escapes itself, so the comma after it is a real separator the guard must catch.
+     */
+    public function test_an_escaped_backslash_does_not_hide_an_unescaped_comma(): void
+    {
+        self::assertTrue(
+            Rdn::create('cn=Smith\\\\, John')->hasUnescapedComma(),
+        );
+    }
+
+    public function test_an_escaped_comma_is_not_reported_as_unescaped(): void
+    {
+        self::assertFalse(
+            Rdn::create('cn=Smith\\, John')->hasUnescapedComma(),
+        );
+    }
+
+    public function test_an_escaped_backslash_ends_the_component_at_the_following_plus(): void
+    {
+        $rdn = Rdn::create('cn=alice\\\\+uid=asmith');
+
+        self::assertSame(
+            'asmith',
+            $rdn->getValueOf('uid'),
+        );
+    }
 }

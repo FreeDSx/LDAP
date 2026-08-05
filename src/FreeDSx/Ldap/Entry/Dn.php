@@ -26,7 +26,6 @@ use function array_slice;
 use function count;
 use function implode;
 use function ltrim;
-use function preg_split;
 use function str_ends_with;
 use function strlen;
 use function strpos;
@@ -40,6 +39,8 @@ use function substr;
  */
 class Dn implements IteratorAggregate, Countable, Stringable
 {
+    use UnescapedSeparatorTrait;
+
     /**
      * @var ?Rdn[]
      */
@@ -211,7 +212,7 @@ class Dn implements IteratorAggregate, Countable, Stringable
         $ancestorSuffix = ',' . $baseDn;
 
         return str_ends_with($thisDn, $ancestorSuffix)
-            && self::isUnescaped($thisDn, strlen($thisDn) - strlen($ancestorSuffix));
+            && self::isUnescapedAt($thisDn, strlen($thisDn) - strlen($ancestorSuffix));
     }
 
     /**
@@ -221,7 +222,7 @@ class Dn implements IteratorAggregate, Countable, Stringable
     {
         $offset = 0;
         while (($pos = strpos($canonical, ',', $offset)) !== false) {
-            if (self::isUnescaped($canonical, $pos)) {
+            if (self::isUnescapedAt($canonical, $pos)) {
                 return substr($canonical, $pos + 1);
             }
             $offset = $pos + 1;
@@ -231,24 +232,6 @@ class Dn implements IteratorAggregate, Countable, Stringable
     }
 
     /**
-     * Whether the character at $pos is preceded by an even number of backslashes (i.e. not escaped).
-     */
-    private static function isUnescaped(
-        string $value,
-        int $pos,
-    ): bool {
-        $slashes = 0;
-
-        for ($i = $pos - 1; $i >= 0 && $value[$i] === '\\'; $i--) {
-            $slashes++;
-        }
-
-        return $slashes % 2 === 0;
-    }
-
-    /**
-     * @todo This needs proper handling. But the regex would probably be rather crazy.
-     *
      * @throws UnexpectedValueException
      */
     private function parse(): void
@@ -258,8 +241,7 @@ class Dn implements IteratorAggregate, Countable, Stringable
 
             return;
         }
-        $pieces = preg_split('/(?<!\\\\),/', $this->dn);
-        $pieces = ($pieces === false) ? [] : $pieces;
+        $pieces = self::splitOnUnescaped($this->dn, ',');
 
         if (count($pieces) === 0) {
             throw new InvalidDnSyntaxException(sprintf(
