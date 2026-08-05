@@ -22,13 +22,14 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class SelfSubjectMatcher implements SubjectMatcherInterface
+final class SelfSubjectMatcher implements TargetDependentSubjectInterface
 {
     public function matches(
         TokenInterface $token,
-        Dn $targetDn,
+        ?Dn $targetDn,
     ): bool {
-        if (!$token instanceof AuthenticatedTokenInterface) {
+        // Without a target there is nothing to be the same as, so this can never be a self match.
+        if ($targetDn === null || !$token instanceof AuthenticatedTokenInterface) {
             return false;
         }
 

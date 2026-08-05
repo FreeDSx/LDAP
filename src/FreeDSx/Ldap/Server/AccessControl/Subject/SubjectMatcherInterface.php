@@ -24,10 +24,10 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 interface SubjectMatcherInterface
 {
     /**
-     * @param Dn $targetDn The DN of the entry being operated on (needed for self-matching).
+     * @param ?Dn $targetDn The entry being operated on, or null for rules that carry no target.
      */
     public function matches(
         TokenInterface $token,
-        Dn $targetDn,
+        ?Dn $targetDn,
     ): bool;
 }

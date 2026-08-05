@@ -29,6 +29,8 @@ use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
  */
 final readonly class ConfidentialAccessRule
 {
+    use TargetlessSubjectTrait;
+
     /**
      * @param string[] $attributes Attribute names. Empty matches every confidential attribute.
      */
@@ -36,7 +38,9 @@ final readonly class ConfidentialAccessRule
         public Effect $effect,
         public SubjectMatcherInterface $subject,
         public array $attributes,
-    ) {}
+    ) {
+        self::assertSubjectNeedsNoTarget($subject);
+    }
 
     public static function allow(
         SubjectMatcherInterface $subject,

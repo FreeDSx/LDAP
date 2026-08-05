@@ -302,8 +302,8 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
     }
 
     /**
-     * The {@see resolveEffect} counterpart for rules carrying no target, so the subject is matched against the
-     * token's own resolved DN. Anonymous identities never match, as they cannot hold a grant.
+     * The {@see resolveEffect} counterpart for rules carrying no target, so subjects that need one never match.
+     * Anonymous identities never match, as they cannot hold a grant.
      *
      * @template TRule of ConfidentialAccessRule|ControlRule|ExtendedOperationRule
      * @template TValue
@@ -327,7 +327,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
                 continue;
             }
 
-            if (!$rule->subject->matches($token, $token->getResolvedDn())) {
+            if (!$rule->subject->matches($token, null)) {
                 continue;
             }
 

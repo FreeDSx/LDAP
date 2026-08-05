@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
 use FreeDSx\Ldap\Server\AccessControl\Subject\AnySubjectMatcher;
+use FreeDSx\Ldap\Server\AccessControl\Subject\SelfSubjectMatcher;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\AccessControl\Target\AnyTargetMatcher;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
@@ -789,6 +790,24 @@ final class RuleBasedAccessControlTest extends TestCase
         self::assertTrue($subject->hasConfidentialAccess(
             $this->bindToken,
             'userPassword',
+        ));
+    }
+
+    public function test_a_control_is_not_usable_by_everyone_via_a_self_subject(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            controls: [
+                ControlRule::allow(
+                    new SelfSubjectMatcher(),
+                    new AnyTargetMatcher(),
+                    Control::OID_PROXY_AUTHORIZATION,
+                ),
+            ],
+        ));
+
+        self::assertFalse($subject->mayUseControl(
+            $this->bindToken,
+            Control::OID_PROXY_AUTHORIZATION,
         ));
     }
 

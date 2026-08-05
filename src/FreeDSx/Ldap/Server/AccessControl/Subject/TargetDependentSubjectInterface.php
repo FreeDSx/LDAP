@@ -13,20 +13,9 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\AccessControl\Subject;
 
-use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Server\Token\TokenInterface;
-
 /**
- * Matches any identity, authenticated or anonymous.
+ * Marks a subject whose answer depends on the target entry, so it can never match a rule that carries no target.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class AnySubjectMatcher implements SubjectMatcherInterface
-{
-    public function matches(
-        TokenInterface $token,
-        ?Dn $targetDn,
-    ): bool {
-        return true;
-    }
-}
+interface TargetDependentSubjectInterface extends SubjectMatcherInterface {}
