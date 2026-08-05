@@ -245,7 +245,10 @@ final class PasswordAuthenticatorTest extends TestCase
         self::assertSame('cn=Alice,dc=example,dc=com', $identity->resolvedDn->toString());
     }
 
-    public function test_get_sasl_identity_returns_identity_with_hashed_password(): void
+    /**
+     * A mechanism keying on the stored value would otherwise make the hash itself the password.
+     */
+    public function test_get_sasl_identity_returns_null_for_a_hashed_password(): void
     {
         $hashed = '{SHA}' . base64_encode(sha1('secret', true));
         $entry = new Entry(
@@ -253,16 +256,28 @@ final class PasswordAuthenticatorTest extends TestCase
             new Attribute('userPassword', $hashed),
         );
 
-        $identity = $this->subject($entry)->getSaslIdentity('alice', MechanismName::SCRAM_SHA256);
+        self::assertNull(
+            $this->subject($entry)->getSaslIdentity('alice', MechanismName::SCRAM_SHA256),
+        );
+    }
+
+    /**
+     * PLAIN verifies the presented password against the stored value, so a hash is still usable there.
+     */
+    public function test_get_sasl_identity_returns_a_hashed_password_for_plain(): void
+    {
+        $hashed = '{SHA}' . base64_encode(sha1('secret', true));
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('userPassword', $hashed),
+        );
+
+        $identity = $this->subject($entry)->getSaslIdentity('alice', MechanismName::PLAIN);
 
         self::assertInstanceOf(SaslIdentity::class, $identity);
         self::assertSame(
             $hashed,
             $identity->password,
-        );
-        self::assertSame(
-            'cn=Alice,dc=example,dc=com',
-            $identity->resolvedDn->toString(),
         );
     }
 

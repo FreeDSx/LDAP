@@ -87,6 +87,12 @@ final class PasswordAuthenticator implements PasswordAuthenticatableInterface
             return null;
         }
 
+        // Only PLAIN verifies the presented password against the stored value. Every other mechanism keys on
+        // it directly, so a stored hash would stand in as the shared secret and authenticate whoever holds it.
+        if ($mechanism !== MechanismName::PLAIN && $this->hashService->isHashed($password)) {
+            return null;
+        }
+
         return new SaslIdentity(
             $password,
             $entry->getDn(),

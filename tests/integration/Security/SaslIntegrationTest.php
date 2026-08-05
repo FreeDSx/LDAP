@@ -13,22 +13,30 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Security;
 
+use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\ResponseInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
+use FreeDSx\Sasl\Mechanism\MechanismName;
+use FreeDSx\Sasl\Options\CramMD5Options;
+use FreeDSx\Sasl\Options\PlainOptions;
 use FreeDSx\Socket\SocketOptions;
 use FreeDSx\Socket\SocketPool;
 use FreeDSx\Socket\SocketPoolOptions;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 
-/**
- * Covers mechanisms whose security depends on the server contributing randomness before a client proof is accepted.
- */
-final class SaslChallengeIntegrationTest extends ServerTestCase
+final class SaslIntegrationTest extends ServerTestCase
 {
+    /**
+     * The stored hash for cn=hashed in the harness seed, as an attacker reading the directory would obtain it.
+     */
+    private const STOLEN_HASH = '{SHA}JDjNt4ihTaLvLHpHhEFSdZmM1KM=';
+
+    private const HASHED_PASSWORD = 'hashedpass';
+
     public function setUp(): void
     {
         $this->setServerMode('ldap-server');
@@ -82,6 +90,46 @@ final class SaslChallengeIntegrationTest extends ServerTestCase
         $this->assertSame(
             ResultCode::PROTOCOL_ERROR,
             $response->getResultCode(),
+        );
+    }
+
+    /**
+     * A mechanism keying on the stored value would otherwise make the hash itself the password.
+     */
+    public function testSaslCramMD5RefusesAStoredHashAsTheSharedSecret(): void
+    {
+        $this->expectException(BindException::class);
+
+        $this->buildClient('tcp')->bindSasl(
+            (new CramMD5Options())->setUsername('hashed')->setPassword(self::STOLEN_HASH),
+            MechanismName::CRAM_MD5,
+        );
+    }
+
+    public function testSaslPlainStillAuthenticatesAgainstAStoredHash(): void
+    {
+        $response = $this->ldapClient()->bindSasl(
+            (new PlainOptions())->setUsername('hashed')->setPassword(self::HASHED_PASSWORD),
+            MechanismName::PLAIN,
+        )->getResponse();
+
+        $this->assertInstanceOf(
+            BindResponse::class,
+            $response,
+        );
+        $this->assertSame(
+            0,
+            $response->getResultCode(),
+        );
+    }
+
+    public function testSaslPlainRefusesAStoredHashAsThePassword(): void
+    {
+        $this->expectException(BindException::class);
+
+        $this->buildClient('tcp')->bindSasl(
+            (new PlainOptions())->setUsername('hashed')->setPassword(self::STOLEN_HASH),
+            MechanismName::PLAIN,
         );
     }
 

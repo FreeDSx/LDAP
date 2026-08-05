@@ -52,6 +52,8 @@ class VlvTest extends ExternalLdapTestCase
             $this->client->unbind();
         } catch (Throwable) {
         }
+
+        parent::tearDown();
     }
 
     public function testVlv(): void

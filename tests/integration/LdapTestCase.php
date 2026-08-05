@@ -22,6 +22,29 @@ class LdapTestCase extends TestCase
 {
     protected static ?bool $isActiveDirectory = null;
 
+    /**
+     * @var LdapClient[]
+     */
+    private array $issuedClients = [];
+
+    /**
+     * Releases every socket handed out, so a later test that forks cannot inherit one a test forgot to close.
+     */
+    protected function tearDown(): void
+    {
+        foreach ($this->issuedClients as $client) {
+            try {
+                $client->disconnect();
+            } catch (Throwable) {
+                // The server may already be gone; only releasing the socket matters here.
+            }
+        }
+
+        $this->issuedClients = [];
+
+        parent::tearDown();
+    }
+
     protected function makeOptions(): ClientOptions
     {
         return (new ClientOptions())
@@ -37,7 +60,10 @@ class LdapTestCase extends TestCase
 
     protected function getClient(?ClientOptions $options = null): LdapClient
     {
-        return new LdapClient($options ?? $this->makeOptions());
+        $client = new LdapClient($options ?? $this->makeOptions());
+        $this->issuedClients[] = $client;
+
+        return $client;
     }
 
     protected function bindClient(LdapClient $client): void
