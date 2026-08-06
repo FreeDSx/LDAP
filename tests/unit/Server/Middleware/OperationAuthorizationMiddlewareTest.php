@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\Request\ForwardPasswordPolicyStateRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -360,38 +361,6 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         self::assertNotNull($this->next->received);
     }
 
-    public function test_dispatch_gates_a_control_configured_as_privileged(): void
-    {
-        $subject = new OperationAuthorizationMiddleware(
-            $this->resolver,
-            $this->accessControl,
-            new Dn(self::SUBSCHEMA_DN),
-            [Control::OID_SUBTREE_DELETE],
-        );
-        $this->routeResolvesTo(HandlerId::Dispatch);
-        $this->accessControl
-            ->expects(self::once())
-            ->method('authorizeControl')
-            ->with(
-                $this->token,
-                self::isInstanceOf(Dn::class),
-                Control::OID_SUBTREE_DELETE,
-            );
-
-        $message = new LdapMessageRequest(
-            1,
-            new DeleteRequest('cn=foo,dc=bar'),
-            new Control(Control::OID_SUBTREE_DELETE, criticality: true),
-        );
-
-        $subject->process(
-            new ServerRequestContext($message, $this->token),
-            $this->next,
-        );
-
-        self::assertNotNull($this->next->received);
-    }
-
     public function test_dispatch_does_not_gate_a_control_outside_the_privileged_set(): void
     {
         $this->routeResolvesTo(HandlerId::Dispatch);
@@ -413,13 +382,47 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         self::assertNotNull($this->next->received);
     }
 
+    /**
+     * This extended operation names an entry, so a DN-scoped rule can match instead of falling back to the root.
+     */
+    public function test_a_privileged_control_on_a_forward_is_authorized_against_its_target_dn(): void
+    {
+        $this->routeResolvesTo(HandlerId::PasswordPolicyForward);
+
+        $authorized = null;
+        $this->accessControl
+            ->method('authorizeControl')
+            ->willReturnCallback(function (
+                TokenInterface $token,
+                Dn $dn,
+                string $oid,
+            ) use (&$authorized): void {
+                $authorized = $dn->toString();
+            });
+
+        $message = new LdapMessageRequest(
+            1,
+            new ForwardPasswordPolicyStateRequest('cn=locked,ou=people,dc=foo,dc=bar', 'uuid', []),
+            new Control(Control::OID_RELAX_RULES, criticality: true),
+        );
+
+        $this->subject->process(
+            new ServerRequestContext($message, $this->token),
+            $this->next,
+        );
+
+        self::assertSame(
+            'cn=locked,ou=people,dc=foo,dc=bar',
+            $authorized,
+        );
+    }
+
     public function test_sync_route_authorizes_the_sync_control_against_the_base_dn(): void
     {
         $subject = new OperationAuthorizationMiddleware(
             $this->resolver,
             $this->accessControl,
             new Dn(self::SUBSCHEMA_DN),
-            [Control::OID_SYNC_REQUEST],
         );
         $this->routeResolvesTo(HandlerId::Sync);
         $this->accessControl
@@ -451,7 +454,6 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
             $this->resolver,
             $this->accessControl,
             new Dn(self::SUBSCHEMA_DN),
-            [Control::OID_SYNC_REQUEST],
         );
         $this->routeResolvesTo(HandlerId::Sync);
         $this->accessControl
@@ -757,7 +759,6 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
             $this->resolver,
             $this->accessControl,
             new Dn(self::SUBSCHEMA_DN),
-            [Control::OID_SYNC_REQUEST],
         );
         $this->routeResolvesTo(HandlerId::Sync);
         $this->accessControl

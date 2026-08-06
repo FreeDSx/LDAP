@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\Request\ForwardPasswordPolicyStateRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
@@ -48,15 +49,25 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 final readonly class OperationAuthorizationMiddleware implements MiddlewareInterface
 {
     /**
-     * @param list<string> $privilegedControls Control OIDs that require an explicit ControlRule grant before use.
-     * @param list<string> $privilegedExtendedOps Extended operation OIDs that require an explicit grant before use.
+     * Control OIDs requiring an explicit ControlRule grant. Fixed rather than configurable: the sync route has no
+     * gate of its own, so this grant is its whole authorization.
      */
+    public const PRIVILEGED_CONTROLS = [
+        Control::OID_RELAX_RULES,
+        Control::OID_SYNC_REQUEST,
+    ];
+
+    /**
+     * Extended operation OIDs requiring an explicit ExtendedOperationRule grant.
+     */
+    public const PRIVILEGED_EXTENDED_OPS = [
+        ExtendedRequest::OID_PPOLICY_STATE_FORWARD,
+    ];
+
     public function __construct(
         private HandlerRouteResolverInterface $routeResolver,
         private AccessControlInterface $accessControl,
         private Dn $subschemaEntry,
-        private array $privilegedControls = [Control::OID_RELAX_RULES],
-        private array $privilegedExtendedOps = [],
     ) {}
 
     /**
@@ -120,7 +131,7 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
             return;
         }
 
-        if (!in_array($request->getName(), $this->privilegedExtendedOps, true)) {
+        if (!in_array($request->getName(), self::PRIVILEGED_EXTENDED_OPS, true)) {
             return;
         }
 
@@ -140,7 +151,7 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
         $controls = $context->message->controls();
         $dn = $this->targetDnFor($context->message->getRequest()) ?? new Dn('');
 
-        foreach ($this->privilegedControls as $oid) {
+        foreach (self::PRIVILEGED_CONTROLS as $oid) {
             if (!$controls->has($oid)) {
                 continue;
             }
@@ -158,9 +169,12 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
      */
     private function targetDnFor(RequestInterface $request): ?Dn
     {
-        return $request instanceof SearchRequest
-            ? $request->getBaseDn()
-            : OperationTargetDn::of($request);
+        return match (true) {
+            $request instanceof SearchRequest => $request->getBaseDn(),
+            // An extended operation names no entry in general, but this one does, and a rule may name it too.
+            $request instanceof ForwardPasswordPolicyStateRequest => $request->getDn(),
+            default => OperationTargetDn::of($request),
+        };
     }
 
     /**

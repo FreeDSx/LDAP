@@ -136,8 +136,6 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
             $container->get(ServerProtocolHandlerFactory::class),
             $container->get(AccessControlInterface::class),
             $options->getSubschemaEntry(),
-            $options->getPrivilegedControls(),
-            $options->getPrivilegedExtendedOps(),
         );
     }
 

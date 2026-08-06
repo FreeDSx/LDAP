@@ -28,10 +28,10 @@ Access control operates at four levels:
 - **Attribute level**: Checked for each attribute involved in Compare, Add, and Modify operations. Also applied to
   each Search result entry. Disallowed attributes are stripped before the entry is sent. If the entry itself is
   denied at operation level, it is suppressed entirely from results.
-- **Control level**: Checked for privileged request controls (Relax Rules by default, configurable via
-  `ServerOptions::setPrivilegedControls()`). See [Control Rules](#control-rules).
-- **Extended operation level**: Checked for privileged extended operations, configurable via
-  `ServerOptions::setPrivilegedExtendedOps()`. See [Extended Operation Rules](#extended-operation-rules).
+- **Control level**: Checked for privileged request controls (Relax Rules and Content Sync). See
+  [Control Rules](#control-rules).
+- **Extended operation level**: Checked for privileged extended operations. See
+  [Extended Operation Rules](#extended-operation-rules).
 
 Rules are bundled in an `AclRules` object configured via `ServerOptions::setAclRules()`. See
 [Configuration](Configuration.md).
@@ -479,9 +479,7 @@ The gated controls are:
 
 * Relax Rules control** (`Control::OID_RELAX_RULES`). With it, an authorized client (see [Schema Validation](Schema.md#validation-mode)).
 
-This set defaults to the Relax Rules control and is configurable with `ServerOptions::setPrivilegedControls()`. For
-example, add `Control::OID_SUBTREE_DELETE` to gate the Tree-Delete control the same way. See
-[Configuration](Configuration.md#setprivilegedcontrols).
+The set is fixed. These are the controls whose routes carry no other gate, so the grant is the whole authorization.
 
 ```php
 use FreeDSx\Ldap\Control\Control;
@@ -502,8 +500,7 @@ A client attaches the control with `Controls::relaxRules()`, e.g. `$client->crea
 ## Extended Operation Rules
 
 Privileged extended operations are gated per identity with `ExtendedOperationRule`s, keyed on the request OID (empty OID
-list matches all). They are denied by default. The set of gated OIDs is configured with
-`ServerOptions::setPrivilegedExtendedOps()`.
+list matches all). They are denied by default. The set of gated OIDs is fixed.
 
 ```php
 use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;

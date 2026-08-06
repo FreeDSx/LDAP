@@ -445,26 +445,6 @@ rule engine. Prefer `setAclRules()` unless the built-in rules are insufficient.
 
 **Default**: `RuleBasedAccessControl` over the rules from `setAclRules()`.
 
-------------------
-#### setPrivilegedControls
-
-Control OIDs that an identity may use only when it holds an explicit `ControlRule` grant for that control. A request
-attaching a privileged control without such a grant is denied. Controls not in this list need no grant. This replaces
-the list, so include any defaults you want to keep.
-
-```php
-use FreeDSx\Ldap\Control\Control;
-
-$options->setPrivilegedControls(
-    Control::OID_RELAX_RULES,    // the default
-    Control::OID_SUBTREE_DELETE, // also gate Tree-Delete behind a grant
-);
-```
-
-See [Access Control](Access-Control.md) for control-rule grants.
-
-**Default**: `[Control::OID_RELAX_RULES]` (Relax Rules).
-
 ## Backend
 
 The LDAP server handles directory data through `WritableStorageBackend`, which applies LDAP semantics over the
