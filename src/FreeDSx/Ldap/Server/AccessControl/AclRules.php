@@ -280,10 +280,11 @@ final readonly class AclRules
     }
 
     /**
-     * Grant a replica's bind identity the privileged capabilities it needs: the content-sync control over $target,
-     * the password-policy forward extended operation, and confidential attributes so those replicate.
+     * Grant a replica's bind identity the privileged capabilities it needs: the content-sync control over $target and
+     * the password-policy forward extended operation.
      *
-     * $target bounds both what may be synced and which entries policy state may be forwarded for.
+     * $target bounds both what may be synced and which entries policy state may be forwarded for. No attribute read
+     * grant is needed, since a sync ships visible entries whole. This is intentional for replication to work properly.
      */
     public function withReplicaGrants(
         SubjectMatcherInterface $replica,
@@ -306,8 +307,7 @@ final readonly class AclRules
                 PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
                 PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
                 PasswordPolicyOid::NAME_PWD_LAST_SUCCESS,
-            )->forWrite())
-            ->appendConfidentialAccess(ConfidentialAccessRule::allowAny($replica));
+            )->forWrite());
     }
 
     /**

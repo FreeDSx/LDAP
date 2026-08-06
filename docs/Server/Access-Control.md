@@ -248,7 +248,7 @@ replacing them, so they compose on `secureDefault()` or on a policy built from `
 | `withFullAccess($subject, $target = new AnyTargetMatcher())`   | Every operation and every attribute write over the target                         |
 | `withSelfServiceWrites($attributes = AclRules::SELF_WRITABLE_ATTRIBUTES)` | Modify on an identity's own entry, limited to the given attributes |
 | `withCredentialProtection($administrators = null)`        | The `userPassword` and Password Modify rules, plus privileged controls and extended operations for the administrator |
-| `withReplicaGrants($replica, $target = new AnyTargetMatcher())` | The content-sync control, the ppolicy-forward extended operation, and confidential attribute reads |
+| `withReplicaGrants($replica, $target = new AnyTargetMatcher())` | The content-sync control, the ppolicy-forward extended operation, and the policy-state writes that forward needs |
 
 `AclRules::secureDefault()` is built from the first three. `withFullAccess()` is what it applies to the configured
 [administrator](#administrators), so reaching for it directly is how you grant a second identity the same rights.
@@ -466,8 +466,8 @@ Four things to keep in mind:
 - A custom schema must carry the extension. Supplying your own `userPassword` definition through
   a schema source without it silently drops the protection.
 
-A replica needs to read confidential attributes in order to replicate them, so `AclRules::withReplicaGrants()`
-includes that grant along with the sync control.
+Replication is not affected. A content sync ships every visible entry whole, so a replica receives confidential
+attributes without a grant for them. See [Replication](Replication.md#access-control).
 
 ## Control Rules
 

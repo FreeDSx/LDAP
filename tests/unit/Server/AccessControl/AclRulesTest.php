@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
+use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerMonitorHandler;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
@@ -124,30 +125,28 @@ final class AclRulesTest extends TestCase
         );
     }
 
-    public function test_withReplicaGrants_allows_confidential_attributes_so_those_replicate(): void
+    /**
+     * A sync ships visible entries whole, so a replica reads confidential attributes without a grant for them.
+     */
+    public function test_withReplicaGrants_adds_no_confidential_grant(): void
     {
         $rules = AclRules::fromEmpty()->withReplicaGrants(Subject::dn('cn=replica,dc=foo,dc=bar'));
 
-        $confidential = $rules->confidential[0];
-        self::assertSame(
-            Effect::Allow,
-            $confidential->effect,
-        );
-        // An empty attribute list covers every confidential attribute, not none of them.
         self::assertSame(
             [],
-            $confidential->attributes,
+            $rules->confidential,
         );
     }
 
     public function test_withCredentialProtection_keeps_confidential_grants_made_earlier(): void
     {
+        $existing = ConfidentialAccessRule::allowAny(Subject::dn(self::ADMIN_DN));
         $rules = AclRules::fromEmpty()
-            ->withReplicaGrants(Subject::dn('cn=replica,dc=foo,dc=bar'))
+            ->appendConfidentialAccess($existing)
             ->withCredentialProtection();
 
-        self::assertCount(
-            1,
+        self::assertContains(
+            $existing,
             $rules->confidential,
         );
     }
