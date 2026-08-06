@@ -34,7 +34,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\EntryBindStrategy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyBindGuard;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
-use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
+use Tests\Support\FreeDSx\Ldap\Server\Clock\RecordingSleeper;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordExpirationRules;
@@ -62,11 +62,43 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
 
     private RecordingLogger $logger;
 
+    private RecordingSleeper $sleeper;
+
     protected function setUp(): void
     {
         $this->clock = FrozenClock::fromString(self::NOW);
         $this->context = new PasswordPolicyContext();
         $this->logger = new RecordingLogger();
+        $this->sleeper = new RecordingSleeper();
+    }
+
+    /**
+     * A name that resolves to nothing must not be measurably faster to refuse than one that exists.
+     */
+    public function test_an_unknown_identity_still_incurs_the_anti_guessing_delay(): void
+    {
+        $authenticator = $this->authenticatorFor(
+            $this->user(),
+            new PasswordPolicy(
+                lockout: new PasswordLockoutRules(
+                    enabled: true,
+                    maxFailure: 3,
+                    minDelay: 2,
+                    maxDelay: 8,
+                ),
+            ),
+        );
+
+        $this->attemptBind(
+            $authenticator,
+            'wrong',
+            'cn=nobody,dc=foo,dc=bar',
+        );
+
+        self::assertSame(
+            [2.0],
+            $this->sleeper->durations,
+        );
     }
 
     public function test_repeated_failures_lock_the_account(): void
@@ -537,7 +569,7 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
                 $this->logger,
                 EventLogPolicy::all(),
             ),
-            new BlockingSleeper(),
+            $this->sleeper,
         );
 
         return new PasswordPolicyAwareAuthenticator(
@@ -559,10 +591,11 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
     private function attemptBind(
         PasswordPolicyAwareAuthenticator $authenticator,
         string $password,
+        ?string $dn = null,
     ): void {
         try {
             $authenticator->authenticate(
-                self::USER_DN,
+                $dn ?? self::USER_DN,
                 $password,
             );
         } catch (OperationException) {

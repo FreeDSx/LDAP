@@ -54,6 +54,7 @@ final class SaslBindPolicyEnforcerTest extends TestCase
     {
         $this->clock = FrozenClock::fromString(self::NOW);
         $this->context = new PasswordPolicyContext();
+        $this->context->setResponseRequested(true);
     }
 
     public function test_without_a_policy_it_does_nothing(): void

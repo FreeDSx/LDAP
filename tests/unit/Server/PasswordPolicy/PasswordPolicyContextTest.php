@@ -44,11 +44,23 @@ final class PasswordPolicyContextTest extends TestCase
     public function test_clear_removes_stashed_outcome(): void
     {
         $context = new PasswordPolicyContext();
+        $context->setResponseRequested(true);
         $context->setOutcome(PasswordPolicyOutcome::allowWithGraceWarning(2));
 
         $context->clear();
 
         self::assertNull($context->getOutcome());
+        self::assertNull($context->buildResponseControl());
+    }
+
+    /**
+     * Otherwise a failed bind reports that an account exists and is locked to a client that asked for nothing.
+     */
+    public function test_build_response_control_is_withheld_when_the_client_did_not_ask(): void
+    {
+        $context = new PasswordPolicyContext();
+        $context->setOutcome(PasswordPolicyOutcome::allowWithError(PwdPolicyError::ACCOUNT_LOCKED));
+
         self::assertNull($context->buildResponseControl());
     }
 
@@ -63,6 +75,7 @@ final class PasswordPolicyContextTest extends TestCase
     public function test_build_response_control_includes_grace_remaining(): void
     {
         $context = new PasswordPolicyContext();
+        $context->setResponseRequested(true);
         $context->setOutcome(PasswordPolicyOutcome::allowWithGraceWarning(3));
 
         $control = $context->buildResponseControl();
@@ -79,6 +92,7 @@ final class PasswordPolicyContextTest extends TestCase
     public function test_build_response_control_includes_time_before_expiration(): void
     {
         $context = new PasswordPolicyContext();
+        $context->setResponseRequested(true);
         $context->setOutcome(PasswordPolicyOutcome::allowWithExpirationWarning(86400));
 
         $control = $context->buildResponseControl();
@@ -94,6 +108,7 @@ final class PasswordPolicyContextTest extends TestCase
     public function test_build_response_control_includes_error_code(): void
     {
         $context = new PasswordPolicyContext();
+        $context->setResponseRequested(true);
         $context->setOutcome(PasswordPolicyOutcome::allowWithError(PwdPolicyError::CHANGE_AFTER_RESET));
 
         $control = $context->buildResponseControl();

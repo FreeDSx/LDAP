@@ -61,6 +61,7 @@ use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
 use FreeDSx\Ldap\Server\Middleware\MetricsMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuditMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuthorizationMiddleware;
+use FreeDSx\Ldap\Server\Middleware\PasswordPolicyRequestMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ResponseWriterMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\HandlerInvoker;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareChain;
@@ -392,6 +393,10 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                     $options,
                     $queue,
                 ),
+                // Ahead of the bind, since a bind and a password-change refusal both answer outside this pipeline.
+                ...($policyContext !== null
+                    ? [new PasswordPolicyRequestMiddleware($policyContext)]
+                    : []),
                 new BindMiddleware(
                     $authorization,
                     new Authenticator($authenticators),

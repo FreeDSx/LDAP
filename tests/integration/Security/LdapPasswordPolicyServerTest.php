@@ -16,6 +16,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Security;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
+use FreeDSx\Ldap\Controls;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 
 final class LdapPasswordPolicyServerTest extends ServerTestCase
@@ -34,6 +35,7 @@ final class LdapPasswordPolicyServerTest extends ServerTestCase
         $response = $this->ldapClient()->bind(
             'cn=reset-user,dc=foo,dc=bar',
             '12345',
+            Controls::pwdPolicy(),
         );
 
         $control = $response->controls()->getByClass(PwdPolicyResponseControl::class);

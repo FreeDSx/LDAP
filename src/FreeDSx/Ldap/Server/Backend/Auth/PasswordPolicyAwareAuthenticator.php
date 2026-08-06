@@ -48,10 +48,19 @@ final readonly class PasswordPolicyAwareAuthenticator implements PasswordAuthent
             $this->backend,
         );
         if ($entry === null) {
-            return $this->decoratedAuthenticator->authenticate(
-                $name,
-                $password,
-            );
+            try {
+                return $this->decoratedAuthenticator->authenticate(
+                    $name,
+                    $password,
+                );
+            } catch (OperationException $cause) {
+                if ($cause->getCode() === ResultCode::INVALID_CREDENTIALS) {
+                    // Otherwise a name that exists is measurably slower to refuse than one that does not.
+                    $this->guard->delayUnknownIdentity($this->policyResolver->resolveDefault());
+                }
+
+                throw $cause;
+            }
         }
 
         $policy = $this->policyResolver->resolveFor($entry);
