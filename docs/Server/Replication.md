@@ -88,8 +88,6 @@ you need rule-based access control. Add one control rule that grants the sync co
 [Quick Start](#quick-start); everything else about your policy, including which identities may search the base being
 synced, is your normal configuration. See [Access Control](Access-Control.md).
 
-If you need to change which controls require an explicit grant, use `ServerOptions::setPrivilegedControls(...)`.
-
 A sync consumer receives full entries, including attributes that are hidden from ordinary searches such as
 `userPassword`, because a replica has to be a faithful copy. The sync control is the privileged gate that decides this,
 so grant it only to identities you trust with the whole directory. Attribute read rules like the secure default's

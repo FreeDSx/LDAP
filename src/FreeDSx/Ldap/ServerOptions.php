@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\SchemaParseException;
@@ -133,21 +132,6 @@ final class ServerOptions implements ServerListenerOptionsInterface
     private ?AccessControlInterface $defaultAccessControl = null;
 
     private ?AclRules $defaultAclRules = null;
-
-    /**
-     * @var list<string>
-     */
-    private array $privilegedControls = [
-        Control::OID_RELAX_RULES,
-        Control::OID_SYNC_REQUEST,
-    ];
-
-    /**
-     * @var list<string>
-     */
-    private array $privilegedExtendedOps = [
-        ExtendedRequest::OID_PPOLICY_STATE_FORWARD,
-    ];
 
     private ?PasswordPolicy $passwordPolicy = null;
 
@@ -384,46 +368,6 @@ final class ServerOptions implements ServerListenerOptionsInterface
                 Subject::authenticated(),
                 $this->getSubschemaEntry(),
             ));
-    }
-
-    /**
-     * Control OIDs treated as privileged on writes: each requires an explicit ControlRule grant (default: Relax Rules).
-     *
-     * @return list<string>
-     */
-    public function getPrivilegedControls(): array
-    {
-        return $this->privilegedControls;
-    }
-
-    /**
-     * Replace the set of privileged control OIDs. Add e.g. Control::OID_SUBTREE_DELETE to gate Tree-Delete behind a grant.
-     */
-    public function setPrivilegedControls(string ...$controlOids): self
-    {
-        $this->privilegedControls = array_values($controlOids);
-
-        return $this;
-    }
-
-    /**
-     * Extended operation OIDs that require an explicit ExtendedOperationRule grant (deny-by-default).
-     *
-     * @return list<string>
-     */
-    public function getPrivilegedExtendedOps(): array
-    {
-        return $this->privilegedExtendedOps;
-    }
-
-    /**
-     * @param list<string> $oids
-     */
-    public function setPrivilegedExtendedOps(array $oids): self
-    {
-        $this->privilegedExtendedOps = array_values($oids);
-
-        return $this;
     }
 
     /**
