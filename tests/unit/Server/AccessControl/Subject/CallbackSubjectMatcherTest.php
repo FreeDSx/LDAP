@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\AccessControl\Subject;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\SubjectEvaluationException;
 use FreeDSx\Ldap\Server\AccessControl\Subject\CallbackSubjectMatcher;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -84,17 +85,19 @@ final class CallbackSubjectMatcherTest extends TestCase
         );
     }
 
-    public function test_it_should_return_false_when_callback_throws(): void
+    public function test_it_should_report_it_cannot_decide_when_the_callback_throws(): void
     {
         $subject = new CallbackSubjectMatcher(
             fn(TokenInterface $token, Dn $dn): bool => throw new RuntimeException('oh no!'),
         );
 
-        self::assertFalse($subject->matches(
+        $this->expectException(SubjectEvaluationException::class);
+
+        $subject->matches(
             BindToken::fromDn(
                 'cn=admin,dc=foo,dc=bar',
             ),
             new Dn('dc=foo,dc=bar'),
-        ));
+        );
     }
 }

@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
 use FreeDSx\Ldap\Server\AccessControl\Subject\AnySubjectMatcher;
+use FreeDSx\Ldap\Server\AccessControl\Subject\CallbackSubjectMatcher;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SelfSubjectMatcher;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\AccessControl\Target\AnyTargetMatcher;
@@ -791,6 +792,55 @@ final class RuleBasedAccessControlTest extends TestCase
             $this->bindToken,
             'userPassword',
         ));
+    }
+
+    public function test_a_deny_still_applies_when_its_subject_cannot_be_decided(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            operations: [
+                OperationRule::deny(
+                    new CallbackSubjectMatcher(static fn(): bool => throw new OperationException('unavailable')),
+                    new AnyTargetMatcher(),
+                    OperationType::Search,
+                ),
+                OperationRule::allow(
+                    new AnySubjectMatcher(),
+                    new AnyTargetMatcher(),
+                    OperationType::Search,
+                ),
+            ],
+        ));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $subject->authorizeOperation(
+            OperationType::Search,
+            $this->bindToken,
+            new Dn('cn=bob,dc=foo,dc=bar'),
+        );
+    }
+
+    public function test_an_allow_does_not_apply_when_its_subject_cannot_be_decided(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            operations: [
+                OperationRule::allow(
+                    new CallbackSubjectMatcher(static fn(): bool => throw new OperationException('unavailable')),
+                    new AnyTargetMatcher(),
+                    OperationType::Search,
+                ),
+            ],
+        ));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $subject->authorizeOperation(
+            OperationType::Search,
+            $this->bindToken,
+            new Dn('cn=bob,dc=foo,dc=bar'),
+        );
     }
 
     public function test_a_control_is_not_usable_by_everyone_via_a_self_subject(): void

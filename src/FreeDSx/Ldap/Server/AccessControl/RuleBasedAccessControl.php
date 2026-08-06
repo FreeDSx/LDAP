@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\SubjectEvaluationException;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
@@ -25,6 +26,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
+use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -213,6 +215,22 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
     }
 
     /**
+     * A subject that cannot be decided at all must not silently drop a deny, so it counts as matching for one.
+     */
+    private function subjectMatches(
+        SubjectMatcherInterface $subject,
+        Effect $effect,
+        TokenInterface $token,
+        ?Dn $dn,
+    ): bool {
+        try {
+            return $subject->matches($token, $dn);
+        } catch (SubjectEvaluationException) {
+            return $effect === Effect::Deny;
+        }
+    }
+
+    /**
      * Writes require a rule to permit them; reads are permitted unless a rule denies.
      */
     private function defaultEffectFor(AttributeAccess $access): Effect
@@ -327,7 +345,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
                 continue;
             }
 
-            if (!$rule->subject->matches($token, null)) {
+            if (!$this->subjectMatches($rule->subject, $rule->effect, $token, null)) {
                 continue;
             }
 
@@ -371,7 +389,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
                 continue;
             }
 
-            if (!$rule->subject->matches($token, $dn)) {
+            if (!$this->subjectMatches($rule->subject, $rule->effect, $token, $dn)) {
                 continue;
             }
 
@@ -397,7 +415,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
                 continue;
             }
 
-            if (!$rule->subject->matches($token, $dn)) {
+            if (!$this->subjectMatches($rule->subject, $rule->effect, $token, $dn)) {
                 continue;
             }
 

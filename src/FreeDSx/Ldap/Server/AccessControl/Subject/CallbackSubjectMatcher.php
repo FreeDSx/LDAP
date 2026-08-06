@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\AccessControl\Subject;
 
 use Closure;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\SubjectEvaluationException;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use Throwable;
 
@@ -41,8 +42,11 @@ final class CallbackSubjectMatcher implements TargetDependentSubjectInterface
 
         try {
             return ($this->callback)($token, $targetDn);
-        } catch (Throwable) {
-            return false;
+        } catch (Throwable $cause) {
+            throw new SubjectEvaluationException(
+                'The subject callback could not decide whether it matches.',
+                previous: $cause,
+            );
         }
     }
 }
