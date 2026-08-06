@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\AccessControl\Rule;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\AccessControl\Target\AnyTargetMatcher;
 use FreeDSx\Ldap\Server\AccessControl\Target\TargetMatcherInterface;
@@ -20,7 +21,7 @@ use FreeDSx\Ldap\Server\AccessControl\Target\TargetMatcherInterface;
 /**
  * An ordered access control rule gating an attribute's read (search filtering, Compare) and write (Add, Modify) access.
  *
- * An empty $attributes list matches all attributes. Attribute names are stored lowercase.
+ * An empty $attributes list matches all attributes.
  *
  * @api
  *
@@ -29,15 +30,25 @@ use FreeDSx\Ldap\Server\AccessControl\Target\TargetMatcherInterface;
 final readonly class AttributeRule
 {
     /**
-     * @param string[] $attributes Lowercase attribute names. Empty matches all attributes.
+     * @var string[]
+     */
+    public array $attributes;
+
+    /**
+     * @param string[] $attributes Attribute names, normalized here so a rule matches however it was spelled.
      */
     public function __construct(
         public Effect $effect,
         public SubjectMatcherInterface $subject,
         public TargetMatcherInterface $target,
-        public array $attributes,
+        array $attributes,
         public AttributeAccess $access = AttributeAccess::Both,
-    ) {}
+    ) {
+        $this->attributes = array_map(
+            Attribute::normalizeName(...),
+            $attributes,
+        );
+    }
 
     public static function allow(
         SubjectMatcherInterface $subject,
@@ -48,7 +59,7 @@ final readonly class AttributeRule
             Effect::Allow,
             $subject,
             $target,
-            array_map('strtolower', $attributes),
+            $attributes,
         );
     }
 
@@ -61,7 +72,7 @@ final readonly class AttributeRule
             Effect::Deny,
             $subject,
             $target,
-            array_map('strtolower', $attributes),
+            $attributes,
         );
     }
 
