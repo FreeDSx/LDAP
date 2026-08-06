@@ -178,6 +178,13 @@ class LdapAclCommand extends Command
                                 OperationType::Search,
                                 OperationType::Compare,
                             ),
+                            // A reserved destination, ahead of the rename grant below, so only the DN an entry
+                            // lands on can refuse it.
+                            OperationRule::deny(
+                                Subject::anyone(),
+                                Target::dn('cn=reserved,ou=people,dc=foo,dc=bar'),
+                                OperationType::ModifyDn,
+                            ),
                             OperationRule::allow(
                                 Subject::authenticated(),
                                 Target::subtree('ou=people,dc=foo,dc=bar'),
