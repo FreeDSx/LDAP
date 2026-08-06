@@ -16,6 +16,8 @@ use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
+use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
+use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
@@ -363,12 +365,23 @@ final class LdapServerCommand extends Command
                     ),
                 ))
                 ->setAclRules(
-                    $options->getAclRules()->appendExtendedOperationRules(
-                        ExtendedOperationRule::allow(
-                            Subject::dn('cn=user,dc=foo,dc=bar'),
-                            ExtendedRequest::OID_PPOLICY_STATE_FORWARD,
+                    $options->getAclRules()
+                        ->appendExtendedOperationRules(
+                            ExtendedOperationRule::allow(
+                                Subject::dn('cn=user,dc=foo,dc=bar'),
+                                ExtendedRequest::OID_PPOLICY_STATE_FORWARD,
+                            ),
+                        )
+                        // Matches the base the replica syncs, so the forward reaches exactly what it replicates.
+                        ->appendAttributeRules(
+                            AttributeRule::allow(
+                                Subject::dn('cn=user,dc=foo,dc=bar'),
+                                Target::subtree('dc=foo,dc=bar'),
+                                PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
+                                PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
+                                PasswordPolicyOid::NAME_PWD_LAST_SUCCESS,
+                            )->forWrite(),
                         ),
-                    ),
                 );
         }
 

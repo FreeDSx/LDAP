@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerMonitorHandler;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
@@ -86,6 +87,40 @@ final class AclRulesTest extends TestCase
         self::assertContains(
             ExtendedRequest::OID_PPOLICY_STATE_FORWARD,
             $extendedOp->extendedOpOids,
+        );
+    }
+
+    /**
+     * The forward operation carries no target of its own, so the same target bounds which entries it may reach.
+     */
+    public function test_withReplicaGrants_scopes_the_forwarded_policy_writes_to_its_target(): void
+    {
+        $replica = BindToken::fromSasl(
+            'replica',
+            new Dn('cn=replica,dc=foo,dc=bar'),
+        );
+        $accessControl = new RuleBasedAccessControl(
+            AclRules::fromEmpty()->withReplicaGrants(
+                Subject::dn('cn=replica,dc=foo,dc=bar'),
+                Target::subtree('ou=replicated,dc=foo,dc=bar'),
+            ),
+        );
+
+        $accessControl->authorizeAttribute(
+            $replica,
+            new Dn('cn=bob,ou=replicated,dc=foo,dc=bar'),
+            PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
+            AttributeAccess::Write,
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $accessControl->authorizeAttribute(
+            $replica,
+            new Dn('cn=admin,dc=foo,dc=bar'),
+            PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
+            AttributeAccess::Write,
         );
     }
 

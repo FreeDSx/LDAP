@@ -143,6 +143,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
             backend: $container->get(WritableStorageBackend::class),
             policyResolver: $container->get(PasswordPolicyResolver::class),
             engine: $container->get(PasswordPolicyEngine::class),
+            accessControl: $container->get(AccessControlInterface::class),
         );
     }
 

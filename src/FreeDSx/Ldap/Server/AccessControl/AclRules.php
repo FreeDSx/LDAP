@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerMonitorHandler;
+use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
@@ -281,6 +282,8 @@ final readonly class AclRules
     /**
      * Grant a replica's bind identity the privileged capabilities it needs: the content-sync control over $target,
      * the password-policy forward extended operation, and confidential attributes so those replicate.
+     *
+     * $target bounds both what may be synced and which entries policy state may be forwarded for.
      */
     public function withReplicaGrants(
         SubjectMatcherInterface $replica,
@@ -296,6 +299,14 @@ final readonly class AclRules
                 $replica,
                 ExtendedRequest::OID_PPOLICY_STATE_FORWARD,
             ))
+            // The extended operation carries no target, so the entries it may be forwarded for are bounded here.
+            ->appendAttributeRules(AttributeRule::allow(
+                $replica,
+                $target,
+                PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
+                PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
+                PasswordPolicyOid::NAME_PWD_LAST_SUCCESS,
+            )->forWrite())
             ->appendConfidentialAccess(ConfidentialAccessRule::allowAny($replica));
     }
 
