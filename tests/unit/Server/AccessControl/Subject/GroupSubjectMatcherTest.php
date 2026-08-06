@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\AccessControl\Subject;
 use DateTimeImmutable;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\SubjectEvaluationException;
 use FreeDSx\Ldap\Server\AccessControl\Subject\GroupSubjectMatcher;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Token\AnonToken;
@@ -102,7 +103,7 @@ final class GroupSubjectMatcherTest extends TestCase
         ));
     }
 
-    public function test_it_should_not_match_when_group_entry_is_not_found(): void
+    public function test_it_should_report_it_cannot_decide_when_the_group_entry_is_not_found(): void
     {
         $this->mockBackend
             ->method('get')
@@ -111,17 +112,38 @@ final class GroupSubjectMatcherTest extends TestCase
         $subject = new GroupSubjectMatcher('cn=admins,dc=foo,dc=bar');
         $subject->setBackend($this->mockBackend);
 
-        self::assertFalse($subject->matches(
+        $this->expectException(SubjectEvaluationException::class);
+
+        $subject->matches(
             BindToken::fromDn(
                 'cn=admin,dc=foo,dc=bar',
             ),
             $this->targetDn,
-        ));
+        );
     }
 
-    public function test_it_should_not_match_when_backend_is_not_set(): void
+    public function test_it_should_report_it_cannot_decide_when_backend_is_not_set(): void
     {
         $subject = new GroupSubjectMatcher('cn=admins,dc=foo,dc=bar');
+
+        $this->expectException(SubjectEvaluationException::class);
+
+        $subject->matches(
+            BindToken::fromDn(
+                'cn=admin,dc=foo,dc=bar',
+            ),
+            $this->targetDn,
+        );
+    }
+
+    public function test_it_should_not_match_when_the_group_has_no_members(): void
+    {
+        $this->mockBackend
+            ->method('get')
+            ->willReturn(new Entry(new Dn('cn=admins,dc=foo,dc=bar')));
+
+        $subject = new GroupSubjectMatcher('cn=admins,dc=foo,dc=bar');
+        $subject->setBackend($this->mockBackend);
 
         self::assertFalse($subject->matches(
             BindToken::fromDn(

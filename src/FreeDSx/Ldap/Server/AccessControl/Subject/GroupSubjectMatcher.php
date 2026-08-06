@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\AccessControl\Subject;
 use DateTimeImmutable;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\SubjectEvaluationException;
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
@@ -65,7 +66,9 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
         ?Dn $targetDn,
     ): bool {
         if ($this->backend === null) {
-            return false;
+            throw new SubjectEvaluationException(
+                'The group subject has no backend to read membership from.',
+            );
         }
 
         if (!$token instanceof AuthenticatedTokenInterface) {
@@ -74,9 +77,13 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
 
         $entry = $this->groupEntry();
         if ($entry === null) {
-            return false;
+            throw new SubjectEvaluationException(sprintf(
+                'The group "%s" could not be read to determine membership.',
+                $this->groupDn->toString(),
+            ));
         }
 
+        // The group exists and simply has no members, which is an answer rather than a failure.
         $memberAttr = $entry->get($this->memberAttribute);
         if ($memberAttr === null) {
             return false;
