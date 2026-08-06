@@ -27,6 +27,8 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPasswordPolicyForwardHandler;
 use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
+use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\PasswordChangeConstraintChain;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
@@ -49,9 +51,12 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
 
     private ResponseStream $lastStream;
 
+    private AccessControlInterface&MockObject $accessControl;
+
     protected function setUp(): void
     {
         $this->backend = $this->createMock(WritableLdapBackendInterface::class);
+        $this->accessControl = $this->createMock(AccessControlInterface::class);
         $this->subject = new ServerPasswordPolicyForwardHandler(
             $this->backend,
             new PasswordPolicyResolver(
@@ -66,6 +71,7 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
                 FrozenClock::fromString(self::NOW),
                 new PasswordChangeConstraintChain([]),
             ),
+            $this->accessControl,
         );
     }
 
@@ -137,6 +143,76 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
             [],
             $changes,
         );
+    }
+
+    /**
+     * The grant to forward says nothing about which entries, so each attribute is authorized at the target DN.
+     */
+    public function test_it_authorizes_every_changed_attribute_against_the_target_dn(): void
+    {
+        $seen = [];
+        $this->accessControl
+            ->method('authorizeAttribute')
+            ->willReturnCallback(function (
+                TokenInterface $token,
+                Dn $dn,
+                string $attribute,
+                AttributeAccess $access,
+            ) use (&$seen): void {
+                $seen[] = $dn->toString() . '/' . $attribute . '/' . $access->name;
+            });
+
+        $this->captureComputedChanges(
+            new ForwardPasswordPolicyStateRequest(
+                self::DN,
+                'uuid',
+                [new DateTimeImmutable('2026-05-20 11:59:00', new DateTimeZone('UTC'))],
+            ),
+            Entry::fromArray(self::DN, ['cn' => ['user']]),
+        );
+
+        self::assertSame(
+            [self::DN . '/pwdFailureTime/Write'],
+            $seen,
+        );
+    }
+
+    public function test_a_denied_attribute_stops_the_forwarded_write(): void
+    {
+        $this->accessControl
+            ->method('authorizeAttribute')
+            ->willThrowException(new OperationException(
+                'Access denied.',
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+            ));
+
+        $compute = null;
+        $this->backend
+            ->method('atomicUpdate')
+            ->with(
+                self::anything(),
+                self::anything(),
+                self::callback(function (callable $fn) use (&$compute): bool {
+                    $compute = $fn;
+
+                    return true;
+                }),
+            );
+
+        $this->subject->handleRequest(
+            $this->messageFor(new ForwardPasswordPolicyStateRequest(
+                self::DN,
+                'uuid',
+                [new DateTimeImmutable('2026-05-20 11:59:00', new DateTimeZone('UTC'))],
+            )),
+            $this->createMock(TokenInterface::class),
+        );
+
+        self::assertNotNull($compute);
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $compute(Entry::fromArray(self::DN, ['cn' => ['user']]));
     }
 
     public function test_it_rejects_a_request_of_the_wrong_type(): void

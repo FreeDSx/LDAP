@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Entry\Change;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\LdapResult;
@@ -22,6 +24,8 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
+use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
@@ -43,6 +47,7 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
         private WritableLdapBackendInterface $backend,
         private PasswordPolicyResolver $policyResolver,
         private PasswordPolicyEngine $engine,
+        private AccessControlInterface $accessControl,
     ) {}
 
     /**
@@ -62,7 +67,10 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
             );
         }
 
-        $this->apply($request);
+        $this->apply(
+            $request,
+            $token,
+        );
 
         return ResponseStream::reply(
             $message,
@@ -72,30 +80,62 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
     }
 
     /**
+     * The write itself stays a system write, since these attributes are NO-USER-MODIFICATION. The grant to forward
+     * says nothing about which entries may be forwarded for, so the caller is authorized against the target here.
+     *
      * @throws OperationException
      */
-    private function apply(ForwardPasswordPolicyStateRequest $request): void
-    {
+    private function apply(
+        ForwardPasswordPolicyStateRequest $request,
+        TokenInterface $token,
+    ): void {
         $this->backend->atomicUpdate(
             $request->getDn(),
             WriteContext::system(
                 new SystemToken(),
                 new ControlBag(),
             ),
-            function (Entry $entry) use ($request): array {
+            function (Entry $entry) use ($request, $token): array {
                 $policy = $this->policyResolver->resolveFor($entry);
 
                 if ($policy === null) {
                     return [];
                 }
 
-                return $this->engine->recordForwardedState(
+                $changes = $this->engine->recordForwardedState(
                     UserPasswordState::fromEntry($entry),
                     $policy,
                     $request->getFailureTimes(),
                     $request->getLastSuccess(),
                 )->changes;
+
+                $this->authorizeChanges(
+                    $token,
+                    $entry->getDn(),
+                    $changes,
+                );
+
+                return $changes;
             },
         );
+    }
+
+    /**
+     * @param Change[] $changes
+     * @throws OperationException
+     */
+    private function authorizeChanges(
+        TokenInterface $token,
+        Dn $dn,
+        array $changes,
+    ): void {
+        foreach ($changes as $change) {
+            $this->accessControl->authorizeAttribute(
+                $token,
+                $dn,
+                $change->getAttribute()->getName(),
+                AttributeAccess::Write,
+            );
+        }
     }
 }
