@@ -57,6 +57,11 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
 
     private RecordingMiddlewareHandler $next;
 
+    /**
+     * @var list<array{OperationType, string}>
+     */
+    private array $authorizedOperations = [];
+
     protected function setUp(): void
     {
         $this->resolver = $this->createMock(HandlerRouteResolverInterface::class);
@@ -215,44 +220,46 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         self::assertNotNull($this->next->received);
     }
 
-    public function test_dispatch_route_authorizes_modify_dn_against_source_only(): void
+    /**
+     * A rename in place still moves the entry to a new DN, which a rule may name.
+     */
+    public function test_dispatch_route_authorizes_modify_dn_against_source_and_destination(): void
     {
         $this->routeResolvesTo(HandlerId::Dispatch);
-        $this->accessControl
-            ->expects(self::once())
-            ->method('authorizeOperation')
-            ->with(
-                OperationType::ModifyDn,
-                $this->token,
-                self::isInstanceOf(Dn::class),
-            );
+        $this->recordAuthorizedOperations();
 
         $this->subject->process(
             $this->contextFor(new ModifyDnRequest('cn=foo,dc=bar', 'cn=baz', true)),
             $this->next,
         );
 
-        self::assertNotNull($this->next->received);
+        self::assertSame(
+            [
+                'cn=foo,dc=bar',
+                'cn=baz,dc=bar',
+            ],
+            $this->authorizedModifyDnTargets(),
+        );
     }
 
-    public function test_dispatch_route_authorizes_modify_dn_against_source_and_new_superior(): void
+    public function test_dispatch_route_authorizes_modify_dn_against_source_destination_and_new_superior(): void
     {
         $this->routeResolvesTo(HandlerId::Dispatch);
-        $this->accessControl
-            ->expects(self::exactly(2))
-            ->method('authorizeOperation')
-            ->with(
-                OperationType::ModifyDn,
-                $this->token,
-                self::isInstanceOf(Dn::class),
-            );
+        $this->recordAuthorizedOperations();
 
         $this->subject->process(
             $this->contextFor(new ModifyDnRequest('cn=foo,dc=bar', 'cn=baz', true, 'ou=other,dc=bar')),
             $this->next,
         );
 
-        self::assertNotNull($this->next->received);
+        self::assertSame(
+            [
+                'cn=foo,dc=bar',
+                'cn=baz,ou=other,dc=bar',
+                'ou=other,dc=bar',
+            ],
+            $this->authorizedModifyDnTargets(),
+        );
     }
 
     public function test_dispatch_route_add_attribute_denial_blocks_dispatch(): void
@@ -915,6 +922,38 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         $this->resolver
             ->method('routeIdFor')
             ->willReturn($id);
+    }
+
+    private function recordAuthorizedOperations(): void
+    {
+        $this->accessControl
+            ->method('authorizeOperation')
+            ->willReturnCallback(function (
+                OperationType $operation,
+                TokenInterface $token,
+                Dn $dn,
+            ): void {
+                $this->authorizedOperations[] = [
+                    $operation,
+                    $dn->toString(),
+                ];
+            });
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function authorizedModifyDnTargets(): array
+    {
+        $targets = [];
+
+        foreach ($this->authorizedOperations as [$operation, $dn]) {
+            if ($operation === OperationType::ModifyDn) {
+                $targets[] = $dn;
+            }
+        }
+
+        return $targets;
     }
 
     private function contextFor(

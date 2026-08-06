@@ -332,6 +332,13 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
             $request->getDn(),
         );
 
+        // The entry ends up here, so a rule naming the destination has to be consulted even for a rename in place.
+        $this->accessControl->authorizeOperation(
+            OperationType::ModifyDn,
+            $token,
+            OperationTargetDn::resultOf($request),
+        );
+
         $newParentDn = $request->getNewParentDn();
 
         if ($newParentDn === null) {

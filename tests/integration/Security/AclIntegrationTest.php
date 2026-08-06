@@ -286,6 +286,20 @@ final class AclIntegrationTest extends ServerTestCase
         );
     }
 
+    public function testRenameIsRefusedWhenTheDestinationDnIsDenied(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->ldapClient()->rename(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'cn=reserved',
+            true,
+        );
+    }
+
     public function testRenameCannotWriteAnRdnAttributeWithoutAGrant(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
