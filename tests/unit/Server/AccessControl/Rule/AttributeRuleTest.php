@@ -66,6 +66,21 @@ final class AttributeRuleTest extends TestCase
         );
     }
 
+    public function test_attribute_names_from_the_constructor_are_normalized(): void
+    {
+        $rule = new AttributeRule(
+            Effect::Deny,
+            new AnySubjectMatcher(),
+            new AnyTargetMatcher(),
+            ['userPassword', 'CN;binary'],
+        );
+
+        self::assertSame(
+            ['userpassword', 'cn'],
+            $rule->attributes,
+        );
+    }
+
     public function test_default_target_is_any_target_matcher(): void
     {
         $rule = AttributeRule::deny(new AnySubjectMatcher());

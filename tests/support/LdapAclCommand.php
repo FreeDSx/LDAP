@@ -11,8 +11,10 @@ use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Schema\LdifSchemaSource;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Operation\OperationType;
+use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
@@ -129,6 +131,7 @@ class LdapAclCommand extends Command
                 new Attribute('cn', 'bob2'),
                 new Attribute('sn', 'Bob'),
                 new Attribute('objectClass', 'inetOrgPerson'),
+                new Attribute('telephoneNumber', '555-0100'),
             ),
             new Entry(
                 new Dn(self::DELEGATE_DN),
@@ -198,6 +201,15 @@ class LdapAclCommand extends Command
                             OperationRule::deny(Subject::anyone()),
                         )
                         ->replaceAttributeRules(
+                            // Built through the public constructor with a mixed-case name, so the rule only bites
+                            // if names are normalized wherever a rule is made.
+                            new AttributeRule(
+                                Effect::Deny,
+                                Subject::anyone(),
+                                Target::any(),
+                                ['TelephoneNumber'],
+                                AttributeAccess::Read,
+                            ),
                             // Self may set its own password but never read it back.
                             AttributeRule::allow(
                                 Subject::self(),

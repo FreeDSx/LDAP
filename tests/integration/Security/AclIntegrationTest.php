@@ -410,6 +410,20 @@ final class AclIntegrationTest extends ServerTestCase
         self::assertNull($results->first()?->get('userPassword'));
     }
 
+    public function testAConstructorBuiltDenyStripsTheAttributeRegardlessOfSpelling(): void
+    {
+        $this->authenticateAdmin();
+
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::equal('uid', 'bob2'))
+                ->base('ou=people,dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(1, $results);
+        self::assertNull($results->first()?->get('telephoneNumber'));
+    }
+
     public function testRenameAuthorizesEveryComponentOfAMultivaluedRdn(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
