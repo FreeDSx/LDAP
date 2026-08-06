@@ -33,6 +33,7 @@ final class PasswordPolicyResponseInterceptorTest extends TestCase
     protected function setUp(): void
     {
         $this->context = new PasswordPolicyContext();
+        $this->context->setResponseRequested(true);
         $this->subject = new PasswordPolicyResponseInterceptor($this->context);
     }
 

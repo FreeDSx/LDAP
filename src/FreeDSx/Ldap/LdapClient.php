@@ -94,10 +94,12 @@ class LdapClient
         string $username,
         #[SensitiveParameter]
         string $password,
+        Control ...$controls,
     ): LdapMessageResponse {
         return $this->sendAndReceive(
             Operations::bind($username, $password)
                 ->setVersion($this->options->getVersion()),
+            ...$controls,
         );
     }
 
@@ -113,6 +115,7 @@ class LdapClient
         ?ChallengeOptionsInterface $options = null,
         ?MechanismName $mechanism = null,
         ?SelectOptions $selectOptions = null,
+        Control ...$controls,
     ): LdapMessageResponse {
         return $this->sendAndReceive(
             Operations::bindSasl(
@@ -121,6 +124,7 @@ class LdapClient
                 selectOptions: $selectOptions,
             )
                 ->setVersion($this->options->getVersion()),
+            ...$controls,
         );
     }
 

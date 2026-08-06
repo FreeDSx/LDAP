@@ -16,6 +16,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Security;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Options\PlainOptions;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
@@ -36,6 +37,7 @@ final class LdapPasswordPolicySaslServerTest extends ServerTestCase
         $response = $this->ldapClient()->bindSasl(
             (new PlainOptions())->setUsername('reset-user')->setPassword('12345'),
             MechanismName::PLAIN,
+            controls: Controls::pwdPolicy(),
         );
 
         $control = $response->controls()->getByClass(PwdPolicyResponseControl::class);

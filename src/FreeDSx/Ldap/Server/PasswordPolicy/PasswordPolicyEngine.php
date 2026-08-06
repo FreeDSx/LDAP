@@ -289,6 +289,17 @@ final readonly class PasswordPolicyEngine
     }
 
     /**
+     * The delay a first failure earns, for a bind name that resolves to no entry and so has no failure count.
+     */
+    public function initialFailureDelay(PasswordPolicy $policy): float
+    {
+        return $this->bindFailureDelay(
+            $policy,
+            1,
+        );
+    }
+
+    /**
      * Union two failure-time lists, deduplicating by generalized-time value so a re-sent forward is idempotent.
      *
      * @param list<DateTimeImmutable> $current

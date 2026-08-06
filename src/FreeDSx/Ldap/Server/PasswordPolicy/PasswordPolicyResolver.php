@@ -43,6 +43,15 @@ final class PasswordPolicyResolver
             ?? $this->inMemoryFallback;
     }
 
+    /**
+     * The policy that applies with no entry in hand, for a bind name that resolves to nothing.
+     */
+    public function resolveDefault(): ?PasswordPolicy
+    {
+        return $this->fromDefaultDn()
+            ?? $this->inMemoryFallback;
+    }
+
     private function fromUserSubentry(Entry $user): ?PasswordPolicy
     {
         $value = $user

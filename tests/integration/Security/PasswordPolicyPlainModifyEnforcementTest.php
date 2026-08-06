@@ -77,6 +77,7 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
     {
         $this->clock = FrozenClock::fromString(self::NOW);
         $this->context = new PasswordPolicyContext();
+        $this->context->setResponseRequested(true);
     }
 
     public function test_reused_password_is_rejected_with_history_control(): void

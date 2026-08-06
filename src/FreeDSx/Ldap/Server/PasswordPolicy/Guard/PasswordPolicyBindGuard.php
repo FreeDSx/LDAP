@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordBindAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\PasswordPolicyOutcome;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\RecordedOutcome;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy\PasswordPolicyBindStrategyInterface;
+use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
@@ -60,6 +61,19 @@ final readonly class PasswordPolicyBindGuard
             $outcome->diagnostic,
             $outcome->ldapResultCode,
         );
+    }
+
+    /**
+     * Applies the same delay a real account earns, so a bind against a name that does not exist is not measurably
+     * faster than one against a name that does.
+     */
+    public function delayUnknownIdentity(?PasswordPolicy $policy): void
+    {
+        if ($policy === null) {
+            return;
+        }
+
+        $this->sleeper->sleep($this->engine->initialFailureDelay($policy));
     }
 
     /**
