@@ -20,6 +20,8 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
@@ -29,6 +31,22 @@ use PHPUnit\Framework\TestCase;
 
 final class PasswordAuthenticatorTest extends TestCase
 {
+    /**
+     * Low enough to keep the suite quick, high enough to stay well clear of measurement noise.
+     */
+    private const CHEAP_BCRYPT_COST = 8;
+
+    /**
+     * Timings are taken as a best-of, since scheduling noise can only ever add to a measurement.
+     */
+    private const TIMING_SAMPLES = 5;
+
+    /**
+     * A skipped comparison lands near zero rather than near parity, so the bar sits far below parity to leave
+     * scheduling noise no way to reach it.
+     */
+    private const MIN_COMPARISON_COST_RATIO = 0.1;
+
     private BindNameResolverInterface&MockObject $mockResolver;
 
     private LdapBackendInterface&MockObject $mockBackend;
@@ -299,6 +317,89 @@ final class PasswordAuthenticatorTest extends TestCase
         ))->getSaslIdentity('alice', MechanismName::SCRAM_SHA256);
 
         self::assertInstanceOf(SaslIdentity::class, $identity);
+    }
+
+    public function test_a_name_resolving_to_nothing_is_refused_at_the_cost_of_a_comparison(): void
+    {
+        $hashService = new PasswordHashService(
+            PasswordHashScheme::Bcrypt,
+            self::CHEAP_BCRYPT_COST,
+        );
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('userPassword', $hashService->hash('secret')),
+        );
+
+        $compared = self::timeRefusedBind($this->authenticatorFor($entry, $hashService));
+        $unresolved = self::timeRefusedBind($this->authenticatorFor(null, $hashService));
+
+        self::assertGreaterThan(
+            $compared * self::MIN_COMPARISON_COST_RATIO,
+            $unresolved,
+        );
+    }
+
+    public function test_an_entry_without_a_password_is_refused_at_the_cost_of_a_comparison(): void
+    {
+        $hashService = new PasswordHashService(
+            PasswordHashScheme::Bcrypt,
+            self::CHEAP_BCRYPT_COST,
+        );
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('userPassword', $hashService->hash('secret')),
+        );
+        $passwordless = new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('cn', 'Bob'),
+        );
+
+        $compared = self::timeRefusedBind($this->authenticatorFor($entry, $hashService));
+        $uncompared = self::timeRefusedBind($this->authenticatorFor($passwordless, $hashService));
+
+        self::assertGreaterThan(
+            $compared * self::MIN_COMPARISON_COST_RATIO,
+            $uncompared,
+        );
+    }
+
+    /**
+     * Fastest of several attempts at refusing a bind that cannot succeed, in seconds.
+     */
+    private static function timeRefusedBind(PasswordAuthenticator $authenticator): float
+    {
+        $fastest = null;
+
+        for ($sample = 0; $sample < self::TIMING_SAMPLES; $sample++) {
+            $start = microtime(true);
+
+            try {
+                $authenticator->authenticate('cn=Alice,dc=example,dc=com', 'wrong');
+            } catch (OperationException) {
+            }
+
+            $elapsed = microtime(true) - $start;
+            $fastest = $fastest === null
+                ? $elapsed
+                : min($fastest, $elapsed);
+        }
+
+        return (float) $fastest;
+    }
+
+    private function authenticatorFor(
+        ?Entry $resolvedEntry,
+        PasswordHashService $hashService,
+    ): PasswordAuthenticator {
+        $resolver = $this->createMock(BindNameResolverInterface::class);
+        $resolver->method('resolve')
+            ->willReturn($resolvedEntry);
+
+        return new PasswordAuthenticator(
+            $resolver,
+            $this->mockBackend,
+            $hashService,
+        );
     }
 
     private function subject(?Entry $resolvedEntry = null): PasswordAuthenticator
