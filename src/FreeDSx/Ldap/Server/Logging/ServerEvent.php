@@ -42,6 +42,7 @@ enum ServerEvent: string
     case AuthorizationDeniedRead        = 'authz.denied.read';
     case ProxyAuthorizationDenied       = 'authz.denied.proxy';
     case CriticalControlRejected        = 'control.critical.rejected';
+    case OperationRefused               = 'operation.refused';
     case SchemaViolation                = 'schema.violation';
     case SyncEntrySkipped               = 'sync.entry_skipped';
     case JournalPruned                  = 'journal.pruned';
@@ -69,6 +70,7 @@ enum ServerEvent: string
             self::AuthorizationDeniedRead,
             self::ProxyAuthorizationDenied,
             self::CriticalControlRejected,
+            self::OperationRefused,
             self::SchemaViolation,
             self::NoticeOfDisconnectSent,
             self::WriteTimeout,

@@ -20,8 +20,10 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
+use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\ForwardPasswordPolicyStateRequest;
+use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
@@ -148,6 +150,13 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
      */
     private function authorizePrivilegedControls(ServerRequestContext $context): void
     {
+        $request = $context->message->getRequest();
+
+        // Neither carries a response, so a denial here could only be delivered as an unsolicited notification.
+        if ($request instanceof AbandonRequest || $request instanceof UnbindRequest) {
+            return;
+        }
+
         $controls = $context->message->controls();
         $dn = $this->targetDnFor($context->message->getRequest()) ?? new Dn('');
 

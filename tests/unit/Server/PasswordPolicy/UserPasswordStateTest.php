@@ -16,7 +16,8 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\PasswordPolicy;
 use DateTimeImmutable;
 use DateTimeZone;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\PasswordPolicyException;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 use PHPUnit\Framework\TestCase;
@@ -152,8 +153,8 @@ final class UserPasswordStateTest extends TestCase
             ['pwdChangedTime' => 'not-a-time'],
         );
 
-        $this->expectException(PasswordPolicyException::class);
-        $this->expectExceptionMessage('non-GeneralizedTime value');
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::OTHER);
 
         UserPasswordState::fromEntry($entry);
     }
@@ -165,8 +166,8 @@ final class UserPasswordStateTest extends TestCase
             ['pwdReset' => 'maybe'],
         );
 
-        $this->expectException(PasswordPolicyException::class);
-        $this->expectExceptionMessage('non-boolean value');
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::OTHER);
 
         UserPasswordState::fromEntry($entry);
     }

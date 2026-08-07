@@ -228,7 +228,11 @@ class SaslBind implements BindInterface
                 $e->getMessage(),
             ));
 
-            throw $e;
+            throw new ResponseAlreadySentException(
+                $e->getMessage(),
+                $e->getCode(),
+                $e,
+            );
         }
 
         // Captured before the queue interceptor clears the policy context on send.

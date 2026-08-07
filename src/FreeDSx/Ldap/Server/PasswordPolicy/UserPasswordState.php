@@ -18,7 +18,9 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\PasswordPolicyException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 
@@ -47,47 +49,21 @@ final readonly class UserPasswordState
     ) {}
 
     /**
-     * @throws PasswordPolicyException when any operational attribute value fails to parse.
+     * Unreadable state fails the operation rather than the session, and says nothing about the entry it came from.
+     *
+     * @throws OperationException when any operational attribute value fails to parse.
      */
     public static function fromEntry(Entry $entry): self
     {
-        return new self(
-            changedAt: self::readGeneralizedTime(
-                $entry,
-                PasswordPolicyOid::NAME_PWD_CHANGED_TIME,
-            ),
-            accountLockedAt: self::readLockedAt($entry),
-            permanentlyLocked: self::isPermanentLockSentinel($entry),
-            failureTimes: self::readGeneralizedTimeList(
-                $entry,
-                PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
-            ),
-            history: self::readHistory($entry),
-            graceUseTimes: self::readGeneralizedTimeList(
-                $entry,
-                PasswordPolicyOid::NAME_PWD_GRACE_USE_TIME,
-            ),
-            mustChange: self::readBoolean(
-                $entry,
-                PasswordPolicyOid::NAME_PWD_RESET,
-            ) ?? false,
-            policySubentry: self::readDn(
-                $entry,
-                PasswordPolicyOid::NAME_PWD_POLICY_SUBENTRY,
-            ),
-            startTime: self::readGeneralizedTime(
-                $entry,
-                PasswordPolicyOid::NAME_PWD_START_TIME,
-            ),
-            endTime: self::readGeneralizedTime(
-                $entry,
-                PasswordPolicyOid::NAME_PWD_END_TIME,
-            ),
-            lastSuccess: self::readGeneralizedTime(
-                $entry,
-                PasswordPolicyOid::NAME_PWD_LAST_SUCCESS,
-            ),
-        );
+        try {
+            return self::parse($entry);
+        } catch (PasswordPolicyException $e) {
+            throw new OperationException(
+                'The password policy state could not be read.',
+                ResultCode::OTHER,
+                $e,
+            );
+        }
     }
 
     public function isLocked(): bool
@@ -143,6 +119,50 @@ final readonly class UserPasswordState
         }
 
         return $count;
+    }
+
+    /**
+     * @throws PasswordPolicyException when any operational attribute value fails to parse.
+     */
+    private static function parse(Entry $entry): self
+    {
+        return new self(
+            changedAt: self::readGeneralizedTime(
+                $entry,
+                PasswordPolicyOid::NAME_PWD_CHANGED_TIME,
+            ),
+            accountLockedAt: self::readLockedAt($entry),
+            permanentlyLocked: self::isPermanentLockSentinel($entry),
+            failureTimes: self::readGeneralizedTimeList(
+                $entry,
+                PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
+            ),
+            history: self::readHistory($entry),
+            graceUseTimes: self::readGeneralizedTimeList(
+                $entry,
+                PasswordPolicyOid::NAME_PWD_GRACE_USE_TIME,
+            ),
+            mustChange: self::readBoolean(
+                $entry,
+                PasswordPolicyOid::NAME_PWD_RESET,
+            ) ?? false,
+            policySubentry: self::readDn(
+                $entry,
+                PasswordPolicyOid::NAME_PWD_POLICY_SUBENTRY,
+            ),
+            startTime: self::readGeneralizedTime(
+                $entry,
+                PasswordPolicyOid::NAME_PWD_START_TIME,
+            ),
+            endTime: self::readGeneralizedTime(
+                $entry,
+                PasswordPolicyOid::NAME_PWD_END_TIME,
+            ),
+            lastSuccess: self::readGeneralizedTime(
+                $entry,
+                PasswordPolicyOid::NAME_PWD_LAST_SUCCESS,
+            ),
+        );
     }
 
     private function newestFailureTime(): ?DateTimeImmutable

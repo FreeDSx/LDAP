@@ -35,6 +35,18 @@ final class SaslBindRequestTest extends TestCase
         self::assertNull($result->getCredentials());
     }
 
+    public function test_bind_request_keeps_the_declared_version_for_a_sasl_bind(): void
+    {
+        $request = (new SaslBindRequest('PLAIN'))->setVersion(2);
+
+        $result = BindRequest::fromAsn1($request->toAsn1());
+
+        self::assertSame(
+            2,
+            $result->getVersion(),
+        );
+    }
+
     public function test_bind_request_returns_sasl_bind_request_from_asn1_with_mechanism_and_credentials(): void
     {
         $request = new SaslBindRequest(
