@@ -81,14 +81,15 @@ class ServerTestCase extends LdapTestCase
 
     public function tearDown(): void
     {
-        parent::tearDown();
-
+        // Ahead of the parent, which closes the socket. Unbinding afterwards would only reconnect to send it.
         try {
             $this->client?->unbind();
         } catch (\Throwable) {
             // Server may have already closed; ignore unbind failures during teardown.
         }
         $this->client = null;
+
+        parent::tearDown();
 
         if ($this->overrideProcess !== null) {
             self::stopProcessTree($this->overrideProcess);

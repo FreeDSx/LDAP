@@ -418,6 +418,30 @@ final class LdapServerTest extends ServerTestCase
         $this->assertNotNull($result);
     }
 
+    public function testItKeepsAnSSLConnectionAliveWhenALaterConnectionEnds(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess('ssl');
+
+        $established = $this->ldapClient();
+        $established->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+
+        $later = $this->buildClient('ssl');
+        $later->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+        $later->unbind();
+
+        // Give the connection handler the moment it needs to end before the established one is used again.
+        usleep(250_000);
+
+        $this->assertNotNull($established->read(''));
+    }
+
     public function testItCanRunOverUnixSocket(): void
     {
         $this->stopServer();

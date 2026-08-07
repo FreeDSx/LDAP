@@ -33,6 +33,20 @@ class SocketServerFactory
         private readonly bool $reusePort = false,
     ) {}
 
+    /**
+     * Whether the handler that owns a connection must negotiate TLS itself, rather than the listener doing it as part
+     * of accepting.
+     *
+     * A session negotiated in the accept loop is inherited by every connection forked after it, and the first of those
+     * to exit sends the close alert that ends the connection for the handler that actually owns it.
+     */
+    public function isTlsHandshakeDeferred(): bool
+    {
+        return $this->runner === RunnerMode::Pcntl
+            && $this->network->isUseSsl()
+            && Transport::from($this->network->getTransport()) === Transport::Tcp;
+    }
+
     public function makeAndBind(): SocketServer
     {
         $isUnixSocket = $this->network->isUnixSocket();
@@ -53,7 +67,7 @@ class SocketServerFactory
             ->setIdleTimeout($this->network->getIdleTimeout())
             ->setWriteTimeout($this->network->getWriteTimeout())
             ->setWriteTimeoutEnforcer($writeTimeoutEnforcer)
-            ->setUseSsl($this->network->isUseSsl())
+            ->setUseSsl($this->network->isUseSsl() && !$this->isTlsHandshakeDeferred())
             ->setSslCert($this->network->getSslCert())
             ->setSslCertKey($this->network->getSslCertKey())
             ->setSslCertPassphrase($this->network->getSslCertPassphrase())
