@@ -478,9 +478,9 @@ class PcntlServerRunner implements ServerRunnerInterface
         int $pid,
         ?ChildChannel $channel,
     ): never {
-        // Cleanup the child's inherited FD copy without shutting down the parent accept loop.
+        // Cleanup the inherited FD copies without disturbing the accept loop or the connections still in flight.
         $this->server->close(shutdown: false);
-        $this->closeInheritedChannels();
+        $this->closeInheritedConnections();
         $channel?->childKeepWrite();
         if ($channel !== null) {
             $this->operationRollup?->enterChild($channel);
@@ -490,6 +490,12 @@ class PcntlServerRunner implements ServerRunnerInterface
         $this->isMainProcess = false;
 
         $this->resettable?->reset();
+
+        if (!$this->encryptConnectionIfDeferred($socket, $context)) {
+            $socket->close();
+
+            exit(0);
+        }
 
         $serverProtocolHandler = $this->serverProtocolFactory->make(
             $socket,
@@ -523,13 +529,13 @@ class PcntlServerRunner implements ServerRunnerInterface
     }
 
     /**
-     * Prepare a freshly forked background-task child: drop the inherited server socket, channels and signal
+     * Prepare a freshly forked background-task child: drop the inherited server socket, connections and signal
      * handlers, then reset inherited per-connection state.
      */
     private function enterChild(): void
     {
         $this->server->close(shutdown: false);
-        $this->closeInheritedChannels();
+        $this->closeInheritedConnections();
         $this->isMainProcess = false;
 
         // A sweep child is terminated by SIGTERM; the replica daemon installs its own handlers when it runs.
@@ -548,13 +554,41 @@ class PcntlServerRunner implements ServerRunnerInterface
     }
 
     /**
-     * Close the parent's channel read ends inherited by this fork so they do not leak in the child.
+     * Release the channel read ends and client sockets of connections already in flight, so this fork neither leaks
+     * them nor ends them when it exits.
      */
-    private function closeInheritedChannels(): void
+    private function closeInheritedConnections(): void
     {
         foreach ($this->childProcesses as $childProcess) {
             $childProcess->getChannel()?->close();
+            $childProcess->releaseSocket();
         }
+
+        $this->childProcesses = [];
+    }
+
+    /**
+     * Negotiate TLS for connections whose handshake the listener left to the handler.
+     *
+     * @param array<string, mixed> $context
+     */
+    private function encryptConnectionIfDeferred(
+        Socket $socket,
+        array $context,
+    ): bool {
+        if (!$this->socketServerFactory->isTlsHandshakeDeferred()) {
+            return true;
+        }
+
+        try {
+            $socket->encrypt(true);
+        } catch (Throwable $e) {
+            $this->logTlsHandshakeError($e, $context);
+
+            return false;
+        }
+
+        return true;
     }
 
     private function makeChildChannel(): ?ChildChannel

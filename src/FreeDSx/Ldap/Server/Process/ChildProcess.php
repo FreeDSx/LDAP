@@ -42,4 +42,12 @@ readonly class ChildProcess
     {
         $this->socket->close();
     }
+
+    /**
+     * Drop this process's own handle on the connection, leaving the process that owns it unaffected.
+     */
+    public function releaseSocket(): void
+    {
+        $this->socket->close(shutdown: false);
+    }
 }

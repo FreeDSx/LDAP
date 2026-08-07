@@ -61,6 +61,16 @@ final class ChildProcessTest extends TestCase
         $this->subject->closeSocket();
     }
 
+    public function test_it_should_release_the_socket_without_shutting_it_down(): void
+    {
+        $this->mockSocket
+            ->expects(self::once())
+            ->method('close')
+            ->with(false);
+
+        $this->subject->releaseSocket();
+    }
+
     public function test_the_channel_is_null_by_default(): void
     {
         self::assertNull($this->subject->getChannel());

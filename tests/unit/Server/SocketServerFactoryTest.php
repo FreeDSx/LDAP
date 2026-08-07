@@ -139,6 +139,38 @@ final class SocketServerFactoryTest extends TestCase
         );
     }
 
+    public function test_it_defers_the_tls_handshake_to_the_connection_handler_for_the_pcntl_runner(): void
+    {
+        $subject = new SocketServerFactory(
+            (new NetworkConfig())
+                ->setPort(3394)
+                ->setUseSsl(true),
+            RunnerMode::Pcntl,
+            $this->mockLogger,
+        );
+
+        self::assertTrue($subject->isTlsHandshakeDeferred());
+        self::assertFalse($subject->makeAndBind()->getOptions()->isUseSsl());
+    }
+
+    public function test_it_leaves_the_tls_handshake_to_the_listener_for_the_swoole_runner(): void
+    {
+        $subject = new SocketServerFactory(
+            (new NetworkConfig())
+                ->setPort(3395)
+                ->setUseSsl(true),
+            RunnerMode::Swoole,
+            $this->mockLogger,
+        );
+
+        self::assertFalse($subject->isTlsHandshakeDeferred());
+    }
+
+    public function test_it_has_no_tls_handshake_to_defer_without_ssl(): void
+    {
+        self::assertFalse($this->subject->isTlsHandshakeDeferred());
+    }
+
     public function test_it_should_make_a_unix_based_socket_server(): void
     {
         if (str_starts_with(strtoupper(PHP_OS), 'WIN')) {

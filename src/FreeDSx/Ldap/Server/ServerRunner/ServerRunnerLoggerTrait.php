@@ -91,6 +91,20 @@ trait ServerRunnerLoggerTrait
     /**
      * @param array<string, mixed> $context
      */
+    private function logTlsHandshakeError(
+        Throwable $e,
+        array $context = [],
+    ): void {
+        $this->getRunnerLogger()?->log(
+            LogLevel::WARNING,
+            'Unable to negotiate TLS with the client. Closing connection.',
+            array_merge($context, self::exceptionContext($e)),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
     private function logConnectionLimitReached(array $context = []): void
     {
         $this->getRunnerLogger()?->log(
