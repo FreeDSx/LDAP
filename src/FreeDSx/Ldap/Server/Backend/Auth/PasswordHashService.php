@@ -108,6 +108,16 @@ final readonly class PasswordHashService
     }
 
     /**
+     * Stands in for a skipped comparison, hashing costing the same as verifying under every supported scheme.
+     */
+    public function verifyDummy(
+        #[SensitiveParameter]
+        string $plain,
+    ): void {
+        $this->hash($plain);
+    }
+
+    /**
      * Prefixes recognized for verification.
      *
      * @return list<string>

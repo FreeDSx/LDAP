@@ -47,13 +47,13 @@ final class PasswordAuthenticator implements PasswordAuthenticatableInterface
         );
 
         if ($entry === null) {
-            $this->denyCredentials();
+            $this->denyUncomparedCredentials($password);
         }
 
         $attr = $entry->get('userPassword');
 
         if ($attr === null) {
-            $this->denyCredentials();
+            $this->denyUncomparedCredentials($password);
         }
 
         foreach ($attr->getValues() as $stored) {
@@ -97,6 +97,17 @@ final class PasswordAuthenticator implements PasswordAuthenticatableInterface
             $password,
             $entry->getDn(),
         );
+    }
+
+    /**
+     * Refuses a bind that reached no stored value, at the cost of one that did.
+     */
+    private function denyUncomparedCredentials(
+        #[SensitiveParameter]
+        string $password,
+    ): never {
+        $this->hashService->verifyDummy($password);
+        $this->denyCredentials();
     }
 
     private function denyCredentials(): never
