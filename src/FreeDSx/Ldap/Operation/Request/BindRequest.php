@@ -103,7 +103,8 @@ abstract class BindRequest implements RequestInterface
         $name = $name->getValue();
 
         if ($auth->getTagNumber() === 3) {
-            return SaslBindRequest::fromAsn1($auth);
+            return SaslBindRequest::fromAsn1($auth)
+                ->setVersion($versionValue);
         }
 
         if ($auth->getTagNumber() !== 0) {

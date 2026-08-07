@@ -174,7 +174,10 @@ final readonly class PasswordHashService
         string $plain,
         string $encoded,
     ): bool {
-        return base64_encode(sha1($plain, true)) === $encoded;
+        return hash_equals(
+            $encoded,
+            base64_encode(sha1($plain, true)),
+        );
     }
 
     private function verifySsha(
@@ -185,7 +188,10 @@ final readonly class PasswordHashService
         $decoded = base64_decode($encoded);
         $salt = substr($decoded, 20);
 
-        return substr($decoded, 0, 20) === sha1($plain . $salt, true);
+        return hash_equals(
+            substr($decoded, 0, 20),
+            sha1($plain . $salt, true),
+        );
     }
 
     private function verifyMd5(
@@ -193,7 +199,10 @@ final readonly class PasswordHashService
         string $plain,
         string $encoded,
     ): bool {
-        return base64_encode(md5($plain, true)) === $encoded;
+        return hash_equals(
+            $encoded,
+            base64_encode(md5($plain, true)),
+        );
     }
 
     private function verifySmd5(
@@ -204,6 +213,9 @@ final readonly class PasswordHashService
         $decoded = base64_decode($encoded);
         $salt = substr($decoded, 16);
 
-        return substr($decoded, 0, 16) === md5($plain . $salt, true);
+        return hash_equals(
+            substr($decoded, 0, 16),
+            md5($plain . $salt, true),
+        );
     }
 }

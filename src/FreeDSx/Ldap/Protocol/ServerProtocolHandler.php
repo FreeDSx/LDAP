@@ -148,6 +148,13 @@ readonly class ServerProtocolHandler
         } catch (OperationException $e) {
             # A pre-pipeline bind/authorization failure. Answer it and keep the session open — a failed bind does not
             # terminate the connection (RFC 4511 §4.2.1). Operation failures are handled by OperationErrorMiddleware.
+            #
+            # Audited here because these are thrown above the writer, so no middleware sees them.
+            $this->eventLogger->recordFailure(
+                ServerEvent::OperationRefused,
+                $e,
+                message: $message,
+            );
             $this->queue->sendMessage($this->responseFactory->getStandardResponse(
                 $message,
                 $e->getCode(),
