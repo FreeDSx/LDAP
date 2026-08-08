@@ -24,23 +24,18 @@ use FreeDSx\Ldap\Server\Subentry\GoverningSubentryResolver;
 /**
  * Locates the {@see PasswordPolicy} that governs a given user entry.
  *
- * One instance is constructed per request so the internal cache lives request-scoped.
+ * Deliberately stateless: resolution runs once per operation.
  */
-final class PasswordPolicyResolver
+final readonly class PasswordPolicyResolver
 {
-    /**
-     * @var array<string, ?PasswordPolicy> normalized DN string to decoded policy (null = not found in DIT)
-     */
-    private array $cache = [];
-
     /**
      * @param ?GoverningSubentryResolver $subentries Null when subentry-based policy is not enabled.
      */
     public function __construct(
-        private readonly LdapBackendInterface $backend,
-        private readonly ?Dn $defaultPolicyDn,
-        private readonly ?PasswordPolicy $inMemoryFallback,
-        private readonly ?GoverningSubentryResolver $subentries = null,
+        private LdapBackendInterface $backend,
+        private ?Dn $defaultPolicyDn,
+        private ?PasswordPolicy $inMemoryFallback,
+        private ?GoverningSubentryResolver $subentries = null,
     ) {}
 
     /**
@@ -115,15 +110,10 @@ final class PasswordPolicyResolver
 
     private function loadFromDit(Dn $dn): ?PasswordPolicy
     {
-        $key = $dn->normalize()->toString();
-
-        if (array_key_exists($key, $this->cache)) {
-            return $this->cache[$key];
-        }
-
         $entry = $this->backend->get($dn);
-        $policy = $entry !== null ? PasswordPolicy::fromEntry($entry) : null;
 
-        return $this->cache[$key] = $policy;
+        return $entry !== null
+            ? PasswordPolicy::fromEntry($entry)
+            : null;
     }
 }
