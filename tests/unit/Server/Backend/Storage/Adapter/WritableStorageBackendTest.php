@@ -56,9 +56,12 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\BackendFactoryTrait;
 
 final class WritableStorageBackendTest extends TestCase
 {
+    use BackendFactoryTrait;
+
     private WritableStorageBackend $subject;
 
     private Entry $alice;
@@ -86,7 +89,7 @@ final class WritableStorageBackendTest extends TestCase
             new Attribute('cn', 'Bob'),
         );
 
-        $this->subject = new WritableStorageBackend(new InMemoryStorage([
+        $this->subject = self::makeWritableBackend(new InMemoryStorage([
             $this->base,
             $this->alice,
             $this->bob,
@@ -298,7 +301,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_add_allows_root_naming_context_entry_for_system_context(): void
     {
-        $backend = new WritableStorageBackend(new InMemoryStorage());
+        $backend = self::makeWritableBackend(new InMemoryStorage());
         $root = new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'));
         $backend->add(
             new AddCommand($root),
@@ -310,7 +313,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_add_refuses_root_naming_context_entry_for_non_system_context(): void
     {
-        $backend = new WritableStorageBackend(new InMemoryStorage());
+        $backend = self::makeWritableBackend(new InMemoryStorage());
         $root = new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'));
 
         self::expectException(OperationException::class);
@@ -324,7 +327,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_add_refuses_single_rdn_root_entry_for_non_system_context(): void
     {
-        $backend = new WritableStorageBackend(new InMemoryStorage());
+        $backend = self::makeWritableBackend(new InMemoryStorage());
         $root = new Entry(new Dn('dc=com'), new Attribute('dc', 'com'));
 
         self::expectException(OperationException::class);
@@ -375,7 +378,7 @@ final class WritableStorageBackendTest extends TestCase
             new Dn('dc=example,dc=com'),
             new Attribute('dc', 'example'),
         );
-        $backend = new WritableStorageBackend(new InMemoryStorage([$leaf]));
+        $backend = self::makeWritableBackend(new InMemoryStorage([$leaf]));
 
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
@@ -392,7 +395,7 @@ final class WritableStorageBackendTest extends TestCase
             new Dn('dc=example,dc=com'),
             new Attribute('dc', 'example'),
         );
-        $backend = new WritableStorageBackend(new InMemoryStorage([$leaf]));
+        $backend = self::makeWritableBackend(new InMemoryStorage([$leaf]));
 
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
@@ -418,7 +421,7 @@ final class WritableStorageBackendTest extends TestCase
             new Dn('cn=Alice,dc=example,dc=com'),
             new Attribute('cn', 'Alice'),
         );
-        $backend = new WritableStorageBackend(new InMemoryStorage([$base, $leaf]));
+        $backend = self::makeWritableBackend(new InMemoryStorage([$base, $leaf]));
 
         $backend->delete(
             new DeleteCommand(new Dn('cn=Alice,dc=example,dc=com')),
@@ -426,27 +429,6 @@ final class WritableStorageBackendTest extends TestCase
         );
 
         self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
-    }
-
-    public function test_naming_contexts_delegates_to_storage(): void
-    {
-        $storage = new InMemoryStorage([
-            new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
-            new Entry(new Dn('cn=Alice,dc=example,dc=com'), new Attribute('cn', 'Alice')),
-            new Entry(new Dn('dc=other,dc=org'), new Attribute('dc', 'other')),
-        ]);
-        $backend = new WritableStorageBackend($storage);
-
-        $contexts = array_map(
-            fn(Dn $dn): string => $dn->toString(),
-            $backend->namingContexts(),
-        );
-        sort($contexts);
-
-        self::assertSame(
-            ['dc=example,dc=com', 'dc=other,dc=org'],
-            $contexts,
-        );
     }
 
     public function test_update_add_attribute_value(): void
@@ -672,7 +654,7 @@ final class WritableStorageBackendTest extends TestCase
     public function test_move_throws_entry_already_exists_when_target_dn_exists(): void
     {
         $alicia = new Entry(new Dn('cn=Alicia,dc=example,dc=com'), new Attribute('cn', 'Alicia'));
-        $backend = new WritableStorageBackend(new InMemoryStorage([
+        $backend = self::makeWritableBackend(new InMemoryStorage([
             $this->base,
             $this->alice,
             $alicia,
@@ -731,7 +713,7 @@ final class WritableStorageBackendTest extends TestCase
             new EntryStream($this->makeTimeLimitStream()),
         );
 
-        $subject = new WritableStorageBackend($storage);
+        $subject = self::makeWritableBackend($storage);
 
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::TIME_LIMIT_EXCEEDED);
@@ -744,9 +726,9 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_search_trips_lookthrough_limit_when_examined_exceeds_cap(): void
     {
-        $subject = new WritableStorageBackend(
+        $subject = self::makeWritableBackend(
             new InMemoryStorage([$this->base, $this->alice, $this->bob]),
-            new SearchLimits(maxSearchLookthrough: 2),
+            limits: new SearchLimits(maxSearchLookthrough: 2),
         );
 
         self::expectException(OperationException::class);
@@ -760,9 +742,9 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_search_does_not_trip_lookthrough_limit_within_cap(): void
     {
-        $subject = new WritableStorageBackend(
+        $subject = self::makeWritableBackend(
             new InMemoryStorage([$this->base, $this->alice, $this->bob]),
-            new SearchLimits(maxSearchLookthrough: 100),
+            limits: new SearchLimits(maxSearchLookthrough: 100),
         );
 
         $request = (new SearchRequest(new PresentFilter('objectClass')))
@@ -777,7 +759,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_search_declines_alias_base_when_base_deref_requested(): void
     {
-        $subject = new WritableStorageBackend(new InMemoryStorage([
+        $subject = self::makeWritableBackend(new InMemoryStorage([
             $this->base,
             $this->alice,
             $this->aliasEntry(),
@@ -795,7 +777,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_search_returns_alias_base_when_deref_never(): void
     {
-        $subject = new WritableStorageBackend(new InMemoryStorage([
+        $subject = self::makeWritableBackend(new InMemoryStorage([
             $this->base,
             $this->alice,
             $this->aliasEntry(),
@@ -816,7 +798,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_search_declines_alias_in_subtree_when_in_search_deref_requested(): void
     {
-        $subject = new WritableStorageBackend(new InMemoryStorage([
+        $subject = self::makeWritableBackend(new InMemoryStorage([
             $this->base,
             $this->alice,
             $this->aliasEntry(),
@@ -834,7 +816,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_search_returns_alias_in_subtree_when_deref_never(): void
     {
-        $subject = new WritableStorageBackend(new InMemoryStorage([
+        $subject = self::makeWritableBackend(new InMemoryStorage([
             $this->base,
             $this->alice,
             $this->aliasEntry(),
@@ -876,7 +858,7 @@ final class WritableStorageBackendTest extends TestCase
         $storage->method('atomic')
             ->willThrowException($ioException);
 
-        $subject = new WritableStorageBackend($storage);
+        $subject = self::makeWritableBackend($storage);
 
         try {
             $subject->add(
@@ -914,7 +896,7 @@ final class WritableStorageBackendTest extends TestCase
                 'Attribute description "bogus attr" is not a valid RFC 4512 attribute description.',
             ));
 
-        $subject = new WritableStorageBackend($storage);
+        $subject = self::makeWritableBackend($storage);
 
         $request = (new SearchRequest(new EqualityFilter('bogus attr', 'x')))
             ->base('dc=example,dc=com')
@@ -935,7 +917,7 @@ final class WritableStorageBackendTest extends TestCase
         $storage->method('atomic')
             ->willThrowException(new StorageIoException('Unable to acquire exclusive lock on the storage backend.'));
 
-        $subject = new WritableStorageBackend($storage);
+        $subject = self::makeWritableBackend($storage);
 
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::UNAVAILABLE);
@@ -954,7 +936,7 @@ final class WritableStorageBackendTest extends TestCase
         $storage->method('atomic')
             ->willThrowException(new StorageIoException('Unable to stage the storage update.'));
 
-        $subject = new WritableStorageBackend($storage);
+        $subject = self::makeWritableBackend($storage);
 
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::UNAVAILABLE);
@@ -976,7 +958,7 @@ final class WritableStorageBackendTest extends TestCase
         $storage->method('atomic')
             ->willThrowException(new StorageIoException('Unable to publish the storage update.'));
 
-        $subject = new WritableStorageBackend($storage);
+        $subject = self::makeWritableBackend($storage);
 
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::UNAVAILABLE);
@@ -1072,7 +1054,7 @@ final class WritableStorageBackendTest extends TestCase
                 return new EntryStream($this->makeGenerator());
             });
 
-        $subject = new WritableStorageBackend(
+        $subject = self::makeWritableBackend(
             storage: $storage,
             limits: new SearchLimits(maxSearchTimeLimit: $serverMax),
         );
@@ -1105,7 +1087,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_add_with_validator_rejects_invalid_entry(): void
     {
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base]),
             validator: new SchemaValidator(
                 SchemaResource::Core->load(),
@@ -1127,7 +1109,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_add_with_validator_accepts_valid_entry(): void
     {
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base]),
             validator: new SchemaValidator(
                 SchemaResource::Core->load(),
@@ -1156,7 +1138,7 @@ final class WritableStorageBackendTest extends TestCase
             new Attribute('cn', 'Alice'),
             new Attribute('sn', 'Smith'),
         );
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base, $valid]),
             validator: new SchemaValidator(
                 SchemaResource::Core->load(),
@@ -1178,7 +1160,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_add_with_lenient_validator_allows_invalid_entry_and_records_violation(): void
     {
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base]),
             validator: new SchemaValidator(
                 SchemaResource::Core->load(),
@@ -1224,7 +1206,7 @@ final class WritableStorageBackendTest extends TestCase
             new Attribute('cn', 'Alice'),
             new Attribute('sn', 'Smith'),
         );
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base, $valid]),
             validator: new SchemaValidator(
                 SchemaResource::Core->load(),
@@ -1266,7 +1248,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_relax_control_allows_invalid_add_under_strict_validator(): void
     {
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base]),
             validator: new SchemaValidator(
                 SchemaResource::Core->load(),
@@ -1298,7 +1280,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_relax_control_does_not_relax_invalid_attribute_syntax(): void
     {
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base]),
             validator: new SchemaValidator(
                 SchemaResource::Core->load(),
@@ -1342,7 +1324,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_lenient_validator_does_not_relax_invalid_attribute_syntax(): void
     {
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base]),
             validator: new SchemaValidator(
                 SchemaResource::Core->load(),
@@ -1392,7 +1374,7 @@ final class WritableStorageBackendTest extends TestCase
             new Attribute('cn', 'Alice'),
             new Attribute('sn', 'Smith'),
         );
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base, $valid]),
             validator: new SchemaValidator(
                 SchemaResource::Core->load(),
@@ -1427,7 +1409,7 @@ final class WritableStorageBackendTest extends TestCase
             new Attribute('cn', 'Alice'),
             new Attribute('sn', 'Smith'),
         );
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base, $valid]),
             validator: new SchemaValidator(
                 SchemaResource::Core->load(),
@@ -1713,7 +1695,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_no_such_object_with_no_existing_ancestor_has_null_matched_dn(): void
     {
-        $backend = new WritableStorageBackend(new InMemoryStorage());
+        $backend = self::makeWritableBackend(new InMemoryStorage());
 
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('cn=Missing,dc=example,dc=com')
@@ -1745,7 +1727,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_delete_subtree_removes_a_deeply_nested_subtree(): void
     {
-        $backend = new WritableStorageBackend(new InMemoryStorage([
+        $backend = self::makeWritableBackend(new InMemoryStorage([
             new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
             new Entry(new Dn('ou=people,dc=example,dc=com'), new Attribute('ou', 'people')),
             new Entry(new Dn('ou=staff,ou=people,dc=example,dc=com'), new Attribute('ou', 'staff')),
@@ -1996,7 +1978,7 @@ final class WritableStorageBackendTest extends TestCase
             [new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))],
             $journal,
         );
-        $backend = new WritableStorageBackend(storage: $storage);
+        $backend = self::makeWritableBackend(storage: $storage);
 
         $backend->add(
             new AddCommand(new Entry(new Dn('cn=New,dc=example,dc=com'), new Attribute('cn', 'New'))),
@@ -2029,7 +2011,7 @@ final class WritableStorageBackendTest extends TestCase
             [new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))],
             $journal,
         );
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             storage: $storage,
             changeRecorder: new ChangeRecorder(),
         );
@@ -2090,7 +2072,7 @@ final class WritableStorageBackendTest extends TestCase
 
     private function subtreeBackend(): WritableStorageBackend
     {
-        return new WritableStorageBackend(new InMemoryStorage([
+        return self::makeWritableBackend(new InMemoryStorage([
             new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
             new Entry(new Dn('ou=people,dc=example,dc=com'), new Attribute('ou', 'people')),
             new Entry(new Dn('cn=alice,ou=people,dc=example,dc=com'), new Attribute('cn', 'alice')),

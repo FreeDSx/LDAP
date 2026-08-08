@@ -28,7 +28,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerRootDseHandler;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
@@ -43,19 +43,19 @@ final class ServerRootDseHandlerTest extends TestCase
 
     private ServerOptions $options;
 
-    private LdapBackendInterface&MockObject $mockBackend;
+    private EntryStorageInterface&MockObject $mockStorage;
 
     protected function setUp(): void
     {
         $this->options = new ServerOptions();
         $this->mockToken = $this->createMock(TokenInterface::class);
-        $this->withBackendNamingContexts([]);
+        $this->withStorageNamingContexts([]);
     }
 
     public function test_it_should_send_back_a_RootDSE(): void
     {
         $this->options->setDseVendorName('Foo');
-        $this->withBackendNamingContexts(['dc=Foo,dc=Bar']);
+        $this->withStorageNamingContexts(['dc=Foo,dc=Bar']);
 
         $search = new LdapMessageRequest(
             1,
@@ -128,7 +128,7 @@ final class ServerRootDseHandlerTest extends TestCase
     {
         $this->subject = new ServerRootDseHandler(
             $this->options,
-            $this->mockBackend,
+            $this->mockStorage,
             $this->responder($this->options->getSchema()),
             true,
         );
@@ -185,7 +185,7 @@ final class ServerRootDseHandlerTest extends TestCase
     public function test_it_should_only_return_attribute_names_from_the_RootDSE_if_requested(): void
     {
         $this->options->setDseVendorName('Foo');
-        $this->withBackendNamingContexts(['dc=Foo,dc=Bar']);
+        $this->withStorageNamingContexts(['dc=Foo,dc=Bar']);
 
         $search = new LdapMessageRequest(
             1,
@@ -260,7 +260,7 @@ final class ServerRootDseHandlerTest extends TestCase
     public function test_it_should_only_return_specific_attributes_from_the_RootDSE_if_requested(): void
     {
         $this->options->setDseVendorName('Foo');
-        $this->withBackendNamingContexts(['dc=Foo,dc=Bar']);
+        $this->withStorageNamingContexts(['dc=Foo,dc=Bar']);
 
         $search = new LdapMessageRequest(
             1,
@@ -300,10 +300,10 @@ final class ServerRootDseHandlerTest extends TestCase
     /**
      * @param list<string> $dns
      */
-    private function withBackendNamingContexts(array $dns): void
+    private function withStorageNamingContexts(array $dns): void
     {
-        $this->mockBackend = $this->createMock(LdapBackendInterface::class);
-        $this->mockBackend
+        $this->mockStorage = $this->createMock(EntryStorageInterface::class);
+        $this->mockStorage
             ->method('namingContexts')
             ->willReturn(array_map(
                 fn(string $dn): Dn => new Dn($dn),
@@ -312,7 +312,7 @@ final class ServerRootDseHandlerTest extends TestCase
 
         $this->subject = new ServerRootDseHandler(
             $this->options,
-            $this->mockBackend,
+            $this->mockStorage,
             $this->responder($this->options->getSchema()),
         );
     }

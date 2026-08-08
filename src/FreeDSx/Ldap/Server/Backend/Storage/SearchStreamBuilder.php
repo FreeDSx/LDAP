@@ -39,26 +39,6 @@ final readonly class SearchStreamBuilder
         private FilterEvaluatorInterface $filterEvaluator,
     ) {}
 
-    public function effectiveTimeLimit(
-        int $requestLimit,
-        ?SearchLimits $effectiveLimits = null,
-    ): int {
-        $serverMax = ($effectiveLimits ?? $this->limits)->maxSearchTimeLimit;
-
-        if ($serverMax === 0) {
-            return $requestLimit;
-        }
-
-        if ($requestLimit === 0) {
-            return $serverMax;
-        }
-
-        return min(
-            $requestLimit,
-            $serverMax,
-        );
-    }
-
     public function buildForBaseObject(
         Entry $entry,
         SearchRequest $request,

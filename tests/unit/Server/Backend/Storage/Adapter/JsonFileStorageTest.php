@@ -37,6 +37,7 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\BackendFactoryTrait;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
@@ -44,6 +45,8 @@ use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
 
 final class JsonFileStorageTest extends TestCase
 {
+    use BackendFactoryTrait;
+
     use JournalingStorageContractTests;
 
     private WritableStorageBackend $subject;
@@ -70,7 +73,7 @@ final class JsonFileStorageTest extends TestCase
         );
 
         $this->storage = $this->makeStorage($this->tempFile);
-        $this->subject = new WritableStorageBackend($this->storage);
+        $this->subject = self::makeWritableBackend($this->storage);
         $this->subject->add(
             new AddCommand(
                 new Entry(
@@ -155,7 +158,7 @@ final class JsonFileStorageTest extends TestCase
     public function test_get_on_nonexistent_file_returns_null(): void
     {
         $storage = $this->makeStorage($this->tempFile . '.nonexistent');
-        $backend = new WritableStorageBackend($storage);
+        $backend = self::makeWritableBackend($storage);
 
         self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
@@ -164,7 +167,7 @@ final class JsonFileStorageTest extends TestCase
     {
         file_put_contents($this->tempFile, '');
         $storage = $this->makeStorage($this->tempFile);
-        $backend = new WritableStorageBackend($storage);
+        $backend = self::makeWritableBackend($storage);
 
         self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
@@ -173,7 +176,7 @@ final class JsonFileStorageTest extends TestCase
     {
         file_put_contents($this->tempFile, 'not valid json {{{');
         $storage = $this->makeStorage($this->tempFile);
-        $backend = new WritableStorageBackend($storage);
+        $backend = self::makeWritableBackend($storage);
 
         self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
@@ -187,7 +190,7 @@ final class JsonFileStorageTest extends TestCase
         );
 
         // A second independent backend reading the same file should see the new entry.
-        $backend2 = new WritableStorageBackend($this->makeStorage($this->tempFile));
+        $backend2 = self::makeWritableBackend($this->makeStorage($this->tempFile));
 
         self::assertNotNull($backend2->get(new Dn('cn=Persistent,dc=example,dc=com')));
     }
@@ -199,7 +202,7 @@ final class JsonFileStorageTest extends TestCase
             $this->context(),
         );
 
-        $backend2 = new WritableStorageBackend($this->makeStorage($this->tempFile));
+        $backend2 = self::makeWritableBackend($this->makeStorage($this->tempFile));
 
         self::assertNull($backend2->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
@@ -224,7 +227,7 @@ final class JsonFileStorageTest extends TestCase
     public function test_cache_is_invalidated_after_write(): void
     {
         $storage = $this->makeStorage($this->tempFile);
-        $backend = new WritableStorageBackend($storage);
+        $backend = self::makeWritableBackend($storage);
 
         // Prime the cache with a valid file (contains Alice).
         self::assertNotNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
@@ -355,7 +358,7 @@ final class JsonFileStorageTest extends TestCase
     public function test_a_recorded_write_is_journaled_through_the_buffer(): void
     {
         $storage = $this->makeJournaledStorage($this->registerTemp());
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             storage: $storage,
             changeRecorder: new ChangeRecorder(),
         );
@@ -420,7 +423,7 @@ final class JsonFileStorageTest extends TestCase
             $base,
             $logger,
         );
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             storage: $storage,
             changeRecorder: new ChangeRecorder(),
         );

@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -46,7 +46,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
 
     public function __construct(
         private readonly ServerOptions $options,
-        private readonly LdapBackendInterface $backend,
+        private readonly EntryStorageInterface $storage,
         private readonly GeneratedEntryResponder $responder,
         private readonly bool $supportsSync = false,
     ) {}
@@ -60,7 +60,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
             'objectClass' => [ObjectClassOid::NAME_TOP],
             'namingContexts' => array_map(
                 fn(Dn $dn): string => $dn->toString(),
-                $this->backend->namingContexts(),
+                $this->storage->namingContexts(),
             ),
             'subschemaSubentry' => [$this->options->getSubschemaEntry()->toString()],
             'supportedControl' => [

@@ -47,6 +47,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionSweeper;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
 use FreeDSx\Ldap\Server\Backend\Storage\OperationalAttributeGenerator;
 use FreeDSx\Ldap\Server\Backend\Storage\SearchStreamBuilder;
+use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptionsFactory;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
@@ -273,12 +274,14 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
         return new WritableStorageBackend(
             storage: $storage,
-            limits: $options->makeSearchLimits(),
+            searchStream: $container->get(SearchStreamBuilder::class),
             validator: $this->buildSchemaValidator($container),
+            listOptions: new StorageListOptionsFactory(
+                $options->getSchema(),
+                $options->makeSearchLimits(),
+            ),
             operationalAttrs: $container->get(OperationalAttributeGenerator::class),
             changeRecorder: $this->changeRecorderFor($container, $storage),
-            schema: $options->getSchema(),
-            searchStream: $container->get(SearchStreamBuilder::class),
         );
     }
 
@@ -320,18 +323,16 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         );
     }
 
-    private function buildSchemaValidator(Container $container): ?SchemaValidator
+    /**
+     * The validator no-ops on its own when validation is Off, so one is always built.
+     */
+    private function buildSchemaValidator(Container $container): SchemaValidator
     {
         $options = $container->get(ServerOptions::class);
-        $mode = $options->getSchemaValidationMode();
-
-        if ($mode === SchemaValidationMode::Off) {
-            return null;
-        }
 
         return new SchemaValidator(
             $options->getSchema(),
-            $mode,
+            $options->getSchemaValidationMode(),
         );
     }
 
