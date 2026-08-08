@@ -15,8 +15,6 @@ namespace FreeDSx\Ldap\Server\Backend\Storage;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
-use FreeDSx\Ldap\Control\Sorting\SortingControl;
-use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
@@ -33,12 +31,10 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
-use FreeDSx\Ldap\Search\Filter\FilterAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
-use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolationDisposition;
 use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
@@ -46,6 +42,7 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\SearchLimits;
+use FreeDSx\Ldap\Server\Subentry\SubentryPlacementGuard;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use Generator;
 
@@ -61,30 +58,19 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
      */
     private const SUBTREE_DELETE_BATCH_SIZE = 1000;
 
-    private readonly SearchStreamBuilder $searchStream;
-
+    /**
+     * @param ?ChangeRecorder $changeRecorder Present only when a journal is configured to append to.
+     */
     public function __construct(
         private readonly EntryStorageInterface $storage,
-        private readonly SearchLimits $limits = new SearchLimits(),
-        private readonly ?SchemaValidator $validator = null,
+        private readonly SearchStreamBuilder $searchStream,
+        private readonly SchemaValidator $validator,
+        private readonly StorageListOptionsFactory $listOptions,
         private readonly OperationalAttributeGenerator $operationalAttrs = new OperationalAttributeGenerator(),
         private readonly WriteEntryOperationHandler $entryHandler = new WriteEntryOperationHandler(),
         private readonly ?ChangeRecorder $changeRecorder = null,
-        private readonly ?Schema $schema = null,
-        ?SearchStreamBuilder $searchStream = null,
-    ) {
-        // Falling back to the schema this backend was given, so post-filtering never silently drops matching rules.
-        $this->searchStream = $searchStream ?? new SearchStreamBuilder(
-            $storage,
-            $limits,
-            new FilterEvaluator($schema),
-        );
-    }
-
-    public function namingContexts(): array
-    {
-        return $this->storage->namingContexts();
-    }
+        private readonly SubentryPlacementGuard $subentryGuard = new SubentryPlacementGuard(),
+    ) {}
 
     public function reset(): void
     {
@@ -138,24 +124,13 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         ControlBag $controls = new ControlBag(),
         ?SearchLimits $effectiveLimits = null,
     ): EntryStream {
-        $limits = $effectiveLimits ?? $this->limits;
         $baseDn = $request->getBaseDn() ?? new Dn('');
         $normBase = $baseDn->normalize();
 
         if ($request->getScope() === SearchRequest::SCOPE_BASE_OBJECT) {
-            $entry = $this->storage->find($normBase);
-
-            if ($entry === null) {
-                $this->throwNoSuchObject(
-                    $this->storage,
-                    $baseDn,
-                );
-            }
-
-            $this->assertBaseNotDeclinedAlias($entry, $request);
-
-            return $this->searchStream->buildForBaseObject(
-                $entry,
+            return $this->searchBaseObject(
+                $normBase,
+                $baseDn,
                 $request,
             );
         }
@@ -166,22 +141,12 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             $request,
         );
 
-        $subtree = $request->getScope() === SearchRequest::SCOPE_WHOLE_SUBTREE;
-        $sortingControl = $controls->get(Control::OID_SORTING);
-        $options = new StorageListOptions(
-            baseDn: $normBase,
-            subtree: $subtree,
-            filter: $request->getFilter(),
-            timeLimit: $this->searchStream->effectiveTimeLimit($request->getTimeLimit(), $limits),
-            sizeLimit: $request->getSizeLimit(),
-            sortKeys: $sortingControl instanceof SortingControl
-                ? $sortingControl->getSortKeys()
-                : [],
-            lookthroughLimit: $limits->maxSearchLookthrough,
-            attributes: $this->materializedAttributes($request),
-            isIntegerOrderedResolver: fn(string $attribute): ?bool => $this->schema?->isIntegerOrdered($attribute),
-            isCaseInsensitiveResolver: fn(string $attribute): ?bool => $this->schema?->isCaseInsensitiveMatched($attribute),
-            subentries: $subentries,
+        $options = $this->listOptions->make(
+            $request,
+            $normBase,
+            $controls,
+            $subentries,
+            $effectiveLimits,
         );
 
         try {
@@ -196,7 +161,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         return $this->searchStream->buildForList(
             $stream,
             $request,
-            $limits,
+            $effectiveLimits,
         );
     }
 
@@ -256,6 +221,12 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             $dn = $command->entry->getDn()->normalize();
             $this->assertParentExists(
                 $storage,
+                $dn,
+                $context,
+            );
+            $this->subentryGuard->assertPlacement(
+                $storage,
+                $command->entry,
                 $dn,
                 $context,
             );
@@ -449,6 +420,13 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 $this->throwEntryAlreadyExists($newEntry->getDn());
             }
 
+            $this->subentryGuard->assertPlacement(
+                $storage,
+                $newEntry,
+                $normNew,
+                $context,
+            );
+
             $this->operationalAttrs->applyForModify(
                 $newEntry,
                 $context,
@@ -465,6 +443,36 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 $context,
             );
         });
+    }
+
+    /**
+     * A base scope search addresses one entry, so it bypasses the list options entirely.
+     *
+     * @throws OperationException
+     */
+    private function searchBaseObject(
+        Dn $normBase,
+        Dn $baseDn,
+        SearchRequest $request,
+    ): EntryStream {
+        $entry = $this->storage->find($normBase);
+
+        if ($entry === null) {
+            $this->throwNoSuchObject(
+                $this->storage,
+                $baseDn,
+            );
+        }
+
+        $this->assertBaseNotDeclinedAlias(
+            $entry,
+            $request,
+        );
+
+        return $this->searchStream->buildForBaseObject(
+            $entry,
+            $request,
+        );
     }
 
     /**
@@ -511,6 +519,12 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             $updated,
             $context,
         );
+        $this->subentryGuard->assertAdministrativeRoleRetained(
+            $storage,
+            $updated,
+            $dn,
+            $context,
+        );
         $this->operationalAttrs->applyForModify(
             $updated,
             $context,
@@ -521,43 +535,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             $updated,
             $context,
         );
-    }
-
-    /**
-     * Base attribute names storage must materialize (requested plus filter-referenced), or null to materialize all.
-     *
-     * @return list<string>|null
-     */
-    private function materializedAttributes(SearchRequest $request): ?array
-    {
-        $names = array_map(
-            static fn(Attribute $attribute): string => strtolower($attribute->getName()),
-            $request->getAttributes(),
-        );
-
-        if ($names === [] || in_array('*', $names, true) || in_array('+', $names, true)) {
-            return null;
-        }
-
-        $filterAttributes = FilterAttributes::referenced($request->getFilter());
-
-        if ($filterAttributes === null) {
-            return null;
-        }
-
-        $materialized = [];
-        foreach ($names as $name) {
-            if ($name === '1.1') {
-                continue;
-            }
-
-            $materialized[$name] = true;
-        }
-        foreach ($filterAttributes as $attribute) {
-            $materialized[$attribute] = true;
-        }
-
-        return array_keys($materialized);
     }
 
     /**
@@ -672,10 +649,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         AddCommand $command,
         WriteContext $context,
     ): void {
-        if ($this->validator === null) {
-            return;
-        }
-
         try {
             $this->validator->validateAdd(
                 $command->entry,
@@ -697,10 +670,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         Entry $updated,
         WriteContext $context,
     ): void {
-        if ($this->validator === null) {
-            return;
-        }
-
         try {
             $this->validator->validateModify(
                 $command,
@@ -753,7 +722,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             return SchemaViolationDisposition::RelaxedByControl;
         }
 
-        return $this->validator?->mode() === SchemaValidationMode::Lenient
+        return $this->validator->mode() === SchemaValidationMode::Lenient
             ? SchemaViolationDisposition::RelaxedByPolicy
             : SchemaViolationDisposition::Rejected;
     }

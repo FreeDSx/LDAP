@@ -28,16 +28,18 @@ use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\ManagerToken;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\BackendFactoryTrait;
 
 /**
  * Composes the real manager authenticator with the bypass-wrapped secure-default ACL, as the server wires them.
  */
 final class DefaultAccessControlEnforcementTest extends TestCase
 {
+    use BackendFactoryTrait;
+
     private const MANAGER_DN = 'cn=manager';
 
     private const PASSWORD = '12345';
@@ -54,7 +56,7 @@ final class DefaultAccessControlEnforcementTest extends TestCase
 
     protected function setUp(): void
     {
-        $backend = new WritableStorageBackend(new InMemoryStorage([
+        $backend = self::makeWritableBackend(new InMemoryStorage([
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [

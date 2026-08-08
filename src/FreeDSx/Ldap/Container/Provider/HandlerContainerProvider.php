@@ -151,7 +151,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
     {
         return new ServerRootDseHandler(
             options: $container->get(ServerOptions::class),
-            backend: $container->get(WritableStorageBackend::class),
+            storage: $container->get(EntryStorageInterface::class),
             responder: $this->makeGeneratedEntryResponder($container),
             supportsSync: $this->syncJournalFor($container) !== null,
         );

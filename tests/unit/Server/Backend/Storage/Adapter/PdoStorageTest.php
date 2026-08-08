@@ -55,12 +55,15 @@ use FreeDSx\Ldap\Server\Token\AnonToken;
 use PDO;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\BackendFactoryTrait;
 use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
 
 final class PdoStorageTest extends TestCase
 {
+    use BackendFactoryTrait;
+
     use JournalingStorageContractTests;
 
     private WritableStorageBackend $subject;
@@ -78,7 +81,7 @@ final class PdoStorageTest extends TestCase
         );
 
         $this->storage = PdoStorageFactory::forPcntl(PdoConfig::forSqlite(':memory:'));
-        $this->subject = new WritableStorageBackend($this->storage);
+        $this->subject = self::makeWritableBackend($this->storage);
         $this->subject->add(
             new AddCommand(
                 new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
@@ -523,7 +526,7 @@ final class PdoStorageTest extends TestCase
     public function test_get_on_empty_database_returns_null(): void
     {
         $storage = PdoStorageFactory::forPcntl(PdoConfig::forSqlite(':memory:'));
-        $backend = new WritableStorageBackend($storage);
+        $backend = self::makeWritableBackend($storage);
 
         self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
@@ -845,9 +848,9 @@ final class PdoStorageTest extends TestCase
     public function test_search_inexact_filter_trips_lookthrough_limit(): void
     {
         $storage = PdoStorageFactory::forPcntl(PdoConfig::forSqlite(':memory:'));
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             $storage,
-            new SearchLimits(maxSearchLookthrough: 2),
+            limits: new SearchLimits(maxSearchLookthrough: 2),
         );
         $backend->add(
             new AddCommand(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
@@ -875,9 +878,9 @@ final class PdoStorageTest extends TestCase
     public function test_search_exact_filter_is_not_subject_to_lookthrough(): void
     {
         $storage = PdoStorageFactory::forPcntl(PdoConfig::forSqlite(':memory:'));
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             $storage,
-            new SearchLimits(maxSearchLookthrough: 1),
+            limits: new SearchLimits(maxSearchLookthrough: 1),
         );
         $backend->add(
             new AddCommand(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
@@ -906,9 +909,9 @@ final class PdoStorageTest extends TestCase
     public function test_search_exact_filter_bounds_transfer_at_lookthrough(): void
     {
         $storage = PdoStorageFactory::forPcntl(PdoConfig::forSqlite(':memory:'));
-        $backend = new WritableStorageBackend(
+        $backend = self::makeWritableBackend(
             $storage,
-            new SearchLimits(maxSearchLookthrough: 2),
+            limits: new SearchLimits(maxSearchLookthrough: 2),
         );
         $backend->add(
             new AddCommand(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
@@ -1221,7 +1224,7 @@ final class PdoStorageTest extends TestCase
     public function test_add_translates_dn_too_long_to_admin_limit_exceeded(): void
     {
         $storage = $this->createPdoStorageWithMaxDnLength(5);
-        $backend = new WritableStorageBackend($storage);
+        $backend = self::makeWritableBackend($storage);
 
         $entry = new Entry(
             new Dn('cn=TooLong,dc=example'),
@@ -1249,7 +1252,7 @@ final class PdoStorageTest extends TestCase
     public function test_subtree_does_not_match_escaped_comma_suffix_collision(): void
     {
         $storage = PdoStorageFactory::forPcntl(PdoConfig::forSqlite(':memory:'));
-        $backend = new WritableStorageBackend($storage);
+        $backend = self::makeWritableBackend($storage);
 
         $base = new Entry(
             new Dn('dc=example,dc=com'),
@@ -1284,7 +1287,7 @@ final class PdoStorageTest extends TestCase
     public function test_subtree_includes_entries_with_escaped_comma_under_correct_parent(): void
     {
         $storage = PdoStorageFactory::forPcntl(PdoConfig::forSqlite(':memory:'));
-        $backend = new WritableStorageBackend($storage);
+        $backend = self::makeWritableBackend($storage);
 
         $base = new Entry(
             new Dn('dc=example,dc=com'),

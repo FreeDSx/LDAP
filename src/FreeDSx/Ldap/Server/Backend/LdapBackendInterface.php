@@ -55,11 +55,4 @@ interface LdapBackendInterface
         Dn $dn,
         EqualityFilter $filter,
     ): bool;
-
-    /**
-     * Normalised DNs the backend hosts. Advertised by the server as RootDSE namingContexts.
-     *
-     * @return list<Dn>
-     */
-    public function namingContexts(): array;
 }

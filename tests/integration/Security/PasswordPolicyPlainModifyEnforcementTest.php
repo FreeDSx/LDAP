@@ -54,6 +54,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordQualityRules;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\BackendFactoryTrait;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
 
 /**
@@ -61,6 +62,8 @@ use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
  */
 final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
 {
+    use BackendFactoryTrait;
+
     private const NOW = '2026-05-20T12:00:00Z';
 
     private const USER_DN = 'cn=user,dc=foo,dc=bar';
@@ -270,7 +273,7 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
         PasswordPolicy $policy,
         array $userAttrs = [],
     ): ServerDispatchHandler {
-        $this->backend = new WritableStorageBackend(new InMemoryStorage([
+        $this->backend = self::makeWritableBackend(new InMemoryStorage([
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [
