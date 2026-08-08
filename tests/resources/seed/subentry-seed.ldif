@@ -1,5 +1,8 @@
 version: 1
 
+# Seed for the RFC 3672 subentry visibility suite. Ordinary entries and subentries are interleaved
+# under the same parents, so a scope test cannot pass by accident of ordering.
+
 dn: dc=foo,dc=bar
 objectClass: top
 objectClass: domain
@@ -11,47 +14,40 @@ cn: user
 sn: User
 userPassword: {SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=
 
-# Writes are denied by default, so suites that write to the provider bind as this identity
+# Writes are denied by default, so tests that write bind as this identity
 dn: cn=admin,dc=foo,dc=bar
 objectClass: inetOrgPerson
 cn: admin
 sn: Admin
 userPassword: {SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=
 
+# An administrative point holding a subentry directly beneath it
 dn: ou=people,dc=foo,dc=bar
 objectClass: organizationalUnit
 ou: people
 administrativeRole: 2.5.23.4
 
+dn: cn=root-policy,dc=foo,dc=bar
+objectClass: subentry
+cn: root-policy
+subtreeSpecification: { }
+
+dn: cn=people-policy,ou=people,dc=foo,dc=bar
+objectClass: subentry
+cn: people-policy
+subtreeSpecification: { base "ou=people" }
+
 dn: cn=alice,ou=people,dc=foo,dc=bar
 objectClass: inetOrgPerson
 cn: alice
-sn: Anderson
+sn: Smith
 
 dn: cn=bob,ou=people,dc=foo,dc=bar
 objectClass: inetOrgPerson
 cn: bob
-sn: Builder
+sn: Jones
 
 dn: cn=carol,ou=people,dc=foo,dc=bar
 objectClass: inetOrgPerson
 cn: carol
-sn: Carpenter
-
-dn: cn=lockme,ou=people,dc=foo,dc=bar
-objectClass: inetOrgPerson
-cn: lockme
-sn: Lockme
-userPassword: {SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=
-
-dn: cn=resetme,ou=people,dc=foo,dc=bar
-objectClass: inetOrgPerson
-cn: resetme
-sn: Resetme
-userPassword: {SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=
-
-# A subentry must reach the replica, since the incremental path ships subentry changes regardless
-dn: cn=sync-policy,ou=people,dc=foo,dc=bar
-objectClass: subentry
-cn: sync-policy
-subtreeSpecification: { base "ou=people" }
+sn: White

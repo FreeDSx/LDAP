@@ -73,11 +73,13 @@ final class ServerControlRegistry
             HandlerId::Search => [
                 Control::OID_SORTING,
                 Control::OID_ASSERTION,
+                Control::OID_SUBENTRIES,
             ],
             HandlerId::Paging => [
                 Control::OID_PAGING,
                 Control::OID_SORTING,
                 Control::OID_ASSERTION,
+                Control::OID_SUBENTRIES,
             ],
             HandlerId::Dispatch => [
                 Control::OID_RELAX_RULES,

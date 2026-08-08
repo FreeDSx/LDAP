@@ -40,6 +40,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\SearchLimits;
+use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -168,7 +169,7 @@ final class WritableStorageBackendTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('dc=example,dc=com')
             ->useBaseScope();
-        $entries = iterator_to_array($this->subject->search($request)->entries);
+        $entries = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
 
         self::assertCount(
             1,
@@ -185,7 +186,7 @@ final class WritableStorageBackendTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('dc=example,dc=com')
             ->useSingleLevelScope();
-        $entries = iterator_to_array($this->subject->search($request)->entries);
+        $entries = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
 
         // Only alice is a direct child of dc=example,dc=com; bob is under ou=People
         self::assertCount(
@@ -203,7 +204,7 @@ final class WritableStorageBackendTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('dc=example,dc=com')
             ->useSubtreeScope();
-        $entries = iterator_to_array($this->subject->search($request)->entries);
+        $entries = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
 
         $dns = array_map(
             static fn(Entry $entry): string => $entry->getDn()->toString(),
@@ -236,7 +237,7 @@ final class WritableStorageBackendTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('cn=Missing,dc=example,dc=com')
             ->useBaseScope();
-        $this->subject->search($request);
+        $this->subject->search($request, SubentryVisibility::All);
     }
 
     public function test_search_single_level_throws_no_such_object_when_base_does_not_exist(): void
@@ -247,7 +248,7 @@ final class WritableStorageBackendTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('cn=Missing,dc=example,dc=com')
             ->useSingleLevelScope();
-        $this->subject->search($request);
+        $this->subject->search($request, SubentryVisibility::All);
     }
 
     public function test_search_subtree_throws_no_such_object_when_base_does_not_exist(): void
@@ -258,7 +259,7 @@ final class WritableStorageBackendTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('cn=Missing,dc=example,dc=com')
             ->useSubtreeScope();
-        $this->subject->search($request);
+        $this->subject->search($request, SubentryVisibility::All);
     }
 
     public function test_add_stores_entry(): void
@@ -738,7 +739,7 @@ final class WritableStorageBackendTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('dc=example,dc=com')
             ->useSingleLevelScope();
-        iterator_to_array($subject->search($request)->entries);
+        iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
     }
 
     public function test_search_trips_lookthrough_limit_when_examined_exceeds_cap(): void
@@ -754,7 +755,7 @@ final class WritableStorageBackendTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('dc=example,dc=com')
             ->useSubtreeScope();
-        iterator_to_array($subject->search($request)->entries);
+        iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
     }
 
     public function test_search_does_not_trip_lookthrough_limit_within_cap(): void
@@ -770,7 +771,7 @@ final class WritableStorageBackendTest extends TestCase
 
         self::assertCount(
             3,
-            iterator_to_array($subject->search($request)->entries),
+            iterator_to_array($subject->search($request, SubentryVisibility::All)->entries),
         );
     }
 
@@ -789,7 +790,7 @@ final class WritableStorageBackendTest extends TestCase
             ->base('cn=ref,dc=example,dc=com')
             ->useBaseScope()
             ->setDereferenceAliases(SearchRequest::DEREF_FINDING_BASE_OBJECT);
-        iterator_to_array($subject->search($request)->entries);
+        iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
     }
 
     public function test_search_returns_alias_base_when_deref_never(): void
@@ -804,7 +805,7 @@ final class WritableStorageBackendTest extends TestCase
             ->base('cn=ref,dc=example,dc=com')
             ->useBaseScope()
             ->setDereferenceAliases(SearchRequest::DEREF_NEVER);
-        $entries = iterator_to_array($subject->search($request)->entries);
+        $entries = iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
 
         self::assertCount(1, $entries);
         self::assertSame(
@@ -828,7 +829,7 @@ final class WritableStorageBackendTest extends TestCase
             ->base('dc=example,dc=com')
             ->useSubtreeScope()
             ->setDereferenceAliases(SearchRequest::DEREF_IN_SEARCHING);
-        iterator_to_array($subject->search($request)->entries);
+        iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
     }
 
     public function test_search_returns_alias_in_subtree_when_deref_never(): void
@@ -845,7 +846,7 @@ final class WritableStorageBackendTest extends TestCase
             ->setDereferenceAliases(SearchRequest::DEREF_NEVER);
         $dns = array_map(
             static fn(Entry $entry): string => $entry->getDn()->toString(),
-            iterator_to_array($subject->search($request)->entries),
+            iterator_to_array($subject->search($request, SubentryVisibility::All)->entries),
         );
 
         self::assertContains(
@@ -863,7 +864,7 @@ final class WritableStorageBackendTest extends TestCase
 
         self::assertCount(
             3,
-            iterator_to_array($this->subject->search($request)->entries),
+            iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries),
         );
     }
 
@@ -919,7 +920,7 @@ final class WritableStorageBackendTest extends TestCase
             ->base('dc=example,dc=com')
             ->useSubtreeScope();
 
-        $stream = $subject->search($request);
+        $stream = $subject->search($request, SubentryVisibility::All);
 
         self::assertSame(
             [],
@@ -1081,7 +1082,7 @@ final class WritableStorageBackendTest extends TestCase
             ->useSingleLevelScope()
             ->timeLimit($requestLimit);
 
-        iterator_to_array($subject->search($request)->entries);
+        iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
 
         self::assertSame(
             $expectedLimit,
@@ -1511,7 +1512,7 @@ final class WritableStorageBackendTest extends TestCase
             ->useSubtreeScope()
             ->select('+');
 
-        $results = iterator_to_array($this->subject->search($request)->entries);
+        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
 
         foreach ($results as $entry) {
             self::assertNotNull(
@@ -1528,7 +1529,7 @@ final class WritableStorageBackendTest extends TestCase
             ->useSubtreeScope()
             ->select('hasSubordinates');
 
-        $results = iterator_to_array($this->subject->search($request)->entries);
+        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
 
         foreach ($results as $entry) {
             self::assertNotNull(
@@ -1545,7 +1546,7 @@ final class WritableStorageBackendTest extends TestCase
             ->useSubtreeScope()
             ->select('cn');
 
-        $results = iterator_to_array($this->subject->search($request)->entries);
+        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
 
         foreach ($results as $entry) {
             self::assertNull(
@@ -1563,7 +1564,7 @@ final class WritableStorageBackendTest extends TestCase
             ->useBaseScope()
             ->select('+');
 
-        $results = iterator_to_array($this->subject->search($request)->entries);
+        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
 
         self::assertCount(1, $results);
         self::assertSame(
@@ -1580,7 +1581,7 @@ final class WritableStorageBackendTest extends TestCase
             ->useBaseScope()
             ->select('+');
 
-        $results = iterator_to_array($this->subject->search($request)->entries);
+        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
 
         self::assertCount(1, $results);
         self::assertSame(
@@ -1596,7 +1597,7 @@ final class WritableStorageBackendTest extends TestCase
             ->useBaseScope()
             ->select('+');
 
-        iterator_to_array($this->subject->search($request)->entries);
+        iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
 
         // Read the stored entry directly — hasSubordinates must not be persisted.
         $stored = $this->subject->get(new Dn('dc=example,dc=com'));
@@ -1612,7 +1613,7 @@ final class WritableStorageBackendTest extends TestCase
             ->useBaseScope();
 
         try {
-            $this->subject->search($request);
+            $this->subject->search($request, SubentryVisibility::All);
             self::fail('Expected OperationException was not thrown.');
         } catch (OperationException $e) {
             self::assertSame(
@@ -1629,7 +1630,7 @@ final class WritableStorageBackendTest extends TestCase
             ->useSubtreeScope();
 
         try {
-            $this->subject->search($request);
+            $this->subject->search($request, SubentryVisibility::All);
             self::fail('Expected OperationException was not thrown.');
         } catch (OperationException $e) {
             self::assertSame(
@@ -1719,7 +1720,7 @@ final class WritableStorageBackendTest extends TestCase
             ->useBaseScope();
 
         try {
-            $backend->search($request);
+            $backend->search($request, SubentryVisibility::All);
             self::fail('Expected OperationException was not thrown.');
         } catch (OperationException $e) {
             self::assertNull($e->getMatchedDn());

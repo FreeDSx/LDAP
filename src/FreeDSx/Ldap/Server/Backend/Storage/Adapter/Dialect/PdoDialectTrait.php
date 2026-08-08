@@ -13,7 +13,11 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
+use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use PDO;
+
+use function strtolower;
 
 /**
  * Standard SQL that should be cross-platform across the adapters.
@@ -105,6 +109,26 @@ trait PdoDialectTrait
             FROM entries
             WHERE lc_parent_dn = ?
             LIMIT 1
+        SQL;
+    }
+
+    public function querySubentryCondition(
+        string $dnColumn,
+        bool $exclude,
+    ): string {
+        $operator = $exclude
+            ? 'NOT IN'
+            : 'IN';
+        $objectClass = strtolower(AttributeTypeOid::NAME_OBJECT_CLASS);
+        $subentry = strtolower(ObjectClassOid::NAME_SUBENTRY);
+
+        return <<<SQL
+            $dnColumn $operator (
+                SELECT sub.entry_lc_dn
+                FROM entry_attribute_values sub
+                WHERE sub.attr_name_lower = '$objectClass'
+                  AND sub.value_lower = '$subentry'
+            )
         SQL;
     }
 

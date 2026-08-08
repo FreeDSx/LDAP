@@ -27,7 +27,7 @@ final class ServerControlRegistryTest extends TestCase
         $this->subject = new ServerControlRegistry();
     }
 
-    public function test_search_supports_sorting_assertion_and_proxy_authorization(): void
+    public function test_search_supports_expected_controls(): void
     {
         self::assertSame(
             [
@@ -35,12 +35,13 @@ final class ServerControlRegistryTest extends TestCase
                 Control::OID_MANAGE_DSA_IT,
                 Control::OID_SORTING,
                 Control::OID_ASSERTION,
+                Control::OID_SUBENTRIES,
             ],
             $this->subject->supportedControlsFor(HandlerId::Search),
         );
     }
 
-    public function test_paging_supports_paging_sorting_assertion_and_proxy_authorization(): void
+    public function test_paging_supports_expected_controls(): void
     {
         self::assertSame(
             [
@@ -49,12 +50,13 @@ final class ServerControlRegistryTest extends TestCase
                 Control::OID_PAGING,
                 Control::OID_SORTING,
                 Control::OID_ASSERTION,
+                Control::OID_SUBENTRIES,
             ],
             $this->subject->supportedControlsFor(HandlerId::Paging),
         );
     }
 
-    public function test_dispatch_supports_relax_rules_assertion_read_entry_subtree_delete_and_proxy_authorization(): void
+    public function test_dispatch_supports_expected_controls(): void
     {
         self::assertSame(
             [

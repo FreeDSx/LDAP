@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 
 /**
  * Resolves a bind name by searching for an entry where a given attribute equals the identity.
@@ -54,6 +55,7 @@ final class AttributeSearchBindNameResolver implements BindNameResolverInterface
 
         $stream = $backend->search(
             $request,
+            SubentryVisibility::Hide,
             new ControlBag(),
         );
 

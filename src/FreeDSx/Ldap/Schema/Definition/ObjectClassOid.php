@@ -98,5 +98,11 @@ final class ObjectClassOid
 
     public const DESC_EXTENSIBLE_OBJECT = 'any attribute type allowed';
 
+    public const OID_SUBENTRY = '2.5.17.0';
+
+    public const NAME_SUBENTRY = 'subentry';
+
+    public const DESC_SUBENTRY = 'entry holding administrative information for part of a subtree';
+
     private function __construct() {}
 }

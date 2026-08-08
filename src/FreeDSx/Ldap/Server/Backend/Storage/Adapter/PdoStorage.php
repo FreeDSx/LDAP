@@ -219,6 +219,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             $filterResult,
             $sqlLimit,
             $options->sortKeys,
+            $options->subentries,
         );
 
         return new EntryStream(
@@ -359,6 +360,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             $driver->params,
             $options->baseDn->normalize()->toString(),
             self::COMPOSED_DRIVER_PROBE_LIMIT,
+            $options->subentries,
         );
     }
 

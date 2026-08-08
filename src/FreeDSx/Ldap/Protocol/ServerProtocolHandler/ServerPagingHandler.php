@@ -199,6 +199,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         // Paged searches use the paged lookthrough limit (falls back to the regular one when unset).
         $result = $this->backend->search(
             $searchRequest,
+            $this->subentryVisibility($pagingRequest->controls()),
             $pagingRequest->controls(),
             new SearchLimits(
                 maxSearchTimeLimit: $this->limits->maxSearchTimeLimit,
