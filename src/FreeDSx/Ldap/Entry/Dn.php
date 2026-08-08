@@ -178,6 +178,16 @@ class Dn implements IteratorAggregate, Countable, Stringable
     }
 
     /**
+     * Return true if this DN and $other name the same entry.
+     *
+     * @throws UnexpectedValueException
+     */
+    public function equals(Dn $other): bool
+    {
+        return $this->normalize()->toString() === $other->normalize()->toString();
+    }
+
+    /**
      * Return true if this DN is a direct child of $parent.
      *
      * @throws UnexpectedValueException

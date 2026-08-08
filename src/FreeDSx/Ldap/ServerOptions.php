@@ -401,15 +401,6 @@ final class ServerOptions implements ServerListenerOptionsInterface
     }
 
     /**
-     * Whether any password-policy source is configured.
-     */
-    public function isPasswordPolicyEnabled(): bool
-    {
-        return $this->passwordPolicy !== null
-            || $this->defaultPasswordPolicyDn !== null;
-    }
-
-    /**
      * Output scheme used by the password hasher when writing a new password.
      */
     public function getPasswordHashScheme(): PasswordHashScheme

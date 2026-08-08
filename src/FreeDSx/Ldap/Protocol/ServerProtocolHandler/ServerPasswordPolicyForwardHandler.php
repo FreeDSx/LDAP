@@ -89,19 +89,25 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
         ForwardPasswordPolicyStateRequest $request,
         TokenInterface $token,
     ): void {
+        $target = $this->backend->get($request->getDn());
+
+        if ($target === null) {
+            return;
+        }
+
+        // Resolved before the transaction opens to avoid potential write locks in atomic.
+        $policy = $this->policyResolver->resolveFor($target);
+        if ($policy === null) {
+            return;
+        }
+
         $this->backend->atomicUpdate(
             $request->getDn(),
             WriteContext::system(
                 new SystemToken(),
                 new ControlBag(),
             ),
-            function (Entry $entry) use ($request, $token): array {
-                $policy = $this->policyResolver->resolveFor($entry);
-
-                if ($policy === null) {
-                    return [];
-                }
-
+            function (Entry $entry) use ($request, $token, $policy): array {
                 $changes = $this->engine->recordForwardedState(
                     UserPasswordState::fromEntry($entry),
                     $policy,

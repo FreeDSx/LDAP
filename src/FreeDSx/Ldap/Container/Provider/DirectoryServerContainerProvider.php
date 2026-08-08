@@ -568,7 +568,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         $options = $container->get(ServerOptions::class);
         $config = $options->getReplicaConfig();
 
-        if ($config === null || !$options->isPasswordPolicyEnabled()) {
+        if ($config === null) {
             return null;
         }
 
@@ -602,9 +602,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         $storage = $container->get(EntryStorageInterface::class);
 
         // Pair reconciliation with forwarding: the store drops forwarded state once the primary's entry replicates back.
-        $passwordStateStore = $options->isPasswordPolicyEnabled()
-            ? $container->get(ReplicaPasswordStateStoreInterface::class)
-            : null;
+        $passwordStateStore = $container->get(ReplicaPasswordStateStoreInterface::class);
 
         return $hostManagedShutdown
             ? LdapReplica::forSwoole(

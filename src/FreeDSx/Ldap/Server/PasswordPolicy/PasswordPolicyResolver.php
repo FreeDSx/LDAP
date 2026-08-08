@@ -15,8 +15,11 @@ namespace FreeDSx\Ldap\Server\PasswordPolicy;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Subentry\GoverningSubentryResolver;
 
 /**
  * Locates the {@see PasswordPolicy} that governs a given user entry.
@@ -30,15 +33,25 @@ final class PasswordPolicyResolver
      */
     private array $cache = [];
 
+    /**
+     * @param ?GoverningSubentryResolver $subentries Null when subentry-based policy is not enabled.
+     */
     public function __construct(
         private readonly LdapBackendInterface $backend,
         private readonly ?Dn $defaultPolicyDn,
         private readonly ?PasswordPolicy $inMemoryFallback,
+        private readonly ?GoverningSubentryResolver $subentries = null,
     ) {}
 
+    /**
+     * The explicit per-user pointer outranks a subentry, which in turn outranks the server-wide default.
+     *
+     * @throws OperationException
+     */
     public function resolveFor(Entry $user): ?PasswordPolicy
     {
         return $this->fromUserSubentry($user)
+            ?? $this->fromSubtreePolicy($user)
             ?? $this->fromDefaultDn()
             ?? $this->inMemoryFallback;
     }
@@ -62,6 +75,33 @@ final class PasswordPolicyResolver
         }
 
         return $this->loadFromDit(new Dn($value));
+    }
+
+    /**
+     * The nearest governing subentry carrying a policy, since govern() returns them innermost first.
+     *
+     * @throws OperationException
+     */
+    private function fromSubtreePolicy(Entry $user): ?PasswordPolicy
+    {
+        if ($this->subentries === null) {
+            return null;
+        }
+
+        foreach ($this->subentries->govern($user) as $subentry) {
+            $isPolicy = $subentry
+                ->get(AttributeTypeOid::NAME_OBJECT_CLASS)
+                ?->has(
+                    PasswordPolicyOid::NAME_PWD_POLICY,
+                    caseSensitive: false,
+                ) === true;
+
+            if ($isPolicy) {
+                return PasswordPolicy::fromEntry($subentry);
+            }
+        }
+
+        return null;
     }
 
     private function fromDefaultDn(): ?PasswordPolicy

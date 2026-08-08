@@ -576,33 +576,30 @@ final class ServerOptionsTest extends TestCase
         );
     }
 
-    public function test_password_policy_is_disabled_by_default(): void
+    public function test_no_password_policy_source_is_configured_by_default(): void
     {
-        self::assertFalse($this->subject->isPasswordPolicyEnabled());
         self::assertNull($this->subject->getPasswordPolicy());
         self::assertNull($this->subject->getDefaultPasswordPolicyDn());
     }
 
-    public function test_setting_in_memory_policy_enables_the_feature(): void
+    public function test_the_in_memory_policy_is_retained(): void
     {
         $policy = new PasswordPolicy(quality: new PasswordQualityRules(minLength: 8));
 
         $this->subject->setPasswordPolicy($policy);
 
-        self::assertTrue($this->subject->isPasswordPolicyEnabled());
         self::assertSame(
             $policy,
             $this->subject->getPasswordPolicy(),
         );
     }
 
-    public function test_setting_default_policy_dn_enables_the_feature(): void
+    public function test_the_default_policy_dn_is_retained(): void
     {
         $dn = new Dn('cn=default,ou=policies,dc=example,dc=com');
 
         $this->subject->setDefaultPasswordPolicyDn($dn);
 
-        self::assertTrue($this->subject->isPasswordPolicyEnabled());
         self::assertSame(
             $dn,
             $this->subject->getDefaultPasswordPolicyDn(),

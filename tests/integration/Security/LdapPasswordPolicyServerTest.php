@@ -17,10 +17,20 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
 use FreeDSx\Ldap\Controls;
+use FreeDSx\Ldap\Exception\BindException;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 
 final class LdapPasswordPolicyServerTest extends ServerTestCase
 {
+    private const PASSWORD = '12345';
+
+    private const WRONG_PASSWORD = 'nope';
+
+    /**
+     * The pwdMaxFailure the subentry seed configures.
+     */
+    private const MAX_FAILURE = 2;
+
     public function setUp(): void
     {
         $this->setServerMode('ldap-password-policy');
@@ -62,5 +72,91 @@ final class LdapPasswordPolicyServerTest extends ServerTestCase
             $response->controls()->has(Control::OID_PWD_POLICY),
             'A clean bind should not carry a password policy response control.',
         );
+    }
+
+    public function testAUserGovernedByAPolicySubentryIsLockedOut(): void
+    {
+        $this->useSubentryPolicyServer();
+        $dn = 'cn=inside-user,ou=secure,dc=foo,dc=bar';
+        $this->failBinds($dn, self::MAX_FAILURE);
+
+        $this->expectException(BindException::class);
+
+        $this->ldapClient()->bind($dn, self::PASSWORD);
+    }
+
+    public function testAUserOutsideAnyAdministrativePointIsNotGoverned(): void
+    {
+        $this->useSubentryPolicyServer();
+        $dn = 'cn=outside-user,dc=foo,dc=bar';
+        $this->failBinds($dn, self::MAX_FAILURE + 1);
+
+        $this->ldapClient()->bind($dn, self::PASSWORD);
+
+        $this->assertSame(
+            'dn:' . $dn,
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    /**
+     * The specification chops ou=exempt, so the policy does not reach entries beneath it.
+     */
+    public function testABranchChoppedFromTheSpecificationIsNotGoverned(): void
+    {
+        $this->useSubentryPolicyServer();
+        $dn = 'cn=exempt-user,ou=exempt,ou=secure,dc=foo,dc=bar';
+        $this->failBinds($dn, self::MAX_FAILURE + 1);
+
+        $this->ldapClient()->bind($dn, self::PASSWORD);
+
+        $this->assertSame(
+            'dn:' . $dn,
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    /**
+     * Its pwdPolicySubentry names a policy with lockout disabled, which outranks the governing subentry.
+     */
+    public function testAnExplicitPointerOutranksTheGoverningSubentry(): void
+    {
+        $this->useSubentryPolicyServer();
+        $dn = 'cn=pointer-user,ou=secure,dc=foo,dc=bar';
+        $this->failBinds($dn, self::MAX_FAILURE + 1);
+
+        $this->ldapClient()->bind($dn, self::PASSWORD);
+
+        $this->assertSame(
+            'dn:' . $dn,
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    /**
+     * No policy is configured in PHP for this run, so enforcement can only come from the DIT.
+     */
+    private function useSubentryPolicyServer(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            ['--subentry-policy'],
+        );
+    }
+
+    private function failBinds(
+        string $dn,
+        int $times,
+    ): void {
+        for ($i = 0; $i < $times; $i++) {
+            try {
+                $this->ldapClient()->bind($dn, self::WRONG_PASSWORD);
+
+                self::fail('A bind with the wrong password should not succeed.');
+            } catch (BindException) {
+                // Expected: the point is to accumulate failures.
+            }
+        }
     }
 }

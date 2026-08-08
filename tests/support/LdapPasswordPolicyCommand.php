@@ -4,12 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap;
 
-use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
-use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
+use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\ServerOptions;
@@ -21,6 +17,10 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class LdapPasswordPolicyCommand extends Command
 {
     use ConsoleOptionsTrait;
+
+    private const POLICY_SEED_LDIF = __DIR__ . '/../resources/seed/password-policy-seed.ldif';
+
+    private const SUBENTRY_SEED_LDIF = __DIR__ . '/../resources/seed/subentry-policy-seed.ldif';
 
     protected function configure(): void
     {
@@ -40,6 +40,12 @@ final class LdapPasswordPolicyCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Port to listen on',
                 '10389',
+            )
+            ->addOption(
+                'subentry-policy',
+                null,
+                InputOption::VALUE_NONE,
+                'Seed a pwdPolicy subentry under an administrative point instead of configuring a policy in PHP',
             );
     }
 
@@ -49,46 +55,28 @@ final class LdapPasswordPolicyCommand extends Command
     ): int {
         $transport = $this->getStringOption($input, 'transport');
         $port = (int) $this->getStringOption($input, 'port');
-        // Plaintext so both simple bind and SASL PLAIN can verify against the stored value.
-        $password = '12345';
-
-        $entries = [
-            new Entry(
-                new Dn('dc=foo,dc=bar'),
-                new Attribute('dc', 'foo'),
-                new Attribute('objectClass', 'domain'),
-            ),
-            new Entry(
-                new Dn('cn=user,dc=foo,dc=bar'),
-                new Attribute('cn', 'user'),
-                new Attribute('uid', 'user'),
-                new Attribute('sn', 'User'),
-                new Attribute('objectClass', 'inetOrgPerson'),
-                new Attribute('userPassword', $password),
-            ),
-            new Entry(
-                new Dn('cn=reset-user,dc=foo,dc=bar'),
-                new Attribute('cn', 'reset-user'),
-                new Attribute('uid', 'reset-user'),
-                new Attribute('sn', 'Reset'),
-                new Attribute('objectClass', 'inetOrgPerson'),
-                new Attribute('userPassword', $password),
-                new Attribute(PasswordPolicyOid::NAME_PWD_RESET, 'TRUE'),
-            ),
-        ];
+        $useSubentries = $input->getOption('subentry-policy') === true;
 
         $network = (new NetworkConfig())
             ->setPort($port)
             ->setTransport($transport)
             ->setSocketAcceptTimeout(0.1);
 
-        $server = new LdapServer(
-            (new ServerOptions(networkConfig: $network))
-                ->setPasswordPolicy(new PasswordPolicy())
-                ->setSaslMechanisms(ServerOptions::SASL_PLAIN)
-                ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL)),
-        );
-        $server->getOptions()->setStorageConfig(InMemoryStorageConfig::withEntries($entries));
+        $options = (new ServerOptions(networkConfig: $network))
+            ->setSaslMechanisms(ServerOptions::SASL_PLAIN)
+            ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));
+
+        // Left unset for the subentry run, so any enforcement observed can only come from the DIT.
+        if (!$useSubentries) {
+            $options->setPasswordPolicy(new PasswordPolicy());
+        }
+
+        $server = new LdapServer($options);
+        $server->seed(new FileLdifLoader(
+            $useSubentries
+                ? self::SUBENTRY_SEED_LDIF
+                : self::POLICY_SEED_LDIF,
+        ));
         $server->run();
 
         return Command::SUCCESS;

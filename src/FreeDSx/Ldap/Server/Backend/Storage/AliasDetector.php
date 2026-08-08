@@ -14,9 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage;
 
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
-
-use function strcasecmp;
 
 /**
  * Recognizes alias entries (RFC 4512: an entry whose objectClass includes "alias").
@@ -27,17 +26,11 @@ final class AliasDetector
 
     public static function isAlias(Entry $entry): bool
     {
-        $objectClass = $entry->get('objectClass');
-        if ($objectClass === null) {
-            return false;
-        }
-
-        foreach ($objectClass->getValues() as $value) {
-            if (strcasecmp($value, ObjectClassOid::NAME_ALIAS) === 0) {
-                return true;
-            }
-        }
-
-        return false;
+        return $entry
+            ->get(AttributeTypeOid::NAME_OBJECT_CLASS)
+            ?->has(
+                ObjectClassOid::NAME_ALIAS,
+                caseSensitive: false,
+            ) === true;
     }
 }

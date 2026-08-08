@@ -19,6 +19,11 @@ use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordQualityRules;
+use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
+use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Subentry\GoverningSubentryResolver;
+use Generator;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -166,6 +171,125 @@ final class PasswordPolicyResolverTest extends TestCase
             1,
             $this->getCalls[self::DEFAULT_DN] ?? 0,
         );
+    }
+
+    public function test_resolves_from_a_governing_subentry_when_the_user_has_no_pointer(): void
+    {
+        $resolver = new PasswordPolicyResolver(
+            $this->backend(),
+            defaultPolicyDn: null,
+            inMemoryFallback: null,
+            subentries: $this->governedBy(['pwdMinLength' => '9']),
+        );
+
+        $resolved = $resolver->resolveFor($this->userEntry());
+
+        self::assertNotNull($resolved);
+        self::assertSame(
+            9,
+            $resolved->quality->minLength,
+        );
+    }
+
+    public function test_the_user_pointer_outranks_a_governing_subentry(): void
+    {
+        $backend = $this->backend([
+            self::SUBENTRY_DN => $this->policyEntry(
+                self::SUBENTRY_DN,
+                ['pwdMinLength' => '12'],
+            ),
+        ]);
+
+        $resolver = new PasswordPolicyResolver(
+            $backend,
+            defaultPolicyDn: null,
+            inMemoryFallback: null,
+            subentries: $this->governedBy(['pwdMinLength' => '9']),
+        );
+
+        $resolved = $resolver->resolveFor(
+            $this->userEntry(['pwdPolicySubentry' => self::SUBENTRY_DN]),
+        );
+
+        self::assertNotNull($resolved);
+        self::assertSame(
+            12,
+            $resolved->quality->minLength,
+        );
+    }
+
+    public function test_a_governing_subentry_outranks_the_default_dn(): void
+    {
+        $backend = $this->backend([
+            self::DEFAULT_DN => $this->policyEntry(
+                self::DEFAULT_DN,
+                ['pwdMinLength' => '6'],
+            ),
+        ]);
+
+        $resolver = new PasswordPolicyResolver(
+            $backend,
+            defaultPolicyDn: new Dn(self::DEFAULT_DN),
+            inMemoryFallback: null,
+            subentries: $this->governedBy(['pwdMinLength' => '9']),
+        );
+
+        $resolved = $resolver->resolveFor($this->userEntry());
+
+        self::assertNotNull($resolved);
+        self::assertSame(
+            9,
+            $resolved->quality->minLength,
+        );
+    }
+
+    public function test_a_governing_subentry_without_a_policy_class_is_ignored(): void
+    {
+        $resolver = new PasswordPolicyResolver(
+            $this->backend(),
+            defaultPolicyDn: null,
+            inMemoryFallback: null,
+            subentries: $this->governedBy(policyClass: false),
+        );
+
+        self::assertNull($resolver->resolveFor($this->userEntry()));
+    }
+
+    /**
+     * A real resolver over a backend that hosts one administrative point holding one subentry.
+     *
+     * @param array<string, string> $extra
+     */
+    private function governedBy(
+        array $extra = [],
+        bool $policyClass = true,
+    ): GoverningSubentryResolver {
+        $objectClasses = $policyClass
+            ? [ObjectClassOid::NAME_SUBENTRY, PasswordPolicyOid::NAME_PWD_POLICY]
+            : [ObjectClassOid::NAME_SUBENTRY];
+        $subentry = Entry::fromArray(
+            'cn=policy,dc=example,dc=com',
+            [
+                'objectClass' => $objectClasses,
+                'subtreeSpecification' => '{ }',
+                'pwdAttribute' => 'userPassword',
+            ] + $extra,
+        );
+
+        $backend = $this->createMock(LdapBackendInterface::class);
+        $backend->method('get')
+            ->willReturnCallback(static fn(Dn $dn): ?Entry => $dn->toString() === 'dc=example,dc=com'
+                ? Entry::fromArray(
+                    'dc=example,dc=com',
+                    ['administrativeRole' => '2.5.23.4'],
+                )
+                : null);
+        $backend->method('search')
+            ->willReturn(new EntryStream((static function () use ($subentry): Generator {
+                yield $subentry;
+            })()));
+
+        return new GoverningSubentryResolver($backend);
     }
 
     /**

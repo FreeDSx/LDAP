@@ -128,20 +128,60 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
 
     public function test_it_still_acks_and_does_not_write_when_no_policy_applies(): void
     {
-        $changes = $this->captureComputedChanges(
-            new ForwardPasswordPolicyStateRequest(self::DN, 'uuid', [
+        $this->backend
+            ->method('get')
+            ->willReturn(Entry::fromArray(self::DN, ['cn' => ['user']]));
+        $this->backend
+            ->expects(self::never())
+            ->method('atomicUpdate');
+
+        // A resolver with no source at all, so nothing governs the target.
+        $subject = new ServerPasswordPolicyForwardHandler(
+            $this->backend,
+            new PasswordPolicyResolver(
+                $this->backend,
+                null,
+                null,
+            ),
+            new PasswordPolicyEngine(
+                FrozenClock::fromString(self::NOW),
+                new PasswordChangeConstraintChain([]),
+            ),
+            $this->accessControl,
+        );
+
+        $stream = $subject->handleRequest(
+            $this->messageFor(new ForwardPasswordPolicyStateRequest(self::DN, 'uuid', [
                 new DateTimeImmutable('2026-05-20 11:59:00', new DateTimeZone('UTC')),
-            ]),
-            null,
+            ])),
+            $this->createMock(TokenInterface::class),
         );
 
         self::assertCount(
             1,
-            [...$this->lastStream->messages],
+            [...$stream->messages],
         );
-        self::assertSame(
-            [],
-            $changes,
+    }
+
+    public function test_it_still_acks_and_does_not_write_when_the_target_is_missing(): void
+    {
+        $this->backend
+            ->method('get')
+            ->willReturn(null);
+        $this->backend
+            ->expects(self::never())
+            ->method('atomicUpdate');
+
+        $stream = $this->subject->handleRequest(
+            $this->messageFor(new ForwardPasswordPolicyStateRequest(self::DN, 'uuid', [
+                new DateTimeImmutable('2026-05-20 11:59:00', new DateTimeZone('UTC')),
+            ])),
+            $this->createMock(TokenInterface::class),
+        );
+
+        self::assertCount(
+            1,
+            [...$stream->messages],
         );
     }
 
@@ -187,6 +227,9 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
             ));
 
         $compute = null;
+        $this->backend
+            ->method('get')
+            ->willReturn(Entry::fromArray(self::DN, ['cn' => ['user']]));
         $this->backend
             ->method('atomicUpdate')
             ->with(
@@ -237,9 +280,14 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
      */
     private function captureComputedChanges(
         ForwardPasswordPolicyStateRequest $request,
-        ?Entry $entry,
+        Entry $entry,
     ): array {
         $captured = [];
+
+        $this->backend
+            ->method('get')
+            ->willReturn($entry);
+
         $this->backend
             ->expects(self::once())
             ->method('atomicUpdate')
@@ -247,9 +295,7 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
                 self::callback(fn(Dn $dn): bool => $dn->toString() === self::DN),
                 self::isInstanceOf(WriteContext::class),
                 self::callback(function (callable $compute) use (&$captured, $entry): bool {
-                    $result = $entry === null
-                        ? []
-                        : $compute($entry);
+                    $result = $compute($entry);
 
                     foreach (is_array($result) ? $result : [] as $change) {
                         if ($change instanceof Change) {
