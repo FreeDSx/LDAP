@@ -108,5 +108,9 @@ final class SyntaxOid
 
     public const DESC_LDAP_SYNTAX_DESCRIPTION = 'LDAP Syntax Description';
 
+    public const OID_SUBTREE_SPECIFICATION = '1.3.6.1.4.1.1466.115.121.1.45';
+
+    public const DESC_SUBTREE_SPECIFICATION = 'Subtree Specification';
+
     private function __construct() {}
 }

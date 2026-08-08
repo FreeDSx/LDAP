@@ -39,6 +39,11 @@ class Paging
 
     private bool $isCritical = false;
 
+    /**
+     * @var list<Control>
+     */
+    private array $controls = [];
+
     public function __construct(
         private LdapClient $client,
         private SearchRequest $search,
@@ -52,6 +57,16 @@ class Paging
     public function isCritical(bool $isCritical = true): self
     {
         $this->isCritical = $isCritical;
+
+        return $this;
+    }
+
+    /**
+     * Controls sent with every page alongside the paging control, replacing any set previously.
+     */
+    public function useControls(Control ...$controls): self
+    {
+        $this->controls = array_values($controls);
 
         return $this;
     }
@@ -126,6 +141,7 @@ class Paging
             $this->search,
             Controls::paging($size ?? $this->size, $cookie)
                 ->setCriticality($this->isCritical),
+            ...$this->controls,
         );
         $control = $message->controls()
             ->get(Control::OID_PAGING);

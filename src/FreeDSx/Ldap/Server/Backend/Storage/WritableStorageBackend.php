@@ -46,6 +46,7 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\SearchLimits;
+use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use Generator;
 
 /**
@@ -133,6 +134,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
      */
     public function search(
         SearchRequest $request,
+        SubentryVisibility $subentries,
         ControlBag $controls = new ControlBag(),
         ?SearchLimits $effectiveLimits = null,
     ): EntryStream {
@@ -179,6 +181,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             attributes: $this->materializedAttributes($request),
             isIntegerOrderedResolver: fn(string $attribute): ?bool => $this->schema?->isIntegerOrdered($attribute),
             isCaseInsensitiveResolver: fn(string $attribute): ?bool => $this->schema?->isCaseInsensitiveMatched($attribute),
+            subentries: $subentries,
         );
 
         try {

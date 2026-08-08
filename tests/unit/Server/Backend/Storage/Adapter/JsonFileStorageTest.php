@@ -34,6 +34,7 @@ use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
+use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -256,7 +257,10 @@ final class JsonFileStorageTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('dc=example,dc=com')
             ->useSingleLevelScope();
-        $results = iterator_to_array($this->subject->search($request)->entries);
+        $results = iterator_to_array($this->subject->search(
+            $request,
+            SubentryVisibility::All,
+        )->entries);
 
         self::assertCount(
             1,
@@ -285,7 +289,10 @@ final class JsonFileStorageTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('dc=example,dc=com')
             ->useSubtreeScope();
-        $results = iterator_to_array($this->subject->search($request)->entries);
+        $results = iterator_to_array($this->subject->search(
+            $request,
+            SubentryVisibility::All,
+        )->entries);
 
         $dns = array_map(
             static fn(Entry $entry): string => $entry->getDn()->toString(),

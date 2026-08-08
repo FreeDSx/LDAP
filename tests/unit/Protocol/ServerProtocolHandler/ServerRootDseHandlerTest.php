@@ -83,6 +83,7 @@ final class ServerRootDseHandlerTest extends TestCase
                         Control::OID_PRE_READ,
                         Control::OID_POST_READ,
                         Control::OID_SUBTREE_DELETE,
+                        Control::OID_SUBENTRIES,
                     ],
                     'supportedExtension' => [
                         ExtendedRequest::OID_WHOAMI,

@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use Closure;
 
 /**
@@ -24,7 +25,7 @@ use Closure;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class StorageListOptions
+final readonly class StorageListOptions
 {
     /**
      * @param SortKey[] $sortKeys
@@ -33,16 +34,17 @@ final class StorageListOptions
      * @param (\Closure(string): (bool|null))|null $isCaseInsensitiveResolver Resolves whether an attribute matches without regard to case.
      */
     public function __construct(
-        public readonly Dn $baseDn,
-        public readonly bool $subtree,
-        public readonly FilterInterface $filter,
-        public readonly int $timeLimit = 0,
-        public readonly int $sizeLimit = 0,
-        public readonly array $sortKeys = [],
-        public readonly int $lookthroughLimit = 0,
-        public readonly ?array $attributes = null,
-        public readonly ?Closure $isIntegerOrderedResolver = null,
-        public readonly ?Closure $isCaseInsensitiveResolver = null,
+        public Dn $baseDn,
+        public bool $subtree,
+        public FilterInterface $filter,
+        public int $timeLimit = 0,
+        public int $sizeLimit = 0,
+        public array $sortKeys = [],
+        public int $lookthroughLimit = 0,
+        public ?array $attributes = null,
+        public ?Closure $isIntegerOrderedResolver = null,
+        public ?Closure $isCaseInsensitiveResolver = null,
+        public SubentryVisibility $subentries = SubentryVisibility::All,
     ) {}
 
     /**

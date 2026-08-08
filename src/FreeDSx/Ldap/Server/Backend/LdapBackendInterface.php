@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\SearchLimits;
+use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 
 /**
  * Read-side backend contract that read-only consumers depend on.
@@ -30,10 +31,12 @@ use FreeDSx\Ldap\Server\SearchLimits;
 interface LdapBackendInterface
 {
     /**
+     * @param SubentryVisibility $subentries Which entry population is in scope; callers state it, as no default is safe for all.
      * @param ?SearchLimits $effectiveLimits Per-request effective limits (time/lookthrough); null uses backend defaults.
      */
     public function search(
         SearchRequest $request,
+        SubentryVisibility $subentries,
         ControlBag $controls = new ControlBag(),
         ?SearchLimits $effectiveLimits = null,
     ): EntryStream;

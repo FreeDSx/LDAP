@@ -83,6 +83,14 @@ interface PdoEntryDialectInterface
     public function querySubtree(): string;
 
     /**
+     * Parameterless condition restricting $dnColumn to entries that lack, or carry, the subentry object class.
+     */
+    public function querySubentryCondition(
+        string $dnColumn,
+        bool $exclude,
+    ): string;
+
+    /**
      * Returns a row when children exist under lc_parent_dn, none otherwise. Parameters: [lc_parent_dn]
      */
     public function queryHasChildren(): string;

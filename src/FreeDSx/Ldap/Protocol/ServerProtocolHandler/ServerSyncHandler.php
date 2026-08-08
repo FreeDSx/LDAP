@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
 use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
 use FreeDSx\Ldap\Server\SearchLimits;
+use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\Sync\Provider\Exception\MalformedSyncCookieException;
 use FreeDSx\Ldap\Sync\Provider\SyncCookie;
@@ -224,6 +225,7 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
     ): Generator {
         $result = $this->backend->search(
             $request,
+            SubentryVisibility::All, // we need all entries in a sync
             $this->controlsForBackend($message),
             $this->limits,
         );

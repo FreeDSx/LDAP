@@ -227,6 +227,7 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
             Control\Control::OID_ASSERTION => Control\AssertionControl::fromAsn1($control),
             Control\Control::OID_PRE_READ => Control\ReadEntry\PreReadControl::fromAsn1($control),
             Control\Control::OID_POST_READ => Control\ReadEntry\PostReadControl::fromAsn1($control),
+            Control\Control::OID_SUBENTRIES => Control\SubentriesControl::fromAsn1($control),
             default => Control\Control::fromAsn1($control),
         };
     }

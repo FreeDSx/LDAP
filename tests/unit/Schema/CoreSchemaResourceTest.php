@@ -14,8 +14,10 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Schema;
 
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
+use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
 use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
+use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaResource;
@@ -69,7 +71,7 @@ final class CoreSchemaResourceTest extends TestCase
     public function test_has_expected_syntax_count(): void
     {
         self::assertCount(
-            24,
+            25,
             $this->schema->getLdapSyntaxes(),
         );
     }
@@ -85,7 +87,7 @@ final class CoreSchemaResourceTest extends TestCase
     public function test_has_expected_attribute_type_count(): void
     {
         self::assertCount(
-            46,
+            48,
             $this->schema->getAttributeTypes(),
         );
     }
@@ -93,7 +95,7 @@ final class CoreSchemaResourceTest extends TestCase
     public function test_has_expected_object_class_count(): void
     {
         self::assertCount(
-            13,
+            14,
             $this->schema->getObjectClasses(),
         );
     }
@@ -271,6 +273,82 @@ final class CoreSchemaResourceTest extends TestCase
     {
         self::assertNotNull(
             $this->schema->getObjectClass(ObjectClassOid::NAME_SUBSCHEMA),
+        );
+    }
+
+    public function test_subtree_specification_syntax_registered(): void
+    {
+        $syntax = $this->schema->getSyntax(SyntaxOid::OID_SUBTREE_SPECIFICATION);
+
+        self::assertNotNull($syntax);
+        self::assertSame(
+            SyntaxOid::DESC_SUBTREE_SPECIFICATION,
+            $syntax->desc,
+        );
+    }
+
+    public function test_subtree_specification_is_single_valued_and_operational(): void
+    {
+        $attr = $this->schema->getAttributeType(AttributeTypeOid::NAME_SUBTREE_SPECIFICATION);
+
+        self::assertNotNull($attr);
+        self::assertTrue($attr->singleValue);
+        self::assertSame(
+            AttributeUsage::DirectoryOperation,
+            $attr->usage,
+        );
+        self::assertSame(
+            SyntaxOid::OID_SUBTREE_SPECIFICATION,
+            $attr->syntaxOid,
+        );
+    }
+
+    /**
+     * It is user-writable by design, so placement and syntax checks are the only guard on it.
+     */
+    public function test_subtree_specification_is_user_modifiable(): void
+    {
+        $attr = $this->schema->getAttributeType(AttributeTypeOid::NAME_SUBTREE_SPECIFICATION);
+
+        self::assertNotNull($attr);
+        self::assertFalse($attr->noUserModification);
+    }
+
+    public function test_administrative_role_is_multi_valued_and_operational(): void
+    {
+        $attr = $this->schema->getAttributeType(AttributeTypeOid::NAME_ADMINISTRATIVE_ROLE);
+
+        self::assertNotNull($attr);
+        self::assertFalse($attr->singleValue);
+        self::assertSame(
+            AttributeUsage::DirectoryOperation,
+            $attr->usage,
+        );
+    }
+
+    public function test_subentry_is_structural_and_requires_a_subtree_specification(): void
+    {
+        $subentry = $this->schema->getObjectClass(ObjectClassOid::NAME_SUBENTRY);
+
+        self::assertNotNull($subentry);
+        self::assertSame(
+            ObjectClassType::StructuralClass,
+            $subentry->type,
+        );
+        self::assertContains(
+            AttributeTypeOid::NAME_SUBTREE_SPECIFICATION,
+            $subentry->must,
+        );
+        self::assertContains(
+            AttributeTypeOid::NAME_CN,
+            $subentry->must,
+        );
+    }
+
+    public function test_subentry_registered_by_oid(): void
+    {
+        self::assertNotNull(
+            $this->schema->getObjectClass(ObjectClassOid::OID_SUBENTRY),
         );
     }
 }

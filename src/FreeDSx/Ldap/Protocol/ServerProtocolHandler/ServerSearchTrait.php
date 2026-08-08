@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
+use FreeDSx\Ldap\Control\SubentriesControl;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
@@ -31,6 +32,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
 use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use Generator;
 
 trait ServerSearchTrait
@@ -171,6 +173,15 @@ trait ServerSearchTrait
         );
 
         return new ControlBag(...$filtered);
+    }
+
+    private function subentryVisibility(ControlBag $controls): SubentryVisibility
+    {
+        $control = $controls->get(Control::OID_SUBENTRIES);
+
+        return $control instanceof SubentriesControl && $control->getIsVisible()
+            ? SubentryVisibility::Only
+            : SubentryVisibility::Hide;
     }
 
     /**

@@ -46,6 +46,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\SearchLimits;
+use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
@@ -559,7 +560,10 @@ final class PdoStorageTest extends TestCase
         $request = (new SearchRequest(new AndFilter()))
             ->base('dc=example,dc=com')
             ->useSingleLevelScope();
-        $results = iterator_to_array($this->subject->search($request)->entries);
+        $results = iterator_to_array($this->subject->search(
+            $request,
+            SubentryVisibility::All,
+        )->entries);
 
         self::assertCount(1, $results);
         self::assertSame(
@@ -579,7 +583,10 @@ final class PdoStorageTest extends TestCase
         $request = (new SearchRequest(new AndFilter()))
             ->base('dc=example,dc=com')
             ->useSubtreeScope();
-        $results = iterator_to_array($this->subject->search($request)->entries);
+        $results = iterator_to_array($this->subject->search(
+            $request,
+            SubentryVisibility::All,
+        )->entries);
 
         $dns = array_map(
             static fn(Entry $entry): string => $entry->getDn()->toString(),
@@ -823,7 +830,10 @@ final class PdoStorageTest extends TestCase
             ->base('dc=example,dc=com')
             ->useSubtreeScope();
 
-        $results = iterator_to_array($this->subject->search($request)->entries);
+        $results = iterator_to_array($this->subject->search(
+            $request,
+            SubentryVisibility::All,
+        )->entries);
 
         self::assertCount(1, $results);
         self::assertSame(
@@ -856,7 +866,10 @@ final class PdoStorageTest extends TestCase
         $request = (new SearchRequest(Filters::endsWith('cn', 'x')))
             ->base('dc=example,dc=com')
             ->useSubtreeScope();
-        iterator_to_array($backend->search($request)->entries);
+        iterator_to_array($backend->search(
+            $request,
+            SubentryVisibility::All,
+        )->entries);
     }
 
     public function test_search_exact_filter_is_not_subject_to_lookthrough(): void
@@ -883,7 +896,10 @@ final class PdoStorageTest extends TestCase
 
         self::assertCount(
             1,
-            iterator_to_array($backend->search($request)->entries),
+            iterator_to_array($backend->search(
+                $request,
+                SubentryVisibility::All,
+            )->entries),
         );
     }
 
@@ -915,7 +931,10 @@ final class PdoStorageTest extends TestCase
 
         self::assertCount(
             3,
-            iterator_to_array($backend->search($request)->entries),
+            iterator_to_array($backend->search(
+                $request,
+                SubentryVisibility::All,
+            )->entries),
         );
     }
 
@@ -1256,7 +1275,10 @@ final class PdoStorageTest extends TestCase
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
 
-        iterator_to_array($backend->search($request)->entries);
+        iterator_to_array($backend->search(
+            $request,
+            SubentryVisibility::All,
+        )->entries);
     }
 
     public function test_subtree_includes_entries_with_escaped_comma_under_correct_parent(): void
@@ -1284,7 +1306,10 @@ final class PdoStorageTest extends TestCase
         $request = (new SearchRequest(new AndFilter()))
             ->base('dc=example,dc=com')
             ->useSubtreeScope();
-        $results = iterator_to_array($backend->search($request)->entries);
+        $results = iterator_to_array($backend->search(
+            $request,
+            SubentryVisibility::All,
+        )->entries);
 
         self::assertCount(2, $results);
     }
@@ -1471,7 +1496,7 @@ final class PdoStorageTest extends TestCase
             ->useSubtreeScope();
 
         $dns = [];
-        foreach ($this->subject->search($request)->entries as $entry) {
+        foreach ($this->subject->search($request, SubentryVisibility::All)->entries as $entry) {
             $dns[] = $entry->getDn()->toString();
         }
 

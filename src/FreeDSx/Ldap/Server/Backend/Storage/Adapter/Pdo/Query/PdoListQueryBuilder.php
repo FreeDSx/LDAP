@@ -18,6 +18,9 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
+use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
+
+use function implode;
 
 /**
  * Builds the SQL query for PdoStorage::list().
@@ -39,6 +42,7 @@ final readonly class PdoListQueryBuilder
         ?SqlFilterResult $filterResult,
         ?int $sqlLimit,
         array $sortKeys,
+        SubentryVisibility $subentries = SubentryVisibility::All,
     ): SqlQuery {
         $streamed = $this->tryBuildStreamingQuery(
             $base,
@@ -46,16 +50,32 @@ final readonly class PdoListQueryBuilder
             $filterResult,
             $sqlLimit,
             $sortKeys,
+            $subentries,
         );
 
         if ($streamed !== null) {
             return $streamed;
         }
 
+        $subentryCondition = $this->subentryCondition(
+            $subentries,
+            'lc_dn',
+        );
         $query = match (true) {
-            !$subtree => $this->buildChildQuery($base, $filterResult),
-            $base === '' => $this->buildRootQuery($filterResult),
-            default => $this->buildSubtreeQuery($base, $filterResult),
+            !$subtree => $this->buildChildQuery(
+                $base,
+                $filterResult,
+                $subentryCondition,
+            ),
+            $base === '' => $this->buildRootQuery(
+                $filterResult,
+                $subentryCondition,
+            ),
+            default => $this->buildSubtreeQuery(
+                $base,
+                $filterResult,
+                $subentryCondition,
+            ),
         };
 
         if ($sortKeys !== []) {
@@ -87,14 +107,25 @@ final readonly class PdoListQueryBuilder
         array $filterParams,
         string $base,
         int $sqlLimit,
+        SubentryVisibility $subentries = SubentryVisibility::All,
     ): SqlQuery {
         $fetchAll = $this->dialect->queryFetchAll();
         $params = $filterParams;
+
+        // Applied inside the candidate select, since the limit below it would otherwise be spent on excluded rows.
+        $subentryCondition = $this->subentryCondition(
+            $subentries,
+            's.entry_lc_dn',
+        );
+        $subentryClause = $subentryCondition !== null
+            ? "AND $subentryCondition"
+            : '';
 
         if ($base === '') {
             $inner = <<<SQL
                 SELECT DISTINCT s.entry_lc_dn AS d FROM entry_attribute_values s
                     WHERE $sidecarCondition
+                    $subentryClause
                     LIMIT ?
                 SQL;
         } else {
@@ -102,6 +133,7 @@ final readonly class PdoListQueryBuilder
                 SELECT DISTINCT s.entry_lc_dn AS d FROM entry_attribute_values s
                     WHERE $sidecarCondition
                       AND (s.entry_lc_dn = ? OR s.entry_lc_dn LIKE ? ESCAPE '!')
+                    $subentryClause
                     LIMIT ?
                 SQL;
             $params[] = $base;
@@ -130,6 +162,7 @@ final readonly class PdoListQueryBuilder
         ?SqlFilterResult $filterResult,
         ?int $sqlLimit,
         array $sortKeys,
+        SubentryVisibility $subentries = SubentryVisibility::All,
     ): ?SqlQuery {
         if (!$subtree || $sqlLimit === null || $sortKeys !== []) {
             return null;
@@ -144,57 +177,80 @@ final readonly class PdoListQueryBuilder
             $filterResult->params,
             $base,
             $sqlLimit,
+            $subentries,
         );
     }
 
     private function buildChildQuery(
         string $base,
         ?SqlFilterResult $filterResult,
+        ?string $subentryCondition,
     ): SqlQuery {
         $query = new SqlQuery(
             $this->dialect->queryFetchChildren(),
             [$base],
         );
 
-        if ($filterResult === null) {
-            return $query;
+        if ($filterResult !== null) {
+            // short-circuits the child scan instead of an IN list materialising the whole match set (O(directory)).
+            $filterSql = $filterResult->correlatedSql ?? $filterResult->sql;
+            $query = $query->appending(
+                ' AND (' . $filterSql . ')',
+                $filterResult->params,
+            );
         }
 
-        // short-circuits the child scan instead of an IN list materialising the whole match set (O(directory)).
-        $filterSql = $filterResult->correlatedSql ?? $filterResult->sql;
-
-        return $query->appending(
-            ' AND (' . $filterSql . ')',
-            $filterResult->params,
-        );
+        return $subentryCondition !== null
+            ? $query->appending(' AND ' . $subentryCondition)
+            : $query;
     }
 
-    private function buildRootQuery(?SqlFilterResult $filterResult): SqlQuery
-    {
-        if ($filterResult === null) {
+    private function buildRootQuery(
+        ?SqlFilterResult $filterResult,
+        ?string $subentryCondition,
+    ): SqlQuery {
+        $conditions = [];
+        $params = [];
+
+        if ($filterResult !== null) {
+            $conditions[] = '(' . $filterResult->sql . ')';
+            $params = $filterResult->params;
+        }
+
+        if ($subentryCondition !== null) {
+            $conditions[] = $subentryCondition;
+        }
+
+        if ($conditions === []) {
             return new SqlQuery($this->dialect->queryFetchAll());
         }
 
         return new SqlQuery(
-            $this->dialect->queryFetchAll() . ' WHERE (' . $filterResult->sql . ')',
-            $filterResult->params,
+            $this->dialect->queryFetchAll() . ' WHERE ' . implode(' AND ', $conditions),
+            $params,
         );
     }
 
     private function buildSubtreeQuery(
         string $base,
         ?SqlFilterResult $filterResult,
+        ?string $subentryCondition,
     ): SqlQuery {
         if ($filterResult === null) {
-            return new SqlQuery(
+            $query = new SqlQuery(
                 $this->dialect->querySubtree(),
                 [$base],
             );
+
+            return $subentryCondition !== null
+                ? $query->appending(' WHERE ' . $subentryCondition)
+                : $query;
         }
 
         return $this->buildFilteredSubtreeQuery(
             $base,
             $filterResult,
+            $subentryCondition,
         );
     }
 
@@ -204,12 +260,17 @@ final readonly class PdoListQueryBuilder
     private function buildFilteredSubtreeQuery(
         string $base,
         SqlFilterResult $filterResult,
+        ?string $subentryCondition,
     ): SqlQuery {
         $fetchAll = $this->dialect->queryFetchAll();
         $filterSql = $filterResult->sql;
+        $subentryClause = $subentryCondition !== null
+            ? "AND $subentryCondition"
+            : '';
         $sql = <<<SQL
             $fetchAll WHERE ($filterSql)
             AND (lc_dn = ? OR lc_dn LIKE ? ESCAPE '!')
+            $subentryClause
             SQL;
 
         $params = $filterResult->params;
@@ -220,6 +281,20 @@ final readonly class PdoListQueryBuilder
             $sql,
             $params,
         );
+    }
+
+    /**
+     * The dialect condition for the given visibility, or null when both populations are selected.
+     */
+    private function subentryCondition(
+        SubentryVisibility $subentries,
+        string $dnColumn,
+    ): ?string {
+        return match ($subentries) {
+            SubentryVisibility::All => null,
+            SubentryVisibility::Hide => $this->dialect->querySubentryCondition($dnColumn, true),
+            SubentryVisibility::Only => $this->dialect->querySubentryCondition($dnColumn, false),
+        };
     }
 
     /**

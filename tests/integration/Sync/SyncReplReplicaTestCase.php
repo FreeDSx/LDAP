@@ -39,6 +39,14 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
         self::assertNotNull($this->waitForReplica('cn=alice,ou=people,dc=foo,dc=bar'));
     }
 
+    /**
+     * Full refresh must ship both populations, or it would disagree with the incremental path.
+     */
+    public function test_seeded_subentries_replicate_to_the_replica(): void
+    {
+        self::assertNotNull($this->waitForReplica('cn=sync-policy,ou=people,dc=foo,dc=bar'));
+    }
+
     public function test_an_add_on_the_provider_propagates_to_the_replica(): void
     {
         $this->writeToProvider(static function (LdapClient $provider): void {

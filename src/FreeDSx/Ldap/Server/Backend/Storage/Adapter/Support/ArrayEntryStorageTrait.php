@@ -18,6 +18,8 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
+use FreeDSx\Ldap\Server\Subentry\SubentryDetector;
+use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use Generator;
 
 /**
@@ -43,6 +45,7 @@ trait ArrayEntryStorageTrait
                     $options->baseDn,
                     $options->subtree,
                     $options->timeLimit,
+                    $options->subentries,
                 ),
             );
         }
@@ -68,6 +71,7 @@ trait ArrayEntryStorageTrait
                 $options->baseDn,
                 $options->subtree,
                 $options->timeLimit,
+                $options->subentries,
             ),
             false,
         );
@@ -105,6 +109,7 @@ trait ArrayEntryStorageTrait
         Dn $baseDn,
         bool $subtree,
         int $timeLimit = 0,
+        SubentryVisibility $subentries = SubentryVisibility::All,
     ): Generator {
         $deadline = $timeLimit > 0
             ? microtime(true) + $timeLimit
@@ -121,7 +126,7 @@ trait ArrayEntryStorageTrait
                 ? $entryDn->isDescendantOf($baseDn)
                 : $entryDn->isChildOf($baseDn);
 
-            if ($inScope) {
+            if ($inScope && SubentryDetector::isVisibleUnder($entry, $subentries)) {
                 yield $entry;
             }
         }

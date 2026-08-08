@@ -242,6 +242,18 @@ final class AttributeTypeOid
 
     public const DESC_MODIFIERS_NAME = 'name of the last modifier of the object';
 
+    public const OID_ADMINISTRATIVE_ROLE = '2.5.18.5';
+
+    public const NAME_ADMINISTRATIVE_ROLE = 'administrativeRole';
+
+    public const DESC_ADMINISTRATIVE_ROLE = 'administrative roles the entry is an administrative point for';
+
+    public const OID_SUBTREE_SPECIFICATION = '2.5.18.6';
+
+    public const NAME_SUBTREE_SPECIFICATION = 'subtreeSpecification';
+
+    public const DESC_SUBTREE_SPECIFICATION = 'the portion of a subtree a subentry applies to';
+
     public const OID_SUBSCHEMA_SUBENTRY = '2.5.18.10';
 
     public const NAME_SUBSCHEMA_SUBENTRY = 'subschemaSubentry';
