@@ -17,8 +17,6 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 
-use function strcasecmp;
-
 /**
  * Recognizes subentries (RFC 3672: an entry whose objectClass includes "subentry").
  *
@@ -30,19 +28,12 @@ final class SubentryDetector
 
     public static function isSubentry(Entry $entry): bool
     {
-        $objectClass = $entry->get(AttributeTypeOid::NAME_OBJECT_CLASS);
-
-        if ($objectClass === null) {
-            return false;
-        }
-
-        foreach ($objectClass->getValues() as $value) {
-            if (strcasecmp($value, ObjectClassOid::NAME_SUBENTRY) === 0) {
-                return true;
-            }
-        }
-
-        return false;
+        return $entry
+            ->get(AttributeTypeOid::NAME_OBJECT_CLASS)
+            ?->has(
+                ObjectClassOid::NAME_SUBENTRY,
+                caseSensitive: false,
+            ) === true;
     }
 
     /**

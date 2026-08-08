@@ -143,13 +143,42 @@ $options->setDefaultPasswordPolicyDn(new Dn('cn=default,ou=policies,dc=example,d
 
 Per-user policies are supported by setting `pwdPolicySubentry` on the user entry to the DN of a `pwdPolicy` entry.
 
+### Subtree-Scoped Policies
+
+A policy can govern a branch of the directory rather than one entry at a time. Add a subentry that carries both
+the `subentry` and `pwdPolicy` object classes directly below an administrative point, and its `subtreeSpecification`
+decides which entries it applies to:
+
+```ldif
+dn: ou=secure,dc=example,dc=com
+objectClass: organizationalUnit
+ou: secure
+administrativeRole: 2.5.23.4
+
+dn: cn=policy,ou=secure,dc=example,dc=com
+objectClass: subentry
+objectClass: pwdPolicy
+cn: policy
+subtreeSpecification: { specificExclusions { chopBefore:"ou=contractors" } }
+pwdAttribute: userPassword
+pwdLockout: TRUE
+pwdMaxFailure: 3
+```
+
+Every entry under `ou=secure` is then governed by that policy, except the `ou=contractors` branch the specification
+chops out. See the subtree specification grammar in RFC 3672 for the full set of components.
+
+Subentries are not returned by ordinary searches. Read one back with a base scope search on its DN, or use the
+subentries control.
+
 ### Policy Resolution Order
 
 For a given user the governing policy is resolved as:
 
 1. The `pwdPolicy` entry named by the user's `pwdPolicySubentry` (if present).
-2. The default DN from `setDefaultPasswordPolicyDn()` (if configured).
-3. The in-memory policy from `setPasswordPolicy()` (if configured).
+2. The nearest governing `pwdPolicy` subentry whose `subtreeSpecification` covers the user.
+3. The default DN from `setDefaultPasswordPolicyDn()` (if configured).
+4. The in-memory policy from `setPasswordPolicy()` (if configured).
 
 If none apply, then no policy is enforced for the user.
 

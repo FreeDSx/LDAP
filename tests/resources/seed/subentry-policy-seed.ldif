@@ -1,0 +1,70 @@
+version: 1
+
+# Seed for subtree-scoped password policy.
+# Passwords are plaintext so both simple bind and SASL PLAIN can verify against the stored value.
+
+dn: dc=foo,dc=bar
+objectClass: top
+objectClass: domain
+dc: foo
+
+# Outside any administrative point, so no policy governs it
+dn: cn=outside-user,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: outside-user
+uid: outside-user
+sn: User
+userPassword: 12345
+
+# The policy this run is really about, pointed at by cn=pointer-user below
+dn: cn=lenient,dc=foo,dc=bar
+objectClass: top
+objectClass: extensibleObject
+objectClass: pwdPolicy
+cn: lenient
+pwdAttribute: userPassword
+pwdLockout: FALSE
+
+dn: ou=secure,dc=foo,dc=bar
+objectClass: organizationalUnit
+ou: secure
+administrativeRole: 2.5.23.4
+
+# Locks out after two failures, everywhere under ou=secure except the chopped branch
+dn: cn=policy,ou=secure,dc=foo,dc=bar
+objectClass: subentry
+objectClass: pwdPolicy
+cn: policy
+subtreeSpecification: { specificExclusions { chopBefore:"ou=exempt" } }
+pwdAttribute: userPassword
+pwdLockout: TRUE
+pwdMaxFailure: 2
+
+# Governed by the subentry
+dn: cn=inside-user,ou=secure,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: inside-user
+uid: inside-user
+sn: User
+userPassword: 12345
+
+# An explicit pointer outranks the governing subentry
+dn: cn=pointer-user,ou=secure,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: pointer-user
+uid: pointer-user
+sn: User
+userPassword: 12345
+pwdPolicySubentry: cn=lenient,dc=foo,dc=bar
+
+dn: ou=exempt,ou=secure,dc=foo,dc=bar
+objectClass: organizationalUnit
+ou: exempt
+
+# Chopped out of the specification, so the policy does not reach it
+dn: cn=exempt-user,ou=exempt,ou=secure,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: exempt-user
+uid: exempt-user
+sn: User
+userPassword: 12345

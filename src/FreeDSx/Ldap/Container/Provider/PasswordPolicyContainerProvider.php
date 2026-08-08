@@ -34,6 +34,9 @@ use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\UniquePolicyTimeFactory;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Subentry\GoverningSubentryResolver;
+use FreeDSx\Ldap\Server\Subentry\SubtreeSpecificationEvaluator;
 use FreeDSx\Ldap\ServerOptions;
 
 /**
@@ -112,11 +115,16 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
     private function makePasswordPolicyResolver(Container $container): PasswordPolicyResolver
     {
         $options = $container->get(ServerOptions::class);
+        $backend = $container->get(WritableStorageBackend::class);
 
         return new PasswordPolicyResolver(
-            $container->get(WritableStorageBackend::class),
+            $backend,
             $options->getDefaultPasswordPolicyDn(),
             $options->getPasswordPolicy(),
+            new GoverningSubentryResolver(
+                $backend,
+                new SubtreeSpecificationEvaluator($container->get(FilterEvaluatorInterface::class)),
+            ),
         );
     }
 

@@ -63,7 +63,7 @@ final readonly class PasswordPolicyComponentFactory
         EventLogger $eventLogger,
         ?PasswordPolicyContext $passwordPolicyContext,
     ): ?PasswordPolicyChangeGuard {
-        if ($passwordPolicyContext === null || !$this->options->isPasswordPolicyEnabled()) {
+        if ($passwordPolicyContext === null) {
             return null;
         }
 

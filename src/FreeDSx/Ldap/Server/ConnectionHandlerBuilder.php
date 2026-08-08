@@ -108,18 +108,15 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         $backend = $this->container->get(WritableStorageBackend::class);
         $passwordAuthenticator = $this->container->get(PasswordAuthenticatableInterface::class);
 
-        $policyContext = null;
-        $interceptors = [];
-        if ($options->isPasswordPolicyEnabled()) {
-            $policyContext = new PasswordPolicyContext();
-            $interceptors[] = new PasswordPolicyResponseInterceptor($policyContext);
-            $passwordAuthenticator = $this->decoratePasswordAuthenticator(
-                $passwordAuthenticator,
-                $backend,
-                $policyContext,
-                $eventLogger,
-            );
-        }
+        // Always composed: policy may come from a DIT entry that appears after the server starts.
+        $policyContext = new PasswordPolicyContext();
+        $interceptors = [new PasswordPolicyResponseInterceptor($policyContext)];
+        $passwordAuthenticator = $this->decoratePasswordAuthenticator(
+            $passwordAuthenticator,
+            $backend,
+            $policyContext,
+            $eventLogger,
+        );
 
         $manager = $options->getManager();
         if ($manager !== null) {
