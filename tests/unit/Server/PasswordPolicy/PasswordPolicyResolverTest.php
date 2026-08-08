@@ -149,7 +149,10 @@ final class PasswordPolicyResolverTest extends TestCase
         );
     }
 
-    public function test_repeated_lookups_hit_the_cache(): void
+    /**
+     * Nothing is cached between operations, so an edited policy entry takes effect immediately.
+     */
+    public function test_each_resolution_re_reads_the_policy_entry(): void
     {
         $defaultEntry = $this->policyEntry(
             self::DEFAULT_DN,
@@ -168,7 +171,7 @@ final class PasswordPolicyResolverTest extends TestCase
         $resolver->resolveFor($this->userEntry());
 
         self::assertSame(
-            1,
+            3,
             $this->getCalls[self::DEFAULT_DN] ?? 0,
         );
     }
