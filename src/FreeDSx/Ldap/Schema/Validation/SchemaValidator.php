@@ -65,6 +65,8 @@ final class SchemaValidator
         if ($this->mode === SchemaValidationMode::Off) {
             return;
         }
+        // Checked first, since a caller relaxing an earlier violation would otherwise stop validation before this.
+        $this->checkAttributeSyntaxes($entry);
 
         if (!$isSystem) {
             $this->checkNoUserModificationInEntry($entry);
@@ -87,6 +89,9 @@ final class SchemaValidator
             return;
         }
 
+        // Checked first, since a caller relaxing an earlier violation would otherwise stop validation before this.
+        $this->checkAttributeSyntaxes($result);
+
         if (!$isSystem) {
             $this->checkNoUserModificationInChanges($command->changes);
         }
@@ -98,8 +103,6 @@ final class SchemaValidator
      */
     private function validateStructure(Entry $entry): void
     {
-        $this->checkAttributeSyntaxes($entry);
-
         if ($this->hasExtensibleObject($entry)) {
             $this->checkSingleValuedAttributes($entry);
 

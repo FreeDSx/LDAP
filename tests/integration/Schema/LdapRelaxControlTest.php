@@ -104,6 +104,28 @@ final class LdapRelaxControlTest extends ServerTestCase
         ));
     }
 
+    public function test_relax_control_does_not_bypass_invalid_syntax_behind_a_relaxed_violation(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
+
+        // entryUUID is NO-USER-MODIFICATION, which relax waives, but its value is still malformed.
+        $this->ldapClient()->create(
+            Entry::fromArray(
+                'cn=relax-bad-uuid,dc=foo,dc=bar',
+                [
+                    'cn' => 'relax-bad-uuid',
+                    'sn' => 'Drift',
+                    'objectClass' => 'person',
+                    'entryUUID' => 'not-a-uuid',
+                ],
+            ),
+            Controls::relaxRules(),
+        );
+    }
+
     public function test_relax_control_does_not_bypass_invalid_attribute_syntax(): void
     {
         $this->authenticateAdmin();
