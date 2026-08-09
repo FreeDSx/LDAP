@@ -49,15 +49,15 @@ LDAP Server Configuration
     * [ServerOptions:setMaxSearchPagedLookthrough](#setmaxsearchpagedlookthrough)
     * [ServerOptions:setSearchLimitRules](#setsearchlimitrules)
 * [Directory Synchronization](#directory-synchronization)
-    * [ServerOptions:setSyncEnabled](#setsyncenabled)
+    * [ServerOptions:setReplicationConfig](#setreplicationconfig)
     * [ServerOptions:setChangeJournalConfig](#setchangejournalconfig)
 * [Read-Only Replica](#read-only-replica)
-    * [ServerOptions:setReplicaConfig](#setreplicaconfig)
-    * [ReplicaConfig:setBind](#setbind)
-    * [ReplicaConfig:setUseStartTls](#setusestarttls)
-    * [ReplicaConfig:setReferWrites](#setreferwrites)
-    * [ReplicaConfig:setFilter](#setfilter)
-    * [ReplicaConfig:setReconnectBackoff](#setreconnectbackoff)
+    * [ConsumerConfig:setBind](#setbind)
+    * [ConsumerConfig:setUseStartTls](#setusestarttls)
+    * [ConsumerConfig:setReferWrites](#setreferwrites)
+    * [ConsumerConfig:setFilter](#setfilter)
+    * [ConsumerConfig:setReconnectBackoff](#setreconnectbackoff)
+    * [ConsumerConfig:setForwardInterval](#setforwardinterval)
 * [SASL Options](#sasl-options)
     * [ServerOptions:setSaslMechanisms](#setsaslmechanisms)
     * [ServerOptions:setExternalCredentialMapper](#setexternalcredentialmapper)
@@ -761,61 +761,79 @@ Record directory changes and serve them to RFC 4533 sync consumers. See [Directo
 the full guide, including the storage and runner requirements and the required access-control grant.
 
 ------------------
-#### setSyncEnabled
+#### setReplicationConfig
 
-Whether the server records writes in a change journal and answers content-sync requests. The storage must support
-journaling (all built-in storage does), and consumers must be granted the privileged sync control through access
-control. See [Directory Synchronization](Replication.md).
+The replication role the server plays, and its identity within the topology. `ReplicationConfig::forProvider()` answers
+content-sync requests, `ReplicationConfig::forReplica()` mirrors an upstream. Serving sync also needs storage that
+supports journaling (all built-in storage does) and the privileged sync control granted through access control. See
+[Directory Synchronization](Replication.md).
 
-**Default**: `false`
+```php
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
+use FreeDSx\Ldap\Server\Config\Replication\ProviderConfig;
+use FreeDSx\Ldap\Server\Config\ReplicationConfig;
+
+$options->setReplicationConfig(
+    ReplicationConfig::forProvider(
+        (new ProviderConfig())->setPollInterval(1.0),
+    )->setId(new ReplicaId('dc1')),
+);
+```
+
+The identity is stamped into sync cookies, so give each provider a stable, unique one. The poll interval bounds how
+quickly a persisting consumer sees a change, and how quickly the server notices a consumer that has gone away.
+
+**Default**: no role, with the identity `local`.
 
 ------------------
 #### setChangeJournalConfig
 
-The change journal configuration: the origin id stamped into sync cookies, and the retention policy that limits journal
-growth. When the policy sets at least one limit, the journal is pruned on a cadence. See
-[Retention](Replication.md#retention).
+The change journal configuration: the retention policy that limits journal growth, and an optional audit sink. When the
+policy sets at least one limit, the journal is pruned on a cadence. See [Retention](Replication.md#retention).
+
+Recording changes and serving them are separate. A journal configured on its own records every write without making the
+server a sync provider, which is what you want for auditing alone. Sync requests are then refused with
+`unwillingToPerform`. A provider records regardless, so it has a journal whether or not you configure one.
 
 ```php
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\JsonLinesAuditSink;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 
-$journalConfig = new ChangeJournalConfig(
-    origin: new ReplicaId('dc1'),
+$options->setChangeJournalConfig(new ChangeJournalConfig(
     retention: new RetentionPolicy(maxRecords: 1_000_000),
-);
-
-$options->setChangeJournalConfig($journalConfig);
+    auditSink: new JsonLinesAuditSink('/var/log/freedsx/changes.jsonl'),
+));
 ```
 
-**Default**: origin `local` with no retention limits (the journal is not pruned).
+**Default**: `null`, so nothing is recorded unless a journal or a provider role is configured. A journal defaults to no
+retention limits, meaning it is not pruned.
 
 ## Read-Only Replica
 
 Run the server as a read-only replica that mirrors a provider over RFC 4533. See
 [Read-Only Replica](Replication.md#read-only-replica) for the full guide.
 
-The `ReplicaConfig` is constructed with the provider's `ClientOptions` (servers, TLS, and the base DN of the subtree to
+The `ConsumerConfig` is constructed with the provider's `ClientOptions` (servers, TLS, and the base DN of the subtree to
 mirror) and, optionally, a `ReplicationCheckpointInterface` where the sync cookie is persisted. The checkpoint defaults
-to in-memory; use `FileReplicationCheckpoint` in production so the replica resumes across restarts. The setters below
+to in-memory. Use `FileReplicationCheckpoint` in production so the replica resumes across restarts. The setters below
 configure the rest.
 
-------------------
-#### setReplicaConfig
+Pass it as the replication role, which puts the server into read-only replica mode. Client writes are refused and a
+background daemon keeps the local storage in step with the provider. A replica requires PDO storage. See
+[Storage Requirement](Replication.md#storage-requirement).
 
-A `ServerOptions` setter that puts the server into read-only replica mode against the given `ReplicaConfig`. Client
-writes are refused and a background daemon keeps the local storage in step with the provider.
-`ServerOptions::forReplica($replicaConfig, $storageConfig)` is a shortcut that constructs the options with this
-already set, taking the replica config and the backend storage config for the local mirror. A replica requires PDO
-storage; see [Storage Requirement](Replication.md#storage-requirement).
-
-**Default**: `null` (the server is a normal read-write directory).
+```php
+$options = new ServerOptions(
+    storageConfig: PdoConfig::forSqlite('/var/lib/freedsx/replica.sqlite'),
+    replicationConfig: ReplicationConfig::forReplica($consumerConfig),
+);
+```
 
 ------------------
 #### setBind
 
-A `ReplicaConfig` setter for how the replica authenticates to the provider, as a `BindRequest` from `Operations::bind()`
+A `ConsumerConfig` setter for how the replica authenticates to the provider, as a `BindRequest` from `Operations::bind()`
 (simple) or `Operations::bindSasl()` (SASL, including EXTERNAL for client-certificate auth).
 
 **Default**: none
@@ -823,7 +841,7 @@ A `ReplicaConfig` setter for how the replica authenticates to the provider, as a
 ------------------
 #### setUseStartTls
 
-A `ReplicaConfig` setter for whether to issue StartTLS on the provider connection before binding. LDAPS is configured on
+A `ConsumerConfig` setter for whether to issue StartTLS on the provider connection before binding. LDAPS is configured on
 the primary `ClientOptions` instead.
 
 **Default**: `false`
@@ -831,7 +849,7 @@ the primary `ClientOptions` instead.
 ------------------
 #### setReferWrites
 
-A `ReplicaConfig` setter for whether a client write to the replica is referred to the provider (`true`) or rejected with
+A `ConsumerConfig` setter for whether a client write to the replica is referred to the provider (`true`) or rejected with
 `unwillingToPerform` (`false`).
 
 **Default**: `true`
@@ -839,16 +857,24 @@ A `ReplicaConfig` setter for whether a client write to the replica is referred t
 ------------------
 #### setFilter
 
-A `ReplicaConfig` setter for an optional filter restricting which entries are replicated.
+A `ConsumerConfig` setter for an optional filter restricting which entries are replicated.
 
 **Default**: `null` (all in-scope entries).
 
 ------------------
 #### setReconnectBackoff
 
-A `ReplicaConfig` setter for the bounded exponential backoff applied between reconnect attempts to the provider.
+A `ConsumerConfig` setter for the bounded exponential backoff applied between reconnect attempts to the provider.
 
 **Default**: `new ReconnectBackoff()` (starts at 1s, doubling to a 30s ceiling).
+
+------------------
+#### setForwardInterval
+
+A `ConsumerConfig` setter for how long queued password-policy bind state waits before being forwarded to the provider.
+Batching trades a slower global lockout against constant upstream chatter. Must be greater than zero.
+
+**Default**: `5.0` seconds.
 
 ## Monitoring
 

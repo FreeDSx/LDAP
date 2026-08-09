@@ -21,7 +21,7 @@ Sync is off by default.
 
 ## Quick Start
 
-Sync needs three things: turn it on, use a storage that supports it, and grant the sync control in access control. The
+Sync needs three things: a provider role, a storage that supports it, and the sync control granted in access control. The
 sync control is privileged, so it is the one access-control addition sync requires. Your normal operation and attribute
 rules are unchanged, and they still have to permit the search over the base being synced.
 
@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 // The one sync-specific grant: the privileged sync control, over the base to sync.
@@ -47,8 +48,10 @@ $aclRules = $myAclRules->appendControlRules($syncGrant);
 // A storage config that is visible across connections (see Storage and Runner Requirements below).
 $storageConfig = PdoConfig::forSqlite('/var/lib/freedsx/directory.sqlite');
 
-$options = (new ServerOptions($storageConfig))
-    ->setSyncEnabled(true)
+$options = (new ServerOptions(
+    storageConfig: $storageConfig,
+    replicationConfig: ReplicationConfig::forProvider(),
+))
     ->setAclRules($aclRules);
 
 $server = new LdapServer($options);
@@ -58,7 +61,7 @@ A consumer can now run a sync against the server.
 
 ## How It Works
 
-With sync enabled, every write (add, modify, delete, and rename) appends one record to the change journal in the same
+While a journal is kept, every write (add, modify, delete, and rename) appends one record to it in the same
 transaction as the write, so a change and its journal record are committed together. Each record carries an increasing
 sequence number, the configured origin, a timestamp, the entry's UUID and DN, and, for deletes, a copy of the removed
 entry.
@@ -109,7 +112,6 @@ The journal grows with every write, so bound it with a retention policy on the j
 
 ```php
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 
 $retention = new RetentionPolicy(
@@ -117,12 +119,7 @@ $retention = new RetentionPolicy(
     maxAgeSeconds: ((60 * 60) * 24) * 7, // age horizon, here seven days (null for no age limit)
 );
 
-$journalConfig = new ChangeJournalConfig(
-    origin: new ReplicaId('dc1'),
-    retention: $retention,
-);
-
-$options->setChangeJournalConfig($journalConfig);
+$options->setChangeJournalConfig(new ChangeJournalConfig(retention: $retention));
 ```
 
 Set either limit, both, or neither. The default policy keeps everything. A record becomes eligible for removal once it
@@ -142,12 +139,22 @@ On a PDO backend the journal lives in tables that are part of the storage schema
 
 ## Origin and Cookies
 
-Each journal has an origin, which defaults to `local`. Set a stable, unique origin for each provider through the
-journal configuration. It is stamped into the sync cookie so a consumer can tell which server a saved cookie came from.
-Do not reuse one origin across different directories.
+Each server has an origin, which defaults to `local`. Set a stable, unique origin for each provider on the replication
+configuration. It is stamped into the sync cookie so a consumer can tell which server a saved cookie came from. Do not
+reuse one origin across different directories.
+
+```php
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
+use FreeDSx\Ldap\Server\Config\ReplicationConfig;
+
+$options->setReplicationConfig(
+    ReplicationConfig::forProvider()
+        ->setId(new ReplicaId('dc1')),
+);
+```
 
 The cookie itself is opaque. It stands for an origin and a position in the change history. Consumers save it and resume
-with it. Neither side should try to read or build it by hand; treat it as a token handed out by the server.
+with it. Neither side should try to read or build it by hand, so treat it as a token handed out by the server.
 
 ## Operational Notes
 
@@ -164,22 +171,23 @@ A FreeDSx server can run as a read-only replica of a provider. It serves reads f
 runs a background daemon that keeps that copy in step with the provider over RFC 4533. Client writes to a replica are not
 accepted; by default they are referred to the provider.
 
-Build the server with `ServerOptions::forReplica(...)`. A `ReplicaConfig` describes how to reach and authenticate to the
-provider; the replica's own listener and storage are configured as usual.
+A `ConsumerConfig` describes how to reach and authenticate to the provider. Pass it as the replication role on the
+server options. The replica's own listener and storage are configured as usual.
 
 ```php
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\ReplicaConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
+use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Sync\Consumer\Checkpoint\FileReplicationCheckpoint;
 use FreeDSx\Ldap\ServerOptions;
 
 // Persist the sync cookie so the replica resumes across restarts (the default is in-memory).
 $checkpoint = new FileReplicationCheckpoint('/var/lib/freedsx/replica.cookie');
 
-$replicaConfig = new ReplicaConfig(
+$consumerConfig = new ConsumerConfig(
     (new ClientOptions())
         ->setServers(['provider.example.com'])
         ->setPort(636)
@@ -189,11 +197,11 @@ $replicaConfig = new ReplicaConfig(
 );
 
 // How the replica authenticates to the provider (a simple bind here; use Operations::bindSasl() for SASL/EXTERNAL).
-$replicaConfig->setBind(Operations::bind('cn=replica,dc=example,dc=com', 'secret'));
+$consumerConfig->setBind(Operations::bind('cn=replica,dc=example,dc=com', 'secret'));
 
-$options = ServerOptions::forReplica(
-    $replicaConfig,
-    PdoConfig::forSqlite('/var/lib/freedsx/replica.sqlite'),
+$options = new ServerOptions(
+    storageConfig: PdoConfig::forSqlite('/var/lib/freedsx/replica.sqlite'),
+    replicationConfig: ReplicationConfig::forReplica($consumerConfig),
 );
 
 (new LdapServer($options))->run();
@@ -213,7 +221,7 @@ the replica does not re-journal them.
 ### Writes Are Refused
 
 Any client write to a replica (add, modify, delete, rename, password modify) is refused. By default it is returned as a
-referral to the provider; call `ReplicaConfig::setReferWrites(false)` to reject it with `unwillingToPerform` instead.
+referral to the provider. Call `ConsumerConfig::setReferWrites(false)` to reject it with `unwillingToPerform` instead.
 Reads, binds, compares, and StartTLS are served normally.
 
 ### Storage Requirement
