@@ -78,6 +78,7 @@ final class SyntaxValidatorRegistryTest extends TestCase
             'printable string' => [SyntaxOid::OID_PRINTABLE_STRING],
             'ia5 string' => [SyntaxOid::OID_IA5_STRING],
             'bit string' => [SyntaxOid::OID_BIT_STRING],
+            'uuid' => [SyntaxOid::OID_UUID],
         ];
     }
 }

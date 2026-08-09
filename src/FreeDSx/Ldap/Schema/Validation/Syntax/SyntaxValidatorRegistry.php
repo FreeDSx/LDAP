@@ -42,6 +42,7 @@ final class SyntaxValidatorRegistry
             SyntaxOid::OID_IA5_STRING => new Ia5StringSyntaxValidator(),
             SyntaxOid::OID_BIT_STRING => new BitStringSyntaxValidator(),
             SyntaxOid::OID_SUBTREE_SPECIFICATION => new SubtreeSpecificationSyntaxValidator(),
+            SyntaxOid::OID_UUID => new UuidSyntaxValidator(),
         ]);
     }
 

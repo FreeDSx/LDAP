@@ -112,5 +112,9 @@ final class SyntaxOid
 
     public const DESC_SUBTREE_SPECIFICATION = 'Subtree Specification';
 
+    public const OID_UUID = '1.3.6.1.1.16.1';
+
+    public const DESC_UUID = 'UUID';
+
     private function __construct() {}
 }
