@@ -181,6 +181,20 @@ class Rdn implements Stringable
     }
 
     /**
+     * Unescape an RDN value, resolving both the \XX hex form and a backslash before a single character.
+     */
+    public static function unescape(string $value): string
+    {
+        return (string) preg_replace_callback(
+            '/\\\\([0-9A-Fa-f]{2}|.)/s',
+            static fn(array $matches): string => strlen($matches[1]) === 2
+                ? pack('H*', $matches[1])
+                : $matches[1],
+            $value,
+        );
+    }
+
+    /**
      * Escape an RDN value.
      */
     public static function escape(string $value): string

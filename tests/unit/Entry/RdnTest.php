@@ -111,6 +111,40 @@ class RdnTest extends TestCase
         );
     }
 
+    public function test_it_should_unescape_a_hex_pair(): void
+    {
+        self::assertSame(
+            'Smith, John',
+            Rdn::unescape('Smith\2C John'),
+        );
+    }
+
+    public function test_it_should_unescape_a_backslash_before_a_single_character(): void
+    {
+        self::assertSame(
+            'Smith, John',
+            Rdn::unescape('Smith\, John'),
+        );
+    }
+
+    public function test_it_should_leave_an_unescaped_value_untouched(): void
+    {
+        self::assertSame(
+            'Plain Name',
+            Rdn::unescape('Plain Name'),
+        );
+    }
+
+    public function test_it_should_round_trip_an_escaped_value(): void
+    {
+        $value = '\foo + "bar", > bar < foo;';
+
+        self::assertSame(
+            $value,
+            Rdn::unescape(Rdn::escape($value)),
+        );
+    }
+
     public function test_has_returns_true_for_the_primary_component(): void
     {
         self::assertTrue($this->subject->has('cn'));

@@ -115,6 +115,34 @@ class Entry implements IteratorAggregate, Countable, Stringable
     }
 
     /**
+     * Keep the values naming the entry among its attributes.
+     *
+     * RFC 4511 §4.7 makes part of its content whether a client supplied them or not.
+     */
+    public function mergeRdnAttributes(): static
+    {
+        if ($this->dn->toArray() === []) {
+            return $this;
+        }
+
+        foreach ($this->dn->getRdn()->getAll() as $component) {
+            $value = Rdn::unescape($component->getValue());
+            $existing = $this->get($component->getName());
+
+            if ($existing === null) {
+                $this->set(new Attribute($component->getName(), $value));
+
+                continue;
+            }
+            if (!$existing->has($value, caseSensitive: false)) {
+                $existing->add($value);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
      * Add an attribute and its values.
      */
     public function add(

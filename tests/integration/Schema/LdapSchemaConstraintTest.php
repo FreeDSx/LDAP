@@ -93,6 +93,32 @@ final class LdapSchemaConstraintTest extends ServerTestCase
         );
     }
 
+    public function test_add_omitting_the_naming_attribute_still_stores_it(): void
+    {
+        $this->authenticateAdmin();
+
+        // RFC 4511 section 4.7 lets a client leave the RDN attribute out of the attribute list.
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=implied-cn,dc=foo,dc=bar',
+            [
+                'sn' => 'Smith',
+                'objectClass' => 'person',
+            ],
+        ));
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'implied-cn'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame(
+            'implied-cn',
+            $entries->first()?->get('cn')?->firstValue(),
+        );
+    }
+
     public function test_add_with_an_empty_directory_string_value_is_rejected(): void
     {
         $this->authenticateAdmin();
