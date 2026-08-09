@@ -63,6 +63,7 @@ final class PrintableStringSyntaxValidatorTest extends TestCase
             'at sign' => ['user@host'],
             'asterisk' => ['a*b'],
             'non ascii letter' => ['unicodé'],
+            'trailing newline' => ["abc\n"],
         ];
     }
 }

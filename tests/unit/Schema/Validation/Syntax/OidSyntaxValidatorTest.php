@@ -64,6 +64,7 @@ final class OidSyntaxValidatorTest extends TestCase
             'descriptor starting with digit' => ['1cn'],
             'descriptor with underscore' => ['cn_x'],
             'with space' => ['1.2 3'],
+            'trailing newline' => ["1.2.3\n"],
         ];
     }
 }

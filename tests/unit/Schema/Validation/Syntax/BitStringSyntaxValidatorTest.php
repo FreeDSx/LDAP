@@ -62,6 +62,7 @@ final class BitStringSyntaxValidatorTest extends TestCase
             'missing suffix' => ["'0101'"],
             'non binary digit' => ["'012'B"],
             'wrong suffix letter' => ["'0101'X"],
+            'trailing newline' => ["'0101'B\n"],
         ];
     }
 }

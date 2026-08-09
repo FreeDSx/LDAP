@@ -34,7 +34,7 @@ final class GeneralizedTime
         )?
         (?:[.,](?<fraction>\d+))?
         (?<zone>Z|[+\-]\d{2}(?:\d{2})?)
-    $/x';
+    $/xD';
 
     private function __construct() {}
 

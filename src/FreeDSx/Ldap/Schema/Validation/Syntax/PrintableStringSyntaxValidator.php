@@ -20,7 +20,7 @@ namespace FreeDSx\Ldap\Schema\Validation\Syntax;
  */
 final class PrintableStringSyntaxValidator implements SyntaxValidatorInterface
 {
-    private const PATTERN = '/^[A-Za-z0-9\'()+,\-.\/:? =]+$/';
+    private const PATTERN = '/^[A-Za-z0-9\'()+,\-.\/:? =]+$/D';
 
     public function isValid(string $value): bool
     {

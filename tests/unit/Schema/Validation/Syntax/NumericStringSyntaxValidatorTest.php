@@ -61,6 +61,7 @@ final class NumericStringSyntaxValidatorTest extends TestCase
             'embedded letter' => ['12a45'],
             'hyphen' => ['12-34'],
             'decimal point' => ['12.34'],
+            'trailing newline' => ["1234\n"],
         ];
     }
 }

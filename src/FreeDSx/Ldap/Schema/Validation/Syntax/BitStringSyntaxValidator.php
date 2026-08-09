@@ -20,7 +20,7 @@ namespace FreeDSx\Ldap\Schema\Validation\Syntax;
  */
 final class BitStringSyntaxValidator implements SyntaxValidatorInterface
 {
-    private const PATTERN = "/^'[01]*'[Bb]$/";
+    private const PATTERN = "/^'[01]*'[Bb]$/D";
 
     public function isValid(string $value): bool
     {
