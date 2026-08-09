@@ -150,7 +150,7 @@ class LdapAclCommand extends Command
         ];
 
         $network = (new NetworkConfig())
-            ->setPort(10389)
+            ->setPort(TestWorker::port())
             ->setTransport($transport)
             ->setSocketAcceptTimeout(0.1);
 

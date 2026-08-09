@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\TestWorker;
 
 final class LdapDumpServerTest extends ServerTestCase
 {
@@ -33,7 +34,7 @@ final class LdapDumpServerTest extends ServerTestCase
     {
         parent::setUpBeforeClass();
 
-        self::$dumpPath = sys_get_temp_dir() . '/freedsx-ldap-dump-integration.ldif';
+        self::$dumpPath = TestWorker::path('dump-integration.ldif');
 
         if (!extension_loaded('pcntl')) {
             return;

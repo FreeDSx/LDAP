@@ -20,6 +20,7 @@ use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\LdapServerCommand;
+use Tests\Support\FreeDSx\Ldap\TestWorker;
 use Throwable;
 
 /**
@@ -27,8 +28,6 @@ use Throwable;
  */
 abstract class SyncReplForwardTestCase extends ServerTestCase
 {
-    private const PROVIDER_PORT = 10391;
-
     private const PWD_LOCKED_TIME = 'pwdAccountLockedTime';
 
     public function setUp(): void
@@ -217,7 +216,7 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
     {
         return $this->getClient(
             (new ClientOptions())
-                ->setPort(self::PROVIDER_PORT)
+                ->setPort(TestWorker::port(TestWorker::OFFSET_PROVIDER))
                 ->setServers(['127.0.0.1'])
                 ->setSslValidateCert(false),
         );

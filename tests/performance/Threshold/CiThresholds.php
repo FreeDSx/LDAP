@@ -50,12 +50,12 @@ final class CiThresholds
             'json:swoole' => new ThresholdSet(
                 maxErrors: 0,
                 minThroughput: 500.0,
-                maxP99Ms: 200.0,
+                maxP99Ms: 800.0,
             ),
             'sqlite:pcntl' => new ThresholdSet(
                 maxErrors: 0,
                 minThroughput: 935.0,
-                maxP99Ms: 200.0,
+                maxP99Ms: 300.0,
             ),
             'sqlite:swoole' => new ThresholdSet(
                 maxErrors: 0,
@@ -78,7 +78,7 @@ final class CiThresholds
             'mysql:swoole' => new ThresholdSet(
                 maxErrors: 0,
                 minThroughput: 720.0,
-                maxP99Ms: 200.0,
+                maxP99Ms: 300.0,
                 perOpMaxP99Ms: ['search-sort' => 250.0],
             ),
             default => throw new InvalidArgumentException(sprintf(

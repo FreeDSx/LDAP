@@ -17,6 +17,7 @@ use Exception;
 use FreeDSx\Ldap\LdapClient;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\FreeDSx\Ldap\TestWorker;
 
 class ServerTestCase extends LdapTestCase
 {
@@ -253,12 +254,12 @@ class ServerTestCase extends LdapTestCase
             $useSsl = true;
         }
         if ($transport === 'unix') {
-            $servers = sys_get_temp_dir() . '/ldap.socket';
+            $servers = TestWorker::path('ldap.socket');
         }
 
         return $this->getClient(
             $this->makeOptions()
-                ->setPort(10389)
+                ->setPort(TestWorker::port())
                 ->setTransport($transport)
                 ->setServers((array) $servers)
                 ->setSslValidateCert(false)

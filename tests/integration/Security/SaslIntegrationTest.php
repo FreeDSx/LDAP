@@ -28,6 +28,7 @@ use FreeDSx\Socket\SocketOptions;
 use FreeDSx\Socket\SocketPool;
 use FreeDSx\Socket\SocketPoolOptions;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\TestWorker;
 
 final class SaslIntegrationTest extends ServerTestCase
 {
@@ -162,7 +163,7 @@ final class SaslIntegrationTest extends ServerTestCase
         $queue = new ClientQueue(new SocketPool(
             (new SocketPoolOptions(
                 (new SocketOptions())
-                    ->setPort(10389)
+                    ->setPort(TestWorker::port())
                     ->setTimeoutConnect(1),
             ))->setServers(['127.0.0.1']),
         ));

@@ -25,14 +25,15 @@
     "phpunit/phpunit": "^11",
     "symplify/easy-coding-standard": "^13.1",
     "phpstan/phpstan": "^2.1",
-    "symfony/process": "^5.4",
+    "symfony/process": "^7.0",
     "symfony/console": "^6.4",
-    "squizlabs/php_codesniffer": "^3.7",
+    "squizlabs/php_codesniffer": "^3.13.6",
     "slevomat/coding-standard": "^7.2",
     "phpstan/phpstan-phpunit": "^2.0",
     "phpstan/extension-installer": "^1.4",
     "swoole/ide-helper": "^6.0",
-    "shipmonk/dead-code-detector": "^1.2"
+    "shipmonk/dead-code-detector": "^1.2",
+    "brianium/paratest": "~7.8.5"
   },
   "minimum-stability": "dev",
   "prefer-stable": true,
@@ -70,10 +71,10 @@
       "@php -d xdebug.mode=coverage vendor/bin/phpunit --testsuite integration-openldap --coverage-clover=coverage-integration-openldap.xml"
     ],
     "test-unit": [
-      "@php -d xdebug.mode=off vendor/bin/phpunit --testsuite unit"
+      "@php -d xdebug.mode=off vendor/bin/paratest --testsuite unit"
     ],
     "test-integration": [
-      "@php -d xdebug.mode=off vendor/bin/phpunit --testsuite integration"
+      "@php -d xdebug.mode=off vendor/bin/paratest --testsuite integration"
     ],
     "test-integration-local": [
       "docker compose -f tests/resources/openldap/docker-compose.yml down --rmi local",
