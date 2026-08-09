@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Sync\Consumer;
 
 use FreeDSx\Ldap\LdapClient;
-use FreeDSx\Ldap\ReplicaConfig;
+use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Sync\SyncRepl;
 
 /**
@@ -25,7 +25,7 @@ use FreeDSx\Ldap\Sync\SyncRepl;
  */
 readonly class PrimaryConnectionFactory
 {
-    public function __construct(private ReplicaConfig $config) {}
+    public function __construct(private ConsumerConfig $config) {}
 
     public function connectLdapClient(): LdapClient
     {

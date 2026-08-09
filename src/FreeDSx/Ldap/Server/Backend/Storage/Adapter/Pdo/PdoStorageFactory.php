@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoChangeJournal;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
@@ -36,11 +37,15 @@ use PDO;
  */
 final class PdoStorageFactory
 {
+    /**
+     * Storage without a journal, so it authors no changes an identity would be stamped on.
+     */
     public static function forPcntl(PdoConfig $config): PdoStorage
     {
         return self::storageOn(
             $config,
             self::sharedProvider($config),
+            new ReplicaId(),
         );
     }
 
@@ -61,10 +66,12 @@ final class PdoStorageFactory
 
     /**
      * @param ?ChangeJournalConfig $journalConfig Attaches a journal on this connection when journaling is enabled.
+     * @param ReplicaId $origin Stamped on the changes this server authors.
      */
     public static function storageOn(
         PdoConfig $config,
         PdoConnectionProviderInterface $provider,
+        ReplicaId $origin,
         ?SleeperInterface $sleeper = null,
         ?ChangeJournalConfig $journalConfig = null,
     ): PdoStorage {
@@ -93,7 +100,7 @@ final class PdoStorageFactory
                     $transactor,
                     $config->getDialect(),
                     $statements,
-                    $journalConfig->origin,
+                    $origin,
                 ),
                 $journalConfig,
             ),

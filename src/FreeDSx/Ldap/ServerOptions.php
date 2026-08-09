@@ -27,7 +27,6 @@ use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
 use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\DefaultPasswordQualityChecker;
 use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\PasswordQualityCheckerInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
@@ -37,6 +36,8 @@ use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
+use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\Config\SchemaConfig;
 use FreeDSx\Ldap\Server\Configuration\ConfigReloaderInterface;
@@ -120,8 +121,6 @@ final class ServerOptions implements ServerListenerOptionsInterface
 
     private ?ExternalCredentialMapperInterface $externalCredentialMapper = null;
 
-    private SchemaConfig $schemaConfig;
-
     private ?AccessControlInterface $accessControl = null;
 
     private ?AclRules $aclRules = null;
@@ -143,11 +142,7 @@ final class ServerOptions implements ServerListenerOptionsInterface
 
     private ?ServerRunnerInterface $serverRunner = null;
 
-    private bool $syncEnabled = false;
-
     private ?ChangeJournalConfig $changeJournalConfig = null;
-
-    private ?ReplicaConfig $replicaConfig = null;
 
     private int $maxSearchSize = 1000;
 
@@ -170,19 +165,18 @@ final class ServerOptions implements ServerListenerOptionsInterface
 
     /**
      * @param ?StorageConfigInterface $storageConfig Storage backend; a transient in-memory directory when omitted.
-     * @param ?NetworkConfig $networkConfig Listener and TLS settings; defaults to a plaintext listener on 0.0.0.0:389.
-     * @param ?SchemaConfig $schemaConfig Schema sources and validation; defaults to the schemas this package ships.
+     * @param NetworkConfig $networkConfig Listener and TLS settings; defaults to a plaintext listener on 0.0.0.0:389.
+     * @param SchemaConfig $schemaConfig Schema sources and validation; defaults to the schemas this package ships.
+     * @param ReplicationConfig $replicationConfig Replication role; defaults to playing none.
      */
     public function __construct(
         ?StorageConfigInterface $storageConfig = null,
-        ?NetworkConfig $networkConfig = null,
-        ?RunnerConfig $runnerConfig = null,
-        ?SchemaConfig $schemaConfig = null,
+        private NetworkConfig $networkConfig = new NetworkConfig(),
+        private RunnerConfig $runnerConfig = new RunnerConfig(),
+        private SchemaConfig $schemaConfig = new SchemaConfig(),
+        private ReplicationConfig $replicationConfig = new ReplicationConfig(),
     ) {
         $this->storageConfig = $storageConfig ?? InMemoryStorageConfig::withEntries();
-        $this->networkConfig = $networkConfig ?? new NetworkConfig();
-        $this->runnerConfig = $runnerConfig ?? new RunnerConfig();
-        $this->schemaConfig = $schemaConfig ?? new SchemaConfig();
     }
 
     public function getDseAltServer(): ?string
@@ -467,21 +461,20 @@ final class ServerOptions implements ServerListenerOptionsInterface
         return $this->serverRunner;
     }
 
-    public function isSyncEnabled(): bool
+    /**
+     * The journal settings for recording changes, or null when nothing is recorded.
+     *
+     * A configured provider records regardless, since it streams from the journal.
+     */
+    public function getChangeJournalConfig(): ?ChangeJournalConfig
     {
-        return $this->syncEnabled;
-    }
+        if ($this->changeJournalConfig !== null) {
+            return $this->changeJournalConfig;
+        }
 
-    public function setSyncEnabled(bool $syncEnabled): self
-    {
-        $this->syncEnabled = $syncEnabled;
-
-        return $this;
-    }
-
-    public function getChangeJournalConfig(): ChangeJournalConfig
-    {
-        return $this->changeJournalConfig ??= new ChangeJournalConfig();
+        return $this->getReplicationConfig()->isProvider()
+            ? $this->changeJournalConfig = new ChangeJournalConfig()
+            : null;
     }
 
     public function setChangeJournalConfig(ChangeJournalConfig $changeJournalConfig): self
@@ -492,35 +485,35 @@ final class ServerOptions implements ServerListenerOptionsInterface
     }
 
     /**
-     * Named constructor for a read-only replica that mirrors an upstream primary over RFC 4533.
-     *
-     * @param PdoConfig $storageConfig Persistent storage for the replica; PDO is required.
+     * A server playing no replication role holds one with both roles empty.
      */
-    public static function forReplica(
-        ReplicaConfig $replicaConfig,
-        PdoConfig $storageConfig,
-    ): self {
-        return (new self($storageConfig))->setReplicaConfig($replicaConfig);
+    public function getReplicationConfig(): ReplicationConfig
+    {
+        return $this->replicationConfig;
     }
 
-    public function getReplicaConfig(): ?ReplicaConfig
+    public function setReplicationConfig(ReplicationConfig $replicationConfig): self
     {
-        return $this->replicaConfig;
-    }
-
-    public function setReplicaConfig(ReplicaConfig $replicaConfig): self
-    {
-        $this->replicaConfig = $replicaConfig;
+        $this->replicationConfig = $replicationConfig;
 
         return $this;
     }
 
     /**
-     * Whether this server is a read-only replica, derived from having a replica config.
+     * The upstream this server mirrors, or null when it mirrors nothing.
+     */
+    public function getConsumerConfig(): ?ConsumerConfig
+    {
+        return $this->getReplicationConfig()
+            ->getConsumer();
+    }
+
+    /**
+     * Whether this server refuses client writes, which today follows from mirroring an upstream.
      */
     public function isReadOnly(): bool
     {
-        return $this->replicaConfig !== null;
+        return $this->getConsumerConfig() !== null;
     }
 
     /**

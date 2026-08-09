@@ -37,6 +37,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
@@ -1391,6 +1392,7 @@ final class PdoStorageTest extends TestCase
         $storage = PdoStorageFactory::storageOn(
             $config = PdoConfig::forSqlite(':memory:'),
             PdoStorageFactory::sharedProvider($config),
+            new ReplicaId(),
             journalConfig: new ChangeJournalConfig(),
         );
         $journal = $storage->changeJournal() ?? self::fail('Expected the storage to have a journal.');

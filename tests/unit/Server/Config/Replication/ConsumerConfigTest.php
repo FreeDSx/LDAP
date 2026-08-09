@@ -11,22 +11,22 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Unit\FreeDSx\Ldap;
+namespace Tests\Unit\FreeDSx\Ldap\Server\Config\Replication;
 
 use FreeDSx\Ldap\ClientOptions;
-use FreeDSx\Ldap\ReplicaConfig;
+use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Sync\Consumer\Checkpoint\InMemoryReplicationCheckpoint;
 use FreeDSx\Ldap\Sync\Consumer\Checkpoint\ReplicationCheckpointInterface;
 use PHPUnit\Framework\TestCase;
 
-final class ReplicaConfigTest extends TestCase
+final class ConsumerConfigTest extends TestCase
 {
-    private ReplicaConfig $subject;
+    private ConsumerConfig $subject;
 
     protected function setUp(): void
     {
-        $this->subject = new ReplicaConfig(
+        $this->subject = new ConsumerConfig(
             (new ClientOptions())
                 ->setServers(['primary.example.com'])
                 ->setPort(636)
@@ -98,7 +98,7 @@ final class ReplicaConfigTest extends TestCase
     {
         $checkpoint = $this->createMock(ReplicationCheckpointInterface::class);
 
-        $config = new ReplicaConfig(
+        $config = new ConsumerConfig(
             new ClientOptions(),
             $checkpoint,
         );

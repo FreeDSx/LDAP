@@ -15,7 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Sync\Consumer;
 
 use Closure;
 use FreeDSx\Ldap\ClientOptions;
-use FreeDSx\Ldap\ReplicaConfig;
+use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Process\Signals\ShutdownSignalsInterface;
@@ -200,7 +200,7 @@ final class LdapReplicaTest extends TestCase
         $this->expectNotToPerformAssertions();
 
         LdapReplica::forPcntl(
-            new ReplicaConfig(new ClientOptions()),
+            new ConsumerConfig(new ClientOptions()),
             new InMemoryStorage(),
         );
     }
@@ -214,7 +214,7 @@ final class LdapReplicaTest extends TestCase
         $this->expectNotToPerformAssertions();
 
         LdapReplica::forSwoole(
-            new ReplicaConfig(new ClientOptions()),
+            new ConsumerConfig(new ClientOptions()),
             new InMemoryStorage(),
         );
     }

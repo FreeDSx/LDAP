@@ -40,6 +40,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterfac
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\FileChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
@@ -172,6 +173,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     {
         $config = $container->get(ServerOptions::class)->getStorageConfig();
         $journalConfig = $this->journalConfig($container);
+        $origin = $this->journalOrigin($container);
 
         return match (true) {
             $config instanceof PdoConfig => $container->get(PdoBackendBuilder::class)->storage(),
@@ -183,7 +185,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             $config instanceof InMemoryStorageConfig => new InMemoryStorage(
                 $config->entries(),
                 $journalConfig === null ? null : AuditingChangeJournal::wrap(
-                    new InMemoryChangeJournal($journalConfig->origin),
+                    new InMemoryChangeJournal($origin),
                     $journalConfig,
                 ),
             ),
@@ -215,7 +217,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                     $lock,
                     $config->path() . self::JOURNAL_SUFFIX,
                     $config->path() . self::SEQ_SUFFIX,
-                    $journalConfig->origin,
+                    $this->journalOrigin($container),
                 ),
                 $journalConfig,
             ),
@@ -224,15 +226,22 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     }
 
     /**
-     * The journal settings to build storage against, or null when journaling is off.
+     * The journal settings to build storage against, or null when nothing is recorded.
      */
     private function journalConfig(Container $container): ?ChangeJournalConfig
     {
-        $options = $container->get(ServerOptions::class);
+        return $container->get(ServerOptions::class)
+            ->getChangeJournalConfig();
+    }
 
-        return $options->isSyncEnabled()
-            ? $options->getChangeJournalConfig()
-            : null;
+    /**
+     * The identity stamped on changes this server authors.
+     */
+    private function journalOrigin(Container $container): ReplicaId
+    {
+        return $container->get(ServerOptions::class)
+            ->getReplicationConfig()
+            ->getId();
     }
 
     /**
@@ -262,6 +271,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return new PdoBackendBuilder(
             $config,
             $options->getRunnerConfig()->getMode(),
+            $this->journalOrigin($container),
             $container->get(SleeperInterface::class),
             $this->journalConfig($container),
         );
@@ -345,7 +355,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     ): ?ChangeRecorder {
         $options = $container->get(ServerOptions::class);
 
-        if (!$options->isSyncEnabled() || !$storage instanceof ChangeJournalingInterface) {
+        if ($options->getChangeJournalConfig() === null || !$storage instanceof ChangeJournalingInterface) {
             return null;
         }
 
@@ -391,7 +401,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     {
         $storageConfig = $options->getStorageConfig();
 
-        if ($options->getReplicaConfig() === null || $storageConfig instanceof PdoConfig) {
+        if ($options->getConsumerConfig() === null || $storageConfig instanceof PdoConfig) {
             return;
         }
 
@@ -430,7 +440,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     {
         $options = $container->get(ServerOptions::class);
 
-        if (!$options->isSyncEnabled()) {
+        if ($options->getChangeJournalConfig() === null) {
             return null;
         }
 
@@ -533,7 +543,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         }
 
         $longLivedTasks = [];
-        if ($options->getReplicaConfig() !== null) {
+        if ($options->getConsumerConfig() !== null) {
             $longLivedTasks[] = new LongLivedTask(
                 LdapReplica::TASK_NAME,
                 function () use ($container): void {
@@ -566,7 +576,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         bool $useCoroutineSleeper,
     ): ?PasswordPolicyForwardWorker {
         $options = $container->get(ServerOptions::class);
-        $config = $options->getReplicaConfig();
+        $config = $options->getConsumerConfig();
 
         if ($config === null) {
             return null;
@@ -576,6 +586,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             $container->get(ReplicaPasswordStateStoreInterface::class),
             new LdapClientForwardStateSender(new PrimaryConnectionFactory($config)),
             $container->get(SleeperInterface::class),
+            interval: $config->getForwardInterval(),
             signals: $useCoroutineSleeper
                 ? null
                 : new PcntlShutdownSignals(),
@@ -593,7 +604,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         bool $hostManagedShutdown,
     ): ?LdapReplica {
         $options = $container->get(ServerOptions::class);
-        $config = $options->getReplicaConfig();
+        $config = $options->getConsumerConfig();
 
         if ($config === null) {
             return null;

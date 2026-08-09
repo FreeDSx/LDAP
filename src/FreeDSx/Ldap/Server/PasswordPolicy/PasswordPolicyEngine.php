@@ -42,7 +42,7 @@ final readonly class PasswordPolicyEngine
     ) {
         // The Container injects the configured factory; the fallback reuses this engine's clock so tests stay in sync.
         $this->uniqueTimes = $uniqueTimes
-            ?? new UniquePolicyTimeFactory($this->clock, new ReplicaId('local'));
+            ?? new UniquePolicyTimeFactory($this->clock, ReplicaId::local());
     }
 
     /**

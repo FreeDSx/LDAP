@@ -8,11 +8,12 @@ use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\ReplicaConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
+use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
+use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use FreeDSx\Ldap\ServerOptions;
 use Symfony\Component\Console\Command\Command;
@@ -72,13 +73,13 @@ final class LdapReplicaCommand extends Command
         );
         register_shutdown_function(static fn() => $provider->stop());
 
-        $replicaConfig = new ReplicaConfig(
+        $consumerConfig = new ConsumerConfig(
             (new ClientOptions())
                 ->setServers(['127.0.0.1'])
                 ->setPort($providerPort)
                 ->setBaseDn('dc=foo,dc=bar'),
         );
-        $replicaConfig->setBind(Operations::bind(
+        $consumerConfig->setBind(Operations::bind(
             'cn=user,dc=foo,dc=bar',
             '12345',
         ));
@@ -90,12 +91,12 @@ final class LdapReplicaCommand extends Command
             ->setShutdownTimeout(0);
 
         $server = new LdapServer(
-            ServerOptions::forReplica(
-                $replicaConfig,
-                $this->createReplicaStorageConfig(),
-            )
-                ->setNetworkConfig($network)
-                ->setRunnerConfig(new RunnerConfig($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl))
+            (new ServerOptions(
+                storageConfig: $this->createReplicaStorageConfig(),
+                networkConfig: $network,
+                runnerConfig: new RunnerConfig($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl),
+                replicationConfig: ReplicationConfig::forReplica($consumerConfig),
+            ))
                 ->setPasswordPolicy(new PasswordPolicy(
                     lockout: new PasswordLockoutRules(
                         enabled: true,

@@ -33,7 +33,7 @@ final class InMemoryChangeJournal implements ChangeJournalInterface
     private int $seq = 0;
 
     public function __construct(
-        private readonly ReplicaId $origin = new ReplicaId('local'),
+        private readonly ReplicaId $origin = new ReplicaId(),
         private readonly ClockInterface $clock = new SystemClock(),
     ) {}
 

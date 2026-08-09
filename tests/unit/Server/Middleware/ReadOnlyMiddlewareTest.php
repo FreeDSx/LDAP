@@ -29,7 +29,7 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
-use FreeDSx\Ldap\ReplicaConfig;
+use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
@@ -44,19 +44,19 @@ final class ReadOnlyMiddlewareTest extends TestCase
 {
     private MiddlewareHandlerInterface&MockObject $next;
 
-    private ReplicaConfig $replicaConfig;
+    private ConsumerConfig $consumerConfig;
 
     private ReadOnlyMiddleware $subject;
 
     protected function setUp(): void
     {
         $this->next = $this->createMock(MiddlewareHandlerInterface::class);
-        $this->replicaConfig = new ReplicaConfig(
+        $this->consumerConfig = new ConsumerConfig(
             (new ClientOptions())
                 ->setServers(['primary.example.com'])
                 ->setPort(389),
         );
-        $this->subject = new ReadOnlyMiddleware($this->replicaConfig);
+        $this->subject = new ReadOnlyMiddleware($this->consumerConfig);
     }
 
     /**
@@ -146,7 +146,7 @@ final class ReadOnlyMiddlewareTest extends TestCase
 
     public function test_a_write_is_rejected_when_referral_is_disabled(): void
     {
-        $this->replicaConfig->setReferWrites(false);
+        $this->consumerConfig->setReferWrites(false);
         $this->next
             ->expects(self::never())
             ->method('handle');

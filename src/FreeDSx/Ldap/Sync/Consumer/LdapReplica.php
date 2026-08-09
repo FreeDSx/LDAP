@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Sync\Consumer;
 
 use FreeDSx\Ldap\Exception\CancelRequestException;
-use FreeDSx\Ldap\ReplicaConfig;
+use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
@@ -57,7 +57,7 @@ final class LdapReplica
     ) {}
 
     public static function forPcntl(
-        ReplicaConfig $config,
+        ConsumerConfig $config,
         EntryStorageInterface $storage,
         ?LoggerInterface $logger = null,
         ?PrimaryConnectionFactory $connectionFactory = null,
@@ -78,7 +78,7 @@ final class LdapReplica
      * @param ?ShutdownSignalsInterface $signals null when a host server owns SIGTERM and drives {@see stop()} instead
      */
     public static function forSwoole(
-        ReplicaConfig $config,
+        ConsumerConfig $config,
         EntryStorageInterface $storage,
         ?LoggerInterface $logger = null,
         ?ShutdownSignalsInterface $signals = new SwooleShutdownSignals(),
@@ -139,7 +139,7 @@ final class LdapReplica
     }
 
     private static function create(
-        ReplicaConfig $config,
+        ConsumerConfig $config,
         EntryStorageInterface $storage,
         SleeperInterface $sleeper,
         ?ShutdownSignalsInterface $signals,

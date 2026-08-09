@@ -183,13 +183,16 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         $streamer = null;
         $persistSupported = false;
 
-        if ($journal !== null) {
+        $provider = $options->getReplicationConfig()->getProvider();
+
+        if ($journal !== null && $provider !== null) {
             $stream = new ChangeStream($journal);
             $streamer = new SyncPersistStreamer(
                 backend: $backend,
                 projector: $projector,
                 stream: $stream,
                 sleeper: $container->get(SleeperInterface::class),
+                pollInterval: $provider->getPollInterval(),
             );
             // Persist can only deliver writes made on other connections: one process shares them in memory,
             // otherwise the journal itself must be cross-process.
@@ -262,9 +265,18 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         );
     }
 
+    /**
+     * The journal to serve sync from, or null when this server is not a provider.
+     *
+     * A journal may exist purely for auditing, which does not by itself expose sync to clients.
+     */
     private function syncJournalFor(Container $container): ?ChangeJournalInterface
     {
-        if (!$container->get(ServerOptions::class)->isSyncEnabled()) {
+        $isProvider = $container->get(ServerOptions::class)
+            ->getReplicationConfig()
+            ->isProvider();
+
+        if (!$isProvider) {
             return null;
         }
 

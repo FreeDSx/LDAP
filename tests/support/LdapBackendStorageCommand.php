@@ -25,10 +25,14 @@ use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Schema\LdifSchemaSource;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\JsonLinesAuditSink;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Config\SchemaConfig;
 use FreeDSx\Ldap\ServerOptions;
 use PDO;
+use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -46,6 +50,21 @@ final class LdapBackendStorageCommand extends Command
     /**
      * The fixed directory content every suite using this harness starts from.
      */
+    /**
+     * Serve sync to consumers, which records every write to the journal as a side effect.
+     */
+    private const JOURNAL_SYNC = 'sync';
+
+    /**
+     * Record every write for auditing, without serving sync.
+     */
+    private const JOURNAL_AUDIT = 'audit';
+
+    /**
+     * The value when --journal is absent; passing it without one means {@see self::JOURNAL_SYNC}.
+     */
+    private const JOURNAL_OFF = 'off';
+
     private const SEED_LDIF = __DIR__ . '/../resources/seed/backend-storage-seed.ldif';
 
     protected function configure(): void
@@ -161,8 +180,13 @@ final class LdapBackendStorageCommand extends Command
             ->addOption(
                 'journal',
                 null,
-                InputOption::VALUE_NONE,
-                'Enable sync so every write appends a change-journal record',
+                InputOption::VALUE_OPTIONAL,
+                sprintf(
+                    'Record writes to the change journal: "%s" also serves them to consumers, "%s" only logs them',
+                    self::JOURNAL_SYNC,
+                    self::JOURNAL_AUDIT,
+                ),
+                self::JOURNAL_OFF,
             )
             ->addOption(
                 'max-search-lookthrough',
@@ -260,9 +284,10 @@ final class LdapBackendStorageCommand extends Command
         ))
             ->setAdministrators(Subject::group('cn=admins,dc=foo,dc=bar'))
             ->setMonitorEnabled((bool) $input->getOption('monitor'))
-            ->setSyncEnabled((bool) $input->getOption('journal'))
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
             ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));
+
+        $this->applyJournalMode($serverOptions, $input);
 
         if ($input->getOption('allow-relax')) {
             $serverOptions->setAclRules(
@@ -397,6 +422,29 @@ final class LdapBackendStorageCommand extends Command
         $server->run();
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Audit mode journals without a replication role, so nothing is served to consumers.
+     */
+    private function applyJournalMode(
+        ServerOptions $serverOptions,
+        InputInterface $input,
+    ): void {
+        // Symfony hands back null when the option is passed without a value.
+        $mode = $input->getOption('journal') ?? self::JOURNAL_SYNC;
+
+        match ($mode) {
+            self::JOURNAL_SYNC => $serverOptions->setReplicationConfig(ReplicationConfig::forProvider()),
+            self::JOURNAL_AUDIT => $serverOptions->setChangeJournalConfig(new ChangeJournalConfig(
+                auditSink: new JsonLinesAuditSink(TestWorker::path('audit.jsonl')),
+            )),
+            self::JOURNAL_OFF => $serverOptions,
+            default => throw new RuntimeException(sprintf(
+                'Unknown --journal mode "%s".',
+                is_string($mode) ? $mode : gettype($mode),
+            )),
+        };
     }
 
     private function buildSchemaConfig(

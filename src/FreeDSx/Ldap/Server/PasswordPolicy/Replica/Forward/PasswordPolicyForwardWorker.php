@@ -42,6 +42,7 @@ class PasswordPolicyForwardWorker
         private readonly ReplicaPasswordStateStoreInterface $store,
         private readonly ForwardStateSenderInterface $sender,
         private readonly SleeperInterface $sleeper,
+        private readonly float $interval = self::DEFAULT_INTERVAL_SECONDS,
         private readonly ReconnectBackoff $backoff = new ReconnectBackoff(),
         private readonly ?ShutdownSignalsInterface $signals = null,
         private readonly ?LoggerInterface $logger = null,
@@ -60,7 +61,7 @@ class PasswordPolicyForwardWorker
             try {
                 $this->forwardOnce();
                 $delay = $this->backoff->initial();
-                $this->sleeper->sleep(self::DEFAULT_INTERVAL_SECONDS);
+                $this->sleeper->sleep($this->interval);
             } catch (ForwardStateException $e) {
                 $this->logger?->warning(
                     'Password-policy forwarding failed; retrying after backoff.',

@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Integration\FreeDSx\Ldap\Server\Backend\Storage\Journal;
+namespace Tests\Integration\FreeDSx\Ldap\Journal;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;

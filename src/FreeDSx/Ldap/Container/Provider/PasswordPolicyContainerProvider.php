@@ -77,7 +77,7 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
             changeConstraints: $chain,
             uniqueTimes: new UniquePolicyTimeFactory(
                 $clock,
-                $options->getChangeJournalConfig()->origin,
+                $options->getReplicationConfig()->getId(),
             ),
         );
     }

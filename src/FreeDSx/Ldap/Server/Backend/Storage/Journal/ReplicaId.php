@@ -22,12 +22,20 @@ use FreeDSx\Ldap\Exception\InvalidArgumentException;
  */
 final readonly class ReplicaId
 {
-    public function __construct(
-        private string $value,
-    ) {
-        if ($this->value === '') {
+    private const LOCAL = 'local';
+
+    private string $value;
+
+    /**
+     * @param ?string $value The identity, or null for the default single-master one.
+     */
+    public function __construct(?string $value = null)
+    {
+        if ($value === '') {
             throw new InvalidArgumentException('A replica id cannot be empty.');
         }
+
+        $this->value = $value ?? self::LOCAL;
     }
 
     public function __toString(): string
@@ -40,7 +48,7 @@ final readonly class ReplicaId
      */
     public static function local(): self
     {
-        return new self('local');
+        return new self();
     }
 
     public function equals(self $other): bool
