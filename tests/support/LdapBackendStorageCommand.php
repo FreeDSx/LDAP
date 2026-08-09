@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Schema\LdifSchemaSource;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\Replication\ProviderConfig;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\JsonLinesAuditSink;
@@ -48,8 +49,10 @@ final class LdapBackendStorageCommand extends Command
     public const MANAGER_PASSWORD = 'manager-pass';
 
     /**
-     * The fixed directory content every suite using this harness starts from.
+     * Tests assert on replicated state, so they should not wait a production poll for it.
      */
+    private const SYNC_POLL_INTERVAL = 0.05;
+
     /**
      * Serve sync to consumers, which records every write to the journal as a side effect.
      */
@@ -65,6 +68,9 @@ final class LdapBackendStorageCommand extends Command
      */
     private const JOURNAL_OFF = 'off';
 
+    /**
+     * The fixed directory content every suite using this harness starts from.
+     */
     private const SEED_LDIF = __DIR__ . '/../resources/seed/backend-storage-seed.ldif';
 
     protected function configure(): void
@@ -435,7 +441,9 @@ final class LdapBackendStorageCommand extends Command
         $mode = $input->getOption('journal') ?? self::JOURNAL_SYNC;
 
         match ($mode) {
-            self::JOURNAL_SYNC => $serverOptions->setReplicationConfig(ReplicationConfig::forProvider()),
+            self::JOURNAL_SYNC => $serverOptions->setReplicationConfig(ReplicationConfig::forProvider(
+                (new ProviderConfig())->setPollInterval(self::SYNC_POLL_INTERVAL),
+            )),
             self::JOURNAL_AUDIT => $serverOptions->setChangeJournalConfig(new ChangeJournalConfig(
                 auditSink: new JsonLinesAuditSink(TestWorker::path('audit.jsonl')),
             )),

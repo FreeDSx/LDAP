@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
 use FreeDSx\Ldap\Control\Sync\SyncStateControl;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\CancelRequestException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
@@ -540,6 +541,31 @@ final class ClientSyncHandlerTest extends TestCase
         self::assertSame(
             [$referral],
             $referralsProcessed,
+        );
+    }
+
+    public function test_a_refused_sync_surfaces_as_an_operation_exception(): void
+    {
+        $messageTo = new LdapMessageRequest(
+            1,
+            new SyncRequest(),
+            new SyncRequestControl(),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
+
+        // A refusal carries no SyncDoneControl, so the loop reads it as complete and must not return it as a result.
+        $this->subject->handleResponse(
+            $messageTo,
+            new LdapMessageResponse(
+                1,
+                new SearchResultDone(
+                    ResultCode::UNWILLING_TO_PERFORM,
+                    '',
+                    'Content synchronization is not supported.',
+                ),
+            ),
         );
     }
 
