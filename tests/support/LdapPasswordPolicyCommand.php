@@ -39,7 +39,7 @@ final class LdapPasswordPolicyCommand extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Port to listen on',
-                '10389',
+                (string) TestWorker::port(),
             )
             ->addOption(
                 'subentry-policy',

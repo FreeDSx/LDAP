@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operations;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\TestWorker;
 use Throwable;
 
 /**
@@ -255,7 +256,7 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
     {
         $provider = $this->getClient(
             (new ClientOptions())
-                ->setPort(10391)
+                ->setPort(TestWorker::port(TestWorker::OFFSET_PROVIDER))
                 ->setServers(['127.0.0.1'])
                 ->setSslValidateCert(false),
         );

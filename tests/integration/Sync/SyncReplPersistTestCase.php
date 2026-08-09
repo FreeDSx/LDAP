@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Session;
 use FreeDSx\Ldap\Sync\SyncRepl;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\TestWorker;
 
 /**
  * Shared end-to-end RFC 4533 refreshAndPersist coverage.
@@ -235,7 +236,7 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
     {
         return $this->getClient(
             $this->makeOptions()
-                ->setPort(10389)
+                ->setPort(TestWorker::port())
                 ->setTransport('tcp')
                 ->setServers(['127.0.0.1'])
                 ->setSslValidateCert(false)

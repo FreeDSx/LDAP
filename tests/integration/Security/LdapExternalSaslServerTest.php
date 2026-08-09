@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Options\ExternalOptions;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\TestWorker;
 use Throwable;
 
 use function strtolower;
@@ -135,7 +136,7 @@ final class LdapExternalSaslServerTest extends ServerTestCase
         $client = new LdapClient(
             (new ClientOptions())
                 ->setServers(['127.0.0.1'])
-                ->setPort(10389)
+                ->setPort(TestWorker::port())
                 ->setTransport('tcp')
                 ->setUseSsl(true)
                 ->setSslValidateCert(false)

@@ -87,7 +87,7 @@ final class LdapServerCommand extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Port to listen on',
-                '10389',
+                (string) TestWorker::port(),
             )
             ->addOption(
                 'runner',
@@ -281,7 +281,7 @@ final class LdapServerCommand extends Command
         $network = (new NetworkConfig())
             ->setPort($port)
             ->setTransport($transport)
-            ->setUnixSocket(sys_get_temp_dir() . '/ldap.socket')
+            ->setUnixSocket(TestWorker::path('ldap.socket'))
             ->setSslCert(self::SSL_CERT)
             ->setSslCertKey(self::SSL_KEY)
             ->setUseSsl($useSsl)
@@ -427,7 +427,7 @@ final class LdapServerCommand extends Command
     private function createStorageConfig(string $storageType): StorageConfigInterface
     {
         if ($storageType === 'json') {
-            $filePath = sys_get_temp_dir() . '/ldap_test_server.json';
+            $filePath = TestWorker::path('server.json');
 
             if (file_exists($filePath)) {
                 unlink($filePath);
@@ -437,7 +437,7 @@ final class LdapServerCommand extends Command
         }
 
         if ($storageType === 'sqlite') {
-            $dbPath = sys_get_temp_dir() . '/ldap_test_server.sqlite';
+            $dbPath = TestWorker::path('server.sqlite');
 
             foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $path) {
                 if (file_exists($path)) {

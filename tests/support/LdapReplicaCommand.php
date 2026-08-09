@@ -37,8 +37,14 @@ final class LdapReplicaCommand extends Command
             ->setName('ldap-replica')
             ->setDescription('Run a read-only replica of a locally spawned provider')
             ->addOption('transport', null, InputOption::VALUE_REQUIRED, 'The replica transport.', 'tcp')
-            ->addOption('port', null, InputOption::VALUE_REQUIRED, 'The replica listen port.', '10389')
-            ->addOption('provider-port', null, InputOption::VALUE_REQUIRED, 'The provider listen port.', '10391')
+            ->addOption('port', null, InputOption::VALUE_REQUIRED, 'The replica listen port.', (string) TestWorker::port())
+            ->addOption(
+                'provider-port',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'The provider listen port.',
+                (string) TestWorker::port(TestWorker::OFFSET_PROVIDER),
+            )
             ->addOption('runner', null, InputOption::VALUE_REQUIRED, 'The server runner (pcntl/swoole).', 'pcntl')
             ->addOption('forward', null, InputOption::VALUE_NONE, 'Enable ppolicy-state forwarding to the provider.');
     }
@@ -147,7 +153,7 @@ final class LdapReplicaCommand extends Command
 
     private function createReplicaStorageConfig(): PdoConfig
     {
-        $dbPath = sys_get_temp_dir() . '/ldap_replica.sqlite';
+        $dbPath = TestWorker::path('replica.sqlite');
 
         foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $path) {
             if (file_exists($path)) {
