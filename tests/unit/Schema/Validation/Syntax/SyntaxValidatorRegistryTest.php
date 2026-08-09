@@ -68,6 +68,7 @@ final class SyntaxValidatorRegistryTest extends TestCase
     public static function constrainedSyntaxProvider(): array
     {
         return [
+            'directory string' => [SyntaxOid::OID_DIRECTORY_STRING],
             'integer' => [SyntaxOid::OID_INTEGER],
             'boolean' => [SyntaxOid::OID_BOOLEAN],
             'generalized time' => [SyntaxOid::OID_GENERALIZED_TIME],

@@ -313,6 +313,21 @@ final class SchemaValidatorTest extends TestCase
         $this->syntaxValidator()->validateAdd($entry);
     }
 
+    public function test_add_empty_directory_string_value_throws_invalid_attribute_syntax(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('objectClass', 'top', 'person'),
+            new Attribute('cn', 'Alice'),
+            new Attribute('sn', ''),
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
+
+        $this->subject->validateAdd($entry);
+    }
+
     public function test_add_with_conforming_values_passes(): void
     {
         $entry = new Entry(

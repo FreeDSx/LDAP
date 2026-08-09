@@ -71,6 +71,45 @@ final class LdapSchemaConstraintTest extends ServerTestCase
         ));
     }
 
+    public function test_add_with_an_empty_directory_string_value_is_rejected(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
+
+        // 'sn' is a Directory String, which RFC 4517 defines as one or more characters.
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=empty-surname,dc=foo,dc=bar',
+            [
+                'cn' => 'empty-surname',
+                'sn' => '',
+                'objectClass' => 'person',
+            ],
+        ));
+    }
+
+    public function test_modify_setting_an_empty_directory_string_value_is_rejected(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=empty-description,dc=foo,dc=bar',
+            [
+                'cn' => 'empty-description',
+                'sn' => 'Smith',
+                'objectClass' => 'person',
+            ],
+        ));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
+
+        $entry = Entry::fromArray('cn=empty-description,dc=foo,dc=bar');
+        $entry->set('description', '');
+        $this->ldapClient()->update($entry);
+    }
+
     public function test_add_with_two_unrelated_structural_classes_is_rejected(): void
     {
         $this->authenticateAdmin();
