@@ -115,7 +115,11 @@ class ClientSyncHandler extends ClientBasicHandler
                 }
             } while (!$this->isSyncComplete($searchDone));
 
-            return $searchDone;
+            // The loop only recognises the codes that continue or end a sync, so anything else is still an error.
+            return parent::handleResponse(
+                $messageTo,
+                $searchDone,
+            );
         } catch (ConnectionException $e) {
             if (!$this->wasCancelHandled) {
                 throw $e;
