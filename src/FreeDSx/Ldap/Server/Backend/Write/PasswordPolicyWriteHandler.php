@@ -15,13 +15,16 @@ namespace FreeDSx\Ldap\Server\Backend\Write;
 
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriterInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordModifyAttempt;
+use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyChangeGuard;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 
@@ -47,8 +50,7 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
 
     public function supports(WriteRequestInterface $request): bool
     {
-        return $request instanceof UpdateCommand
-            && $this->userPasswordValues($request, self::SET_TYPES) !== [];
+        return $this->newPasswordsFor($request) !== [];
     }
 
     /**
@@ -58,7 +60,25 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
         WriteRequestInterface $request,
         WriteContext $context,
     ): void {
-        if (!$request instanceof UpdateCommand) {
+        match (true) {
+            $request instanceof AddCommand => $this->handleAdd($request, $context),
+            $request instanceof UpdateCommand => $this->handleUpdate($request, $context),
+            default => $this->backend->handle($request, $context),
+        };
+    }
+
+    /**
+     * Setting a password while creating an entry is a password change like any other (draft-behera-10 section 4.2),
+     * so it is held to the same policy. The entry has no prior state, so only quality can reject it.
+     *
+     * @throws OperationException
+     */
+    private function handleAdd(
+        AddCommand $request,
+        WriteContext $context,
+    ): void {
+        $newPasswords = $this->entryPasswordValues($request->entry);
+        if ($newPasswords === []) {
             $this->backend->handle(
                 $request,
                 $context,
@@ -67,6 +87,31 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
             return;
         }
 
+        $deltas = $this->changeGuard->enforceAll($this->attemptsFor(
+            $request->entry,
+            $newPasswords,
+            null,
+            $this->isSelf($context, $request->entry->getDn()),
+        ));
+
+        // Folded in rather than written after, so the entry is never stored without the state governing it.
+        $this->applyOperationalChanges(
+            $request->entry,
+            $deltas,
+        );
+        $this->backend->handle(
+            $request,
+            $context,
+        );
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function handleUpdate(
+        UpdateCommand $request,
+        WriteContext $context,
+    ): void {
         $newPasswords = $this->userPasswordValues($request, self::SET_TYPES);
         $entry = $this->backend->get($request->dn);
         if ($newPasswords === [] || $entry === null) {
@@ -78,26 +123,16 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
             return;
         }
 
-        $oldPassword = $this->userPasswordValues($request, [Change::TYPE_DELETE])[0] ?? null;
         $isSelf = $this->isSelf(
             $context,
             $request->dn,
         );
-
-        // Every value being set must satisfy policy; otherwise a weak value could ride along behind a valid one
-        // each value is recorded in history so none can be reused after a multi-valued set.
-        $attempts = array_map(
-            fn(string $newPassword): PasswordModifyAttempt => new PasswordModifyAttempt(
-                target: $entry,
-                newPassword: $newPassword,
-                hashedNewPassword: $newPassword,
-                oldPassword: $oldPassword,
-                isSelf: $isSelf,
-                passwordIsCleartext: !$this->hashService->isHashed($newPassword),
-            ),
+        $deltas = $this->changeGuard->enforceAll($this->attemptsFor(
+            $entry,
             $newPasswords,
-        );
-        $deltas = $this->changeGuard->enforceAll($attempts);
+            $this->userPasswordValues($request, [Change::TYPE_DELETE])[0] ?? null,
+            $isSelf,
+        ));
 
         $this->backend->handle(
             $request,
@@ -112,6 +147,70 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
         $token = $context->getToken();
         if ($isSelf && $token instanceof AuthenticatedTokenInterface) {
             $token->clearMustChangePassword();
+        }
+    }
+
+    /**
+     * Every value being set must satisfy policy.
+     *
+     * @param non-empty-list<string> $newPasswords
+     * @return non-empty-list<PasswordModifyAttempt>
+     */
+    private function attemptsFor(
+        Entry $target,
+        array $newPasswords,
+        ?string $oldPassword,
+        bool $isSelf,
+    ): array {
+        return array_map(
+            fn(string $newPassword): PasswordModifyAttempt => new PasswordModifyAttempt(
+                target: $target,
+                newPassword: $newPassword,
+                hashedNewPassword: $newPassword,
+                oldPassword: $oldPassword,
+                isSelf: $isSelf,
+                passwordIsCleartext: !$this->hashService->isHashed($newPassword),
+            ),
+            $newPasswords,
+        );
+    }
+
+    /**
+     * New password values a command sets, for whichever operation carries them.
+     *
+     * @return list<string>
+     */
+    private function newPasswordsFor(WriteRequestInterface $request): array
+    {
+        return match (true) {
+            $request instanceof AddCommand => $this->entryPasswordValues($request->entry),
+            $request instanceof UpdateCommand => $this->userPasswordValues($request, self::SET_TYPES),
+            default => [],
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function entryPasswordValues(Entry $entry): array
+    {
+        return array_values(
+            $entry->get(AttributeTypeOid::NAME_USER_PASSWORD)?->getValues() ?? [],
+        );
+    }
+
+    private function applyOperationalChanges(
+        Entry $entry,
+        OperationalChanges $deltas,
+    ): void {
+        foreach ($deltas->changes as $change) {
+            if ($change->getType() === Change::TYPE_REPLACE) {
+                $entry->set($change->getAttribute());
+
+                continue;
+            }
+
+            $entry->reset($change->getAttribute());
         }
     }
 

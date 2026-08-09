@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Auth;
 
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
@@ -50,13 +51,12 @@ final class PasswordAuthenticator implements PasswordAuthenticatableInterface
             $this->denyUncomparedCredentials($password);
         }
 
-        $attr = $entry->get('userPassword');
-
-        if ($attr === null) {
+        $credentials = $this->storedCredentials($entry);
+        if ($credentials === []) {
             $this->denyUncomparedCredentials($password);
         }
 
-        foreach ($attr->getValues() as $stored) {
+        foreach ($credentials as $stored) {
             if ($this->hashService->verify($password, $stored)) {
                 return new BindToken(
                     AuthzId::fromDn($entry->getDn()),
@@ -81,8 +81,7 @@ final class PasswordAuthenticator implements PasswordAuthenticatableInterface
             return null;
         }
 
-        $password = $entry->get('userPassword')?->getValues()[0];
-
+        $password = $this->storedCredentials($entry)[0] ?? null;
         if ($password === null) {
             return null;
         }
@@ -97,6 +96,19 @@ final class PasswordAuthenticator implements PasswordAuthenticatableInterface
             $password,
             $entry->getDn(),
         );
+    }
+
+    /**
+     * Stored values usable as a credential. An empty value is the absence of one, not a secret to match or key on.
+     *
+     * @return list<string>
+     */
+    private function storedCredentials(Entry $entry): array
+    {
+        return array_values(array_filter(
+            $entry->get('userPassword')?->getValues() ?? [],
+            static fn(string $value): bool => $value !== '',
+        ));
     }
 
     /**

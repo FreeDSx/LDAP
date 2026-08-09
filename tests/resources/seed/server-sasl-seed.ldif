@@ -30,3 +30,11 @@ cn: hashed
 sn: Hashed
 uid: hashed
 userPassword: {SHA}JDjNt4ihTaLvLHpHhEFSdZmM1KM=
+
+# Empty on purpose: an empty value is the absence of a credential.
+dn: cn=empty,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: empty
+sn: Empty
+uid: empty
+userPassword:

@@ -131,6 +131,46 @@ final class PasswordHashServiceTest extends TestCase
         ));
     }
 
+    public function test_an_empty_stored_value_does_not_verify_against_an_empty_password(): void
+    {
+        self::assertFalse($this->subject->verify(
+            '',
+            '',
+        ));
+    }
+
+    public function test_an_empty_stored_value_does_not_verify(): void
+    {
+        self::assertFalse($this->subject->verify(
+            'secret',
+            '',
+        ));
+    }
+
+    public function test_an_empty_password_does_not_verify(): void
+    {
+        self::assertFalse($this->subject->verify(
+            '',
+            'secret',
+        ));
+    }
+
+    public function test_an_empty_password_does_not_verify_against_a_hash_of_one(): void
+    {
+        self::assertFalse($this->subject->verify(
+            '',
+            $this->subject->hash(''),
+        ));
+    }
+
+    public function test_a_whitespace_only_password_still_verifies(): void
+    {
+        self::assertTrue($this->subject->verify(
+            ' ',
+            ' ',
+        ));
+    }
+
     public function test_sha_format_verifies(): void
     {
         $hashed = '{SHA}' . base64_encode(sha1('mypassword', true));

@@ -91,6 +91,11 @@ final readonly class PasswordHashService
         string $plain,
         string $stored,
     ): bool {
+        // An empty value on either side is the absence of a credential, never a match for one.
+        if ($plain === '' || $stored === '') {
+            return false;
+        }
+
         foreach ($this->recognizedPrefixes() as $prefix) {
             if (str_starts_with($stored, $prefix)) {
                 return $this->verifyScheme(
