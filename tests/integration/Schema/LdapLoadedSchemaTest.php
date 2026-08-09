@@ -285,6 +285,32 @@ final class LdapLoadedSchemaTest extends ServerTestCase
         );
     }
 
+    public function test_a_malformed_uuid_value_is_rejected(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
+
+        $this->createRecord(
+            'uuid-malformed',
+            ['projectUuid' => '597ae2f6-16a6-1027-98f4-not-a-uuid'],
+        );
+    }
+
+    public function test_an_upper_case_uuid_value_is_accepted(): void
+    {
+        $this->createRecord(
+            'uuid-upper',
+            ['projectUuid' => '597AE2F6-16A6-1027-98F4-D28B5365DC14'],
+        );
+
+        self::assertSame(
+            'uuid-upper',
+            $this->findOne(Filters::equal('projectUuid', '597AE2F6-16A6-1027-98F4-D28B5365DC14')),
+        );
+    }
+
     public function test_uuid_is_case_sensitive(): void
     {
         $this->createRecord(

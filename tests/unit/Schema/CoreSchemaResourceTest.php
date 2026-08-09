@@ -118,6 +118,25 @@ final class CoreSchemaResourceTest extends TestCase
         self::assertNotNull($this->schema->getSyntax(SyntaxOid::OID_INTEGER));
     }
 
+    public function test_uuid_syntax_registered(): void
+    {
+        $syntax = $this->schema->getSyntax(SyntaxOid::OID_UUID);
+
+        self::assertNotNull($syntax);
+        self::assertSame(
+            SyntaxOid::DESC_UUID,
+            $syntax->desc,
+        );
+    }
+
+    public function test_entry_uuid_uses_the_uuid_syntax(): void
+    {
+        self::assertSame(
+            SyntaxOid::OID_UUID,
+            $this->schema->getAttributeType(AttributeTypeOid::NAME_ENTRY_UUID)?->syntaxOid,
+        );
+    }
+
     // --- matching rules ---
 
     public function test_case_ignore_match_registered_by_oid(): void

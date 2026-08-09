@@ -71,6 +71,28 @@ final class LdapSchemaConstraintTest extends ServerTestCase
         ));
     }
 
+    public function test_the_published_subschema_declares_entry_uuid_with_the_uuid_syntax(): void
+    {
+        $this->authenticateAdmin();
+
+        $subschema = $this->ldapClient()->read(
+            'cn=Subschema',
+            ['attributeTypes'],
+        );
+        $definitions = $subschema?->get('attributeTypes')?->getValues() ?? [];
+        $entryUuid = array_values(array_filter(
+            $definitions,
+            static fn(string $definition): bool => str_contains($definition, "NAME 'entryUUID'"),
+        ));
+
+        self::assertCount(1, $entryUuid);
+        self::assertStringContainsString(
+            'SYNTAX 1.3.6.1.1.16.1',
+            $entryUuid[0],
+            'RFC 4530 section 2.1 defines entryUUID with the UUID syntax, not Octet String.',
+        );
+    }
+
     public function test_add_with_an_empty_directory_string_value_is_rejected(): void
     {
         $this->authenticateAdmin();

@@ -95,7 +95,7 @@ attributeTypes: ( 2.5.18.4 NAME 'modifiersName' DESC 'name of the last modifier 
 attributeTypes: ( 2.5.18.10 NAME 'subschemaSubentry' DESC 'DN of the subschema entry governing the entity' EQUALITY 2.5.13.1 SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 SINGLE-VALUE NO-USER-MODIFICATION USAGE directoryOperation )
 attributeTypes: ( 2.5.18.9 NAME 'hasSubordinates' DESC 'whether the entry has any subordinate entries' EQUALITY 2.5.13.13 SYNTAX 1.3.6.1.4.1.1466.115.121.1.7 SINGLE-VALUE NO-USER-MODIFICATION USAGE directoryOperation )
 attributeTypes: ( 2.5.21.9 NAME 'structuralObjectClass' DESC 'structural object class of the entry' EQUALITY 2.5.13.0 SYNTAX 1.3.6.1.4.1.1466.115.121.1.38 SINGLE-VALUE NO-USER-MODIFICATION USAGE directoryOperation )
-attributeTypes: ( 1.3.6.1.1.16.4 NAME 'entryUUID' DESC 'universally unique identifier for the entry' EQUALITY 2.5.13.17 SYNTAX 1.3.6.1.4.1.1466.115.121.1.40 SINGLE-VALUE NO-USER-MODIFICATION USAGE directoryOperation )
+attributeTypes: ( 1.3.6.1.1.16.4 NAME 'entryUUID' DESC 'universally unique identifier for the entry' EQUALITY 2.5.13.17 SYNTAX 1.3.6.1.1.16.1 SINGLE-VALUE NO-USER-MODIFICATION USAGE directoryOperation )
 attributeTypes: ( 1.3.6.1.1.20 NAME 'entryDN' DESC 'DN of the entry' EQUALITY 2.5.13.1 SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 SINGLE-VALUE NO-USER-MODIFICATION USAGE directoryOperation )
 attributeTypes: ( 2.5.21.5 NAME 'attributeTypes' DESC 'attribute type descriptions' EQUALITY 2.5.13.30 SYNTAX 1.3.6.1.4.1.1466.115.121.1.3 NO-USER-MODIFICATION USAGE directoryOperation )
 attributeTypes: ( 2.5.21.6 NAME 'objectClasses' DESC 'object class descriptions' EQUALITY 2.5.13.30 SYNTAX 1.3.6.1.4.1.1466.115.121.1.37 NO-USER-MODIFICATION USAGE directoryOperation )
