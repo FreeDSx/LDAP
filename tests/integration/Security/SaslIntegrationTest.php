@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Options\CramMD5Options;
 use FreeDSx\Sasl\Options\PlainOptions;
+use FreeDSx\Sasl\Options\ScramOptions;
 use FreeDSx\Socket\SocketOptions;
 use FreeDSx\Socket\SocketPool;
 use FreeDSx\Socket\SocketPoolOptions;
@@ -130,6 +131,26 @@ final class SaslIntegrationTest extends ServerTestCase
         $this->buildClient('tcp')->bindSasl(
             (new PlainOptions())->setUsername('hashed')->setPassword(self::STOLEN_HASH),
             MechanismName::PLAIN,
+        );
+    }
+
+    public function testSaslCramMD5RefusesAnEmptyStoredPassword(): void
+    {
+        $this->expectException(BindException::class);
+
+        $this->buildClient('tcp')->bindSasl(
+            (new CramMD5Options())->setUsername('empty')->setPassword(''),
+            MechanismName::CRAM_MD5,
+        );
+    }
+
+    public function testSaslScramRefusesAnEmptyStoredPassword(): void
+    {
+        $this->expectException(BindException::class);
+
+        $this->buildClient('tcp')->bindSasl(
+            (new ScramOptions())->setUsername('empty')->setPassword(''),
+            MechanismName::SCRAM_SHA256,
         );
     }
 

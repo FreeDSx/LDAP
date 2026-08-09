@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\LdapResult;
+use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -263,6 +264,110 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
         self::assertFalse(
             $token->mustChangePassword(),
             'A successful self password modify must lift the session restriction without a rebind.',
+        );
+    }
+
+    public function test_add_with_a_password_below_the_minimum_length_is_rejected(): void
+    {
+        $handler = $this->dispatchHandler(
+            new PasswordPolicy(quality: new PasswordQualityRules(
+                minLength: 8,
+                checkQuality: 2,
+            )),
+        );
+
+        try {
+            $handler->handleRequest(
+                $this->add('cn=new,dc=foo,dc=bar', 'short'),
+                $this->token(),
+            );
+            self::fail('Expected the short password to be rejected.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::CONSTRAINT_VIOLATION,
+                $e->getCode(),
+            );
+        }
+    }
+
+    /**
+     * An empty value must reach the quality check rather than read as no password being set.
+     */
+    public function test_add_with_an_empty_password_is_rejected_by_the_minimum_length(): void
+    {
+        $handler = $this->dispatchHandler(
+            new PasswordPolicy(quality: new PasswordQualityRules(
+                minLength: 8,
+                checkQuality: 2,
+            )),
+        );
+
+        try {
+            $handler->handleRequest(
+                $this->add('cn=new,dc=foo,dc=bar', ''),
+                $this->token(),
+            );
+            self::fail('Expected the empty password to be rejected.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::CONSTRAINT_VIOLATION,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function test_add_stamps_the_password_changed_time(): void
+    {
+        $handler = $this->dispatchHandler(new PasswordPolicy(quality: new PasswordQualityRules(inHistory: 3)));
+
+        $this->handle(
+            $handler,
+            $this->add('cn=new,dc=foo,dc=bar', 'a-fresh-password'),
+            $this->token(),
+        );
+
+        $entry = $this->backend->get(new Dn('cn=new,dc=foo,dc=bar'));
+        self::assertNotNull($entry);
+        self::assertNotNull(
+            $entry->get(PasswordPolicyOid::NAME_PWD_CHANGED_TIME),
+            'Without pwdChangedTime the password has no age, so pwdMaxAge can never expire it.',
+        );
+    }
+
+    public function test_add_by_an_administrator_stamps_pwd_reset_when_must_change_is_set(): void
+    {
+        $handler = $this->dispatchHandler(
+            new PasswordPolicy(change: new PasswordChangeRules(mustChange: true)),
+        );
+
+        $this->handle(
+            $handler,
+            $this->add('cn=new,dc=foo,dc=bar', 'a-fresh-password'),
+            $this->token(),
+        );
+
+        $entry = $this->backend->get(new Dn('cn=new,dc=foo,dc=bar'));
+        self::assertSame(
+            'TRUE',
+            $entry?->get(PasswordPolicyOid::NAME_PWD_RESET)?->firstValue(),
+        );
+    }
+
+    private function add(
+        string $dn,
+        string $password,
+    ): LdapMessageRequest {
+        return new LdapMessageRequest(
+            1,
+            new AddRequest(Entry::fromArray(
+                $dn,
+                [
+                    'objectClass' => ['inetOrgPerson'],
+                    'cn' => ['new'],
+                    'sn' => ['New'],
+                    'userPassword' => [$password],
+                ],
+            )),
         );
     }
 

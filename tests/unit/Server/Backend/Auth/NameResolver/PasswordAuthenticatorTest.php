@@ -299,6 +299,78 @@ final class PasswordAuthenticatorTest extends TestCase
         );
     }
 
+    /**
+     * Mechanisms keying on the stored value would otherwise take an empty shared secret anyone can reproduce.
+     */
+    public function test_get_sasl_identity_returns_null_for_an_empty_stored_password(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('userPassword', ''),
+        );
+
+        self::assertNull(
+            $this->subject($entry)->getSaslIdentity('alice', MechanismName::CRAM_MD5),
+        );
+    }
+
+    public function test_get_sasl_identity_skips_an_empty_stored_password_for_a_usable_one(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('userPassword', '', 'secret'),
+        );
+
+        $identity = $this->subject($entry)->getSaslIdentity('alice', MechanismName::CRAM_MD5);
+
+        self::assertInstanceOf(SaslIdentity::class, $identity);
+        self::assertSame(
+            'secret',
+            $identity->password,
+        );
+    }
+
+    public function test_get_sasl_identity_keeps_a_whitespace_only_stored_password(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('userPassword', ' '),
+        );
+
+        $identity = $this->subject($entry)->getSaslIdentity('alice', MechanismName::CRAM_MD5);
+
+        self::assertInstanceOf(SaslIdentity::class, $identity);
+        self::assertSame(
+            ' ',
+            $identity->password,
+        );
+    }
+
+    public function test_throws_for_an_empty_stored_password(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('userPassword', ''),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
+
+        $this->subject($entry)->authenticate('cn=Alice,dc=example,dc=com', '');
+    }
+
+    public function test_an_empty_stored_password_does_not_prevent_a_later_value_from_matching(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('userPassword', '', 'secret'),
+        );
+
+        $token = $this->subject($entry)->authenticate('cn=Alice,dc=example,dc=com', 'secret');
+
+        self::assertInstanceOf(BindToken::class, $token);
+    }
+
     public function test_get_sasl_identity_uses_the_same_resolver_as_authenticate(): void
     {
         $entry = new Entry(
