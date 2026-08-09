@@ -210,6 +210,9 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         AddCommand $command,
         WriteContext $context,
     ): void {
+        // Merged before validation, so the values naming the entry count toward what its object classes require.
+        $command->entry->mergeRdnAttributes();
+
         // Validated up front: the entry is the caller's, and applying operational attributes below mutates it, so a
         // replayed transaction would otherwise re-validate an entry that now carries them.
         $this->validateForAdd(

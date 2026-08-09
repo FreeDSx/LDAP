@@ -13,9 +13,9 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation;
 
-use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 
 /**
@@ -38,24 +38,12 @@ final class MoveOperation
         if ($command->deleteOldRdn) {
             foreach ($command->dn->getRdn()->getAll() as $component) {
                 $newEntry->get($component->getName())?->removeValues(
-                    [$component->getValue()],
+                    [Rdn::unescape($component->getValue())],
                     caseSensitive: false,
                 );
             }
         }
 
-        foreach ($command->newRdn->getAll() as $component) {
-            $existing = $newEntry->get($component->getName());
-            if ($existing === null) {
-                $newEntry->set(new Attribute($component->getName(), $component->getValue()));
-
-                continue;
-            }
-            if (!$existing->has($component->getValue(), caseSensitive: false)) {
-                $existing->add($component->getValue());
-            }
-        }
-
-        return $newEntry;
+        return $newEntry->mergeRdnAttributes();
     }
 }

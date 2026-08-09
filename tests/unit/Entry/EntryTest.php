@@ -383,4 +383,89 @@ class EntryTest extends TestCase
             $change->getType(),
         );
     }
+
+    public function test_merge_rdn_attributes_adds_a_missing_naming_attribute(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('sn', 'Smith'),
+        );
+
+        $entry->mergeRdnAttributes();
+
+        self::assertSame(
+            ['Alice'],
+            $entry->get('cn')?->getValues(),
+        );
+    }
+
+    public function test_merge_rdn_attributes_keeps_an_existing_value_alongside_the_naming_one(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'Other'),
+        );
+
+        $entry->mergeRdnAttributes();
+
+        self::assertSame(
+            ['Other', 'Alice'],
+            $entry->get('cn')?->getValues(),
+        );
+    }
+
+    public function test_merge_rdn_attributes_does_not_duplicate_a_value_differing_only_by_case(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'alice'),
+        );
+
+        $entry->mergeRdnAttributes();
+
+        self::assertSame(
+            ['alice'],
+            $entry->get('cn')?->getValues(),
+        );
+    }
+
+    public function test_merge_rdn_attributes_unescapes_the_naming_value(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Smith\2C John,dc=example,dc=com'),
+            new Attribute('sn', 'Smith'),
+        );
+
+        $entry->mergeRdnAttributes();
+
+        self::assertSame(
+            ['Smith, John'],
+            $entry->get('cn')?->getValues(),
+        );
+    }
+
+    public function test_merge_rdn_attributes_covers_every_component_of_a_multivalued_rdn(): void
+    {
+        $entry = new Entry(new Dn('cn=Alice+sn=Smith,dc=example,dc=com'));
+
+        $entry->mergeRdnAttributes();
+
+        self::assertSame(
+            ['Alice'],
+            $entry->get('cn')?->getValues(),
+        );
+        self::assertSame(
+            ['Smith'],
+            $entry->get('sn')?->getValues(),
+        );
+    }
+
+    public function test_merge_rdn_attributes_is_a_no_op_for_the_root_dse(): void
+    {
+        $entry = new Entry(new Dn(''));
+
+        $entry->mergeRdnAttributes();
+
+        self::assertCount(0, $entry->getAttributes());
+    }
 }
