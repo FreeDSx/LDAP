@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server;
 
-use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Server\Paging\PagingRequests;
 use Generator;
 
@@ -24,11 +23,6 @@ use Generator;
  */
 final class RequestHistory
 {
-    /**
-     * @var int[]
-     */
-    private array $ids = [];
-
     private PagingRequests $pagingRequests;
 
     /**
@@ -45,36 +39,11 @@ final class RequestHistory
     }
 
     /**
-     * Add a specific message ID that the client has used.
-     *
-     * @throws ProtocolException
-     */
-    public function addId(int $id): void
-    {
-        if ($id === 0 || in_array($id, $this->ids, true)) {
-            throw new ProtocolException(sprintf(
-                'The message ID %s is not valid.',
-                $id,
-            ));
-        }
-
-        $this->ids[] = $id;
-    }
-
-    /**
      * The currently active paging requests from the client.
      */
     public function pagingRequest(): PagingRequests
     {
         return $this->pagingRequests;
-    }
-
-    /**
-     * @return int[]
-     */
-    public function getIds(): array
-    {
-        return $this->ids;
     }
 
     /**
