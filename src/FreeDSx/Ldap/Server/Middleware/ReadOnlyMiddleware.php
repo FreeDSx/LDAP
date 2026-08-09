@@ -29,7 +29,7 @@ use FreeDSx\Ldap\Operation\Response\ModifyResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
-use FreeDSx\Ldap\ReplicaConfig;
+use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
@@ -58,7 +58,7 @@ final readonly class ReadOnlyMiddleware implements MiddlewareInterface
         OperationType::PasswordModify,
     ];
 
-    public function __construct(private ReplicaConfig $replicaConfig) {}
+    public function __construct(private ConsumerConfig $consumerConfig) {}
 
     public function process(
         ServerRequestContext $context,
@@ -76,7 +76,7 @@ final readonly class ReadOnlyMiddleware implements MiddlewareInterface
             return $next->handle($context);
         }
 
-        if (!$this->replicaConfig->shouldReferWrites()) {
+        if (!$this->consumerConfig->shouldReferWrites()) {
             throw new OperationException(
                 self::DIAGNOSTIC,
                 ResultCode::UNWILLING_TO_PERFORM,
@@ -96,7 +96,7 @@ final readonly class ReadOnlyMiddleware implements MiddlewareInterface
         RequestInterface $request,
         int $messageId,
     ): LdapMessageResponse {
-        $referrals = $this->replicaConfig->referralUrls();
+        $referrals = $this->consumerConfig->referralUrls();
 
         // The default covers PasswordModify (an extended operation); the write gate guarantees no other type reaches here.
         $response = match (true) {

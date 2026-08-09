@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Container;
@@ -428,7 +429,7 @@ class ContainerTest extends TestCase
     private function journalingOptions(): ServerOptions
     {
         return (new ServerOptions())
-            ->setSyncEnabled(true)
+            ->setReplicationConfig(ReplicationConfig::forProvider())
             ->setChangeJournalConfig(new ChangeJournalConfig(
                 retention: new RetentionPolicy(maxRecords: 100),
             ));

@@ -11,8 +11,11 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap;
+namespace FreeDSx\Ldap\Server\Config\Replication;
 
+use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Sync\Consumer\Checkpoint\InMemoryReplicationCheckpoint;
@@ -20,16 +23,23 @@ use FreeDSx\Ldap\Sync\Consumer\Checkpoint\ReplicationCheckpointInterface;
 use FreeDSx\Ldap\Sync\Consumer\ReconnectBackoff;
 
 /**
- * Configures a server as a replica of an upstream primary.
+ * How a server mirrors an upstream primary over RFC 4533.
  *
- * Replicas currently act as read-only.
+ * Consumers currently act as read-only.
  *
  * @api
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class ReplicaConfig
+final class ConsumerConfig
 {
+    /**
+     * Seconds between drains of the queue forwarding local bind state to the primary.
+     */
+    public const DEFAULT_FORWARD_INTERVAL = 5.0;
+
+    private float $forwardInterval = self::DEFAULT_FORWARD_INTERVAL;
+
     private ?ReconnectBackoff $reconnectBackoff = null;
 
     public function __construct(
@@ -50,7 +60,7 @@ final class ReplicaConfig
     }
 
     /**
-     * How the replica authenticates to the primary (via Operations::bind() or Operations::bindSasl()), or null for none.
+     * How the consumer authenticates to the primary (via Operations::bind() or Operations::bindSasl()), or null for none.
      */
     public function getBind(): ?BindRequest
     {
@@ -65,7 +75,7 @@ final class ReplicaConfig
     }
 
     /**
-     * Whether the replica issues StartTLS on the primary connection before binding (LDAPS is set on the primary options).
+     * Whether the consumer issues StartTLS on the primary connection before binding (LDAPS is set on the primary options).
      */
     public function getUseStartTls(): bool
     {
@@ -75,6 +85,28 @@ final class ReplicaConfig
     public function setUseStartTls(bool $useStartTls): self
     {
         $this->useStartTls = $useStartTls;
+
+        return $this;
+    }
+
+    /**
+     * How long queued bind state waits before the next attempt to forward it to the primary.
+     */
+    public function getForwardInterval(): float
+    {
+        return $this->forwardInterval;
+    }
+
+    /**
+     * @throws InvalidArgumentException when the interval is not positive, which would drain without pause.
+     */
+    public function setForwardInterval(float $forwardInterval): self
+    {
+        if ($forwardInterval <= 0) {
+            throw new InvalidArgumentException('The forward interval must be greater than zero.');
+        }
+
+        $this->forwardInterval = $forwardInterval;
 
         return $this;
     }
@@ -95,7 +127,7 @@ final class ReplicaConfig
     }
 
     /**
-     * Where the sync cookie is persisted so the replica resumes across restarts.
+     * Where the sync cookie is persisted so the consumer resumes across restarts.
      */
     public function getCheckpoint(): ReplicationCheckpointInterface
     {

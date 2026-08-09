@@ -18,6 +18,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditSinkInterface;
 /**
  * Central change-journal settings a storage backend builder assembles its journal from.
  *
+ * Recording changes stands on its own for auditing; replication reads the same journal when configured.
+ *
  * @api
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
@@ -25,7 +27,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditSinkInterface;
 final readonly class ChangeJournalConfig
 {
     public function __construct(
-        public ReplicaId $origin = new ReplicaId('local'),
         public RetentionPolicy $retention = new RetentionPolicy(),
         public ?AuditSinkInterface $auditSink = null,
     ) {}

@@ -55,7 +55,7 @@ final readonly class FileChangeJournal implements ChangeJournalInterface
         private StorageLockInterface $lock,
         private string $journalPath,
         private string $seqPath,
-        private ReplicaId $origin = new ReplicaId('local'),
+        private ReplicaId $origin = new ReplicaId(),
         private ClockInterface $clock = new SystemClock(),
         private RowSerializerInterface $serializer = new JsonlRowSerializer(),
         private ChangeRecordRowMapper $mapper = new ChangeRecordRowMapper(),

@@ -39,7 +39,7 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
         private PdoTransactor $transactor,
         private PdoJournalDialectInterface $dialect,
         private PdoStatementPool $statements,
-        private ReplicaId $origin = new ReplicaId('local'),
+        private ReplicaId $origin = new ReplicaId(),
         private ClockInterface $clock = new SystemClock(),
     ) {}
 

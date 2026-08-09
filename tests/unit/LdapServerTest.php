@@ -29,7 +29,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\ClientOptions;
-use FreeDSx\Ldap\ReplicaConfig;
+use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
+use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\ServerOptions;
@@ -96,7 +97,7 @@ class LdapServerTest extends TestCase
         }
 
         $options = (new ServerOptions(networkConfig: NetworkConfig::withPort(33389)))
-            ->setReplicaConfig(new ReplicaConfig(new ClientOptions()))
+            ->setReplicationConfig(ReplicationConfig::forReplica(new ConsumerConfig(new ClientOptions())))
             ->setStorageConfig($storageConfig)
             ->setRunnerConfig(new RunnerConfig($runner));
 
@@ -108,7 +109,7 @@ class LdapServerTest extends TestCase
     public function test_run_does_not_throw_for_a_replica_on_pdo_storage(): void
     {
         $this->options
-            ->setReplicaConfig(new ReplicaConfig(new ClientOptions()))
+            ->setReplicationConfig(ReplicationConfig::forReplica(new ConsumerConfig(new ClientOptions())))
             ->setStorageConfig(PdoConfig::forSqlite(':memory:'));
 
         $this->mockServerRunner

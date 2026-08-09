@@ -376,7 +376,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         ProtocolHandlerProviderInterface $handlerProvider,
     ): MiddlewareChain {
         $options = $this->serverOptions();
-        $replicaConfig = $options->getReplicaConfig();
+        $consumerConfig = $options->getConsumerConfig();
 
         return new MiddlewareChain(
             [
@@ -414,8 +414,8 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                 ),
                 // Only present on a read-only replica; sits below the writer so its referral is drained,
                 // and before the ACL loop so a write short-circuits early.
-                ...($replicaConfig !== null
-                    ? [new ReadOnlyMiddleware($replicaConfig)]
+                ...($consumerConfig !== null
+                    ? [new ReadOnlyMiddleware($consumerConfig)]
                     : []),
                 $this->container->get(CriticalControlMiddleware::class),
                 $this->container->get(OperationAuthorizationMiddleware::class),

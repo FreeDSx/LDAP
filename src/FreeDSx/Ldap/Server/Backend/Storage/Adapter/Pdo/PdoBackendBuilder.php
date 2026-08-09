@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SwooleWriterQueue;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
@@ -44,10 +45,12 @@ final class PdoBackendBuilder
     /**
      * @param SleeperInterface $sleeper Paces a retried transaction.
      * @param ?ChangeJournalConfig $journalConfig Attaches a change journal when journaling is enabled.
+     * @param ReplicaId $origin Stamped on the changes this server authors.
      */
     public function __construct(
         private readonly PdoConfig $config,
         RunnerMode $runner,
+        private readonly ReplicaId $origin,
         private readonly SleeperInterface $sleeper = new BlockingSleeper(),
         private readonly ?ChangeJournalConfig $journalConfig = null,
     ) {
@@ -78,6 +81,7 @@ final class PdoBackendBuilder
         $this->storage = PdoStorageFactory::storageOn(
             $this->config,
             $provider,
+            $this->origin,
             $this->sleeper,
             $this->journalConfig,
         );
@@ -95,12 +99,14 @@ final class PdoBackendBuilder
         $writeStorage = PdoStorageFactory::storageOn(
             $this->config,
             $writes,
+            $this->origin,
             $this->sleeper,
             $this->journalConfig,
         );
         $readStorage = PdoStorageFactory::storageOn(
             $this->config,
             $reads,
+            $this->origin,
             $this->sleeper,
             $this->journalConfig,
         );

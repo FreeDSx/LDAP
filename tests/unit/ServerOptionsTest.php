@@ -21,6 +21,9 @@ use FreeDSx\Ldap\Schema\Definition\Nis\AttributeTypeOid as NisAttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
+use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\DefaultPasswordQualityChecker;
@@ -42,7 +45,6 @@ use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRule;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRules;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\ClientOptions;
-use FreeDSx\Ldap\ReplicaConfig;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -56,24 +58,26 @@ final class ServerOptionsTest extends TestCase
         $this->subject = new ServerOptions();
     }
 
-    public function test_a_default_server_is_not_a_read_only_replica(): void
+    public function test_a_default_server_plays_no_replication_role(): void
     {
         self::assertFalse($this->subject->isReadOnly());
-        self::assertNull($this->subject->getReplicaConfig());
+        self::assertNull($this->subject->getConsumerConfig());
+        self::assertFalse($this->subject->getReplicationConfig()->isProvider());
+        self::assertFalse($this->subject->getReplicationConfig()->isConsumer());
     }
 
-    public function test_for_replica_configures_a_read_only_replica(): void
+    public function test_a_consumer_role_makes_the_server_read_only(): void
     {
-        $config = new ReplicaConfig(new ClientOptions());
-        $options = ServerOptions::forReplica(
-            $config,
-            PdoConfig::forSqlite(':memory:'),
+        $config = new ConsumerConfig(new ClientOptions());
+        $options = new ServerOptions(
+            storageConfig: PdoConfig::forSqlite(':memory:'),
+            replicationConfig: ReplicationConfig::forReplica($config),
         );
 
         self::assertTrue($options->isReadOnly());
         self::assertSame(
             $config,
-            $options->getReplicaConfig(),
+            $options->getConsumerConfig(),
         );
     }
 
@@ -159,33 +163,45 @@ final class ServerOptionsTest extends TestCase
         );
     }
 
-    public function test_sync_is_disabled_by_default(): void
+    public function test_a_provider_role_journals_without_the_journal_being_configured(): void
     {
-        self::assertFalse($this->subject->isSyncEnabled());
+        $this->subject->setReplicationConfig(ReplicationConfig::forProvider());
+
+        self::assertNotNull($this->subject->getChangeJournalConfig());
     }
 
-    public function test_it_can_enable_sync(): void
+    public function test_nothing_is_journaled_by_default(): void
     {
-        $this->subject->setSyncEnabled(true);
-
-        self::assertTrue($this->subject->isSyncEnabled());
+        self::assertNull($this->subject->getChangeJournalConfig());
     }
 
-    public function test_the_change_journal_config_defaults_to_a_usable_config(): void
+    public function test_a_journal_can_be_configured_without_a_replication_role(): void
     {
-        self::assertTrue(
-            $this->subject->getChangeJournalConfig()->origin->equals(new ReplicaId('local')),
-        );
-    }
-
-    public function test_it_can_override_the_change_journal_config(): void
-    {
-        $config = new ChangeJournalConfig(new ReplicaId('node-a'));
+        $config = new ChangeJournalConfig();
         $this->subject->setChangeJournalConfig($config);
 
         self::assertSame(
             $config,
             $this->subject->getChangeJournalConfig(),
+        );
+        self::assertFalse($this->subject->getReplicationConfig()->isProvider());
+    }
+
+    public function test_the_replica_id_defaults_to_the_local_identity(): void
+    {
+        self::assertTrue(
+            $this->subject->getReplicationConfig()->getId()->equals(ReplicaId::local()),
+        );
+    }
+
+    public function test_it_can_override_the_network_config(): void
+    {
+        $config = NetworkConfig::withPort(1389);
+        $this->subject->setNetworkConfig($config);
+
+        self::assertSame(
+            $config,
+            $this->subject->getNetworkConfig(),
         );
     }
 
