@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
 use FreeDSx\Ldap\Server\Config\ConfidentialityRequirement;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\Replication\ProviderConfig;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\ServerOptions;
@@ -53,6 +54,11 @@ final class LdapServerCommand extends Command
     public const MANAGER_DN = 'cn=manager';
 
     public const MANAGER_PASSWORD = 'manager-pass';
+
+    /**
+     * Tests assert on replicated state, so they should not wait a production poll for it.
+     */
+    private const SYNC_POLL_INTERVAL = 0.05;
 
     /**
      * Writes are denied by default, so tests that write bind as this identity.
@@ -296,7 +302,9 @@ final class LdapServerCommand extends Command
             ->setAdministrators(Subject::dn(self::ADMIN_DN))
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
             ->setMaxSearchPagedLookthrough((int) $this->getStringOption($input, 'max-search-paged-lookthrough'))
-            ->setReplicationConfig(ReplicationConfig::forProvider())
+            ->setReplicationConfig(ReplicationConfig::forProvider(
+                (new ProviderConfig())->setPollInterval(self::SYNC_POLL_INTERVAL),
+            ))
             ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));
 
         $authenticatedLookthrough = (int) $this->getStringOption($input, 'authenticated-lookthrough');

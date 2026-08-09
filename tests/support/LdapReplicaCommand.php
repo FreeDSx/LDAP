@@ -30,6 +30,11 @@ final class LdapReplicaCommand extends Command
 {
     use ConsoleOptionsTrait;
 
+    /**
+     * Tests assert on forwarded bind state, so they should not wait a production drain for it.
+     */
+    private const FORWARD_INTERVAL = 0.05;
+
     private const SEED = __DIR__ . '/../resources/seed/sync-seed.ldif';
 
     protected function configure(): void
@@ -83,6 +88,7 @@ final class LdapReplicaCommand extends Command
             'cn=user,dc=foo,dc=bar',
             '12345',
         ));
+        $consumerConfig->setForwardInterval(self::FORWARD_INTERVAL);
 
         $network = (new NetworkConfig())
             ->setPort($port)
