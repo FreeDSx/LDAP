@@ -24,7 +24,23 @@ final readonly class SearchLimits
         public int $maxSearchPageSize = 0,
         public int $maxSearchLookthrough = 0,
         public int $maxSearchPagedLookthrough = 0,
+        public ?int $maxPagingSessions = null,
     ) {}
+
+    /**
+     * A per-identity rule that says nothing about paging sessions keeps the server-wide cap rather than lifting it.
+     */
+    public function withMaxPagingSessions(?int $maxPagingSessions): self
+    {
+        return new self(
+            maxSearchSize: $this->maxSearchSize,
+            maxSearchTimeLimit: $this->maxSearchTimeLimit,
+            maxSearchPageSize: $this->maxSearchPageSize,
+            maxSearchLookthrough: $this->maxSearchLookthrough,
+            maxSearchPagedLookthrough: $this->maxSearchPagedLookthrough,
+            maxPagingSessions: $maxPagingSessions,
+        );
+    }
 
     /**
      * Effective lookthrough for paged searches: the paged limit when set, otherwise the regular lookthrough.

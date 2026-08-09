@@ -76,6 +76,8 @@ final class EventContext
 
     public const REMOVED = 'removed';
 
+    public const LIMIT = 'limit';
+
     public const DURATION_SECONDS = 'duration_seconds';
 
     public const NEW_RDN = 'new_rdn';

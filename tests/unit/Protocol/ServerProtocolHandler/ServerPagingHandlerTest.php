@@ -423,6 +423,132 @@ class ServerPagingHandlerTest extends TestCase
         self::assertSame(ResultCode::SIZE_LIMIT_EXCEEDED, $done->getResultCode());
     }
 
+    public function test_starting_a_session_at_the_limit_evicts_the_least_recent(): void
+    {
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback(fn(): EntryStream => new EntryStream($this->makeGenerator(
+                Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']),
+                Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']),
+            )));
+
+        $subject = new ServerPagingHandler(
+            backend: $this->mockBackend,
+            filterEvaluator: $this->mockFilterEvaluator,
+            accessControl: $this->mockAccessControl,
+            requestHistory: $this->requestHistory,
+            schema: $this->schema,
+            limits: new SearchLimits(maxPagingSessions: 2),
+        );
+
+        // Each leaves a page outstanding, so none of them completes and releases its slot.
+        $this->drive($subject, $this->makeSearchMessage(size: 1));
+        $firstCookie = $this->donePagingControl()->getCookie();
+        $this->drive($subject, $this->makeSearchMessage(size: 1));
+        $this->drive($subject, $this->makeSearchMessage(size: 1));
+
+        self::assertSame(
+            2,
+            $this->requestHistory->pagingRequest()->count(),
+        );
+        self::assertNull(
+            $this->requestHistory->getPagingGenerator($firstCookie),
+            'The evicted session must not keep its generator alive.',
+        );
+        self::assertFalse(
+            $this->requestHistory->pagingRequest()->has($firstCookie),
+            'Resuming an evicted session must be refused.',
+        );
+    }
+
+    public function test_a_session_that_runs_to_completion_releases_its_slot(): void
+    {
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback(fn(): EntryStream => new EntryStream($this->makeGenerator(
+                Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']),
+            )));
+
+        $subject = new ServerPagingHandler(
+            backend: $this->mockBackend,
+            filterEvaluator: $this->mockFilterEvaluator,
+            accessControl: $this->mockAccessControl,
+            requestHistory: $this->requestHistory,
+            schema: $this->schema,
+            limits: new SearchLimits(maxPagingSessions: 2),
+        );
+
+        // A page larger than the result set finishes the search outright.
+        $this->drive($subject, $this->makeSearchMessage(size: 10));
+        $this->drive($subject, $this->makeSearchMessage(size: 10));
+        $this->drive($subject, $this->makeSearchMessage(size: 10));
+
+        self::assertSame(
+            0,
+            $this->requestHistory->pagingRequest()->count(),
+            'Completed sessions must be reclaimed without waiting for eviction.',
+        );
+    }
+
+    public function test_an_abandoned_session_releases_its_slot(): void
+    {
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback(fn(): EntryStream => new EntryStream($this->makeGenerator(
+                Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']),
+                Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']),
+            )));
+
+        $subject = new ServerPagingHandler(
+            backend: $this->mockBackend,
+            filterEvaluator: $this->mockFilterEvaluator,
+            accessControl: $this->mockAccessControl,
+            requestHistory: $this->requestHistory,
+            schema: $this->schema,
+            limits: new SearchLimits(maxPagingSessions: 2),
+        );
+
+        $this->drive($subject, $this->makeSearchMessage(size: 1));
+        $cookie = $this->donePagingControl()->getCookie();
+
+        // RFC 2696 section 3: a zero page size with the cookie abandons the search.
+        $this->drive($subject, $this->makeSearchMessage(size: 0, cookie: $cookie));
+
+        self::assertSame(
+            0,
+            $this->requestHistory->pagingRequest()->count(),
+        );
+        self::assertNull($this->requestHistory->getPagingGenerator($cookie));
+    }
+
+    public function test_sessions_are_not_evicted_when_no_limit_is_set(): void
+    {
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback(fn(): EntryStream => new EntryStream($this->makeGenerator(
+                Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']),
+                Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']),
+            )));
+
+        $subject = new ServerPagingHandler(
+            backend: $this->mockBackend,
+            filterEvaluator: $this->mockFilterEvaluator,
+            accessControl: $this->mockAccessControl,
+            requestHistory: $this->requestHistory,
+            schema: $this->schema,
+            limits: new SearchLimits(maxPagingSessions: 0),
+        );
+
+        $this->drive($subject, $this->makeSearchMessage(size: 1));
+        $this->drive($subject, $this->makeSearchMessage(size: 1));
+        $this->drive($subject, $this->makeSearchMessage(size: 1));
+
+        self::assertSame(
+            3,
+            $this->requestHistory->pagingRequest()->count(),
+        );
+    }
+
     public function test_server_max_page_size_caps_client_page_size(): void
     {
         $message = $this->makeSearchMessage(size: 10);

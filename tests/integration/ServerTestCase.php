@@ -136,12 +136,16 @@ class ServerTestCase extends LdapTestCase
     /**
      * Per-test server override. For tests that require a different config.
      *
+     * Anything already listening is stopped first, since only one server can hold the port.
+     *
      * @param list<string> $extraArgs
      */
     protected function createServerProcess(
         string $transport,
         array $extraArgs = [],
     ): void {
+        $this->stopServer();
+
         $processArgs = [
             'php',
             '-dpcov.enabled=0',

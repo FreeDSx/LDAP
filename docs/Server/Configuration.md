@@ -47,6 +47,7 @@ LDAP Server Configuration
     * [ServerOptions:setMaxSearchPageSize](#setmaxsearchpagesize)
     * [ServerOptions:setMaxSearchLookthrough](#setmaxsearchlookthrough)
     * [ServerOptions:setMaxSearchPagedLookthrough](#setmaxsearchpagedlookthrough)
+    * [ServerOptions:setMaxPagingSessions](#setmaxpagingsessions)
     * [ServerOptions:setSearchLimitRules](#setsearchlimitrules)
 * [Directory Synchronization](#directory-synchronization)
     * [ServerOptions:setReplicationConfig](#setreplicationconfig)
@@ -716,6 +717,15 @@ large result sets, so this lets you allow large paged enumerations without loose
 for ordinary searches. A value of `0` falls back to the regular lookthrough limit.
 
 **Default**: `0` (use the regular lookthrough limit)
+
+------------------
+#### setMaxPagingSessions
+
+Cap how many paged searches one connection may leave unfinished, since each holds its result state until the connection
+closes. Starting one past the cap discards the least recently started session, logged as `paging.session_evicted`. A
+client resuming a discarded session is refused with an invalid cookie. A value of `0` removes the cap.
+
+**Default**: `25`
 
 ------------------
 #### setSearchLimitRules

@@ -719,6 +719,27 @@ final class LdapServerTest extends ServerTestCase
         $this->assertFalse($paging->hasEntries());
     }
 
+    public function testAnUnfinishedPagingSessionIsDiscardedOnceTheCapIsReached(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            ['--max-paging-sessions=2'],
+        );
+        $this->authenticateUser();
+
+        $search = Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar');
+
+        // Each takes a page and stops, so none of them releases its slot.
+        $first = $this->ldapClient()->paging($search, 1);
+        $first->getEntries();
+        $this->ldapClient()->paging($search, 1)->getEntries();
+        $this->ldapClient()->paging($search, 1)->getEntries();
+
+        $this->expectException(OperationException::class);
+
+        $first->getEntries();
+    }
+
     public function testSighupDoesNotShutdownTheServer(): void
     {
         if (!extension_loaded('posix')) {

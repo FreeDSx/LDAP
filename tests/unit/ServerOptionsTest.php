@@ -578,7 +578,8 @@ final class ServerOptionsTest extends TestCase
             ->setMaxSearchTimeLimit(60)
             ->setMaxSearchPageSize(250)
             ->setMaxSearchLookthrough(5000)
-            ->setMaxSearchPagedLookthrough(100000);
+            ->setMaxSearchPagedLookthrough(100000)
+            ->setMaxPagingSessions(5);
 
         self::assertEquals(
             new SearchLimits(
@@ -587,6 +588,7 @@ final class ServerOptionsTest extends TestCase
                 maxSearchPageSize: 250,
                 maxSearchLookthrough: 5000,
                 maxSearchPagedLookthrough: 100000,
+                maxPagingSessions: 5,
             ),
             $this->subject->makeSearchLimits(),
         );
