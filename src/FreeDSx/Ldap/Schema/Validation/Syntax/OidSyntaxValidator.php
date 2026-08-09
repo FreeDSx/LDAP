@@ -20,7 +20,7 @@ namespace FreeDSx\Ldap\Schema\Validation\Syntax;
  */
 final class OidSyntaxValidator implements SyntaxValidatorInterface
 {
-    private const PATTERN = '/^([0-9]+(\.[0-9]+)*|[A-Za-z][A-Za-z0-9-]*)$/';
+    private const PATTERN = '/^([0-9]+(\.[0-9]+)*|[A-Za-z][A-Za-z0-9-]*)$/D';
 
     public function isValid(string $value): bool
     {

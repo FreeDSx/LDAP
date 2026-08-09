@@ -62,6 +62,7 @@ final class GeneralizedTimeSyntaxValidatorTest extends TestCase
             'not a time' => ['notatime'],
             'missing zone' => ['20240101123000'],
             'invalid month' => ['20241301010000Z'],
+            'trailing newline' => ["20240101123000Z\n"],
         ];
     }
 }
