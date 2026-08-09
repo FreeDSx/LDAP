@@ -617,7 +617,8 @@ trait SqlFilterTranslatorTrait
     {
         $lower = strtolower($attribute);
 
-        if (preg_match('/^([a-z][a-z0-9-]*|\d+(\.\d+)+)(;[a-z0-9-]+)*$/', $lower) !== 1) {
+        // The D modifier matters here: without it a trailing newline slips past the whitelist and into an identifier.
+        if (preg_match('/^([a-z][a-z0-9-]*|\d+(\.\d+)+)(;[a-z0-9-]+)*$/D', $lower) !== 1) {
             throw new InvalidAttributeException(sprintf(
                 'Attribute description "%s" is not a valid RFC 4512 attribute description.',
                 $attribute,
