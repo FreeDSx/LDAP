@@ -31,6 +31,7 @@ final class SyntaxValidatorRegistry
     public static function default(): self
     {
         return new self([
+            SyntaxOid::OID_DIRECTORY_STRING => new DirectoryStringSyntaxValidator(),
             SyntaxOid::OID_INTEGER => new IntegerSyntaxValidator(),
             SyntaxOid::OID_BOOLEAN => new BooleanSyntaxValidator(),
             SyntaxOid::OID_GENERALIZED_TIME => new GeneralizedTimeSyntaxValidator(),
