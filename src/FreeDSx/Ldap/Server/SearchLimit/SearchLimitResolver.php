@@ -41,11 +41,25 @@ final class SearchLimitResolver implements SearchLimitResolverInterface, Backend
     {
         foreach ($this->rules->rules as $rule) {
             // Limit rules carry no target entry, so a subject needing one cannot match.
-            if ($rule->subject->matches($token, null)) {
-                return $rule->limits;
+            if (!$rule->subject->matches($token, null)) {
+                continue;
             }
+
+            return $this->withServerWidePagingCap($rule->limits);
         }
 
         return $this->default;
+    }
+
+    /**
+     * Paging sessions cap per-connection memory, so a rule saying nothing about them inherits rather than lifts.
+     */
+    private function withServerWidePagingCap(SearchLimits $limits): SearchLimits
+    {
+        if ($limits->maxPagingSessions !== null || $this->default->maxPagingSessions === null) {
+            return $limits;
+        }
+
+        return $limits->withMaxPagingSessions($this->default->maxPagingSessions);
     }
 }

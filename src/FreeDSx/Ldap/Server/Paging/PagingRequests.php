@@ -36,6 +36,21 @@ final class PagingRequests
         $this->requests[] = $request;
     }
 
+    public function count(): int
+    {
+        return count($this->requests);
+    }
+
+    /**
+     * The least recently started request, since they are held in the order they were added.
+     */
+    public function oldest(): ?PagingRequest
+    {
+        $requests = array_values($this->requests);
+
+        return $requests[0] ?? null;
+    }
+
     public function remove(PagingRequest $toRemove): void
     {
         foreach ($this->requests as $i => $pagingRequest) {

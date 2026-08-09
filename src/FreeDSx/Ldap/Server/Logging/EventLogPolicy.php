@@ -60,6 +60,7 @@ final readonly class EventLogPolicy
             ServerEvent::CriticalControlRejected,
             ServerEvent::SchemaViolation,
             ServerEvent::SyncEntrySkipped,
+            ServerEvent::PagingSessionEvicted,
             ServerEvent::JournalPruned,
             ServerEvent::JournalPruneFailed,
             ServerEvent::NoticeOfDisconnectSent,

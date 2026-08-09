@@ -60,6 +60,51 @@ final class SearchLimitResolverTest extends TestCase
         );
     }
 
+    public function test_a_rule_silent_on_paging_sessions_keeps_the_server_wide_cap(): void
+    {
+        $resolver = new SearchLimitResolver(
+            (new SearchLimitRules())->withRules(
+                SearchLimitRule::for(Subject::authenticated(), new SearchLimits(maxSearchSize: 50)),
+            ),
+            new SearchLimits(maxPagingSessions: 25),
+        );
+
+        self::assertSame(
+            25,
+            $resolver->resolve($this->authenticatedToken())->maxPagingSessions,
+        );
+    }
+
+    public function test_a_rule_can_raise_the_paging_session_cap_for_an_identity(): void
+    {
+        $resolver = new SearchLimitResolver(
+            (new SearchLimitRules())->withRules(
+                SearchLimitRule::for(Subject::authenticated(), new SearchLimits(maxPagingSessions: 100)),
+            ),
+            new SearchLimits(maxPagingSessions: 25),
+        );
+
+        self::assertSame(
+            100,
+            $resolver->resolve($this->authenticatedToken())->maxPagingSessions,
+        );
+    }
+
+    public function test_a_rule_can_lift_the_paging_session_cap_entirely(): void
+    {
+        $resolver = new SearchLimitResolver(
+            (new SearchLimitRules())->withRules(
+                SearchLimitRule::for(Subject::authenticated(), new SearchLimits(maxPagingSessions: 0)),
+            ),
+            new SearchLimits(maxPagingSessions: 25),
+        );
+
+        self::assertSame(
+            0,
+            $resolver->resolve($this->authenticatedToken())->maxPagingSessions,
+        );
+    }
+
     public function test_anonymous_falls_through_authenticated_rule_to_the_default(): void
     {
         $resolver = new SearchLimitResolver(

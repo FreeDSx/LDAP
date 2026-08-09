@@ -132,6 +132,13 @@ final class LdapServerCommand extends Command
                 '0',
             )
             ->addOption(
+                'max-paging-sessions',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Unfinished paged searches a connection may hold before the least recent is discarded (0 = no cap)',
+                '25',
+            )
+            ->addOption(
                 'authenticated-lookthrough',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -302,6 +309,7 @@ final class LdapServerCommand extends Command
             ->setAdministrators(Subject::dn(self::ADMIN_DN))
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
             ->setMaxSearchPagedLookthrough((int) $this->getStringOption($input, 'max-search-paged-lookthrough'))
+            ->setMaxPagingSessions((int) $this->getStringOption($input, 'max-paging-sessions'))
             ->setReplicationConfig(ReplicationConfig::forProvider(
                 (new ProviderConfig())->setPollInterval(self::SYNC_POLL_INTERVAL),
             ))

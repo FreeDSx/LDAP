@@ -262,6 +262,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
             requestHistory: $context->requestHistory,
             schema: $options->getSchema(),
             limits: $searchLimits ?? $options->makeSearchLimits(),
+            eventLogger: $context->eventLogger,
         );
     }
 

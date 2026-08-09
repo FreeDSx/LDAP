@@ -45,6 +45,7 @@ $server = new LdapServer((new ServerOptions())->setLogger($logger));
 | `control.critical.rejected` | on      | notice | Client sent a critical control the server doesn't support |
 | `schema.violation`          | on      | notice | Add/Modify violates the schema (rejected, or allowed under Lenient mode / the Relax control) |
 | `session.disconnect_notice` | on      | notice | Server sends an unsolicited Notice of Disconnect          |
+| `paging.session_evicted`    | on      | notice | A connection hit `setMaxPagingSessions`, so its least recently started paged search was discarded |
 | `entry.added`               | off     | info   | Add succeeds (audit-trail)                                |
 | `entry.modified`            | off     | info   | Modify succeeds (audit-trail)                             |
 | `entry.deleted`             | off     | info   | Delete succeeds (audit-trail)                             |

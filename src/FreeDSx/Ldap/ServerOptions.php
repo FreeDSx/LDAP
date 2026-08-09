@@ -154,6 +154,8 @@ final class ServerOptions implements ServerListenerOptionsInterface
 
     private int $maxSearchPagedLookthrough = 0;
 
+    private int $maxPagingSessions = 25;
+
     private ?SearchLimitRules $searchLimitRules = null;
 
     private ?ConfigReloaderInterface $configReloader = null;
@@ -593,6 +595,21 @@ final class ServerOptions implements ServerListenerOptionsInterface
         return $this;
     }
 
+    /**
+     * Paged searches a connection may leave unfinished before the least recent is discarded. Zero means no cap.
+     */
+    public function getMaxPagingSessions(): int
+    {
+        return $this->maxPagingSessions;
+    }
+
+    public function setMaxPagingSessions(int $maxPagingSessions): self
+    {
+        $this->maxPagingSessions = $maxPagingSessions;
+
+        return $this;
+    }
+
     public function setSearchLimitRules(SearchLimitRules $searchLimitRules): self
     {
         $this->searchLimitRules = $searchLimitRules;
@@ -613,6 +630,7 @@ final class ServerOptions implements ServerListenerOptionsInterface
             maxSearchPageSize: $this->maxSearchPageSize,
             maxSearchLookthrough: $this->maxSearchLookthrough,
             maxSearchPagedLookthrough: $this->maxSearchPagedLookthrough,
+            maxPagingSessions: $this->maxPagingSessions,
         );
     }
 

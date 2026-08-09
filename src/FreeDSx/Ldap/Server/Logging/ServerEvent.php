@@ -45,6 +45,7 @@ enum ServerEvent: string
     case OperationRefused               = 'operation.refused';
     case SchemaViolation                = 'schema.violation';
     case SyncEntrySkipped               = 'sync.entry_skipped';
+    case PagingSessionEvicted           = 'paging.session_evicted';
     case JournalPruned                  = 'journal.pruned';
     case JournalPruneFailed             = 'journal.prune_failed';
     case NoticeOfDisconnectSent         = 'session.disconnect_notice';
@@ -75,6 +76,7 @@ enum ServerEvent: string
             self::NoticeOfDisconnectSent,
             self::WriteTimeout,
             self::IdleTimeout,
+            self::PagingSessionEvicted,
             self::PasswordPolicyExpired,
             self::PasswordPolicyChangeRejected => LogLevel::NOTICE,
             default => LogLevel::INFO,

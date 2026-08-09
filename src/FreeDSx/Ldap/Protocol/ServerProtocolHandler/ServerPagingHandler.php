@@ -32,6 +32,9 @@ use FreeDSx\Ldap\Server\Paging\PagingResponse;
 use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
+use FreeDSx\Ldap\Server\Logging\EventContext;
+use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use Generator;
@@ -55,6 +58,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         private readonly Schema $schema,
         private readonly PagingRequestComparator $requestComparator = new PagingRequestComparator(),
         private readonly SearchLimits $limits = new SearchLimits(),
+        private readonly ?EventLogger $eventLogger = null,
     ) {}
 
     /**
@@ -392,10 +396,37 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
             return $this->findPagingRequestOrThrow($pagingControl->getCookie());
         }
 
+        $this->evictOldestSessionAtLimit();
+
         $pagingRequest = $this->makePagingRequest($message);
         $this->requestHistory->pagingRequest()->add($pagingRequest);
 
         return $pagingRequest;
+    }
+
+    /**
+     * Unfinished sessions would otherwise retain a generator apiece for the life of the connection.
+     */
+    private function evictOldestSessionAtLimit(): void
+    {
+        $limit = $this->limits->maxPagingSessions ?? 0;
+        $requests = $this->requestHistory->pagingRequest();
+
+        if ($limit <= 0 || $requests->count() < $limit) {
+            return;
+        }
+
+        $oldest = $requests->oldest();
+        if ($oldest === null) {
+            return;
+        }
+
+        $requests->remove($oldest);
+        $this->requestHistory->removePagingGenerator($oldest->getNextCookie());
+        $this->eventLogger?->record(
+            ServerEvent::PagingSessionEvicted,
+            [EventContext::LIMIT => $limit],
+        );
     }
 
     /**
