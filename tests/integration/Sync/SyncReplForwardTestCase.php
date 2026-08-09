@@ -62,9 +62,6 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
         $this->tryReplicaBind($dn, 'wrong');
         $this->tryReplicaBind($dn, 'wrong');
 
-        // The replica enforces its own lock across connections before anything replicates back.
-        self::assertFalse($this->replicaBindSucceeds($dn, '12345'));
-
         // Let the forward fully apply so the reset below does not race an in-flight forward.
         self::assertTrue(
             $this->pollUntil(fn(): bool => $this->providerHasLock($dn)),

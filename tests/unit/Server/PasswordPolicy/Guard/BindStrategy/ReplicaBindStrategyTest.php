@@ -14,7 +14,9 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy;
 
 use FreeDSx\Ldap\Control\PwdPolicyError;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -30,6 +32,8 @@ use Tests\Support\FreeDSx\Ldap\Server\PasswordPolicy\Replica\SqliteReplicaPasswo
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
 use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
@@ -43,6 +47,8 @@ final class ReplicaBindStrategyTest extends TestCase
 
     private ReplicaPasswordStateStoreInterface $store;
 
+    private LdapBackendInterface&MockObject $backend;
+
     private PasswordPolicyContext $context;
 
     private RecordingSleeper $sleeper;
@@ -52,6 +58,7 @@ final class ReplicaBindStrategyTest extends TestCase
     protected function setUp(): void
     {
         $this->store = SqliteReplicaPasswordStateStoreFactory::inMemory();
+        $this->backend = $this->createMock(LdapBackendInterface::class);
         $this->context = new PasswordPolicyContext();
         $this->sleeper = new RecordingSleeper();
 
@@ -64,6 +71,7 @@ final class ReplicaBindStrategyTest extends TestCase
             new ReplicaBindStrategy(
                 $engine,
                 $this->store,
+                $this->backend,
             ),
             $this->context,
             new EventLogger(
@@ -107,6 +115,31 @@ final class ReplicaBindStrategyTest extends TestCase
         $this->expectException(OperationException::class);
 
         $this->subject->preBind($this->attempt(new UserPasswordState(permanentlyLocked: true)));
+    }
+
+    public function test_preBind_denies_when_the_entry_locked_after_the_caller_read_it(): void
+    {
+        $this->backend
+            ->method('get')
+            ->willReturn(new Entry(
+                new Dn(self::DN),
+                new Attribute('pwdAccountLockedTime', '20260520120000Z'),
+            ));
+
+        $this->expectException(OperationException::class);
+
+        $this->subject->preBind($this->attempt(new UserPasswordState()));
+    }
+
+    public function test_preBind_allows_when_neither_the_local_state_nor_the_entry_locks(): void
+    {
+        $this->backend
+            ->method('get')
+            ->willReturn(new Entry(new Dn(self::DN)));
+
+        $this->expectNotToPerformAssertions();
+
+        $this->subject->preBind($this->attempt(new UserPasswordState()));
     }
 
     public function test_failure_is_persisted_to_the_local_store(): void

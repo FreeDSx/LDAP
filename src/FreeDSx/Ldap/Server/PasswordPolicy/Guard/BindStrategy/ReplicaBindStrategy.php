@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordBindAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\PasswordPolicyOutcome;
@@ -34,6 +35,7 @@ final readonly class ReplicaBindStrategy implements PasswordPolicyBindStrategyIn
     public function __construct(
         private PasswordPolicyEngine $engine,
         private ReplicaPasswordStateStoreInterface $store,
+        private LdapBackendInterface $backend,
     ) {}
 
     /**
@@ -50,10 +52,16 @@ final readonly class ReplicaBindStrategy implements PasswordPolicyBindStrategyIn
             return $entryOutcome;
         }
 
-        return $this->engine->evaluateLocalLockout(
+        $localOutcome = $this->engine->evaluateLocalLockout(
             $this->store->load($attempt->dn)->toUserPasswordState($attempt->dn),
             $attempt->policy,
         );
+
+        if ($localOutcome->denied) {
+            return $localOutcome;
+        }
+
+        return $this->reReadEntryOutcome($attempt);
     }
 
     public function record(
@@ -78,6 +86,24 @@ final readonly class ReplicaBindStrategy implements PasswordPolicyBindStrategyIn
         return $recorded ?? new RecordedOutcome(
             PasswordPolicyOutcome::allow(),
             OperationalChanges::none(),
+        );
+    }
+
+    /**
+     * The caller's entry state was read before the local one, and applying a replicated entry drops the local state it
+     * supersedes. Both reading clear therefore has to be confirmed against the entry as it stands now.
+     */
+    private function reReadEntryOutcome(PasswordBindAttempt $attempt): PasswordPolicyOutcome
+    {
+        $entry = $this->backend->get($attempt->dn);
+
+        if ($entry === null) {
+            return PasswordPolicyOutcome::allow();
+        }
+
+        return $this->engine->evaluatePreBind(
+            UserPasswordState::fromEntry($entry),
+            $attempt->policy,
         );
     }
 

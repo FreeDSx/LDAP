@@ -76,6 +76,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
             return new ReplicaBindStrategy(
                 $engine,
                 $container->get(ReplicaPasswordStateStoreInterface::class),
+                $container->get(WritableStorageBackend::class),
             );
         }
 

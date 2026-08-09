@@ -37,6 +37,10 @@ readonly class ReconcilingChangeApplier implements ChangeApplierInterface
         $this->baseApplier->beginRefresh();
     }
 
+    /**
+     * The entry is written before any local state is dropped, and that order must hold: a bind reading no local state
+     * concludes the entry it superseded is already durable, and re-reads the entry rather than allowing.
+     */
     public function apply(
         SyncEntryResult $result,
         Session $session,
