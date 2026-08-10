@@ -394,6 +394,7 @@ final class ServerRootDseHandlerTest extends TestCase
         return new GeneratedEntryResponder(
             new RuleBasedAccessControl(),
             new FilterEvaluator($schema),
+            $schema,
         );
     }
 }

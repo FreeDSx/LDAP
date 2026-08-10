@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
@@ -323,13 +324,34 @@ final class ServerMonitorHandlerTest extends TestCase
         );
     }
 
-    private function makeMessage(): LdapMessageRequest
+    /**
+     * The metrics are not schema-defined, so they count as user attributes and a bare read still returns them.
+     */
+    public function test_it_narrows_the_entry_to_the_requested_attributes(): void
+    {
+        $stream = $this->subject->handleRequest(
+            $this->makeMessage('connectionsActive'),
+            $this->mockToken,
+        );
+        $messages = [...$stream->messages];
+
+        /** @var SearchResultEntry $result */
+        $result = $messages[0]->getResponse();
+
+        self::assertSame(
+            ['connectionsActive'],
+            array_keys($result->getEntry()->toArray()),
+        );
+    }
+
+    private function makeMessage(string ...$selectors): LdapMessageRequest
     {
         return new LdapMessageRequest(
             1,
             (new SearchRequest(Filters::present('objectClass')))
                 ->base('cn=monitor')
-                ->useBaseScope(),
+                ->useBaseScope()
+                ->setAttributes(...$selectors),
         );
     }
 
@@ -349,9 +371,12 @@ final class ServerMonitorHandlerTest extends TestCase
 
     private function responder(): GeneratedEntryResponder
     {
+        $schema = SchemaResource::Core->load();
+
         return new GeneratedEntryResponder(
             new RuleBasedAccessControl(),
-            new FilterEvaluator(),
+            new FilterEvaluator($schema),
+            $schema,
         );
     }
 }

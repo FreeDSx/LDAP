@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
-use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
@@ -112,32 +111,11 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
             $entry->set('altServer', (string) $this->options->getDseAltServer());
         }
 
-        $entry = $this->responder->readable(
+        // Every attribute here is operational, so "+" is the only wildcard that selects them (RFC 4512 section 5.1).
+        return $this->responder->respondWith(
+            $message,
             $entry,
             $token,
-        );
-
-        // Stripping and matching both precede attribute selection, since selecting must not change what matched.
-        if (!$this->responder->matches($message, $entry)) {
-            return $this->responder->reply(
-                $message,
-                null,
-            );
-        }
-
-        /** @var SearchRequest $request */
-        $request = $message->getRequest();
-
-        // Every attribute here is operational, so "+" is the only wildcard that selects them (RFC 4512 section 5.1).
-        $projection = AttributeProjection::forRequest(
-            $request->getAttributes(),
-            $request->getAttributesOnly(),
-            $this->options->getSchema(),
-        );
-
-        return $this->responder->reply(
-            $message,
-            $projection->project($entry),
         );
     }
 }

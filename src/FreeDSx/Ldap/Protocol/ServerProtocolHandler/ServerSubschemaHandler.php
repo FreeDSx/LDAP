@@ -70,14 +70,11 @@ class ServerSubschemaHandler implements ServerProtocolHandlerInterface
             ]),
         );
 
-        $entry = $this->responder->readable(
+        // The schema definitions are operational, so a client that does not ask for them gets the naming attributes only.
+        return $this->responder->respondWith(
+            $message,
             $entry,
             $token,
-        );
-
-        return $this->responder->reply(
-            $message,
-            $this->responder->matches($message, $entry) ? $entry : null,
         );
     }
 

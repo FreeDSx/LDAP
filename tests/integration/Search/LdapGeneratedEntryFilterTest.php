@@ -247,6 +247,69 @@ final class LdapGeneratedEntryFilterTest extends ServerTestCase
         self::assertNotNull($entry->get('supportedSaslMechanisms') ?? $entry->get('namingContexts'));
     }
 
+    public function test_the_subschema_withholds_its_definitions_unless_they_are_asked_for(): void
+    {
+        $this->authenticateUser();
+
+        self::assertSame(
+            ['objectClass', 'cn'],
+            $this->attributeNamesOf(self::SUBSCHEMA_DN, []),
+        );
+        self::assertContains(
+            'objectClasses',
+            $this->attributeNamesOf(self::SUBSCHEMA_DN, ['+']),
+        );
+    }
+
+    /**
+     * The filter runs against the whole entry, so narrowing the selection must not change what matched.
+     */
+    public function test_a_schema_definition_still_matches_when_it_is_not_selected(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->searchBase(
+            self::SUBSCHEMA_DN,
+            Filters::equal('objectClasses', '2.5.6.6'),
+            ['cn'],
+        );
+
+        self::assertCount(1, $entries);
+        self::assertSame(
+            ['cn'],
+            array_keys($entries->first()?->toArray() ?? []),
+        );
+    }
+
+    public function test_the_monitor_entry_narrows_to_the_requested_attributes(): void
+    {
+        $this->authenticateAdmin();
+
+        self::assertSame(
+            ['connectionsActive'],
+            $this->attributeNamesOf(self::MONITOR_DN, ['connectionsActive']),
+        );
+    }
+
+    /**
+     * @param list<string> $attributes
+     * @return list<string>
+     */
+    private function attributeNamesOf(
+        string $base,
+        array $attributes,
+    ): array {
+        $entry = $this->searchBase(
+            $base,
+            Filters::present('objectClass'),
+            $attributes,
+        )->first();
+
+        self::assertNotNull($entry);
+
+        return array_keys($entry->toArray());
+    }
+
     /**
      * @param list<string> $attributes
      */
