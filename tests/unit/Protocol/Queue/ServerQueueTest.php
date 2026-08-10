@@ -276,6 +276,31 @@ final class ServerQueueTest extends TestCase
         );
     }
 
+    public function test_peek_buffers_a_cancel_carrying_a_zero_message_id_and_returns_null(): void
+    {
+        $queue = $this->makeQueueWithEncodedRequest(
+            new LdapMessageRequest(0, new CancelRequest(2)),
+        );
+
+        self::assertNull($queue->peekForCancelSignal(2));
+
+        $buffered = $queue->getMessage();
+
+        self::assertSame(
+            0,
+            $buffered->getMessageId(),
+        );
+    }
+
+    public function test_peek_buffers_an_abandon_carrying_a_zero_message_id_and_returns_null(): void
+    {
+        $queue = $this->makeQueueWithEncodedRequest(
+            new LdapMessageRequest(0, new AbandonRequest(2)),
+        );
+
+        self::assertNull($queue->peekForCancelSignal(2));
+    }
+
     public function test_peek_buffers_abandon_targeting_different_message_and_returns_null(): void
     {
         $queue = $this->makeQueueWithEncodedRequest(

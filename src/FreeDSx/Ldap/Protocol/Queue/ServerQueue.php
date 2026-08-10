@@ -109,7 +109,9 @@ class ServerQueue extends LdapQueue implements ConnectionControl
         $message = $this->getMessage();
         $request = $message->getRequest();
 
-        if ($this->isAbandonOrCancelRequest($request, $inFlightMessageId)) {
+        // Peeking skips the validation middleware, and a Cancel is acknowledged under the ID it arrives with. Buffering
+        // an unusable one leaves the refusal to the middleware rather than tearing down the operation being streamed.
+        if ($message->getMessageId() !== 0 && $this->isAbandonOrCancelRequest($request, $inFlightMessageId)) {
             return $message;
         }
 
