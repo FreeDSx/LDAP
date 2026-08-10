@@ -121,6 +121,14 @@ trait ServerSearchTrait
             );
         }
 
+        // The size is constrained to (0..maxInt), and a negative one would otherwise mean an unbounded page.
+        if ($pagingControl->getSize() < 0) {
+            throw new OperationException(
+                'The paged results size must not be negative.',
+                ResultCode::PROTOCOL_ERROR,
+            );
+        }
+
         return $pagingControl;
     }
 

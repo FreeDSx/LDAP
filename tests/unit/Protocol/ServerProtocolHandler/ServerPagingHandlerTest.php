@@ -316,6 +316,76 @@ class ServerPagingHandlerTest extends TestCase
         );
     }
 
+    public function test_it_rejects_a_negative_page_size_on_the_initial_request(): void
+    {
+        $message = $this->makeSearchMessage(size: -1);
+
+        $this->mockBackend
+            ->expects(self::never())
+            ->method('search');
+
+        self::expectExceptionObject(new OperationException(
+            'The paged results size must not be negative.',
+            ResultCode::PROTOCOL_ERROR,
+        ));
+
+        $this->subject->handleRequest(
+            $message,
+            $this->mockToken,
+        );
+    }
+
+    public function test_it_rejects_a_negative_page_size_on_a_subsequent_request(): void
+    {
+        $entry1 = Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']);
+        $entry2 = Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']);
+        $entry3 = Entry::create('cn=3,dc=foo,dc=bar', ['cn' => '3']);
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2, $entry3)));
+
+        $subject = new ServerPagingHandler(
+            backend: $this->mockBackend,
+            filterEvaluator: $this->mockFilterEvaluator,
+            accessControl: $this->mockAccessControl,
+            requestHistory: $this->requestHistory,
+            schema: $this->schema,
+            limits: new SearchLimits(maxSearchPageSize: 1),
+        );
+        $this->drive($subject, $this->makeSearchMessage(size: 1));
+
+        $cookie = $this->donePagingControl()->getCookie();
+        self::assertNotSame('', $cookie);
+
+        $this->sentMessages = [];
+        $pagingReq = $this->requestHistory->pagingRequest()->findByNextCookie($cookie);
+
+        try {
+            $subject->handleRequest(
+                $this->makeSearchMessage(
+                    size: -1,
+                    cookie: $cookie,
+                    searchRequest: $pagingReq->getSearchRequest(),
+                ),
+                $this->mockToken,
+            );
+            self::fail('Expected the negative page size to be rejected.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                'The paged results size must not be negative.',
+                $e->getMessage(),
+            );
+            self::assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        }
+
+        // A negative size must not bypass the page bound and drain the rest of the result set.
+        self::assertSame([], $this->entryMessages());
+    }
+
     public function test_it_should_return_size_limit_exceeded_on_first_page_when_limit_is_hit(): void
     {
         $searchRequest = (new SearchRequest(Filters::raw('(foo=bar)')))
