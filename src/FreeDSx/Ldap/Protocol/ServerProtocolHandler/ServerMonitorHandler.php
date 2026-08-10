@@ -50,17 +50,13 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
         LdapMessageRequest $message,
         TokenInterface $token,
     ): ResponseStream {
-        $entry = $this->responder->readable(
+        return $this->responder->respondWith(
+            $message,
             Entry::fromArray(
                 self::DN,
                 $this->attributes($this->snapshots->snapshot()),
             ),
             $token,
-        );
-
-        return $this->responder->reply(
-            $message,
-            $this->responder->matches($message, $entry) ? $entry : null,
         );
     }
 

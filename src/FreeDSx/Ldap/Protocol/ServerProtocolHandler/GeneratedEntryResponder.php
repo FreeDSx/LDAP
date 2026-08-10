@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
+use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
@@ -37,6 +38,7 @@ final readonly class GeneratedEntryResponder
     public function __construct(
         private AccessControlInterface $accessControl,
         private FilterEvaluatorInterface $filterEvaluator,
+        private Schema $schema,
     ) {}
 
     /**
@@ -78,6 +80,37 @@ final readonly class GeneratedEntryResponder
     }
 
     /**
+     * The whole response path for a synthesized entry: read policy, then the filter, then attribute selection.
+     *
+     * Prefer this over calling the steps directly, so every generated entry answers the request the same way.
+     */
+    public function respondWith(
+        LdapMessageRequest $message,
+        Entry $entry,
+        TokenInterface $token,
+    ): ResponseStream {
+        $readable = $this->readable(
+            $entry,
+            $token,
+        );
+
+        if (!$this->matches($message, $readable)) {
+            return $this->reply(
+                $message,
+                null,
+            );
+        }
+
+        return $this->reply(
+            $message,
+            $this->project(
+                $message,
+                $readable,
+            ),
+        );
+    }
+
+    /**
      * Replies with the entry, or with an empty result when it is null.
      */
     public function reply(
@@ -93,5 +126,25 @@ final readonly class GeneratedEntryResponder
             OperationOutcomeResult::succeeded(),
             ...$responses,
         );
+    }
+
+    /**
+     * Narrows the entry to the request's attribute selection.
+     */
+    private function project(
+        LdapMessageRequest $message,
+        Entry $entry,
+    ): Entry {
+        $request = $message->getRequest();
+
+        if (!$request instanceof SearchRequest) {
+            return $entry;
+        }
+
+        return AttributeProjection::forRequest(
+            $request->getAttributes(),
+            $request->getAttributesOnly(),
+            $this->schema,
+        )->project($entry);
     }
 }

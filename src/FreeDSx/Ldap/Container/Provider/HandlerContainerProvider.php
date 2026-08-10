@@ -162,6 +162,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         return new GeneratedEntryResponder(
             $container->get(AccessControlInterface::class),
             $container->get(FilterEvaluatorInterface::class),
+            $container->get(ServerOptions::class)->getSchema(),
         );
     }
 

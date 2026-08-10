@@ -88,7 +88,7 @@ final class ServerSubschemaHandlerTest extends TestCase
 
     public function test_it_returns_non_empty_attribute_types_in_rfc4512_format(): void
     {
-        $entry = $this->handleAndCaptureEntry();
+        $entry = $this->handleAndCaptureEntry('+');
         $values = $entry->get('attributeTypes')?->getValues() ?? [];
 
         self::assertGreaterThan(0, count($values));
@@ -97,7 +97,7 @@ final class ServerSubschemaHandlerTest extends TestCase
 
     public function test_it_returns_non_empty_object_classes(): void
     {
-        $entry = $this->handleAndCaptureEntry();
+        $entry = $this->handleAndCaptureEntry('+');
 
         self::assertGreaterThan(
             0,
@@ -107,7 +107,7 @@ final class ServerSubschemaHandlerTest extends TestCase
 
     public function test_it_returns_non_empty_matching_rules(): void
     {
-        $entry = $this->handleAndCaptureEntry();
+        $entry = $this->handleAndCaptureEntry('+');
 
         self::assertGreaterThan(
             0,
@@ -117,7 +117,7 @@ final class ServerSubschemaHandlerTest extends TestCase
 
     public function test_it_returns_non_empty_ldap_syntaxes(): void
     {
-        $entry = $this->handleAndCaptureEntry();
+        $entry = $this->handleAndCaptureEntry('+');
 
         self::assertGreaterThan(
             0,
@@ -127,11 +127,36 @@ final class ServerSubschemaHandlerTest extends TestCase
 
     public function test_it_returns_non_empty_matching_rule_use(): void
     {
-        $entry = $this->handleAndCaptureEntry();
+        $entry = $this->handleAndCaptureEntry('+');
 
         self::assertGreaterThan(
             0,
             count($entry->get('matchingRuleUse')?->getValues() ?? []),
+        );
+    }
+
+    /**
+     * The schema definitions are operational, so a client that did not ask for them gets the naming attributes only.
+     */
+    public function test_a_bare_read_returns_only_the_naming_attributes(): void
+    {
+        foreach ([[], ['*']] as $selectors) {
+            $entry = $this->handleAndCaptureEntry(...$selectors);
+
+            self::assertSame(
+                ['objectClass', 'cn'],
+                array_keys($entry->toArray()),
+            );
+        }
+    }
+
+    public function test_a_named_schema_attribute_is_returned_on_its_own(): void
+    {
+        $entry = $this->handleAndCaptureEntry('objectClasses');
+
+        self::assertSame(
+            ['objectClasses'],
+            array_keys($entry->toArray()),
         );
     }
 
@@ -140,20 +165,24 @@ final class ServerSubschemaHandlerTest extends TestCase
         return new GeneratedEntryResponder(
             new RuleBasedAccessControl(),
             new FilterEvaluator($schema),
+            $schema,
         );
     }
 
-    private function makeMessage(): LdapMessageRequest
+    private function makeMessage(string ...$selectors): LdapMessageRequest
     {
         return new LdapMessageRequest(
             1,
-            (new SearchRequest(Filters::present('objectClass')))->base('cn=Subschema')->useBaseScope(),
+            (new SearchRequest(Filters::present('objectClass')))
+                ->base($this->options->getSubschemaEntry()->toString())
+                ->useBaseScope()
+                ->setAttributes(...$selectors),
         );
     }
 
-    private function handleAndCaptureEntry(): Entry
+    private function handleAndCaptureEntry(string ...$selectors): Entry
     {
-        $stream = $this->subject->handleRequest($this->makeMessage(), $this->mockToken);
+        $stream = $this->subject->handleRequest($this->makeMessage(...$selectors), $this->mockToken);
         $messages = [...$stream->messages];
 
         /** @var SearchResultEntry $result */
