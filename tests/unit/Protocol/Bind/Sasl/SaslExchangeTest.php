@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Bind\Sasl;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\RequestValidationException;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -225,6 +226,54 @@ final class SaslExchangeTest extends TestCase
         self::expectExceptionCode(ResultCode::PROTOCOL_ERROR);
 
         $this->subject->run($this->makeInput());
+    }
+
+    public function test_it_rejects_a_continuation_carrying_a_zero_message_id(): void
+    {
+        $this->mockChallenge
+            ->method('challenge')
+            ->willReturn($this->makeContext(isComplete: false, response: 'server-challenge'));
+
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage'); // SASL_BIND_IN_PROGRESS only; a zero ID cannot frame a response
+
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('getMessage')
+            ->willReturn(new LdapMessageRequest(
+                0,
+                new SaslBindRequest('PLAIN'),
+            ));
+
+        self::expectException(RequestValidationException::class);
+
+        $this->subject->run($this->makeInput());
+    }
+
+    public function test_it_accepts_a_continuation_reusing_the_initial_message_id(): void
+    {
+        $this->mockChallenge
+            ->method('challenge')
+            ->willReturnOnConsecutiveCalls(
+                $this->makeContext(isComplete: false, response: 'server-challenge'),
+                $this->makeContext(isComplete: true, response: 'server-final'),
+            );
+
+        $this->mockQueue->method('sendMessage');
+        $this->mockQueue
+            ->method('getMessage')
+            ->willReturn(new LdapMessageRequest(
+                1,
+                new SaslBindRequest('PLAIN', 'creds'),
+            ));
+
+        $result = $this->subject->run($this->makeInput());
+
+        self::assertSame(
+            1,
+            $result->getLastMessage()->getMessageId(),
+        );
     }
 
     public function test_cram_md5_credentials_in_the_initial_bind_do_not_authenticate(): void

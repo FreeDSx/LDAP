@@ -21,7 +21,7 @@ use SensitiveParameter;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class PasswordHashService
+readonly class PasswordHashService
 {
     /**
      * Read-only legacy prefixes recognized in addition to the writable {@see PasswordHashScheme} set.
@@ -35,7 +35,7 @@ final readonly class PasswordHashService
     ];
 
     /**
-     * @param int|null $hashCost bcrypt cost forwarded to password_hash(); null uses the PHP default (10). Does not apply to argon2.
+     * @param int|null $hashCost bcrypt cost forwarded to password_hash(); null uses the PHP default. Does not apply to argon2.
      */
     public function __construct(
         private PasswordHashScheme $scheme = PasswordHashScheme::Bcrypt,
