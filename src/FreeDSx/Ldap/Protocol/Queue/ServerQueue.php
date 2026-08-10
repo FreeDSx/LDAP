@@ -18,6 +18,7 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Exception\RequestValidationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
@@ -35,6 +36,7 @@ use FreeDSx\Socket\Queue\Message;
 use FreeDSx\Socket\Socket;
 use Generator;
 
+use function count;
 use function strlen;
 
 /**
@@ -44,6 +46,11 @@ use function strlen;
  */
 class ServerQueue extends LdapQueue implements ConnectionControl
 {
+    /**
+     * Well above what a pipelining client sends mid-stream, but low enough to bound what one connection can buffer.
+     */
+    private const MAX_PENDING_MESSAGES = 128;
+
     /**
      * @var LdapMessageRequest[]
      */
@@ -83,35 +90,38 @@ class ServerQueue extends LdapQueue implements ConnectionControl
             return array_shift($this->pendingMessages);
         }
 
-        $message = $this->getAndValidateMessage($id);
-
-        if (!$message instanceof LdapMessageRequest) {
-            throw new ProtocolException(sprintf(
-                'Expected an instance of LdapMessageResponse but got: %s',
-                get_class($message),
-            ));
-        }
-
-        return $message;
+        return $this->readRequest($id);
     }
 
     /**
      * Checks whether an Abandon or Cancel targeting a message ID has arrived.
      *
      * Other messages received while peeking are buffered.
+     *
+     * @throws RequestValidationException if a peeked message carries an unusable message ID.
      */
     public function peekForCancelSignal(int $inFlightMessageId): ?LdapMessageRequest
     {
+        // Nothing drains the buffer until the stream ends, so reading pauses here, and the socket holds the backlog.
+        if (count($this->pendingMessages) >= self::MAX_PENDING_MESSAGES) {
+            return null;
+        }
+
         if (!$this->hasPendingData()) {
             return null;
         }
 
-        $message = $this->getMessage();
+        // Reads past anything already buffered; draining that here would re-inspect the same message forever.
+        $message = $this->readRequest(null);
+
+        // Peeking skips the validation middleware, and buffering defers a refusal a persist stream never reaches.
+        if ($message->getMessageId() === 0) {
+            throw new RequestValidationException('The message ID 0 cannot be used in a client request.');
+        }
+
         $request = $message->getRequest();
 
-        // Peeking skips the validation middleware, and a Cancel is acknowledged under the ID it arrives with. Buffering
-        // an unusable one leaves the refusal to the middleware rather than tearing down the operation being streamed.
-        if ($message->getMessageId() !== 0 && $this->isAbandonOrCancelRequest($request, $inFlightMessageId)) {
+        if ($this->isAbandonOrCancelRequest($request, $inFlightMessageId)) {
             return $message;
         }
 
@@ -204,6 +214,24 @@ class ServerQueue extends LdapQueue implements ConnectionControl
         }
 
         return $response;
+    }
+
+    /**
+     * @throws ProtocolException
+     * @throws UnsolicitedNotificationException
+     * @throws ConnectionException
+     */
+    private function readRequest(?int $id): LdapMessageRequest
+    {
+        $message = $this->getAndValidateMessage($id);
+        if (!$message instanceof LdapMessageRequest) {
+            throw new ProtocolException(sprintf(
+                'Expected an instance of LdapMessageResponse but got: %s',
+                get_class($message),
+            ));
+        }
+
+        return $message;
     }
 
     /**
