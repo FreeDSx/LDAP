@@ -177,7 +177,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testItCanRetrieveTheRootDSE(): void
     {
-        $rootDse = $this->ldapClient()->read();
+        $rootDse = $this->ldapClient()->read('', ['*', '+']);
 
         $this->assertNotNull($rootDse);
         $this->assertSame(
@@ -246,6 +246,19 @@ final class LdapServerTest extends ServerTestCase
         );
     }
 
+    public function testABareRootDseReadReturnsOnlyItsUserAttributes(): void
+    {
+        foreach ([[], ['*']] as $selectors) {
+            $rootDse = $this->ldapClient()->read('', $selectors);
+
+            $this->assertNotNull($rootDse);
+            $this->assertSame(
+                ['objectClass'],
+                array_keys($rootDse->toArray()),
+            );
+        }
+    }
+
     public function testTheRootDseReturnsNoAttributesForTheNoAttributesSelector(): void
     {
         $rootDse = $this->ldapClient()->read('', ['1.1']);
@@ -257,9 +270,42 @@ final class LdapServerTest extends ServerTestCase
         );
     }
 
+    public function testASearchWithholdsOperationalAttributesUnlessTheyAreAsked(): void
+    {
+        $this->authenticateUser();
+        $dn = 'cn=user,dc=foo,dc=bar';
+
+        $this->assertSame(
+            ['entryUUID'],
+            $this->attributeNamesOf($dn, ['entryUUID']),
+        );
+
+        foreach ([[], ['*']] as $selectors) {
+            $names = $this->attributeNamesOf($dn, $selectors);
+
+            $this->assertContains('cn', $names);
+            $this->assertNotContains('entryUUID', $names);
+            $this->assertNotContains('createTimestamp', $names);
+        }
+    }
+
+    public function testTheStarSelectorAlsoReturnsAnOperationalAttributeNamedAlongsideIt(): void
+    {
+        $this->authenticateUser();
+
+        $names = $this->attributeNamesOf(
+            'cn=user,dc=foo,dc=bar',
+            ['*', 'entryUUID'],
+        );
+
+        $this->assertContains('cn', $names);
+        $this->assertContains('entryUUID', $names);
+        $this->assertNotContains('createTimestamp', $names);
+    }
+
     public function testTheRootDseAdvertisesThePasswordPolicyControl(): void
     {
-        $rootDse = $this->ldapClient()->read();
+        $rootDse = $this->ldapClient()->read('', ['supportedControl']);
 
         $this->assertNotNull($rootDse);
         $this->assertContains(
@@ -876,5 +922,18 @@ final class LdapServerTest extends ServerTestCase
             'cn' => [$cn],
             'sn' => ['Test'],
         ]);
+    }
+
+    /**
+     * @param list<string> $selectors
+     * @return list<string>
+     */
+    private function attributeNamesOf(
+        string $dn,
+        array $selectors,
+    ): array {
+        return array_keys($this->ldapClient()
+            ->readOrFail($dn, $selectors)
+            ->toArray());
     }
 }

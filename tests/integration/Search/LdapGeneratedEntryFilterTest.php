@@ -239,7 +239,7 @@ final class LdapGeneratedEntryFilterTest extends ServerTestCase
         $this->stopServer();
         $this->createServerProcess('tcp', ['--monitor', '--hide-rootdse-vendor']);
 
-        $entries = $this->searchBase('', Filters::present('objectClass'));
+        $entries = $this->searchBase('', Filters::present('objectClass'), ['+']);
         $entry = $entries->first();
 
         self::assertNotNull($entry);
