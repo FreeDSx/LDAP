@@ -187,7 +187,7 @@ final class Driver
                 fclose($parentReady);
                 fclose($parentGo);
                 $this->runChild(
-                    $i,
+                    $this->config->workerIdOffset + $i,
                     $mix,
                     $childReady,
                     $childGo,

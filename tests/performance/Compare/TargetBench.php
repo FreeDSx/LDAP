@@ -31,6 +31,11 @@ use Throwable;
  */
 final class TargetBench
 {
+    /**
+     * Kept under the smallest default size limit the benched servers enforce.
+     */
+    private const CLEANUP_PAGE_SIZE = 500;
+
     public readonly string $benchBaseDn;
 
     public readonly string $writeBaseDn;
@@ -68,6 +73,14 @@ final class TargetBench
             '.',
             array_map('strtolower', $matches[1]),
         );
+    }
+
+    /**
+     * Proves the server is reachable and the credentials work, so a bad side is reported before anything is seeded.
+     */
+    public function preflight(): void
+    {
+        $this->bindIfNeeded();
     }
 
     public function seed(int $seedEntries): void
@@ -109,26 +122,7 @@ final class TargetBench
         // The seed connection may have gone idle and been dropped during the run, so reconnect for a reliable teardown.
         $this->reconnect();
 
-        try {
-            $entries = $this->client->search(
-                Operations::search(
-                    Filters::present('objectClass'),
-                )
-                    ->base($this->benchBaseDn)
-                    ->useSubtreeScope(),
-            );
-        } catch (OperationException $e) {
-            if ($e->getCode() === ResultCode::NO_SUCH_OBJECT) {
-                return;
-            }
-
-            throw $e;
-        }
-
-        $dns = [];
-        foreach ($entries as $entry) {
-            $dns[] = (string) $entry->getDn();
-        }
+        $dns = $this->subtreeDns();
 
         usort(
             $dns,
@@ -155,6 +149,38 @@ final class TargetBench
         }
 
         $this->bound = false;
+    }
+
+    /**
+     * A seeded subtree outgrows the size limit a single search is capped at, so it is collected a page at a time.
+     *
+     * @return list<string>
+     * @throws OperationException
+     */
+    private function subtreeDns(): array
+    {
+        $paging = $this->client->paging(
+            Operations::search(Filters::present('objectClass'))
+                ->base($this->benchBaseDn)
+                ->useSubtreeScope(),
+            self::CLEANUP_PAGE_SIZE,
+        );
+
+        $dns = [];
+
+        try {
+            while ($paging->hasEntries()) {
+                foreach ($paging->getEntries() as $entry) {
+                    $dns[] = (string) $entry->getDn();
+                }
+            }
+        } catch (OperationException $e) {
+            if ($e->getCode() !== ResultCode::NO_SUCH_OBJECT) {
+                throw $e;
+            }
+        }
+
+        return $dns;
     }
 
     private function buildClient(): LdapClient
