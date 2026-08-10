@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\ClientOptions;
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\BindException;
@@ -717,6 +719,49 @@ final class LdapServerTest extends ServerTestCase
 
         $paging->end();
         $this->assertFalse($paging->hasEntries());
+    }
+
+    public function testANegativePageSizeIsRejectedOnASubsequentPagingRequest(): void
+    {
+        $this->authenticateUser();
+
+        $search = Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar');
+
+        $response = $this->ldapClient()->sendAndReceive(
+            $search,
+            new PagingControl(1, ''),
+        );
+        $paging = $response->controls()->get(Control::OID_PAGING);
+
+        $this->assertInstanceOf(
+            PagingControl::class,
+            $paging,
+        );
+        $this->assertNotSame(
+            '',
+            $paging->getCookie(),
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::PROTOCOL_ERROR);
+
+        $this->ldapClient()->sendAndReceive(
+            $search,
+            new PagingControl(-1, $paging->getCookie()),
+        );
+    }
+
+    public function testANegativePageSizeIsRejectedOnTheInitialPagingRequest(): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::PROTOCOL_ERROR);
+
+        $this->ldapClient()->sendAndReceive(
+            Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'),
+            new PagingControl(-1, ''),
+        );
     }
 
     public function testAnUnfinishedPagingSessionIsDiscardedOnceTheCapIsReached(): void
