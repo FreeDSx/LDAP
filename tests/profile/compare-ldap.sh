@@ -72,8 +72,9 @@ resolve_svc() {
     local key="$1" p="$2"
     case "$key" in
         freedsx)
+            # Seeding and the write ops need an administrator, matching the root identity the other two sides bind as.
             declare -g "${p}_SVC=freedsx-server" "${p}_CONT=freedsx-profile-server" "${p}_PORT=10389" \
-                "${p}_BIND=cn=user,dc=foo,dc=bar" "${p}_PW=12345" "${p}_BASE=dc=foo,dc=bar" \
+                "${p}_BIND=cn=admin,dc=foo,dc=bar" "${p}_PW=12345" "${p}_BASE=dc=foo,dc=bar" \
                 "${p}_LABEL=FreeDSx/$STORAGE" "${p}_SETUP=none" ;;
         openldap)
             declare -g "${p}_SVC=openldap" "${p}_CONT=freedsx-profile-openldap" "${p}_PORT=389" \

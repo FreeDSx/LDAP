@@ -272,6 +272,25 @@ final class BenchCompareCommand extends Command
         $sourceSnapshot = null;
         $benches = [];
 
+        // Both sides are contacted first: seeding one side is wasted work if the other turns out to be unreachable.
+        $unreachable = $this->unreachableSides(array_values(array_filter([
+            $skipTarget ? null : $targetSide,
+            $skipSource ? null : $sourceSide,
+        ])));
+
+        if ($unreachable !== []) {
+            foreach ($unreachable as $reason) {
+                $output->writeln('<error>' . $reason . '</error>');
+            }
+            $output->writeln(
+                '<comment>This command benchmarks running servers rather than starting them. Bring the bench stack up '
+                . 'with "composer profile-up" (or use "composer compare-ldap", which does both), point --source-port / '
+                . '--target-port at your own servers, or pass --skip-target / --skip-source to run one side.</comment>',
+            );
+
+            return Command::FAILURE;
+        }
+
         try {
             if (!$skipTarget) {
                 $targetSnapshot = $this->runSide($output, $progress, $targetSide, $params, $benches);
@@ -300,6 +319,40 @@ final class BenchCompareCommand extends Command
     }
 
     /**
+     * @param list<BenchSide> $sides
+     * @return list<string> one message per side that could not be reached, empty when all are usable
+     */
+    private function unreachableSides(array $sides): array
+    {
+        $reasons = [];
+
+        foreach ($sides as $side) {
+            $bench = $this->makeBench($side);
+
+            try {
+                $bench->preflight();
+            } catch (Throwable $e) {
+                $reasons[] = $e->getMessage();
+            } finally {
+                $bench->close();
+            }
+        }
+
+        return $reasons;
+    }
+
+    private function makeBench(BenchSide $side): TargetBench
+    {
+        return new TargetBench(
+            host: $side->host,
+            port: $side->port,
+            bindDn: $side->bindDn,
+            bindPassword: $side->bindPassword,
+            rootBaseDn: $side->baseDn,
+        );
+    }
+
+    /**
      * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSizeLimit: int, searchValue: string, driverProcesses: int} $params
      * @param list<TargetBench> $benches
      */
@@ -310,13 +363,7 @@ final class BenchCompareCommand extends Command
         array $params,
         array &$benches,
     ): StatsSnapshot {
-        $bench = new TargetBench(
-            host: $side->host,
-            port: $side->port,
-            bindDn: $side->bindDn,
-            bindPassword: $side->bindPassword,
-            rootBaseDn: $side->baseDn,
-        );
+        $bench = $this->makeBench($side);
         $benches[] = $bench;
 
         $this->seedSide(

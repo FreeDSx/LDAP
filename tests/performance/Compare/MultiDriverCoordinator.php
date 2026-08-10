@@ -198,6 +198,7 @@ final class MultiDriverCoordinator
             jit: $base->jit,
             searchSizeLimit: $base->searchSizeLimit,
             searchValue: $base->searchValue,
+            workerIdOffset: $childIndex * $base->clients,
         );
     }
 

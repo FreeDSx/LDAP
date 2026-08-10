@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Schema\Schema;
 /**
  * Projects an entry onto a search request's attribute selection list (RFC 4511 §4.5.1.8, RFC 3673).
  *
- *   - empty list / "*" = all user attributes; operational ones only when also named
+ *   - empty list / "*" = all user attributes (operational ones only when also named)
  *   - "+"              = all operational attributes (classified via the supplied schema)
  *   - "1.1"            = no attributes (DN only)
  *   - explicit names   = only those, whatever their usage
@@ -38,6 +38,13 @@ final class AttributeProjection
      * @var array<string, bool>
      */
     private array $operationalByName = [];
+
+    /**
+     * Per-instance memo of the selection decision keyed on attribute description.
+     *
+     * @var array<string, bool>
+     */
+    private array $includeByDescription = [];
 
     /**
      * @param string[] $names
@@ -76,10 +83,11 @@ final class AttributeProjection
 
     public function project(Entry $entry): Entry
     {
+        $attributes = $entry->getAttributes();
         $filteredAttributes = [];
 
         if (!$this->returnNone) {
-            foreach ($entry->getAttributes() as $attribute) {
+            foreach ($attributes as $attribute) {
                 if (!$this->shouldInclude($attribute)) {
                     continue;
                 }
@@ -90,6 +98,11 @@ final class AttributeProjection
             }
         }
 
+        // Nothing was withheld, so the entry already is its own projection.
+        if (!$this->typesOnly && count($filteredAttributes) === count($attributes)) {
+            return $entry;
+        }
+
         return Entry::raw(
             $entry->getDn(),
             $filteredAttributes,
@@ -98,7 +111,13 @@ final class AttributeProjection
 
     private function shouldInclude(Attribute $attribute): bool
     {
-        if (in_array(strtolower($attribute->getDescription()), $this->names, true)) {
+        return $this->includeByDescription[$attribute->getDescription()]
+            ??= $this->decideInclude($attribute);
+    }
+
+    private function decideInclude(Attribute $attribute): bool
+    {
+        if ($this->names !== [] && in_array(strtolower($attribute->getDescription()), $this->names, true)) {
             return true;
         }
 
