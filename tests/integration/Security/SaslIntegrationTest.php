@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Security;
 
 use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\ResponseInterface;
@@ -156,17 +157,45 @@ final class SaslIntegrationTest extends ServerTestCase
     }
 
     /**
+     * Credentials that would otherwise authenticate, so only the message ID can account for the refusal.
+     */
+    public function testSaslContinuationCarryingAZeroMessageIdIsRefused(): void
+    {
+        $queue = $this->rawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            1,
+            new SaslBindRequest('CRAM-MD5'),
+        ));
+        $challenge = $queue->getMessage(1)->getResponse();
+        self::assertInstanceOf(
+            BindResponse::class,
+            $challenge,
+        );
+
+        $queue->sendMessage(new LdapMessageRequest(
+            0,
+            new SaslBindRequest(
+                'CRAM-MD5',
+                'user ' . hash_hmac('md5', (string) $challenge->getSaslCredentials(), '12345'),
+            ),
+        ));
+
+        try {
+            $queue->getMessage();
+            self::fail('The continuation was accepted.');
+        } catch (UnsolicitedNotificationException $e) {
+            self::assertTrue($e->isNoticeOfDisconnection());
+        } finally {
+            $queue->close();
+        }
+    }
+
+    /**
      * The stock client never puts these credentials in an initial bind, so the request is sent raw.
      */
     private function sendRawBind(SaslBindRequest $request): ResponseInterface
     {
-        $queue = new ClientQueue(new SocketPool(
-            (new SocketPoolOptions(
-                (new SocketOptions())
-                    ->setPort(TestWorker::port())
-                    ->setTimeoutConnect(1),
-            ))->setServers(['127.0.0.1']),
-        ));
+        $queue = $this->rawQueue();
 
         $queue->sendMessage(new LdapMessageRequest(
             1,
@@ -176,5 +205,16 @@ final class SaslIntegrationTest extends ServerTestCase
         $queue->close();
 
         return $response;
+    }
+
+    private function rawQueue(): ClientQueue
+    {
+        return new ClientQueue(new SocketPool(
+            (new SocketPoolOptions(
+                (new SocketOptions())
+                    ->setPort(TestWorker::port())
+                    ->setTimeoutConnect(1),
+            ))->setServers(['127.0.0.1']),
+        ));
     }
 }

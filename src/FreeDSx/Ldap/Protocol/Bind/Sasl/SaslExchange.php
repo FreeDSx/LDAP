@@ -17,6 +17,7 @@ use Closure;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\RequestValidationException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
@@ -303,9 +304,15 @@ final class SaslExchange
      * Validates that the message received mid-exchange is a SASL bind continuation.
      *
      * @throws OperationException if the client sends a non-SASL request.
+     * @throws RequestValidationException if the continuation carries an unusable message ID.
      */
     private function requireSaslContinuation(LdapMessageRequest $message): SaslBindRequest
     {
+        // Continuations skip the validation middleware, and the challenge echoes back whatever ID arrives.
+        if ($message->getMessageId() === 0) {
+            throw new RequestValidationException('The message ID 0 cannot be used in a client request.');
+        }
+
         $request = $message->getRequest();
 
         if ($request instanceof SaslBindRequest) {

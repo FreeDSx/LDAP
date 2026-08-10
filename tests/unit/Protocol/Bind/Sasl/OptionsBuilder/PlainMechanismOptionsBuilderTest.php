@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\PlainMechanismOptionsBuilder;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Options\PlainOptions;
@@ -120,5 +121,63 @@ final class PlainMechanismOptionsBuilderTest extends TestCase
             'cn=user,dc=foo,dc=bar',
             $this->subject->getResolvedDn()?->toString(),
         );
+    }
+
+    public function test_a_name_resolving_to_nothing_is_refused_at_the_cost_of_a_comparison(): void
+    {
+        $hashService = $this->createMock(PasswordHashService::class);
+        $hashService->expects(self::once())
+            ->method('verifyDummy')
+            ->with('wrong');
+
+        $this->mockAuthenticator
+            ->method('getSaslIdentity')
+            ->willReturn(null);
+
+        $subject = new PlainMechanismOptionsBuilder(
+            $this->mockAuthenticator,
+            $hashService,
+        );
+        $options = $subject->buildOptions(null, MechanismName::PLAIN);
+        assert($options instanceof PlainOptions);
+        $validate = $options->getValidate();
+        assert(is_callable($validate));
+
+        self::assertFalse($validate(
+            null,
+            'unknown',
+            'wrong',
+        ));
+    }
+
+    public function test_a_resolved_name_is_not_charged_a_dummy_comparison(): void
+    {
+        $hashService = $this->createMock(PasswordHashService::class);
+        $hashService->expects(self::never())
+            ->method('verifyDummy');
+        $hashService->method('verify')
+            ->willReturn(false);
+
+        $this->mockAuthenticator
+            ->method('getSaslIdentity')
+            ->willReturn(new SaslIdentity(
+                'correct',
+                new Dn('cn=user,dc=foo,dc=bar'),
+            ));
+
+        $subject = new PlainMechanismOptionsBuilder(
+            $this->mockAuthenticator,
+            $hashService,
+        );
+        $options = $subject->buildOptions(null, MechanismName::PLAIN);
+        assert($options instanceof PlainOptions);
+        $validate = $options->getValidate();
+        assert(is_callable($validate));
+
+        self::assertFalse($validate(
+            null,
+            'cn=user,dc=foo,dc=bar',
+            'wrong',
+        ));
     }
 }

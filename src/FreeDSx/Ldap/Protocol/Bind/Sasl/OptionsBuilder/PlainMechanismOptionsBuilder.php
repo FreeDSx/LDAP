@@ -47,7 +47,14 @@ class PlainMechanismOptionsBuilder implements MechanismOptionsBuilderInterface
                     MechanismName::PLAIN,
                 );
 
-                if ($identity === null || !$this->hashService->verify($password, $identity->password)) {
+                // Refuses a name that reached no stored value at the cost of one that did.
+                if ($identity === null) {
+                    $this->hashService->verifyDummy($password);
+
+                    return false;
+                }
+
+                if (!$this->hashService->verify($password, $identity->password)) {
                     return false;
                 }
 
