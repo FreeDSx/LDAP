@@ -30,9 +30,12 @@ final class WriteEntryOperationHandler
         Entry $entry,
         WriteRequestInterface $command,
     ): Entry {
+        // Work on a copy so a command rejected by later validation leaves the stored entry untouched.
+        $target = $entry->makeCopy();
+
         return match (true) {
-            $command instanceof UpdateCommand => (new UpdateOperation())->execute($entry, $command),
-            $command instanceof MoveCommand => (new MoveOperation())->execute($entry, $command),
+            $command instanceof UpdateCommand => (new UpdateOperation())->execute($target, $command),
+            $command instanceof MoveCommand => (new MoveOperation())->execute($target, $command),
             default => throw new LogicException(
                 sprintf('No entry operation handler for %s', $command::class),
             ),

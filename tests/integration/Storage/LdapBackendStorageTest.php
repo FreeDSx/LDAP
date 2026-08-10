@@ -445,6 +445,35 @@ class LdapBackendStorageTest extends ServerTestCase
         self::assertSame(['Jones'], $entries->first()?->get('sn')?->getValues());
     }
 
+    public function testRejectedModifyLeavesTheEntryUnchanged(): void
+    {
+        $this->authenticateAdmin();
+
+        // cn=user has no extensibleObject class, so removing a required attribute is actually refused.
+        $entry = Entry::fromArray('cn=user,dc=foo,dc=bar');
+        $entry->reset('sn');
+
+        try {
+            $this->ldapClient()->update($entry);
+            self::fail('The schema violating modify should have been rejected.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::OBJECT_CLASS_VIOLATION,
+                $e->getCode(),
+            );
+        }
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'sn')
+                ->base('cn=user,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+        self::assertSame(
+            ['Admin'],
+            $found->first()?->get('sn')?->getValues(),
+        );
+    }
+
     public function testRenameChangesRdn(): void
     {
         $this->authenticateAdmin();
