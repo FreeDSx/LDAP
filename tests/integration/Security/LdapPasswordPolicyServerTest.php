@@ -18,6 +18,9 @@ use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Search\Filters;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 
 final class LdapPasswordPolicyServerTest extends ServerTestCase
@@ -71,6 +74,47 @@ final class LdapPasswordPolicyServerTest extends ServerTestCase
         $this->assertFalse(
             $response->controls()->has(Control::OID_PWD_POLICY),
             'A clean bind should not carry a password policy response control.',
+        );
+    }
+
+    public function testACriticalPasswordPolicyControlIsAcceptedOnANonBindOperation(): void
+    {
+        $this->ldapClient()->bind(
+            'cn=user,dc=foo,dc=bar',
+            self::PASSWORD,
+        );
+
+        // The control may accompany any request, so a critical one must not be refused outside the bind.
+        $response = $this->ldapClient()->sendAndReceive(
+            Operations::whoami(),
+            Controls::pwdPolicy(),
+        )->getResponse();
+
+        $this->assertInstanceOf(
+            ExtendedResponse::class,
+            $response,
+        );
+        $this->assertSame(
+            'dn:cn=user,dc=foo,dc=bar',
+            $response->getValue(),
+        );
+    }
+
+    public function testACriticalPasswordPolicyControlIsAcceptedOnASearch(): void
+    {
+        $this->ldapClient()->bind(
+            'cn=user,dc=foo,dc=bar',
+            self::PASSWORD,
+        );
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'),
+            Controls::pwdPolicy(),
+        );
+
+        $this->assertGreaterThan(
+            0,
+            $entries->count(),
         );
     }
 

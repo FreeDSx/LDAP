@@ -202,6 +202,7 @@ final class LdapServerTest extends ServerTestCase
                     '1.3.6.1.1.13.2',
                     '1.2.840.113556.1.4.805',
                     '1.3.6.1.4.1.4203.1.10.1',
+                    '1.3.6.1.4.1.42.2.27.8.5.1',
                     '1.3.6.1.4.1.4203.1.9.1.1',
                 ],
                 'supportedExtension' => [
@@ -223,6 +224,47 @@ final class LdapServerTest extends ServerTestCase
                 ],
             ],
             $rootDse->toArray(),
+        );
+    }
+
+    public function testTheRootDseReturnsItsOperationalAttributesForThePlusSelector(): void
+    {
+        $rootDse = $this->ldapClient()->read('', ['+']);
+
+        $this->assertNotNull($rootDse);
+        $this->assertSame(
+            [
+                'namingContexts',
+                'subschemaSubentry',
+                'supportedControl',
+                'supportedExtension',
+                'supportedFeatures',
+                'supportedLDAPVersion',
+                'vendorName',
+            ],
+            array_keys($rootDse->toArray()),
+        );
+    }
+
+    public function testTheRootDseReturnsNoAttributesForTheNoAttributesSelector(): void
+    {
+        $rootDse = $this->ldapClient()->read('', ['1.1']);
+
+        $this->assertNotNull($rootDse);
+        $this->assertSame(
+            [],
+            $rootDse->toArray(),
+        );
+    }
+
+    public function testTheRootDseAdvertisesThePasswordPolicyControl(): void
+    {
+        $rootDse = $this->ldapClient()->read();
+
+        $this->assertNotNull($rootDse);
+        $this->assertContains(
+            Control::OID_PWD_POLICY,
+            $rootDse->get('supportedControl')?->getValues() ?? [],
         );
     }
 
