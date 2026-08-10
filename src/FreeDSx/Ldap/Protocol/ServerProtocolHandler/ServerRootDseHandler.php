@@ -25,8 +25,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 
-use function count;
-
 /**
  * Handles RootDSE based search requests.
  *
@@ -74,6 +72,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
                 Control::OID_POST_READ,
                 Control::OID_SUBTREE_DELETE,
                 Control::OID_SUBENTRIES,
+                Control::OID_PWD_POLICY,
             ],
             'supportedExtension' => [
                 ExtendedRequest::OID_WHOAMI,
@@ -128,43 +127,17 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
 
         /** @var SearchRequest $request */
         $request = $message->getRequest();
-        $this->filterEntryAttributes($request, $entry);
+
+        // Every attribute here is operational, so "+" is the only wildcard that selects them (RFC 4512 section 5.1).
+        $projection = AttributeProjection::forRequest(
+            $request->getAttributes(),
+            $request->getAttributesOnly(),
+            $this->options->getSchema(),
+        );
 
         return $this->responder->reply(
             $message,
-            $entry,
+            $projection->project($entry),
         );
-    }
-
-    /**
-     * Filters attributes from an entry to return only what was requested.
-     */
-    private function filterEntryAttributes(
-        SearchRequest $request,
-        Entry $entry,
-    ): void {
-        if (count($request->getAttributes()) !== 0) {
-            foreach ($entry->getAttributes() as $dseAttr) {
-                $found = false;
-                foreach ($request->getAttributes() as $attribute) {
-                    if ($attribute->equals($dseAttr)) {
-                        $found = true;
-                        break;
-                    }
-                }
-                if ($found === true && $request->getAttributesOnly()) {
-                    $dseAttr->reset();
-                }
-                if ($found === false) {
-                    $entry->reset($dseAttr);
-                    $entry->changes()->reset();
-                }
-            }
-        }
-        if ($request->getAttributesOnly()) {
-            foreach ($entry->getAttributes() as $attribute) {
-                $attribute->reset();
-            }
-        }
     }
 }

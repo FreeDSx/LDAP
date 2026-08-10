@@ -87,7 +87,7 @@ final class CoreSchemaResourceTest extends TestCase
     public function test_has_expected_attribute_type_count(): void
     {
         self::assertCount(
-            48,
+            57,
             $this->schema->getAttributeTypes(),
         );
     }
@@ -331,6 +331,37 @@ final class CoreSchemaResourceTest extends TestCase
 
         self::assertNotNull($attr);
         self::assertFalse($attr->noUserModification);
+    }
+
+    /**
+     * @param string $name
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('rootDseAttributes')]
+    public function test_root_dse_attributes_are_dsa_operational(string $name): void
+    {
+        $attr = $this->schema->getAttributeType($name);
+
+        self::assertNotNull($attr);
+        self::assertSame(
+            AttributeUsage::DsaOperation,
+            $attr->usage,
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function rootDseAttributes(): iterable
+    {
+        yield 'altServer' => ['altServer'];
+        yield 'namingContexts' => ['namingContexts'];
+        yield 'supportedControl' => ['supportedControl'];
+        yield 'supportedExtension' => ['supportedExtension'];
+        yield 'supportedFeatures' => ['supportedFeatures'];
+        yield 'supportedLDAPVersion' => ['supportedLDAPVersion'];
+        yield 'supportedSASLMechanisms' => ['supportedSASLMechanisms'];
+        yield 'vendorName' => ['vendorName'];
+        yield 'vendorVersion' => ['vendorVersion'];
     }
 
     public function test_administrative_role_is_multi_valued_and_operational(): void

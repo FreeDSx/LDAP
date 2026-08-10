@@ -33,6 +33,7 @@ final class ServerControlRegistryTest extends TestCase
             [
                 Control::OID_PROXY_AUTHORIZATION,
                 Control::OID_MANAGE_DSA_IT,
+                Control::OID_PWD_POLICY,
                 Control::OID_SORTING,
                 Control::OID_ASSERTION,
                 Control::OID_SUBENTRIES,
@@ -47,6 +48,7 @@ final class ServerControlRegistryTest extends TestCase
             [
                 Control::OID_PROXY_AUTHORIZATION,
                 Control::OID_MANAGE_DSA_IT,
+                Control::OID_PWD_POLICY,
                 Control::OID_PAGING,
                 Control::OID_SORTING,
                 Control::OID_ASSERTION,
@@ -62,6 +64,7 @@ final class ServerControlRegistryTest extends TestCase
             [
                 Control::OID_PROXY_AUTHORIZATION,
                 Control::OID_MANAGE_DSA_IT,
+                Control::OID_PWD_POLICY,
                 Control::OID_RELAX_RULES,
                 Control::OID_ASSERTION,
                 Control::OID_PRE_READ,
@@ -82,7 +85,20 @@ final class ServerControlRegistryTest extends TestCase
             [
                 Control::OID_PROXY_AUTHORIZATION,
                 Control::OID_MANAGE_DSA_IT,
+                Control::OID_PWD_POLICY,
             ],
+            $this->subject->supportedControlsFor($id),
+        );
+    }
+
+    /**
+     * @param HandlerId $id
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('checkedHandlers')]
+    public function test_the_password_policy_control_is_supported_on_every_checked_handler(HandlerId $id): void
+    {
+        self::assertContains(
+            Control::OID_PWD_POLICY,
             $this->subject->supportedControlsFor($id),
         );
     }

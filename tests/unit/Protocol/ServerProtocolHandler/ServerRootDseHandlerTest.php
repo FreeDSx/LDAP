@@ -84,6 +84,7 @@ final class ServerRootDseHandlerTest extends TestCase
                         Control::OID_POST_READ,
                         Control::OID_SUBTREE_DELETE,
                         Control::OID_SUBENTRIES,
+                        Control::OID_PWD_POLICY,
                     ],
                     'supportedExtension' => [
                         ExtendedRequest::OID_WHOAMI,
@@ -122,6 +123,26 @@ final class ServerRootDseHandlerTest extends TestCase
 
         self::assertTrue($entry->get('supportedControl')?->has(Control::OID_PAGING) === true);
         self::assertTrue($entry->get('supportedExtension')?->has(ExtendedRequest::OID_PWD_MODIFY) === true);
+    }
+
+    public function test_it_always_advertises_the_password_policy_control(): void
+    {
+        $search = new LdapMessageRequest(
+            1,
+            (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope(),
+        );
+
+        $stream = $this->subject->handleRequest(
+            $search,
+            $this->mockToken,
+        );
+        $messages = [...$stream->messages];
+
+        /** @var SearchResultEntry $result */
+        $result = $messages[0]->getResponse();
+        $entry = $result->getEntry();
+
+        self::assertTrue($entry->get('supportedControl')?->has(Control::OID_PWD_POLICY) === true);
     }
 
     public function test_it_advertises_the_sync_control_when_sync_is_enabled(): void
@@ -257,6 +278,41 @@ final class ServerRootDseHandlerTest extends TestCase
         self::assertTrue($attr->has('cn=schema,dc=example,dc=com'));
     }
 
+    public function test_the_all_operational_selector_returns_every_root_dse_attribute_but_objectClass(): void
+    {
+        $this->options->setDseVendorName('Foo');
+        $this->withStorageNamingContexts(['dc=Foo,dc=Bar']);
+
+        self::assertSame(
+            [
+                'namingContexts',
+                'subschemaSubentry',
+                'supportedControl',
+                'supportedExtension',
+                'supportedFeatures',
+                'supportedLDAPVersion',
+                'vendorName',
+            ],
+            $this->attributeNamesFor('+'),
+        );
+    }
+
+    public function test_the_no_attributes_selector_returns_an_empty_root_dse(): void
+    {
+        self::assertSame(
+            [],
+            $this->attributeNamesFor('1.1'),
+        );
+    }
+
+    public function test_an_explicitly_named_root_dse_attribute_matches_regardless_of_case(): void
+    {
+        self::assertSame(
+            ['supportedControl'],
+            $this->attributeNamesFor('SUPPORTEDCONTROL'),
+        );
+    }
+
     public function test_it_should_only_return_specific_attributes_from_the_RootDSE_if_requested(): void
     {
         $this->options->setDseVendorName('Foo');
@@ -270,15 +326,7 @@ final class ServerRootDseHandlerTest extends TestCase
                 ->setAttributes('namingcontexts'),
         );
 
-        # The reset below is needed, unfortunately, to properly test due to how the objects change...
-        # objectClass is built first and then dropped, which is what leaves namingContexts at its index.
-        $entry = Entry::create('', [
-            'objectClass' => 'top',
-            'namingContexts' => 'dc=Foo,dc=Bar',
-        ]);
-        $entry->reset('objectClass');
-        $entry->changes()->reset();
-        $entry->get('namingContexts')?->equals(new Attribute('foo'));
+        $entry = Entry::create('', ['namingContexts' => 'dc=Foo,dc=Bar']);
 
         $stream = $this->subject->handleRequest(
             $search,
@@ -295,6 +343,34 @@ final class ServerRootDseHandlerTest extends TestCase
             ],
             [...$stream->messages],
         );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function attributeNamesFor(string ...$selectors): array
+    {
+        $search = new LdapMessageRequest(
+            1,
+            (new SearchRequest(Filters::present('objectClass')))
+                ->base('')
+                ->useBaseScope()
+                ->setAttributes(...$selectors),
+        );
+
+        $stream = $this->subject->handleRequest(
+            $search,
+            $this->mockToken,
+        );
+        $messages = [...$stream->messages];
+
+        /** @var SearchResultEntry $result */
+        $result = $messages[0]->getResponse();
+
+        return array_values(array_map(
+            static fn(Attribute $attribute): string => $attribute->getName(),
+            $result->getEntry()->getAttributes(),
+        ));
     }
 
     /**
