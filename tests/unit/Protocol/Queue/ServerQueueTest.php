@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Exception\RequestSizeExceededException;
+use FreeDSx\Ldap\Exception\RequestValidationException;
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapperInterface;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
@@ -41,6 +42,11 @@ use Tests\Support\FreeDSx\Ldap\Protocol\Queue\Response\RecordingInterceptor;
 
 final class ServerQueueTest extends TestCase
 {
+    /**
+     * Comfortably past the buffer cap, so an uncapped peek would read on every attempt.
+     */
+    private const FLOOD_ATTEMPTS = 500;
+
     private ServerQueue $subject;
 
     private Socket&MockObject $mockSocket;
@@ -276,29 +282,77 @@ final class ServerQueueTest extends TestCase
         );
     }
 
-    public function test_peek_buffers_a_cancel_carrying_a_zero_message_id_and_returns_null(): void
+    public function test_peek_refuses_a_cancel_carrying_a_zero_message_id(): void
     {
         $queue = $this->makeQueueWithEncodedRequest(
             new LdapMessageRequest(0, new CancelRequest(2)),
         );
 
-        self::assertNull($queue->peekForCancelSignal(2));
+        self::expectException(RequestValidationException::class);
+        self::expectExceptionMessage('The message ID 0 cannot be used in a client request.');
 
-        $buffered = $queue->getMessage();
+        $queue->peekForCancelSignal(2);
+    }
 
-        self::assertSame(
-            0,
-            $buffered->getMessageId(),
+    public function test_peek_refuses_an_unrelated_message_carrying_a_zero_message_id(): void
+    {
+        $queue = $this->makeQueueWithEncodedRequest(
+            new LdapMessageRequest(0, new DeleteRequest('dc=foo,dc=bar')),
+        );
+
+        self::expectException(RequestValidationException::class);
+
+        $queue->peekForCancelSignal(2);
+    }
+
+    public function test_peek_finds_a_cancel_queued_behind_an_unrelated_message(): void
+    {
+        $encoder = new LdapEncoder();
+        $socket = $this->createMock(Socket::class);
+        $socket->method('read')->willReturn(
+            $encoder->encode((new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')))->toAsn1())
+                . $encoder->encode((new LdapMessageRequest(6, new CancelRequest(2)))->toAsn1()),
+            false,
+        );
+
+        $queue = new ServerQueue($socket, $encoder);
+
+        $buffered = $queue->peekForCancelSignal(2);
+        $signal = $queue->peekForCancelSignal(2);
+
+        self::assertNull($buffered);
+        self::assertInstanceOf(
+            CancelRequest::class,
+            $signal?->getRequest(),
         );
     }
 
-    public function test_peek_buffers_an_abandon_carrying_a_zero_message_id_and_returns_null(): void
+    public function test_peek_stops_reading_once_the_pending_buffer_is_full(): void
     {
-        $queue = $this->makeQueueWithEncodedRequest(
-            new LdapMessageRequest(0, new AbandonRequest(2)),
+        $encoder = new LdapEncoder();
+        $bytes = $encoder->encode(
+            (new LdapMessageRequest(5, new DeleteRequest('dc=foo,dc=bar')))->toAsn1(),
         );
+        $reads = 0;
 
-        self::assertNull($queue->peekForCancelSignal(2));
+        $socket = $this->createMock(Socket::class);
+        $socket->method('read')
+            ->willReturnCallback(function () use ($bytes, &$reads): string {
+                $reads++;
+
+                return $bytes;
+            });
+
+        $queue = new ServerQueue($socket, $encoder);
+
+        for ($attempt = 0; $attempt < self::FLOOD_ATTEMPTS; $attempt++) {
+            self::assertNull($queue->peekForCancelSignal(2));
+        }
+
+        self::assertLessThan(
+            self::FLOOD_ATTEMPTS,
+            $reads,
+        );
     }
 
     public function test_peek_buffers_abandon_targeting_different_message_and_returns_null(): void
