@@ -21,10 +21,12 @@ use FreeDSx\Ldap\Schema\Schema;
 /**
  * Projects an entry onto a search request's attribute selection list (RFC 4511 §4.5.1.8, RFC 3673).
  *
- *   - empty list / "*" = all attributes already on the entry
+ *   - empty list / "*" = all user attributes; operational ones only when also named
  *   - "+"              = all operational attributes (classified via the supplied schema)
  *   - "1.1"            = no attributes (DN only)
- *   - explicit names   = only those
+ *   - explicit names   = only those, whatever their usage
+ *
+ * An attribute the schema does not define counts as a user attribute, so unknown ones keep flowing.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -42,7 +44,7 @@ final class AttributeProjection
      */
     private function __construct(
         private readonly array $names,
-        private readonly bool $returnAll,
+        private readonly bool $wantsUser,
         private readonly bool $wantsOperational,
         private readonly bool $returnNone,
         private readonly bool $typesOnly,
@@ -74,10 +76,6 @@ final class AttributeProjection
 
     public function project(Entry $entry): Entry
     {
-        if ($this->isPassThrough()) {
-            return $entry;
-        }
-
         $filteredAttributes = [];
 
         if (!$this->returnNone) {
@@ -98,23 +96,15 @@ final class AttributeProjection
         );
     }
 
-    private function isPassThrough(): bool
-    {
-        return $this->names === [] && !$this->typesOnly;
-    }
-
     private function shouldInclude(Attribute $attribute): bool
     {
-        if ($this->returnAll) {
-            return true;
-        }
-
         if (in_array(strtolower($attribute->getDescription()), $this->names, true)) {
             return true;
         }
 
-        return $this->wantsOperational
-            && $this->isOperational($attribute);
+        return $this->isOperational($attribute)
+            ? $this->wantsOperational
+            : $this->wantsUser;
     }
 
     private function isOperational(Attribute $attribute): bool

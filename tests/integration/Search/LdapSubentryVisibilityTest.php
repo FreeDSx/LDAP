@@ -186,7 +186,7 @@ class LdapSubentryVisibilityTest extends ServerTestCase
 
     public function test_the_root_dse_advertises_the_control(): void
     {
-        $rootDse = $this->ldapClient()->readOrFail('');
+        $rootDse = $this->ldapClient()->readOrFail('', ['supportedControl']);
 
         self::assertContains(
             Control::OID_SUBENTRIES,

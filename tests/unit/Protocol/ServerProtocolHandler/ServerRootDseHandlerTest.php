@@ -57,10 +57,7 @@ final class ServerRootDseHandlerTest extends TestCase
         $this->options->setDseVendorName('Foo');
         $this->withStorageNamingContexts(['dc=Foo,dc=Bar']);
 
-        $search = new LdapMessageRequest(
-            1,
-            (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope(),
-        );
+        $search = $this->rootDseSearch('*', '+');
 
         $stream = $this->subject->handleRequest(
             $search,
@@ -106,10 +103,7 @@ final class ServerRootDseHandlerTest extends TestCase
 
     public function test_it_always_advertises_paging_and_password_modify(): void
     {
-        $search = new LdapMessageRequest(
-            1,
-            (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope(),
-        );
+        $search = $this->rootDseSearch('*', '+');
 
         $stream = $this->subject->handleRequest(
             $search,
@@ -127,10 +121,7 @@ final class ServerRootDseHandlerTest extends TestCase
 
     public function test_it_always_advertises_the_password_policy_control(): void
     {
-        $search = new LdapMessageRequest(
-            1,
-            (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope(),
-        );
+        $search = $this->rootDseSearch('*', '+');
 
         $stream = $this->subject->handleRequest(
             $search,
@@ -154,10 +145,7 @@ final class ServerRootDseHandlerTest extends TestCase
             true,
         );
 
-        $search = new LdapMessageRequest(
-            1,
-            (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope(),
-        );
+        $search = $this->rootDseSearch('*', '+');
 
         $stream = $this->subject->handleRequest(
             $search,
@@ -176,10 +164,7 @@ final class ServerRootDseHandlerTest extends TestCase
         $this->options
             ->setSaslMechanisms(ServerOptions::SASL_PLAIN, ServerOptions::SASL_CRAM_MD5);
 
-        $search = new LdapMessageRequest(
-            1,
-            (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope(),
-        );
+        $search = $this->rootDseSearch('*', '+');
 
         $stream = $this->subject->handleRequest(
             $search,
@@ -210,10 +195,7 @@ final class ServerRootDseHandlerTest extends TestCase
 
         $search = new LdapMessageRequest(
             1,
-            (new SearchRequest(Filters::present('objectClass')))
-                ->base('')
-                ->useBaseScope()
-                ->setAttributesOnly(true),
+            $this->rootDseRequest('*', '+')->setAttributesOnly(true),
         );
 
         $stream = $this->subject->handleRequest(
@@ -241,10 +223,7 @@ final class ServerRootDseHandlerTest extends TestCase
 
     public function test_it_advertises_subschema_subentry_in_rootdse(): void
     {
-        $search = new LdapMessageRequest(
-            1,
-            (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope(),
-        );
+        $search = $this->rootDseSearch('*', '+');
 
         $stream = $this->subject->handleRequest($search, $this->mockToken);
         $messages = [...$stream->messages];
@@ -262,10 +241,7 @@ final class ServerRootDseHandlerTest extends TestCase
         $this->options->getSchemaConfig()
             ->setSubschemaEntry(new Dn('cn=schema,dc=example,dc=com'));
 
-        $search = new LdapMessageRequest(
-            1,
-            (new SearchRequest(Filters::present('objectClass')))->base('')->useBaseScope(),
-        );
+        $search = $this->rootDseSearch('*', '+');
 
         $stream = $this->subject->handleRequest($search, $this->mockToken);
         $messages = [...$stream->messages];
@@ -297,6 +273,21 @@ final class ServerRootDseHandlerTest extends TestCase
         );
     }
 
+    /**
+     * Every RootDSE attribute but objectClass is operational, so neither selector reaches them.
+     */
+    public function test_a_bare_read_returns_only_objectClass(): void
+    {
+        self::assertSame(
+            ['objectClass'],
+            $this->attributeNamesFor(),
+        );
+        self::assertSame(
+            ['objectClass'],
+            $this->attributeNamesFor('*'),
+        );
+    }
+
     public function test_the_no_attributes_selector_returns_an_empty_root_dse(): void
     {
         self::assertSame(
@@ -318,13 +309,7 @@ final class ServerRootDseHandlerTest extends TestCase
         $this->options->setDseVendorName('Foo');
         $this->withStorageNamingContexts(['dc=Foo,dc=Bar']);
 
-        $search = new LdapMessageRequest(
-            1,
-            (new SearchRequest(Filters::present('objectClass')))
-                ->base('')
-                ->useBaseScope()
-                ->setAttributes('namingcontexts'),
-        );
+        $search = $this->rootDseSearch('namingcontexts');
 
         $entry = Entry::create('', ['namingContexts' => 'dc=Foo,dc=Bar']);
 
@@ -346,20 +331,31 @@ final class ServerRootDseHandlerTest extends TestCase
     }
 
     /**
+     * A base-scoped search of the RootDSE, selecting the given attributes.
+     */
+    private function rootDseRequest(string ...$selectors): SearchRequest
+    {
+        return (new SearchRequest(Filters::present('objectClass')))
+            ->base('')
+            ->useBaseScope()
+            ->setAttributes(...$selectors);
+    }
+
+    private function rootDseSearch(string ...$selectors): LdapMessageRequest
+    {
+        return new LdapMessageRequest(
+            1,
+            $this->rootDseRequest(...$selectors),
+        );
+    }
+
+    /**
      * @return list<string>
      */
     private function attributeNamesFor(string ...$selectors): array
     {
-        $search = new LdapMessageRequest(
-            1,
-            (new SearchRequest(Filters::present('objectClass')))
-                ->base('')
-                ->useBaseScope()
-                ->setAttributes(...$selectors),
-        );
-
         $stream = $this->subject->handleRequest(
-            $search,
+            $this->rootDseSearch(...$selectors),
             $this->mockToken,
         );
         $messages = [...$stream->messages];

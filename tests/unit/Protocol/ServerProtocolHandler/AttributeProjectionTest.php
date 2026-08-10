@@ -41,7 +41,7 @@ final class AttributeProjectionTest extends TestCase
         );
     }
 
-    public function test_empty_selection_returns_entry_unchanged(): void
+    public function test_empty_selection_returns_only_user_attributes(): void
     {
         $projection = AttributeProjection::forRequest(
             [],
@@ -49,13 +49,13 @@ final class AttributeProjectionTest extends TestCase
             $this->schema,
         );
 
-        self::assertSame(
-            $this->entry,
-            $projection->project($this->entry),
+        self::assertEqualsCanonicalizing(
+            ['cn', 'sn', 'userPassword'],
+            $this->attributeNames($projection->project($this->entry)),
         );
     }
 
-    public function test_star_selector_returns_every_attribute_already_on_the_entry(): void
+    public function test_star_selector_returns_only_user_attributes(): void
     {
         $projection = AttributeProjection::forRequest(
             [new Attribute('*')],
@@ -66,8 +66,65 @@ final class AttributeProjectionTest extends TestCase
         $projected = $projection->project($this->entry);
 
         self::assertEqualsCanonicalizing(
-            ['cn', 'sn', 'userPassword', 'createTimestamp', 'modifyTimestamp', 'entryUUID'],
+            ['cn', 'sn', 'userPassword'],
             $this->attributeNames($projected),
+        );
+    }
+
+    /**
+     * RFC 4511 section 4.5.1.8 clause 2: "*" plus a named operational attribute returns both.
+     */
+    public function test_star_selector_also_returns_an_operational_attribute_named_alongside_it(): void
+    {
+        $projection = AttributeProjection::forRequest(
+            [
+                new Attribute('*'),
+                new Attribute('entryUUID'),
+            ],
+            false,
+            $this->schema,
+        );
+
+        self::assertEqualsCanonicalizing(
+            ['cn', 'sn', 'userPassword', 'entryUUID'],
+            $this->attributeNames($projection->project($this->entry)),
+        );
+    }
+
+    public function test_star_and_plus_together_return_every_attribute(): void
+    {
+        $projection = AttributeProjection::forRequest(
+            [
+                new Attribute('*'),
+                new Attribute('+'),
+            ],
+            false,
+            $this->schema,
+        );
+
+        self::assertEqualsCanonicalizing(
+            ['cn', 'sn', 'userPassword', 'createTimestamp', 'modifyTimestamp', 'entryUUID'],
+            $this->attributeNames($projection->project($this->entry)),
+        );
+    }
+
+    public function test_an_attribute_the_schema_does_not_define_counts_as_a_user_attribute(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'Alice'),
+            new Attribute('someCustomAttr', 'value'),
+        );
+
+        $projection = AttributeProjection::forRequest(
+            [new Attribute('*')],
+            false,
+            $this->schema,
+        );
+
+        self::assertEqualsCanonicalizing(
+            ['cn', 'someCustomAttr'],
+            $this->attributeNames($projection->project($entry)),
         );
     }
 

@@ -116,7 +116,7 @@ final class LdapSaslServerTest extends ServerTestCase
 
     public function testRootDseAdvertisesSaslMechanisms(): void
     {
-        $rootDse = $this->ldapClient()->read('');
+        $rootDse = $this->ldapClient()->read('', ['+']);
 
         $this->assertNotNull($rootDse);
 
