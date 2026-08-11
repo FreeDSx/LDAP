@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query;
 
-use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
@@ -34,7 +33,7 @@ final readonly class PdoListQueryBuilder
     ) {}
 
     /**
-     * @param SortKey[] $sortKeys
+     * @param list<SortKeySpec> $sortKeys
      */
     public function build(
         string $base,
@@ -154,7 +153,7 @@ final readonly class PdoListQueryBuilder
      * A single drivable sidecar leaf under a bounded, unsorted subtree/root search drives off the sidecar index so the
      * limit short-circuits candidate scanning.
      *
-     * @param SortKey[] $sortKeys
+     * @param list<SortKeySpec> $sortKeys
      */
     private function tryBuildStreamingQuery(
         string $base,
@@ -298,24 +297,16 @@ final readonly class PdoListQueryBuilder
     }
 
     /**
-     * @param SortKey[] $sortKeys
+     * @param list<SortKeySpec> $sortKeys
      */
     private function applySort(
         SqlQuery $query,
         array $sortKeys,
     ): SqlQuery {
-        $specs = array_values(array_map(
-            static fn(SortKey $sortKey): SortKeySpec => new SortKeySpec(
-                strtolower($sortKey->getAttribute()),
-                $sortKey->getUseReverseOrder() ? 'DESC' : 'ASC',
-            ),
-            $sortKeys,
-        ));
-
         $sorted = $this->dialect->sortedQuery(
             $query->sql,
             $query->params,
-            $specs,
+            $sortKeys,
         );
 
         return new SqlQuery(

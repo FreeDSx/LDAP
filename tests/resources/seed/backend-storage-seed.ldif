@@ -37,6 +37,8 @@ objectClass: extensibleObject
 cn: alice
 sn: Smith
 mail: alice@foo.bar
+# Only reachable through its base type, so it shows whether attribute options are honored.
+mail;lang-en: alice-en@foo.bar
 uidNumber: 99
 # Matched case-exactly by the schema, so searches on it prove the configured schema is in play.
 employeeNumber: A1b2C3
@@ -45,3 +47,12 @@ dn: cn=nosn,dc=foo,dc=bar
 objectClass: groupOfNames
 cn: nosn
 member: cn=user,dc=foo,dc=bar
+
+# The RDN needs escaping, so it shows whether a DN assertion compares the value or its escaped spelling. Its
+# uidNumber sorts below alice's textually and above it numerically, so ordering shows which rule was applied.
+dn: cn=Smith\, John,dc=foo,dc=bar
+objectClass: groupOfNames
+objectClass: extensibleObject
+cn: Smith, John
+member: cn=user,dc=foo,dc=bar
+uidNumber: 100

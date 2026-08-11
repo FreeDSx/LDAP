@@ -25,7 +25,9 @@ use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
+use FreeDSx\Ldap\Server\Backend\Storage\AttributeFilterSupport;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterAttributeContextInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -143,7 +145,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
     }
 
-    public function test_not_value_correlated_sql_keeps_the_presence_guard(): void
+    public function test_not_value_correlated_sql_negates_the_value_exists(): void
     {
         $result = $this->subject->translate(new NotFilter(
             new EqualityFilter('cn', 'Alice'),
@@ -155,9 +157,8 @@ final class SqliteFilterTranslatorTest extends TestCase
             'NOT (',
             $result->correlatedSql,
         );
-        // Presence guard EXISTS plus the negated value EXISTS.
         self::assertSame(
-            2,
+            1,
             substr_count($result->correlatedSql, 'EXISTS ('),
         );
     }
@@ -249,11 +250,51 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
     }
 
+    public function test_an_attribute_the_schema_does_not_define_can_never_match(): void
+    {
+        $result = $this->subject->translate(
+            new EqualityFilter('shoeSize', '12'),
+            $this->attributeContext(support: AttributeFilterSupport::NeverMatches),
+        );
+
+        self::assertNotNull($result);
+        self::assertSame(
+            '1 = 0',
+            $result->sql,
+        );
+        // Undefined only behaves like false until a negation is layered over it, so the evaluator must still run.
+        self::assertFalse($result->isExact);
+    }
+
+    public function test_negating_an_attribute_the_schema_does_not_define_can_never_match(): void
+    {
+        $result = $this->subject->translate(
+            new NotFilter(new EqualityFilter('shoeSize', '12')),
+            $this->attributeContext(support: AttributeFilterSupport::NeverMatches),
+        );
+
+        self::assertNotNull($result);
+        self::assertStringContainsString(
+            '1 = 0',
+            $result->sql,
+        );
+    }
+
+    public function test_an_attribute_with_subtypes_is_left_to_the_evaluator(): void
+    {
+        $result = $this->subject->translate(
+            new EqualityFilter('name', 'alice'),
+            $this->attributeContext(support: AttributeFilterSupport::NeedsEvaluator),
+        );
+
+        self::assertNull($result);
+    }
+
     public function test_gte_emits_numeric_cast_for_integer_ordered_attribute(): void
     {
         $result = $this->subject->translate(
             new GreaterThanOrEqualFilter('uidNumber', '30'),
-            fn(string $attribute): bool => true,
+            $this->attributeContext(integerOrdered: true),
         );
 
         self::assertNotNull($result);
@@ -272,7 +313,7 @@ final class SqliteFilterTranslatorTest extends TestCase
     {
         $result = $this->subject->translate(
             new GreaterThanOrEqualFilter('cn', '30'),
-            fn(string $attribute): bool => false,
+            $this->attributeContext(integerOrdered: false),
         );
 
         self::assertNotNull($result);
@@ -321,7 +362,7 @@ final class SqliteFilterTranslatorTest extends TestCase
     {
         $result = $this->subject->translate(
             new LessThanOrEqualFilter('uidNumber', '50'),
-            fn(string $attribute): bool => true,
+            $this->attributeContext(integerOrdered: true),
         );
 
         self::assertNotNull($result);
@@ -752,7 +793,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertTrue($result->isExact);
     }
 
-    public function test_not_equality_adds_presence_guard(): void
+    public function test_not_equality_emits_plain_not_for_the_evaluator_to_refine(): void
     {
         $result = $this->subject->translate(
             new NotFilter(new EqualityFilter(
@@ -763,7 +804,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringStartsWith(
-            '(NOT (',
+            'NOT (',
             $result->sql,
         );
         self::assertStringContainsString(
@@ -981,5 +1022,16 @@ final class SqliteFilterTranslatorTest extends TestCase
             [],
             $result->drivableLeaves,
         );
+    }
+
+    private function attributeContext(
+        ?bool $integerOrdered = null,
+        AttributeFilterSupport $support = AttributeFilterSupport::Exact,
+    ): FilterAttributeContextInterface {
+        $context = $this->createMock(FilterAttributeContextInterface::class);
+        $context->method('isIntegerOrdered')->willReturn($integerOrdered);
+        $context->method('filterSupport')->willReturn($support);
+
+        return $context;
     }
 }

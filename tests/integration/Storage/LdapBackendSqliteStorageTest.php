@@ -139,7 +139,8 @@ final class LdapBackendSqliteStorageTest extends LdapBackendStorageTest
                 ->useSubtreeScope(),
         );
 
-        self::assertCount(0, $entries);
+        // Only the entry holding 100 qualifies; bytewise, 99 would qualify too.
+        self::assertCount(1, $entries);
     }
 
     public function testGteAsciiNonDigitValueMatchesLexicographically(): void

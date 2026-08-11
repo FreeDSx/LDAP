@@ -42,6 +42,13 @@ final class Schema
     private array $attributeTypes = [];
 
     /**
+     * Every OID named as a SUP, built on first use and dropped whenever the type set changes.
+     *
+     * @var array<string, true>|null
+     */
+    private ?array $superTypeOids = null;
+
+    /**
      * @var array<string, ObjectClass>
      */
     private array $objectClasses = [];
@@ -62,6 +69,7 @@ final class Schema
         foreach ($type->names as $name) {
             $this->attributeTypes[strtolower($name)] = $type;
         }
+        $this->superTypeOids = null;
 
         return $this;
     }
@@ -116,6 +124,61 @@ final class Schema
         }
 
         return $attributeType->syntaxOid === SyntaxOid::OID_INTEGER;
+    }
+
+    /**
+     * Whether one attribute type is the other, or descends from it through the SUP chain.
+     *
+     * Either side may be given as an OID or any of the names the type is known by.
+     */
+    public function isTypeOrSubtypeOf(
+        string $nameOrOid,
+        string $ofNameOrOid,
+    ): bool {
+        $type = $this->getAttributeType($nameOrOid);
+        $of = $this->getAttributeType($ofNameOrOid);
+
+        if ($type === null || $of === null) {
+            return false;
+        }
+
+        $seen = [];
+        while ($type !== null) {
+            if ($type->oid === $of->oid) {
+                return true;
+            }
+            if ($type->superTypeOid === null || isset($seen[$type->superTypeOid])) {
+                return false;
+            }
+            $seen[$type->superTypeOid] = true;
+            $type = $this->getAttributeType($type->superTypeOid);
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether any other attribute type names this one as its SUP, so an assertion on it must also cover theirs.
+     */
+    public function hasSubtypes(string $nameOrOid): bool
+    {
+        $attributeType = $this->getAttributeType($nameOrOid);
+
+        if ($attributeType === null) {
+            return false;
+        }
+
+        if ($this->superTypeOids === null) {
+            $oids = [];
+            foreach ($this->attributeTypes as $type) {
+                if ($type->superTypeOid !== null) {
+                    $oids[$type->superTypeOid] = true;
+                }
+            }
+            $this->superTypeOids = $oids;
+        }
+
+        return isset($this->superTypeOids[$attributeType->oid]);
     }
 
     /**

@@ -178,7 +178,6 @@ final class Fts5SubstringIndex implements SubstringIndexInterface
             self::MATCH_SQL,
             [$attributeLower, implode(' AND ', $terms)],
             isExact: false,
-            referencedAttributes: [$attributeLower],
         );
     }
 }

@@ -491,14 +491,14 @@ final class FilterEvaluatorTest extends TestCase
         ));
     }
 
-    public function test_matching_rule_unknown_throws_inappropriate_matching(): void
+    public function test_matching_rule_unknown_is_undefined_rather_than_an_error(): void
     {
-        $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::INAPPROPRIATE_MATCHING);
-
-        $this->subject->evaluate(
-            $this->entry,
-            new MatchingRuleFilter('1.2.3.4.5.unknown', 'cn', 'Alice'),
+        // RFC 4511 4.5.1.7: "Servers MUST NOT return errors if ... matching rule ids are not recognized".
+        self::assertFalse(
+            $this->subject->evaluate(
+                $this->entry,
+                new MatchingRuleFilter('1.2.3.4.5.unknown', 'cn', 'Alice'),
+            ),
         );
     }
 
@@ -583,11 +583,11 @@ final class FilterEvaluatorTest extends TestCase
         ));
     }
 
-    public function test_not_returns_false_when_attribute_is_absent(): void
+    public function test_not_returns_true_when_a_recognizable_attribute_is_absent(): void
     {
-        // RFC 4511 §4.5.1: NOT(UNDEFINED) = UNDEFINED, which maps to false.
-        // An entry missing "description" must NOT match (!(description=test)).
-        self::assertFalse(
+        // Undefined is for what the server cannot determine (RFC 4511 4.5.1.7); an absent value is simply false,
+        // exactly as it already is for a present filter on the same attribute.
+        self::assertTrue(
             $this->subject->evaluate(
                 $this->entry,
                 Filters::not(Filters::equal('description', 'test')),
@@ -955,14 +955,13 @@ final class FilterEvaluatorTest extends TestCase
         ));
     }
 
-    public function test_without_schema_non_hardcoded_matching_rule_throws_inappropriate_matching(): void
+    public function test_without_schema_a_non_hardcoded_matching_rule_is_undefined(): void
     {
-        $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::INAPPROPRIATE_MATCHING);
-
-        $this->subject->evaluate(
-            $this->entry,
-            new MatchingRuleFilter('2.5.13.14', 'cn', 'Alice'),
+        self::assertFalse(
+            $this->subject->evaluate(
+                $this->entry,
+                new MatchingRuleFilter('2.5.13.14', 'cn', 'Alice'),
+            ),
         );
     }
 

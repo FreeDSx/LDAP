@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Changes;
 use PHPUnit\Framework\TestCase;
 
-class ChangesSpec extends TestCase
+class ChangesTest extends TestCase
 {
     private Changes $subject;
 

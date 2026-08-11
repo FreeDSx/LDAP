@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Entry\Option;
 use FreeDSx\Ldap\Entry\Options;
 use PHPUnit\Framework\TestCase;
 
-class OptionsSpec extends TestCase
+class OptionsTest extends TestCase
 {
     private Options $subject;
 
@@ -74,6 +74,25 @@ class OptionsSpec extends TestCase
         self::assertSame(
             'bar;foo;lang-en;range=1500-*',
             $this->subject->toString(true),
+        );
+    }
+
+    public function test_it_should_sort_the_same_regardless_of_case_or_order(): void
+    {
+        self::assertSame(
+            (new Options('lang-en', 'lang-DE'))->toString(true),
+            (new Options('lang-EN', 'lang-de'))->toString(true),
+        );
+    }
+
+    public function test_it_should_sort_the_same_whether_or_not_an_option_was_read_first(): void
+    {
+        $warmed = new Options('lang-en', 'lang-DE');
+        $warmed->has('lang-en');
+
+        self::assertSame(
+            (new Options('lang-en', 'lang-DE'))->toString(true),
+            $warmed->toString(true),
         );
     }
 

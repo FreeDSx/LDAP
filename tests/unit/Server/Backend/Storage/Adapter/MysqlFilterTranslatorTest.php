@@ -24,7 +24,9 @@ use FreeDSx\Ldap\Search\Filter\OrFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\MysqlFilterTranslator;
+use FreeDSx\Ldap\Server\Backend\Storage\AttributeFilterSupport;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterAttributeContextInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -206,9 +208,13 @@ final class MysqlFilterTranslatorTest extends TestCase
 
     public function test_gte_emits_numeric_cast_for_integer_ordered_attribute(): void
     {
+        $context = $this->createMock(FilterAttributeContextInterface::class);
+        $context->method('isIntegerOrdered')->willReturn(true);
+        $context->method('filterSupport')->willReturn(AttributeFilterSupport::Exact);
+
         $result = $this->subject->translate(
             new GreaterThanOrEqualFilter('uidNumber', '30'),
-            fn(string $attribute): bool => true,
+            $context,
         );
 
         self::assertNotNull($result);
@@ -625,7 +631,7 @@ final class MysqlFilterTranslatorTest extends TestCase
         );
     }
 
-    public function test_not_equality_adds_presence_guard(): void
+    public function test_not_equality_emits_plain_not_for_the_evaluator_to_refine(): void
     {
         $result = $this->subject->translate(
             new NotFilter(new EqualityFilter(
@@ -636,7 +642,7 @@ final class MysqlFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringStartsWith(
-            '(NOT (',
+            'NOT (',
             $result->sql,
         );
         self::assertStringContainsString(
@@ -663,7 +669,7 @@ final class MysqlFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
-    public function test_not_composite_inner_is_inexact(): void
+    public function test_not_composite_inner_stays_exact_when_every_leaf_is(): void
     {
         $result = $this->subject->translate(
             new NotFilter(new AndFilter(
@@ -679,7 +685,7 @@ final class MysqlFilterTranslatorTest extends TestCase
         );
 
         self::assertNotNull($result);
-        self::assertFalse($result->isExact);
+        self::assertTrue($result->isExact);
         self::assertStringStartsWith(
             'NOT (',
             $result->sql,

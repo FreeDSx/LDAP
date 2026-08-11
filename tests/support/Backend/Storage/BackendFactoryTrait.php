@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Support\FreeDSx\Ldap\Backend\Storage;
 
 use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -30,7 +31,8 @@ use FreeDSx\Ldap\Server\SearchLimits;
 trait BackendFactoryTrait
 {
     /**
-     * Defaults to an empty schema with validation off, which is what most tests want.
+     * Defaults to the core schema with validation off: filter evaluation reads the schema to tell an unrecognized
+     * attribute type from one an entry merely lacks, so an empty schema would make every assertion Undefined.
      */
     private static function makeWritableBackend(
         EntryStorageInterface $storage,
@@ -39,7 +41,7 @@ trait BackendFactoryTrait
         ?SearchLimits $limits = null,
         ?ChangeRecorder $changeRecorder = null,
     ): WritableStorageBackend {
-        $schema ??= new Schema();
+        $schema ??= SchemaResource::Core->load();
         $limits ??= new SearchLimits();
 
         return new WritableStorageBackend(

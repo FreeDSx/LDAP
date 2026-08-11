@@ -15,6 +15,9 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support;
 
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
+use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
+use FreeDSx\Ldap\Schema\Schema;
 
 /**
  * Sorts a list of entries in-place by an ordered list of SortKeys.
@@ -23,6 +26,8 @@ use FreeDSx\Ldap\Entry\Entry;
  */
 final class SortKeyComparator
 {
+    public function __construct(private readonly ?Schema $schema = null) {}
+
     /**
      * Returns a new sorted array.
      *
@@ -83,9 +88,39 @@ final class SortKeyComparator
                 $b,
                 $sortKey->getAttribute(),
             ),
+            $this->orderingFor($sortKey),
         );
 
         return $sortKey->getUseReverseOrder() ? -$cmp : $cmp;
+    }
+
+    /**
+     * The rule the key asks for, else the one its attribute declares; null when neither resolves.
+     */
+    private function orderingFor(SortKey $sortKey): ?MatchingRuleComparatorInterface
+    {
+        $schema = $this->schema;
+
+        if ($schema === null) {
+            return null;
+        }
+
+        $rule = $sortKey->getOrderingRule();
+
+        if ($rule !== null) {
+            return $schema->getComparator($rule);
+        }
+
+        $orderingOid = $schema->getAttributeType($sortKey->getAttribute())?->orderingOid;
+
+        if ($orderingOid !== null) {
+            return $schema->getComparator($orderingOid);
+        }
+
+        // A type can order numerically through its syntax alone, without naming an ordering rule.
+        return $schema->isIntegerOrdered($sortKey->getAttribute()) === true
+            ? $schema->getComparator(MatchingRuleOid::OID_INTEGER_ORDERING_MATCH)
+            : null;
     }
 
     /**
@@ -94,6 +129,7 @@ final class SortKeyComparator
     private function rawCompare(
         ?string $aValue,
         ?string $bValue,
+        ?MatchingRuleComparatorInterface $ordering,
     ): int {
         if ($aValue === null && $bValue === null) {
             return 0;
@@ -105,6 +141,13 @@ final class SortKeyComparator
 
         if ($bValue === null) {
             return -1;
+        }
+
+        if ($ordering !== null) {
+            return $ordering->compare(
+                $aValue,
+                $bValue,
+            );
         }
 
         return strcasecmp(

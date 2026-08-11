@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Search\Filter\FilterAttributeInterface;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\LessThanOrEqualFilter;
@@ -26,7 +27,8 @@ use FreeDSx\Ldap\Search\Filter\OrFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
-use Closure;
+use FreeDSx\Ldap\Server\Backend\Storage\AttributeFilterSupport;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterAttributeContextInterface;
 
 /**
  * Translates LDAP filters to SQL against the `entry_attribute_values` sidecar index.
@@ -38,32 +40,52 @@ trait SqlFilterTranslatorTrait
     private ?SubstringIndexInterface $substringIndex = null;
 
     /**
-     * @var (\Closure(string): (bool|null))|null Resolves whether an attribute orders numerically, for the current call.
+     * Schema derived answers for the current call, or null when the caller had no schema.
      */
-    private ?Closure $integerOrderedResolver = null;
+    private ?FilterAttributeContextInterface $attributeContext = null;
 
-    /**
-     * @var (\Closure(string): (bool|null))|null Resolves whether an attribute ignores case, for the current call.
-     */
-    private ?Closure $caseInsensitiveResolver = null;
-
-    /**
-     * @param (\Closure(string): (bool|null))|null $isIntegerOrdered Resolves numeric ordering; null = unknown.
-     * @param (\Closure(string): (bool|null))|null $isCaseInsensitive Resolves case-insensitive matching; null = unknown.
-     */
     public function translate(
         FilterInterface $filter,
-        ?Closure $isIntegerOrdered = null,
-        ?Closure $isCaseInsensitive = null,
+        ?FilterAttributeContextInterface $attributeContext = null,
     ): ?SqlFilterResult {
-        $this->integerOrderedResolver = $isIntegerOrdered;
-        $this->caseInsensitiveResolver = $isCaseInsensitive;
+        $this->attributeContext = $attributeContext;
 
         return $this->dispatch($filter);
     }
 
+    /**
+     * How faithfully SQL can answer an assertion on this attribute; Exact when the caller had no schema.
+     */
+    private function filterSupport(string $attribute): AttributeFilterSupport
+    {
+        return $this->attributeContext?->filterSupport($attribute)
+            ?? AttributeFilterSupport::Exact;
+    }
+
     private function dispatch(FilterInterface $filter): ?SqlFilterResult
     {
+        $attribute = $filter instanceof FilterAttributeInterface
+            ? $filter->getAttribute()
+            : null;
+        $support = $attribute !== null
+            ? $this->filterSupport($attribute)
+            : AttributeFilterSupport::Exact;
+
+        // Rows under this name alone are not the whole answer, so leave the item to the evaluator.
+        if ($support === AttributeFilterSupport::NeedsEvaluator) {
+            return null;
+        }
+
+        // Undefined for every entry, so on its own it selects nothing. It stays inexact because Undefined only
+        // behaves like false until a negation is layered over it, and SQL has no third value to carry that.
+        if ($support === AttributeFilterSupport::NeverMatches) {
+            return new SqlFilterResult(
+                '1 = 0',
+                [],
+                isExact: false,
+            );
+        }
+
         return match (true) {
             $filter instanceof AndFilter => $this->translateAnd($filter),
             $filter instanceof OrFilter => $this->translateOr($filter),
@@ -134,13 +156,32 @@ trait SqlFilterTranslatorTrait
         $alias = $this->valueAlias();
         $value = $filter->getValue();
 
+        // Stored text and the assertion can spell the same integer differently, so those compare as numbers. The
+        // cast saturates at the platform integer, making it a superset the evaluator still has to check.
+        if ($this->attributeContext?->isIntegerOrdered($filter->getAttribute()) === true) {
+            $condition = sprintf(
+                '%s = %s',
+                $this->castToNumeric($alias),
+                $this->castToNumeric('?'),
+            );
+
+            return new SqlFilterResult(
+                $this->buildValueExists($attribute, $condition),
+                [$this->prepareMatchValue($value)],
+                isExact: false,
+                sidecarCondition: $this->sidecarCondition(
+                    $attribute,
+                    $condition,
+                ),
+            );
+        }
+
         return new SqlFilterResult(
             $this->buildValueExists($attribute, "$alias = ?"),
             [$this->prepareMatchValue($value)],
             isExact: $this->isExactEquality($value)
                 && $this->matchesCaseFolded($attribute)
                 && !$this->attributeHasOption($filter->getAttribute()),
-            referencedAttributes: [$attribute],
             sidecarCondition: $this->sidecarCondition(
                 $attribute,
                 "$alias = ?",
@@ -162,7 +203,6 @@ trait SqlFilterTranslatorTrait
             isExact: $this->isExactEquality($value)
                 && $this->matchesCaseFolded($attribute)
                 && !$this->attributeHasOption($filter->getAttribute()),
-            referencedAttributes: [$attribute],
             sidecarCondition: $this->sidecarCondition(
                 $attribute,
                 "$alias = ?",
@@ -208,9 +248,8 @@ trait SqlFilterTranslatorTrait
     ): SqlFilterResult {
         $attribute = $this->validateAttribute($rawAttribute);
         $hasOption = $this->attributeHasOption($rawAttribute);
-        $resolver = $this->integerOrderedResolver;
 
-        if ($resolver !== null && $resolver($rawAttribute) === true) {
+        if ($this->attributeContext?->isIntegerOrdered($rawAttribute) === true) {
             $condition = sprintf(
                 '%s %s %s',
                 $this->castToNumeric($this->valueAlias()),
@@ -222,7 +261,6 @@ trait SqlFilterTranslatorTrait
                 $this->buildValueExists($attribute, $condition),
                 [$this->prepareMatchValue($value)],
                 isExact: !$hasOption,
-                referencedAttributes: [$attribute],
                 sidecarCondition: $this->sidecarCondition($attribute, $condition),
             );
         }
@@ -236,7 +274,6 @@ trait SqlFilterTranslatorTrait
                 && $this->isExactOrdered($value)
                 && $this->matchesCaseFolded($attribute)
                 && !$hasOption,
-            referencedAttributes: [$attribute],
             sidecarCondition: $this->sidecarCondition(
                 $attribute,
                 $condition,
@@ -304,7 +341,6 @@ trait SqlFilterTranslatorTrait
             $sql,
             $params,
             isExact: $isExact,
-            referencedAttributes: [$attribute],
             sidecarCondition: $sidecar,
         );
     }
@@ -365,11 +401,7 @@ trait SqlFilterTranslatorTrait
      */
     private function matchesCaseFolded(string $attribute): bool
     {
-        if ($this->caseInsensitiveResolver === null) {
-            return true;
-        }
-
-        return ($this->caseInsensitiveResolver)($attribute) ?? true;
+        return $this->attributeContext?->isCaseInsensitive($attribute) ?? true;
     }
 
     /**
@@ -533,70 +565,16 @@ trait SqlFilterTranslatorTrait
             return null;
         }
 
-        // NOT(present) is the one negation that legitimately matches absent
-        // attributes, so no presence guard is needed.
-        if ($inner instanceof PresentFilter) {
-            return new SqlFilterResult(
-                'NOT (' . $result->sql . ')',
-                $result->params,
-                isExact: $result->isExact,
-                correlatedSql: $result->correlatedSql !== null
-                    ? 'NOT (' . $result->correlatedSql . ')'
-                    : null,
-            );
-        }
-
-        // RFC 4511 §4.5.1.7: NOT(undefined) = undefined. SQL `NOT EXISTS(...)`
-        // returns TRUE for rows missing the attribute, so for value-bearing
-        // simple filters (those that populated referencedAttributes) we AND
-        // in a presence guard so missing-attribute rows are excluded.
-        if ($result->referencedAttributes !== []) {
-            $attributes = array_values(array_unique($result->referencedAttributes));
-            $guards = array_map(
-                fn(string $attribute): string => $this->buildPresenceCheck($attribute),
-                $attributes,
-            );
-
-            return new SqlFilterResult(
-                '(NOT (' . $result->sql . ') AND ' . implode(' AND ', $guards) . ')',
-                $result->params,
-                isExact: $result->isExact,
-                correlatedSql: $result->correlatedSql !== null
-                    ? '(NOT (' . $result->correlatedSql . ') AND ' . implode(' AND ', $this->correlatedGuards($attributes)) . ')'
-                    : null,
-            );
-        }
-
-        // Composite inner (AND/OR/NOT): tracking three-valued logic precisely
-        // through SQL composition is fragile. The plain `NOT (...)` SQL is a
-        // SUPERSET of the correct LDAP result for missing-attribute rows, so
-        // marking it inexact lets the PHP FilterEvaluator strip false positives.
+        // An assertion the schema defines is false when the entry lacks the attribute, so negating it legitimately
+        // matches those rows and plain `NOT (...)` is precise. Types the schema does not define never reach here;
+        // dispatch() has already answered them.
         return new SqlFilterResult(
             'NOT (' . $result->sql . ')',
             $result->params,
-            isExact: false,
+            isExact: $result->isExact,
             correlatedSql: $result->correlatedSql !== null
                 ? 'NOT (' . $result->correlatedSql . ')'
                 : null,
-        );
-    }
-
-    /**
-     * Correlated `EXISTS` presence guards matching the IN-form presence guards for a NOT(value) filter.
-     *
-     * @param list<string> $attributes
-     * @return list<string>
-     */
-    private function correlatedGuards(array $attributes): array
-    {
-        return array_map(
-            fn(string $attribute): string => SqlFilterResult::correlatedLeaf(
-                $this->sidecarCondition(
-                    $attribute,
-                    null,
-                ),
-            ),
-            $attributes,
         );
     }
 

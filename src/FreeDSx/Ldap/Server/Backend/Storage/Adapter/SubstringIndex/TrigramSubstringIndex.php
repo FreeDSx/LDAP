@@ -150,7 +150,6 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
             ),
             [$attributeLower, ...$trigrams],
             isExact: false,
-            referencedAttributes: [$attributeLower],
         );
     }
 

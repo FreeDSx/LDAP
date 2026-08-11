@@ -19,13 +19,282 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Read operations: scope, filter evaluation, projection, compare, and search limits.
  */
 trait QueryTestsTrait
 {
+    /**
+     * RFC 4511 4.5.1 evaluation, driven over a real connection so every assertion travels as BER.
+     *
+     * The seed holds seven entries; only cn=alice carries uidNumber, mail and employeeNumber. Each backend runs these,
+     * since the PDO adapters translate filters to SQL and only re-check inexact results in PHP.
+     *
+     * @return iterable<string, array{FilterInterface, int}>
+     */
+    public static function filterProvider(): iterable
+    {
+        yield 'present' => [
+            Filters::present('uidNumber'),
+            2,
+        ];
+        yield 'approximate' => [
+            Filters::approximate('cn', 'alice'),
+            1,
+        ];
+        yield 'and' => [
+            Filters::and(
+                Filters::equal('cn', 'alice'),
+                Filters::present('sn'),
+            ),
+            1,
+        ];
+        yield 'or' => [
+            Filters::or(
+                Filters::equal('cn', 'alice'),
+                Filters::equal('cn', 'nosn'),
+            ),
+            2,
+        ];
+        yield 'not' => [
+            Filters::not(Filters::equal('cn', 'alice')),
+            7,
+        ];
+
+        // RFC 4526.
+        yield 'absolute true' => [
+            Filters::and(),
+            8,
+        ];
+        yield 'absolute false' => [
+            Filters::or(),
+            0,
+        ];
+
+        yield 'a non numeric assertion cannot match an integer' => [
+            Filters::equal('uidNumber', 'abc'),
+            0,
+        ];
+        // Casting to an integer would read this as the stored value and match it.
+        yield 'an integer assertion with trailing text matches nothing' => [
+            Filters::equal('uidNumber', '99abc'),
+            0,
+        ];
+        yield 'leading zeros are the same integer' => [
+            Filters::equal('uidNumber', '099'),
+            1,
+        ];
+
+        // RFC 4511 4.5.1.7: an assertion on an unrecognized attribute type is Undefined, and NOT of Undefined stays
+        // Undefined, so no entry may be returned. A present filter on a known type is False, never Undefined.
+        yield 'negating an unrecognized attribute type matches nothing' => [
+            Filters::not(Filters::present('shoeSize')),
+            0,
+        ];
+        yield 'negating an absent but defined attribute matches everything' => [
+            Filters::not(Filters::present('telephoneNumber')),
+            8,
+        ];
+        yield 'negating a value assertion on an unrecognized type matches nothing' => [
+            Filters::not(Filters::equal('shoeSize', '12')),
+            0,
+        ];
+        yield 'negating a value assertion on an absent but defined attribute' => [
+            Filters::not(Filters::equal('telephoneNumber', '555')),
+            8,
+        ];
+        yield 'negating a conjunction' => [
+            Filters::not(Filters::and(
+                Filters::equal('cn', 'alice'),
+                Filters::present('sn'),
+            )),
+            7,
+        ];
+        // A conjunction is false as soon as one branch is false, so every entry failing the recognized branch is
+        // negated to true. Only the entry that satisfies it is left Undefined by the branch that cannot be resolved.
+        yield 'negating a conjunction holding an unrecognized type' => [
+            Filters::not(Filters::and(
+                Filters::equal('cn', 'alice'),
+                Filters::equal('shoeSize', '12'),
+            )),
+            7,
+        ];
+
+        // RFC 4512 2.5.2: an assertion on the base type covers its tagged variants and its subtypes.
+        yield 'the base type matches a value held under an option' => [
+            Filters::equal('mail', 'alice-en@foo.bar'),
+            1,
+        ];
+        yield 'a supertype matches a value held by its subtype' => [
+            Filters::equal('name', 'alice'),
+            1,
+        ];
+
+        // RFC 4511 4.5.1.7.7.
+        yield 'extensible with an explicit matching rule' => [
+            Filters::extensible('cn', 'ALICE', '2.5.13.2', false),
+            1,
+        ];
+        yield 'extensible without a rule uses the type EQUALITY' => [
+            Filters::extensible('employeeNumber', 'A1b2C3', null, false),
+            1,
+        ];
+        yield 'extensible without a rule respects a case exact EQUALITY' => [
+            Filters::extensible('employeeNumber', 'a1b2c3', null, false),
+            0,
+        ];
+        yield 'extensible with an unrecognized rule is Undefined' => [
+            Filters::extensible('cn', 'alice', '9.9.9.9', false),
+            0,
+        ];
+        yield 'extensible against the DN' => [
+            Filters::extensible('cn', 'alice', null, true),
+            1,
+        ];
+        // The RDN stores this value escaped, but the assertion is against the value itself.
+        yield 'extensible against a DN whose value needs escaping' => [
+            Filters::extensible('cn', 'Smith, John', null, true),
+            1,
+        ];
+
+        // No approximate rule is implemented, so it must answer as the type's equality rule does.
+        yield 'approximate on a case exact type rejects a case difference' => [
+            Filters::approximate('employeeNumber', 'a1b2c3'),
+            0,
+        ];
+        yield 'approximate on a case exact type accepts the exact value' => [
+            Filters::approximate('employeeNumber', 'A1b2C3'),
+            1,
+        ];
+    }
+
+    #[DataProvider('filterProvider')]
+    public function test_filter_evaluation_over_the_wire(
+        FilterInterface $filter,
+        int $expected,
+    ): void {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search($filter)
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            $expected,
+            $entries,
+        );
+    }
+
+    public function testRequestingABaseTypeReturnsItsTaggedVariants(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'alice'), 'mail')
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        $alice = $entries->first();
+        self::assertNotNull($alice);
+        self::assertSame(
+            ['alice@foo.bar'],
+            $alice->get(new Attribute('mail'), true)?->getValues(),
+        );
+        self::assertSame(
+            ['alice-en@foo.bar'],
+            $alice->get(new Attribute('mail;lang-en'), true)?->getValues(),
+        );
+    }
+
+    public function testRequestingASupertypeReturnsItsSubtypeValues(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'alice'), 'name')
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        $alice = $entries->first();
+        self::assertNotNull($alice);
+        self::assertSame(
+            ['alice'],
+            $alice->get(new Attribute('cn'), true)?->getValues(),
+        );
+        self::assertSame(
+            ['Smith'],
+            $alice->get(new Attribute('sn'), true)?->getValues(),
+        );
+    }
+
+    public function testRequestingATypeByItsOidReturnsIt(): void
+    {
+        $this->authenticateUser();
+
+        // Filtering on a different attribute, so only the OID can be what asks for cn.
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('sn', 'Smith'), '2.5.4.3')
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            ['alice'],
+            $entries->first()?->get(new Attribute('cn'), true)?->getValues(),
+        );
+    }
+
+    public function testATypesOnlyRequestKeepsAttributeOptions(): void
+    {
+        $this->authenticateUser();
+
+        $request = Operations::search(Filters::equal('cn', 'alice'), 'mail')
+            ->base('dc=foo,dc=bar')
+            ->useSubtreeScope();
+        $request->setAttributesOnly(true);
+
+        $alice = $this->ldapClient()->search($request)->first();
+        self::assertNotNull($alice);
+
+        $descriptions = array_map(
+            static fn(Attribute $attribute): string => $attribute->getDescription(),
+            $alice->getAttributes(),
+        );
+        sort($descriptions);
+        self::assertSame(
+            ['mail', 'mail;lang-en'],
+            $descriptions,
+        );
+    }
+
+    public function testAnUnrecognizedMatchingRuleDoesNotFailTheWholeSearch(): void
+    {
+        $this->authenticateUser();
+
+        // The bad assertion is Undefined, so the disjunction still returns what its other branch matches.
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::or(
+                Filters::equal('cn', 'alice'),
+                Filters::extensible('cn', 'alice', '9.9.9.9', false),
+            ))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            1,
+            $entries,
+        );
+    }
+
     public function testSearchBaseObjectReturnsBaseEntry(): void
     {
         $this->authenticateUser();
@@ -51,7 +320,7 @@ trait QueryTestsTrait
         );
 
         self::assertCount(
-            5,
+            6,
             $entries,
         );
     }
@@ -328,7 +597,7 @@ trait QueryTestsTrait
     }
 
     /**
-     * uidNumber declares the INTEGER syntax, so '99' is below '100' rather than above it bytewise.
+     * uidNumber declares the INTEGER syntax, so 99 is below 100 rather than above it bytewise.
      */
     public function testGteOnAnIntegerAttributeOrdersNumerically(): void
     {
@@ -340,12 +609,14 @@ trait QueryTestsTrait
                 ->useSubtreeScope(),
         );
 
-        self::assertCount(0, $entries);
+        // Bytewise, '99' would also be at or above '100'.
+        self::assertCount(1, $entries);
+        self::assertSame(
+            'cn=Smith\\, John,dc=foo,dc=bar',
+            $entries->first()?->getDn()->toString(),
+        );
     }
 
-    /**
-     * Bytewise, '99' would sort above '100' and be excluded.
-     */
     public function testLteOnAnIntegerAttributeOrdersNumerically(): void
     {
         $this->authenticateUser();
@@ -356,11 +627,8 @@ trait QueryTestsTrait
                 ->useSubtreeScope(),
         );
 
-        self::assertCount(1, $entries);
-        self::assertSame(
-            'cn=alice,ou=people,dc=foo,dc=bar',
-            $entries->first()?->getDn()->toString(),
-        );
+        // Bytewise, '99' would sort above '100' and be excluded.
+        self::assertCount(2, $entries);
     }
 
     public function testNotEqualityExcludesMatches(): void

@@ -123,17 +123,20 @@ class Options implements Countable, IteratorAggregate, Stringable
      */
     public function toString(bool $sortedlc = false): string
     {
-        $opts = $this->options;
+        // Sorting the rendered options rather than the objects, so ordering follows the text and not their internals.
+        $options = array_map(
+            static fn(Option $option): string => $option->toString($sortedlc),
+            $this->options,
+        );
+
         if ($sortedlc) {
-            sort($opts);
+            sort($options);
         }
 
-        $options = '';
-        foreach ($opts as $option) {
-            $options .= ($options === '') ? $option->toString($sortedlc) : ';' . $option->toString($sortedlc);
-        }
-
-        return $options;
+        return implode(
+            ';',
+            $options,
+        );
     }
 
     /**

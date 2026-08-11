@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
-use Closure;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterAttributeContextInterface;
 
 /**
  * Translates FilterInterface into a SQL WHERE fragment.
@@ -26,13 +26,8 @@ use Closure;
  */
 interface FilterTranslatorInterface
 {
-    /**
-     * @param (\Closure(string): (bool|null))|null $isIntegerOrdered Resolves whether an attribute orders numerically.
-     * @param (\Closure(string): (bool|null))|null $isCaseInsensitive Resolves whether an attribute matches without regard to case.
-     */
     public function translate(
         FilterInterface $filter,
-        ?Closure $isIntegerOrdered = null,
-        ?Closure $isCaseInsensitive = null,
+        ?FilterAttributeContextInterface $attributeContext = null,
     ): ?SqlFilterResult;
 }

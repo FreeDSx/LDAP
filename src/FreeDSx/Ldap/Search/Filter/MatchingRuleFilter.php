@@ -42,6 +42,18 @@ class MatchingRuleFilter implements FilterInterface, FilterAttributeInterface, S
 {
     protected const CHOICE_TAG = 9;
 
+    /**
+     * The universal type behind each context tag of the assertion, needed to decode them from BER.
+     */
+    private const CHILD_TAG_MAP = [
+        AbstractType::TAG_CLASS_CONTEXT_SPECIFIC => [
+            1 => AbstractType::TAG_TYPE_OCTET_STRING,
+            2 => AbstractType::TAG_TYPE_OCTET_STRING,
+            3 => AbstractType::TAG_TYPE_OCTET_STRING,
+            4 => AbstractType::TAG_TYPE_BOOLEAN,
+        ],
+    ];
+
     private ?string $matchingRule;
 
     private ?string $attribute;
@@ -177,7 +189,14 @@ class MatchingRuleFilter implements FilterInterface, FilterAttributeInterface, S
      */
     public static function fromAsn1(AbstractType $type): self
     {
-        $type = $type instanceof IncompleteType ? (new LdapEncoder())->complete($type, AbstractType::TAG_TYPE_SEQUENCE) : $type;
+        // The children are context tagged primitives, so their universal types must be supplied to decode them.
+        $type = $type instanceof IncompleteType
+            ? (new LdapEncoder())->complete(
+                $type,
+                AbstractType::TAG_TYPE_SEQUENCE,
+                self::CHILD_TAG_MAP,
+            )
+            : $type;
         if (!($type instanceof SequenceType && (count($type) >= 1 && count($type) <= 4))) {
             throw new ProtocolException('The matching rule filter is malformed');
         }

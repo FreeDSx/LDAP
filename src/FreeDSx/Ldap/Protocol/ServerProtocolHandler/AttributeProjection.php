@@ -83,29 +83,45 @@ final class AttributeProjection
 
     public function project(Entry $entry): Entry
     {
-        $attributes = $entry->getAttributes();
-        $filteredAttributes = [];
-
-        if (!$this->returnNone) {
-            foreach ($attributes as $attribute) {
-                if (!$this->shouldInclude($attribute)) {
-                    continue;
-                }
-
-                $filteredAttributes[] = $this->typesOnly
-                    ? new Attribute($attribute->getName())
-                    : $attribute;
-            }
+        if ($this->returnNone) {
+            return Entry::raw(
+                $entry->getDn(),
+                [],
+            );
         }
 
+        $attributes = $entry->getAttributes();
+        $selected = array_filter(
+            $attributes,
+            $this->shouldInclude(...),
+        );
+
         // Nothing was withheld, so the entry already is its own projection.
-        if (!$this->typesOnly && count($filteredAttributes) === count($attributes)) {
+        if (!$this->typesOnly && count($selected) === count($attributes)) {
             return $entry;
         }
 
         return Entry::raw(
             $entry->getDn(),
-            $filteredAttributes,
+            array_values(
+                $this->typesOnly
+                    ? $this->withoutValues($selected)
+                    : $selected,
+            ),
+        );
+    }
+
+    /**
+     * Options are part of the description a client asked for, so they survive a types-only request.
+     *
+     * @param array<Attribute> $attributes
+     * @return array<Attribute>
+     */
+    private function withoutValues(array $attributes): array
+    {
+        return array_map(
+            static fn(Attribute $attribute): Attribute => new Attribute($attribute->getDescription()),
+            $attributes,
         );
     }
 
@@ -121,9 +137,35 @@ final class AttributeProjection
             return true;
         }
 
+        if ($this->isNamedType($attribute)) {
+            return true;
+        }
+
         return $this->isOperational($attribute)
             ? $this->wantsOperational
             : $this->wantsUser;
+    }
+
+    /**
+     * Whether a requested name asks for this attribute: its own type, or one it descends from.
+     *
+     * A type may be named by any of its names or its OID, and naming it asks for the values held under its options
+     * and its subtypes too (RFC 4511 4.5.1.8, RFC 4512 2.5.2).
+     */
+    private function isNamedType(Attribute $attribute): bool
+    {
+        $type = Attribute::normalizeName($attribute->getDescription());
+
+        foreach ($this->names as $name) {
+            if ($name === $type) {
+                return true;
+            }
+            if ($this->schema->isTypeOrSubtypeOf($type, $name)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function isOperational(Attribute $attribute): bool
