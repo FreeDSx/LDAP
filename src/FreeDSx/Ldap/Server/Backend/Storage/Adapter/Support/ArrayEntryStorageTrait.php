@@ -76,7 +76,7 @@ trait ArrayEntryStorageTrait
             false,
         );
 
-        yield from (new SortKeyComparator())->sort(
+        yield from (new SortKeyComparator($options->schema))->sort(
             $collected,
             $options->sortKeys,
         );

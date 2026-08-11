@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\PdoListQueryBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
@@ -44,6 +45,38 @@ final class PdoListQueryBuilderTest extends TestCase
         self::assertStringContainsString('ORDER BY', $sql);
         self::assertStringContainsString('ASC NULLS LAST', $sql);
         self::assertSame(['cn'], $params);
+    }
+
+    public function test_sqlite_orders_a_numeric_key_as_a_number(): void
+    {
+        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(
+            '',
+            true,
+            null,
+            null,
+            [self::spec(SortKey::ascending('uidNumber'), numeric: true)],
+        );
+
+        self::assertStringContainsString(
+            'MIN(CAST(eav.value_lower AS INTEGER))',
+            $query->sql,
+        );
+    }
+
+    public function test_mysql_orders_a_numeric_key_as_a_number(): void
+    {
+        $query = (new PdoListQueryBuilder(new MysqlDialect()))->build(
+            '',
+            true,
+            null,
+            null,
+            [self::spec(SortKey::ascending('uidNumber'), numeric: true)],
+        );
+
+        self::assertStringContainsString(
+            'MIN(CAST(eav.value_lower AS SIGNED))',
+            $query->sql,
+        );
     }
 
     public function test_sqlite_descending_orders_nulls_first_with_one_param(): void
@@ -219,7 +252,7 @@ final class PdoListQueryBuilderTest extends TestCase
             true,
             $this->sidecarLeaf(),
             500,
-            [SortKey::ascending('cn')],
+            [self::spec(SortKey::ascending('cn'))],
         );
 
         self::assertStringNotContainsString(
@@ -361,9 +394,23 @@ final class PdoListQueryBuilderTest extends TestCase
             true,
             $filter,
             null,
-            $sortKeys,
+            array_values(array_map(
+                self::spec(...),
+                $sortKeys,
+            )),
         );
 
         return [$query->sql, $query->params];
+    }
+
+    private static function spec(
+        SortKey $sortKey,
+        bool $numeric = false,
+    ): SortKeySpec {
+        return new SortKeySpec(
+            strtolower($sortKey->getAttribute()),
+            $sortKey->getUseReverseOrder() ? 'DESC' : 'ASC',
+            $numeric,
+        );
     }
 }

@@ -14,24 +14,24 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage;
 
 use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
-use Closure;
 
 /**
  * DTO for EntryStorageInterface::list(), decoupled from LDAP protocol objects.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class StorageListOptions
+final readonly class StorageListOptions implements FilterAttributeContextInterface
 {
     /**
      * @param SortKey[] $sortKeys
      * @param list<string>|null $attributes Lowercase base attribute names to materialize, or null for all.
-     * @param (\Closure(string): (bool|null))|null $isIntegerOrderedResolver Resolves whether an attribute orders numerically.
-     * @param (\Closure(string): (bool|null))|null $isCaseInsensitiveResolver Resolves whether an attribute matches without regard to case.
+     * @param ?Schema $schema Answers the attribute questions below; callers with no schema leave it null.
      */
     public function __construct(
         public Dn $baseDn,
@@ -42,19 +42,37 @@ final readonly class StorageListOptions
         public array $sortKeys = [],
         public int $lookthroughLimit = 0,
         public ?array $attributes = null,
-        public ?Closure $isIntegerOrderedResolver = null,
-        public ?Closure $isCaseInsensitiveResolver = null,
         public SubentryVisibility $subentries = SubentryVisibility::All,
+        public ?Schema $schema = null,
     ) {}
+
+    /**
+     * How faithfully SQL alone can answer an assertion on the attribute.
+     */
+    public function filterSupport(string $attribute): AttributeFilterSupport
+    {
+        if ($this->schema === null) {
+            return AttributeFilterSupport::Exact;
+        }
+
+        // Options are not part of the type, so they are dropped before asking the schema about it.
+        $type = Attribute::normalizeName($attribute);
+
+        if ($this->schema->getAttributeType($type) === null) {
+            return AttributeFilterSupport::NeverMatches;
+        }
+
+        return $this->schema->hasSubtypes($type)
+            ? AttributeFilterSupport::NeedsEvaluator
+            : AttributeFilterSupport::Exact;
+    }
 
     /**
      * Whether the attribute orders numerically. null when unresolved (no schema was supplied).
      */
     public function isIntegerOrdered(string $attribute): ?bool
     {
-        return $this->isIntegerOrderedResolver !== null
-            ? ($this->isIntegerOrderedResolver)($attribute)
-            : null;
+        return $this->schema?->isIntegerOrdered($attribute);
     }
 
     /**
@@ -62,9 +80,7 @@ final readonly class StorageListOptions
      */
     public function isCaseInsensitive(string $attribute): ?bool
     {
-        return $this->isCaseInsensitiveResolver !== null
-            ? ($this->isCaseInsensitiveResolver)($attribute)
-            : null;
+        return $this->schema?->isCaseInsensitiveMatched($attribute);
     }
 
     /**

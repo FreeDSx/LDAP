@@ -17,7 +17,9 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\PdoListQueryBuilder;
@@ -184,8 +186,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
         $filterResult = $this->translator->translate(
             $options->filter,
-            $options->isIntegerOrdered(...),
-            $options->isCaseInsensitive(...),
+            $options,
         );
 
         // A composed filter with a selective drivable leaf streams off that leaf; PHP re-evaluates the full filter.
@@ -218,7 +219,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             $options->subtree,
             $filterResult,
             $sqlLimit,
-            $options->sortKeys,
+            $this->sortSpecs($options),
             $options->subentries,
         );
 
@@ -415,6 +416,23 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     /**
      * @return Generator<Entry>
      */
+    /**
+     * Resolves each sort key against the schema here, since the query layer has no view of it.
+     *
+     * @return list<SortKeySpec>
+     */
+    private function sortSpecs(StorageListOptions $options): array
+    {
+        return array_values(array_map(
+            static fn(SortKey $sortKey): SortKeySpec => new SortKeySpec(
+                strtolower($sortKey->getAttribute()),
+                $sortKey->getUseReverseOrder() ? 'DESC' : 'ASC',
+                $options->isIntegerOrdered($sortKey->getAttribute()) === true,
+            ),
+            $options->sortKeys,
+        ));
+    }
+
     /**
      * @param list<string>|null $attributes
      */

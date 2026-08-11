@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
@@ -56,7 +57,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     /**
      * Flattened RDN components of the current entry's DN; scoped to one evaluate() call.
      *
-     * @var array<\FreeDSx\Ldap\Entry\Rdn>|null
+     * @var array<Rdn>|null
      */
     private ?array $cachedDnRdns = null;
 
@@ -110,8 +111,8 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             $filter instanceof PresentFilter => $this->evaluatePresent($entry, $filter),
             $filter instanceof EqualityFilter => $this->evaluateEquality($entry, $filter),
             $filter instanceof SubstringFilter => $this->evaluateSubstring($entry, $filter),
-            $filter instanceof GreaterThanOrEqualFilter => $this->evaluateGreaterOrEqual($entry, $filter),
-            $filter instanceof LessThanOrEqualFilter => $this->evaluateLessOrEqual($entry, $filter),
+            $filter instanceof GreaterThanOrEqualFilter,
+            $filter instanceof LessThanOrEqualFilter => $this->evaluateOrdered($entry, $filter),
             $filter instanceof ApproximateFilter => $this->evaluateApproximate($entry, $filter),
             $filter instanceof MatchingRuleFilter => $this->evaluateMatchingRule($entry, $filter),
             default => throw new OperationException(
@@ -184,25 +185,29 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         PresentFilter $filter,
     ): FilterResult {
-        return $this->lookupAttribute($entry, $filter->getAttribute()) !== null
+        // RFC 4511 4.5.1.7.5: true when the type or a subtype of it is present.
+        return $this->valuesForAssertion($entry, $filter->getAttribute()) !== []
             ? FilterResult::True
-            : FilterResult::False;
+            : $this->absentResult($filter->getAttribute());
     }
 
     private function evaluateEquality(
         Entry $entry,
         EqualityFilter $filter,
     ): FilterResult {
-        $attribute = $this->lookupAttribute($entry, $filter->getAttribute());
+        $values = $this->valuesForAssertion(
+            $entry,
+            $filter->getAttribute(),
+        );
 
-        if ($attribute === null) {
-            return FilterResult::Undefined;
+        if ($values === []) {
+            return $this->absentResult($filter->getAttribute());
         }
 
         $comparator = $this->resolveEqualityComparator($filter->getAttribute());
         $filterValue = $filter->getValue();
 
-        foreach ($attribute->getValues() as $value) {
+        foreach ($values as $value) {
             if ($comparator->equals($value, $filterValue)) {
                 return FilterResult::True;
             }
@@ -215,16 +220,16 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         SubstringFilter $filter,
     ): FilterResult {
-        $attribute = $this->lookupAttribute($entry, $filter->getAttribute());
+        $values = $this->valuesForAssertion($entry, $filter->getAttribute());
 
-        if ($attribute === null) {
-            return FilterResult::Undefined;
+        if ($values === []) {
+            return $this->absentResult($filter->getAttribute());
         }
 
         $comparator = $this->resolveSubstringComparator($filter->getAttribute());
         $assertion = $this->buildSubstringAssertion($filter);
 
-        foreach ($attribute->getValues() as $value) {
+        foreach ($values as $value) {
             if ($comparator->substringMatches($value, $assertion)) {
                 return FilterResult::True;
             }
@@ -233,51 +238,32 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         return FilterResult::False;
     }
 
-    private function evaluateGreaterOrEqual(
+    /**
+     * Both ordered filters agree on everything but the direction of the final comparison.
+     */
+    private function evaluateOrdered(
         Entry $entry,
-        GreaterThanOrEqualFilter $filter,
+        GreaterThanOrEqualFilter|LessThanOrEqualFilter $filter,
     ): FilterResult {
-        $attribute = $this->lookupAttribute($entry, $filter->getAttribute());
+        $values = $this->valuesForAssertion(
+            $entry,
+            $filter->getAttribute(),
+        );
 
-        if ($attribute === null) {
-            return FilterResult::Undefined;
+        if ($values === []) {
+            return $this->absentResult($filter->getAttribute());
         }
 
         $filterValue = $filter->getValue();
         $comparator = $this->resolveOrderingComparator($filter->getAttribute());
         $filterIsDigit = $comparator === null && $this->orderedFilterValueIsDigit($filter);
+        $atLeast = $filter instanceof GreaterThanOrEqualFilter;
 
-        foreach ($attribute->getValues() as $value) {
+        foreach ($values as $value) {
             $cmp = $comparator?->compare($value, $filterValue)
                 ?? $this->compareOrdered($value, $filterValue, $filterIsDigit);
 
-            if ($cmp >= 0) {
-                return FilterResult::True;
-            }
-        }
-
-        return FilterResult::False;
-    }
-
-    private function evaluateLessOrEqual(
-        Entry $entry,
-        LessThanOrEqualFilter $filter,
-    ): FilterResult {
-        $attribute = $this->lookupAttribute($entry, $filter->getAttribute());
-
-        if ($attribute === null) {
-            return FilterResult::Undefined;
-        }
-
-        $filterValue = $filter->getValue();
-        $comparator = $this->resolveOrderingComparator($filter->getAttribute());
-        $filterIsDigit = $comparator === null && $this->orderedFilterValueIsDigit($filter);
-
-        foreach ($attribute->getValues() as $value) {
-            $cmp = $comparator?->compare($value, $filterValue)
-                ?? $this->compareOrdered($value, $filterValue, $filterIsDigit);
-
-            if ($cmp <= 0) {
+            if ($atLeast ? $cmp >= 0 : $cmp <= 0) {
                 return FilterResult::True;
             }
         }
@@ -301,16 +287,19 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         ApproximateFilter $filter,
     ): FilterResult {
-        $attribute = $this->lookupAttribute($entry, $filter->getAttribute());
+        $values = $this->valuesForAssertion($entry, $filter->getAttribute());
 
-        if ($attribute === null) {
-            return FilterResult::Undefined;
+        if ($values === []) {
+            return $this->absentResult($filter->getAttribute());
         }
 
+        // No approximate rule is implemented, so this falls back to the type's own equality rather than a case
+        // insensitive default, which would answer differently than the equality filter for the same assertion.
+        $comparator = $this->resolveEqualityComparator($filter->getAttribute());
         $filterValue = $filter->getValue();
 
-        foreach ($attribute->getValues() as $value) {
-            if ($this->defaultComparator->equals($value, $filterValue)) {
+        foreach ($values as $value) {
+            if ($comparator->equals($value, $filterValue)) {
                 return FilterResult::True;
             }
         }
@@ -322,15 +311,25 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         MatchingRuleFilter $filter,
     ): FilterResult {
+        // RFC 4511 4.5.1.7: an unrecognized rule makes the item Undefined, and a server must not answer with an error.
+        $matcher = $this->resolveRuleMatcher(
+            $filter->getMatchingRule(),
+            $filter->getAttribute(),
+        );
+
+        if ($matcher === null) {
+            return FilterResult::Undefined;
+        }
+
         $filterValue = $filter->getValue();
         $values = $this->collectValuesToTest($entry, $filter);
 
         if ($values === []) {
-            return FilterResult::Undefined;
+            return FilterResult::False;
         }
 
         foreach ($values as $value) {
-            if ($this->matchByRule($filter->getMatchingRule(), $value, $filterValue)) {
+            if ($matcher($value, $filterValue)) {
                 return FilterResult::True;
             }
         }
@@ -396,41 +395,46 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             );
         }
 
+        // RDN values carry their escaping, which is a property of the DN string rather than of the value asserted.
         return array_map(
-            fn($component) => $component->getValue(),
+            fn($component) => Rdn::unescape($component->getValue()),
             $components,
         );
     }
 
-    private function matchByRule(
+    /**
+     * Resolve the assertion for a rule or null when the rule cannot be applied, so the item is Undefined.
+     *
+     * @return null|callable(string, string): bool
+     */
+    private function resolveRuleMatcher(
         ?string $rule,
-        string $value,
-        string $filterValue,
-    ): bool {
+        ?string $attribute,
+    ): ?callable {
+        // RFC 4511 4.5.1.7.7: an absent matchingRule means the EQUALITY rule of the attribute type.
         if ($rule === null) {
-            return $this->defaultComparator->equals(
-                $value,
-                $filterValue,
-            );
+            $comparator = $attribute !== null
+                ? $this->resolveEqualityComparator($attribute)
+                : $this->defaultComparator;
+
+            return $comparator->equals(...);
         }
 
         $schemaComparator = $this->schema?->getComparator($rule);
         if ($schemaComparator !== null) {
-            return $schemaComparator->equals(
-                $value,
-                $filterValue,
-            );
+            return $schemaComparator->equals(...);
         }
 
         return match ($rule) {
-            self::MATCHING_RULE_CASE_IGNORE => strtolower($value) === strtolower($filterValue),
-            self::MATCHING_RULE_CASE_EXACT => $value === $filterValue,
-            self::MATCHING_RULE_BIT_AND => ((int) $value & (int) $filterValue) === (int) $filterValue,
-            self::MATCHING_RULE_BIT_OR => ((int) $value & (int) $filterValue) !== 0,
-            default => throw new OperationException(
-                sprintf('Unsupported matching rule: %s', $rule),
-                ResultCode::INAPPROPRIATE_MATCHING,
-            ),
+            self::MATCHING_RULE_CASE_IGNORE => static fn(string $v, string $a): bool
+                => strtolower($v) === strtolower($a),
+            self::MATCHING_RULE_CASE_EXACT => static fn(string $v, string $a): bool
+                => $v === $a,
+            self::MATCHING_RULE_BIT_AND => static fn(string $v, string $a): bool
+                => ((int) $v & (int) $a) === (int) $a,
+            self::MATCHING_RULE_BIT_OR => static fn(string $v, string $a): bool
+                => ((int) $v & (int) $a) !== 0,
+            default => null,
         };
     }
 
@@ -502,13 +506,21 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     }
 
     /**
-     * Defers to Entry::get() when the filter attribute has options, to preserve Attribute::equals() options-matching.
+     * Whether a description carries options, without paying for an Attribute to ask Attribute::hasOptions().
+     */
+    private static function descriptionHasOptions(string $attributeDescription): bool
+    {
+        return str_contains($attributeDescription, ';');
+    }
+
+    /**
+     * Defers to Entry::get() when the filter attribute has options to preserve Attribute::equals() options-matching.
      */
     private function lookupAttribute(
         Entry $entry,
         string $filterAttributeName,
     ): ?Attribute {
-        if (str_contains($filterAttributeName, ';')) {
+        if (self::descriptionHasOptions($filterAttributeName)) {
             return $entry->get($filterAttributeName);
         }
 
@@ -522,6 +534,66 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         }
 
         return $this->attributeIndex[strtolower($filterAttributeName)] ?? null;
+    }
+
+    /**
+     * Every value an assertion on this description must be tested against.
+     *
+     * RFC 4512 2.5.2 makes an assertion on an attribute type cover its tagged variants and its subtypes.
+     *
+     * @return array<string>
+     */
+    private function valuesForAssertion(
+        Entry $entry,
+        string $filterAttributeName,
+    ): array {
+        if (self::descriptionHasOptions($filterAttributeName)) {
+            return $entry->get($filterAttributeName)?->getValues() ?? [];
+        }
+
+        $wanted = strtolower($filterAttributeName);
+        $values = [];
+
+        foreach ($entry->getAttributes() as $attribute) {
+            if ($this->describesSameType($attribute->getName(), $wanted)) {
+                array_push($values, ...$attribute->getValues());
+            }
+        }
+
+        return $values;
+    }
+
+    /**
+     * Whether an entry attribute is the wanted type, or a subtype of it through the SUP chain.
+     */
+    private function describesSameType(
+        string $entryAttributeName,
+        string $wantedLowerName,
+    ): bool {
+        if (strtolower($entryAttributeName) === $wantedLowerName) {
+            return true;
+        }
+
+        return $this->schema?->isTypeOrSubtypeOf(
+            $entryAttributeName,
+            $wantedLowerName,
+        ) ?? false;
+    }
+
+    /**
+     * An item is Undefined only when the server cannot determine an answer, which for an attribute description means
+     * the schema does not define it (RFC 4511 4.5.1.7). A defined type the entry simply lacks is False.
+     */
+    private function absentResult(string $filterAttributeName): FilterResult
+    {
+        $schema = $this->schema;
+        if ($schema === null) {
+            return FilterResult::False;
+        }
+
+        return $schema->getAttributeType(Attribute::normalizeName($filterAttributeName)) === null
+            ? FilterResult::Undefined
+            : FilterResult::False;
     }
 
     private function orderedFilterValueIsDigit(

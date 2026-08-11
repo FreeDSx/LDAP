@@ -66,9 +66,8 @@ final readonly class StorageListOptionsFactory
                 : [],
             lookthroughLimit: $limits->maxSearchLookthrough,
             attributes: $this->materializedAttributes($request),
-            isIntegerOrderedResolver: fn(string $attribute): ?bool => $this->schema->isIntegerOrdered($attribute),
-            isCaseInsensitiveResolver: fn(string $attribute): ?bool => $this->schema->isCaseInsensitiveMatched($attribute),
             subentries: $subentries,
+            schema: $this->schema,
         );
     }
 
@@ -122,7 +121,16 @@ final readonly class StorageListOptionsFactory
                 continue;
             }
 
+            // Values of a subtype are stored under their own name, so nothing narrower than everything is safe.
+            if ($this->schema->hasSubtypes($name)) {
+                return null;
+            }
             $materialized[$name] = true;
+
+            // A type may be asked for by its OID or any of its names, while it is stored under just one of them.
+            foreach ($this->schema->getAttributeType($name)->names ?? [] as $alias) {
+                $materialized[strtolower($alias)] = true;
+            }
         }
         foreach ($filterAttributes as $attribute) {
             $materialized[$attribute] = true;

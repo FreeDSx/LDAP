@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 
 /**
- * One resolved sort key: the lowercased attribute and its SQL direction.
+ * One resolved sort key: the lowercased attribute, its SQL direction, and how its values order.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -23,5 +23,6 @@ final readonly class SortKeySpec
     public function __construct(
         public string $attributeLower,
         public string $direction,
+        public bool $numeric = false,
     ) {}
 }

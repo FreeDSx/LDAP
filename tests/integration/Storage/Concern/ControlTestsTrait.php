@@ -43,7 +43,7 @@ trait ControlTestsTrait
         }
 
         self::assertCount(
-            7,
+            8,
             $allEntries,
         );
     }
@@ -109,6 +109,29 @@ trait ControlTestsTrait
         self::assertSame(
             ['Smith', 'Admin', 'Admin'],
             $sns,
+        );
+    }
+
+    public function testSortControlOrdersAnIntegerAttributeNumerically(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present('uidNumber'), 'uidNumber')
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+            new SortingControl(SortKey::ascending('uidNumber')),
+        );
+
+        $values = array_map(
+            static fn(Entry $e): string => $e->get('uidNumber')?->firstValue() ?? '',
+            $entries->toArray(),
+        );
+
+        // Ordered as text, '100' would come first.
+        self::assertSame(
+            ['99', '100'],
+            $values,
         );
     }
 

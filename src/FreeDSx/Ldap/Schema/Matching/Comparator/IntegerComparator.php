@@ -25,14 +25,25 @@ final class IntegerComparator implements MatchingRuleComparatorInterface
         string $a,
         string $b,
     ): bool {
-        return (int) $a === (int) $b;
+        $left = self::canonical($a);
+        $right = self::canonical($b);
+
+        return $left !== null
+            && $left === $right;
     }
 
     public function compare(
         string $a,
         string $b,
     ): int {
-        return (int) $a <=> (int) $b;
+        $left = self::canonical($a);
+        $right = self::canonical($b);
+
+        if ($left === null || $right === null) {
+            return strcmp($a, $b);
+        }
+
+        return self::compareCanonical($left, $right);
     }
 
     public function substringMatches(
@@ -40,5 +51,42 @@ final class IntegerComparator implements MatchingRuleComparatorInterface
         SubstringAssertion $assertion,
     ): bool {
         return false;
+    }
+
+    /**
+     * An integer reduced to one spelling, or null when the value is not one.
+     *
+     * Values can exceed the platform integer, so they stay as digits rather than being cast.
+     */
+    private static function canonical(string $value): ?string
+    {
+        if (preg_match('/^[+-]?\d+$/', $value) !== 1) {
+            return null;
+        }
+
+        $isNegative = $value[0] === '-';
+        $digits = ltrim(ltrim($value, '+-'), '0');
+
+        if ($digits === '') {
+            return '0';
+        }
+
+        return ($isNegative ? '-' : '') . $digits;
+    }
+
+    private static function compareCanonical(
+        string $a,
+        string $b,
+    ): int {
+        $aNegative = $a[0] === '-';
+        $bNegative = $b[0] === '-';
+
+        if ($aNegative !== $bNegative) {
+            return $aNegative ? -1 : 1;
+        }
+
+        $magnitude = strlen($a) <=> strlen($b) ?: strcmp($a, $b);
+
+        return $aNegative ? -$magnitude : $magnitude;
     }
 }

@@ -203,8 +203,11 @@ trait PdoDialectTrait
         // key once into a derived table, then order by the materialised column (single evaluation per candidate).
         foreach ($sortKeys as $index => $sortKey) {
             $alias = '__sk' . $index;
+            $value = $sortKey->numeric
+                ? 'CAST(eav.value_lower AS SIGNED)'
+                : 'eav.value_lower';
             $projections[] = <<<SQL
-                (SELECT MIN(eav.value_lower)
+                (SELECT MIN({$value})
                  FROM entry_attribute_values eav
                  WHERE eav.entry_lc_dn = __base.lc_dn
                    AND eav.attr_name_lower = ?) AS {$alias}

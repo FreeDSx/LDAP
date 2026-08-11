@@ -68,6 +68,87 @@ final class IntegerComparatorTest extends TestCase
         self::assertGreaterThan(0, $result);
     }
 
+    public function test_equals_rejects_a_value_with_trailing_text(): void
+    {
+        self::assertFalse($this->subject->equals(
+            '99',
+            '99abc',
+        ));
+    }
+
+    public function test_equals_rejects_a_non_numeric_value(): void
+    {
+        self::assertFalse($this->subject->equals(
+            '0',
+            'abc',
+        ));
+        self::assertFalse($this->subject->equals(
+            'abc',
+            'abc',
+        ));
+    }
+
+    public function test_equals_beyond_the_platform_integer(): void
+    {
+        self::assertFalse($this->subject->equals(
+            '9223372036854775808',
+            '9223372036854775809',
+        ));
+        self::assertTrue($this->subject->equals(
+            '9223372036854775808',
+            '09223372036854775808',
+        ));
+    }
+
+    public function test_equals_signed_values(): void
+    {
+        self::assertTrue($this->subject->equals(
+            '-42',
+            '-42',
+        ));
+        self::assertTrue($this->subject->equals(
+            '+42',
+            '42',
+        ));
+        self::assertFalse($this->subject->equals(
+            '-42',
+            '42',
+        ));
+        self::assertTrue($this->subject->equals(
+            '-0',
+            '0',
+        ));
+    }
+
+    public function test_compare_orders_negatives_below_positives(): void
+    {
+        self::assertLessThan(
+            0,
+            $this->subject->compare(
+                '-100',
+                '3',
+            ),
+        );
+        self::assertGreaterThan(
+            0,
+            $this->subject->compare(
+                '-3',
+                '-100',
+            ),
+        );
+    }
+
+    public function test_compare_beyond_the_platform_integer(): void
+    {
+        self::assertLessThan(
+            0,
+            $this->subject->compare(
+                '9223372036854775807',
+                '9223372036854775808',
+            ),
+        );
+    }
+
     public function test_substring_always_returns_false(): void
     {
         $result = $this->subject->substringMatches(
