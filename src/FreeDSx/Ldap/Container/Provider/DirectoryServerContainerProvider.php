@@ -34,6 +34,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
+use FreeDSx\Ldap\Server\Backend\Write\WriteRequestReplayer;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
@@ -106,6 +107,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             LdapImporter::class => $this->makeLdapImporter(...),
             PdoBackendBuilder::class => $this->makePdoBackendBuilder(...),
             WritableStorageBackend::class => $this->makeBackend(...),
+            WriteRequestReplayer::class => $this->makeWriteRequestReplayer(...),
             ServerProtocolFactory::class => $this->makeServerProtocolFactory(...),
             ServerProtocolFactoryInterface::class => static fn(Container $c): ServerProtocolFactoryInterface => $c->get(ServerProtocolFactory::class),
             ServerProtocolHandlerFactory::class => $this->makeServerProtocolHandlerFactory(...),
@@ -166,6 +168,11 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeFilterEvaluator(Container $container): FilterEvaluator
     {
         return new FilterEvaluator($container->get(ServerOptions::class)->getSchema());
+    }
+
+    private function makeWriteRequestReplayer(Container $container): WriteRequestReplayer
+    {
+        return new WriteRequestReplayer($container->get(WritableStorageBackend::class));
     }
 
     private function makeDirectoryDumper(Container $container): DirectoryDumper
