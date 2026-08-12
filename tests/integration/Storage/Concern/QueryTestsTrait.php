@@ -232,6 +232,69 @@ trait QueryTestsTrait
         );
     }
 
+    public function testRequestingEntryDnReturnsTheEntryDn(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'alice'), 'entryDN')
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            ['cn=alice,ou=people,dc=foo,dc=bar'],
+            $entries->first()?->get(new Attribute('entryDN'), true)?->getValues(),
+        );
+    }
+
+    public function testRequestingAllOperationalAttributesReturnsEntryDn(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'alice'), '+')
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            ['cn=alice,ou=people,dc=foo,dc=bar'],
+            $entries->first()?->get(new Attribute('entryDN'), true)?->getValues(),
+        );
+    }
+
+    public function testRequestingEntryDnByItsOidReturnsIt(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'alice'), '1.3.6.1.1.20')
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            ['cn=alice,ou=people,dc=foo,dc=bar'],
+            $entries->first()?->get(new Attribute('entryDN'), true)?->getValues(),
+        );
+    }
+
+    public function testEntryDnIsOperationalSoItIsNotReturnedByDefault(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'alice'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertNull(
+            $entries->first()?->get(new Attribute('entryDN'), true),
+        );
+    }
+
     public function testRequestingASupertypeReturnsItsSubtypeValues(): void
     {
         $this->authenticateUser();

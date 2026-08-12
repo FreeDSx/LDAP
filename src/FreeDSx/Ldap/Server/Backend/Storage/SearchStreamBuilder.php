@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\SearchLimits;
@@ -79,6 +80,10 @@ final readonly class SearchStreamBuilder
             $generator = $this->wrapWithHasSubordinates($generator);
         }
 
+        if ($this->requestsEntryDn($request)) {
+            $generator = $this->wrapWithEntryDn($generator);
+        }
+
         return new EntryStream(
             $generator,
             true,
@@ -100,6 +105,49 @@ final readonly class SearchStreamBuilder
     {
         return strcasecmp($attr->getName(), '+') === 0
             || strcasecmp($attr->getName(), 'hasSubordinates') === 0;
+    }
+
+    private function requestsEntryDn(SearchRequest $request): bool
+    {
+        foreach ($request->getAttributes() as $attr) {
+            if ($this->isEntryDnAttribute($attr)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isEntryDnAttribute(Attribute $attr): bool
+    {
+        return strcasecmp($attr->getName(), '+') === 0
+            || strcasecmp($attr->getName(), AttributeTypeOid::NAME_ENTRY_DN) === 0
+            || $attr->getName() === AttributeTypeOid::OID_ENTRY_DN;
+    }
+
+    /**
+     * @param Generator<Entry> $generator
+     * @return Generator<Entry>
+     */
+    private function wrapWithEntryDn(Generator $generator): Generator
+    {
+        foreach ($generator as $entry) {
+            yield $this->injectEntryDn($entry);
+        }
+    }
+
+    /**
+     * RFC 5020: a copy of the entry's DN, derived on read so a rename cannot leave it stale.
+     */
+    private function injectEntryDn(Entry $entry): Entry
+    {
+        $copy = $entry->makeCopy();
+        $copy->set(
+            AttributeTypeOid::NAME_ENTRY_DN,
+            $entry->getDn()->toString(),
+        );
+
+        return $copy;
     }
 
     private function injectHasSubordinates(Entry $entry): Entry
