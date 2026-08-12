@@ -27,7 +27,10 @@ use FreeDSx\Ldap\Search\Filter\SubstringFilter;
  */
 class FilterParser
 {
-    private const MATCHING_RULE = '/^([a-zA-Z0-9\.]+)?(\:dn)?(\:([a-zA-Z0-9\.]+))?$/';
+    /**
+     * ABNF string literals are case insensitive (RFC 4234 2.3), so ":dn" may be given in any case.
+     */
+    private const MATCHING_RULE = '/^([a-zA-Z0-9\.]+)?(\:dn)?(\:([a-zA-Z0-9\.]+))?$/i';
 
     private string $filter;
 
@@ -241,7 +244,8 @@ class FilterParser
                 $startsAt,
             ));
         }
-        if ($startValue === null || $startValue === $endAt - 1) {
+        // RFC 4515 3: valueencoding permits an empty assertion value, as in the "(seeAlso=)" example of section 4.
+        if ($startValue === null) {
             throw new FilterParseException(sprintf(
                 'Expected a value after "%s" at position %s, but got none.',
                 $filterType,
@@ -293,7 +297,8 @@ class FilterParser
 
         $matchingRule = $matches[4] ?? '';
         $attrName = $matches[1] ?? '';
-        $useDnAttr = isset($matches[2]);
+        // An optional group that did not take part still reports as set, holding an empty string.
+        $useDnAttr = ($matches[2] ?? '') !== '';
 
         # RFC 4511, 4.5.1.7.7: If the matchingRule field is absent, the type field MUST be present [..]
         if ($matchingRule === '' && $attrName === '') {
@@ -335,10 +340,11 @@ class FilterParser
             $substringValue = $this->unescapeValue($substring[0]);
             $substringType = (int) $substring[1];
 
+            // The offset and the length both have to be of the raw fragment for the end of the value to line up.
             if ($substringType === 0) {
-                $filter->setStartsWith($substring[0]);
-            } elseif (($substringType + strlen($substringValue)) === strlen($value)) {
-                $filter->setEndsWith($substring[0]);
+                $filter->setStartsWith($substringValue);
+            } elseif (($substringType + strlen($substring[0])) === strlen($value)) {
+                $filter->setEndsWith($substringValue);
             } else {
                 $contains[] = $substringValue;
             }
@@ -355,13 +361,8 @@ class FilterParser
         int $startAt,
         int $endAt,
     ): FilterInterface {
-        if ($this->isAtFilterContainer($startAt + 2)) {
-            throw new FilterParseException(sprintf(
-                'The "not" filter at position %s cannot contain multiple filters.',
-                $startAt,
-            ));
-        }
-        $info = $this->parseComparisonFilter($startAt + 2);
+        // RFC 4515 3: "not" negates any single filter, including a nested container.
+        $info = $this->parseFilterString($startAt + 2);
         if (($info[0] + 1) !== $endAt) {
             throw new FilterParseException(sprintf(
                 'The value after the "not" filter value was unexpected: %s',

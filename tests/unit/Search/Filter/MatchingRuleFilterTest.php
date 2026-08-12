@@ -144,12 +144,15 @@ final class MatchingRuleFilterTest extends TestCase
         );
     }
 
+    /**
+     * RFC 4515 3 orders the components as attr [":dn"] [":" matchingrule] ":=" value.
+     */
     public function test_it_should_get_the_filter_representation_with_a_dn_match(): void
     {
         $this->subject->setUseDnAttributes(true);
 
         self::assertSame(
-            '(bar:foo:dn:=foobar)',
+            '(bar:dn:foo:=foobar)',
             $this->subject->toString(),
         );
     }

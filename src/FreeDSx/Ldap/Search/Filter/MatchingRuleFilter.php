@@ -163,15 +163,16 @@ class MatchingRuleFilter implements FilterInterface, FilterAttributeInterface, S
      */
     public function toString(): string
     {
+        // RFC 4515 3: attr [":dn"] [":" matchingrule] ":=" value.
         $filter = '';
         if ($this->attribute !== null) {
             $filter = $this->attribute;
         }
-        if ($this->matchingRule !== null) {
-            $filter .= ':' . $this->matchingRule;
-        }
         if ($this->useDnAttributes) {
             $filter .= ':dn';
+        }
+        if ($this->matchingRule !== null) {
+            $filter .= ':' . $this->matchingRule;
         }
 
         return self::PAREN_LEFT

@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Search;
 
 use FreeDSx\Ldap\Exception\FilterParseException;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
+use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
 use FreeDSx\Ldap\Search\Filter\OrFilter;
 use FreeDSx\Ldap\Search\FilterParser;
 use FreeDSx\Ldap\Search\Filters;
@@ -213,6 +214,55 @@ final class FilterParserTest extends TestCase
         FilterParser::parse('(!(foo=bar)(bar=baz))');
     }
 
+    /**
+     * RFC 4515 3 defines "not" over any single filter, which includes a nested container.
+     */
+    public function test_it_should_parse_a_not_filter_wrapping_a_container(): void
+    {
+        self::assertEquals(
+            Filters::not(Filters::and(
+                Filters::equal('foo', 'bar'),
+                Filters::equal('bar', 'baz'),
+            )),
+            FilterParser::parse('(!(&(foo=bar)(bar=baz)))'),
+        );
+    }
+
+    public function test_it_should_unescape_the_initial_substring(): void
+    {
+        self::assertEquals(
+            Filters::startsWith('cn', '*a'),
+            FilterParser::parse('(cn=\2aa*)'),
+        );
+    }
+
+    public function test_it_should_unescape_the_final_substring(): void
+    {
+        self::assertEquals(
+            Filters::endsWith('cn', 'a*'),
+            FilterParser::parse('(cn=*a\2a)'),
+        );
+    }
+
+    public function test_it_should_only_use_dn_attributes_when_asked_to(): void
+    {
+        $withoutDn = FilterParser::parse('(cn:2.5.13.5:=foo)');
+        $withDn = FilterParser::parse('(cn:dn:2.5.13.5:=foo)');
+
+        self::assertInstanceOf(MatchingRuleFilter::class, $withoutDn);
+        self::assertInstanceOf(MatchingRuleFilter::class, $withDn);
+        self::assertFalse($withoutDn->getUseDnAttributes());
+        self::assertTrue($withDn->getUseDnAttributes());
+    }
+
+    public function test_it_should_accept_dn_attributes_in_any_case(): void
+    {
+        $filter = FilterParser::parse('(:DN:2.4.6.8.10:=Dino)');
+
+        self::assertInstanceOf(MatchingRuleFilter::class, $filter);
+        self::assertTrue($filter->getUseDnAttributes());
+    }
+
     public function test_it_should_decode_hex_encoded_values(): void
     {
         self::assertEquals(
@@ -258,11 +308,15 @@ final class FilterParserTest extends TestCase
         FilterParser::parse($filter);
     }
 
-    public function test_it_should_error_on_empty_values(): void
+    /**
+     * RFC 4515 3 permits an empty assertionvalue, and section 4 gives "(seeAlso=)" as an example.
+     */
+    public function test_it_should_accept_an_empty_value(): void
     {
-        self::expectException(FilterParseException::class);
-
-        FilterParser::parse('(foo=)');
+        self::assertSame(
+            '(foo=)',
+            FilterParser::parse('(foo=)')->toString(),
+        );
     }
 
     public function test_it_should_error_on_unrecognized_operators(): void
