@@ -66,6 +66,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         private readonly SearchStreamBuilder $searchStream,
         private readonly SchemaValidator $validator,
         private readonly StorageListOptionsFactory $listOptions,
+        private readonly FilterEvaluatorInterface $filterEvaluator,
         private readonly OperationalAttributeGenerator $operationalAttrs = new OperationalAttributeGenerator(),
         private readonly WriteEntryOperationHandler $entryHandler = new WriteEntryOperationHandler(),
         private readonly ?ChangeRecorder $changeRecorder = null,
@@ -100,19 +101,11 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             );
         }
 
-        $attribute = $entry->get($filter->getAttribute());
-
-        if ($attribute === null) {
-            return false;
-        }
-
-        foreach ($attribute->getValues() as $value) {
-            if (strcasecmp($value, $filter->getValue()) === 0) {
-                return true;
-            }
-        }
-
-        return false;
+        // A comparison is an equality assertion, so it answers through the same evaluation a filter would get.
+        return $this->filterEvaluator->evaluate(
+            $entry,
+            $filter,
+        );
     }
 
     /**

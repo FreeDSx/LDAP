@@ -310,6 +310,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                 $options->getSchema(),
                 $options->makeSearchLimits(),
             ),
+            filterEvaluator: $container->get(FilterEvaluatorInterface::class),
             operationalAttrs: $container->get(OperationalAttributeGenerator::class),
             changeRecorder: $this->changeRecorderFor($container, $storage),
         );
