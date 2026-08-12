@@ -36,7 +36,7 @@ final readonly class GoverningSubentryResolver
 {
     public function __construct(
         private LdapBackendInterface $backend,
-        private SubtreeSpecificationEvaluator $evaluator = new SubtreeSpecificationEvaluator(),
+        private SubtreeSpecificationEvaluator $evaluator,
         private SubtreeSpecificationParser $parser = new SubtreeSpecificationParser(),
     ) {}
 

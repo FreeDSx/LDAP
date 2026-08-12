@@ -23,10 +23,8 @@ use FreeDSx\Ldap\Ldif\LdifParser;
 use FreeDSx\Ldap\Ldif\Loader\LdifLoaderInterface;
 use FreeDSx\Ldap\Ldif\Output\LdifOutputInterface;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestReplayer;
@@ -123,13 +121,9 @@ class LdapServer
         LdifOutputInterface $output,
         DumpOptions $options = new DumpOptions(),
     ): self {
-        $storage = $this->container->get(EntryStorageInterface::class);
-
-        $output->write((new DirectoryDumper(
-            $storage,
-            $storage->namingContexts(),
-            $this->container->get(FilterEvaluatorInterface::class),
-        ))->dump($options));
+        $output->write(
+            $this->container->get(DirectoryDumper::class)->dump($options),
+        );
 
         return $this;
     }

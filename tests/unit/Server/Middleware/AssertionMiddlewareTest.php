@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
@@ -56,7 +57,7 @@ final class AssertionMiddlewareTest extends TestCase
             ));
 
         $this->subject = new AssertionMiddleware(new AssertionEvaluator(
-            new FilterEvaluator(),
+            new FilterEvaluator(SchemaResource::Core->load()),
             $this->backend,
             new RuleBasedAccessControl(AclRules::fromEmpty()),
         ));
