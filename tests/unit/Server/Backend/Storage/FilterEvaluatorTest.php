@@ -36,7 +36,7 @@ final class FilterEvaluatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new FilterEvaluator();
+        $this->subject = new FilterEvaluator(SchemaResource::Core->load());
 
         $this->entry = new Entry(
             new Dn('cn=Alice,dc=example,dc=com'),
@@ -890,18 +890,6 @@ final class FilterEvaluatorTest extends TestCase
         );
         self::assertFalse(
             $subject->evaluate($entry, Filters::equal('userPassword', 'secret')),
-        );
-    }
-
-    public function test_equality_without_schema_falls_back_to_case_ignore_for_userpassword(): void
-    {
-        $entry = new Entry(
-            new Dn('cn=Test,dc=example,dc=com'),
-            new Attribute('userPassword', 'Secret'),
-        );
-
-        self::assertTrue(
-            $this->subject->evaluate($entry, Filters::equal('userPassword', 'secret')),
         );
     }
 

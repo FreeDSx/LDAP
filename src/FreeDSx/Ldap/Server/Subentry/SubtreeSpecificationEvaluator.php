@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Server\Subentry;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 
 /**
@@ -26,7 +25,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 final readonly class SubtreeSpecificationEvaluator
 {
     public function __construct(
-        private FilterEvaluatorInterface $filterEvaluator = new FilterEvaluator(),
+        private FilterEvaluatorInterface $filterEvaluator,
     ) {}
 
     /**

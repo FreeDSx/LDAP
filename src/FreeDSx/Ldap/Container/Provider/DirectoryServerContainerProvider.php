@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
@@ -99,6 +100,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             PasswordAuthenticatableInterface::class => $this->makePasswordAuthenticator(...),
             FilterEvaluatorInterface::class => $this->makeFilterEvaluator(...),
             EntryStorageInterface::class => $this->makeStorage(...),
+            DirectoryDumper::class => $this->makeDirectoryDumper(...),
             OperationalAttributeGenerator::class => $this->makeOperationalAttributeGenerator(...),
             SearchStreamBuilder::class => $this->makeSearchStreamBuilder(...),
             LdapImporter::class => $this->makeLdapImporter(...),
@@ -164,6 +166,17 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeFilterEvaluator(Container $container): FilterEvaluator
     {
         return new FilterEvaluator($container->get(ServerOptions::class)->getSchema());
+    }
+
+    private function makeDirectoryDumper(Container $container): DirectoryDumper
+    {
+        $storage = $container->get(EntryStorageInterface::class);
+
+        return new DirectoryDumper(
+            $storage,
+            $storage->namingContexts(),
+            $container->get(FilterEvaluatorInterface::class),
+        );
     }
 
     /**

@@ -19,7 +19,6 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use Generator;
@@ -37,7 +36,7 @@ final readonly class DirectoryDumper
     public function __construct(
         private EntryStorageInterface $storage,
         private array $namingContexts,
-        private FilterEvaluatorInterface $filterEvaluator = new FilterEvaluator(),
+        private FilterEvaluatorInterface $filterEvaluator,
         private LdifWriter $writer = new LdifWriter(),
     ) {}
 

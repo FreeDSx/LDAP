@@ -82,7 +82,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
     private readonly IntegerComparator $integerComparator;
 
-    public function __construct(private readonly ?Schema $schema = null)
+    public function __construct(private readonly Schema $schema)
     {
         $this->defaultComparator = new CaseIgnoreComparator();
         $this->integerComparator = new IntegerComparator();
@@ -420,7 +420,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return $comparator->equals(...);
         }
 
-        $schemaComparator = $this->schema?->getComparator($rule);
+        $schemaComparator = $this->schema->getComparator($rule);
         if ($schemaComparator !== null) {
             return $schemaComparator->equals(...);
         }
@@ -440,10 +440,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
     private function resolveEqualityComparator(string $attrName): MatchingRuleComparatorInterface
     {
-        if ($this->schema === null) {
-            return $this->defaultComparator;
-        }
-
         $attrType = $this->schema->getAttributeType($attrName);
         $comparator = $attrType?->equalityOid !== null
             ? $this->schema->getComparator($attrType->equalityOid)
@@ -454,10 +450,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
     private function resolveSubstringComparator(string $attrName): MatchingRuleComparatorInterface
     {
-        if ($this->schema === null) {
-            return $this->defaultComparator;
-        }
-
         $attrType = $this->schema->getAttributeType($attrName);
         $comparator = $attrType?->substringOid !== null
             ? $this->schema->getComparator($attrType->substringOid)
@@ -467,14 +459,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     }
 
     /**
-     * Returns null when schema is unavailable or the attribute is unknown — caller falls back to the digit heuristic.
+     * Returns null when the attribute is unknown, so the caller falls back to the digit heuristic.
      */
     private function resolveOrderingComparator(string $attrName): ?MatchingRuleComparatorInterface
     {
-        if ($this->schema === null) {
-            return null;
-        }
-
         $attrType = $this->schema->getAttributeType($attrName);
 
         if ($attrType === null) {
@@ -574,10 +562,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return true;
         }
 
-        return $this->schema?->isTypeOrSubtypeOf(
+        return $this->schema->isTypeOrSubtypeOf(
             $entryAttributeName,
             $wantedLowerName,
-        ) ?? false;
+        );
     }
 
     /**
@@ -586,12 +574,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
      */
     private function absentResult(string $filterAttributeName): FilterResult
     {
-        $schema = $this->schema;
-        if ($schema === null) {
-            return FilterResult::False;
-        }
-
-        return $schema->getAttributeType(Attribute::normalizeName($filterAttributeName)) === null
+        return $this->schema->getAttributeType(Attribute::normalizeName($filterAttributeName)) === null
             ? FilterResult::Undefined
             : FilterResult::False;
     }

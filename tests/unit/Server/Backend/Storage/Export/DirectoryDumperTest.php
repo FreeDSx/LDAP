@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Ldif\LdifOutputOptions;
 use FreeDSx\Ldap\Ldif\LdifWriter;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
@@ -25,6 +26,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
+use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use PHPUnit\Framework\TestCase;
@@ -33,10 +35,7 @@ final class DirectoryDumperTest extends TestCase
 {
     public function test_it_yields_the_version_header_first_when_enabled(): void
     {
-        $dumper = new DirectoryDumper(
-            $this->storageWithEntries(),
-            [new Dn('dc=foo,dc=bar')],
-        );
+        $dumper = $this->makeDumper();
 
         $chunks = iterator_to_array(
             $dumper->dump(new DumpOptions()),
@@ -52,11 +51,7 @@ final class DirectoryDumperTest extends TestCase
     public function test_it_omits_the_version_header_when_disabled(): void
     {
         $writer = new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false));
-        $dumper = new DirectoryDumper(
-            $this->storageWithEntries(),
-            [new Dn('dc=foo,dc=bar')],
-            writer: $writer,
-        );
+        $dumper = $this->makeDumper(writer: $writer);
 
         $chunks = iterator_to_array(
             $dumper->dump(new DumpOptions()),
@@ -71,9 +66,7 @@ final class DirectoryDumperTest extends TestCase
 
     public function test_it_iterates_entries_across_naming_contexts_when_no_base_is_set(): void
     {
-        $dumper = new DirectoryDumper(
-            $this->storageWithEntries(),
-            [new Dn('dc=foo,dc=bar')],
+        $dumper = $this->makeDumper(
             writer: new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
         );
 
@@ -98,9 +91,7 @@ final class DirectoryDumperTest extends TestCase
 
     public function test_it_restricts_to_the_options_base_dn_when_set(): void
     {
-        $dumper = new DirectoryDumper(
-            $this->storageWithEntries(),
-            [new Dn('dc=foo,dc=bar')],
+        $dumper = $this->makeDumper(
             writer: new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
         );
 
@@ -147,9 +138,8 @@ final class DirectoryDumperTest extends TestCase
                 => $entry->getDn()->toString() === 'cn=alice,dc=foo,dc=bar',
         );
 
-        $dumper = new DirectoryDumper(
+        $dumper = $this->makeDumper(
             $storage,
-            [new Dn('dc=foo,dc=bar')],
             $evaluator,
             new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
         );
@@ -182,9 +172,8 @@ final class DirectoryDumperTest extends TestCase
         $evaluator = $this->createMock(FilterEvaluatorInterface::class);
         $evaluator->expects(self::never())->method('evaluate');
 
-        $dumper = new DirectoryDumper(
+        $dumper = $this->makeDumper(
             $storage,
-            [new Dn('dc=foo,dc=bar')],
             $evaluator,
             new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
         );
@@ -210,14 +199,27 @@ final class DirectoryDumperTest extends TestCase
                 })(),
             ));
 
-        $dumper = new DirectoryDumper(
-            $storage,
-            [new Dn('dc=foo,dc=bar')],
-        );
+        $dumper = $this->makeDumper($storage);
 
         iterator_to_array(
             $dumper->dump(new DumpOptions()),
             false,
+        );
+    }
+
+    /**
+     * The subject, with only the collaborator a test cares about supplied.
+     */
+    private function makeDumper(
+        ?EntryStorageInterface $storage = null,
+        ?FilterEvaluatorInterface $filterEvaluator = null,
+        ?LdifWriter $writer = null,
+    ): DirectoryDumper {
+        return new DirectoryDumper(
+            $storage ?? $this->storageWithEntries(),
+            [new Dn('dc=foo,dc=bar')],
+            $filterEvaluator ?? new FilterEvaluator(SchemaResource::Core->load()),
+            $writer ?? new LdifWriter(),
         );
     }
 
