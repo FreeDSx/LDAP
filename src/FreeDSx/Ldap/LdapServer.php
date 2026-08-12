@@ -26,7 +26,6 @@ use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestReplayer;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -103,9 +102,7 @@ class LdapServer
      */
     public function applyChanges(LdifLoaderInterface $loader): self
     {
-        $backend = $this->backend();
-
-        (new WriteRequestReplayer($backend))
+        $this->container->get(WriteRequestReplayer::class)
             ->apply((new LdifParser())->parse($loader));
 
         return $this;
@@ -126,14 +123,6 @@ class LdapServer
         );
 
         return $this;
-    }
-
-    /**
-     * The assembled storage backend from the container.
-     */
-    private function backend(): WritableStorageBackend
-    {
-        return $this->container->get(WritableStorageBackend::class);
     }
 
     /**
