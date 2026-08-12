@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
+use FreeDSx\Ldap\Schema\Matching\StringPrep;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 
 /**
@@ -21,6 +22,24 @@ use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
  */
 final class TelephoneNumberComparator implements MatchingRuleComparatorInterface
 {
+    /**
+     * The hyphens and the space RFC 4518 2.6.3 calls insignificant.
+     */
+    private const INSIGNIFICANT = [
+        ' ',
+        "\u{002D}",
+        "\u{058A}",
+        "\u{2010}",
+        "\u{2011}",
+        "\u{2212}",
+        "\u{FE63}",
+        "\u{FF0D}",
+    ];
+
+    public function __construct(
+        private readonly StringPrep $prep = new StringPrep(),
+    ) {}
+
     public function equals(
         string $a,
         string $b,
@@ -55,12 +74,15 @@ final class TelephoneNumberComparator implements MatchingRuleComparatorInterface
         );
     }
 
+    /**
+     * The preparation profile only rearranges spaces, which are removed here along with the hyphens.
+     */
     private function normalize(string $value): string
     {
-        return strtolower(str_replace(
-            [' ', '-'],
+        return str_replace(
+            self::INSIGNIFICANT,
             '',
-            $value,
-        ));
+            $this->prep->prepareForEquality($value),
+        );
     }
 }
