@@ -579,6 +579,80 @@ trait QueryTestsTrait
         self::assertTrue($result);
     }
 
+    public function testCompareAppliesTheSchemaDeclaredMatchingRule(): void
+    {
+        $this->authenticateUser();
+
+        // employeeNumber matches case exactly, so a case folded comparison must not be true.
+        self::assertTrue($this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'employeeNumber',
+            'A1b2C3',
+        ));
+        self::assertFalse($this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'employeeNumber',
+            'a1b2c3',
+        ));
+    }
+
+    public function testCompareAgreesWithTheSameAssertionAsAFilter(): void
+    {
+        $this->authenticateUser();
+
+        foreach (['A1b2C3', 'a1b2c3'] as $assertion) {
+            $matched = $this->ldapClient()->search(
+                Operations::search(Filters::equal('employeeNumber', $assertion))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+            );
+
+            self::assertSame(
+                count($matched) === 1,
+                $this->ldapClient()->compare(
+                    'cn=alice,ou=people,dc=foo,dc=bar',
+                    'employeeNumber',
+                    $assertion,
+                ),
+            );
+        }
+    }
+
+    public function testCompareIsFalseWhenTheEntryLacksTheAttribute(): void
+    {
+        $this->authenticateUser();
+
+        self::assertFalse($this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'telephoneNumber',
+            '555',
+        ));
+    }
+
+    public function testCompareIsFalseForAnUnrecognizedAttributeType(): void
+    {
+        $this->authenticateUser();
+
+        // The assertion is Undefined rather than false, but neither is a match.
+        self::assertFalse($this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'shoeSize',
+            '12',
+        ));
+    }
+
+    public function testCompareCoversValuesHeldBySubtypes(): void
+    {
+        $this->authenticateUser();
+
+        // RFC 4512 2.5.2: cn is a subtype of name, so its value answers a comparison against the supertype.
+        self::assertTrue($this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'name',
+            'alice',
+        ));
+    }
+
     public function testCompareReturnsFalseForNonMatchingValue(): void
     {
         $this->authenticateUser();

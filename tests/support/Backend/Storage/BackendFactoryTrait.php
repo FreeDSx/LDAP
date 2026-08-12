@@ -43,13 +43,14 @@ trait BackendFactoryTrait
     ): WritableStorageBackend {
         $schema ??= SchemaResource::Core->load();
         $limits ??= new SearchLimits();
+        $filterEvaluator = new FilterEvaluator($schema);
 
         return new WritableStorageBackend(
             storage: $storage,
             searchStream: new SearchStreamBuilder(
                 $storage,
                 $limits,
-                new FilterEvaluator($schema),
+                $filterEvaluator,
             ),
             validator: $validator ?? new SchemaValidator(
                 $schema,
@@ -59,6 +60,7 @@ trait BackendFactoryTrait
                 $schema,
                 $limits,
             ),
+            filterEvaluator: $filterEvaluator,
             changeRecorder: $changeRecorder,
         );
     }
