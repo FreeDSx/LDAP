@@ -36,6 +36,14 @@ final class NumericStringComparatorTest extends TestCase
         self::assertTrue($result);
     }
 
+    public function test_equals_folds_compatibility_digits(): void
+    {
+        self::assertTrue($this->subject->equals(
+            "\u{FF11}\u{FF12}\u{FF13}",
+            '123',
+        ));
+    }
+
     public function test_equals_does_not_match_different_digits(): void
     {
         $result = $this->subject->equals(

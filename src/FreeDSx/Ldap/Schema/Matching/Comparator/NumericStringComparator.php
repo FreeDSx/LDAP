@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
+use FreeDSx\Ldap\Schema\Matching\StringPrep;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 
 /**
@@ -21,6 +22,10 @@ use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
  */
 final class NumericStringComparator implements MatchingRuleComparatorInterface
 {
+    public function __construct(
+        private readonly StringPrep $prep = new StringPrep(),
+    ) {}
+
     public function equals(
         string $a,
         string $b,
@@ -54,12 +59,15 @@ final class NumericStringComparator implements MatchingRuleComparatorInterface
         );
     }
 
+    /**
+     * RFC 4518 2.6.2: every space is insignificant, so the profile's space handling is simply undone here.
+     */
     private function normalize(string $value): string
     {
         return str_replace(
             ' ',
             '',
-            $value,
+            $this->prep->prepareForEquality($value),
         );
     }
 }

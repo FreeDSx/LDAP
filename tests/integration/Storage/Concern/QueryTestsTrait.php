@@ -161,6 +161,25 @@ trait QueryTestsTrait
             1,
         ];
 
+        // RFC 4518 appendix B: a space at the edge of a fragment stays significant, so these must not match a value
+        // holding no space there. Collapsing and trimming both sides alike would wrongly match all three.
+        yield 'an initial and final space cannot match a value without them' => [
+            Filters::startsWith('cn', 'al ')->setEndsWith(' ice'),
+            0,
+        ];
+        yield 'a leading space in an any fragment is significant' => [
+            Filters::contains('cn', ' alice '),
+            0,
+        ];
+        yield 'the same assertion split across fragments agrees' => [
+            Filters::startsWith('cn', ' ')->setContains('alice')->setEndsWith(' '),
+            0,
+        ];
+        yield 'a fragment spanning a space matches a value holding one' => [
+            Filters::contains('cn', 'Smith, John'),
+            1,
+        ];
+
         // No approximate rule is implemented, so it must answer as the type's equality rule does.
         yield 'approximate on a case exact type rejects a case difference' => [
             Filters::approximate('employeeNumber', 'a1b2c3'),
