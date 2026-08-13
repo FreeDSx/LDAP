@@ -42,4 +42,9 @@ interface FilterAttributeContextInterface
         string $attribute,
         string $value,
     ): bool;
+
+    /**
+     * Whether the attribute defines a SUBSTR rule (false makes a substring item Undefined per RFC 4511 4.5.1.7).
+     */
+    public function hasSubstringRule(string $attribute): bool;
 }

@@ -320,6 +320,21 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
     }
 
+    public function test_a_substring_on_a_type_with_no_substring_rule_selects_nothing(): void
+    {
+        $result = $this->subject->translate(
+            new SubstringFilter('uidNumber', '1'),
+            $this->attributeContext(hasSubstringRule: false),
+        );
+
+        self::assertNotNull($result);
+        self::assertSame(
+            '1 = 0',
+            $result->sql,
+        );
+        self::assertFalse($result->isExact);
+    }
+
     public function test_an_attribute_with_subtypes_is_left_to_the_evaluator(): void
     {
         $result = $this->subject->translate(
@@ -1068,11 +1083,13 @@ final class SqliteFilterTranslatorTest extends TestCase
         ?bool $integerOrdered = null,
         AttributeFilterSupport $support = AttributeFilterSupport::Exact,
         bool $assertionConforms = true,
+        bool $hasSubstringRule = true,
     ): FilterAttributeContextInterface {
         $context = $this->createMock(FilterAttributeContextInterface::class);
         $context->method('isIntegerOrdered')->willReturn($integerOrdered);
         $context->method('filterSupport')->willReturn($support);
         $context->method('assertionValueConforms')->willReturn($assertionConforms);
+        $context->method('hasSubstringRule')->willReturn($hasSubstringRule);
 
         return $context;
     }

@@ -127,6 +127,28 @@ final class Schema
     }
 
     /**
+     * The effective SUBSTR rule OID, walking the SUP chain when the type declares none directly.
+     */
+    public function getSubstringRuleOid(string $nameOrOid): ?string
+    {
+        $attributeType = $this->getAttributeType($nameOrOid);
+        $seen = [];
+
+        while ($attributeType !== null && !isset($seen[$attributeType->oid])) {
+            if ($attributeType->substringOid !== null) {
+                return $attributeType->substringOid;
+            }
+
+            $seen[$attributeType->oid] = true;
+            $attributeType = $attributeType->superTypeOid !== null
+                ? $this->getAttributeType($attributeType->superTypeOid)
+                : null;
+        }
+
+        return null;
+    }
+
+    /**
      * Whether one attribute type is the other, or descends from it through the SUP chain.
      *
      * Either side may be given as an OID or any of the names the type is known by.

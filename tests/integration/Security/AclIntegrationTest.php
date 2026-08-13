@@ -631,6 +631,26 @@ final class AclIntegrationTest extends ServerTestCase
         );
     }
 
+    public function testFilteringOnACustomConfidentialAttributePrefixMatchesNothing(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        // secretCode declares a SUBSTR rule, so only the confidential rewrite can be keeping this from matching.
+        $results = $this->ldapClient()->search(
+            Operations::search(Filters::startsWith(
+                'secretCode',
+                substr(LdapAclCommand::SECRET_CODE, 0, 4),
+            ))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            0,
+            $results,
+        );
+    }
+
     public function testAGrantDoesNotExtendToOtherConfidentialAttributes(): void
     {
         $this->authenticateAdmin();

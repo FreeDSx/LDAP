@@ -88,6 +88,13 @@ final class FilterEvaluator implements FilterEvaluatorInterface
      */
     private WeakMap $recognizedAttributeCache;
 
+    /**
+     * Resolved SUBSTR rule OID per filter, with false standing for a type that declares none.
+     *
+     * @var WeakMap<object, string|false>
+     */
+    private WeakMap $substringRuleCache;
+
     private readonly CaseIgnoreComparator $defaultComparator;
 
     private readonly IntegerComparator $integerComparator;
@@ -102,6 +109,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         $this->substringCache = new WeakMap();
         $this->assertionSyntaxCache = new WeakMap();
         $this->recognizedAttributeCache = new WeakMap();
+        $this->substringRuleCache = new WeakMap();
     }
 
     public function evaluate(
@@ -243,6 +251,14 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         SubstringFilter $filter,
     ): FilterResult {
+        // RFC 4511 4.5.1.7: the rule a substring item applies is the type's SUBSTR, so a type declaring none has
+        // no way to answer the assertion and the item is Undefined.
+        $substringRuleOid = $this->substringRuleOid($filter);
+
+        if ($substringRuleOid === null) {
+            return FilterResult::Undefined;
+        }
+
         $values = $this->valuesForAssertion($entry, $filter->getAttribute());
 
         // A type the schema defines but the entry lacks is False; an undefined type was answered upstream.
@@ -250,7 +266,8 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return FilterResult::False;
         }
 
-        $comparator = $this->resolveSubstringComparator($filter->getAttribute());
+        $comparator = $this->schema->getComparator($substringRuleOid)
+            ?? $this->defaultComparator;
         $assertion = $this->buildSubstringAssertion($filter);
 
         foreach ($values as $value) {
@@ -470,16 +487,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         return $comparator ?? $this->defaultComparator;
     }
 
-    private function resolveSubstringComparator(string $attrName): MatchingRuleComparatorInterface
-    {
-        $attrType = $this->schema->getAttributeType($attrName);
-        $comparator = $attrType?->substringOid !== null
-            ? $this->schema->getComparator($attrType->substringOid)
-            : null;
-
-        return $comparator ?? $this->defaultComparator;
-    }
-
     /**
      * Returns null when the attribute is unknown, so the caller falls back to the digit heuristic.
      */
@@ -630,5 +637,21 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             $filter->getAttribute(),
             $filter->getValue(),
         );
+    }
+
+    /**
+     * The SUBSTR rule the filter's type resolves to, or null when it declares none.
+     *
+     * The answer depends only on the filter, so it is memoized rather than recomputed for every entry tested.
+     */
+    private function substringRuleOid(SubstringFilter $filter): ?string
+    {
+        $ruleOid = $this->substringRuleCache[$filter] ??= $this->schema->getSubstringRuleOid(
+            Attribute::normalizeName($filter->getAttribute()),
+        ) ?? false;
+
+        return $ruleOid === false
+            ? null
+            : $ruleOid;
     }
 }
