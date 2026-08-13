@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 
 /**
@@ -28,6 +29,8 @@ use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
  */
 final readonly class StorageListOptions implements FilterAttributeContextInterface
 {
+    private ?AttributeSyntaxResolver $syntaxResolver;
+
     /**
      * @param SortKey[] $sortKeys
      * @param list<string>|null $attributes Lowercase base attribute names to materialize, or null for all.
@@ -44,7 +47,21 @@ final readonly class StorageListOptions implements FilterAttributeContextInterfa
         public ?array $attributes = null,
         public SubentryVisibility $subentries = SubentryVisibility::All,
         public ?Schema $schema = null,
-    ) {}
+    ) {
+        $this->syntaxResolver = $schema === null
+            ? null
+            : new AttributeSyntaxResolver($schema);
+    }
+
+    /**
+     * Whether a value conforms to the attribute's syntax; true when no schema can say otherwise.
+     */
+    public function assertionValueConforms(
+        string $attribute,
+        string $value,
+    ): bool {
+        return $this->syntaxResolver?->conforms($attribute, $value) ?? true;
+    }
 
     /**
      * How faithfully SQL alone can answer an assertion on the attribute.

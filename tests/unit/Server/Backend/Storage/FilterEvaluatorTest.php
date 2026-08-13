@@ -26,6 +26,8 @@ use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
+use Generator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class FilterEvaluatorTest extends TestCase
@@ -985,5 +987,91 @@ final class FilterEvaluatorTest extends TestCase
             $entry,
             Filters::greaterThanOrEqual('uidNumber', '100'),
         ));
+    }
+
+    #[DataProvider('invalidAssertionValueProvider')]
+    public function test_an_assertion_value_the_syntax_rejects_is_undefined(FilterInterface $filter): void
+    {
+        self::assertFalse($this->integerSchemaEvaluator()->evaluate(
+            $this->uidNumberEntry(),
+            $filter,
+        ));
+    }
+
+    /**
+     * Undefined is excluded under negation too, so both polarities answer the same way (RFC 4511 4.5.1.7).
+     */
+    #[DataProvider('invalidAssertionValueProvider')]
+    public function test_a_negated_assertion_value_the_syntax_rejects_is_still_undefined(FilterInterface $filter): void
+    {
+        self::assertFalse($this->integerSchemaEvaluator()->evaluate(
+            $this->uidNumberEntry(),
+            Filters::not($filter),
+        ));
+    }
+
+    public static function invalidAssertionValueProvider(): Generator
+    {
+        yield 'equality' => [Filters::equal('uidNumber', 'abc')];
+        yield 'greaterThanOrEqual' => [Filters::greaterThanOrEqual('uidNumber', 'abc')];
+        yield 'lessThanOrEqual' => [Filters::lessThanOrEqual('uidNumber', 'abc')];
+        yield 'approximate' => [new ApproximateFilter('uidNumber', 'abc')];
+    }
+
+    public function test_a_conforming_assertion_value_is_unaffected(): void
+    {
+        $subject = $this->integerSchemaEvaluator();
+        $entry = $this->uidNumberEntry();
+
+        self::assertTrue($subject->evaluate(
+            $entry,
+            Filters::equal('uidNumber', '100'),
+        ));
+        self::assertFalse($subject->evaluate(
+            $entry,
+            Filters::not(Filters::equal('uidNumber', '100')),
+        ));
+    }
+
+    /**
+     * A present filter carries no assertion value, so it cannot be Undefined for this reason.
+     */
+    public function test_a_present_filter_is_not_subject_to_the_assertion_syntax_check(): void
+    {
+        self::assertTrue($this->integerSchemaEvaluator()->evaluate(
+            $this->uidNumberEntry(),
+            Filters::present('uidNumber'),
+        ));
+    }
+
+    /**
+     * A substring fragment is a portion of a value rather than a whole one, so it is not held to the type's syntax.
+     */
+    public function test_a_substring_fragment_is_not_subject_to_the_assertion_syntax_check(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Test,dc=example,dc=com'),
+            new Attribute('uidNumber', '-50'),
+        );
+
+        self::assertTrue($this->integerSchemaEvaluator()->evaluate(
+            $entry,
+            Filters::startsWith('uidNumber', '-'),
+        ));
+    }
+
+    private function integerSchemaEvaluator(): FilterEvaluator
+    {
+        return new FilterEvaluator(
+            SchemaResource::Core->load()->merge(SchemaResource::Nis->load()),
+        );
+    }
+
+    private function uidNumberEntry(): Entry
+    {
+        return new Entry(
+            new Dn('cn=Test,dc=example,dc=com'),
+            new Attribute('uidNumber', '100'),
+        );
     }
 }

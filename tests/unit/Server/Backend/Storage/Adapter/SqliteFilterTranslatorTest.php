@@ -280,6 +280,46 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
     }
 
+    public function test_an_assertion_value_the_syntax_rejects_selects_nothing_and_stays_inexact(): void
+    {
+        $result = $this->subject->translate(
+            new EqualityFilter('uidNumber', 'abc'),
+            $this->attributeContext(assertionConforms: false),
+        );
+
+        self::assertNotNull($result);
+        self::assertStringContainsString(
+            '1 = 0',
+            $result->sql,
+        );
+        self::assertFalse($result->isExact);
+    }
+
+    public function test_a_negated_assertion_the_syntax_rejects_stays_inexact_so_the_evaluator_decides(): void
+    {
+        $result = $this->subject->translate(
+            new NotFilter(new EqualityFilter('uidNumber', 'abc')),
+            $this->attributeContext(assertionConforms: false),
+        );
+
+        self::assertNotNull($result);
+        self::assertFalse($result->isExact);
+    }
+
+    public function test_a_substring_filter_is_not_subject_to_the_assertion_syntax_check(): void
+    {
+        $result = $this->subject->translate(
+            new SubstringFilter('uidNumber', '1'),
+            $this->attributeContext(assertionConforms: false),
+        );
+
+        self::assertNotNull($result);
+        self::assertStringNotContainsString(
+            '1 = 0',
+            $result->sql,
+        );
+    }
+
     public function test_an_attribute_with_subtypes_is_left_to_the_evaluator(): void
     {
         $result = $this->subject->translate(
@@ -1027,10 +1067,12 @@ final class SqliteFilterTranslatorTest extends TestCase
     private function attributeContext(
         ?bool $integerOrdered = null,
         AttributeFilterSupport $support = AttributeFilterSupport::Exact,
+        bool $assertionConforms = true,
     ): FilterAttributeContextInterface {
         $context = $this->createMock(FilterAttributeContextInterface::class);
         $context->method('isIntegerOrdered')->willReturn($integerOrdered);
         $context->method('filterSupport')->willReturn($support);
+        $context->method('assertionValueConforms')->willReturn($assertionConforms);
 
         return $context;
     }

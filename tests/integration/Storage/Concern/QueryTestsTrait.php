@@ -84,9 +84,14 @@ trait QueryTestsTrait
             Filters::equal('uidNumber', '99abc'),
             0,
         ];
-        yield 'leading zeros are the same integer' => [
+        // RFC 4517 3.3.16 forbids a leading zero, so the assertion value is invalid and the item is Undefined.
+        yield 'an integer assertion with a leading zero is undefined' => [
             Filters::equal('uidNumber', '099'),
-            1,
+            0,
+        ];
+        yield 'a negated integer assertion with a leading zero is still undefined' => [
+            Filters::not(Filters::equal('uidNumber', '099')),
+            0,
         ];
 
         // RFC 4511 4.5.1.7: an assertion on an unrecognized attribute type is Undefined, and NOT of Undefined stays
@@ -188,6 +193,37 @@ trait QueryTestsTrait
         yield 'approximate on a case exact type accepts the exact value' => [
             Filters::approximate('employeeNumber', 'A1b2C3'),
             1,
+        ];
+
+        // An assertion value the type's syntax rejects is Undefined, which is excluded under negation as well. The
+        // valid-but-unmatched pairs are the control: those negate to every entry, the invalid ones to none.
+        yield 'an assertion value the syntax rejects matches nothing' => [
+            Filters::equal('member', '%%%'),
+            0,
+        ];
+        yield 'a negated assertion value the syntax rejects still matches nothing' => [
+            Filters::not(Filters::equal('member', '%%%')),
+            0,
+        ];
+        yield 'a valid assertion matching no entry matches nothing' => [
+            Filters::equal('member', 'cn=nobody,dc=foo,dc=bar'),
+            0,
+        ];
+        yield 'a negated valid assertion matching no entry matches every entry' => [
+            Filters::not(Filters::equal('member', 'cn=nobody,dc=foo,dc=bar')),
+            8,
+        ];
+        yield 'an ordered assertion the syntax rejects matches nothing' => [
+            Filters::greaterThanOrEqual('member', '%%%'),
+            0,
+        ];
+        yield 'a negated ordered assertion the syntax rejects matches nothing' => [
+            Filters::not(Filters::greaterThanOrEqual('member', '%%%')),
+            0,
+        ];
+        yield 'a substring fragment is not held to the assertion syntax' => [
+            Filters::startsWith('member', 'cn=user,'),
+            2,
         ];
     }
 

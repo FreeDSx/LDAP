@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Schema\Text;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
+use FreeDSx\Ldap\Search\Filter\AttributeValueAssertionInterface;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filter\FilterAttributeInterface;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
@@ -62,14 +63,35 @@ trait SqlFilterTranslatorTrait
             ?? AttributeFilterSupport::Exact;
     }
 
-    private function dispatch(FilterInterface $filter): ?SqlFilterResult
+    /**
+     * An assertion value the type's syntax rejects is Undefined for every entry, whatever the attribute supports.
+     */
+    private function supportFor(FilterInterface $filter): AttributeFilterSupport
     {
+        if ($filter instanceof AttributeValueAssertionInterface && !$this->assertionValueConforms($filter)) {
+            return AttributeFilterSupport::NeverMatches;
+        }
+
         $attribute = $filter instanceof FilterAttributeInterface
             ? $filter->getAttribute()
             : null;
-        $support = $attribute !== null
-            ? $this->filterSupport($attribute)
-            : AttributeFilterSupport::Exact;
+
+        return $attribute === null
+            ? AttributeFilterSupport::Exact
+            : $this->filterSupport($attribute);
+    }
+
+    private function assertionValueConforms(AttributeValueAssertionInterface $filter): bool
+    {
+        return $this->attributeContext?->assertionValueConforms(
+            $filter->getAttribute(),
+            $filter->getValue(),
+        ) ?? true;
+    }
+
+    private function dispatch(FilterInterface $filter): ?SqlFilterResult
+    {
+        $support = $this->supportFor($filter);
 
         // Rows under this name alone are not the whole answer, so leave the item to the evaluator.
         if ($support === AttributeFilterSupport::NeedsEvaluator) {
