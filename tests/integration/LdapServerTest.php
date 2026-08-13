@@ -402,7 +402,7 @@ final class LdapServerTest extends ServerTestCase
         $allEntries = [];
         $iterations = 0;
 
-        $search = Operations::search(Filters::raw('(foo=*)'))->base('dc=foo,dc=bar');
+        $search = Operations::search(Filters::raw('(employeeNumber=*)'))->base('dc=foo,dc=bar');
         $paging = $this->ldapClient()->paging($search);
 
         while ($paging->hasEntries()) {
@@ -428,7 +428,7 @@ final class LdapServerTest extends ServerTestCase
         ]);
         $this->authenticateUser();
 
-        $search = Operations::search(Filters::raw('(foo=*)'))->base('dc=foo,dc=bar');
+        $search = Operations::search(Filters::raw('(employeeNumber=*)'))->base('dc=foo,dc=bar');
         $paging = $this->ldapClient()->paging($search);
 
         $count = 0;
@@ -455,7 +455,7 @@ final class LdapServerTest extends ServerTestCase
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
 
-        $search = Operations::search(Filters::raw('(foo=*)'))->base('dc=foo,dc=bar');
+        $search = Operations::search(Filters::raw('(employeeNumber=*)'))->base('dc=foo,dc=bar');
         $paging = $this->ldapClient()->paging($search);
         while ($paging->hasEntries()) {
             $paging->getEntries(500);
@@ -476,7 +476,7 @@ final class LdapServerTest extends ServerTestCase
         $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
 
         $this->ldapClient()->search(
-            Operations::search(Filters::raw('(foo=*)'))->base('dc=foo,dc=bar')->useSubtreeScope(),
+            Operations::search(Filters::raw('(employeeNumber=*)'))->base('dc=foo,dc=bar')->useSubtreeScope(),
         );
     }
 

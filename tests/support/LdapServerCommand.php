@@ -287,7 +287,8 @@ final class LdapServerCommand extends Command
                     'cn' => "entry-{$i}",
                     'objectClass' => 'inetOrgPerson',
                     'sn' => 'Entry',
-                    'foo' => (string) $i,
+                    // Must be a type the schema defines, or every assertion on it is Undefined (RFC 4511 4.5.1.7).
+                    'employeeNumber' => (string) $i,
                 ],
             );
         }
