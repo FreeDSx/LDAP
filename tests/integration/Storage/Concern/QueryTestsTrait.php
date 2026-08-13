@@ -221,9 +221,69 @@ trait QueryTestsTrait
             Filters::not(Filters::greaterThanOrEqual('member', '%%%')),
             0,
         ];
-        yield 'a substring fragment is not held to the assertion syntax' => [
-            Filters::startsWith('member', 'cn=user,'),
-            2,
+        // RFC 4511 4.5.1.7: a substring item applies the type's SUBSTR rule, so a type declaring none is Undefined
+        // for every entry, negated or not. The pairs below are the control: types that do declare one still answer.
+        yield 'a substring on a type with no substring rule matches nothing' => [
+            Filters::startsWith(
+                'member',
+                'cn=user,',
+            ),
+            0,
+        ];
+        yield 'a negated substring on a type with no substring rule still matches nothing' => [
+            Filters::not(
+                Filters::startsWith(
+                    'member',
+                    'cn=user,',
+                ),
+            ),
+            0,
+        ];
+        yield 'a substring on an integer type matches nothing' => [
+            Filters::startsWith(
+                'uidNumber',
+                '9',
+            ),
+            0,
+        ];
+        yield 'a negated substring on an integer type still matches nothing' => [
+            Filters::not(
+                Filters::startsWith(
+                    'uidNumber',
+                    '9',
+                ),
+            ),
+            0,
+        ];
+        yield 'a substring on entryDN matches nothing' => [
+            Filters::endsWith(
+                'entryDN',
+                'dc=foo,dc=bar',
+            ),
+            0,
+        ];
+        yield 'a substring on a type declaring a substring rule matches' => [
+            Filters::startsWith(
+                'cn',
+                'al',
+            ),
+            1,
+        ];
+        yield 'a substring on an ia5 type declaring a substring rule matches' => [
+            Filters::endsWith(
+                'mail',
+                '@foo.bar',
+            ),
+            1,
+        ];
+        yield 'a negated substring on a type declaring a substring rule matches the rest' => [
+            Filters::not(
+                Filters::startsWith(
+                    'cn',
+                    'al',
+                ),
+            ),
+            7,
         ];
 
         // RFC 5020: entryDN is derived on read, so it must match without having been requested or stored.

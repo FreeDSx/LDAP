@@ -24,6 +24,9 @@ use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Schema\Definition\AttributeType;
+use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
+use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
 use Generator;
@@ -1054,17 +1057,131 @@ final class FilterEvaluatorTest extends TestCase
 
     /**
      * A substring fragment is a portion of a value rather than a whole one, so it is not held to the type's syntax.
+     *
+     * The type is built here because no shipped schema pairs a SUBSTR rule with a syntax a fragment can violate.
      */
     public function test_a_substring_fragment_is_not_subject_to_the_assertion_syntax_check(): void
     {
+        $subject = new FilterEvaluator(
+            SchemaResource::Core->load()->addAttributeType(new AttributeType(
+                oid: '1.3.6.1.4.1.99999.5.1',
+                names: ['serialCode'],
+                equalityOid: MatchingRuleOid::OID_INTEGER_MATCH,
+                substringOid: MatchingRuleOid::OID_CASE_IGNORE_SUBSTRINGS_MATCH,
+                syntaxOid: SyntaxOid::OID_INTEGER,
+            )),
+        );
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),
-            new Attribute('uidNumber', '-50'),
+            new Attribute('serialCode', '-50'),
         );
 
-        self::assertTrue($this->integerSchemaEvaluator()->evaluate(
+        // A lone hyphen is not a valid INTEGER, so an equality assertion carrying it would be Undefined.
+        self::assertTrue($subject->evaluate(
             $entry,
-            Filters::startsWith('uidNumber', '-'),
+            Filters::startsWith('serialCode', '-'),
+        ));
+    }
+
+    /**
+     * RFC 4511 4.5.1.7: a substring item applies the type's SUBSTR rule, so a type declaring none is Undefined.
+     */
+    #[DataProvider('substringWithoutRuleProvider')]
+    public function test_a_substring_on_a_type_with_no_substring_rule_is_undefined(FilterInterface $filter): void
+    {
+        self::assertFalse($this->subject->evaluate(
+            $this->entry,
+            $filter,
+        ));
+    }
+
+    /**
+     * Undefined is excluded under negation too, so both polarities answer the same way.
+     */
+    #[DataProvider('substringWithoutRuleProvider')]
+    public function test_a_negated_substring_on_a_type_with_no_substring_rule_is_still_undefined(
+        FilterInterface $filter,
+    ): void {
+        self::assertFalse($this->subject->evaluate(
+            $this->entry,
+            Filters::not($filter),
+        ));
+    }
+
+    public static function substringWithoutRuleProvider(): Generator
+    {
+        yield 'integer syntax' => [
+            Filters::startsWith(
+                'uidNumber',
+                '1',
+            ),
+        ];
+        yield 'dn syntax' => [
+            Filters::startsWith(
+                'member',
+                'cn=',
+            ),
+        ];
+        yield 'derived from the entry' => [
+            Filters::endsWith(
+                'entryDN',
+                'dc=com',
+            ),
+        ];
+    }
+
+    /**
+     * The control for the case above: a type that does declare a SUBSTR rule still answers normally.
+     */
+    #[DataProvider('substringWithRuleProvider')]
+    public function test_a_substring_on_a_type_declaring_a_substring_rule_still_matches(FilterInterface $filter): void
+    {
+        self::assertTrue($this->subject->evaluate(
+            $this->entry,
+            $filter,
+        ));
+    }
+
+    public static function substringWithRuleProvider(): Generator
+    {
+        yield 'declared directly' => [
+            Filters::startsWith(
+                'cn',
+                'Al',
+            ),
+        ];
+        yield 'declared on an ia5 type' => [
+            Filters::endsWith(
+                'mail',
+                '@example.com',
+            ),
+        ];
+        yield 'covering a subtype value' => [
+            Filters::startsWith(
+                'name',
+                'Al',
+            ),
+        ];
+    }
+
+    public function test_a_substring_rule_is_inherited_through_the_sup_chain(): void
+    {
+        $subject = new FilterEvaluator(
+            SchemaResource::Core->load()->addAttributeType(new AttributeType(
+                oid: '1.3.6.1.4.1.99999.5.2',
+                names: ['nickName'],
+                equalityOid: MatchingRuleOid::OID_CASE_IGNORE_MATCH,
+                superTypeOid: '2.5.4.41',
+            )),
+        );
+        $entry = new Entry(
+            new Dn('cn=Test,dc=example,dc=com'),
+            new Attribute('nickName', 'Ali'),
+        );
+
+        self::assertTrue($subject->evaluate(
+            $entry,
+            Filters::startsWith('nickName', 'Al'),
         ));
     }
 
@@ -1130,12 +1247,22 @@ final class FilterEvaluatorTest extends TestCase
             Filters::present('entryDN'),
             true,
         ];
+        // entryDN declares no SUBSTR rule, so a substring item on it is Undefined in both polarities.
         yield 'substring' => [
             Filters::endsWith(
                 'entryDN',
                 'dc=foo,dc=bar',
             ),
-            true,
+            false,
+        ];
+        yield 'negated substring' => [
+            Filters::not(
+                Filters::endsWith(
+                    'entryDN',
+                    'dc=foo,dc=bar',
+                ),
+            ),
+            false,
         ];
     }
 

@@ -66,6 +66,19 @@ final readonly class StorageListOptions implements FilterAttributeContextInterfa
     }
 
     /**
+     * Whether the attribute defines a SUBSTR rule; true when no schema can say otherwise.
+     */
+    public function hasSubstringRule(string $attribute): bool
+    {
+        if ($this->schema === null) {
+            return true;
+        }
+
+        // Options are not part of the type, so they are dropped before asking the schema about it.
+        return $this->schema->getSubstringRuleOid(Attribute::normalizeName($attribute)) !== null;
+    }
+
+    /**
      * How faithfully SQL alone can answer an assertion on the attribute.
      */
     public function filterSupport(string $attribute): AttributeFilterSupport

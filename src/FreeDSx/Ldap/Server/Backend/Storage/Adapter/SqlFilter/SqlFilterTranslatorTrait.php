@@ -64,11 +64,16 @@ trait SqlFilterTranslatorTrait
     }
 
     /**
-     * An assertion value the type's syntax rejects is Undefined for every entry, whatever the attribute supports.
+     * An item the type cannot answer is Undefined for every entry, whatever the attribute otherwise supports.
      */
     private function supportFor(FilterInterface $filter): AttributeFilterSupport
     {
         if ($filter instanceof AttributeValueAssertionInterface && !$this->assertionValueConforms($filter)) {
+            return AttributeFilterSupport::NeverMatches;
+        }
+
+        // A substring item applies the type's SUBSTR rule, so a type declaring none cannot answer it.
+        if ($filter instanceof SubstringFilter && !$this->hasSubstringRule($filter->getAttribute())) {
             return AttributeFilterSupport::NeverMatches;
         }
 
@@ -87,6 +92,14 @@ trait SqlFilterTranslatorTrait
             $filter->getAttribute(),
             $filter->getValue(),
         ) ?? true;
+    }
+
+    /**
+     * Whether the attribute defines a SUBSTR rule; true when the caller had no schema.
+     */
+    private function hasSubstringRule(string $attribute): bool
+    {
+        return $this->attributeContext?->hasSubstringRule($attribute) ?? true;
     }
 
     private function dispatch(FilterInterface $filter): ?SqlFilterResult
