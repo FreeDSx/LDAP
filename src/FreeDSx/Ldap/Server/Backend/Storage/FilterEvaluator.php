@@ -48,6 +48,8 @@ use WeakMap;
  */
 final class FilterEvaluator implements FilterEvaluatorInterface
 {
+    use EntryDnAttributeTrait;
+
     private const MATCHING_RULE_CASE_IGNORE = '2.5.13.2';
 
     private const MATCHING_RULE_CASE_EXACT = '2.5.13.5';
@@ -371,7 +373,9 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         $values = [];
 
         if ($filterAttributeName !== null) {
-            $values = $this->lookupAttribute($entry, $filterAttributeName)?->getValues() ?? [];
+            $values = self::isEntryDnAttribute($filterAttributeName)
+                ? [$entry->getDn()->toString()]
+                : $this->lookupAttribute($entry, $filterAttributeName)?->getValues() ?? [];
         } else {
             foreach ($entry->getAttributes() as $attribute) {
                 array_push(
@@ -558,6 +562,11 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         string $filterAttributeName,
     ): array {
+        // RFC 5020: derived from the entry, so it is matchable whether or not the request asked for it.
+        if (self::isEntryDnAttribute($filterAttributeName)) {
+            return [$entry->getDn()->toString()];
+        }
+
         if (self::descriptionHasOptions($filterAttributeName)) {
             return $entry->get($filterAttributeName)?->getValues() ?? [];
         }

@@ -31,6 +31,8 @@ use Generator;
  */
 final readonly class SearchStreamBuilder
 {
+    use EntryDnAttributeTrait;
+
     /**
      * @param FilterEvaluatorInterface $filterEvaluator Must know the configured schema, or matching rules are ignored.
      */
@@ -110,7 +112,7 @@ final readonly class SearchStreamBuilder
     private function requestsEntryDn(SearchRequest $request): bool
     {
         foreach ($request->getAttributes() as $attr) {
-            if ($this->isEntryDnAttribute($attr)) {
+            if ($this->requestsEntryDnAttribute($attr)) {
                 return true;
             }
         }
@@ -118,11 +120,10 @@ final readonly class SearchStreamBuilder
         return false;
     }
 
-    private function isEntryDnAttribute(Attribute $attr): bool
+    private function requestsEntryDnAttribute(Attribute $attr): bool
     {
         return strcasecmp($attr->getName(), '+') === 0
-            || strcasecmp($attr->getName(), AttributeTypeOid::NAME_ENTRY_DN) === 0
-            || $attr->getName() === AttributeTypeOid::OID_ENTRY_DN;
+            || self::isEntryDnAttribute($attr->getName());
     }
 
     /**

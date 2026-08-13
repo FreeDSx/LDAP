@@ -225,6 +225,40 @@ trait QueryTestsTrait
             Filters::startsWith('member', 'cn=user,'),
             2,
         ];
+
+        // RFC 5020: entryDN is derived on read, so it must match without having been requested or stored.
+        yield 'entryDN matches the entry it names' => [
+            Filters::equal(
+                'entryDN',
+                'cn=alice,ou=people,dc=foo,dc=bar',
+            ),
+            1,
+        ];
+        yield 'entryDN compares as a dn rather than a string' => [
+            Filters::equal(
+                'entryDN',
+                'CN=alice,OU=people,DC=foo,DC=bar',
+            ),
+            1,
+        ];
+        yield 'entryDN matches an escaped rdn by its unescaped value' => [
+            Filters::equal(
+                'entryDN',
+                'cn=Smith\, John,dc=foo,dc=bar',
+            ),
+            1,
+        ];
+        yield 'entryDN matches nothing for an absent dn' => [
+            Filters::equal(
+                'entryDN',
+                'cn=nobody,dc=foo,dc=bar',
+            ),
+            0,
+        ];
+        yield 'entryDN is present on every entry' => [
+            Filters::present('entryDN'),
+            8,
+        ];
     }
 
     #[DataProvider('filterProvider')]

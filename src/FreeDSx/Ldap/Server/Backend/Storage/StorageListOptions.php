@@ -29,6 +29,8 @@ use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
  */
 final readonly class StorageListOptions implements FilterAttributeContextInterface
 {
+    use EntryDnAttributeTrait;
+
     private ?AttributeSyntaxResolver $syntaxResolver;
 
     /**
@@ -68,6 +70,11 @@ final readonly class StorageListOptions implements FilterAttributeContextInterfa
      */
     public function filterSupport(string $attribute): AttributeFilterSupport
     {
+        // Derived on read rather than stored, so no rows answer it and only the evaluator can.
+        if (self::isEntryDnAttribute($attribute)) {
+            return AttributeFilterSupport::NeedsEvaluator;
+        }
+
         if ($this->schema === null) {
             return AttributeFilterSupport::Exact;
         }

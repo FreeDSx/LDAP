@@ -1012,10 +1012,30 @@ final class FilterEvaluatorTest extends TestCase
 
     public static function invalidAssertionValueProvider(): Generator
     {
-        yield 'equality' => [Filters::equal('uidNumber', 'abc')];
-        yield 'greaterThanOrEqual' => [Filters::greaterThanOrEqual('uidNumber', 'abc')];
-        yield 'lessThanOrEqual' => [Filters::lessThanOrEqual('uidNumber', 'abc')];
-        yield 'approximate' => [new ApproximateFilter('uidNumber', 'abc')];
+        yield 'equality' => [
+            Filters::equal(
+                'uidNumber',
+                'abc',
+            ),
+        ];
+        yield 'greaterThanOrEqual' => [
+            Filters::greaterThanOrEqual(
+                'uidNumber',
+                'abc',
+            ),
+        ];
+        yield 'lessThanOrEqual' => [
+            Filters::lessThanOrEqual(
+                'uidNumber',
+                'abc',
+            ),
+        ];
+        yield 'approximate' => [
+            new ApproximateFilter(
+                'uidNumber',
+                'abc',
+            ),
+        ];
     }
 
     public function test_a_conforming_assertion_value_is_unaffected(): void
@@ -1058,6 +1078,77 @@ final class FilterEvaluatorTest extends TestCase
             $entry,
             Filters::startsWith('uidNumber', '-'),
         ));
+    }
+
+    /**
+     * RFC 5020: entryDN is derived from the entry, so it matches whether or not the request asked for it.
+     */
+    #[DataProvider('entryDnFilterProvider')]
+    public function test_entry_dn_is_filterable(
+        FilterInterface $filter,
+        bool $expected,
+    ): void {
+        $entry = new Entry(
+            new Dn('cn=Smith\, John,dc=foo,dc=bar'),
+            new Attribute('cn', 'Smith, John'),
+        );
+
+        self::assertSame(
+            $expected,
+            $this->subject->evaluate($entry, $filter),
+        );
+    }
+
+    public static function entryDnFilterProvider(): Generator
+    {
+        yield 'exact' => [
+            Filters::equal(
+                'entryDN',
+                'cn=Smith\, John,dc=foo,dc=bar',
+            ),
+            true,
+        ];
+        yield 'compared as a dn rather than a string' => [
+            Filters::equal(
+                'entryDN',
+                'CN=Smith\, John,DC=foo,DC=bar',
+            ),
+            true,
+        ];
+        yield 'by oid' => [
+            Filters::equal(
+                '1.3.6.1.1.20',
+                'cn=Smith\, John,dc=foo,dc=bar',
+            ),
+            true,
+        ];
+        yield 'another entry dn' => [
+            Filters::equal(
+                'entryDN',
+                'cn=other,dc=foo,dc=bar',
+            ),
+            false,
+        ];
+        yield 'negated another entry dn' => [
+            Filters::not(
+                Filters::equal(
+                    'entryDN',
+                    'cn=other,dc=foo,dc=bar',
+                ),
+            ),
+            true,
+        ];
+        yield 'present' => [
+            Filters::present('entryDN'),
+            true,
+        ];
+        yield 'substring' => [
+            Filters::endsWith(
+                'entryDN',
+                'dc=foo,dc=bar',
+            ),
+            true,
+        ];
     }
 
     private function integerSchemaEvaluator(): FilterEvaluator
