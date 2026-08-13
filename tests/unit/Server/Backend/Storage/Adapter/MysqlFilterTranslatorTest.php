@@ -211,6 +211,7 @@ final class MysqlFilterTranslatorTest extends TestCase
         $context = $this->createMock(FilterAttributeContextInterface::class);
         $context->method('isIntegerOrdered')->willReturn(true);
         $context->method('filterSupport')->willReturn(AttributeFilterSupport::Exact);
+        $context->method('assertionValueConforms')->willReturn(true);
 
         $result = $this->subject->translate(
             new GreaterThanOrEqualFilter('uidNumber', '30'),

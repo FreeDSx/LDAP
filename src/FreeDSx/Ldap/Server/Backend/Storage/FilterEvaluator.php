@@ -24,8 +24,10 @@ use FreeDSx\Ldap\Schema\Matching\Comparator\IntegerComparator;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
+use FreeDSx\Ldap\Search\Filter\AttributeValueAssertionInterface;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
@@ -78,16 +80,25 @@ final class FilterEvaluator implements FilterEvaluatorInterface
      */
     private WeakMap $orderedDigitCache;
 
+    /**
+     * @var WeakMap<object, bool>
+     */
+    private WeakMap $assertionSyntaxCache;
+
     private readonly CaseIgnoreComparator $defaultComparator;
 
     private readonly IntegerComparator $integerComparator;
+
+    private readonly AttributeSyntaxResolver $syntaxResolver;
 
     public function __construct(private readonly Schema $schema)
     {
         $this->defaultComparator = new CaseIgnoreComparator();
         $this->integerComparator = new IntegerComparator();
+        $this->syntaxResolver = new AttributeSyntaxResolver($schema);
         $this->substringCache = new WeakMap();
         $this->orderedDigitCache = new WeakMap();
+        $this->assertionSyntaxCache = new WeakMap();
     }
 
     public function evaluate(
@@ -195,6 +206,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         EqualityFilter $filter,
     ): FilterResult {
+        if (!$this->assertionSyntaxIsValid($filter)) {
+            return FilterResult::Undefined;
+        }
+
         $values = $this->valuesForAssertion(
             $entry,
             $filter->getAttribute(),
@@ -245,6 +260,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         GreaterThanOrEqualFilter|LessThanOrEqualFilter $filter,
     ): FilterResult {
+        if (!$this->assertionSyntaxIsValid($filter)) {
+            return FilterResult::Undefined;
+        }
+
         $values = $this->valuesForAssertion(
             $entry,
             $filter->getAttribute(),
@@ -287,6 +306,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         ApproximateFilter $filter,
     ): FilterResult {
+        if (!$this->assertionSyntaxIsValid($filter)) {
+            return FilterResult::Undefined;
+        }
+
         $values = $this->valuesForAssertion($entry, $filter->getAttribute());
 
         if ($values === []) {
@@ -583,5 +606,18 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         GreaterThanOrEqualFilter|LessThanOrEqualFilter $filter,
     ): bool {
         return $this->orderedDigitCache[$filter] ??= ctype_digit($filter->getValue());
+    }
+
+    /**
+     * An assertion value that does not conform to the type's syntax makes the item Undefined (RFC 4511 4.5.1.7).
+     *
+     * The answer depends only on the filter, so it is memoized rather than recomputed for every entry tested.
+     */
+    private function assertionSyntaxIsValid(AttributeValueAssertionInterface $filter): bool
+    {
+        return $this->assertionSyntaxCache[$filter] ??= $this->syntaxResolver->conforms(
+            $filter->getAttribute(),
+            $filter->getValue(),
+        );
     }
 }

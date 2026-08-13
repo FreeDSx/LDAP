@@ -209,18 +209,30 @@ final class LdapLoadedSchemaTest extends ServerTestCase
         );
     }
 
-    public function test_bit_string_matches_a_bare_bit_sequence(): void
+    public function test_bit_string_matches_the_quoted_form(): void
     {
         $this->createRecord(
             'bit-string',
             ['projectFlags' => "'0101'B"],
         );
 
-        // A plain string comparison would not match the quoted form.
         self::assertSame(
             'bit-string',
-            $this->findOne(Filters::equal('projectFlags', '0101')),
+            $this->findOne(Filters::equal('projectFlags', "'0101'B")),
         );
+    }
+
+    /**
+     * RFC 4517 3.3.2 requires the quoted form, so a bare sequence is an invalid assertion value and is Undefined.
+     */
+    public function test_bit_string_rejects_a_bare_bit_sequence(): void
+    {
+        $this->createRecord(
+            'bit-string-bare',
+            ['projectFlags' => "'0101'B"],
+        );
+
+        self::assertNull($this->findOne(Filters::equal('projectFlags', '0101')));
     }
 
     public function test_bit_string_does_not_match_different_bits(): void

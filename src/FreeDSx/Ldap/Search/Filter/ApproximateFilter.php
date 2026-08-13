@@ -20,7 +20,7 @@ use Stringable;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ApproximateFilter implements FilterInterface, FilterAttributeInterface, Stringable
+class ApproximateFilter implements FilterInterface, AttributeValueAssertionInterface, Stringable
 {
     use AttributeValueAssertionTrait;
 

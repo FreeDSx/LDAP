@@ -20,7 +20,7 @@ use Stringable;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class GreaterThanOrEqualFilter implements FilterInterface, FilterAttributeInterface, Stringable
+class GreaterThanOrEqualFilter implements FilterInterface, AttributeValueAssertionInterface, Stringable
 {
     use AttributeValueAssertionTrait;
 

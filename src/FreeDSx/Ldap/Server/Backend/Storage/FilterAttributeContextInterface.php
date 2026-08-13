@@ -34,4 +34,12 @@ interface FilterAttributeContextInterface
      * How faithfully SQL alone can answer an assertion on the attribute.
      */
     public function filterSupport(string $attribute): AttributeFilterSupport;
+
+    /**
+     * Whether a value conforms to the attribute's syntax (false makes the item Undefined per RFC 4511 4.5.1.7).
+     */
+    public function assertionValueConforms(
+        string $attribute,
+        string $value,
+    ): bool;
 }
