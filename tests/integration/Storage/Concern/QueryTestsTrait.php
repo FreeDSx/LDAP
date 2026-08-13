@@ -259,6 +259,29 @@ trait QueryTestsTrait
             Filters::present('entryDN'),
             8,
         ];
+
+        // cn=alice stores shoeSize, which the configured schema does not define. Every assertion on it is Undefined
+        // regardless of that stored value, and Undefined is excluded under negation too (RFC 4511 4.5.1.7).
+        yield 'an unrecognized type an entry stores is undefined' => [
+            Filters::equal(
+                'shoeSize',
+                '12',
+            ),
+            0,
+        ];
+        yield 'a negated unrecognized type an entry stores is still undefined' => [
+            Filters::not(
+                Filters::equal(
+                    'shoeSize',
+                    '12',
+                ),
+            ),
+            0,
+        ];
+        yield 'a present filter on an unrecognized type an entry stores is undefined' => [
+            Filters::present('shoeSize'),
+            0,
+        ];
     }
 
     #[DataProvider('filterProvider')]

@@ -38,7 +38,10 @@ final class FilterEvaluatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new FilterEvaluator(SchemaResource::Core->load());
+        // NIS is merged in for uidNumber: an unrecognized type is Undefined, so the fixture must define what it asserts on.
+        $this->subject = new FilterEvaluator(
+            SchemaResource::Core->load()->merge(SchemaResource::Nis->load()),
+        );
 
         $this->entry = new Entry(
             new Dn('cn=Alice,dc=example,dc=com'),
@@ -262,33 +265,18 @@ final class FilterEvaluatorTest extends TestCase
         );
     }
 
-    public function test_gte_compares_numbers_as_integers(): void
+    /**
+     * Ordering follows the schema, so a type with no ORDERING rule and a non-integer syntax orders as a string.
+     */
+    public function test_gte_orders_as_a_string_when_the_type_has_no_ordering_rule(): void
     {
-        // '10' >= '5' must be true numerically; lexicographically '10' < '5'
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),
-            new Attribute('count', '10'),
-        );
-
-        self::assertTrue(
-            $this->subject->evaluate($entry, Filters::greaterThanOrEqual('count', '5')),
-        );
-    }
-
-    public function test_gte_does_not_treat_scientific_notation_as_numeric(): void
-    {
-        // '1e1' is not ctype_digit, so it falls back to lexicographic comparison.
-        // Lexicographically '1e1' < '5', so gte('5') should be false.
-        $entry = new Entry(
-            new Dn('cn=Test,dc=example,dc=com'),
-            new Attribute('count', '1e1'),
+            new Attribute('description', '10'),
         );
 
         self::assertFalse(
-            $this->subject->evaluate(
-                $entry,
-                Filters::greaterThanOrEqual('count', '5'),
-            ),
+            $this->subject->evaluate($entry, Filters::greaterThanOrEqual('description', '5')),
         );
     }
 
@@ -737,12 +725,12 @@ final class FilterEvaluatorTest extends TestCase
     {
         $entry = new Entry(
             new Dn('cn=Multi,dc=example,dc=com'),
-            new Attribute('mailAlias', 'a@foo.bar', 'b@foo.bar', 'c@foo.bar'),
+            new Attribute('mail', 'a@foo.bar', 'b@foo.bar', 'c@foo.bar'),
         );
 
         self::assertTrue($this->subject->evaluate(
             $entry,
-            Filters::equal('mailAlias', 'b@foo.bar'),
+            Filters::equal('mail', 'b@foo.bar'),
         ));
     }
 
@@ -929,7 +917,7 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_matching_rule_filter_resolves_non_hardcoded_oid(): void
     {
-        $subject = new FilterEvaluator(SchemaResource::Core->load());
+        $subject = $this->integerSchemaEvaluator();
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),
             new Attribute('uidNumber', '1001'),

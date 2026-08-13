@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\AttributeValueAssertionInterface;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Search\Filter\FilterAttributeInterface;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\LessThanOrEqualFilter;
@@ -80,12 +81,12 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     /**
      * @var WeakMap<object, bool>
      */
-    private WeakMap $orderedDigitCache;
+    private WeakMap $assertionSyntaxCache;
 
     /**
      * @var WeakMap<object, bool>
      */
-    private WeakMap $assertionSyntaxCache;
+    private WeakMap $recognizedAttributeCache;
 
     private readonly CaseIgnoreComparator $defaultComparator;
 
@@ -99,8 +100,8 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         $this->integerComparator = new IntegerComparator();
         $this->syntaxResolver = new AttributeSyntaxResolver($schema);
         $this->substringCache = new WeakMap();
-        $this->orderedDigitCache = new WeakMap();
         $this->assertionSyntaxCache = new WeakMap();
+        $this->recognizedAttributeCache = new WeakMap();
     }
 
     public function evaluate(
@@ -117,6 +118,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         FilterInterface $filter,
     ): FilterResult {
+        if ($filter instanceof FilterAttributeInterface && !$this->attributeIsRecognized($filter)) {
+            return FilterResult::Undefined;
+        }
+
         return match (true) {
             $filter instanceof AndFilter => $this->evaluateAnd($entry, $filter),
             $filter instanceof OrFilter => $this->evaluateOr($entry, $filter),
@@ -201,7 +206,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         // RFC 4511 4.5.1.7.5: true when the type or a subtype of it is present.
         return $this->valuesForAssertion($entry, $filter->getAttribute()) !== []
             ? FilterResult::True
-            : $this->absentResult($filter->getAttribute());
+            : FilterResult::False;
     }
 
     private function evaluateEquality(
@@ -217,8 +222,9 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             $filter->getAttribute(),
         );
 
+        // A type the schema defines but the entry lacks is False; an undefined type was answered upstream.
         if ($values === []) {
-            return $this->absentResult($filter->getAttribute());
+            return FilterResult::False;
         }
 
         $comparator = $this->resolveEqualityComparator($filter->getAttribute());
@@ -239,8 +245,9 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     ): FilterResult {
         $values = $this->valuesForAssertion($entry, $filter->getAttribute());
 
+        // A type the schema defines but the entry lacks is False; an undefined type was answered upstream.
         if ($values === []) {
-            return $this->absentResult($filter->getAttribute());
+            return FilterResult::False;
         }
 
         $comparator = $this->resolveSubstringComparator($filter->getAttribute());
@@ -271,18 +278,17 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             $filter->getAttribute(),
         );
 
+        // A type the schema defines but the entry lacks is False; an undefined type was answered upstream.
         if ($values === []) {
-            return $this->absentResult($filter->getAttribute());
+            return FilterResult::False;
         }
 
         $filterValue = $filter->getValue();
         $comparator = $this->resolveOrderingComparator($filter->getAttribute());
-        $filterIsDigit = $comparator === null && $this->orderedFilterValueIsDigit($filter);
         $atLeast = $filter instanceof GreaterThanOrEqualFilter;
 
         foreach ($values as $value) {
-            $cmp = $comparator?->compare($value, $filterValue)
-                ?? $this->compareOrdered($value, $filterValue, $filterIsDigit);
+            $cmp = $comparator->compare($value, $filterValue);
 
             if ($atLeast ? $cmp >= 0 : $cmp <= 0) {
                 return FilterResult::True;
@@ -290,18 +296,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         }
 
         return FilterResult::False;
-    }
-
-    private function compareOrdered(
-        string $value,
-        string $filterValue,
-        bool $filterValueIsDigit,
-    ): int {
-        if ($filterValueIsDigit && ctype_digit($value)) {
-            return (int) $value <=> (int) $filterValue;
-        }
-
-        return strcasecmp($value, $filterValue);
     }
 
     private function evaluateApproximate(
@@ -314,8 +308,9 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
         $values = $this->valuesForAssertion($entry, $filter->getAttribute());
 
+        // A type the schema defines but the entry lacks is False; an undefined type was answered upstream.
         if ($values === []) {
-            return $this->absentResult($filter->getAttribute());
+            return FilterResult::False;
         }
 
         // No approximate rule is implemented, so this falls back to the type's own equality rather than a case
@@ -488,12 +483,12 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     /**
      * Returns null when the attribute is unknown, so the caller falls back to the digit heuristic.
      */
-    private function resolveOrderingComparator(string $attrName): ?MatchingRuleComparatorInterface
+    private function resolveOrderingComparator(string $attrName): MatchingRuleComparatorInterface
     {
         $attrType = $this->schema->getAttributeType($attrName);
 
         if ($attrType === null) {
-            return null;
+            return $this->defaultComparator;
         }
 
         // An explicit, registered ordering rule wins
@@ -601,20 +596,27 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     }
 
     /**
-     * An item is Undefined only when the server cannot determine an answer, which for an attribute description means
-     * the schema does not define it (RFC 4511 4.5.1.7). A defined type the entry simply lacks is False.
+     * An attribute description the schema does not define makes the item Undefined (RFC 4511 4.5.1.7), whether or
+     * not an entry happens to carry values under that name.
+     *
+     * The answer depends only on the filter, so it is memoized rather than recomputed for every entry tested.
      */
-    private function absentResult(string $filterAttributeName): FilterResult
+    private function attributeIsRecognized(FilterAttributeInterface $filter): bool
     {
-        return $this->schema->getAttributeType(Attribute::normalizeName($filterAttributeName)) === null
-            ? FilterResult::Undefined
-            : FilterResult::False;
+        return $this->recognizedAttributeCache[$filter] ??= $this->schemaDefines($filter->getAttribute());
     }
 
-    private function orderedFilterValueIsDigit(
-        GreaterThanOrEqualFilter|LessThanOrEqualFilter $filter,
-    ): bool {
-        return $this->orderedDigitCache[$filter] ??= ctype_digit($filter->getValue());
+    /**
+     * An extensibleMatch may name no type at all, which this rule has nothing to say about.
+     */
+    private function schemaDefines(?string $attributeDescription): bool
+    {
+        if ($attributeDescription === null) {
+            return true;
+        }
+
+        return self::isEntryDnAttribute($attributeDescription)
+            || $this->schema->getAttributeType(Attribute::normalizeName($attributeDescription)) !== null;
     }
 
     /**

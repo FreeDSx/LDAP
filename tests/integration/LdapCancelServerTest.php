@@ -38,7 +38,7 @@ final class LdapCancelServerTest extends ServerTestCase
     {
         $entriesReceived = 0;
 
-        $request = Operations::search(Filters::present('foo'))
+        $request = Operations::search(Filters::present('employeeNumber'))
             ->base('dc=foo,dc=bar')
             ->useEntryHandler(function (EntryResult $result) use (&$entriesReceived): void {
                 $entriesReceived++;
