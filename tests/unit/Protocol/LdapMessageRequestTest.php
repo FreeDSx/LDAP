@@ -17,6 +17,8 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
+use FreeDSx\Asn1\Type\SequenceType;
+use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
@@ -123,5 +125,83 @@ final class LdapMessageRequestTest extends TestCase
         // Zero is in range here; it is refused later as reserved rather than as an unparseable ID.
         yield 'zero' => [0];
         yield 'maxInt' => [LdapMessage::MAX_INT];
+    }
+
+    public function test_a_failure_inside_the_operation_names_the_message_it_belongs_to(): void
+    {
+        try {
+            LdapMessageRequest::fromAsn1(self::addRequestWithNoValues());
+            self::fail('The valueless attribute should have been refused.');
+        } catch (MessageDecodeException $e) {
+            self::assertSame(
+                4,
+                $e->getMessageId(),
+            );
+            self::assertSame(
+                8,
+                $e->getProtocolOpTag(),
+            );
+        }
+    }
+
+    public function test_a_failure_inside_a_control_names_the_message_it_belongs_to(): void
+    {
+        $encoder = new LdapEncoder();
+
+        try {
+            LdapMessageRequest::fromAsn1(Asn1::sequence(
+                Asn1::integer(7),
+                Asn1::application(10, Asn1::octetString('dc=foo,dc=bar')),
+                Asn1::context(0, (new IncompleteType($encoder->encode(
+                    (new Control(Control::OID_PAGING, false, 'not-a-paging-control'))->toAsn1(),
+                )))->setIsConstructed(true)),
+            ));
+            self::fail('The malformed control value should have been refused.');
+        } catch (MessageDecodeException $e) {
+            self::assertSame(
+                7,
+                $e->getMessageId(),
+            );
+            self::assertSame(
+                10,
+                $e->getProtocolOpTag(),
+            );
+        }
+    }
+
+    /**
+     * An unrecognized operation cannot be answered, so it must stay a plain failure that ends the session.
+     */
+    public function test_an_unrecognized_operation_is_not_answerable(): void
+    {
+        try {
+            LdapMessageRequest::fromAsn1(Asn1::sequence(
+                Asn1::integer(3),
+                Asn1::application(30, Asn1::octetString('nope')),
+            ));
+            self::fail('The unrecognized operation should have been refused.');
+        } catch (ProtocolException $e) {
+            self::assertNotInstanceOf(
+                MessageDecodeException::class,
+                $e,
+            );
+        }
+    }
+
+    /**
+     * @return SequenceType<mixed>
+     */
+    private static function addRequestWithNoValues(): SequenceType
+    {
+        return Asn1::sequence(
+            Asn1::integer(4),
+            Asn1::application(8, Asn1::sequence(
+                Asn1::octetString('cn=foo,dc=foo,dc=bar'),
+                Asn1::sequenceOf(Asn1::sequence(
+                    Asn1::octetString('cn'),
+                    Asn1::setOf(),
+                )),
+            )),
+        );
     }
 }

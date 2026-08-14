@@ -102,6 +102,14 @@ class AddRequest implements RequestInterface
                 throw new ProtocolException('The add request is malformed.');
             }
 
+            // An Attribute constrains its values to SIZE(1..MAX), unlike the PartialAttribute a Modify carries.
+            if (count($vals->getChildren()) === 0) {
+                throw new ProtocolException(sprintf(
+                    'No values for attribute type "%s".',
+                    (string) $attrType->getValue(),
+                ));
+            }
+
             $attrValues = [];
             foreach ($vals->getChildren() as $val) {
                 if (!$val instanceof OctetStringType) {

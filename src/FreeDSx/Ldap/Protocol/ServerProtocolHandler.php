@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RequestSizeExceededException;
@@ -62,7 +63,22 @@ readonly class ServerProtocolHandler
         $closeReason = null;
 
         try {
-            while ($message = $this->queue->getMessage()) {
+            while (true) {
+                try {
+                    $message = $this->queue->getMessage();
+                } catch (MessageDecodeException $e) {
+                    # The envelope parsed, so this message can be answered by its ID and the session continues. The
+                    # PDU was consumed before its contents were decoded, so the stream is already past it.
+                    if (!$this->answerDecodeFailure($e)) {
+                        $this->sendNoticeOfDisconnect('The message could not be processed.');
+                        $closeReason = ConnectionObservation::ProtocolError;
+
+                        break;
+                    }
+
+                    continue;
+                }
+
                 $this->dispatchRequest($message);
                 # If a protocol handler closed the TCP connection, then just break here...
                 if (!$this->queue->isConnected()) {
@@ -161,6 +177,33 @@ readonly class ServerProtocolHandler
                 $e->getMessage(),
             ));
         }
+    }
+
+    /**
+     * Answers a decode failure with the response its operation owes, reporting whether one could be framed.
+     *
+     * @throws EncoderException
+     */
+    private function answerDecodeFailure(MessageDecodeException $e): bool
+    {
+        $response = $this->responseFactory->getDecodeFailureResponse(
+            $e->getMessageId(),
+            $e->getProtocolOpTag(),
+            $e->getMessage(),
+        );
+
+        // An operation with no response, or a response tag masquerading as a request, leaves nothing to answer with.
+        if ($response === null) {
+            return false;
+        }
+
+        $this->eventLogger->record(
+            ServerEvent::MessageDecodeFailed,
+            [EventContext::REASON_MESSAGE => $e->getMessage()],
+        );
+        $this->queue->sendMessage($response);
+
+        return true;
     }
 
     /**

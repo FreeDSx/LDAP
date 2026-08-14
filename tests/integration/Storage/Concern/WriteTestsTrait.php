@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -71,6 +72,62 @@ trait WriteTestsTrait
         self::assertSame(
             ['tagged'],
             $tagged->get(new Attribute('cn'), true)?->getValues(),
+        );
+    }
+
+    public function testAddRejectsAnAttributeCarryingNoValues(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::PROTOCOL_ERROR);
+
+        $this->ldapClient()->create(new Entry(
+            'cn=novalues,dc=foo,dc=bar',
+            new Attribute('objectClass', 'inetOrgPerson'),
+            new Attribute('cn', 'novalues'),
+            new Attribute('sn', 'Novalues'),
+            new Attribute('description'),
+        ));
+    }
+
+    public function testModifyRejectsAnAddCarryingNoValues(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::PROTOCOL_ERROR);
+
+        $this->ldapClient()->send(Operations::modify(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            Change::add(new Attribute('description')),
+        ));
+    }
+
+    public function testRenameToANewRdnThatIsNotUtf8IsRefused(): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->rename(
+                'cn=alice,ou=people,dc=foo,dc=bar',
+                "cn=\xFF\xFE",
+            );
+            self::fail('The new RDN that is not UTF-8 should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INVALID_DN_SYNTAX,
+                $e->getCode(),
+            );
+        }
+
+        self::assertCount(
+            1,
+            $this->ldapClient()->search(
+                Operations::search(Filters::equal('cn', 'alice'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+            ),
         );
     }
 

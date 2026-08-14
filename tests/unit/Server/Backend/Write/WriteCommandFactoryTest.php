@@ -78,6 +78,18 @@ final class WriteCommandFactoryTest extends TestCase
         self::assertSame('ou=people,dc=bar', $command->newParent?->toString());
     }
 
+    public function test_it_rejects_a_new_rdn_that_is_not_utf8(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INVALID_DN_SYNTAX);
+
+        $this->subject->fromRequest(new ModifyDnRequest(
+            'cn=foo,dc=bar',
+            "cn=\xFF\xFE",
+            true,
+        ));
+    }
+
     public function test_it_throws_for_unsupported_request(): void
     {
         self::expectException(OperationException::class);
