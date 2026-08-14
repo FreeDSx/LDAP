@@ -200,6 +200,13 @@ final class LdapBackendStorageCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Maximum entries examined per search before adminLimitExceeded (0 = no limit)',
                 '0',
+            )
+            ->addOption(
+                'max-search-size',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Maximum entries returned per search (0 = no limit)',
+                '0',
             );
     }
 
@@ -291,6 +298,7 @@ final class LdapBackendStorageCommand extends Command
             ->setAdministrators(Subject::group('cn=admins,dc=foo,dc=bar'))
             ->setMonitorEnabled((bool) $input->getOption('monitor'))
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
+            ->setMaxSearchSize((int) $this->getStringOption($input, 'max-search-size'))
             ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));
 
         $this->applyJournalMode($serverOptions, $input);

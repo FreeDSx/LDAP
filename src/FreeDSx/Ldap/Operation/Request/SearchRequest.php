@@ -103,6 +103,26 @@ class SearchRequest implements RequestInterface
      */
     public const DEREF_ALWAYS = 3;
 
+    /**
+     * Every scope this server performs; the RFC 4511 4.5.1 enumeration is extensible, so others are well formed
+     * but name a scope it cannot answer.
+     */
+    public const SUPPORTED_SCOPES = [
+        self::SCOPE_BASE_OBJECT,
+        self::SCOPE_SINGLE_LEVEL,
+        self::SCOPE_WHOLE_SUBTREE,
+    ];
+
+    /**
+     * The RFC 4511 4.5.1 alias dereferencing enumeration, which unlike scope is closed.
+     */
+    public const DEREF_VALUES = [
+        self::DEREF_NEVER,
+        self::DEREF_IN_SEARCHING,
+        self::DEREF_FINDING_BASE_OBJECT,
+        self::DEREF_ALWAYS,
+    ];
+
     protected const APP_TAG = 3;
 
     private ?Dn $baseDn = null;

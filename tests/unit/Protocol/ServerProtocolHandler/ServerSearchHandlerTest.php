@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
@@ -45,6 +46,7 @@ use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use Generator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -138,6 +140,90 @@ final class ServerSearchHandlerTest extends TestCase
             OperationOutcome::Succeeded,
             $result->outcome(),
         );
+    }
+
+    #[DataProvider('outOfRangeParameterProvider')]
+    public function test_it_rejects_a_search_parameter_outside_its_permitted_range(
+        SearchRequest $request,
+        string $expectedMessage,
+    ): void {
+        $this->mockBackend
+            ->expects(self::never())
+            ->method('search');
+
+        self::expectExceptionObject(new OperationException(
+            $expectedMessage,
+            ResultCode::PROTOCOL_ERROR,
+        ));
+
+        $this->subject->handleRequest(
+            new LdapMessageRequest(
+                2,
+                $request,
+            ),
+            $this->mockToken,
+        );
+    }
+
+    public static function outOfRangeParameterProvider(): Generator
+    {
+        yield 'a scope above the enumeration' => [
+            self::searchRequest()->setScope(3),
+            'The search scope requested is not supported.',
+        ];
+        yield 'a negative scope' => [
+            self::searchRequest()->setScope(-1),
+            'The search scope requested is not supported.',
+        ];
+        yield 'an alias value above the enumeration' => [
+            self::searchRequest()->setDereferenceAliases(4),
+            'The alias dereferencing value requested is not valid.',
+        ];
+        yield 'a negative alias value' => [
+            self::searchRequest()->setDereferenceAliases(-1),
+            'The alias dereferencing value requested is not valid.',
+        ];
+        yield 'a negative size limit' => [
+            self::searchRequest()->setSizeLimit(-1),
+            'The size limit requested is outside the permitted range.',
+        ];
+        yield 'a size limit above maxInt' => [
+            self::searchRequest()->setSizeLimit(LdapMessage::MAX_INT + 1),
+            'The size limit requested is outside the permitted range.',
+        ];
+        yield 'a negative time limit' => [
+            self::searchRequest()->setTimeLimit(-1),
+            'The time limit requested is outside the permitted range.',
+        ];
+        yield 'a time limit above maxInt' => [
+            self::searchRequest()->setTimeLimit(LdapMessage::MAX_INT + 1),
+            'The time limit requested is outside the permitted range.',
+        ];
+    }
+
+    /**
+     * Scope 3 is the subordinate scope the extensible enumeration anticipates, so it is well formed but unsupported.
+     */
+    public function test_it_accepts_every_scope_it_supports(): void
+    {
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback(fn(): EntryStream => new EntryStream($this->makeGenerator()));
+
+        foreach (SearchRequest::SUPPORTED_SCOPES as $scope) {
+            $result = $this->drive(
+                $this->subject,
+                new LdapMessageRequest(
+                    2,
+                    self::searchRequest()->setScope($scope),
+                ),
+            );
+
+            self::assertSame(
+                OperationOutcome::Succeeded,
+                $result->outcome(),
+            );
+        }
     }
 
     public function test_entry_stripped_by_acl_is_excluded_when_it_no_longer_matches_filter(): void
@@ -724,6 +810,12 @@ final class ServerSearchHandlerTest extends TestCase
         $done = end($this->sentMessages);
         self::assertInstanceOf(LdapMessageResponse::class, $done);
         self::assertNull($done->controls()->get(Control::OID_SORTING_RESPONSE));
+    }
+
+    private static function searchRequest(): SearchRequest
+    {
+        return (new SearchRequest(Filters::equal('foo', 'bar')))
+            ->base('dc=foo,dc=bar');
     }
 
     private function makeHandler(
