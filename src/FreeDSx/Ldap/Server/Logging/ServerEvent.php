@@ -48,6 +48,7 @@ enum ServerEvent: string
     case PagingSessionEvicted           = 'paging.session_evicted';
     case JournalPruned                  = 'journal.pruned';
     case JournalPruneFailed             = 'journal.prune_failed';
+    case MessageDecodeFailed            = 'message.decode_failed';
     case NoticeOfDisconnectSent         = 'session.disconnect_notice';
     case WriteTimeout                   = 'session.write_timeout';
     case IdleTimeout                    = 'session.idle_timeout';
@@ -73,6 +74,7 @@ enum ServerEvent: string
             self::CriticalControlRejected,
             self::OperationRefused,
             self::SchemaViolation,
+            self::MessageDecodeFailed,
             self::NoticeOfDisconnectSent,
             self::WriteTimeout,
             self::IdleTimeout,

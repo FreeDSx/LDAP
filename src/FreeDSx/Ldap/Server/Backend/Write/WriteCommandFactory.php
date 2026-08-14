@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\Text;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
@@ -63,6 +64,14 @@ final class WriteCommandFactory
         if ($request->getNewRdn()->hasUnescapedComma()) {
             throw new OperationException(
                 'The new RDN contains an unescaped comma.',
+                ResultCode::INVALID_DN_SYNTAX,
+            );
+        }
+
+        // A RelativeLDAPDN is an LDAPString, so bytes that do not spell one cannot name an entry.
+        if (!Text::isUtf8($request->getNewRdn()->toString())) {
+            throw new OperationException(
+                'The new RDN is not encoded as UTF-8.',
                 ResultCode::INVALID_DN_SYNTAX,
             );
         }

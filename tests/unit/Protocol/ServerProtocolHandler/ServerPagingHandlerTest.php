@@ -259,7 +259,7 @@ class ServerPagingHandlerTest extends TestCase
         );
     }
 
-    public function test_it_sends_an_operations_error_when_the_paging_generator_has_expired(): void
+    public function test_it_is_unwilling_to_perform_when_the_paging_generator_has_expired(): void
     {
         // A paging request exists and has been processed, but its generator was never stored
         // (simulating a session that expired or was evicted).
@@ -291,7 +291,7 @@ class ServerPagingHandlerTest extends TestCase
         self::assertSame([], $this->entryMessages());
         $done = $this->doneMessage()->getResponse();
         self::assertInstanceOf(SearchResultDone::class, $done);
-        self::assertSame(ResultCode::OPERATIONS_ERROR, $done->getResultCode());
+        self::assertSame(ResultCode::UNWILLING_TO_PERFORM, $done->getResultCode());
         self::assertSame('', $this->donePagingControl()->getCookie());
         self::assertInstanceOf(SearchOperationResult::class, $result);
         self::assertSame(
@@ -308,7 +308,10 @@ class ServerPagingHandlerTest extends TestCase
             searchRequest: $this->makeSearchRequest('(oh=no)'),
         );
 
-        self::expectExceptionObject(new OperationException("The supplied cookie is invalid."));
+        self::expectExceptionObject(new OperationException(
+            'The supplied cookie is invalid.',
+            ResultCode::UNWILLING_TO_PERFORM,
+        ));
 
         $this->subject->handleRequest(
             $message,

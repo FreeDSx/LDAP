@@ -207,6 +207,13 @@ final class LdapBackendStorageCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Maximum entries returned per search (0 = no limit)',
                 '0',
+            )
+            ->addOption(
+                'max-paging-sessions',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Maximum concurrent paging sessions before the oldest is aged out',
+                '25',
             );
     }
 
@@ -299,6 +306,7 @@ final class LdapBackendStorageCommand extends Command
             ->setMonitorEnabled((bool) $input->getOption('monitor'))
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
             ->setMaxSearchSize((int) $this->getStringOption($input, 'max-search-size'))
+            ->setMaxPagingSessions((int) $this->getStringOption($input, 'max-paging-sessions'))
             ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));
 
         $this->applyJournalMode($serverOptions, $input);

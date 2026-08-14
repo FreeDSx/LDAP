@@ -123,6 +123,37 @@ class ResponseFactory
     }
 
     /**
+     * The response owed to a message whose contents could not be decoded, keyed by its protocolOp tag.
+     *
+     * The request object never existed, so the tag alone has to pick the response type the client is waiting on.
+     */
+    public function getDecodeFailureResponse(
+        int $messageId,
+        int $protocolOpTag,
+        string $diagnostic,
+    ): ?LdapMessageResponse {
+        $response = match ($protocolOpTag) {
+            0 => new BindResponse(new LdapResult(ResultCode::PROTOCOL_ERROR, '', $diagnostic)),
+            3 => new SearchResultDone(ResultCode::PROTOCOL_ERROR, '', $diagnostic),
+            6 => new ModifyResponse(ResultCode::PROTOCOL_ERROR, '', $diagnostic),
+            8 => new AddResponse(ResultCode::PROTOCOL_ERROR, '', $diagnostic),
+            10 => new DeleteResponse(ResultCode::PROTOCOL_ERROR, '', $diagnostic),
+            12 => new ModifyDnResponse(ResultCode::PROTOCOL_ERROR, '', $diagnostic),
+            14 => new CompareResponse(ResultCode::PROTOCOL_ERROR, '', $diagnostic),
+            23 => new ExtendedResponse(new LdapResult(ResultCode::PROTOCOL_ERROR, '', $diagnostic)),
+            // Unbind and Abandon have no response, and a response tag is not a request at all.
+            default => null,
+        };
+
+        return $response === null
+            ? null
+            : new LdapMessageResponse(
+                $messageId,
+                $response,
+            );
+    }
+
+    /**
      * Retrieve an extended error, which has a message ID of zero.
      *
      * @param Control ...$controls Response controls to attach to the resulting message.

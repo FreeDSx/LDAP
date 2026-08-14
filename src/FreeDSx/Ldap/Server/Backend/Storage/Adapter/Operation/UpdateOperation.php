@@ -54,6 +54,15 @@ final class UpdateOperation
         Change $change,
     ): void {
         $attribute = $change->getAttribute();
+
+        // Legal to encode, but it would leave an attribute holding no values, which an entry cannot carry.
+        if ($attribute->getValues() === []) {
+            throw new OperationException(
+                sprintf('The add of attribute "%s" requires values.', $attribute->getName()),
+                ResultCode::PROTOCOL_ERROR,
+            );
+        }
+
         $existing = $entry->get($attribute, true);
 
         if ($existing === null) {

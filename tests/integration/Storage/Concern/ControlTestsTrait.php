@@ -13,9 +13,12 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 
@@ -64,6 +67,70 @@ trait ControlTestsTrait
 
         // After abandonment, hasEntries() must return false
         self::assertFalse($paging->hasEntries());
+    }
+
+    /**
+     * RFC 2696 3 prescribes this when a client resumes a paged search the server aged out.
+     */
+    public function testResumingAnAgedOutPagingSessionIsUnwillingToPerform(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::storageExtraArgs(),
+                '--max-paging-sessions=1',
+            ],
+        );
+        $this->authenticateUser();
+
+        $search = Operations::search(Filters::present('objectClass'))
+            ->base('dc=foo,dc=bar')
+            ->useSubtreeScope();
+
+        $first = $this->ldapClient()->paging($search, 1);
+        $first->getEntries();
+
+        // Starting a second session at the cap ages the first one out.
+        $second = $this->ldapClient()->paging($search, 1);
+        $second->getEntries();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
+
+        $first->getEntries();
+    }
+
+    public function testAMalformedControlValueIsAnsweredWithoutEndingTheSession(): void
+    {
+        $this->authenticateUser();
+
+        $search = Operations::search(Filters::present('objectClass'))
+            ->base('dc=foo,dc=bar')
+            ->useSubtreeScope();
+
+        try {
+            $this->ldapClient()->search(
+                $search,
+                new Control(
+                    Control::OID_PAGING,
+                    false,
+                    'not-a-paging-control',
+                ),
+            );
+            self::fail('The malformed control value should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        }
+
+        // The same connection must still serve requests, which is the whole point of answering rather than closing.
+        self::assertCount(
+            8,
+            $this->ldapClient()->search($search),
+        );
     }
 
     public function testSortControlAscendingOrdersResults(): void

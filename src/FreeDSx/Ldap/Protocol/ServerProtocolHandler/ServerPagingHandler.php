@@ -256,7 +256,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         if ($generator === null) {
             throw new OperationException(
                 'The paging session could not be resumed.',
-                ResultCode::OPERATIONS_ERROR,
+                ResultCode::UNWILLING_TO_PERFORM,
             );
         }
 
@@ -456,9 +456,10 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
                 ->pagingRequest()
                 ->findByNextCookie($cookie);
         } catch (ProtocolException $e) {
+            // An aged-out session leaves no record, so a resumed one and an invented one answer alike.
             throw new OperationException(
                 $e->getMessage(),
-                ResultCode::OPERATIONS_ERROR,
+                ResultCode::UNWILLING_TO_PERFORM,
             );
         }
     }
