@@ -17,9 +17,13 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
+use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
+use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use Generator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class LdapMessageRequestTest extends TestCase
@@ -80,5 +84,44 @@ final class LdapMessageRequestTest extends TestCase
 
         self::assertTrue($message->controls()->has(Control::OID_PWD_POLICY));
         self::assertNull($message->controls()->getByClass(PwdPolicyResponseControl::class));
+    }
+
+    #[DataProvider('outOfRangeMessageIdProvider')]
+    public function test_it_refuses_a_message_id_outside_the_permitted_range(int $messageId): void
+    {
+        self::expectException(ProtocolException::class);
+        self::expectExceptionMessage('The LDAP message ID is outside the range it is permitted to use.');
+
+        LdapMessageRequest::fromAsn1(Asn1::sequence(
+            Asn1::integer($messageId),
+            Asn1::application(10, Asn1::octetString('dc=foo,dc=bar')),
+        ));
+    }
+
+    public static function outOfRangeMessageIdProvider(): Generator
+    {
+        yield 'negative' => [-1];
+        yield 'above maxInt' => [LdapMessage::MAX_INT + 1];
+    }
+
+    #[DataProvider('inRangeMessageIdProvider')]
+    public function test_it_accepts_a_message_id_at_the_edge_of_the_permitted_range(int $messageId): void
+    {
+        $message = LdapMessageRequest::fromAsn1(Asn1::sequence(
+            Asn1::integer($messageId),
+            Asn1::application(10, Asn1::octetString('dc=foo,dc=bar')),
+        ));
+
+        self::assertSame(
+            $messageId,
+            $message->getMessageId(),
+        );
+    }
+
+    public static function inRangeMessageIdProvider(): Generator
+    {
+        // Zero is in range here; it is refused later as reserved rather than as an unparseable ID.
+        yield 'zero' => [0];
+        yield 'maxInt' => [LdapMessage::MAX_INT];
     }
 }

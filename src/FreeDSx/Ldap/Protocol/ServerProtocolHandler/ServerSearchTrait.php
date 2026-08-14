@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
@@ -94,6 +95,9 @@ trait ServerSearchTrait
         );
     }
 
+    /**
+     * @throws OperationException
+     */
     private function getSearchRequestFromMessage(LdapMessageRequest $message): SearchRequest
     {
         $request = $message->getRequest();
@@ -104,7 +108,61 @@ trait ServerSearchTrait
                 get_class($request),
             ));
         }
+
+        $this->assertSearchParametersInRange($request);
+
         return $request;
+    }
+
+    /**
+     * Rejects RFC 4511 4.5.1 field values the decoder admits but the ASN.1 constraints do not.
+     *
+     * The decoder checks each field's type and stops there, so an out-of-range value would otherwise be coerced
+     * into a working request: an unknown scope reads as one level, and a negative sizeLimit defeats the server
+     * maximum entirely.
+     *
+     * @throws OperationException
+     */
+    private function assertSearchParametersInRange(SearchRequest $request): void
+    {
+        // An unknown scope must not silently become a scope the client did not ask for.
+        if (!in_array($request->getScope(), SearchRequest::SUPPORTED_SCOPES, true)) {
+            throw new OperationException(
+                'The search scope requested is not supported.',
+                ResultCode::PROTOCOL_ERROR,
+            );
+        }
+
+        if (!in_array($request->getDereferenceAliases(), SearchRequest::DEREF_VALUES, true)) {
+            throw new OperationException(
+                'The alias dereferencing value requested is not valid.',
+                ResultCode::PROTOCOL_ERROR,
+            );
+        }
+
+        $this->assertWithinMaxInt(
+            $request->getSizeLimit(),
+            'size limit',
+        );
+        $this->assertWithinMaxInt(
+            $request->getTimeLimit(),
+            'time limit',
+        );
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function assertWithinMaxInt(
+        int $value,
+        string $field,
+    ): void {
+        if ($value < 0 || $value > LdapMessage::MAX_INT) {
+            throw new OperationException(
+                sprintf('The %s requested is outside the permitted range.', $field),
+                ResultCode::PROTOCOL_ERROR,
+            );
+        }
     }
 
     /**

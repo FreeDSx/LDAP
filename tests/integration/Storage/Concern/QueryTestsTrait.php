@@ -1010,4 +1010,73 @@ trait QueryTestsTrait
         $this->expectExceptionCode(ResultCode::ALIAS_DEREFERENCING_PROBLEM);
         $this->ldapClient()->search($derefRequest);
     }
+
+    /**
+     * RFC 4511 4.5.1 constrains these fields, and the decoder only checks their type, so an out-of-range value
+     * would otherwise be coerced into a request the client never made.
+     *
+     * @return iterable<string, array{SearchRequest}>
+     */
+    public static function outOfRangeSearchParameterProvider(): iterable
+    {
+        yield 'a scope above the enumeration' => [
+            self::rangeProbeRequest()->setScope(3),
+        ];
+        yield 'a negative scope' => [
+            self::rangeProbeRequest()->setScope(-1),
+        ];
+        yield 'an alias value above the enumeration' => [
+            self::rangeProbeRequest()->setDereferenceAliases(4),
+        ];
+        yield 'a negative size limit' => [
+            self::rangeProbeRequest()->setSizeLimit(-1),
+        ];
+        yield 'a negative time limit' => [
+            self::rangeProbeRequest()->setTimeLimit(-1),
+        ];
+    }
+
+    #[DataProvider('outOfRangeSearchParameterProvider')]
+    public function test_a_search_parameter_outside_its_range_is_a_protocol_error(SearchRequest $request): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::PROTOCOL_ERROR);
+
+        $this->ldapClient()->search($request);
+    }
+
+    /**
+     * The clamp is applied with min(), so a negative limit would win it and lift the ceiling entirely.
+     */
+    public function testANegativeSizeLimitCannotDefeatTheServerMaximum(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::storageExtraArgs(),
+                '--seed-entries=10',
+                '--max-search-size=2',
+            ],
+        );
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::PROTOCOL_ERROR);
+
+        $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope()
+                ->setSizeLimit(-1),
+        );
+    }
+
+    private static function rangeProbeRequest(): SearchRequest
+    {
+        return Operations::search(Filters::present('objectClass'))
+            ->base('dc=foo,dc=bar');
+    }
 }

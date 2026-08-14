@@ -70,6 +70,11 @@ use function count;
  */
 abstract class LdapMessage implements ProtocolElementInterface, PduInterface
 {
+    /**
+     * The upper bound every RFC 4511 INTEGER (0 .. maxInt) field shares.
+     */
+    public const MAX_INT = 2147483647;
+
     private ControlBag $controls;
 
     public function __construct(
@@ -167,6 +172,12 @@ abstract class LdapMessage implements ProtocolElementInterface, PduInterface
         $messageId = $type->getChild(0);
         if (!($messageId instanceof IntegerType)) {
             throw new ProtocolException('Expected an LDAP message ID as an ASN.1 integer type. None received.');
+        }
+
+        // A value outside the range MessageID constrains is not an encoding of that type, so it cannot be parsed
+        // as one. Answering it would mean echoing an ID no conformant peer can accept.
+        if ($messageId->getValue() < 0 || $messageId->getValue() > self::MAX_INT) {
+            throw new ProtocolException('The LDAP message ID is outside the range it is permitted to use.');
         }
         /** @var SequenceType|null $opAsn1 */
         $opAsn1 = $type->getChild(1);

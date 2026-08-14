@@ -354,6 +354,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
 
                 $page[] = $projection->project($filtered);
 
+                // Deliberate: the limit bounds each page rather than the whole paged operation.
                 if ($sizeLimit > 0 && count($page) >= $sizeLimit) {
                     $generator->next();
                     break;
