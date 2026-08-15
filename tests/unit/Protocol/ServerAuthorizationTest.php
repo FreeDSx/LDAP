@@ -83,6 +83,13 @@ final class ServerAuthorizationTest extends TestCase
         ));
     }
 
+    public function test_it_should_not_require_authentication_for_an_abandon_request(): void
+    {
+        self::assertFalse($this->subject->isAuthenticationRequired(
+            Operations::abandon(1),
+        ));
+    }
+
     public function test_it_should_not_require_authentication_for_a_rootdse_request(): void
     {
         self::assertFalse($this->subject->isAuthenticationRequired(
@@ -187,7 +194,6 @@ final class ServerAuthorizationTest extends TestCase
             [Operations::add(Entry::fromArray(''))],
             [Operations::delete('cn=foo')],
             [Operations::rename('cn=foo', 'cn=foo')],
-            [Operations::abandon(1)],
             [Operations::passwordModify('', '', '')],
             [Operations::modify('cn=foo', Change::reset('foo'))],
             [Operations::compare('cn=foo', 'foo', 'bar')],

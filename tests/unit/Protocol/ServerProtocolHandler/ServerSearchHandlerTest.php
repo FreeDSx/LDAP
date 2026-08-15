@@ -791,6 +791,107 @@ final class ServerSearchHandlerTest extends TestCase
         );
     }
 
+    public function test_a_repeated_sort_key_attribute_reports_unwilling_to_perform(): void
+    {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar'),
+            new SortingControl(
+                SortKey::ascending('cn'),
+                SortKey::descending('CN'),
+            ),
+        );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturn(new EntryStream($this->makeGenerator()));
+
+        $this->drive(
+            $this->subject,
+            $search,
+        );
+
+        $done = end($this->sentMessages);
+        self::assertInstanceOf(LdapMessageResponse::class, $done);
+        $sortControl = $done->controls()->get(Control::OID_SORTING_RESPONSE);
+        self::assertInstanceOf(
+            SortingResponseControl::class,
+            $sortControl,
+        );
+        self::assertSame(
+            ResultCode::UNWILLING_TO_PERFORM,
+            $sortControl->getResult(),
+        );
+    }
+
+    public function test_an_unsortable_critical_sort_fails_the_search_and_returns_no_entries(): void
+    {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar'),
+            (new SortingControl(SortKey::ascending('bogusAttr')))->setCriticality(true),
+        );
+
+        $this->mockBackend
+            ->expects(self::never())
+            ->method('search');
+
+        $this->drive(
+            $this->subject,
+            $search,
+        );
+
+        self::assertCount(
+            1,
+            $this->sentMessages,
+            'No entries may be returned when a critical sort cannot be honored.',
+        );
+
+        $done = end($this->sentMessages);
+        self::assertInstanceOf(LdapMessageResponse::class, $done);
+        $response = $done->getResponse();
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $response,
+        );
+        self::assertSame(
+            ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+            $response->getResultCode(),
+        );
+        self::assertInstanceOf(
+            SortingResponseControl::class,
+            $done->controls()->get(Control::OID_SORTING_RESPONSE),
+        );
+    }
+
+    public function test_an_unsortable_non_critical_sort_still_returns_entries(): void
+    {
+        $entry = Entry::create('dc=foo,dc=bar', ['cn' => 'foo']);
+
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar'),
+            new SortingControl(SortKey::ascending('bogusAttr')),
+        );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturn(new EntryStream($this->makeGenerator($entry)));
+        $this->mockFilterEvaluator
+            ->method('evaluate')
+            ->willReturn(true);
+
+        $this->drive(
+            $this->subject,
+            $search,
+        );
+
+        self::assertCount(
+            2,
+            $this->sentMessages,
+        );
+    }
+
     public function test_no_sort_control_does_not_append_sorting_response_control(): void
     {
         $search = new LdapMessageRequest(

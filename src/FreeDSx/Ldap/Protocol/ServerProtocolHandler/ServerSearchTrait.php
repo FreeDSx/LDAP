@@ -32,6 +32,8 @@ use FreeDSx\Ldap\Protocol\LdapMessage;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
+use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
+use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use Generator;
@@ -260,6 +262,35 @@ trait ServerSearchTrait
     }
 
     /**
+     * RFC 2891 §1.2: a critical sort the server cannot honor fails the search and returns no entries.
+     */
+    private function refuseUnsortableCriticalSearch(
+        LdapMessageRequest $message,
+        ?SortingControl $sortControl,
+        ?SortingResponseControl $sortResponse,
+    ): ?ResponseStream {
+        if ($sortControl === null || !$sortControl->getCriticality()) {
+            return null;
+        }
+
+        if ($sortResponse === null || $sortResponse->getResult() === ResultCode::SUCCESS) {
+            return null;
+        }
+
+        return ResponseStream::of(
+            [new LdapMessageResponse(
+                $message->getMessageId(),
+                new SearchResultDone(
+                    ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+                    diagnosticMessage: 'The requested sort could not be performed.',
+                ),
+                $sortResponse,
+            )],
+            OperationOutcomeResult::failed(ResultCode::UNAVAILABLE_CRITICAL_EXTENSION),
+        );
+    }
+
+    /**
      * The RFC 2891 sort response control, with the result code per §1.2 (first unsortable key wins).
      */
     private function sortingResponseControl(
@@ -270,9 +301,20 @@ trait ServerSearchTrait
             return null;
         }
 
+        $seen = [];
+
         foreach ($sortControl->getSortKeys() as $sortKey) {
             $attribute = $sortKey->getAttribute();
             $attributeType = $schema->getAttributeType($attribute);
+
+            // RFC 2891 §1.1: an attribute type should occur in the key list only once.
+            if (isset($seen[strtolower($attribute)])) {
+                return new SortingResponseControl(
+                    ResultCode::UNWILLING_TO_PERFORM,
+                    $attribute,
+                );
+            }
+            $seen[strtolower($attribute)] = true;
 
             if ($attributeType === null) {
                 return new SortingResponseControl(

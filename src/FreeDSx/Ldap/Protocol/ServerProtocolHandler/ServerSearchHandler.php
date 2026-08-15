@@ -62,6 +62,22 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
 
         $this->assertBaseDnProvided($request);
 
+        $sortControl = $this->sortingControl($message);
+        $sortResponse = $this->sortingResponseControl(
+            $sortControl,
+            $this->schema,
+        );
+
+        $refusal = $this->refuseUnsortableCriticalSearch(
+            $message,
+            $sortControl,
+            $sortResponse,
+        );
+
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
         $backendResult = $this->backend->search(
             $request,
             $this->subentryVisibility($message->controls()),
@@ -85,10 +101,6 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
             $state,
         );
 
-        $sortResponse = $this->sortingResponseControl(
-            $this->sortingControl($message),
-            $this->schema,
-        );
         $responseControls = $sortResponse !== null
             ? [$sortResponse]
             : [];

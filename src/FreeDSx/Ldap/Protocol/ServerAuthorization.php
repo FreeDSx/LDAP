@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol;
 
+use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -52,6 +53,8 @@ class ServerAuthorization
         } elseif ($request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_START_TLS) {
             return false;
         } elseif ($request instanceof UnbindRequest) {
+            return false;
+        } elseif ($request instanceof AbandonRequest) {
             return false;
         } elseif ($request instanceof BindRequest) {
             return false;
