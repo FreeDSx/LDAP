@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
@@ -1072,6 +1073,50 @@ trait QueryTestsTrait
                 ->useSubtreeScope()
                 ->setSizeLimit(-1),
         );
+    }
+
+    public function testMatchedDnIsEmptyOnASuccessfulSearch(): void
+    {
+        $this->authenticateUser();
+
+        $response = $this->ldapClient()->send(
+            Operations::search(Filters::present('objectClass'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        $done = $response?->getResponse();
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $done,
+        );
+        self::assertSame(
+            '',
+            $done->getDn()->toString(),
+        );
+    }
+
+    public function testMatchedDnNamesTheClosestAncestorWhenTheBaseIsMissing(): void
+    {
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('cn=nope,ou=people,dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+            );
+            self::fail('The missing base should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::NO_SUCH_OBJECT,
+                $e->getCode(),
+            );
+            self::assertSame(
+                'ou=people,dc=foo,dc=bar',
+                $e->getMatchedDn()?->toString(),
+            );
+        }
     }
 
     private static function rangeProbeRequest(): SearchRequest

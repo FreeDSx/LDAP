@@ -82,7 +82,6 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
                 $token,
                 $projection,
             ),
-            (string) $request->getBaseDn(),
             $state,
         );
 

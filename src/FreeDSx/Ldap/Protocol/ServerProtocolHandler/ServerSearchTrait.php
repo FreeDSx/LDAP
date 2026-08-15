@@ -71,10 +71,7 @@ trait ServerSearchTrait
         if ($cancelSignal !== null && $cancellation->isCanceled()) {
             yield new LdapMessageResponse(
                 $messageId,
-                new SearchResultDone(
-                    ResultCode::CANCELED,
-                    $searchResult->getBaseDn(),
-                ),
+                new SearchResultDone(ResultCode::CANCELED),
             );
             yield new LdapMessageResponse(
                 $cancelSignal->getMessageId(),
@@ -88,7 +85,7 @@ trait ServerSearchTrait
             $messageId,
             new SearchResultDone(
                 $state->resultCode,
-                $searchResult->getBaseDn(),
+                $searchResult->getMatchedDn(),
                 $state->diagnosticMessage,
             ),
             ...$controls,

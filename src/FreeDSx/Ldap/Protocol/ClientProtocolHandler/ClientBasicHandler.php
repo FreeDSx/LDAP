@@ -89,10 +89,15 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
                 $result->getResultCode(),
             );
         }
+        // RFC 4511 §4.1.9 fills matchedDN only when the target could not be named, so an empty one carries nothing.
+        $matchedDn = $result->getDn();
 
         throw new OperationException(
             $result->getDiagnosticMessage(),
             $result->getResultCode(),
+            matchedDn: $matchedDn->toString() === ''
+                ? null
+                : $matchedDn,
         );
     }
 }

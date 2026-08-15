@@ -200,10 +200,7 @@ final readonly class SyncPersistStreamer
     ): Generator {
         yield new LdapMessageResponse(
             $messageId,
-            new SearchResultDone(
-                ResultCode::CANCELED,
-                $baseDn->toString(),
-            ),
+            new SearchResultDone(ResultCode::CANCELED),
             new SyncDoneControl(
                 (new SyncCookie($origin, $lastSeq))->encode(),
                 true,

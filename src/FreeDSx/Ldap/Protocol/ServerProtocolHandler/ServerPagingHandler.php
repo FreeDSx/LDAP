@@ -85,16 +85,10 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
                 $token,
             );
             if ($response->isSizeLimitExceeded()) {
-                $searchResult = SearchResult::makeSizeLimitResult(
-                    $response->getEntries(),
-                    (string) $searchRequest->getBaseDn(),
-                );
+                $searchResult = SearchResult::makeSizeLimitResult($response->getEntries());
                 $controls[] = new PagingControl(0, '');
             } else {
-                $searchResult = SearchResult::makeSuccessResult(
-                    $response->getEntries(),
-                    (string) $searchRequest->getBaseDn(),
-                );
+                $searchResult = SearchResult::makeSuccessResult($response->getEntries());
                 $controls[] = new PagingControl(
                     $response->getRemaining(),
                     $response->isComplete()
