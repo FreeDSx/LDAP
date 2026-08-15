@@ -554,6 +554,45 @@ final class AclIntegrationTest extends ServerTestCase
         );
     }
 
+    /**
+     * It's very unclear from the RFC whether a re-bind should be allowed to even resume a paged search. Other
+     * implementations allow it, and our ACL / filtering applies correctly. So keeping it as is and making sure
+     * an integration test is in place so it doesn't regress.
+     */
+    public function testPagingAfterARebindAppliesTheNewIdentity(): void
+    {
+        $search = Operations::search(Filters::present('userPassword'))
+            ->base('dc=foo,dc=bar')
+            ->useSubtreeScope()
+            ->setAttributes('cn');
+
+        $this->authenticateAdmin();
+        self::assertGreaterThan(
+            1,
+            count($this->ldapClient()->search($search)),
+            'The granted identity must see more than one page worth, or the test proves nothing.',
+        );
+
+        $paging = $this->ldapClient()->paging($search, 1);
+        self::assertCount(
+            1,
+            $paging->getEntries(),
+        );
+
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $delivered = 0;
+        while ($paging->hasEntries()) {
+            $delivered += count($paging->getEntries());
+        }
+
+        self::assertSame(
+            0,
+            $delivered,
+            'Entries the re-bound identity could not have selected must not continue to arrive.',
+        );
+    }
+
     public function testADisjunctionKeepsTheBranchThatIsNotWithheld(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
