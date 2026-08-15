@@ -50,6 +50,8 @@ class ServerSubschemaHandler implements ServerProtocolHandlerInterface
                     ObjectClassOid::NAME_SUBSCHEMA,
                 ],
                 $rdn->getName() => [$rdn->getValue()],
+                // Self-referential, so a client discovering schema never has to special-case this entry.
+                AttributeTypeOid::NAME_SUBSCHEMA_SUBENTRY => [$schemaDn->toString()],
                 AttributeTypeOid::NAME_ATTRIBUTE_TYPES => array_map(
                     fn($at) => $at->toDescriptionString(),
                     $schema->getAttributeTypes(),
