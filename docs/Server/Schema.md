@@ -61,7 +61,8 @@ $entry = Entry::fromArray(
 
 ### extensibleObject
 
-Adding `extensibleObject` as an auxiliary class bypasses the attribute-set checks.
+Adding `extensibleObject` as an auxiliary class lets an entry hold any attribute the schema defines,
+whether or not its object classes permit it.
 
 ```php
 $entry = Entry::fromArray(
@@ -71,6 +72,27 @@ $entry = Entry::fromArray(
         'cn'          => 'alice',
         'sn'          => 'Smith',
         'uidNumber'   => '1001',   // not in inetOrgPerson MAY; allowed via extensibleObject
+    ],
+);
+```
+
+Only the permitted-attribute list is waived. The entry still needs a structural class, still needs every
+`MUST` attribute its classes require, and every attribute it holds must be defined by the schema. An
+undefined attribute is rejected with `undefinedAttributeType` (17) whether or not `extensibleObject` is
+present.
+
+### Carrying an auxiliary class
+
+An auxiliary class such as `pwdPolicy` cannot stand on its own, so pair it with a structural class.
+`device` is the conventional carrier:
+
+```php
+$entry = Entry::fromArray(
+    'cn=default-policy,ou=policies,dc=example,dc=com',
+    [
+        'objectClass'  => ['top', 'device', 'pwdPolicy'],
+        'cn'           => 'default-policy',
+        'pwdAttribute' => 'userPassword',
     ],
 );
 ```

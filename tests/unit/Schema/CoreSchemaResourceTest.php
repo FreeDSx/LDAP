@@ -87,7 +87,7 @@ final class CoreSchemaResourceTest extends TestCase
     public function test_has_expected_attribute_type_count(): void
     {
         self::assertCount(
-            57,
+            59,
             $this->schema->getAttributeTypes(),
         );
     }
@@ -95,12 +95,10 @@ final class CoreSchemaResourceTest extends TestCase
     public function test_has_expected_object_class_count(): void
     {
         self::assertCount(
-            14,
+            15,
             $this->schema->getObjectClasses(),
         );
     }
-
-    // --- syntaxes ---
 
     public function test_directory_string_syntax_registered(): void
     {
@@ -137,7 +135,33 @@ final class CoreSchemaResourceTest extends TestCase
         );
     }
 
-    // --- matching rules ---
+    public function test_device_is_a_structural_class_requiring_cn(): void
+    {
+        $device = $this->schema->getObjectClass('device');
+
+        self::assertNotNull($device);
+        self::assertSame(
+            ObjectClassType::StructuralClass,
+            $device->type,
+        );
+        self::assertSame(
+            ['cn'],
+            $device->must,
+        );
+    }
+
+    public function test_the_attributes_device_permits_are_all_defined(): void
+    {
+        $device = $this->schema->getObjectClass('device');
+        self::assertNotNull($device);
+
+        foreach ($device->may as $attribute) {
+            self::assertNotNull(
+                $this->schema->getAttributeType($attribute),
+                sprintf('device MAY %s, which the schema does not define.', $attribute),
+            );
+        }
+    }
 
     public function test_case_ignore_match_registered_by_oid(): void
     {
@@ -195,8 +219,6 @@ final class CoreSchemaResourceTest extends TestCase
         );
     }
 
-    // --- attribute types ---
-
     public function test_cn_registered_by_oid(): void
     {
         self::assertNotNull(
@@ -239,8 +261,6 @@ final class CoreSchemaResourceTest extends TestCase
             $this->schema->getAttributeType(AttributeTypeOid::NAME_OBJECT_CLASS),
         );
     }
-
-    // --- object classes ---
 
     public function test_top_registered(): void
     {

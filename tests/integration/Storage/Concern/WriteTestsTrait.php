@@ -207,6 +207,29 @@ trait WriteTestsTrait
         ));
     }
 
+    public function testAddAcceptsDeviceCarryingAnAuxiliaryPolicyClass(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(new Entry(
+            'cn=policy-carrier,dc=foo,dc=bar',
+            new Attribute('objectClass', 'top', 'device', 'pwdPolicy'),
+            new Attribute('cn', 'policy-carrier'),
+            new Attribute('pwdAttribute', 'userPassword'),
+        ));
+
+        self::assertCount(
+            1,
+            $this->ldapClient()->search(
+                Operations::search(Filters::equal('cn', 'policy-carrier'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+            ),
+        );
+
+        $this->ldapClient()->delete('cn=policy-carrier,dc=foo,dc=bar');
+    }
+
     public function testAddDuplicateDnFails(): void
     {
         $this->authenticateAdmin();
