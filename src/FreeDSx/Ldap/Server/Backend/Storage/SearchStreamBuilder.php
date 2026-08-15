@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage;
 
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -31,26 +32,37 @@ use Generator;
  */
 final readonly class SearchStreamBuilder
 {
-    use EntryDnAttributeTrait;
+    use DerivedAttributeTrait;
+
+    /**
+     * How each derived attribute's value is produced, keyed on the type name.
+     *
+     * @var array<string, callable(Entry): string>
+     */
+    private array $derivedResolvers;
 
     /**
      * @param FilterEvaluatorInterface $filterEvaluator Must know the configured schema, or matching rules are ignored.
      */
     public function __construct(
-        private EntryStorageInterface $storage,
+        EntryStorageInterface $storage,
         private SearchLimits $limits,
         private FilterEvaluatorInterface $filterEvaluator,
-    ) {}
+        Dn $subschemaEntry = new Dn('cn=Subschema'),
+    ) {
+        $this->derivedResolvers = self::derivedResolvers($subschemaEntry) + [
+            AttributeTypeOid::NAME_HAS_SUBORDINATES => static fn(Entry $entry): string => $storage
+                ->hasChildren($entry->getDn()) ? 'TRUE' : 'FALSE',
+        ];
+    }
 
     public function buildForBaseObject(
         Entry $entry,
         SearchRequest $request,
     ): EntryStream {
-        $entry = $this->requestsHasSubordinates($request)
-            ? $this->injectHasSubordinates($entry)
-            : $entry;
-
-        return new EntryStream($this->yieldSingle($entry));
+        return new EntryStream(
+            $this->yieldSingle($this->injectDerived($entry, $request)),
+        );
     }
 
     /**
@@ -78,13 +90,7 @@ final readonly class SearchStreamBuilder
             );
         }
 
-        if ($this->requestsHasSubordinates($request)) {
-            $generator = $this->wrapWithHasSubordinates($generator);
-        }
-
-        if ($this->requestsEntryDn($request)) {
-            $generator = $this->wrapWithEntryDn($generator);
-        }
+        $generator = $this->wrapWithDerived($generator, $request);
 
         return new EntryStream(
             $generator,
@@ -92,83 +98,83 @@ final readonly class SearchStreamBuilder
         );
     }
 
-    private function requestsHasSubordinates(SearchRequest $request): bool
-    {
-        foreach ($request->getAttributes() as $attr) {
-            if ($this->isHasSubordinatesAttribute($attr)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function isHasSubordinatesAttribute(Attribute $attr): bool
-    {
-        return $this->isNamed($attr, SearchRequest::ATTRIBUTES_ALL_OPERATIONAL)
-            || $this->isNamed($attr, AttributeTypeOid::NAME_HAS_SUBORDINATES);
-    }
-
-    private function isNamed(
-        Attribute $attr,
-        string $name,
-    ): bool {
-        return strcasecmp($attr->getName(), $name) === 0;
-    }
-
-    private function requestsEntryDn(SearchRequest $request): bool
-    {
-        foreach ($request->getAttributes() as $attr) {
-            if ($this->requestsEntryDnAttribute($attr)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function requestsEntryDnAttribute(Attribute $attr): bool
-    {
-        return $this->isNamed($attr, SearchRequest::ATTRIBUTES_ALL_OPERATIONAL)
-            || self::isEntryDnAttribute($attr->getName());
-    }
-
     /**
      * @param Generator<Entry> $generator
      * @return Generator<Entry>
      */
-    private function wrapWithEntryDn(Generator $generator): Generator
-    {
+    private function wrapWithDerived(
+        Generator $generator,
+        SearchRequest $request,
+    ): Generator {
         foreach ($generator as $entry) {
-            yield $this->injectEntryDn($entry);
+            yield $this->injectDerived($entry, $request);
         }
     }
 
     /**
-     * RFC 5020: a copy of the entry's DN, derived on read so a rename cannot leave it stale.
+     * Operational attributes held by nothing in storage, so they are computed per read and only when asked for.
      */
-    private function injectEntryDn(Entry $entry): Entry
-    {
+    private function injectDerived(
+        Entry $entry,
+        SearchRequest $request,
+    ): Entry {
+        $requested = $this->requestedDerived($request);
+
+        if ($requested === []) {
+            return $entry;
+        }
+
         $copy = $entry->makeCopy();
-        $copy->set(
-            AttributeTypeOid::NAME_ENTRY_DN,
-            $entry->getDn()->toString(),
-        );
+
+        foreach ($requested as $name) {
+            $copy->set(
+                $name,
+                ($this->derivedResolvers[$name])($entry),
+            );
+        }
 
         return $copy;
     }
 
-    private function injectHasSubordinates(Entry $entry): Entry
+    /**
+     * Derived attribute names the request asks for, by name, by OID, or through the operational wildcard.
+     *
+     * @return list<string>
+     */
+    private function requestedDerived(SearchRequest $request): array
     {
-        $copy = $entry->makeCopy();
-        $copy->set(
-            'hasSubordinates',
-            $this->storage->hasChildren($entry->getDn())
-                ? 'TRUE'
-                : 'FALSE',
+        $attributes = $request->getAttributes();
+        $wantsAllOperational = $this->namesAny(
+            $attributes,
+            SearchRequest::ATTRIBUTES_ALL_OPERATIONAL,
         );
+        $requested = [];
 
-        return $copy;
+        foreach (array_keys($this->derivedResolvers) as $name) {
+            if ($wantsAllOperational || $this->namesAny($attributes, $name)) {
+                $requested[] = $name;
+            }
+        }
+
+        return $requested;
+    }
+
+    /**
+     * Whether any requested description names the given type, allowing for its OID and its options.
+     *
+     * @param array<Attribute> $attributes
+     */
+    private function namesAny(
+        array $attributes,
+        string $name,
+    ): bool {
+        foreach ($attributes as $attr) {
+            if (self::describesType($attr->getName(), $name)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function derefsInSearch(SearchRequest $request): bool
@@ -222,17 +228,6 @@ final readonly class SearchStreamBuilder
             if ($this->filterEvaluator->evaluate($entry, $filter)) {
                 yield $entry;
             }
-        }
-    }
-
-    /**
-     * @param Generator<Entry> $generator
-     * @return Generator<Entry>
-     */
-    private function wrapWithHasSubordinates(Generator $generator): Generator
-    {
-        foreach ($generator as $entry) {
-            yield $this->injectHasSubordinates($entry);
         }
     }
 

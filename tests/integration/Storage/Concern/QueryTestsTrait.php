@@ -321,6 +321,32 @@ trait QueryTestsTrait
             8,
         ];
 
+        // RFC 4512 4.2: derived from server configuration, so it matches without being stored.
+        yield 'subschemaSubentry is present on every entry' => [
+            Filters::present('subschemaSubentry'),
+            8,
+        ];
+        yield 'subschemaSubentry matches the configured subschema dn' => [
+            Filters::equal(
+                'subschemaSubentry',
+                'cn=Subschema',
+            ),
+            8,
+        ];
+        yield 'subschemaSubentry matches nothing for another dn' => [
+            Filters::equal(
+                'subschemaSubentry',
+                'cn=SomewhereElse',
+            ),
+            0,
+        ];
+        yield 'subschemaSubentry matches by its oid' => [
+            Filters::equal(
+                '2.5.18.10',
+                'cn=Subschema',
+            ),
+            8,
+        ];
     }
 
     #[DataProvider('filterProvider')]
@@ -404,6 +430,82 @@ trait QueryTestsTrait
             Operations::search(Filters::equal('cn', 'alice'), '1.3.6.1.1.20')
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            ['cn=alice,ou=people,dc=foo,dc=bar'],
+            $entries->first()?->get(new Attribute('entryDN'), true)?->getValues(),
+        );
+    }
+
+    public function testRequestingSubschemaSubentryReturnsTheSubschemaDn(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'alice'), 'subschemaSubentry')
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            ['cn=Subschema'],
+            $entries->first()?->get(new Attribute('subschemaSubentry'), true)?->getValues(),
+        );
+    }
+
+    public function testSubschemaSubentryIsReturnedOnABaseScopedRead(): void
+    {
+        $this->authenticateUser();
+
+        // The discovery flow every schema-aware client uses: read it from the entry it governs.
+        $entries = $this->ldapClient()->search(
+            Operations::read('cn=alice,ou=people,dc=foo,dc=bar', 'subschemaSubentry'),
+        );
+
+        self::assertSame(
+            ['cn=Subschema'],
+            $entries->first()?->get(new Attribute('subschemaSubentry'), true)?->getValues(),
+        );
+    }
+
+    public function testRequestingAllOperationalAttributesReturnsSubschemaSubentry(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'alice'), '+')
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            ['cn=Subschema'],
+            $entries->first()?->get(new Attribute('subschemaSubentry'), true)?->getValues(),
+        );
+    }
+
+    public function testSubschemaSubentryIsOperationalSoItIsNotReturnedByDefault(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'alice'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertNull(
+            $entries->first()?->get(new Attribute('subschemaSubentry'), true),
+        );
+    }
+
+    public function testEntryDnIsReturnedOnABaseScopedRead(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::read('cn=alice,ou=people,dc=foo,dc=bar', 'entryDN'),
         );
 
         self::assertSame(

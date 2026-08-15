@@ -167,7 +167,12 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeFilterEvaluator(Container $container): FilterEvaluator
     {
-        return new FilterEvaluator($container->get(ServerOptions::class)->getSchema());
+        $options = $container->get(ServerOptions::class);
+
+        return new FilterEvaluator(
+            $options->getSchema(),
+            $options->getSubschemaEntry(),
+        );
     }
 
     private function makeWriteRequestReplayer(Container $container): WriteRequestReplayer
@@ -321,10 +326,13 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
      */
     private function makeSearchStreamBuilder(Container $container): SearchStreamBuilder
     {
+        $options = $container->get(ServerOptions::class);
+
         return new SearchStreamBuilder(
             $container->get(EntryStorageInterface::class),
-            $container->get(ServerOptions::class)->makeSearchLimits(),
+            $options->makeSearchLimits(),
             $container->get(FilterEvaluatorInterface::class),
+            $options->getSubschemaEntry(),
         );
     }
 

@@ -93,6 +93,21 @@ final class LdapSchemaConstraintTest extends ServerTestCase
         );
     }
 
+    public function test_the_subschema_entry_names_itself_as_its_own_subschema(): void
+    {
+        $this->authenticateAdmin();
+
+        $subschema = $this->ldapClient()->read(
+            'cn=Subschema',
+            ['subschemaSubentry'],
+        );
+
+        self::assertSame(
+            ['cn=Subschema'],
+            $subschema?->get('subschemaSubentry')?->getValues(),
+        );
+    }
+
     public function test_add_omitting_the_naming_attribute_still_stores_it(): void
     {
         $this->authenticateAdmin();

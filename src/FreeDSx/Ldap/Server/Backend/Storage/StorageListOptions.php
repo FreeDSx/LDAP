@@ -29,7 +29,7 @@ use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
  */
 final readonly class StorageListOptions implements FilterAttributeContextInterface
 {
-    use EntryDnAttributeTrait;
+    use DerivedAttributeTrait;
 
     private ?AttributeSyntaxResolver $syntaxResolver;
 
@@ -84,7 +84,7 @@ final readonly class StorageListOptions implements FilterAttributeContextInterfa
     public function filterSupport(string $attribute): AttributeFilterSupport
     {
         // Derived on read rather than stored, so no rows answer it and only the evaluator can.
-        if (self::isEntryDnAttribute($attribute)) {
+        if (self::describesAnyDerivedAttribute($attribute)) {
             return AttributeFilterSupport::NeedsEvaluator;
         }
 

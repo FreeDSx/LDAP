@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage;
 
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -49,7 +50,7 @@ use WeakMap;
  */
 final class FilterEvaluator implements FilterEvaluatorInterface
 {
-    use EntryDnAttributeTrait;
+    use DerivedAttributeTrait;
 
     private const MATCHING_RULE_CASE_IGNORE = '2.5.13.2';
 
@@ -101,8 +102,18 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
     private readonly AttributeSyntaxResolver $syntaxResolver;
 
-    public function __construct(private readonly Schema $schema)
-    {
+    /**
+     * How each derived attribute's value is produced, keyed on the type name.
+     *
+     * @var array<string, callable(Entry): string>
+     */
+    private readonly array $derivedResolvers;
+
+    public function __construct(
+        private readonly Schema $schema,
+        Dn $subschemaEntry = new Dn('cn=Subschema'),
+    ) {
+        $this->derivedResolvers = self::derivedResolvers($subschemaEntry);
         $this->defaultComparator = new CaseIgnoreComparator();
         $this->integerComparator = new IntegerComparator();
         $this->syntaxResolver = new AttributeSyntaxResolver($schema);
@@ -385,9 +396,9 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         $values = [];
 
         if ($filterAttributeName !== null) {
-            $values = self::isEntryDnAttribute($filterAttributeName)
-                ? [$entry->getDn()->toString()]
-                : $this->lookupAttribute($entry, $filterAttributeName)?->getValues() ?? [];
+            $values = $this->derivedValues($entry, $filterAttributeName)
+                ?? $this->lookupAttribute($entry, $filterAttributeName)?->getValues()
+                ?? [];
         } else {
             foreach ($entry->getAttributes() as $attribute) {
                 array_push(
@@ -564,9 +575,11 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         string $filterAttributeName,
     ): array {
-        // RFC 5020: derived from the entry, so it is matchable whether or not the request asked for it.
-        if (self::isEntryDnAttribute($filterAttributeName)) {
-            return [$entry->getDn()->toString()];
+        // Derived rather than stored, so it is matchable whether or not the request asked for it.
+        $derived = $this->derivedValues($entry, $filterAttributeName);
+
+        if ($derived !== null) {
+            return $derived;
         }
 
         if (self::descriptionHasOptions($filterAttributeName)) {
@@ -622,8 +635,26 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return true;
         }
 
-        return self::isEntryDnAttribute($attributeDescription)
+        return self::describesAnyDerivedAttribute($attributeDescription)
             || $this->schema->getAttributeType(Attribute::normalizeName($attributeDescription)) !== null;
+    }
+
+    /**
+     * Values for an attribute no entry stores, or null when the description names none of them.
+     *
+     * @return list<string>|null
+     */
+    private function derivedValues(
+        Entry $entry,
+        string $attributeDescription,
+    ): ?array {
+        foreach ($this->derivedResolvers as $name => $resolve) {
+            if (self::describesType($attributeDescription, $name)) {
+                return [$resolve($entry)];
+            }
+        }
+
+        return null;
     }
 
     /**
