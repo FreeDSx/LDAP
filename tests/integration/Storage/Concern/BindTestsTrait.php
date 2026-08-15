@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Operations;
 
 /**
  * Authentication against the backend.
@@ -45,6 +46,18 @@ trait BindTestsTrait
         $this->expectException(BindException::class);
 
         $this->ldapClient()->bind('cn=nobody,dc=foo,dc=bar', '12345');
+    }
+
+    public function testAnUnauthenticatedAbandonDrawsNoResponse(): void
+    {
+        self::assertNull($this->ldapClient()->send(Operations::abandon(99)));
+
+        // A response to the abandon would be read here instead of the bind's own, so this proves none was sent.
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        self::assertTrue(
+            $this->ldapClient()->compare('cn=user,dc=foo,dc=bar', 'cn', 'user'),
+        );
     }
 
     public function testBindCarryingAnUnsupportedCriticalControlIsRefused(): void

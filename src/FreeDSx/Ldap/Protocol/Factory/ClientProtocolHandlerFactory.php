@@ -52,6 +52,8 @@ class ClientProtocolHandlerFactory
             );
         } elseif ($request instanceof Request\UnbindRequest) {
             return new ClientProtocolHandler\ClientUnbindHandler($this->queue());
+        } elseif ($request instanceof Request\AbandonRequest) {
+            return new ClientProtocolHandler\ClientAbandonHandler($this->queue());
         } elseif ($request instanceof Request\SaslBindRequest) {
             return new ClientProtocolHandler\ClientSaslBindHandler(
                 $this->queue(),

@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
+use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -99,6 +100,68 @@ trait ControlTestsTrait
         $this->expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
 
         $first->getEntries();
+    }
+
+    public function testACriticalSortThatCannotBePerformedFailsTheSearch(): void
+    {
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+                (new SortingControl(SortKey::ascending('bogusAttr')))->setCriticality(true),
+            );
+            self::fail('The critical sort should have failed the search.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function testANonCriticalSortThatCannotBePerformedStillReturnsEntries(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+            new SortingControl(SortKey::ascending('bogusAttr')),
+        );
+
+        self::assertCount(
+            8,
+            $entries,
+        );
+    }
+
+    public function testARepeatedSortKeyAttributeIsRefusedInTheSortResult(): void
+    {
+        $this->authenticateUser();
+
+        $response = $this->ldapClient()->send(
+            Operations::search(Filters::present('objectClass'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+            new SortingControl(
+                SortKey::ascending('sn'),
+                SortKey::descending('sn'),
+            ),
+        );
+
+        $sortResponse = $response?->controls()->get(Control::OID_SORTING_RESPONSE);
+        self::assertInstanceOf(
+            SortingResponseControl::class,
+            $sortResponse,
+        );
+        self::assertSame(
+            ResultCode::UNWILLING_TO_PERFORM,
+            $sortResponse->getResult(),
+        );
     }
 
     public function testAMalformedControlValueIsAnsweredWithoutEndingTheSession(): void
