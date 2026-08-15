@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Middleware\AuthorizationResolutionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\BindMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ConfidentialityMiddleware;
+use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareChain;
 use FreeDSx\Ldap\Server\Middleware\RequestValidationMiddleware;
 use FreeDSx\Ldap\Server\ServerConnectionScaffoldingTrait;
@@ -85,6 +86,7 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
                 new BindMiddleware(
                     $serverAuthorization,
                     new Authenticator($authenticators),
+                    new CriticalControlValidator(),
                 ),
                 new AuthorizationResolutionMiddleware(
                     new DispatchAuthorizer($serverAuthorization),

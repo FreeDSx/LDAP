@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\AccessControl\ConfidentialFilterRewriter;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ConfidentialAttributeMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
+use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\Middleware\MetricsMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuthorizationMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ResourceLimitMiddleware;
@@ -57,6 +58,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
             AssertionEvaluator::class => $this->makeAssertionEvaluator(...),
             MetricsResponseInterceptor::class => $this->makeMetricsResponseInterceptor(...),
             MetricsMiddleware::class => $this->makeMetricsMiddleware(...),
+            CriticalControlValidator::class => $this->makeCriticalControlValidator(...),
             CriticalControlMiddleware::class => $this->makeCriticalControlMiddleware(...),
             OperationAuthorizationMiddleware::class => $this->makeOperationAuthorizationMiddleware(...),
             ConfidentialAttributeMiddleware::class => $this->makeConfidentialAttributeMiddleware(...),
@@ -126,7 +128,15 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
 
     private function makeCriticalControlMiddleware(Container $container): CriticalControlMiddleware
     {
-        return new CriticalControlMiddleware($container->get(ServerProtocolHandlerFactory::class));
+        return new CriticalControlMiddleware(
+            $container->get(ServerProtocolHandlerFactory::class),
+            $container->get(CriticalControlValidator::class),
+        );
+    }
+
+    private function makeCriticalControlValidator(Container $container): CriticalControlValidator
+    {
+        return new CriticalControlValidator();
     }
 
     private function makeOperationAuthorizationMiddleware(Container $container): OperationAuthorizationMiddleware

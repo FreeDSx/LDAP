@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Protocol\Factory\HandlerId;
 use FreeDSx\Ldap\Protocol\Factory\HandlerRouteResolverInterface;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
+use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Middleware\ServerControlRegistry;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -42,7 +43,7 @@ final class CriticalControlMiddlewareTest extends TestCase
         $this->resolver = $this->createMock(HandlerRouteResolverInterface::class);
         $this->subject = new CriticalControlMiddleware(
             $this->resolver,
-            new ServerControlRegistry(),
+            new CriticalControlValidator(new ServerControlRegistry()),
         );
         $this->next = new RecordingMiddlewareHandler(new CallLog());
     }
