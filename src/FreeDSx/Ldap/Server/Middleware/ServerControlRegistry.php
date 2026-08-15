@@ -46,6 +46,22 @@ final class ServerControlRegistry
         HandlerId::Unbind,
     ];
 
+    /**
+     * A bind is answered in middleware rather than routed to a handler, so it has no HandlerId to look up.
+     *
+     * Proxied authorization is absent deliberately: RFC 4370 §3 does not list Bind among the operations it may
+     * accompany, and its criticality must be TRUE, so it can only ever be refused here.
+     *
+     * @return list<string>
+     */
+    public function supportedControlsForBind(): array
+    {
+        return [
+            Control::OID_MANAGE_DSA_IT,
+            Control::OID_PWD_POLICY,
+        ];
+    }
+
     public function appliesTo(HandlerId $id): bool
     {
         return !in_array(

@@ -35,6 +35,7 @@ final readonly class BindMiddleware implements MiddlewareInterface
     public function __construct(
         private ServerAuthorization $authorization,
         private Authenticator $authenticator,
+        private CriticalControlValidator $criticalControls,
     ) {}
 
     /**
@@ -52,6 +53,10 @@ final readonly class BindMiddleware implements MiddlewareInterface
 
         // RFC 4511 §4.2.1: a bind discards any prior authentication; a failed bind leaves the session anonymous.
         $this->authorization->setToken(new AnonToken());
+
+        // Checked here because the authenticator writes the response itself.
+        // RFC 4511 §4.1.11 refuses the operation before it is performed.
+        $this->criticalControls->assertSupportedForBind($context->message->controls());
 
         if (!$this->authorization->isAuthenticationTypeSupported($request)) {
             throw new OperationException(

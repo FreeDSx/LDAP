@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Middleware;
 
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
@@ -22,11 +23,13 @@ use FreeDSx\Ldap\Protocol\Authenticator;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Server\Middleware\BindMiddleware;
+use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\ServerOptions;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Middleware\CallLog;
@@ -62,6 +65,81 @@ final class BindMiddlewareTest extends TestCase
         );
 
         self::assertNotNull($this->next->received);
+    }
+
+    #[DataProvider('bindControlProvider')]
+    public function test_a_critical_control_the_bind_cannot_honor_is_refused(
+        Control $control,
+        bool $expectRefusal,
+    ): void {
+        $this->authenticator
+            ->method('bind')
+            ->willReturn(BindToken::fromDn('cn=user,dc=foo,dc=bar'));
+
+        $context = new ServerRequestContext(new LdapMessageRequest(
+            1,
+            new SimpleBindRequest('cn=user,dc=foo,dc=bar', 'secret'),
+            $control,
+        ));
+
+        if (!$expectRefusal) {
+            $this->subject()->process($context, $this->next);
+            self::assertInstanceOf(
+                BindToken::class,
+                $this->authorization->getToken(),
+            );
+
+            return;
+        }
+
+        try {
+            $this->subject()->process($context, $this->next);
+            self::fail('The critical control should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+                $e->getCode(),
+            );
+        }
+
+        self::assertInstanceOf(
+            AnonToken::class,
+            $this->authorization->getToken(),
+            'The prior identity is dropped even when the control refuses the bind (RFC 4511 §4.2.1).',
+        );
+    }
+
+    /**
+     * @return iterable<string, array{Control, bool}>
+     */
+    public static function bindControlProvider(): iterable
+    {
+        yield 'an unrecognized critical control' => [
+            new Control('1.2.3.4.5', criticality: true),
+            true,
+        ];
+        // A bind is not among the operations RFC 4370 §3 lists, and the control's criticality is always TRUE.
+        yield 'proxied authorization, which a bind may never carry' => [
+            new Control(Control::OID_PROXY_AUTHORIZATION, criticality: true),
+            true,
+        ];
+        // Controls the dispatch route allows, which a bind is not routed through.
+        yield 'a critical assertion control' => [
+            new Control(Control::OID_ASSERTION, criticality: true),
+            true,
+        ];
+        yield 'a critical pre-read control' => [
+            new Control(Control::OID_PRE_READ, criticality: true),
+            true,
+        ];
+        yield 'the password policy control, which accompanies a bind' => [
+            new Control(Control::OID_PWD_POLICY, criticality: true),
+            false,
+        ];
+        yield 'an unrecognized control that is not critical' => [
+            new Control('1.2.3.4.5', criticality: false),
+            false,
+        ];
     }
 
     public function test_a_successful_bind_stores_the_token_and_short_circuits(): void
@@ -151,6 +229,7 @@ final class BindMiddlewareTest extends TestCase
         return new BindMiddleware(
             $this->authorization,
             $this->authenticator,
+            new CriticalControlValidator(),
         );
     }
 }

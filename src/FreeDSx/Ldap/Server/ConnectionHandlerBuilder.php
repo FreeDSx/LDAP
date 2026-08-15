@@ -58,6 +58,7 @@ use FreeDSx\Ldap\Server\Middleware\BindMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ConfidentialAttributeMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ConfidentialityMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
+use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\Middleware\MetricsMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuditMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuthorizationMiddleware;
@@ -397,6 +398,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                 new BindMiddleware(
                     $authorization,
                     new Authenticator($authenticators),
+                    $this->container->get(CriticalControlValidator::class),
                 ),
                 new AuthorizationResolutionMiddleware(
                     $dispatchAuthorizer,
