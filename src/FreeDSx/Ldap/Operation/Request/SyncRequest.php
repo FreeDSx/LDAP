@@ -26,13 +26,16 @@ class SyncRequest extends SearchRequest
 
     private ?Closure $refreshDoneHandler = null;
 
+    /**
+     * A replica wants a faithful copy, so both attribute classes are requested unless told otherwise.
+     */
     public function __construct(
         ?FilterInterface $filter = null,
         string|Attribute ...$attributes,
     ) {
         parent::__construct(
             $filter ?? Filters::present('objectClass'),
-            ...$attributes,
+            ...($attributes === [] ? self::ATTRIBUTES_ALL : $attributes),
         );
     }
 

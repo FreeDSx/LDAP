@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Sync;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
@@ -136,6 +137,77 @@ final class SyncReplNativeTest extends ServerTestCase
         );
     }
 
+    public function testACookieReusedForDifferentContentFallsBackToAFullRefresh(): void
+    {
+        $this->authenticateAdmin();
+
+        $cookie = null;
+        $initial = $this->syncRepl();
+        $initial->useCookieHandler(function (string $value) use (&$cookie): void {
+            $cookie = $value;
+        });
+        $initial->poll();
+
+        self::assertNotNull($cookie);
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=erin,ou=people,dc=foo,dc=bar',
+            [
+                'cn' => 'erin',
+                'sn' => 'Evans',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        $narrowed = $this->syncRepl(Filters::equal('objectClass', 'organizationalUnit'));
+        $narrowed->useCookie($cookie);
+
+        // An incremental resume would answer with the delta alone, which holds nothing matching the
+        // new filter. The whole content of the narrowed search proves the cookie was refused.
+        self::assertSame(
+            ['ou=people,dc=foo,dc=bar'],
+            $this->collectPoll($narrowed),
+        );
+    }
+
+    public function testAPollDefaultsToEveryUserAndOperationalAttribute(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->collectEntries($this->syncRepl());
+        $alice = $entries['cn=alice,ou=people,dc=foo,dc=bar'] ?? null;
+
+        self::assertNotNull($alice);
+        self::assertNotNull(
+            $alice->get('cn'),
+            'A user attribute must come across by default.',
+        );
+        self::assertNotNull(
+            $alice->get('entryUUID'),
+            'An operational attribute must come across by default, so a replica is a faithful copy.',
+        );
+    }
+
+    public function testAPollHonoursAnExplicitAttributeSelection(): void
+    {
+        $this->authenticateUser();
+
+        $syncRepl = $this->syncRepl();
+        $syncRepl->request()->select('cn');
+
+        $entries = $this->collectEntries($syncRepl);
+        $alice = $entries['cn=alice,ou=people,dc=foo,dc=bar'] ?? null;
+
+        self::assertNotNull($alice);
+        self::assertSame(
+            ['cn'],
+            array_map(
+                static fn(Attribute $attribute): string => $attribute->getDescription(),
+                $alice->getAttributes(),
+            ),
+        );
+    }
+
     private function syncRepl(?FilterInterface $filter = null): SyncRepl
     {
         $syncRepl = $this->ldapClient()->syncRepl($filter);
@@ -157,5 +229,18 @@ final class SyncReplNativeTest extends ServerTestCase
         });
 
         return $dns;
+    }
+
+    /**
+     * @return array<string, Entry>
+     */
+    private function collectEntries(SyncRepl $syncRepl): array
+    {
+        $entries = [];
+        $syncRepl->poll(function (SyncEntryResult $result) use (&$entries): void {
+            $entries[strtolower($result->getEntry()->getDn()->toString())] = $result->getEntry();
+        });
+
+        return $entries;
     }
 }

@@ -93,18 +93,18 @@ final readonly class SyncPersistStreamer
         SearchRequest $request,
         TokenInterface $token,
         int $messageId,
-        Dn $baseDn,
         Cancellation $cancellation,
     ): Generator {
         $lastSeq = $startSeq;
         $origin = $this->stream->origin();
+        $contentKey = SyncCookie::contentKey($request);
 
         while (true) {
             $latestSeq = $this->stream->latestSeq();
 
             // A trim past the consumer's position would silently drop changes: force a full re-sync instead.
             if ($latestSeq > $lastSeq && !$this->stream->retainsSince($lastSeq)) {
-                yield $this->refreshRequired($messageId, $baseDn, $origin, $latestSeq);
+                yield $this->refreshRequired($messageId);
 
                 return;
             }
@@ -117,7 +117,7 @@ final readonly class SyncPersistStreamer
             // Advances the client cookie, and doubles as a keepalive that surfaces a dead peer on the next poll.
             yield new LdapMessageResponse(
                 $messageId,
-                new SyncNewCookie((new SyncCookie($origin, $lastSeq))->encode()),
+                new SyncNewCookie((new SyncCookie($origin, $lastSeq, $contentKey))->encode()),
             );
 
             $signal = $cancellation->signal();
@@ -128,9 +128,9 @@ final readonly class SyncPersistStreamer
                     yield from $this->terminal(
                         $signal->getMessageId(),
                         $messageId,
-                        $baseDn,
                         $origin,
                         $lastSeq,
+                        $contentKey,
                     );
                 }
 
@@ -172,6 +172,7 @@ final readonly class SyncPersistStreamer
 
         return $this->projector->projectFetched(
             $entry,
+            $change,
             $request,
             $token,
         );
@@ -194,15 +195,15 @@ final readonly class SyncPersistStreamer
     private function terminal(
         int $cancelMessageId,
         int $messageId,
-        Dn $baseDn,
         ReplicaId $origin,
         int $lastSeq,
+        string $contentKey,
     ): Generator {
         yield new LdapMessageResponse(
             $messageId,
             new SearchResultDone(ResultCode::CANCELED),
             new SyncDoneControl(
-                (new SyncCookie($origin, $lastSeq))->encode(),
+                (new SyncCookie($origin, $lastSeq, $contentKey))->encode(),
                 true,
             ),
         );
@@ -212,20 +213,17 @@ final readonly class SyncPersistStreamer
         );
     }
 
-    private function refreshRequired(
-        int $messageId,
-        Dn $baseDn,
-        ReplicaId $origin,
-        int $latestSeq,
-    ): LdapMessageResponse {
+    /**
+     * RFC 4533 §2.5: a cookie here would mean an incremental refresh is enough, so the pruned window must be
+     * signalled by omitting it, which asks for the full refresh the consumer actually needs.
+     */
+    private function refreshRequired(int $messageId): LdapMessageResponse
+    {
         return new LdapMessageResponse(
             $messageId,
-            new SearchResultDone(
-                ResultCode::SYNCHRONIZATION_REFRESH_REQUIRED,
-                $baseDn->toString(),
-            ),
+            new SearchResultDone(ResultCode::SYNCHRONIZATION_REFRESH_REQUIRED),
             new SyncDoneControl(
-                (new SyncCookie($origin, $latestSeq))->encode(),
+                null,
                 true,
             ),
         );

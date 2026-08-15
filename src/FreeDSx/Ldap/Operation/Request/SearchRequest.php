@@ -123,6 +123,29 @@ class SearchRequest implements RequestInterface
         self::DEREF_ALWAYS,
     ];
 
+    /**
+     * Requests all user attributes (RFC 4511 4.5.1.8).
+     */
+    public const ATTRIBUTES_ALL_USER = '*';
+
+    /**
+     * Requests all operational attributes (RFC 3673).
+     */
+    public const ATTRIBUTES_ALL_OPERATIONAL = '+';
+
+    /**
+     * Requests no attributes at all, returning the DN alone (RFC 4511 4.5.1.8).
+     */
+    public const ATTRIBUTES_NONE = '1.1';
+
+    /**
+     * Requests every attribute of both classes, which neither wildcard asks for on its own.
+     */
+    public const ATTRIBUTES_ALL = [
+        self::ATTRIBUTES_ALL_USER,
+        self::ATTRIBUTES_ALL_OPERATIONAL,
+    ];
+
     protected const APP_TAG = 3;
 
     private ?Dn $baseDn = null;

@@ -14,10 +14,12 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Sync\Provider;
 
 use FreeDSx\Ldap\Control\Sync\SyncStateControl;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
@@ -65,6 +67,7 @@ final class SyncResultProjectorTest extends TestCase
         $this->subject = new SyncResultProjector(
             accessControl: $this->accessControl,
             filterEvaluator: $this->filterEvaluator,
+            schema: SchemaResource::Core->load(),
         );
     }
 
@@ -72,6 +75,7 @@ final class SyncResultProjectorTest extends TestCase
     {
         $result = $this->subject->projectSearched(
             $this->entry('cn=a,dc=example,dc=com', self::UUID),
+            $this->request(),
             $this->token,
         );
 
@@ -99,6 +103,7 @@ final class SyncResultProjectorTest extends TestCase
 
         $result = $this->subject->projectSearched(
             $entry,
+            $this->request(),
             $this->token,
         );
 
@@ -109,25 +114,106 @@ final class SyncResultProjectorTest extends TestCase
         );
     }
 
+    public function test_a_searched_entry_is_limited_to_the_requested_attributes(): void
+    {
+        $result = $this->subject->projectSearched(
+            Entry::create(
+                'cn=a,dc=example,dc=com',
+                [
+                    'cn' => 'x',
+                    'sn' => 'y',
+                    'entryUUID' => self::UUID,
+                ],
+            ),
+            $this->request('cn'),
+            $this->token,
+        );
+
+        self::assertNotNull($result);
+        self::assertSame(
+            ['cn'],
+            array_map(
+                static fn(Attribute $attribute): string => $attribute->getDescription(),
+                $result->entry->getEntry()->getAttributes(),
+            ),
+        );
+        self::assertSame(
+            self::UUID,
+            $result->control->decodedUuid(),
+        );
+    }
+
     public function test_a_searched_entry_hidden_by_acl_is_null(): void
     {
         $this->hidden = true;
 
         self::assertNull($this->subject->projectSearched(
             $this->entry('cn=a,dc=example,dc=com', self::UUID),
+            $this->request(),
             $this->token,
         ));
     }
 
-    public function test_a_fetched_entry_not_matching_the_filter_is_null(): void
+    public function test_a_fetched_entry_that_leaves_the_filter_becomes_a_delete(): void
     {
         $this->filterMatches = false;
 
+        $result = $this->subject->projectFetched(
+            $this->entry('cn=a,dc=example,dc=com', self::UUID),
+            $this->change(ChangeType::Modify),
+            $this->request(),
+            $this->token,
+        );
+
+        self::assertNotNull($result);
+        self::assertSame(
+            SyncStateControl::STATE_DELETE,
+            $result->control->getState(),
+        );
+    }
+
+    public function test_a_fetched_entry_hidden_by_acl_without_a_pre_image_is_null(): void
+    {
+        $this->hidden = true;
+
         self::assertNull($this->subject->projectFetched(
             $this->entry('cn=a,dc=example,dc=com', self::UUID),
+            $this->change(ChangeType::Modify),
             $this->request(),
             $this->token,
         ));
+    }
+
+    public function test_a_fetched_modify_is_projected_as_a_modify(): void
+    {
+        $result = $this->subject->projectFetched(
+            $this->entry('cn=a,dc=example,dc=com', self::UUID),
+            $this->change(ChangeType::Modify),
+            $this->request(),
+            $this->token,
+        );
+
+        self::assertNotNull($result);
+        self::assertSame(
+            SyncStateControl::STATE_MODIFY,
+            $result->control->getState(),
+        );
+    }
+
+    public function test_a_fetched_add_is_projected_as_an_add(): void
+    {
+        $result = $this->subject->projectFetched(
+            $this->entry('cn=a,dc=example,dc=com', self::UUID),
+            $this->change(ChangeType::Add),
+            $this->request(),
+            $this->token,
+        );
+
+        self::assertNotNull($result);
+        self::assertSame(
+            SyncStateControl::STATE_ADD,
+            $result->control->getState(),
+        );
     }
 
     public function test_a_visible_delete_with_a_pre_image_becomes_a_delete(): void
@@ -169,11 +255,13 @@ final class SyncResultProjectorTest extends TestCase
         $subject = new SyncResultProjector(
             accessControl: $this->accessControl,
             filterEvaluator: $this->filterEvaluator,
+            schema: SchemaResource::Core->load(),
             eventLogger: new EventLogger($logger, EventLogPolicy::default()),
         );
 
         self::assertNull($subject->projectSearched(
             $this->entry('cn=a,dc=example,dc=com', 'not-a-uuid'),
+            $this->request(),
             $this->token,
         ));
     }
@@ -191,6 +279,16 @@ final class SyncResultProjectorTest extends TestCase
         );
     }
 
+    private function change(ChangeType $changeType): PendingChange
+    {
+        return new PendingChange(
+            changeType: $changeType,
+            dn: new Dn('cn=a,dc=example,dc=com'),
+            entryUuid: self::UUID,
+            authzId: AuthzId::anonymous(),
+        );
+    }
+
     private function deleteChange(?Entry $preImage): PendingChange
     {
         return new PendingChange(
@@ -202,9 +300,9 @@ final class SyncResultProjectorTest extends TestCase
         );
     }
 
-    private function request(): SearchRequest
+    private function request(string ...$attributes): SearchRequest
     {
-        return (new SearchRequest(Filters::present('objectClass')))
+        return (new SearchRequest(Filters::present('objectClass'), ...$attributes))
             ->base('dc=example,dc=com')
             ->useSubtreeScope();
     }

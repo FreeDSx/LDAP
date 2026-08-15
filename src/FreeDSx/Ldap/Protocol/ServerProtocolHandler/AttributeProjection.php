@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
 use FreeDSx\Ldap\Schema\Schema;
 
@@ -73,9 +74,9 @@ final class AttributeProjection
 
         return new self(
             $names,
-            count($names) === 0 || in_array('*', $names, true),
-            in_array('+', $names, true),
-            count($names) === 1 && $names[0] === '1.1',
+            count($names) === 0 || in_array(SearchRequest::ATTRIBUTES_ALL_USER, $names, true),
+            in_array(SearchRequest::ATTRIBUTES_ALL_OPERATIONAL, $names, true),
+            count($names) === 1 && $names[0] === SearchRequest::ATTRIBUTES_NONE,
             $typesOnly,
             $schema,
         );

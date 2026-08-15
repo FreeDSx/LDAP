@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
@@ -51,6 +50,14 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
 {
     use ServerSearchTrait;
 
+    /**
+     * The only values RFC 4533 §3.5.2 permits a Sync request to carry.
+     */
+    private const PERMITTED_DEREF_VALUES = [
+        SearchRequest::DEREF_NEVER,
+        SearchRequest::DEREF_FINDING_BASE_OBJECT,
+    ];
+
     public function __construct(
         private readonly LdapBackendInterface $backend,
         private readonly SyncResultProjector $projector,
@@ -81,18 +88,20 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
 
         $mode = $control->getMode();
         $this->assertModeSupported($mode);
+        $this->assertDereferenceAliasesSupported($request);
 
-        $baseDn = $this->assertBaseDnProvided($request);
+        $this->assertBaseDnProvided($request);
         $messageId = $message->getMessageId();
         $latestSeq = $stream->latestSeq();
-        $sinceSeq = $this->resolveSince($control, $stream, $latestSeq);
+        $contentKey = SyncCookie::contentKey($request);
+        $sinceSeq = $this->resolveSince($control, $stream, $latestSeq, $contentKey);
         $state = new SearchResultState();
 
         $entries = $sinceSeq === null
             ? $this->fullRefreshEntries($message, $request, $token, $state)
             : $this->incrementalEntries($message, $request, $token, $streamer, $sinceSeq, $state);
 
-        $cookie = (new SyncCookie($stream->origin(), $latestSeq))->encode();
+        $cookie = (new SyncCookie($stream->origin(), $latestSeq, $contentKey))->encode();
         $outcome = fn(): SearchOperationResult => SearchOperationResult::success(
             $message,
             $state->entriesReturned,
@@ -116,7 +125,6 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
                         $request,
                         $token,
                         $messageId,
-                        $baseDn,
                         $cancellation,
                     ),
                 ),
@@ -133,7 +141,6 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
             $this->withSyncDone(
                 $entries,
                 $messageId,
-                $baseDn,
                 new SyncDoneControl($cookie, $sinceSeq !== null),
             ),
             $outcome,
@@ -172,13 +179,25 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
     }
 
     /**
+     * @throws OperationException
+     */
+    private function assertDereferenceAliasesSupported(SearchRequest $request): void
+    {
+        if (!in_array($request->getDereferenceAliases(), self::PERMITTED_DEREF_VALUES, true)) {
+            throw new OperationException(
+                'The alias dereferencing value requested cannot accompany a content synchronization request.',
+                ResultCode::PROTOCOL_ERROR,
+            );
+        }
+    }
+
+    /**
      * @param Generator<LdapMessageResponse> $entries
      * @return Generator<LdapMessageResponse>
      */
     private function withSyncDone(
         Generator $entries,
         int $messageId,
-        Dn $baseDn,
         SyncDoneControl $doneControl,
     ): Generator {
         yield from $entries;
@@ -231,7 +250,11 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
             yield from $this->emit(
                 $this->toResponse(
                     $message->getMessageId(),
-                    $this->projector->projectSearched($entry, $token),
+                    $this->projector->projectSearched(
+                        $entry,
+                        $request,
+                        $token,
+                    ),
                 ),
                 $state,
             );
@@ -294,6 +317,7 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
         SyncRequestControl $control,
         ChangeStream $stream,
         int $latestSeq,
+        string $contentKey,
     ): ?int {
         $cookie = $control->getCookie();
 
@@ -308,6 +332,12 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
         }
 
         if (!$decoded->origin->equals($stream->origin()) || $decoded->seq > $latestSeq) {
+            return null;
+        }
+
+        // Resuming against different content would leave the consumer holding a mixture of two searches,
+        // so the cookie only carries forward for the search it was issued against (RFC 4533 §3.5).
+        if (!hash_equals($decoded->content, $contentKey)) {
             return null;
         }
 

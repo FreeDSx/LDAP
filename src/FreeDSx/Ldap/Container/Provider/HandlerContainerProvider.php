@@ -177,6 +177,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         $projector = new SyncResultProjector(
             accessControl: $container->get(AccessControlInterface::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
+            schema: $options->getSchema(),
             eventLogger: $context->eventLogger,
         );
 
