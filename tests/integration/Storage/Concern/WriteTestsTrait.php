@@ -131,6 +131,82 @@ trait WriteTestsTrait
         );
     }
 
+    public function testAddRejectsDuplicateAttributeDescriptions(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ATTRIBUTE_OR_VALUE_EXISTS);
+
+        $this->ldapClient()->create(new Entry(
+            'cn=dupdesc,dc=foo,dc=bar',
+            new Attribute('objectClass', 'inetOrgPerson'),
+            new Attribute('cn', 'dupdesc'),
+            new Attribute('CN', 'other'),
+            new Attribute('sn', 'Dup'),
+        ));
+    }
+
+    public function testAddRejectsEquivalentDuplicateValues(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ATTRIBUTE_OR_VALUE_EXISTS);
+
+        $this->ldapClient()->create(new Entry(
+            'cn=dupval,dc=foo,dc=bar',
+            new Attribute('objectClass', 'inetOrgPerson'),
+            new Attribute('cn', 'dupval'),
+            new Attribute('sn', 'SAME', 'same'),
+        ));
+    }
+
+    public function testAddRejectsExtensibleObjectWithoutAStructuralClass(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);
+
+        $this->ldapClient()->create(new Entry(
+            'cn=extonly,dc=foo,dc=bar',
+            new Attribute('objectClass', 'extensibleObject'),
+            new Attribute('cn', 'extonly'),
+        ));
+    }
+
+    public function testAddRejectsAnUndefinedAttributeEvenOnAnExtensibleObject(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNDEFINED_ATTRIBUTE_TYPE);
+
+        $this->ldapClient()->create(new Entry(
+            'cn=extundefined,dc=foo,dc=bar',
+            new Attribute('objectClass', 'inetOrgPerson', 'extensibleObject'),
+            new Attribute('cn', 'extundefined'),
+            new Attribute('sn', 'Ext'),
+            new Attribute('shoeSize', '12'),
+        ));
+    }
+
+    public function testModifyRejectsChangingTheStructuralObjectClass(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::OBJECT_CLASS_MODS_PROHIBITED);
+
+        $this->ldapClient()->send(Operations::modify(
+            'cn=nosn,dc=foo,dc=bar',
+            Change::replace(new Attribute('objectClass', 'top', 'groupOfUniqueNames')),
+            Change::add(new Attribute('uniqueMember', 'cn=user,dc=foo,dc=bar')),
+            Change::delete(new Attribute('member')),
+        ));
+    }
+
     public function testAddDuplicateDnFails(): void
     {
         $this->authenticateAdmin();

@@ -155,12 +155,93 @@ final class SchemaValidatorTest extends TestCase
         $this->subject->validateAdd($entry);
     }
 
-    public function test_add_extensible_object_bypasses_attribute_checks(): void
+    public function test_add_extensible_object_waives_the_permitted_attribute_list(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('objectClass', 'person', 'extensibleObject'),
+            new Attribute('cn', 'Alice'),
+            new Attribute('sn', 'Smith'),
+            // Defined by the schema but permitted by neither person nor extensibleObject's own MAY list.
+            new Attribute('l', 'Somewhere'),
+        );
+
+        $this->expectNotToPerformAssertions();
+        $this->subject->validateAdd($entry);
+    }
+
+    public function test_add_extensible_object_still_requires_a_structural_class(): void
     {
         $entry = new Entry(
             new Dn('cn=Alice,dc=example,dc=com'),
             new Attribute('objectClass', 'extensibleObject'),
+            new Attribute('cn', 'Alice'),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);
+
+        $this->subject->validateAdd($entry);
+    }
+
+    public function test_add_extensible_object_still_rejects_an_undefined_attribute_type(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('objectClass', 'person', 'extensibleObject'),
+            new Attribute('cn', 'Alice'),
+            new Attribute('sn', 'Smith'),
             new Attribute('anyAttr', 'value'),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::UNDEFINED_ATTRIBUTE_TYPE);
+
+        $this->subject->validateAdd($entry);
+    }
+
+    public function test_add_rejects_duplicate_attribute_descriptions(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('objectClass', 'person'),
+            new Attribute('cn', 'Alice'),
+            new Attribute('CN', 'Other'),
+            new Attribute('sn', 'Smith'),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::ATTRIBUTE_OR_VALUE_EXISTS);
+
+        $this->subject->validateAdd($entry);
+    }
+
+    public function test_add_rejects_values_equivalent_under_the_equality_rule(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('objectClass', 'person'),
+            new Attribute('cn', 'Alice'),
+            new Attribute('sn', 'SAME', 'same'),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::ATTRIBUTE_OR_VALUE_EXISTS);
+
+        $this->subject->validateAdd($entry);
+    }
+
+    /**
+     * The values differ only by case, which caseExactMatch keeps distinct.
+     */
+    public function test_add_keeps_values_a_case_exact_rule_treats_as_distinct(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('objectClass', 'inetOrgPerson'),
+            new Attribute('cn', 'Alice'),
+            new Attribute('sn', 'Smith'),
+            new Attribute('labeledURI', 'https://Example.test', 'https://example.test'),
         );
 
         $this->expectNotToPerformAssertions();
@@ -177,6 +258,45 @@ final class SchemaValidatorTest extends TestCase
         );
         $result = $this->personEntry();
 
+        $this->subject->validateModify($command, $result);
+    }
+
+    public function test_modify_rejects_changing_the_structural_object_class(): void
+    {
+        $command = new UpdateCommand(
+            new Dn('cn=group,dc=example,dc=com'),
+            [Change::replace(new Attribute('objectClass', 'groupOfUniqueNames'))],
+        );
+        $result = new Entry(
+            new Dn('cn=group,dc=example,dc=com'),
+            new Attribute('objectClass', 'groupOfUniqueNames'),
+            new Attribute('cn', 'group'),
+            new Attribute('uniqueMember', 'cn=someone,dc=example,dc=com'),
+            new Attribute('structuralObjectClass', 'groupOfNames'),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::OBJECT_CLASS_MODS_PROHIBITED);
+
+        $this->subject->validateModify($command, $result);
+    }
+
+    public function test_modify_keeps_an_unchanged_structural_object_class(): void
+    {
+        $command = new UpdateCommand(
+            new Dn('cn=group,dc=example,dc=com'),
+            [Change::add(new Attribute('description', 'A group'))],
+        );
+        $result = new Entry(
+            new Dn('cn=group,dc=example,dc=com'),
+            new Attribute('objectClass', 'groupOfNames'),
+            new Attribute('cn', 'group'),
+            new Attribute('member', 'cn=someone,dc=example,dc=com'),
+            new Attribute('description', 'A group'),
+            new Attribute('structuralObjectClass', 'groupOfNames'),
+        );
+
+        $this->expectNotToPerformAssertions();
         $this->subject->validateModify($command, $result);
     }
 

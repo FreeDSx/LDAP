@@ -1,0 +1,25 @@
+version: 1
+
+# Seeded with validation off, because the point of cn=undefined is to hold an attribute the configured schema
+# does not define. No validated write path can produce that, which is what makes it a fixture rather than data.
+
+dn: dc=foo,dc=bar
+objectClass: domain
+dc: foo
+
+dn: cn=user,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: user
+sn: Admin
+userPassword: {SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=
+
+dn: cn=defined,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: defined
+sn: Defined
+
+dn: cn=undefined,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: undefined
+sn: Undefined
+shoeSize: 12

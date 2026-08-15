@@ -42,8 +42,6 @@ mail;lang-en: alice-en@foo.bar
 uidNumber: 99
 # Matched case-exactly by the schema, so searches on it prove the configured schema is in play.
 employeeNumber: A1b2C3
-# Stored but absent from the schema, so assertions on it must be Undefined rather than answered from the value.
-shoeSize: 12
 
 dn: cn=nosn,dc=foo,dc=bar
 objectClass: groupOfNames

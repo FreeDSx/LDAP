@@ -214,6 +214,19 @@ final class LdapBackendStorageCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Maximum concurrent paging sessions before the oldest is aged out',
                 '25',
+            )
+            ->addOption(
+                'seed-ldif',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Path to the LDIF seeded at startup',
+                self::SEED_LDIF,
+            )
+            ->addOption(
+                'no-seed-validation',
+                null,
+                InputOption::VALUE_NONE,
+                'Seed without schema validation, for fixtures the configured schema deliberately does not cover',
             );
     }
 
@@ -425,8 +438,14 @@ final class LdapBackendStorageCommand extends Command
             $container,
         );
 
-        $seed = function () use ($server, $entries, $container): void {
-            $server->seed(new FileLdifLoader(self::SEED_LDIF));
+        $seedLdif = $this->getStringOption($input, 'seed-ldif');
+        $validateSeed = !$input->getOption('no-seed-validation');
+
+        $seed = function () use ($server, $entries, $container, $seedLdif, $validateSeed): void {
+            $server->seed(
+                new FileLdifLoader($seedLdif),
+                ignoreValidation: !$validateSeed,
+            );
 
             // The generated entries stay a raw import, since they exist to widen the return path rather than to
             // be valid directory content.

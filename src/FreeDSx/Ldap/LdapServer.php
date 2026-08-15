@@ -75,6 +75,7 @@ class LdapServer
      * Use {@see applyChanges()} instead to replay a changelog (modify/delete/rename) through the live write path.
      *
      * @param Dn $creatorDn DN recorded as creatorsName/modifiersName on imported entries; defaults to the anonymous (empty) DN.
+     * @param bool $ignoreValidation Loads content the current schema does not cover, e.g. a migration that predates it.
      * @throws LdifParseException when the LDIF cannot be parsed
      * @throws RuntimeException when the LDIF contains a non-add change record
      * @throws InvalidArgumentException when the creator DN is malformed or an entry's parent is missing
@@ -83,10 +84,12 @@ class LdapServer
     public function seed(
         LdifLoaderInterface $loader,
         Dn $creatorDn = new Dn(''),
+        bool $ignoreValidation = false,
     ): self {
         $this->container->get(LdapImporter::class)->importEntries(
             $this->streamSeedEntries($loader),
             $creatorDn,
+            $ignoreValidation,
         );
 
         return $this;
