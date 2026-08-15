@@ -17,11 +17,14 @@ sn: User
 userPassword: 12345
 
 # The policy this run is really about, pointed at by cn=pointer-user below
+# pwdPolicy is auxiliary, so the entry still needs a structural class to carry it.
 dn: cn=lenient,dc=foo,dc=bar
 objectClass: top
+objectClass: person
 objectClass: extensibleObject
 objectClass: pwdPolicy
 cn: lenient
+sn: lenient
 pwdAttribute: userPassword
 pwdLockout: FALSE
 

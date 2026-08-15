@@ -21,6 +21,8 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
+use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
+use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
@@ -69,6 +71,8 @@ final class SchemaValidator
         if (!$isSystem) {
             $this->checkNoUserModificationInEntry($entry);
         }
+        $this->checkDistinctAttributeDescriptions($entry);
+        $this->checkNoEquivalentValues($entry);
         $this->validateStructure($entry);
     }
 
@@ -93,7 +97,47 @@ final class SchemaValidator
         if (!$isSystem) {
             $this->checkNoUserModificationInChanges($command->changes);
         }
+        $this->checkNoEquivalentValues($result);
+        $this->checkStructuralClassUnchanged($result);
         $this->validateStructure($result);
+    }
+
+    /**
+     * RFC 4512 §2.4.2: the structural object class of an entry shall not be changed.
+     *
+     * @throws OperationException
+     */
+    private function checkStructuralClassUnchanged(Entry $result): void
+    {
+        $recorded = $result->get('structuralObjectClass')?->firstValue();
+
+        if ($recorded === null) {
+            return;
+        }
+
+        $structural = $this->structuralClassOf($this->collectObjectClasses($result));
+
+        if ($structural === null || strcasecmp($structural, $recorded) === 0) {
+            return;
+        }
+
+        $this->fail(
+            sprintf('The structural object class cannot be changed from "%s" to "%s".', $recorded, $structural),
+            ResultCode::OBJECT_CLASS_MODS_PROHIBITED,
+        );
+    }
+
+    /**
+     * @param list<ObjectClass> $objectClasses
+     */
+    private function structuralClassOf(array $objectClasses): ?string
+    {
+        $structural = array_values(array_filter(
+            $objectClasses,
+            fn(ObjectClass $oc) => $oc->type === ObjectClassType::StructuralClass,
+        ));
+
+        return $this->mostSubordinateOf($structural)?->names[0] ?? null;
     }
 
     /**
@@ -101,19 +145,125 @@ final class SchemaValidator
      */
     private function validateStructure(Entry $entry): void
     {
-        if ($this->hasExtensibleObject($entry)) {
-            $this->checkSingleValuedAttributes($entry);
-
-            return;
-        }
-
         $objectClasses = $this->collectObjectClasses($entry);
 
         $this->checkStructuralClass($entry, $objectClasses);
         $chain = new ObjectClassChain($this->schema, $objectClasses);
         $this->checkRequiredAttributes($entry, $chain->must);
-        $this->checkAllowedAttributes($entry, $chain->must, $chain->may);
+        $this->checkAttributeTypesAreDefined($entry);
+
+        // RFC 4512 §4.3 lets extensibleObject hold any user attribute, so only the MAY list is waived; the
+        // structural class, the MUST attributes, and the types themselves still apply.
+        if (!$this->hasExtensibleObject($entry)) {
+            $this->checkAllowedAttributes($entry, $chain->must, $chain->may);
+        }
+
         $this->checkSingleValuedAttributes($entry);
+    }
+
+    /**
+     * RFC 4512 §2.2: all attributes of an entry must have distinct attribute descriptions.
+     *
+     * @throws OperationException
+     */
+    private function checkDistinctAttributeDescriptions(Entry $entry): void
+    {
+        $seen = [];
+
+        foreach ($entry->getAttributes() as $attr) {
+            $description = strtolower($attr->getDescription());
+
+            if (isset($seen[$description])) {
+                $this->fail(
+                    sprintf('Attribute "%s" is supplied more than once.', $attr->getDescription()),
+                    ResultCode::ATTRIBUTE_OR_VALUE_EXISTS,
+                );
+            }
+
+            $seen[$description] = true;
+        }
+    }
+
+    /**
+     * RFC 4511 §4.1.7: no two of an attribute's values may be equivalent.
+     *
+     * @throws OperationException
+     */
+    private function checkNoEquivalentValues(Entry $entry): void
+    {
+        foreach ($entry->getAttributes() as $attr) {
+            if (!$this->hasEquivalentValues($attr)) {
+                continue;
+            }
+
+            $this->fail(
+                sprintf('Attribute "%s" is supplied an equivalent value more than once.', $attr->getDescription()),
+                ResultCode::ATTRIBUTE_OR_VALUE_EXISTS,
+            );
+        }
+    }
+
+    /**
+     * Equivalence is the type's equality rule rather than a normalized key, so each value is put to the ones before it.
+     */
+    private function hasEquivalentValues(Attribute $attr): bool
+    {
+        $comparator = $this->equalityComparatorFor($attr->getName());
+        $seen = [];
+
+        foreach ($attr->getValues() as $value) {
+            if ($this->equalsAny($comparator, $seen, $value)) {
+                return true;
+            }
+
+            $seen[] = $value;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<string> $values
+     */
+    private function equalsAny(
+        MatchingRuleComparatorInterface $comparator,
+        array $values,
+        string $candidate,
+    ): bool {
+        foreach ($values as $value) {
+            if ($comparator->equals($value, $candidate)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function equalityComparatorFor(string $attribute): MatchingRuleComparatorInterface
+    {
+        $equalityOid = $this->schema->getAttributeType($attribute)?->equalityOid;
+        $comparator = $equalityOid !== null
+            ? $this->schema->getComparator($equalityOid)
+            : null;
+
+        return $comparator ?? new CaseIgnoreComparator();
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function checkAttributeTypesAreDefined(Entry $entry): void
+    {
+        foreach ($entry->getAttributes() as $attr) {
+            if ($this->schema->getAttributeType($attr->getName()) !== null) {
+                continue;
+            }
+
+            $this->fail(
+                sprintf('Undefined attribute type: "%s".', $attr->getName()),
+                ResultCode::UNDEFINED_ATTRIBUTE_TYPE,
+            );
+        }
     }
 
     private function hasExtensibleObject(Entry $entry): bool
@@ -183,13 +333,23 @@ final class SchemaValidator
      */
     private function hasSingleStructuralChain(array $structural): bool
     {
+        return $this->mostSubordinateOf($structural) !== null;
+    }
+
+    /**
+     * The one class whose superclass chain covers every other structural class, or null when they do not form one.
+     *
+     * @param list<ObjectClass> $structural
+     */
+    private function mostSubordinateOf(array $structural): ?ObjectClass
+    {
         foreach ($structural as $candidate) {
             if ($this->coversAllStructural($candidate, $structural)) {
-                return true;
+                return $candidate;
             }
         }
 
-        return false;
+        return null;
     }
 
     /**
@@ -273,14 +433,7 @@ final class SchemaValidator
         foreach ($entry->getAttributes() as $attr) {
             $attrType = $this->schema->getAttributeType($attr->getName());
 
-            if ($attrType === null) {
-                $this->fail(
-                    sprintf('Undefined attribute type: "%s".', $attr->getName()),
-                    ResultCode::UNDEFINED_ATTRIBUTE_TYPE,
-                );
-            }
-
-            if ($attrType->usage !== AttributeUsage::UserApplications) {
+            if ($attrType === null || $attrType->usage !== AttributeUsage::UserApplications) {
                 continue;
             }
 
