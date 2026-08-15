@@ -95,6 +95,18 @@ final readonly class StorageListOptionsFactory
     }
 
     /**
+     * Whether the selection is open ended, either by naming a wildcard or by naming nothing at all.
+     *
+     * @param array<string> $names
+     */
+    private function wantsEveryAttribute(array $names): bool
+    {
+        return $names === []
+            || in_array(SearchRequest::ATTRIBUTES_ALL_USER, $names, true)
+            || in_array(SearchRequest::ATTRIBUTES_ALL_OPERATIONAL, $names, true);
+    }
+
+    /**
      * Base attribute names storage must materialize (requested plus filter-referenced), or null to materialize all.
      *
      * @return list<string>|null
@@ -106,7 +118,7 @@ final readonly class StorageListOptionsFactory
             $request->getAttributes(),
         );
 
-        if ($names === [] || in_array('*', $names, true) || in_array('+', $names, true)) {
+        if ($this->wantsEveryAttribute($names)) {
             return null;
         }
 
@@ -117,7 +129,7 @@ final readonly class StorageListOptionsFactory
 
         $materialized = [];
         foreach ($names as $name) {
-            if ($name === '1.1') {
+            if ($name === SearchRequest::ATTRIBUTES_NONE) {
                 continue;
             }
 

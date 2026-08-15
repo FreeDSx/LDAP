@@ -13,7 +13,9 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Sync\Provider;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Sync\Provider\Exception\MalformedSyncCookieException;
 use JsonException;
@@ -30,15 +32,40 @@ final readonly class SyncCookie
     /**
      * Encoding version; bumped if the blob grows (e.g. a per-origin vector for multi-master).
      */
-    private const VERSION = 1;
+    private const VERSION = 2;
 
     public function __construct(
         public ReplicaId $origin,
         public int $seq,
+        public string $content = '',
     ) {
         if ($this->seq < 0) {
             throw new InvalidArgumentException('A sync cookie seq cannot be negative.');
         }
+    }
+
+    /**
+     * Identifies the content a cookie was issued for, so it cannot be replayed against a different search.
+     *
+     * RFC 4533 §3.5 makes every search request field content-controlling except the two limits, which bound an
+     * operation rather than describing the content.
+     */
+    public static function contentKey(SearchRequest $request): string
+    {
+        $attributes = array_map(
+            static fn(Attribute $attribute): string => strtolower($attribute->getDescription()),
+            $request->getAttributes(),
+        );
+        sort($attributes);
+
+        return hash('sha256', implode("\0", [
+            (string) $request->getBaseDn(),
+            (string) $request->getScope(),
+            (string) $request->getDereferenceAliases(),
+            $request->getAttributesOnly() ? '1' : '0',
+            $request->getFilter()->toString(),
+            implode(',', $attributes),
+        ]));
     }
 
     public function encode(): string
@@ -48,6 +75,7 @@ final readonly class SyncCookie
                 'v' => self::VERSION,
                 'origin' => (string) $this->origin,
                 'seq' => $this->seq,
+                'content' => $this->content,
             ],
             JSON_THROW_ON_ERROR,
         ));
@@ -83,14 +111,20 @@ final readonly class SyncCookie
 
         $origin = $data['origin'] ?? null;
         $seq = $data['seq'] ?? null;
+        $content = $data['content'] ?? null;
 
         if (!is_string($origin) || $origin === '' || !is_int($seq) || $seq < 0) {
             throw new MalformedSyncCookieException('The sync cookie is missing a valid origin or seq.');
         }
 
+        if (!is_string($content)) {
+            throw new MalformedSyncCookieException('The sync cookie is missing its content key.');
+        }
+
         return new self(
             new ReplicaId($origin),
             $seq,
+            $content,
         );
     }
 }

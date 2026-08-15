@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\QueueWriterConfig;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
@@ -129,6 +130,7 @@ final class SyncPersistStreamerTest extends TestCase
             projector: new SyncResultProjector(
                 accessControl: $accessControl,
                 filterEvaluator: $filterEvaluator,
+                schema: SchemaResource::Core->load(),
             ),
             stream: new ChangeStream($this->journal),
             sleeper: new CallbackSleeper(fn() => ($this->onSleep)()),
@@ -219,6 +221,7 @@ final class SyncPersistStreamerTest extends TestCase
             projector: new SyncResultProjector(
                 accessControl: $this->createMock(AccessControlInterface::class),
                 filterEvaluator: $this->createMock(FilterEvaluatorInterface::class),
+                schema: SchemaResource::Core->load(),
             ),
             stream: new ChangeStream($journal),
             sleeper: new CallbackSleeper(),
@@ -249,7 +252,6 @@ final class SyncPersistStreamerTest extends TestCase
                 $this->request(),
                 $this->token,
                 5,
-                new Dn('dc=example,dc=com'),
                 $cancellation,
             ),
             fn(): OperationOutcomeResult => OperationOutcomeResult::succeeded(),

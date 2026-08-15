@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Sync\Provider;
 
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Sync\Provider\Exception\MalformedSyncCookieException;
 use FreeDSx\Ldap\Sync\Provider\SyncCookie;
@@ -74,5 +76,81 @@ final class SyncCookieTest extends TestCase
         self::expectException(MalformedSyncCookieException::class);
 
         SyncCookie::decode($future);
+    }
+
+    public function test_encode_decode_preserves_the_content_key(): void
+    {
+        $decoded = SyncCookie::decode(
+            (new SyncCookie(new ReplicaId('node-a'), 1, 'abc123'))->encode(),
+        );
+
+        self::assertSame(
+            'abc123',
+            $decoded->content,
+        );
+    }
+
+    public function test_decode_rejects_a_cookie_without_a_content_key(): void
+    {
+        $legacy = base64_encode((string) json_encode([
+            'v' => 2,
+            'origin' => 'node-a',
+            'seq' => 1,
+        ]));
+
+        self::expectException(MalformedSyncCookieException::class);
+
+        SyncCookie::decode($legacy);
+    }
+
+    public function test_the_content_key_changes_with_each_content_controlling_parameter(): void
+    {
+        $base = $this->request();
+
+        $keys = [
+            SyncCookie::contentKey($base),
+            SyncCookie::contentKey($this->request()->base('ou=other,dc=example,dc=com')),
+            SyncCookie::contentKey($this->request()->useSingleLevelScope()),
+            SyncCookie::contentKey($this->request()->select('cn')),
+            SyncCookie::contentKey($this->request()->setAttributesOnly(true)),
+            SyncCookie::contentKey($this->request()->setDereferenceAliases(SearchRequest::DEREF_FINDING_BASE_OBJECT)),
+            SyncCookie::contentKey(
+                (new SearchRequest(Filters::equal('cn', 'a')))
+                    ->base('dc=example,dc=com')
+                    ->useSubtreeScope(),
+            ),
+        ];
+
+        self::assertSame(
+            $keys,
+            array_unique($keys),
+        );
+    }
+
+    public function test_the_content_key_ignores_the_limits(): void
+    {
+        self::assertSame(
+            SyncCookie::contentKey($this->request()),
+            SyncCookie::contentKey(
+                $this->request()
+                    ->setSizeLimit(10)
+                    ->setTimeLimit(20),
+            ),
+        );
+    }
+
+    public function test_the_content_key_ignores_the_order_and_case_of_the_selection(): void
+    {
+        self::assertSame(
+            SyncCookie::contentKey($this->request()->select('cn', 'SN')),
+            SyncCookie::contentKey($this->request()->select('sn', 'CN')),
+        );
+    }
+
+    private function request(): SearchRequest
+    {
+        return (new SearchRequest(Filters::present('objectClass')))
+            ->base('dc=example,dc=com')
+            ->useSubtreeScope();
     }
 }

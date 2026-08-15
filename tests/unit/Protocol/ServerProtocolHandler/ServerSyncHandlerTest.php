@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSyncHandler;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
@@ -156,6 +157,7 @@ final class ServerSyncHandlerTest extends TestCase
         $this->syncProjector = new SyncResultProjector(
             accessControl: $this->accessControl,
             filterEvaluator: $this->filterEvaluator,
+            schema: SchemaResource::Core->load(),
         );
         $this->persistStreamer = new SyncPersistStreamer(
             backend: $this->backend,
@@ -271,12 +273,31 @@ final class ServerSyncHandlerTest extends TestCase
      */
     public static function fullRefreshTriggers(): iterable
     {
-        yield 'malformed cookie' => ['@@not a cookie@@', false];
-        yield 'cookie from another origin' => [(new SyncCookie(new ReplicaId('other'), 0))->encode(), false];
-        yield 'reload hint set' => [(new SyncCookie(new ReplicaId(self::ORIGIN), 0))->encode(), true];
+        $content = SyncCookie::contentKey(self::searchRequest());
+
+        yield 'malformed cookie' => [
+            '@@not a cookie@@',
+            false,
+        ];
+        yield 'cookie from another origin' => [
+            (new SyncCookie(new ReplicaId('other'), 0, $content))->encode(),
+            false,
+        ];
+        yield 'reload hint set' => [
+            (new SyncCookie(new ReplicaId(self::ORIGIN), 0, $content))->encode(),
+            true,
+        ];
+        yield 'cookie issued for different content' => [
+            (new SyncCookie(
+                new ReplicaId(self::ORIGIN),
+                0,
+                SyncCookie::contentKey(self::searchRequest()->select('cn')),
+            ))->encode(),
+            false,
+        ];
     }
 
-    public function test_a_valid_cookie_streams_the_delta_as_adds_and_deletes(): void
+    public function test_a_valid_cookie_streams_the_delta_as_modifies_and_deletes(): void
     {
         $this->append(ChangeType::Modify, 'cn=a,dc=example,dc=com', self::UUID_A);
         $this->append(
@@ -291,7 +312,7 @@ final class ServerSyncHandlerTest extends TestCase
 
         self::assertSame(
             [
-                [SyncStateControl::STATE_ADD, self::UUID_A],
+                [SyncStateControl::STATE_MODIFY, self::UUID_A],
                 [SyncStateControl::STATE_DELETE, self::UUID_B],
             ],
             $this->states(),
@@ -320,7 +341,7 @@ final class ServerSyncHandlerTest extends TestCase
         );
     }
 
-    public function test_a_changed_entry_that_no_longer_matches_the_filter_is_skipped(): void
+    public function test_a_changed_entry_that_no_longer_matches_the_filter_is_announced_as_a_delete(): void
     {
         $this->append(ChangeType::Modify, 'cn=a,dc=example,dc=com', self::UUID_A);
         $this->liveEntries['cn=a,dc=example,dc=com'] = $this->entry('cn=a,dc=example,dc=com', self::UUID_A);
@@ -329,7 +350,7 @@ final class ServerSyncHandlerTest extends TestCase
         $this->handle($this->cookieAt(0));
 
         self::assertSame(
-            [],
+            [[SyncStateControl::STATE_DELETE, self::UUID_A]],
             $this->states(),
         );
     }
@@ -477,6 +498,7 @@ final class ServerSyncHandlerTest extends TestCase
             projector: new SyncResultProjector(
                 accessControl: $this->accessControl,
                 filterEvaluator: $this->filterEvaluator,
+                schema: SchemaResource::Core->load(),
             ),
         );
 
@@ -527,25 +549,32 @@ final class ServerSyncHandlerTest extends TestCase
         );
     }
 
+    private static function searchRequest(): SearchRequest
+    {
+        return (new SearchRequest(Filters::present('objectClass')))
+            ->base('dc=example,dc=com')
+            ->useSubtreeScope();
+    }
+
     private function syncMessage(
         ?string $cookie,
         int $mode = SyncRequestControl::MODE_REFRESH_ONLY,
         bool $reloadHint = false,
     ): LdapMessageRequest {
-        $request = (new SearchRequest(Filters::present('objectClass')))
-            ->base('dc=example,dc=com')
-            ->useSubtreeScope();
-
         return new LdapMessageRequest(
             1,
-            $request,
+            self::searchRequest(),
             new SyncRequestControl($mode, $cookie, $reloadHint),
         );
     }
 
     private function cookieAt(int $seq): string
     {
-        return (new SyncCookie(new ReplicaId(self::ORIGIN), $seq))->encode();
+        return (new SyncCookie(
+            new ReplicaId(self::ORIGIN),
+            $seq,
+            SyncCookie::contentKey(self::searchRequest()),
+        ))->encode();
     }
 
     private function append(

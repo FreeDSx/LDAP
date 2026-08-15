@@ -105,8 +105,15 @@ final readonly class SearchStreamBuilder
 
     private function isHasSubordinatesAttribute(Attribute $attr): bool
     {
-        return strcasecmp($attr->getName(), '+') === 0
-            || strcasecmp($attr->getName(), 'hasSubordinates') === 0;
+        return $this->isNamed($attr, SearchRequest::ATTRIBUTES_ALL_OPERATIONAL)
+            || $this->isNamed($attr, AttributeTypeOid::NAME_HAS_SUBORDINATES);
+    }
+
+    private function isNamed(
+        Attribute $attr,
+        string $name,
+    ): bool {
+        return strcasecmp($attr->getName(), $name) === 0;
     }
 
     private function requestsEntryDn(SearchRequest $request): bool
@@ -122,7 +129,7 @@ final readonly class SearchStreamBuilder
 
     private function requestsEntryDnAttribute(Attribute $attr): bool
     {
-        return strcasecmp($attr->getName(), '+') === 0
+        return $this->isNamed($attr, SearchRequest::ATTRIBUTES_ALL_OPERATIONAL)
             || self::isEntryDnAttribute($attr->getName());
     }
 
