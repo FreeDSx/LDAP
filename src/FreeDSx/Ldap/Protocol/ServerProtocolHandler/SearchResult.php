@@ -17,15 +17,15 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Operation\ResultCode;
 
-final class SearchResult
+final readonly class SearchResult
 {
     /**
      * @param iterable<Entry> $entries
      */
     private function __construct(
-        private readonly iterable $entries,
-        private readonly SearchResultState $state,
-        private readonly string $baseDn = '',
+        private iterable $entries,
+        private SearchResultState $state,
+        private string $matchedDn = '',
     ) {}
 
     /**
@@ -36,13 +36,11 @@ final class SearchResult
      */
     public static function makeSuccessResult(
         iterable $entries,
-        string $baseDn = '',
         ?SearchResultState $state = null,
     ): self {
         return new self(
             $entries,
             $state ?? new SearchResultState(),
-            $baseDn,
         );
     }
 
@@ -53,7 +51,7 @@ final class SearchResult
      */
     public static function makeErrorResult(
         int $resultCode,
-        string $baseDn = '',
+        string $matchedDn = '',
         string $diagnosticMessage = '',
         ?iterable $entries = null,
     ): self {
@@ -67,7 +65,7 @@ final class SearchResult
                 resultCode: $resultCode,
                 diagnosticMessage: $diagnosticMessage,
             ),
-            $baseDn,
+            $matchedDn,
         );
     }
 
@@ -76,14 +74,11 @@ final class SearchResult
      *
      * @param iterable<Entry> $entries
      */
-    public static function makeSizeLimitResult(
-        iterable $entries,
-        string $baseDn = '',
-    ): self {
+    public static function makeSizeLimitResult(iterable $entries): self
+    {
         return new self(
             $entries,
             new SearchResultState(resultCode: ResultCode::SIZE_LIMIT_EXCEEDED),
-            $baseDn,
         );
     }
 
@@ -100,8 +95,11 @@ final class SearchResult
         return $this->state;
     }
 
-    public function getBaseDn(): string
+    /**
+     * Empty unless the target could not be named, which is the only case RFC 4511 §4.1.9 fills matchedDN for.
+     */
+    public function getMatchedDn(): string
     {
-        return $this->baseDn;
+        return $this->matchedDn;
     }
 }

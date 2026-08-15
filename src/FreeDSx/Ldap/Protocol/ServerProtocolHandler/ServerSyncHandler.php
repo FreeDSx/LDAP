@@ -185,10 +185,7 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
 
         yield new LdapMessageResponse(
             $messageId,
-            new SearchResultDone(
-                ResultCode::SUCCESS,
-                $baseDn->toString(),
-            ),
+            new SearchResultDone(ResultCode::SUCCESS),
             $doneControl,
         );
     }

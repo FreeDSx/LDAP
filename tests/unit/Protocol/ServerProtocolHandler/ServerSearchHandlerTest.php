@@ -132,7 +132,7 @@ final class ServerSearchHandlerTest extends TestCase
             new LdapMessageResponse(2, new SearchResultEntry($entry2)),
             new LdapMessageResponse(
                 2,
-                new SearchResultDone(0, 'dc=foo,dc=bar'),
+                new SearchResultDone(0),
             ),
         ]);
         self::assertInstanceOf(SearchOperationResult::class, $result);
@@ -257,7 +257,7 @@ final class ServerSearchHandlerTest extends TestCase
         $this->assertSentMessages([
             new LdapMessageResponse(
                 2,
-                new SearchResultDone(0, 'dc=foo,dc=bar'),
+                new SearchResultDone(0),
             ),
         ]);
     }
@@ -317,7 +317,7 @@ final class ServerSearchHandlerTest extends TestCase
             new LdapMessageResponse(2, new SearchResultEntry($entry1)),
             new LdapMessageResponse(
                 2,
-                new SearchResultDone(ResultCode::SIZE_LIMIT_EXCEEDED, 'dc=foo,dc=bar'),
+                new SearchResultDone(ResultCode::SIZE_LIMIT_EXCEEDED),
             ),
         ]);
     }
@@ -346,7 +346,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->assertSentMessages([
             new LdapMessageResponse(2, new SearchResultEntry($entry1)),
-            new LdapMessageResponse(2, new SearchResultDone(0, 'dc=foo,dc=bar')),
+            new LdapMessageResponse(2, new SearchResultDone(0)),
         ]);
     }
 
@@ -376,7 +376,7 @@ final class ServerSearchHandlerTest extends TestCase
         $this->assertSentMessages([
             new LdapMessageResponse(2, new SearchResultEntry($entry1)),
             new LdapMessageResponse(2, new SearchResultEntry($entry2)),
-            new LdapMessageResponse(2, new SearchResultDone(0, 'dc=foo,dc=bar')),
+            new LdapMessageResponse(2, new SearchResultDone(0)),
         ]);
     }
 
@@ -408,7 +408,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->assertSentMessages([
             new LdapMessageResponse(2, new SearchResultEntry($entry1)),
-            new LdapMessageResponse(2, new SearchResultDone(ResultCode::SIZE_LIMIT_EXCEEDED, 'dc=foo,dc=bar')),
+            new LdapMessageResponse(2, new SearchResultDone(ResultCode::SIZE_LIMIT_EXCEEDED)),
         ]);
     }
 
@@ -440,7 +440,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->assertSentMessages([
             new LdapMessageResponse(2, new SearchResultEntry($entry1)),
-            new LdapMessageResponse(2, new SearchResultDone(ResultCode::SIZE_LIMIT_EXCEEDED, 'dc=foo,dc=bar')),
+            new LdapMessageResponse(2, new SearchResultDone(ResultCode::SIZE_LIMIT_EXCEEDED)),
         ]);
     }
 
@@ -472,7 +472,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->assertSentMessages([
             new LdapMessageResponse(2, new SearchResultEntry($entry1)),
-            new LdapMessageResponse(2, new SearchResultDone(ResultCode::SIZE_LIMIT_EXCEEDED, 'dc=foo,dc=bar')),
+            new LdapMessageResponse(2, new SearchResultDone(ResultCode::SIZE_LIMIT_EXCEEDED)),
         ]);
     }
 
@@ -496,7 +496,7 @@ final class ServerSearchHandlerTest extends TestCase
         $this->assertSentMessages([
             new LdapMessageResponse(
                 2,
-                new SearchResultDone(0, 'dc=foo,dc=bar'),
+                new SearchResultDone(0),
             ),
         ]);
     }
@@ -542,7 +542,7 @@ final class ServerSearchHandlerTest extends TestCase
             new LdapMessageResponse(2, new SearchResultEntry($entry2)),
             new LdapMessageResponse(
                 2,
-                new SearchResultDone(0, 'dc=foo,dc=bar'),
+                new SearchResultDone(0),
             ),
         ]);
     }
@@ -582,7 +582,7 @@ final class ServerSearchHandlerTest extends TestCase
         $this->assertSentMessages([
             new LdapMessageResponse(
                 2,
-                new SearchResultDone(0, 'dc=foo,dc=bar'),
+                new SearchResultDone(0),
             ),
         ]);
     }
@@ -660,7 +660,7 @@ final class ServerSearchHandlerTest extends TestCase
             [
                 new LdapMessageResponse(
                     2,
-                    new SearchResultDone(ResultCode::CANCELED, 'dc=foo,dc=bar'),
+                    new SearchResultDone(ResultCode::CANCELED),
                 ),
                 new LdapMessageResponse(
                     3,
@@ -692,7 +692,7 @@ final class ServerSearchHandlerTest extends TestCase
         $this->assertSentMessages([
             new LdapMessageResponse(
                 2,
-                new SearchResultDone(ResultCode::SUCCESS, 'dc=foo,dc=bar'),
+                new SearchResultDone(ResultCode::SUCCESS),
             ),
         ]);
     }
