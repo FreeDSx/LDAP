@@ -14,10 +14,10 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Exception\UrlParseException;
+use FreeDSx\Ldap\Schema\Validation\Syntax\OidSyntaxValidator;
 use Stringable;
 
 use function explode;
-use function str_ireplace;
 use function str_replace;
 use function substr;
 
@@ -109,12 +109,6 @@ class LdapUrlExtension implements Stringable
      */
     public static function parse(string $extension): LdapUrlExtension
     {
-        if (preg_match('/!?\w+(=.*)?/', $extension) !== 1) {
-            throw new UrlParseException(sprintf(
-                'The LDAP URL extension is malformed: %s',
-                $extension,
-            ));
-        }
         $pieces = explode(
             separator: '=',
             string: $extension,
@@ -129,13 +123,17 @@ class LdapUrlExtension implements Stringable
             );
         }
 
-        $name = str_ireplace('%2c', ',', self::decode($pieces[0]));
+        $name = self::decode($pieces[0]);
+        # RFC 4516 2.1 defines extype as an oid, so it shares the schema OID grammar.
+        if (!(new OidSyntaxValidator())->isValid($name)) {
+            throw new UrlParseException(sprintf(
+                'The LDAP URL extension is malformed: %s',
+                $extension,
+            ));
+        }
+
         $value = isset($pieces[1])
-            ? str_ireplace(
-                search: '%2c',
-                replace: ',',
-                subject: self::decode($pieces[1]),
-            )
+            ? self::decode($pieces[1])
             : null;
 
         return new self(

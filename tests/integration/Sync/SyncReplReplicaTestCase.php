@@ -109,6 +109,58 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
         }
     }
 
+    /**
+     * The URL is generated on one side and parsed on the other, so only a round trip proves either.
+     */
+    public function test_the_referral_url_survives_the_round_trip_to_the_client(): void
+    {
+        self::assertNotNull($this->waitForReplica('cn=alice,ou=people,dc=foo,dc=bar'));
+
+        $client = $this->buildClient('tcp');
+        $client->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+
+        try {
+            $client->create(Entry::fromArray(
+                'cn=nope,ou=people,dc=foo,dc=bar',
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'nope',
+                    'sn' => 'Nope',
+                ],
+            ));
+
+            self::fail('The write should have been referred to the provider.');
+        } catch (ReferralException $e) {
+            $referrals = $e->getReferrals();
+
+            self::assertCount(
+                1,
+                $referrals,
+            );
+            self::assertSame(
+                sprintf(
+                    'ldap://127.0.0.1:%d/',
+                    TestWorker::port(TestWorker::OFFSET_PROVIDER),
+                ),
+                $referrals[0]->toString(),
+            );
+            self::assertSame(
+                '127.0.0.1',
+                $referrals[0]->getHost(),
+            );
+            self::assertSame(
+                TestWorker::port(TestWorker::OFFSET_PROVIDER),
+                $referrals[0]->getPort(),
+            );
+            self::assertFalse($referrals[0]->getUseSsl());
+        } finally {
+            $client->unbind();
+        }
+    }
+
     public function test_a_password_modify_on_the_replica_is_referred_to_the_provider(): void
     {
         $target = 'cn=user,dc=foo,dc=bar';

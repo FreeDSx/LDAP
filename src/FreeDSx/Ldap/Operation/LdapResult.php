@@ -209,11 +209,17 @@ class LdapResult implements ResponseInterface
                         if (!$ldapUrl instanceof OctetStringType) {
                             throw new ProtocolException('The ASN1 structure for a referral is malformed.');
                         }
+
                         try {
                             $referrals[] = LdapUrl::parse($ldapUrl->getValue());
-                        } catch (UrlParseException $e) {
-                            throw new ProtocolException($e->getMessage());
+                        } catch (UrlParseException) {
+                            # RFC 4511 4.1.10 makes the URIs alternatives, so an unusable one is ignored.
                         }
+                    }
+
+                    # The field is only sent when it holds a URI, so losing every one would hide the continuation.
+                    if ($referrals === []) {
+                        throw new ProtocolException('The LDAP result holds no usable referral URI.');
                     }
                 }
             }

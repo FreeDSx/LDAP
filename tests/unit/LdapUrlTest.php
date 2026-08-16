@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\UrlParseException;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\LdapUrlExtension;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class LdapUrlTest extends TestCase
@@ -352,5 +353,131 @@ class LdapUrlTest extends TestCase
         $this->expectException(UrlParseException::class);
 
         LdapUrl::parse('ldap');
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function malformedUrlProvider(): array
+    {
+        return [
+            'more query components than exist' => [
+                'ldap://foo/dc=x????????',
+            ],
+            'empty attribute selector' => [
+                'ldap://foo/dc=x?cn,,sn?',
+            ],
+            'only an attribute separator' => [
+                'ldap://foo/dc=x?,?',
+            ],
+            'unrecognized scope' => [
+                'ldap://foo/dc=x??bogus',
+            ],
+            'extension type that is not an oid' => [
+                'ldap://foo/dc=x????!!bad',
+            ],
+            'extension type with a leading hyphen' => [
+                'ldap://foo/dc=x????-bad=v',
+            ],
+            'port beyond the valid range' => [
+                'ldap://foo:99999/dc=x',
+            ],
+        ];
+    }
+
+    #[DataProvider('malformedUrlProvider')]
+    public function test_it_should_reject_a_malformed_url(string $url): void
+    {
+        $this->expectException(UrlParseException::class);
+
+        LdapUrl::parse($url);
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function percentEncodingProvider(): array
+    {
+        return [
+            'a non ascii dn' => [
+                'ldap://foo/cn=caf%c3%a9,dc=x',
+                'cn=café,dc=x',
+            ],
+            'an uppercase escape' => [
+                'ldap://foo/cn=caf%C3%A9,dc=x',
+                'cn=café,dc=x',
+            ],
+            'an escape outside the reserved set' => [
+                'ldap://foo/cn=%41,dc=x',
+                'cn=A,dc=x',
+            ],
+            'an encoded percent stays text' => [
+                'ldap://foo/cn=%253f,dc=x',
+                'cn=%3f,dc=x',
+            ],
+            'a percent that escapes nothing' => [
+                'ldap://foo/cn=100%,dc=x',
+                'cn=100%,dc=x',
+            ],
+        ];
+    }
+
+    #[DataProvider('percentEncodingProvider')]
+    public function test_it_should_decode_any_percent_escape_exactly_once(
+        string $url,
+        string $expectedDn,
+    ): void {
+        self::assertSame(
+            $expectedDn,
+            (string) LdapUrl::parse($url)->getDn(),
+        );
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function roundTripProvider(): array
+    {
+        return [
+            'non ascii' => [
+                'cn=café,dc=x',
+            ],
+            'a literal percent' => [
+                'cn=100%,dc=x',
+            ],
+            'text that looks like an escape' => [
+                'cn=%3f,dc=x',
+            ],
+            'a space' => [
+                'cn=a b,dc=x',
+            ],
+            'a control character' => [
+                "cn=a\x01b,dc=x",
+            ],
+        ];
+    }
+
+    #[DataProvider('roundTripProvider')]
+    public function test_it_should_round_trip_a_dn_that_needs_escaping(string $dn): void
+    {
+        $url = (new LdapUrl('foo'))->setDn($dn);
+
+        self::assertSame(
+            $dn,
+            (string) LdapUrl::parse($url->toString())->getDn(),
+        );
+    }
+
+    /**
+     * RFC 4511 4.1.10 admits only the restricted set, so anything else survives by being escaped.
+     */
+    public function test_it_should_generate_a_url_with_no_octet_outside_the_restricted_set(): void
+    {
+        $url = (new LdapUrl('foo'))->setDn("cn=café\x01,dc=x");
+
+        self::assertSame(
+            'ldap://foo/cn=caf%c3%a9%01,dc=x',
+            $url->toString(),
+        );
     }
 }

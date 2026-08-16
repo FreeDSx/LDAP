@@ -13,10 +13,9 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
-use function array_keys;
-use function array_values;
-use function str_ireplace;
-use function str_replace;
+use function bin2hex;
+use function hex2bin;
+use function preg_replace_callback;
 
 /**
  * Some common methods for LDAP URLs and URL Extensions.
@@ -26,47 +25,30 @@ use function str_replace;
 trait LdapUrlTrait
 {
     /**
-     * @var array<string, string>
+     * Anything outside printable ASCII, plus the printable characters that would otherwise read as structure.
      */
-    private static array $escapeMap = [
-        '%' => '%25',
-        '?' => '%3f',
-        ' ' => '%20',
-        '<' => '%3c',
-        '>' => '%3e',
-        '"' => '%22',
-        '#' => '%23',
-        '{' => '%7b',
-        '}' => '%7d',
-        '|' => '%7c',
-        '\\' => '%5c',
-        '^' => '%5e',
-        '~' => '%7e',
-        '[' => '%5b',
-        ']' => '%5d',
-        '`' => '%60',
-    ];
+    private const MUST_ENCODE = '/[^\x21-\x7E]|[%?<>"#{}|\\\\^~\[\]`]/';
 
     /**
-     * Percent-encode certain values in the URL.
+     * Percent-encode the octets a generated URL may not carry (RFC 4516 2.1).
      */
     protected static function encode(?string $value): string
     {
-        return str_replace(
-            search: array_keys(self::$escapeMap),
-            replace: array_values(self::$escapeMap),
+        return (string) preg_replace_callback(
+            pattern: self::MUST_ENCODE,
+            callback: static fn(array $matches): string => '%' . bin2hex($matches[0]),
             subject: (string) $value,
         );
     }
 
     /**
-     * Percent-decode values from the URL.
+     * Percent-decode in a single pass, so an encoded percent yields text rather than decoding a second time.
      */
     protected static function decode(string $value): string
     {
-        return str_ireplace(
-            search: array_values(self::$escapeMap),
-            replace: array_keys(self::$escapeMap),
+        return (string) preg_replace_callback(
+            pattern: '/%([0-9A-Fa-f]{2})/',
+            callback: static fn(array $matches): string => (string) hex2bin($matches[1]),
             subject: $value,
         );
     }
