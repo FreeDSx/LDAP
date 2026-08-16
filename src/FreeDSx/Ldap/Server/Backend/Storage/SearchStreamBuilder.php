@@ -14,13 +14,13 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage;
 
 use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\SearchLimits;
@@ -36,26 +36,13 @@ final readonly class SearchStreamBuilder
     use DerivedAttributeTrait;
 
     /**
-     * How each derived attribute's value is produced, keyed on the type name.
-     *
-     * @var array<string, callable(Entry): string>
-     */
-    private array $derivedResolvers;
-
-    /**
      * @param FilterEvaluatorInterface $filterEvaluator Must know the configured schema, or matching rules are ignored.
      */
     public function __construct(
-        EntryStorageInterface $storage,
         private SearchLimits $limits,
         private FilterEvaluatorInterface $filterEvaluator,
-        Dn $subschemaEntry = new Dn('cn=Subschema'),
-    ) {
-        $this->derivedResolvers = self::derivedResolvers($subschemaEntry) + [
-            AttributeTypeOid::NAME_HAS_SUBORDINATES => static fn(Entry $entry): string => $storage
-                ->hasChildren($entry->getDn()) ? 'TRUE' : 'FALSE',
-        ];
-    }
+        private DerivedResolver $derivedResolver,
+    ) {}
 
     public function buildForBaseObject(
         Entry $entry,
@@ -125,7 +112,10 @@ final readonly class SearchStreamBuilder
         foreach ($requested as $name) {
             $copy->set(
                 $name,
-                ($this->derivedResolvers[$name])($entry),
+                $this->derivedResolver->resolve(
+                    $name,
+                    $entry,
+                ),
             );
         }
 
@@ -146,7 +136,7 @@ final readonly class SearchStreamBuilder
         );
         $requested = [];
 
-        foreach (array_keys($this->derivedResolvers) as $name) {
+        foreach (array_keys(self::DERIVED_ATTRIBUTE_OIDS) as $name) {
             if ($wantsAllOperational || $this->namesAny($attributes, $name)) {
                 $requested[] = $name;
             }

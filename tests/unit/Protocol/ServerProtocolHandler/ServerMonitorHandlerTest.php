@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Schema\SchemaResource;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\FilterEvaluatorFactoryTrait;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Entry\Entry;
@@ -41,6 +41,8 @@ use PHPUnit\Framework\TestCase;
 
 final class ServerMonitorHandlerTest extends TestCase
 {
+    use FilterEvaluatorFactoryTrait;
+
     private TokenInterface&MockObject $mockToken;
 
     private InMemoryMetricsRecorder $metrics;
@@ -375,7 +377,7 @@ final class ServerMonitorHandlerTest extends TestCase
 
         return new GeneratedEntryResponder(
             new RuleBasedAccessControl(),
-            new FilterEvaluator($schema),
+            $this->makeFilterEvaluator($schema),
             $schema,
         );
     }

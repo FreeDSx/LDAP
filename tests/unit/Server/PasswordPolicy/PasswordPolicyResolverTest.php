@@ -22,8 +22,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordQualityRules;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
-use FreeDSx\Ldap\Schema\SchemaResource;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\FilterEvaluatorFactoryTrait;
 use FreeDSx\Ldap\Server\Subentry\GoverningSubentryResolver;
 use FreeDSx\Ldap\Server\Subentry\SubtreeSpecificationEvaluator;
 use Generator;
@@ -32,6 +31,8 @@ use PHPUnit\Framework\TestCase;
 
 final class PasswordPolicyResolverTest extends TestCase
 {
+    use FilterEvaluatorFactoryTrait;
+
     private const USER_DN = 'uid=alice,dc=example,dc=com';
 
     private const SUBENTRY_DN = 'cn=subentry-policy,ou=policies,dc=example,dc=com';
@@ -298,7 +299,7 @@ final class PasswordPolicyResolverTest extends TestCase
         return new GoverningSubentryResolver(
             $backend,
             new SubtreeSpecificationEvaluator(
-                new FilterEvaluator(SchemaResource::Core->load()),
+                $this->makeFilterEvaluator(),
             ),
         );
     }
