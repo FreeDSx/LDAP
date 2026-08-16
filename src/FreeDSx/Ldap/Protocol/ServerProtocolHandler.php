@@ -190,6 +190,7 @@ readonly class ServerProtocolHandler
             $e->getMessageId(),
             $e->getProtocolOpTag(),
             $e->getMessage(),
+            $e->getResultCode(),
         );
 
         // An operation with no response, or a response tag masquerading as a request, leaves nothing to answer with.
@@ -199,7 +200,10 @@ readonly class ServerProtocolHandler
 
         $this->eventLogger->record(
             ServerEvent::MessageDecodeFailed,
-            [EventContext::REASON_MESSAGE => $e->getMessage()],
+            [
+                EventContext::REASON_MESSAGE => $e->getMessage(),
+                EventContext::REASON_CODE => $e->getResultCode(),
+            ],
         );
         $this->queue->sendMessage($response);
 

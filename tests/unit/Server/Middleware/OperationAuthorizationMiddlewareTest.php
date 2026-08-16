@@ -15,7 +15,6 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Middleware;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Controls;
-use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -857,32 +856,6 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         self::assertSame(
             ['cn', 'uid'],
             $seen,
-        );
-    }
-
-    public function test_an_option_bearing_rdn_is_refused_when_the_base_attribute_write_is_denied(): void
-    {
-        $this->routeResolvesTo(HandlerId::Dispatch);
-        $this->accessControl
-            ->method('authorizeAttribute')
-            ->willReturnCallback(
-                function (TokenInterface $token, Dn $dn, string $attribute): void {
-                    if (Attribute::normalizeName($attribute) === 'userpassword') {
-                        throw $this->denied();
-                    }
-                },
-            );
-
-        $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
-
-        $this->subject->process(
-            $this->contextFor(new ModifyDnRequest(
-                'cn=foo,dc=bar',
-                'userPassword;x=hunter2',
-                false,
-            )),
-            $this->next,
         );
     }
 

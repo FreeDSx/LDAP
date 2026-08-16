@@ -131,16 +131,41 @@ class ResponseFactory
         int $messageId,
         int $protocolOpTag,
         string $diagnostic,
+        int $resultCode = ResultCode::PROTOCOL_ERROR,
     ): ?LdapMessageResponse {
         $response = match ($protocolOpTag) {
-            0 => new BindResponse(new LdapResult(ResultCode::PROTOCOL_ERROR, '', $diagnostic)),
-            3 => new SearchResultDone(ResultCode::PROTOCOL_ERROR, '', $diagnostic),
-            6 => new ModifyResponse(ResultCode::PROTOCOL_ERROR, '', $diagnostic),
-            8 => new AddResponse(ResultCode::PROTOCOL_ERROR, '', $diagnostic),
-            10 => new DeleteResponse(ResultCode::PROTOCOL_ERROR, '', $diagnostic),
-            12 => new ModifyDnResponse(ResultCode::PROTOCOL_ERROR, '', $diagnostic),
-            14 => new CompareResponse(ResultCode::PROTOCOL_ERROR, '', $diagnostic),
-            23 => new ExtendedResponse(new LdapResult(ResultCode::PROTOCOL_ERROR, '', $diagnostic)),
+            0 => new BindResponse(new LdapResult(
+                $resultCode,
+                diagnosticMessage: $diagnostic,
+            )),
+            3 => new SearchResultDone(
+                $resultCode,
+                diagnosticMessage: $diagnostic,
+            ),
+            6 => new ModifyResponse(
+                $resultCode,
+                diagnosticMessage: $diagnostic,
+            ),
+            8 => new AddResponse(
+                $resultCode,
+                diagnosticMessage: $diagnostic,
+            ),
+            10 => new DeleteResponse(
+                $resultCode,
+                diagnosticMessage: $diagnostic,
+            ),
+            12 => new ModifyDnResponse(
+                $resultCode,
+                diagnosticMessage: $diagnostic,
+            ),
+            14 => new CompareResponse(
+                $resultCode,
+                diagnosticMessage: $diagnostic,
+            ),
+            23 => new ExtendedResponse(new LdapResult(
+                $resultCode,
+                diagnosticMessage: $diagnostic,
+            )),
             // Unbind and Abandon have no response, and a response tag is not a request at all.
             default => null,
         };
