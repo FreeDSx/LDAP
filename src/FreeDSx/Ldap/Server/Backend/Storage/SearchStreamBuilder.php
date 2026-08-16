@@ -73,14 +73,9 @@ final readonly class SearchStreamBuilder
         SearchRequest $request,
         ?SearchLimits $effectiveLimits = null,
     ): EntryStream {
-        $generator = $stream->entries;
-
-        // In-search alias dereferencing is not supported. Decline rather than silently return the alias.
-        if ($this->derefsInSearch($request)) {
-            $generator = $this->wrapWithAliasDecline($generator);
-        }
-
-        $generator = $this->wrapWithTimeLimitHandling($generator);
+        // In-search alias dereferencing is not implemented, so an alias is returned as the ordinary entry it is
+        // rather than failing the search. This is a deliberate RFC difference.
+        $generator = $this->wrapWithTimeLimitHandling($stream->entries);
 
         if (!$stream->isPreFiltered) {
             $generator = $this->wrapWithFilterEvaluation(
@@ -175,33 +170,6 @@ final readonly class SearchStreamBuilder
         }
 
         return false;
-    }
-
-    private function derefsInSearch(SearchRequest $request): bool
-    {
-        $deref = $request->getDereferenceAliases();
-
-        return $deref === SearchRequest::DEREF_IN_SEARCHING
-            || $deref === SearchRequest::DEREF_ALWAYS;
-    }
-
-    /**
-     * @param Generator<Entry> $generator
-     * @return Generator<Entry>
-     * @throws OperationException
-     */
-    private function wrapWithAliasDecline(Generator $generator): Generator
-    {
-        foreach ($generator as $entry) {
-            if (AliasDetector::isAlias($entry)) {
-                throw new OperationException(
-                    'Alias dereferencing is not supported.',
-                    ResultCode::ALIAS_DEREFERENCING_PROBLEM,
-                );
-            }
-
-            yield $entry;
-        }
     }
 
     /**

@@ -17,6 +17,8 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\MetricsResponseInterceptor;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
+use FreeDSx\Ldap\Server\Backend\Storage\AliasResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
@@ -24,6 +26,7 @@ use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialFilterRewriter;
+use FreeDSx\Ldap\Server\Middleware\AliasDereferenceMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ConfidentialAttributeMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
@@ -61,6 +64,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
             CriticalControlValidator::class => $this->makeCriticalControlValidator(...),
             CriticalControlMiddleware::class => $this->makeCriticalControlMiddleware(...),
             OperationAuthorizationMiddleware::class => $this->makeOperationAuthorizationMiddleware(...),
+            AliasDereferenceMiddleware::class => $this->makeAliasDereferenceMiddleware(...),
             ConfidentialAttributeMiddleware::class => $this->makeConfidentialAttributeMiddleware(...),
             AssertionMiddleware::class => $this->makeAssertionMiddleware(...),
             ResourceLimitMiddleware::class => $this->makeResourceLimitMiddleware(...),
@@ -147,6 +151,14 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
             $container->get(ServerProtocolHandlerFactory::class),
             $container->get(AccessControlInterface::class),
             $options->getSubschemaEntry(),
+        );
+    }
+
+    private function makeAliasDereferenceMiddleware(Container $container): AliasDereferenceMiddleware
+    {
+        return new AliasDereferenceMiddleware(
+            new AliasResolver($container->get(EntryStorageInterface::class)),
+            $container->get(AccessControlInterface::class),
         );
     }
 

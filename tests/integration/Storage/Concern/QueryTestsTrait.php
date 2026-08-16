@@ -1144,7 +1144,11 @@ trait QueryTestsTrait
         );
     }
 
-    public function testSearchDeclinesAliasDereferencing(): void
+    /**
+     * A base naming an alias resolves to the entry it names (RFC 4511 4.5.1.3 derefFindingBaseObj), while an alias
+     * met while searching is returned as the ordinary entry it is rather than failing the search.
+     */
+    public function testAliasDereferencing(): void
     {
         $this->stopServer();
         $this->createServerProcess('tcp', static::storageExtraArgs());
@@ -1156,23 +1160,116 @@ trait QueryTestsTrait
             'aliasedObjectName' => 'cn=user,dc=foo,dc=bar',
         ]));
 
-        $neverRequest = Operations::search(Filters::equal('cn', 'ref'))
-            ->base('dc=foo,dc=bar')
-            ->useSubtreeScope();
+        try {
+            self::assertCount(
+                1,
+                $this->ldapClient()->search(
+                    Operations::search(Filters::equal('cn', 'ref'))
+                        ->base('dc=foo,dc=bar')
+                        ->useSubtreeScope(),
+                ),
+                'An alias in scope is an ordinary entry when nothing is dereferenced.',
+            );
 
-        self::assertCount(
-            1,
-            $this->ldapClient()->search($neverRequest),
-        );
+            self::assertCount(
+                1,
+                $this->ldapClient()->search(
+                    Operations::search(Filters::equal('cn', 'ref'))
+                        ->base('dc=foo,dc=bar')
+                        ->useSubtreeScope()
+                        ->setDereferenceAliases(SearchRequest::DEREF_ALWAYS),
+                ),
+                'An alias in scope stays an ordinary entry rather than failing the search.',
+            );
 
-        $derefRequest = Operations::search(Filters::equal('cn', 'ref'))
-            ->base('dc=foo,dc=bar')
-            ->useSubtreeScope()
-            ->setDereferenceAliases(SearchRequest::DEREF_ALWAYS);
+            $viaAlias = $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('cn=ref,dc=foo,dc=bar')
+                    ->useBaseScope()
+                    ->setDereferenceAliases(SearchRequest::DEREF_FINDING_BASE_OBJECT),
+            );
 
-        $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::ALIAS_DEREFERENCING_PROBLEM);
-        $this->ldapClient()->search($derefRequest);
+            self::assertSame(
+                'cn=user,dc=foo,dc=bar',
+                strtolower((string) $viaAlias->first()?->getDn()),
+                'A base naming an alias resolves to the entry it names.',
+            );
+
+            self::assertSame(
+                'cn=ref,dc=foo,dc=bar',
+                strtolower((string) $this->ldapClient()->search(
+                    Operations::search(Filters::present('objectClass'))
+                        ->base('cn=ref,dc=foo,dc=bar')
+                        ->useBaseScope(),
+                )->first()?->getDn()),
+                'The same base names the alias itself when nothing is dereferenced.',
+            );
+        } finally {
+            $this->ldapClient()->delete('cn=ref,dc=foo,dc=bar');
+        }
+    }
+
+    public function testABaseAliasNamingAMissingEntryIsAnAliasProblem(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess('tcp', static::storageExtraArgs());
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(Entry::fromArray('cn=dangle,dc=foo,dc=bar', [
+            'objectClass' => ['top', 'alias', 'extensibleObject'],
+            'cn' => 'dangle',
+            'aliasedObjectName' => 'cn=nothere,dc=foo,dc=bar',
+        ]));
+
+        try {
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('cn=dangle,dc=foo,dc=bar')
+                    ->useBaseScope()
+                    ->setDereferenceAliases(SearchRequest::DEREF_FINDING_BASE_OBJECT),
+            );
+            self::fail('Expected the dangling alias to be refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ALIAS_PROBLEM,
+                $e->getCode(),
+            );
+        } finally {
+            $this->ldapClient()->delete('cn=dangle,dc=foo,dc=bar');
+        }
+    }
+
+    public function testABaseAliasThatLoopsIsAnAliasProblem(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess('tcp', static::storageExtraArgs());
+        $this->authenticateAdmin();
+
+        foreach ([['loopa', 'loopb'], ['loopb', 'loopa']] as [$name, $target]) {
+            $this->ldapClient()->create(Entry::fromArray("cn=$name,dc=foo,dc=bar", [
+                'objectClass' => ['top', 'alias', 'extensibleObject'],
+                'cn' => $name,
+                'aliasedObjectName' => "cn=$target,dc=foo,dc=bar",
+            ]));
+        }
+
+        try {
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('cn=loopa,dc=foo,dc=bar')
+                    ->useBaseScope()
+                    ->setDereferenceAliases(SearchRequest::DEREF_FINDING_BASE_OBJECT),
+            );
+            self::fail('Expected the alias loop to be refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ALIAS_PROBLEM,
+                $e->getCode(),
+            );
+        } finally {
+            $this->ldapClient()->delete('cn=loopa,dc=foo,dc=bar');
+            $this->ldapClient()->delete('cn=loopb,dc=foo,dc=bar');
+        }
     }
 
     /**

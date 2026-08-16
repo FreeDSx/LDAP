@@ -52,6 +52,7 @@ use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\OperationAuditor;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
+use FreeDSx\Ldap\Server\Middleware\AliasDereferenceMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AuthorizationResolutionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\BindMiddleware;
@@ -420,6 +421,8 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                     ? [new ReadOnlyMiddleware($consumerConfig)]
                     : []),
                 $this->container->get(CriticalControlMiddleware::class),
+                // Above the gate, so a base reached via an alias is authorized as what it resolves to.
+                $this->container->get(AliasDereferenceMiddleware::class),
                 $this->container->get(OperationAuthorizationMiddleware::class),
                 // Below the authorization gate, so an assertion the identity cannot satisfy never reaches storage.
                 $this->container->get(ConfidentialAttributeMiddleware::class),

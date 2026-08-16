@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -416,6 +417,67 @@ final class AclIntegrationTest extends ServerTestCase
                     ->useSubtreeScope(),
             ),
         );
+    }
+
+    public function testABaseAliasCannotReachAnEntryTheIdentityIsDeniedSearchOn(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray('cn=hiddenref,ou=people,dc=foo,dc=bar', [
+            'objectClass' => ['top', 'alias', 'extensibleObject'],
+            'cn' => 'hiddenref',
+            'aliasedObjectName' => LdapAclCommand::HIDDEN_DN,
+        ]));
+
+        try {
+            $this->authenticateUser();
+            $code = null;
+
+            try {
+                $this->ldapClient()->search(
+                    Operations::search(Filters::present('objectClass'))
+                        ->base('cn=hiddenref,ou=people,dc=foo,dc=bar')
+                        ->useBaseScope()
+                        ->setDereferenceAliases(SearchRequest::DEREF_FINDING_BASE_OBJECT),
+                );
+            } catch (OperationException $e) {
+                $code = $e->getCode();
+            }
+
+            // Reported as missing rather than denied, so the refusal says nothing the identity could not already see.
+            self::assertSame(
+                ResultCode::NO_SUCH_OBJECT,
+                $code,
+            );
+        } finally {
+            $this->authenticateAdmin();
+            $this->ldapClient()->delete('cn=hiddenref,ou=people,dc=foo,dc=bar');
+        }
+    }
+
+    public function testAnAdministratorCanFollowTheSameBaseAlias(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray('cn=adminref,ou=people,dc=foo,dc=bar', [
+            'objectClass' => ['top', 'alias', 'extensibleObject'],
+            'cn' => 'adminref',
+            'aliasedObjectName' => LdapAclCommand::HIDDEN_DN,
+        ]));
+
+        try {
+            $entries = $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('cn=adminref,ou=people,dc=foo,dc=bar')
+                    ->useBaseScope()
+                    ->setDereferenceAliases(SearchRequest::DEREF_FINDING_BASE_OBJECT),
+            );
+
+            self::assertSame(
+                LdapAclCommand::HIDDEN_DN,
+                strtolower((string) $entries->first()?->getDn()),
+            );
+        } finally {
+            $this->ldapClient()->delete('cn=adminref,ou=people,dc=foo,dc=bar');
+        }
     }
 
     public function testAnEvadedRenameLeavesNoCredentialOnAPasswordlessEntry(): void
