@@ -757,7 +757,7 @@ final class WritableStorageBackendTest extends TestCase
         );
     }
 
-    public function test_search_declines_alias_base_when_base_deref_requested(): void
+    public function test_search_returns_alias_base_when_base_deref_requested(): void
     {
         $subject = self::makeWritableBackend(new InMemoryStorage([
             $this->base,
@@ -765,14 +765,17 @@ final class WritableStorageBackendTest extends TestCase
             $this->aliasEntry(),
         ]));
 
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::ALIAS_DEREFERENCING_PROBLEM);
-
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('cn=ref,dc=example,dc=com')
             ->useBaseScope()
             ->setDereferenceAliases(SearchRequest::DEREF_FINDING_BASE_OBJECT);
-        iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
+        $entries = iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
+
+        self::assertCount(1, $entries);
+        self::assertSame(
+            'cn=ref,dc=example,dc=com',
+            array_values($entries)[0]->getDn()->toString(),
+        );
     }
 
     public function test_search_returns_alias_base_when_deref_never(): void
@@ -796,7 +799,15 @@ final class WritableStorageBackendTest extends TestCase
         );
     }
 
-    public function test_search_declines_alias_in_subtree_when_in_search_deref_requested(): void
+    /**
+     * A deliberate deviation from RFC 4511 4.5.1.3, which has an alias found in scope replaced by the entry it names
+     * and the search continued in that entry's subtree.
+     *
+     * Implementing full search dereferencing is not practical, but we shouldn't fail a search when any alias shows up
+     * in it. This seems like reasonable behavior, though it's different from what the RFC specifies. But other
+     * implementations already handle aliases in different ways.
+     */
+    public function test_search_returns_alias_in_subtree_when_in_search_deref_requested(): void
     {
         $subject = self::makeWritableBackend(new InMemoryStorage([
             $this->base,
@@ -804,14 +815,16 @@ final class WritableStorageBackendTest extends TestCase
             $this->aliasEntry(),
         ]));
 
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::ALIAS_DEREFERENCING_PROBLEM);
-
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('dc=example,dc=com')
             ->useSubtreeScope()
             ->setDereferenceAliases(SearchRequest::DEREF_IN_SEARCHING);
-        iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
+        $dns = array_map(
+            static fn(Entry $entry): string => $entry->getDn()->toString(),
+            array_values(iterator_to_array($subject->search($request, SubentryVisibility::All)->entries)),
+        );
+
+        self::assertContains('cn=ref,dc=example,dc=com', $dns);
     }
 
     public function test_search_returns_alias_in_subtree_when_deref_never(): void
