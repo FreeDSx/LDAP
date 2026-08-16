@@ -40,8 +40,9 @@ mail: alice@foo.bar
 # Only reachable through its base type, so it shows whether attribute options are honored.
 mail;lang-en: alice-en@foo.bar
 uidNumber: 99
-# Matched case-exactly by the schema, so searches on it prove the configured schema is in play.
 employeeNumber: A1b2C3
+# Matched case-exactly by the schema, so searches on it prove the configured schema is in play.
+labeledURI: A1b2C3
 
 dn: cn=nosn,dc=foo,dc=bar
 objectClass: groupOfNames

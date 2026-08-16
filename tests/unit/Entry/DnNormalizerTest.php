@@ -69,8 +69,40 @@ final class DnNormalizerTest extends TestCase
     public function test_escaped_comma_in_value_is_preserved(): void
     {
         self::assertSame(
-            'cn=doe\,john,dc=example,dc=com',
+            'cn=doe\2cjohn,dc=example,dc=com',
             DnNormalizer::canonicalize('cn=Doe\,John,dc=Example,dc=Com'),
+        );
+    }
+
+    public function test_the_two_spellings_of_an_escaped_comma_share_one_canonical_form(): void
+    {
+        self::assertSame(
+            DnNormalizer::canonicalize('cn=doe\,john,dc=x'),
+            DnNormalizer::canonicalize('cn=doe\2cjohn,dc=x'),
+        );
+    }
+
+    public function test_an_escaped_comma_stays_distinct_from_an_rdn_separator(): void
+    {
+        self::assertNotSame(
+            DnNormalizer::canonicalize('cn=doe\2cjohn,dc=x'),
+            DnNormalizer::canonicalize('cn=doe,john=x,dc=x'),
+        );
+    }
+
+    public function test_a_hex_escape_resolves_to_the_character_it_encodes(): void
+    {
+        self::assertSame(
+            DnNormalizer::canonicalize('cn=admin,dc=x'),
+            DnNormalizer::canonicalize('cn=\61dmin,dc=x'),
+        );
+    }
+
+    public function test_a_null_byte_does_not_collapse_two_distinct_dns(): void
+    {
+        self::assertNotSame(
+            DnNormalizer::canonicalize("cn=a\\00b,dc=x"),
+            DnNormalizer::canonicalize('cn=ab,dc=x'),
         );
     }
 

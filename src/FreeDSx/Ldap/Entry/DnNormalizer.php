@@ -22,7 +22,6 @@ use function count;
 use function implode;
 use function preg_replace;
 use function sort;
-use function str_replace;
 use function strtolower;
 use function trim;
 
@@ -43,7 +42,7 @@ final class DnNormalizer
     /**
      * Canonical DN form.
      *
-     * Values are not unescaped, so an escaped edge space (cn=\ x\ ) does not fold like an unescaped one.
+     * Escapes resolved before folding (RFC 4514 4) and reapplied after.
      */
     public static function canonicalize(string $dn): string
     {
@@ -107,20 +106,17 @@ final class DnNormalizer
         string $value,
         bool $ascii,
     ): string {
-        if ($ascii) {
-            return $this->canonicalizeAsciiValue($value);
-        }
+        $resolved = Rdn::unescape($value);
+        $folded = $ascii && Text::isAscii($resolved)
+            ? $this->canonicalizeAsciiValue($resolved)
+            : $this->prep->prepareForEquality($resolved);
 
-        return $this->prep->prepareForEquality($value);
+        return Rdn::escape($folded);
     }
 
     private function canonicalizeAsciiValue(string $value): string
     {
-        $folded = strtolower(str_replace(
-            "\0",
-            '',
-            $value,
-        ));
+        $folded = strtolower($value);
         $collapsed = preg_replace(
             '/[\x09-\x0D ]+/',
             ' ',

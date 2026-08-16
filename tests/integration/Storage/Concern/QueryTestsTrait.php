@@ -32,7 +32,7 @@ trait QueryTestsTrait
     /**
      * RFC 4511 4.5.1 evaluation, driven over a real connection so every assertion travels as BER.
      *
-     * The seed holds seven entries; only cn=alice carries uidNumber, mail and employeeNumber. Each backend runs these,
+     * The seed holds seven entries; only cn=alice carries uidNumber, mail and labeledURI. Each backend runs these,
      * since the PDO adapters translate filters to SQL and only re-check inexact results in PHP.
      *
      * @return iterable<string, array{FilterInterface, int}>
@@ -146,11 +146,11 @@ trait QueryTestsTrait
             1,
         ];
         yield 'extensible without a rule uses the type EQUALITY' => [
-            Filters::extensible('employeeNumber', 'A1b2C3', null, false),
+            Filters::extensible('labeledURI', 'A1b2C3', null, false),
             1,
         ];
         yield 'extensible without a rule respects a case exact EQUALITY' => [
-            Filters::extensible('employeeNumber', 'a1b2c3', null, false),
+            Filters::extensible('labeledURI', 'a1b2c3', null, false),
             0,
         ];
         yield 'extensible with an unrecognized rule is Undefined' => [
@@ -188,11 +188,11 @@ trait QueryTestsTrait
 
         // No approximate rule is implemented, so it must answer as the type's equality rule does.
         yield 'approximate on a case exact type rejects a case difference' => [
-            Filters::approximate('employeeNumber', 'a1b2c3'),
+            Filters::approximate('labeledURI', 'a1b2c3'),
             0,
         ];
         yield 'approximate on a case exact type accepts the exact value' => [
-            Filters::approximate('employeeNumber', 'A1b2C3'),
+            Filters::approximate('labeledURI', 'A1b2C3'),
             1,
         ];
 
@@ -551,6 +551,89 @@ trait QueryTestsTrait
         );
     }
 
+    /**
+     * @param non-empty-string $baseDn
+     */
+    #[DataProvider('refusedBaseDnProvider')]
+    public function testAMalformedBaseDnIsRefusedWithoutEndingTheSession(string $baseDn): void
+    {
+        $this->authenticateUser();
+        $code = null;
+
+        try {
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base($baseDn)
+                    ->useBaseScope(),
+            );
+        } catch (OperationException $e) {
+            $code = $e->getCode();
+        }
+
+        self::assertSame(
+            ResultCode::INVALID_DN_SYNTAX,
+            $code,
+        );
+
+        // A malformed DN names one message; the connection must stay usable for the next one.
+        self::assertCount(
+            1,
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('dc=foo,dc=bar')
+                    ->useBaseScope(),
+            ),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-string}>
+     */
+    public static function refusedBaseDnProvider(): iterable
+    {
+        yield 'attribute type outside the grammar' => ['!!!=bar,dc=foo,dc=bar'];
+        yield 'attribute type with an inner space' => ['cn foo=bar,dc=foo,dc=bar'];
+        yield 'empty attribute type' => ['=bar,dc=foo,dc=bar'];
+        yield 'attribute option in an rdn' => ['cn;lang-en=alice,dc=foo,dc=bar'];
+        yield 'oid arc with a leading zero' => ['2.05.4.3=alice,dc=foo,dc=bar'];
+        yield 'hexstring value form' => ['cn=#0C03616263,dc=foo,dc=bar'];
+        yield 'raw null byte in a value' => ["cn=a\0b,dc=foo,dc=bar"];
+    }
+
+    public function testAHexEscapeNamesTheSameEntryAsTheCharacterItEncodes(): void
+    {
+        $this->authenticateUser();
+
+        // RFC 4514 4: \61 is the hex escape for "a", so this base denotes cn=alice.
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'))
+                ->base('cn=\61lice,ou=people,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+
+        self::assertSame(
+            ['alice'],
+            $entries->first()?->get(new Attribute('cn'), true)?->getValues(),
+        );
+    }
+
+    public function testBothSpellingsOfAnEscapedCommaNameOneEntry(): void
+    {
+        $this->authenticateUser();
+
+        // The seed holds cn=Smith\, John; \2c is the hex spelling of the same escaped comma.
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'))
+                ->base('cn=Smith\2c John,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+
+        self::assertSame(
+            ['Smith, John'],
+            $entries->first()?->get(new Attribute('cn'), true)?->getValues(),
+        );
+    }
+
     public function testRequestingATypeByItsOidReturnsIt(): void
     {
         $this->authenticateUser();
@@ -710,14 +793,14 @@ trait QueryTestsTrait
         $this->authenticateUser();
 
         $exact = $this->ldapClient()->search(
-            Operations::search(Filters::equal('employeeNumber', 'A1b2C3'))
+            Operations::search(Filters::equal('labeledURI', 'A1b2C3'))
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
         );
-        // The schema matches employeeNumber case-exactly. Storage post-filters results itself, so a case-folded
+        // The schema matches labeledURI case-exactly. Storage post-filters results itself, so a case-folded
         // value matching here would mean that path evaluated without the schema.
         $caseFolded = $this->ldapClient()->search(
-            Operations::search(Filters::equal('employeeNumber', 'a1b2c3'))
+            Operations::search(Filters::equal('labeledURI', 'a1b2c3'))
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
         );
@@ -817,15 +900,15 @@ trait QueryTestsTrait
     {
         $this->authenticateUser();
 
-        // employeeNumber matches case exactly, so a case folded comparison must not be true.
+        // labeledURI matches case exactly, so a case folded comparison must not be true.
         self::assertTrue($this->ldapClient()->compare(
             'cn=alice,ou=people,dc=foo,dc=bar',
-            'employeeNumber',
+            'labeledURI',
             'A1b2C3',
         ));
         self::assertFalse($this->ldapClient()->compare(
             'cn=alice,ou=people,dc=foo,dc=bar',
-            'employeeNumber',
+            'labeledURI',
             'a1b2c3',
         ));
     }
@@ -836,7 +919,7 @@ trait QueryTestsTrait
 
         foreach (['A1b2C3', 'a1b2c3'] as $assertion) {
             $matched = $this->ldapClient()->search(
-                Operations::search(Filters::equal('employeeNumber', $assertion))
+                Operations::search(Filters::equal('labeledURI', $assertion))
                     ->base('dc=foo,dc=bar')
                     ->useSubtreeScope(),
             );
@@ -845,7 +928,7 @@ trait QueryTestsTrait
                 count($matched) === 1,
                 $this->ldapClient()->compare(
                     'cn=alice,ou=people,dc=foo,dc=bar',
-                    'employeeNumber',
+                    'labeledURI',
                     $assertion,
                 ),
             );
