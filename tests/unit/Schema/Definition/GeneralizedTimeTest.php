@@ -39,6 +39,17 @@ final class GeneralizedTimeTest extends TestCase
         );
     }
 
+    /**
+     * RFC 4517 3.3.13 admits "60" as a leap second, and it names the instant after 59.
+     */
+    public function test_parses_a_leap_second_as_the_instant_it_names(): void
+    {
+        self::assertSame(
+            '2017-01-01T00:00:00+00:00',
+            GeneralizedTime::parse('20161231235960Z')->format('c'),
+        );
+    }
+
     public function test_parses_hour_only_precision(): void
     {
         $parsed = GeneralizedTime::parse('2025041510Z');

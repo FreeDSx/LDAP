@@ -24,17 +24,25 @@ use FreeDSx\Ldap\Exception\InvalidArgumentException;
  */
 final class GeneralizedTime
 {
+    /**
+     * The RFC 4517 3.3.13 ranges, since the offset never reaches the calendar check below.
+     */
     private const PATTERN = '/^
         (?<year>\d{4})
-        (?<month>\d{2})
-        (?<day>\d{2})
-        (?<hour>\d{2})
-        (?:(?<minute>\d{2})
-            (?:(?<second>\d{2}))?
+        (?<month>0[1-9]|1[0-2])
+        (?<day>0[1-9]|[12]\d|3[01])
+        (?<hour>[01]\d|2[0-3])
+        (?:(?<minute>[0-5]\d)
+            (?:(?<second>[0-5]\d|60))?
         )?
         (?:[.,](?<fraction>\d+))?
-        (?<zone>Z|[+\-]\d{2}(?:\d{2})?)
+        (?<zone>Z|[+\-](?:[01]\d|2[0-3])(?:[0-5]\d)?)
     $/xD';
+
+    /**
+     * RFC 4517 3.3.13 admits "60" as a leap second, which no calendar holds.
+     */
+    private const LEAP_SECOND = '60';
 
     private function __construct() {}
 
@@ -65,7 +73,8 @@ final class GeneralizedTime
             ));
         }
 
-        return $parsed->setTimezone(new DateTimeZone('UTC'));
+        return self::applyLeapSecond($parsed, $matches)
+            ->setTimezone(new DateTimeZone('UTC'));
     }
 
     /**
@@ -90,12 +99,30 @@ final class GeneralizedTime
     }
 
     /**
+     * A leap second is parsed as second 59, so the instant it names is one second later.
+     *
+     * @param array<int|string, string> $components named capture groups
+     */
+    private static function applyLeapSecond(
+        DateTimeImmutable $parsed,
+        array $components,
+    ): DateTimeImmutable {
+        if (($components['second'] ?? '') !== self::LEAP_SECOND) {
+            return $parsed;
+        }
+
+        return $parsed->modify('+1 second');
+    }
+
+    /**
      * @param array<int|string, string> $components named capture groups
      */
     private static function componentsToIso8601(array $components): string
     {
         $minute = ($components['minute'] ?? '') !== '' ? $components['minute'] : '00';
         $second = ($components['second'] ?? '') !== '' ? $components['second'] : '00';
+        // No calendar holds :60, so it is parsed as :59 and stepped forward once the instant exists.
+        $second = $second === self::LEAP_SECOND ? '59' : $second;
         $fraction = ($components['fraction'] ?? '') !== '' ? '.' . $components['fraction'] : '';
         $zone = $components['zone'] === 'Z'
             ? '+0000'

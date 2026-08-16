@@ -20,7 +20,13 @@ namespace FreeDSx\Ldap\Schema\Validation\Syntax;
  */
 final class OidSyntaxValidator implements SyntaxValidatorInterface
 {
-    private const PATTERN = '/^([0-9]+(\.[0-9]+)*|[A-Za-z][A-Za-z0-9-]*)$/D';
+    /**
+     * RFC 4512 1.4: an arc carries no leading zero, and a numericoid needs at least one dot.
+     */
+    private const PATTERN = '/^('
+        . '(?:0|[1-9][0-9]*)(?:\.(?:0|[1-9][0-9]*))+'
+        . '|[A-Za-z][A-Za-z0-9-]*'
+        . ')$/D';
 
     public function isValid(string $value): bool
     {
