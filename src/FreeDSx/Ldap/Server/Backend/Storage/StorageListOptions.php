@@ -122,8 +122,7 @@ final readonly class StorageListOptions implements FilterAttributeContextInterfa
 
     /**
      * Match-all options for internal callers (e.g. hasChildren) and tests that do not need a meaningful filter.
-     */
-    /**
+     *
      * @param list<string>|null $attributes Lowercase base attribute names to materialize, or null for all.
      */
     public static function matchAll(

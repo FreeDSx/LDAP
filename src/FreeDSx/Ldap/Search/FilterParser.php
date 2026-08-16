@@ -434,13 +434,40 @@ class FilterParser
         ));
     }
 
+    /**
+     * @throws FilterParseException
+     */
     private function unescapeValue(string $value): string
     {
+        $this->assertValueEncoding($value);
+
         return (string) preg_replace_callback(
             '/\\\\([0-9A-Fa-f]{2})/',
             fn(array $matches) => (string) hex2bin($matches[1]),
             $value,
         );
+    }
+
+    /**
+     * RFC 4515 3: an assertion value is UTF1SUBSET, UTFMB, or an escape of exactly two hex digits.
+     *
+     * UTF1SUBSET excludes NUL, the parentheses, the asterisk and the backslash.
+     *
+     * @throws FilterParseException
+     */
+    private function assertValueEncoding(string $value): void
+    {
+        if (preg_match('/\\\\(?![0-9A-Fa-f]{2})/', $value) === 1) {
+            throw new FilterParseException(
+                'A "\" in an assertion value must be followed by two hex digits.',
+            );
+        }
+
+        if (preg_match('/[\x00()*]/', $value) === 1) {
+            throw new FilterParseException(
+                'An assertion value cannot hold an unescaped NUL, parenthesis or asterisk.',
+            );
+        }
     }
 
     /**

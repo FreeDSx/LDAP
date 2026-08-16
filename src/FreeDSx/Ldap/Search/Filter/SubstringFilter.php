@@ -168,7 +168,7 @@ class SubstringFilter implements FilterInterface, FilterAttributeInterface, Stri
      */
     public function toString(): string
     {
-        $filter = self::PAREN_LEFT . $this->attribute . self::FILTER_EQUAL;
+        $filter = self::PAREN_LEFT . $this->attributeToString() . self::FILTER_EQUAL;
 
         $value = '';
         if (count($this->contains) !== 0) {

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Schema\Text;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
@@ -606,24 +607,13 @@ trait SqlFilterTranslatorTrait
     }
 
     /**
-     * Validates an LDAP attribute description against the RFC 4512 syntax:
-     *
-     *   attributedescription = attributetype options
-     *   attributetype        = oid
-     *   oid                  = descr / numericoid
-     *   descr                = keystring (e.g. "cn", "userCertificate")
-     *   numericoid           = number 1*( DOT number ) (e.g. "2.5.4.3")
-     *   options              = *( ";" option )
-     *   option               = 1*keychar
+     * The lowercased attribute type an identifier may carry, once the RFC 4512 2.5 grammar admits it.
      *
      * @throws InvalidAttributeException
      */
     private function validateAttribute(string $attribute): string
     {
-        $lower = strtolower($attribute);
-
-        // The D modifier matters here: without it a trailing newline slips past the whitelist and into an identifier.
-        if (preg_match('/^([a-z][a-z0-9-]*|\d+(\.\d+)+)(;[a-z0-9-]+)*$/D', $lower) !== 1) {
+        if (!Attribute::isValidDescription($attribute)) {
             throw new InvalidAttributeException(sprintf(
                 'Attribute description "%s" is not a valid RFC 4512 attribute description.',
                 $attribute,
@@ -632,7 +622,7 @@ trait SqlFilterTranslatorTrait
 
         return explode(
             ';',
-            $lower,
+            strtolower($attribute),
             2,
         )[0];
     }

@@ -14,7 +14,9 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Search\Filter;
 
 use FreeDSx\Asn1\Asn1;
+use FreeDSx\Ldap\Exception\FilterParseException;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class EqualityFilterTest extends TestCase
@@ -95,5 +97,74 @@ final class EqualityFilterTest extends TestCase
             '(foo=\29\28bar=foo)',
             $this->subject->toString(),
         );
+    }
+
+    /**
+     * @param non-empty-string $attribute
+     */
+    #[DataProvider('unrepresentableAttributeProvider')]
+    public function test_an_attribute_outside_the_grammar_has_no_string_representation(string $attribute): void
+    {
+        self::expectException(FilterParseException::class);
+
+        (new EqualityFilter($attribute, 'x'))->toString();
+    }
+
+    /**
+     * RFC 4515 3 takes attr from RFC 4512 2.5, and nothing escapes an attribute into shape.
+     *
+     * @return iterable<string, array{non-empty-string}>
+     */
+    public static function unrepresentableAttributeProvider(): iterable
+    {
+        yield 'an opening parenthesis' => [
+            'cn(bad',
+        ];
+        yield 'a closing parenthesis' => [
+            'cn)bad',
+        ];
+        yield 'an equals sign' => [
+            'cn=bad',
+        ];
+        yield 'an asterisk' => [
+            'cn*bad',
+        ];
+        yield 'a leading digit' => [
+            '1cn',
+        ];
+        yield 'an underscore' => [
+            'user_id',
+        ];
+    }
+
+    /**
+     * @param non-empty-string $attribute
+     */
+    #[DataProvider('representableAttributeProvider')]
+    public function test_an_attribute_within_the_grammar_is_emitted_as_written(string $attribute): void
+    {
+        self::assertSame(
+            "($attribute=x)",
+            (new EqualityFilter($attribute, 'x'))->toString(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-string}>
+     */
+    public static function representableAttributeProvider(): iterable
+    {
+        yield 'a descr' => [
+            'cn',
+        ];
+        yield 'a descr with hyphens and digits' => [
+            'x-my-attr2',
+        ];
+        yield 'a numeric oid' => [
+            '2.5.4.3',
+        ];
+        yield 'a descr carrying an option' => [
+            'cn;lang-en',
+        ];
     }
 }

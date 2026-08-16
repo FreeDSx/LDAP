@@ -286,6 +286,78 @@ final class FilterParserTest extends TestCase
         );
     }
 
+    /**
+     * @param non-empty-string $filter
+     */
+    #[DataProvider('malformedValueEncodingProvider')]
+    public function test_it_should_error_on_a_value_outside_the_rfc_4515_encoding(string $filter): void
+    {
+        self::expectException(FilterParseException::class);
+
+        FilterParser::parse($filter);
+    }
+
+    /**
+     * RFC 4515 3: escaped is ESC HEX HEX, and UTF1SUBSET excludes NUL, the parentheses and the asterisk.
+     *
+     * @return iterable<string, array{non-empty-string}>
+     */
+    public static function malformedValueEncodingProvider(): iterable
+    {
+        yield 'a backslash followed by no hex digits' => [
+            '(cn=a\zz)',
+        ];
+        yield 'a backslash at the end of a value' => [
+            '(cn=a\)',
+        ];
+        yield 'a backslash followed by one hex digit' => [
+            '(cn=a\5)',
+        ];
+        yield 'an unescaped opening parenthesis' => [
+            '(cn=a(b)',
+        ];
+        yield 'a raw null byte' => [
+            "(cn=a\x00b)",
+        ];
+    }
+
+    /**
+     * @param non-empty-string $filter
+     */
+    #[DataProvider('wellFormedValueEncodingProvider')]
+    public function test_it_should_accept_a_value_within_the_rfc_4515_encoding(string $filter): void
+    {
+        self::assertSame(
+            $filter,
+            FilterParser::parse($filter)->toString(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-string}>
+     */
+    public static function wellFormedValueEncodingProvider(): iterable
+    {
+        yield 'an escaped backslash' => [
+            '(cn=a\5cb)',
+        ];
+        yield 'an escaped parenthesis' => [
+            '(cn=a\28b)',
+        ];
+        yield 'an escaped asterisk' => [
+            '(cn=a\2ab)',
+        ];
+        yield 'an escaped null' => [
+            '(cn=a\00b)',
+        ];
+        yield 'a substring, whose asterisks are structural' => [
+            '(cn=a*b*c)',
+        ];
+        yield 'a multibyte value' => [
+            '(cn=Ω)',
+        ];
+    }
+
     public function test_it_should_error_on_nested_unmatched_parenthesis(): void
     {
         self::expectException(FilterParseException::class);

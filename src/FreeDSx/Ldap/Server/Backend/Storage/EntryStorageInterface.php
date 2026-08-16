@@ -48,8 +48,7 @@ interface EntryStorageInterface
 
     /**
      * Persist the entry keyed by its normalised DN, replacing any existing entry at the same DN.
-     */
-    /**
+     *
      * @param bool $rebuildIndexes Rewrite every secondary-index row rather than only those whose values changed.
      */
     public function store(

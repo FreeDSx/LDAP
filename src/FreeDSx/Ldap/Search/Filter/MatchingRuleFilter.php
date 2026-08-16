@@ -21,6 +21,7 @@ use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Exception\FilterParseException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use Stringable;
@@ -164,10 +165,7 @@ class MatchingRuleFilter implements FilterInterface, FilterAttributeInterface, S
     public function toString(): string
     {
         // RFC 4515 3: attr [":dn"] [":" matchingrule] ":=" value.
-        $filter = '';
-        if ($this->attribute !== null) {
-            $filter = $this->attribute;
-        }
+        $filter = $this->attributeToString();
         if ($this->useDnAttributes) {
             $filter .= ':dn';
         }
@@ -242,5 +240,26 @@ class MatchingRuleFilter implements FilterInterface, FilterAttributeInterface, S
             $matchValue->getValue(),
             $useDnAttr,
         );
+    }
+
+    /**
+     * The attribute as a filter string names it, empty when the assertion carries none.
+     *
+     * @throws FilterParseException
+     */
+    private function attributeToString(): string
+    {
+        if ($this->attribute === null) {
+            return '';
+        }
+
+        if (!Attribute::isValidDescription($this->attribute)) {
+            throw new FilterParseException(sprintf(
+                'The attribute "%s" has no valid filter string representation.',
+                $this->attribute,
+            ));
+        }
+
+        return $this->attribute;
     }
 }

@@ -459,9 +459,6 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
     }
 
     /**
-     * @throws OperationException
-     */
-    /**
      * @param list<Entry> $page
      */
     private function pageHasCapacity(

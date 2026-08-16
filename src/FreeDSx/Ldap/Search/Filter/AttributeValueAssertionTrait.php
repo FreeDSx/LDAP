@@ -77,7 +77,7 @@ trait AttributeValueAssertionTrait
     public function toString(): string
     {
         return self::PAREN_LEFT
-            . $this->attribute
+            . $this->attributeToString()
             . self::FILTER_TYPE
             . Attribute::escape($this->value)
             . self::PAREN_RIGHT;

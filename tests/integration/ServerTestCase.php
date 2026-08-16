@@ -109,8 +109,7 @@ class ServerTestCase extends LdapTestCase
 
     /**
      * Shared-server lifecycle — called from setUpBeforeClass / tearDownAfterClass
-     */
-    /**
+     *
      * @param list<string> $extraArgs
      */
     protected static function initSharedServer(

@@ -198,6 +198,24 @@ class Attribute implements IteratorAggregate, Countable, Stringable
     }
 
     /**
+     * Whether a description matches the RFC 4512 2.5 grammar:
+     *
+     *   attributedescription = attributetype options
+     *   attributetype        = oid            ; descr / numericoid
+     *   options              = *( ";" option )
+     *   option               = 1*keychar
+     *
+     * The D modifier matters: without it a trailing newline slips past the whitelist and into an identifier.
+     */
+    public static function isValidDescription(string $description): bool
+    {
+        return preg_match(
+            '/^([a-z][a-z0-9-]*|\d+(\.\d+)+)(;[a-z0-9-]+)*$/D',
+            strtolower($description),
+        ) === 1;
+    }
+
+    /**
      * Gets the name (AttributeType) portion of the AttributeDescription, which excludes the options.
      */
     public function getName(): string
