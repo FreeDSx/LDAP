@@ -68,6 +68,23 @@ final class CoreSchemaResourceTest extends TestCase
         );
     }
 
+    public function test_employee_number_matches_case_insensitively(): void
+    {
+        $employeeNumber = $this->schema->getAttributeType('employeeNumber');
+
+        self::assertNotNull($employeeNumber);
+        self::assertSame(
+            '2.5.13.2',
+            $employeeNumber->equalityOid,
+            'RFC 2798 defines employeeNumber with caseIgnoreMatch.',
+        );
+        self::assertSame(
+            '2.5.13.4',
+            $employeeNumber->substringOid,
+            'RFC 2798 defines employeeNumber with caseIgnoreSubstringsMatch.',
+        );
+    }
+
     public function test_has_expected_syntax_count(): void
     {
         self::assertCount(

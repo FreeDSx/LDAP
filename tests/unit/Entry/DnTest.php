@@ -102,6 +102,26 @@ class DnTest extends TestCase
         yield 'undotted numeric oid' => ['2=bar'];
     }
 
+    public function test_a_raw_null_byte_in_a_value_is_invalid(): void
+    {
+        self::assertFalse(Dn::isValid("cn=a\0b,dc=x"));
+    }
+
+    public function test_the_escaped_null_form_stays_valid(): void
+    {
+        self::assertTrue(Dn::isValid('cn=a\00b,dc=x'));
+    }
+
+    public function test_the_hexstring_value_form_is_refused(): void
+    {
+        self::assertFalse(Dn::isValid('cn=#0C03616263,dc=x'));
+    }
+
+    public function test_an_escaped_leading_sharp_is_still_a_valid_value(): void
+    {
+        self::assertTrue(Dn::isValid('cn=\23abc,dc=x'));
+    }
+
     /**
      * @param non-empty-string $dn
      */

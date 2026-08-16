@@ -131,6 +131,53 @@ trait WriteTestsTrait
         );
     }
 
+    public function testAddWithAHexstringDnIsRefused(): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->create(Entry::fromArray(
+                'cn=#0C03616263,dc=foo,dc=bar',
+                [
+                    'cn' => 'abc',
+                    'sn' => 'Hex',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+            self::fail('The hexstring DN form should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INVALID_DN_SYNTAX,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function testAddWithAnEscapedLeadingSharpIsStoredAsALiteralValue(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=\23hashtag,dc=foo,dc=bar',
+            [
+                'cn' => '#hashtag',
+                'sn' => 'Hash',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        try {
+            $entries = $this->ldapClient()->search(
+                Operations::search(Filters::equal('cn', '#hashtag'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+            );
+
+            self::assertCount(1, $entries);
+        } finally {
+            $this->ldapClient()->delete('cn=\23hashtag,dc=foo,dc=bar');
+        }
+    }
+
     public function testAddRejectsDuplicateAttributeDescriptions(): void
     {
         $this->authenticateAdmin();
@@ -228,6 +275,48 @@ trait WriteTestsTrait
         );
 
         $this->ldapClient()->delete('cn=policy-carrier,dc=foo,dc=bar');
+    }
+
+    /**
+     * RDN values are folded case-insensitively whatever the attribute's EQUALITY rule says, so labeledURI names
+     * one entry despite matching case-exactly everywhere else.
+     *
+     * A deliberate deviation: honouring caseExact here would make DNs differing only in case distinct entries, and
+     * an accidental case difference is likelier than an intended one. Real world implementations genuinely already
+     * behave differently on this point.
+     */
+    public function testRdnCaseIsFoldedEvenForACaseExactAttribute(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'labeledURI=CaseTest,dc=foo,dc=bar',
+            [
+                'cn' => 'casetest',
+                'sn' => 'Case',
+                'labeledURI' => 'CaseTest',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        try {
+            $this->ldapClient()->create(Entry::fromArray(
+                'labeledURI=casetest,dc=foo,dc=bar',
+                [
+                    'cn' => 'casetest2',
+                    'sn' => 'Case',
+                    'labeledURI' => 'casetest',
+                    'objectClass' => 'inetOrgPerson',
+                ],
+            ));
+            self::fail('The case-folded DN should have named the entry already added.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ENTRY_ALREADY_EXISTS,
+                $e->getCode(),
+            );
+        } finally {
+            $this->ldapClient()->delete('labeledURI=CaseTest,dc=foo,dc=bar');
+        }
     }
 
     public function testAddDuplicateDnFails(): void

@@ -163,6 +163,7 @@ class Rdn implements Stringable
                 ));
             }
             self::assertAttributeType($parts[0]);
+            self::assertValue($parts[1]);
 
             if ($obj === null) {
                 $obj = new self(
@@ -235,6 +236,25 @@ class Rdn implements Stringable
                 'The attribute type "%s" is not valid in a DN.',
                 $name,
             ));
+        }
+    }
+
+    /**
+     * @throws InvalidDnSyntaxException
+     */
+    private static function assertValue(string $value): void
+    {
+        // RFC 4514 3 admits no raw NUL, though the escaped \00 form stays legal.
+        if (str_contains($value, "\0")) {
+            throw new InvalidDnSyntaxException('An RDN value cannot hold an unescaped null byte.');
+        }
+
+        // The 2.4 hexstring form is refused: no other common LDAP implementation supports it as specified, and
+        // nothing is known to emit it. May revisit if there's a legitimate use case.
+        if (str_starts_with($value, '#')) {
+            throw new InvalidDnSyntaxException(
+                'The hexstring form of an RDN value is not supported; escape a literal "#" as \23.',
+            );
         }
     }
 }

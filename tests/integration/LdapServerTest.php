@@ -705,11 +705,10 @@ final class LdapServerTest extends ServerTestCase
         $this->assertNotNull($this->ldapClient()->read(''));
     }
 
-    public function testASearchWithAMalformedBaseDnReportsNoSuchObject(): void
+    public function testASearchWithAMalformedBaseDnReportsInvalidDnSyntax(): void
     {
         $this->authenticateAdmin();
 
-        // The search path only normalizes, which never decomposes the DN, so there is nothing to reject.
         try {
             $this->ldapClient()->search(
                 Operations::search(Filters::present('objectClass'))
@@ -719,7 +718,7 @@ final class LdapServerTest extends ServerTestCase
             $this->fail('Expected the search to be refused.');
         } catch (OperationException $e) {
             $this->assertSame(
-                ResultCode::NO_SUCH_OBJECT,
+                ResultCode::INVALID_DN_SYNTAX,
                 $e->getCode(),
             );
         }

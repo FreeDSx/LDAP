@@ -15,6 +15,8 @@ namespace Tests\Integration\FreeDSx\Ldap\Sync;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
@@ -206,6 +208,26 @@ final class SyncReplNativeTest extends ServerTestCase
                 $alice->getAttributes(),
             ),
         );
+    }
+
+    public function testASyncWithAMalformedBaseDnIsRefused(): void
+    {
+        $this->authenticateUser();
+
+        $syncRepl = $this->ldapClient()->syncRepl();
+        $syncRepl->request()
+            ->base('cn=#0C03616263,dc=foo,dc=bar')
+            ->useSubtreeScope();
+
+        try {
+            $syncRepl->poll();
+            self::fail('Expected the sync to be refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INVALID_DN_SYNTAX,
+                $e->getCode(),
+            );
+        }
     }
 
     private function syncRepl(?FilterInterface $filter = null): SyncRepl

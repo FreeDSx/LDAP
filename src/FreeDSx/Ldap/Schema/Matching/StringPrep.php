@@ -38,7 +38,7 @@ final readonly class StringPrep
     public function __construct(
         public bool $foldCase = true,
     ) {
-        $this->canFoldUnicode = function_exists('mb_strtolower');
+        $this->canFoldUnicode = function_exists('mb_convert_case');
         $this->canNormalize = class_exists(Normalizer::class);
     }
 
@@ -112,6 +112,10 @@ final readonly class StringPrep
         ) ?? $stripped;
     }
 
+    /**
+     * RFC 4518 2.3 calls for RFC 3454 B.2 case folding, which is not lowercasing: folding maps German sharp s
+     * to "ss" so that it compares equal to the spelled-out form.
+     */
     private function caseFold(string $value): string
     {
         if (!$this->foldCase) {
@@ -119,8 +123,9 @@ final readonly class StringPrep
         }
 
         if ($this->canFoldUnicode) {
-            return mb_strtolower(
+            return mb_convert_case(
                 $value,
+                MB_CASE_FOLD,
                 'UTF-8',
             );
         }
