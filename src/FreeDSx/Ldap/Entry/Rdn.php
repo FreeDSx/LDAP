@@ -47,6 +47,11 @@ class Rdn implements Stringable
     ];
 
     /**
+     * RFC 4514 3: attributeType is a descr (RFC 4512 keystring) or a dotted numericoid whose arcs carry no leading zeros.
+     */
+    private const ATTRIBUTE_TYPE_PATTERN = '/^(?:[A-Za-z][A-Za-z0-9-]*|(?:0|[1-9][0-9]*)(?:\.(?:0|[1-9][0-9]*))+)$/';
+
+    /**
      * @var Rdn[]
      */
     private array $additional = [];
@@ -157,6 +162,8 @@ class Rdn implements Stringable
                     $piece,
                 ));
             }
+            self::assertAttributeType($parts[0]);
+
             if ($obj === null) {
                 $obj = new self(
                     name: $parts[0],
@@ -216,5 +223,18 @@ class Rdn implements Stringable
         }
 
         return self::escapeNonPrintable($value);
+    }
+
+    /**
+     * @throws InvalidDnSyntaxException
+     */
+    private static function assertAttributeType(string $name): void
+    {
+        if (preg_match(self::ATTRIBUTE_TYPE_PATTERN, trim($name)) !== 1) {
+            throw new InvalidDnSyntaxException(sprintf(
+                'The attribute type "%s" is not valid in a DN.',
+                $name,
+            ));
+        }
     }
 }

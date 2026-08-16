@@ -376,13 +376,45 @@ final class AclIntegrationTest extends ServerTestCase
     {
         $this->bindDelegate();
 
+        // RFC 4514 3 admits no options in an RDN attribute type
         $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+        $this->expectExceptionCode(ResultCode::INVALID_DN_SYNTAX);
 
         $this->ldapClient()->rename(
             'uid=bob,ou=people,dc=foo,dc=bar',
             new Rdn('userPassword;x', 'hunter2'),
             false,
+        );
+    }
+
+    public function testAnInvalidDnSyntaxRenameDoesNotEndTheSession(): void
+    {
+        $this->bindDelegate();
+        $code = null;
+
+        try {
+            $this->ldapClient()->rename(
+                'uid=bob,ou=people,dc=foo,dc=bar',
+                new Rdn('userPassword;x', 'hunter2'),
+                false,
+            );
+        } catch (OperationException $e) {
+            $code = $e->getCode();
+        }
+
+        self::assertSame(
+            ResultCode::INVALID_DN_SYNTAX,
+            $code,
+        );
+
+        // A malformed DN names one message; the connection must stay usable for the next one.
+        self::assertCount(
+            1,
+            $this->ldapClient()->search(
+                Operations::search(Filters::equal('uid', 'bob'))
+                    ->base('ou=people,dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+            ),
         );
     }
 

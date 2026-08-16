@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Entry;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Rdn;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class DnTest extends TestCase
@@ -75,6 +76,50 @@ class DnTest extends TestCase
         self::assertTrue(Dn::isValid('cn=foo,dc=bar,dc=foo'));
         self::assertFalse(Dn::isValid('foo'));
         self::assertTrue(Dn::isValid(''));
+    }
+
+    /**
+     * @param non-empty-string $dn
+     */
+    #[DataProvider('invalidAttributeTypeProvider')]
+    public function test_an_attribute_type_outside_the_rfc_4514_grammar_is_invalid(string $dn): void
+    {
+        self::assertFalse(Dn::isValid($dn));
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-string}>
+     */
+    public static function invalidAttributeTypeProvider(): iterable
+    {
+        yield 'empty type' => ['=foo'];
+        yield 'punctuation only' => ['!!!=bar'];
+        yield 'inner space' => ['cn foo=bar'];
+        yield 'leading digit' => ['1cn=bar'];
+        yield 'underscore' => ['user_id=bar'];
+        yield 'attribute option' => ['cn;lang-en=bar'];
+        yield 'oid with a leading zero arc' => ['1.03.6=bar'];
+        yield 'undotted numeric oid' => ['2=bar'];
+    }
+
+    /**
+     * @param non-empty-string $dn
+     */
+    #[DataProvider('validAttributeTypeProvider')]
+    public function test_an_attribute_type_within_the_rfc_4514_grammar_is_valid(string $dn): void
+    {
+        self::assertTrue(Dn::isValid($dn));
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-string}>
+     */
+    public static function validAttributeTypeProvider(): iterable
+    {
+        yield 'descr' => ['cn=bar'];
+        yield 'descr with a hyphen and digits' => ['x-my-attr2=bar'];
+        yield 'numeric oid' => ['2.5.4.3=bar'];
+        yield 'numeric oid with a zero arc' => ['2.5.0.3=bar'];
     }
 
     public function test_it_should_handle_a_rootdse_as_a_dn(): void

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Exception;
 
+use FreeDSx\Ldap\Operation\ResultCode;
 use Throwable;
 
 /**
@@ -27,12 +28,18 @@ final class MessageDecodeException extends ProtocolException
         private readonly int $protocolOpTag,
         string $message,
         ?Throwable $previous = null,
+        private readonly int $resultCode = ResultCode::PROTOCOL_ERROR,
     ) {
         parent::__construct(
             $message,
             0,
             $previous,
         );
+    }
+
+    public function getResultCode(): int
+    {
+        return $this->resultCode;
     }
 
     public function getMessageId(): int
