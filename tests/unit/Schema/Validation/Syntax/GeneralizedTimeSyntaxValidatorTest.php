@@ -48,6 +48,10 @@ final class GeneralizedTimeSyntaxValidatorTest extends TestCase
             'numeric offset' => ['20240101123000+0500'],
             'hour precision' => ['2024010112Z'],
             'fractional seconds' => ['20240101123000.5Z'],
+            'the largest offset the grammar admits' => ['20240101123000+2359'],
+            'a negative offset' => ['20240101123000-0500'],
+            // RFC 4517 3.3.13 defines leap-second as "60" alongside second, so this is a legal value.
+            'a leap second' => ['20161231235960Z'],
         ];
     }
 
@@ -63,6 +67,11 @@ final class GeneralizedTimeSyntaxValidatorTest extends TestCase
             'missing zone' => ['20240101123000'],
             'invalid month' => ['20241301010000Z'],
             'trailing newline' => ["20240101123000Z\n"],
+            // RFC 4517 3.3.13: g-differential reuses hour ("00" to "23") and minute ("00" to "59").
+            'offset hour above 23' => ['20240101123000+2400'],
+            'offset hour far above 23' => ['20240101123000+9900'],
+            'offset minute above 59' => ['20240101123000+0060'],
+            'a second above the leap second' => ['20240101123061Z'],
         ];
     }
 }

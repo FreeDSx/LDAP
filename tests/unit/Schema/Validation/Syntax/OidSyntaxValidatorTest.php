@@ -48,6 +48,7 @@ final class OidSyntaxValidatorTest extends TestCase
             'short numeric oid' => ['2.5.4.3'],
             'descriptor' => ['cn'],
             'descriptor with digits and hyphen' => ['x-my-attr2'],
+            'a zero arc, which is a single digit rather than a leading zero' => ['1.0.6'],
         ];
     }
 
@@ -65,6 +66,11 @@ final class OidSyntaxValidatorTest extends TestCase
             'descriptor with underscore' => ['cn_x'],
             'with space' => ['1.2 3'],
             'trailing newline' => ["1.2.3\n"],
+            // RFC 4512 1.4: number is DIGIT / ( LDIGIT 1*DIGIT ), so 1.03.6 and 1.3.6 cannot both be spellings
+            // of one OID.
+            'leading zero in an arc' => ['1.03.6'],
+            'leading zeros in the first arc' => ['007.1'],
+            'a number carrying no dot is no numericoid' => ['1'],
         ];
     }
 }
