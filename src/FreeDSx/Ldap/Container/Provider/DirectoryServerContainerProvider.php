@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
+use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributeAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributePolicy;
@@ -32,6 +33,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackendBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestReplayer;
@@ -167,11 +169,25 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeFilterEvaluator(Container $container): FilterEvaluator
     {
-        $options = $container->get(ServerOptions::class);
-
         return new FilterEvaluator(
-            $options->getSchema(),
-            $options->getSubschemaEntry(),
+            $container->get(ServerOptions::class)->getSchema(),
+            $this->makeDerivedResolver($container),
+            $this->makeAttributeSyntaxResolver($container),
+        );
+    }
+
+    private function makeAttributeSyntaxResolver(Container $container): AttributeSyntaxResolver
+    {
+        return new AttributeSyntaxResolver(
+            $container->get(ServerOptions::class)->getSchema(),
+        );
+    }
+
+    private function makeDerivedResolver(Container $container): DerivedResolver
+    {
+        return new DerivedResolver(
+            $container->get(EntryStorageInterface::class),
+            $container->get(ServerOptions::class)->getSubschemaEntry(),
         );
     }
 
@@ -329,10 +345,9 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         $options = $container->get(ServerOptions::class);
 
         return new SearchStreamBuilder(
-            $container->get(EntryStorageInterface::class),
             $options->makeSearchLimits(),
             $container->get(FilterEvaluatorInterface::class),
-            $options->getSubschemaEntry(),
+            $this->makeDerivedResolver($container),
         );
     }
 

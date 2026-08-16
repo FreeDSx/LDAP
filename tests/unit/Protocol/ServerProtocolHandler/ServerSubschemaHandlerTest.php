@@ -26,7 +26,7 @@ use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\FilterEvaluatorFactoryTrait;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -34,6 +34,8 @@ use PHPUnit\Framework\TestCase;
 
 final class ServerSubschemaHandlerTest extends TestCase
 {
+    use FilterEvaluatorFactoryTrait;
+
     private TokenInterface&MockObject $mockToken;
 
     private ServerOptions $options;
@@ -164,7 +166,7 @@ final class ServerSubschemaHandlerTest extends TestCase
     {
         return new GeneratedEntryResponder(
             new RuleBasedAccessControl(),
-            new FilterEvaluator($schema),
+            $this->makeFilterEvaluator($schema),
             $schema,
         );
     }

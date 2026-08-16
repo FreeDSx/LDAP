@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
@@ -32,9 +33,12 @@ use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
 use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\FilterEvaluatorFactoryTrait;
 
 final class FilterEvaluatorTest extends TestCase
 {
+    use FilterEvaluatorFactoryTrait;
+
     private FilterEvaluator $subject;
 
     private Entry $entry;
@@ -42,7 +46,7 @@ final class FilterEvaluatorTest extends TestCase
     protected function setUp(): void
     {
         // NIS is merged in for uidNumber: an unrecognized type is Undefined, so the fixture must define what it asserts on.
-        $this->subject = new FilterEvaluator(
+        $this->subject = $this->makeFilterEvaluator(
             SchemaResource::Core->load()->merge(SchemaResource::Nis->load()),
         );
 
@@ -872,7 +876,7 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_equality_uses_octet_string_match_for_userpassword(): void
     {
-        $subject = new FilterEvaluator(SchemaResource::Core->load());
+        $subject = $this->makeFilterEvaluator();
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),
             new Attribute('userPassword', 'Secret'),
@@ -888,7 +892,7 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_equality_collapses_whitespace_for_cn(): void
     {
-        $subject = new FilterEvaluator(SchemaResource::Core->load());
+        $subject = $this->makeFilterEvaluator();
         $entry = new Entry(
             new Dn('cn=Foo  Bar,dc=example,dc=com'),
             new Attribute('cn', 'Foo  Bar'),
@@ -904,7 +908,7 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_substring_matches_across_collapsed_spaces(): void
     {
-        $subject = new FilterEvaluator(SchemaResource::Core->load());
+        $subject = $this->makeFilterEvaluator();
         $entry = new Entry(
             new Dn('cn=Foo  Bar Baz,dc=example,dc=com'),
             new Attribute('cn', 'Foo  Bar Baz'),
@@ -920,17 +924,16 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_matching_rule_filter_resolves_non_hardcoded_oid(): void
     {
-        $subject = $this->integerSchemaEvaluator();
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),
             new Attribute('uidNumber', '1001'),
         );
 
-        self::assertTrue($subject->evaluate(
+        self::assertTrue($this->subject->evaluate(
             $entry,
             new MatchingRuleFilter('2.5.13.14', 'uidNumber', '1001'),
         ));
-        self::assertFalse($subject->evaluate(
+        self::assertFalse($this->subject->evaluate(
             $entry,
             new MatchingRuleFilter('2.5.13.14', 'uidNumber', '1002'),
         ));
@@ -948,7 +951,7 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_gte_uses_digit_heuristic_for_attribute_unknown_to_schema(): void
     {
-        $subject = new FilterEvaluator(SchemaResource::Core->load());
+        $subject = $this->makeFilterEvaluator(SchemaResource::Core->load());
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),
             new Attribute('uidNumber', '99'),
@@ -966,15 +969,12 @@ final class FilterEvaluatorTest extends TestCase
      */
     public function test_schema_gte_infers_numeric_ordering_from_integer_syntax(): void
     {
-        $subject = new FilterEvaluator(
-            SchemaResource::Core->load()->merge(SchemaResource::Nis->load()),
-        );
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),
             new Attribute('uidNumber', '50'),
         );
 
-        self::assertFalse($subject->evaluate(
+        self::assertFalse($this->subject->evaluate(
             $entry,
             Filters::greaterThanOrEqual('uidNumber', '100'),
         ));
@@ -983,7 +983,7 @@ final class FilterEvaluatorTest extends TestCase
     #[DataProvider('invalidAssertionValueProvider')]
     public function test_an_assertion_value_the_syntax_rejects_is_undefined(FilterInterface $filter): void
     {
-        self::assertFalse($this->integerSchemaEvaluator()->evaluate(
+        self::assertFalse($this->subject->evaluate(
             $this->uidNumberEntry(),
             $filter,
         ));
@@ -995,7 +995,7 @@ final class FilterEvaluatorTest extends TestCase
     #[DataProvider('invalidAssertionValueProvider')]
     public function test_a_negated_assertion_value_the_syntax_rejects_is_still_undefined(FilterInterface $filter): void
     {
-        self::assertFalse($this->integerSchemaEvaluator()->evaluate(
+        self::assertFalse($this->subject->evaluate(
             $this->uidNumberEntry(),
             Filters::not($filter),
         ));
@@ -1031,14 +1031,13 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_a_conforming_assertion_value_is_unaffected(): void
     {
-        $subject = $this->integerSchemaEvaluator();
         $entry = $this->uidNumberEntry();
 
-        self::assertTrue($subject->evaluate(
+        self::assertTrue($this->subject->evaluate(
             $entry,
             Filters::equal('uidNumber', '100'),
         ));
-        self::assertFalse($subject->evaluate(
+        self::assertFalse($this->subject->evaluate(
             $entry,
             Filters::not(Filters::equal('uidNumber', '100')),
         ));
@@ -1049,7 +1048,7 @@ final class FilterEvaluatorTest extends TestCase
      */
     public function test_a_present_filter_is_not_subject_to_the_assertion_syntax_check(): void
     {
-        self::assertTrue($this->integerSchemaEvaluator()->evaluate(
+        self::assertTrue($this->subject->evaluate(
             $this->uidNumberEntry(),
             Filters::present('uidNumber'),
         ));
@@ -1062,7 +1061,7 @@ final class FilterEvaluatorTest extends TestCase
      */
     public function test_a_substring_fragment_is_not_subject_to_the_assertion_syntax_check(): void
     {
-        $subject = new FilterEvaluator(
+        $subject = $this->makeFilterEvaluator(
             SchemaResource::Core->load()->addAttributeType(new AttributeType(
                 oid: '1.3.6.1.4.1.99999.5.1',
                 names: ['serialCode'],
@@ -1166,7 +1165,7 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_a_substring_rule_is_inherited_through_the_sup_chain(): void
     {
-        $subject = new FilterEvaluator(
+        $subject = $this->makeFilterEvaluator(
             SchemaResource::Core->load()->addAttributeType(new AttributeType(
                 oid: '1.3.6.1.4.1.99999.5.2',
                 names: ['nickName'],
@@ -1264,13 +1263,6 @@ final class FilterEvaluatorTest extends TestCase
             ),
             false,
         ];
-    }
-
-    private function integerSchemaEvaluator(): FilterEvaluator
-    {
-        return new FilterEvaluator(
-            SchemaResource::Core->load()->merge(SchemaResource::Nis->load()),
-        );
     }
 
     private function uidNumberEntry(): Entry

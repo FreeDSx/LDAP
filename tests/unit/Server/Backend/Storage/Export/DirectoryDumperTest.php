@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Ldif\LdifOutputOptions;
 use FreeDSx\Ldap\Ldif\LdifWriter;
-use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
@@ -26,13 +25,15 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\FilterEvaluatorFactoryTrait;
 
 final class DirectoryDumperTest extends TestCase
 {
+    use FilterEvaluatorFactoryTrait;
+
     public function test_it_yields_the_version_header_first_when_enabled(): void
     {
         $dumper = $this->makeDumper();
@@ -218,7 +219,7 @@ final class DirectoryDumperTest extends TestCase
         return new DirectoryDumper(
             $storage ?? $this->storageWithEntries(),
             [new Dn('dc=foo,dc=bar')],
-            $filterEvaluator ?? new FilterEvaluator(SchemaResource::Core->load()),
+            $filterEvaluator ?? $this->makeFilterEvaluator(),
             $writer ?? new LdifWriter(),
         );
     }

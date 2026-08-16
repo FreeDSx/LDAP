@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Filter;
 
 use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -39,7 +38,8 @@ use FreeDSx\Ldap\Search\Filter\NotFilter;
 use FreeDSx\Ldap\Search\Filter\OrFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
-use FreeDSx\Ldap\Server\Backend\Storage\DerivedAttributeTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use WeakMap;
 
 /**
@@ -97,27 +97,16 @@ final class FilterEvaluator implements FilterEvaluatorInterface
      */
     private WeakMap $substringRuleCache;
 
-    private readonly CaseIgnoreComparator $defaultComparator;
-
-    private readonly IntegerComparator $integerComparator;
-
     private readonly AttributeSyntaxResolver $syntaxResolver;
-
-    /**
-     * How each derived attribute's value is produced, keyed on the type name.
-     *
-     * @var array<string, callable(Entry): string>
-     */
-    private readonly array $derivedResolvers;
 
     public function __construct(
         private readonly Schema $schema,
-        Dn $subschemaEntry = new Dn('cn=Subschema'),
+        private readonly DerivedResolver $derivedResolver,
+        ?AttributeSyntaxResolver $syntaxResolver = null,
+        private readonly CaseIgnoreComparator $defaultComparator = new CaseIgnoreComparator(),
+        private readonly IntegerComparator $integerComparator = new IntegerComparator(),
     ) {
-        $this->derivedResolvers = self::derivedResolvers($subschemaEntry);
-        $this->defaultComparator = new CaseIgnoreComparator();
-        $this->integerComparator = new IntegerComparator();
-        $this->syntaxResolver = new AttributeSyntaxResolver($schema);
+        $this->syntaxResolver = $syntaxResolver ?? new AttributeSyntaxResolver($schema);
         $this->substringCache = new WeakMap();
         $this->assertionSyntaxCache = new WeakMap();
         $this->recognizedAttributeCache = new WeakMap();
@@ -649,13 +638,19 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         Entry $entry,
         string $attributeDescription,
     ): ?array {
-        foreach ($this->derivedResolvers as $name => $resolve) {
-            if (self::describesType($attributeDescription, $name)) {
-                return [$resolve($entry)];
-            }
+        // The filter may spell the type as a name or an OID, so it is canonicalized before being resolved.
+        $name = self::derivedTypeName($attributeDescription);
+
+        if ($name === null) {
+            return null;
         }
 
-        return null;
+        return [
+            $this->derivedResolver->resolve(
+                $name,
+                $entry,
+            ),
+        ];
     }
 
     /**

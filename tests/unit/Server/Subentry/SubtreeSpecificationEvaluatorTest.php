@@ -15,14 +15,15 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Subentry;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Schema\SchemaResource;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\FilterEvaluatorFactoryTrait;
 use FreeDSx\Ldap\Server\Subentry\SubtreeSpecificationEvaluator;
 use FreeDSx\Ldap\Server\Subentry\SubtreeSpecificationParser;
 use PHPUnit\Framework\TestCase;
 
 final class SubtreeSpecificationEvaluatorTest extends TestCase
 {
+    use FilterEvaluatorFactoryTrait;
+
     private const ADMIN_POINT = 'ou=area,dc=foo,dc=bar';
 
     private SubtreeSpecificationEvaluator $subject;
@@ -32,7 +33,7 @@ final class SubtreeSpecificationEvaluatorTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = new SubtreeSpecificationEvaluator(
-            new FilterEvaluator(SchemaResource::Core->load()),
+            $this->makeFilterEvaluator(),
         );
         $this->parser = new SubtreeSpecificationParser();
     }

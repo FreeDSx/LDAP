@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
 use FreeDSx\Ldap\Server\Backend\Storage\SearchStreamBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptionsFactory;
@@ -30,11 +29,13 @@ use FreeDSx\Ldap\Server\SearchLimits;
  */
 trait BackendFactoryTrait
 {
+    use FilterEvaluatorFactoryTrait;
+
     /**
      * Defaults to the core schema with validation off: filter evaluation reads the schema to tell an unrecognized
      * attribute type from one an entry merely lacks, so an empty schema would make every assertion Undefined.
      */
-    private static function makeWritableBackend(
+    private function makeWritableBackend(
         EntryStorageInterface $storage,
         ?SchemaValidator $validator = null,
         ?Schema $schema = null,
@@ -43,14 +44,17 @@ trait BackendFactoryTrait
     ): WritableStorageBackend {
         $schema ??= SchemaResource::Core->load();
         $limits ??= new SearchLimits();
-        $filterEvaluator = new FilterEvaluator($schema);
+        $filterEvaluator = $this->makeFilterEvaluator(
+            $schema,
+            $storage,
+        );
 
         return new WritableStorageBackend(
             storage: $storage,
             searchStream: new SearchStreamBuilder(
-                $storage,
                 $limits,
                 $filterEvaluator,
+                $this->makeDerivedResolver($storage),
             ),
             validator: $validator ?? new SchemaValidator(
                 $schema,
