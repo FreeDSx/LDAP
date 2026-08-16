@@ -68,9 +68,13 @@ class SearchResultReference implements ResponseInterface
             }
             try {
                 $referrals[] = LdapUrl::parse($referral->getValue());
-            } catch (UrlParseException $e) {
-                throw new ProtocolException($e->getMessage());
+            } catch (UrlParseException) {
+                # RFC 4511 4.1.10 makes the URIs alternatives, so an unusable one is ignored.
             }
+        }
+
+        if ($referrals === []) {
+            throw new ProtocolException('The search result reference holds no usable URI.');
         }
 
         return new self(...$referrals);

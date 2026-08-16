@@ -24,6 +24,7 @@ use function count;
 use function end;
 use function explode;
 use function implode;
+use function in_array;
 use function key;
 use function ltrim;
 use function parse_url;
@@ -227,7 +228,6 @@ class LdapUrl implements Stringable
      * Given a string LDAP URL, get its object representation.
      *
      * @throws UrlParseException
-     * @throws InvalidArgumentException
      */
     public static function parse(string $ldapUrl): LdapUrl
     {
@@ -239,21 +239,85 @@ class LdapUrl implements Stringable
         $url->setDn((isset($pieces['path']) && $pieces['path'] !== '/') ? self::decode(ltrim($pieces['path'], '/')) : null);
 
         $query = explode('?', $pieces['query'] ?? '');
-        if (count($query) !== 0) {
-            $url->setAttributes(...($query[0] === '' ? [] : explode(',', $query[0])));
-            $url->setScope(isset($query[1]) && $query[1] !== '' ? $query[1] : null);
-            $url->setFilter(isset($query[2]) && $query[2] !== '' ? self::decode($query[2]) : null);
 
-            $extensions = [];
-            if (isset($query[3]) && $query[3] !== '') {
-                $extensions = array_map(function ($ext) {
-                    return LdapUrlExtension::parse($ext);
-                }, explode(',', $query[3]));
-            }
-            $url->setExtensions(...$extensions);
+        # RFC 4516 2 admits four query components at most: attributes, scope, filter and extensions.
+        if (count($query) > 4) {
+            throw new UrlParseException(sprintf(
+                'The LDAP URL has too many query components: %s',
+                $ldapUrl,
+            ));
         }
 
+        $url->setAttributes(...self::parseAttributes(
+            $query[0] ?? '',
+            $ldapUrl,
+        ));
+        self::applyScope(
+            $url,
+            isset($query[1]) && $query[1] !== '' ? $query[1] : null,
+            $ldapUrl,
+        );
+        $url->setFilter(isset($query[2]) && $query[2] !== '' ? self::decode($query[2]) : null);
+
+        $extensions = [];
+        if (isset($query[3]) && $query[3] !== '') {
+            $extensions = array_map(
+                fn(string $ext): LdapUrlExtension => LdapUrlExtension::parse($ext),
+                explode(',', $query[3]),
+            );
+        }
+        $url->setExtensions(...$extensions);
+
         return $url;
+    }
+
+    /**
+     * @return string[]
+     * @throws UrlParseException
+     */
+    private static function parseAttributes(
+        string $attributes,
+        string $ldapUrl,
+    ): array {
+        if ($attributes === '') {
+            return [];
+        }
+
+        $selectors = explode(',', $attributes);
+        if (in_array('', $selectors, true)) {
+            throw new UrlParseException(sprintf(
+                'The LDAP URL has an empty attribute selector: %s',
+                $ldapUrl,
+            ));
+        }
+
+        return array_map(
+            fn(string $attribute): string => self::decode($attribute),
+            $selectors,
+        );
+    }
+
+    /**
+     * A scope outside the RFC 4516 2 set makes the URL malformed, not the caller's argument invalid.
+     *
+     * @throws UrlParseException
+     */
+    private static function applyScope(
+        LdapUrl $url,
+        ?string $scope,
+        string $ldapUrl,
+    ): void {
+        try {
+            $url->setScope($scope);
+        } catch (InvalidArgumentException $e) {
+            throw new UrlParseException(
+                sprintf(
+                    'The LDAP URL has an invalid scope: %s',
+                    $ldapUrl,
+                ),
+                previous: $e,
+            );
+        }
     }
 
     /**

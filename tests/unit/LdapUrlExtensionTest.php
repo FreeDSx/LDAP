@@ -13,7 +13,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap;
 
+use FreeDSx\Ldap\Exception\UrlParseException;
 use FreeDSx\Ldap\LdapUrlExtension;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class LdapUrlExtensionTest extends TestCase
@@ -142,5 +144,51 @@ class LdapUrlExtensionTest extends TestCase
             'e-bindname=cn=Manager%2cdc=example%2cdc=com',
             $this->subject->toString(),
         );
+    }
+
+    public function test_it_should_parse_a_numeric_oid_extension_type(): void
+    {
+        self::assertEquals(
+            new LdapUrlExtension(
+                '1.3.6.1.4.1.1466.20037',
+                'v',
+            ),
+            LdapUrlExtension::parse('1.3.6.1.4.1.1466.20037=v'),
+        );
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function malformedExtensionProvider(): array
+    {
+        return [
+            'a repeated criticality marker' => [
+                '!!e-bindname',
+            ],
+            'a type with a leading hyphen' => [
+                '-bindname=v',
+            ],
+            'a type with a leading digit' => [
+                '1bindname=v',
+            ],
+            'an arc with a leading zero' => [
+                '1.03.6=v',
+            ],
+            'a type holding a space' => [
+                'e bindname=v',
+            ],
+            'an empty type' => [
+                '=v',
+            ],
+        ];
+    }
+
+    #[DataProvider('malformedExtensionProvider')]
+    public function test_it_should_reject_an_extension_type_that_is_not_an_oid(string $extension): void
+    {
+        $this->expectException(UrlParseException::class);
+
+        LdapUrlExtension::parse($extension);
     }
 }
