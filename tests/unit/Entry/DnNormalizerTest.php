@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Entry;
 
 use FreeDSx\Ldap\Entry\DnNormalizer;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class DnNormalizerTest extends TestCase
@@ -98,11 +99,64 @@ final class DnNormalizerTest extends TestCase
         );
     }
 
-    public function test_a_null_byte_does_not_collapse_two_distinct_dns(): void
+    /**
+     * @param non-empty-string $dn
+     */
+    #[DataProvider('invisiblyDifferentDnProvider')]
+    public function test_a_dn_differing_only_by_a_code_point_that_renders_as_nothing_is_one_key(string $dn): void
     {
-        self::assertNotSame(
-            DnNormalizer::canonicalize("cn=a\\00b,dc=x"),
+        self::assertSame(
+            DnNormalizer::canonicalize('cn=admin,dc=x'),
+            DnNormalizer::canonicalize($dn),
+        );
+    }
+
+    /**
+     * The canonical form is the authorization key, so a second key here is an ACL rule that misses its entry.
+     *
+     * @return iterable<string, array{non-empty-string}>
+     */
+    public static function invisiblyDifferentDnProvider(): iterable
+    {
+        yield 'left to right mark' => [
+            "cn=adm\u{200E}in,dc=x",
+        ];
+        yield 'right to left mark' => [
+            "cn=adm\u{200F}in,dc=x",
+        ];
+        yield 'left to right embedding' => [
+            "cn=adm\u{202A}in,dc=x",
+        ];
+        yield 'soft hyphen' => [
+            "cn=adm\u{00AD}in,dc=x",
+        ];
+        yield 'zero width space' => [
+            "cn=adm\u{200B}in,dc=x",
+        ];
+        yield 'object replacement character' => [
+            "cn=adm\u{FFFC}in,dc=x",
+        ];
+        // The ascii shortcut bypasses the prep profile, so it needs the same mapping.
+        yield 'ascii control below the line breaks' => [
+            "cn=adm\x01in,dc=x",
+        ];
+        yield 'ascii control above the line breaks' => [
+            "cn=adm\x1Fin,dc=x",
+        ];
+        yield 'delete' => [
+            "cn=adm\x7Fin,dc=x",
+        ];
+    }
+
+    /**
+     * RFC 4518 2.2 maps NUL to nothing, so the escaped form names the same entry. The raw byte is refused as
+     * invalid syntax instead, which is where the grammar draws the line.
+     */
+    public function test_an_escaped_null_byte_names_the_same_entry(): void
+    {
+        self::assertSame(
             DnNormalizer::canonicalize('cn=ab,dc=x'),
+            DnNormalizer::canonicalize("cn=a\\00b,dc=x"),
         );
     }
 

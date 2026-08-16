@@ -114,9 +114,17 @@ final class DnNormalizer
         return Rdn::escape($folded);
     }
 
+    /**
+     * Applies the same RFC 4518 2.2 mapping the prep profile would.
+     */
     private function canonicalizeAsciiValue(string $value): string
     {
-        $folded = strtolower($value);
+        $lowered = strtolower($value);
+        $folded = preg_replace(
+            '/[\x00-\x08\x0E-\x1F\x7F]/',
+            '',
+            $lowered,
+        ) ?? $lowered;
         $collapsed = preg_replace(
             '/[\x09-\x0D ]+/',
             ' ',
