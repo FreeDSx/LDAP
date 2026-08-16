@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Storage;
+namespace FreeDSx\Ldap\Server\Backend\Storage\Filter;
 
 /**
  * How faithfully SQL can answer an assertion on an attribute, which only the schema can decide.

@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Server\Subentry;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 
 /**
  * Decides whether a subtree specification covers an entry. RFC 3672.

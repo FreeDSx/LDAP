@@ -24,9 +24,9 @@ use FreeDSx\Ldap\Search\Filter\OrFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\MysqlFilterTranslator;
-use FreeDSx\Ldap\Server\Backend\Storage\AttributeFilterSupport;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterAttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterAttributeContextInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

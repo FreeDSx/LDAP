@@ -29,8 +29,8 @@ use FreeDSx\Ldap\Search\Filter\OrFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\AttributeFilterSupport;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterAttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterAttributeContextInterface;
 
 /**
  * Translates LDAP filters to SQL against the `entry_attribute_values` sidecar index.

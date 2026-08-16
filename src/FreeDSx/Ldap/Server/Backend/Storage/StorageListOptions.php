@@ -20,6 +20,8 @@ use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterAttributeContextInterface;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 
 /**

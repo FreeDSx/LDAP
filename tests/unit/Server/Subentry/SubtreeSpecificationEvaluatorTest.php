@@ -16,7 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Subentry;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\SchemaResource;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
 use FreeDSx\Ldap\Server\Subentry\SubtreeSpecificationEvaluator;
 use FreeDSx\Ldap\Server\Subentry\SubtreeSpecificationParser;
 use PHPUnit\Framework\TestCase;
