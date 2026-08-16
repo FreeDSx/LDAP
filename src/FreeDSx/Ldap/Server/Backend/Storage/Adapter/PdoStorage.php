@@ -414,9 +414,6 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     }
 
     /**
-     * @return Generator<Entry>
-     */
-    /**
      * Resolves each sort key against the schema here, since the query layer has no view of it.
      *
      * @return list<SortKeySpec>

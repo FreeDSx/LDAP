@@ -51,7 +51,7 @@ class PresentFilter implements FilterInterface, FilterAttributeInterface, String
     public function toString(): string
     {
         return self::PAREN_LEFT
-            . $this->attribute
+            . $this->attributeToString()
             . self::FILTER_EQUAL
             . '*'
             . self::PAREN_RIGHT;
