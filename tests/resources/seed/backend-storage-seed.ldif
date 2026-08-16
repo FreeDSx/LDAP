@@ -43,6 +43,8 @@ uidNumber: 99
 employeeNumber: A1b2C3
 # Matched case-exactly by the schema, so searches on it prove the configured schema is in play.
 labeledURI: A1b2C3
+# Case folding maps the sharp s to "ss", which lowercasing alone would not.
+displayName: Straße
 
 dn: cn=nosn,dc=foo,dc=bar
 objectClass: groupOfNames

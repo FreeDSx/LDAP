@@ -342,7 +342,8 @@ trait SqlFilterTranslatorTrait
         $alias = $this->valueAlias();
 
         if ($startsWith !== null) {
-            $prefix = $this->prepareMatchValue($startsWith);
+            // A fragment keeps its edge spaces, which a whole value would have trimmed.
+            $prefix = SqlFilterUtility::normalizeFragment($startsWith);
             $inner = "$alias LIKE ? ESCAPE '!'";
             $sql = $this->buildValueExists(
                 $attribute,
@@ -472,20 +473,11 @@ trait SqlFilterTranslatorTrait
     }
 
     /**
-     * Pre-lower + truncate to match sidecar's value_lower; non-UTF-8 returns '' (matches binary-syntax rows only).
+     * Prepared the same way the sidecar's value_lower was written, so SQL and the evaluator agree.
      */
     private function prepareMatchValue(string $value): string
     {
-        if (!Text::isUtf8($value)) {
-            return '';
-        }
-
-        return mb_substr(
-            mb_strtolower($value, 'UTF-8'),
-            0,
-            SqlFilterUtility::MAX_INDEXED_VALUE_CHARS,
-            'UTF-8',
-        );
+        return SqlFilterUtility::normalize($value);
     }
 
     private function translateAnd(AndFilter $filter): ?SqlFilterResult

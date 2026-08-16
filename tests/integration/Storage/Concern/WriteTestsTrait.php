@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Add, delete, modify, and rename against the backend.
@@ -317,6 +318,65 @@ trait WriteTestsTrait
         } finally {
             $this->ldapClient()->delete('labeledURI=CaseTest,dc=foo,dc=bar');
         }
+    }
+
+    /**
+     * @param non-empty-string $cn
+     */
+    #[DataProvider('invisiblyDifferentValueProvider')]
+    public function testAddIsRefusedForADnDifferingOnlyByACodePointThatRendersAsNothing(string $cn): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ENTRY_ALREADY_EXISTS);
+
+        $this->ldapClient()->create(Entry::fromArray("cn=$cn,dc=foo,dc=bar", [
+            'cn' => $cn,
+            'sn' => 'Impostor',
+            'objectClass' => 'inetOrgPerson',
+        ]));
+    }
+
+    /**
+     * RFC 4518 2.2 maps these to nothing, so each names the seeded cn=admin and cannot be added beside it.
+     *
+     * @return iterable<string, array{non-empty-string}>
+     */
+    public static function invisiblyDifferentValueProvider(): iterable
+    {
+        yield 'left to right mark' => [
+            "adm\u{200E}in",
+        ];
+        yield 'right to left mark' => [
+            "adm\u{200F}in",
+        ];
+        yield 'soft hyphen' => [
+            "adm\u{00AD}in",
+        ];
+        yield 'zero width space' => [
+            "adm\u{200B}in",
+        ];
+        yield 'object replacement character' => [
+            "adm\u{FFFC}in",
+        ];
+        yield 'ascii control' => [
+            "adm\x01in",
+        ];
+    }
+
+    public function testARenameOntoAnInvisiblyDifferentDnIsRefused(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ENTRY_ALREADY_EXISTS);
+
+        // Renaming keeps the parent, so this lands beside the seeded cn=admin under dc=foo,dc=bar.
+        $this->ldapClient()->rename(
+            'cn=nosn,dc=foo,dc=bar',
+            "cn=adm\u{200E}in",
+        );
     }
 
     public function testAddDuplicateDnFails(): void

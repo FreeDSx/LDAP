@@ -186,6 +186,34 @@ trait QueryTestsTrait
             1,
         ];
 
+        // RFC 4518 2.2 maps these to nothing, so an assertion carrying one still matches the stored value.
+        yield 'an assertion carrying a left to right mark still matches' => [
+            Filters::equal('cn', "adm\u{200E}in"),
+            1,
+        ];
+        yield 'an assertion carrying a soft hyphen still matches' => [
+            Filters::equal('cn', "adm\u{00AD}in"),
+            1,
+        ];
+        yield 'an assertion carrying a zero width space still matches' => [
+            Filters::equal('cn', "adm\u{200B}in"),
+            1,
+        ];
+        yield 'an assertion carrying an ascii control still matches' => [
+            Filters::equal('cn', "adm\x01in"),
+            1,
+        ];
+
+        // RFC 4518 2.3 folds per RFC 3454 B.2 rather than lowercasing, so sharp s and "ss" are one value.
+        yield 'sharp s folds to a double s' => [
+            Filters::equal('displayName', 'strasse'),
+            1,
+        ];
+        yield 'the spelled out form matches the sharp s whatever its case' => [
+            Filters::equal('displayName', 'STRASSE'),
+            1,
+        ];
+
         // No approximate rule is implemented, so it must answer as the type's equality rule does.
         yield 'approximate on a case exact type rejects a case difference' => [
             Filters::approximate('labeledURI', 'a1b2c3'),
@@ -591,13 +619,27 @@ trait QueryTestsTrait
      */
     public static function refusedBaseDnProvider(): iterable
     {
-        yield 'attribute type outside the grammar' => ['!!!=bar,dc=foo,dc=bar'];
-        yield 'attribute type with an inner space' => ['cn foo=bar,dc=foo,dc=bar'];
-        yield 'empty attribute type' => ['=bar,dc=foo,dc=bar'];
-        yield 'attribute option in an rdn' => ['cn;lang-en=alice,dc=foo,dc=bar'];
-        yield 'oid arc with a leading zero' => ['2.05.4.3=alice,dc=foo,dc=bar'];
-        yield 'hexstring value form' => ['cn=#0C03616263,dc=foo,dc=bar'];
-        yield 'raw null byte in a value' => ["cn=a\0b,dc=foo,dc=bar"];
+        yield 'attribute type outside the grammar' => [
+            '!!!=bar,dc=foo,dc=bar',
+        ];
+        yield 'attribute type with an inner space' => [
+            'cn foo=bar,dc=foo,dc=bar',
+        ];
+        yield 'empty attribute type' => [
+            '=bar,dc=foo,dc=bar',
+        ];
+        yield 'attribute option in an rdn' => [
+            'cn;lang-en=alice,dc=foo,dc=bar',
+        ];
+        yield 'oid arc with a leading zero' => [
+            '2.05.4.3=alice,dc=foo,dc=bar',
+        ];
+        yield 'hexstring value form' => [
+            'cn=#0C03616263,dc=foo,dc=bar',
+        ];
+        yield 'raw null byte in a value' => [
+            "cn=a\0b,dc=foo,dc=bar",
+        ];
     }
 
     public function testAHexEscapeNamesTheSameEntryAsTheCharacterItEncodes(): void

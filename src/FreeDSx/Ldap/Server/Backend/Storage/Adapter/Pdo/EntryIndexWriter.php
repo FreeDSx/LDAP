@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Schema\Text;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoEntryDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
@@ -223,15 +222,6 @@ final readonly class EntryIndexWriter
 
     private function valueLower(string $value): string
     {
-        if (!Text::isUtf8($value)) {
-            return '';
-        }
-
-        return mb_substr(
-            mb_strtolower($value, 'UTF-8'),
-            0,
-            SqlFilterUtility::MAX_INDEXED_VALUE_CHARS,
-            'UTF-8',
-        );
+        return SqlFilterUtility::normalize($value);
     }
 }

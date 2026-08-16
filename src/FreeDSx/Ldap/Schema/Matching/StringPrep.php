@@ -22,14 +22,28 @@ use Normalizer;
 final readonly class StringPrep
 {
     /**
-     * Code points removed by the Map step (RFC 4518 §2.2): soft hyphen, zero-width, variation selectors, NULL.
+     * Code points removed by the Map step (RFC 4518 §2.2).
      */
-    private const MAP_TO_NOTHING = '/[\x{00AD}\x{034F}\x{200B}\x{200C}\x{200D}\x{2060}\x{FEFF}\x{180B}-\x{180D}\x{FE00}-\x{FE0F}\x{0000}]/u';
+    private const MAP_TO_NOTHING = '/['
+        // Controls, less the line breaking ones mapped to SPACE below.
+        . '\x{0000}-\x{0008}\x{000E}-\x{001F}\x{007F}-\x{0084}\x{0086}-\x{009F}'
+        // Soft hyphens, combining grapheme joiner, variation selectors.
+        . '\x{00AD}\x{034F}\x{06DD}\x{070F}\x{1806}\x{180B}-\x{180E}\x{FE00}-\x{FE0F}'
+        // Zero width space and the bidi formatting points, which otherwise render identically to nothing.
+        . '\x{200B}-\x{200F}\x{202A}-\x{202E}\x{2060}-\x{2063}\x{206A}-\x{206F}\x{FEFF}'
+        // Annotation marks, object replacement, and the musical and tag formatting points.
+        . '\x{FFF9}-\x{FFFC}\x{1D173}-\x{1D17A}\x{E0001}\x{E0020}-\x{E007F}'
+        . ']/u';
 
     /**
-     * Whitespace variants folded to SPACE by the Map step (RFC 4518 §2.2).
+     * Whitespace folded to SPACE by the Map step (RFC 4518 §2.2).
      */
-    private const MAP_TO_SPACE = '/[\x{0009}-\x{000D}\x{0085}\x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}\x{2029}\x{202F}\x{205F}\x{3000}]/u';
+    private const MAP_TO_SPACE = '/['
+        // Line breaking controls.
+        . '\x{0009}-\x{000D}\x{0085}'
+        // Every code point carrying a Separator property.
+        . '\x{00A0}\x{1680}\x{2000}-\x{200A}\x{2028}-\x{2029}\x{202F}\x{205F}\x{3000}'
+        . ']/u';
 
     private bool $canFoldUnicode;
 

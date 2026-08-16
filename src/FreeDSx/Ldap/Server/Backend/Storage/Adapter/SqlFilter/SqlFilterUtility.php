@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 
+use FreeDSx\Ldap\Schema\Matching\StringPrep;
+use FreeDSx\Ldap\Schema\Text;
+
 /**
  * Shared utilities for SQL-based storage adapters.
  *
@@ -25,6 +28,27 @@ final class SqlFilterUtility
      */
     public const MAX_INDEXED_VALUE_CHARS = 255;
 
+    private static ?StringPrep $prep = null;
+
+    /**
+     * The sidecar form of a value, for the write side and the query side alike.
+     *
+     * Both must prepare identically or SQL answers a question the evaluator would answer differently, so this is
+     * the one definition of it.
+     */
+    public static function normalize(string $value): string
+    {
+        return self::truncate(self::prep()->prepareForEquality($value));
+    }
+
+    /**
+     * The sidecar form of a substring fragment, which keeps its edge spaces where a whole value would not.
+     */
+    public static function normalizeFragment(string $fragment): string
+    {
+        return self::truncate(self::prep()->prepareFragment($fragment));
+    }
+
     /**
      * Escape LIKE specials using `!` as the escape char.
      */
@@ -34,6 +58,28 @@ final class SqlFilterUtility
             ['!', '%', '_'],
             ['!!', '!%', '!_'],
             $value,
+        );
+    }
+
+    private static function prep(): StringPrep
+    {
+        return self::$prep ??= new StringPrep(foldCase: true);
+    }
+
+    /**
+     * Non-UTF-8 returns '', which matches binary-syntax rows only.
+     */
+    private static function truncate(string $value): string
+    {
+        if (!Text::isUtf8($value)) {
+            return '';
+        }
+
+        return mb_substr(
+            $value,
+            0,
+            self::MAX_INDEXED_VALUE_CHARS,
+            'UTF-8',
         );
     }
 }
