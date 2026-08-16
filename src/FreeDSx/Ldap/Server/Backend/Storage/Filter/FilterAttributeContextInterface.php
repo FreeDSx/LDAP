@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Storage;
+namespace FreeDSx\Ldap\Server\Backend\Storage\Filter;
 
 /**
  * The schema derived facts a filter translator needs, without handing it the schema itself.

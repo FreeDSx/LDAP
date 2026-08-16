@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Schema\SchemaResource;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
 use FreeDSx\Ldap\Server\Subentry\GoverningSubentryResolver;
 use FreeDSx\Ldap\Server\Subentry\SubtreeSpecificationEvaluator;
 use Generator;

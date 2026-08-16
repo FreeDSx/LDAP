@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Schema\SchemaResource;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluator;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Entry\Entry;

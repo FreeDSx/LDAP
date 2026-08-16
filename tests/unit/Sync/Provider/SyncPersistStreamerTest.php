@@ -37,7 +37,7 @@ use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;

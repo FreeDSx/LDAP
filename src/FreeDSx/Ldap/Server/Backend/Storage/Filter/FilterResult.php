@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Storage;
+namespace FreeDSx\Ldap\Server\Backend\Storage\Filter;
 
 /**
  * RFC 4511 three-valued filter result.

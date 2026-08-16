@@ -30,7 +30,7 @@ use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\Paging\PagingRequestComparator;
 use FreeDSx\Ldap\Server\Paging\PagingResponse;
 use FreeDSx\Ldap\Server\RequestHistory;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;

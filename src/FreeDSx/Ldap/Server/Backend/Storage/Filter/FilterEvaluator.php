@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Storage;
+namespace FreeDSx\Ldap\Server\Backend\Storage\Filter;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
@@ -39,6 +39,7 @@ use FreeDSx\Ldap\Search\Filter\NotFilter;
 use FreeDSx\Ldap\Search\Filter\OrFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
+use FreeDSx\Ldap\Server\Backend\Storage\DerivedAttributeTrait;
 use WeakMap;
 
 /**

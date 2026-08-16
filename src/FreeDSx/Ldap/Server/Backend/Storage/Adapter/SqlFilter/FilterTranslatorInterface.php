@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\FilterAttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterAttributeContextInterface;
 
 /**
  * Translates FilterInterface into a SQL WHERE fragment.
