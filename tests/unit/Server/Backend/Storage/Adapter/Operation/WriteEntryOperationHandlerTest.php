@@ -18,6 +18,8 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
+use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\WriteEntryOperationHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
@@ -33,7 +35,9 @@ final class WriteEntryOperationHandlerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new WriteEntryOperationHandler();
+        $this->subject = new WriteEntryOperationHandler(
+            new EqualityComparatorResolver(SchemaResource::Core->load()),
+        );
         $this->entry = new Entry(
             new Dn('cn=alice,dc=example,dc=com'),
             new Attribute('cn', 'alice'),

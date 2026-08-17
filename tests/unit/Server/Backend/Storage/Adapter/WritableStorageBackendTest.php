@@ -24,8 +24,6 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
-use FreeDSx\Ldap\Schema\SchemaResource;
-use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
@@ -301,7 +299,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_add_allows_root_naming_context_entry_for_system_context(): void
     {
-        $backend = self::makeWritableBackend(new InMemoryStorage());
+        $backend = self::makeWritableBackend();
         $root = new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'));
         $backend->add(
             new AddCommand($root),
@@ -313,7 +311,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_add_refuses_root_naming_context_entry_for_non_system_context(): void
     {
-        $backend = self::makeWritableBackend(new InMemoryStorage());
+        $backend = self::makeWritableBackend();
         $root = new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'));
 
         self::expectException(OperationException::class);
@@ -327,7 +325,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_add_refuses_single_rdn_root_entry_for_non_system_context(): void
     {
-        $backend = self::makeWritableBackend(new InMemoryStorage());
+        $backend = self::makeWritableBackend();
         $root = new Entry(new Dn('dc=com'), new Attribute('dc', 'com'));
 
         self::expectException(OperationException::class);
@@ -1102,10 +1100,7 @@ final class WritableStorageBackendTest extends TestCase
     {
         $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base]),
-            validator: new SchemaValidator(
-                SchemaResource::Core->load(),
-                SchemaValidationMode::Strict,
-            ),
+            validationMode: SchemaValidationMode::Strict,
         );
 
         self::expectException(OperationException::class);
@@ -1124,10 +1119,7 @@ final class WritableStorageBackendTest extends TestCase
     {
         $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base]),
-            validator: new SchemaValidator(
-                SchemaResource::Core->load(),
-                SchemaValidationMode::Strict,
-            ),
+            validationMode: SchemaValidationMode::Strict,
         );
 
         $backend->add(
@@ -1153,10 +1145,7 @@ final class WritableStorageBackendTest extends TestCase
         );
         $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base, $valid]),
-            validator: new SchemaValidator(
-                SchemaResource::Core->load(),
-                SchemaValidationMode::Strict,
-            ),
+            validationMode: SchemaValidationMode::Strict,
         );
 
         self::expectException(OperationException::class);
@@ -1175,10 +1164,7 @@ final class WritableStorageBackendTest extends TestCase
     {
         $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base]),
-            validator: new SchemaValidator(
-                SchemaResource::Core->load(),
-                SchemaValidationMode::Lenient,
-            ),
+            validationMode: SchemaValidationMode::Lenient,
         );
         $violations = new SchemaViolations();
 
@@ -1221,10 +1207,7 @@ final class WritableStorageBackendTest extends TestCase
         );
         $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base, $valid]),
-            validator: new SchemaValidator(
-                SchemaResource::Core->load(),
-                SchemaValidationMode::Lenient,
-            ),
+            validationMode: SchemaValidationMode::Lenient,
         );
         $violations = new SchemaViolations();
 
@@ -1263,10 +1246,7 @@ final class WritableStorageBackendTest extends TestCase
     {
         $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base]),
-            validator: new SchemaValidator(
-                SchemaResource::Core->load(),
-                SchemaValidationMode::Strict,
-            ),
+            validationMode: SchemaValidationMode::Strict,
         );
         $violations = new SchemaViolations();
 
@@ -1295,10 +1275,7 @@ final class WritableStorageBackendTest extends TestCase
     {
         $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base]),
-            validator: new SchemaValidator(
-                SchemaResource::Core->load(),
-                SchemaValidationMode::Strict,
-            ),
+            validationMode: SchemaValidationMode::Strict,
         );
         $violations = new SchemaViolations();
 
@@ -1339,10 +1316,7 @@ final class WritableStorageBackendTest extends TestCase
     {
         $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base]),
-            validator: new SchemaValidator(
-                SchemaResource::Core->load(),
-                SchemaValidationMode::Lenient,
-            ),
+            validationMode: SchemaValidationMode::Lenient,
         );
         $violations = new SchemaViolations();
 
@@ -1389,10 +1363,7 @@ final class WritableStorageBackendTest extends TestCase
         );
         $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base, $valid]),
-            validator: new SchemaValidator(
-                SchemaResource::Core->load(),
-                SchemaValidationMode::Strict,
-            ),
+            validationMode: SchemaValidationMode::Strict,
         );
 
         $backend->update(
@@ -1424,10 +1395,7 @@ final class WritableStorageBackendTest extends TestCase
         );
         $backend = self::makeWritableBackend(
             storage: new InMemoryStorage([$this->base, $valid]),
-            validator: new SchemaValidator(
-                SchemaResource::Core->load(),
-                SchemaValidationMode::Strict,
-            ),
+            validationMode: SchemaValidationMode::Strict,
         );
 
         self::expectException(OperationException::class);
@@ -1708,7 +1676,7 @@ final class WritableStorageBackendTest extends TestCase
 
     public function test_no_such_object_with_no_existing_ancestor_has_null_matched_dn(): void
     {
-        $backend = self::makeWritableBackend(new InMemoryStorage());
+        $backend = self::makeWritableBackend();
 
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('cn=Missing,dc=example,dc=com')

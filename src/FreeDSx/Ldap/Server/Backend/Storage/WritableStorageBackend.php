@@ -68,8 +68,8 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         private readonly SchemaValidator $validator,
         private readonly StorageListOptionsFactory $listOptions,
         private readonly FilterEvaluatorInterface $filterEvaluator,
+        private readonly WriteEntryOperationHandler $entryHandler,
         private readonly OperationalAttributeGenerator $operationalAttrs = new OperationalAttributeGenerator(),
-        private readonly WriteEntryOperationHandler $entryHandler = new WriteEntryOperationHandler(),
         private readonly ?ChangeRecorder $changeRecorder = null,
         private readonly SubentryPlacementGuard $subentryGuard = new SubentryPlacementGuard(),
     ) {}

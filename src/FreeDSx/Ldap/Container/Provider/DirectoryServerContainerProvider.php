@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Container\Contributor\DirectoryListenerContributor;
 use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
+use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
@@ -50,6 +51,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionSweeper;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\WriteEntryOperationHandler;
 use FreeDSx\Ldap\Server\Backend\Storage\OperationalAttributeGenerator;
 use FreeDSx\Ldap\Server\Backend\Storage\SearchStreamBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptionsFactory;
@@ -172,6 +174,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return new FilterEvaluator(
             $container->get(ServerOptions::class)->getSchema(),
             $this->makeDerivedResolver($container),
+            $this->makeEqualityComparatorResolver($container),
             $this->makeAttributeSyntaxResolver($container),
         );
     }
@@ -179,6 +182,13 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeAttributeSyntaxResolver(Container $container): AttributeSyntaxResolver
     {
         return new AttributeSyntaxResolver(
+            $container->get(ServerOptions::class)->getSchema(),
+        );
+    }
+
+    private function makeEqualityComparatorResolver(Container $container): EqualityComparatorResolver
+    {
+        return new EqualityComparatorResolver(
             $container->get(ServerOptions::class)->getSchema(),
         );
     }
@@ -332,6 +342,9 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                 $options->makeSearchLimits(),
             ),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
+            entryHandler: new WriteEntryOperationHandler(
+                $this->makeEqualityComparatorResolver($container),
+            ),
             operationalAttrs: $container->get(OperationalAttributeGenerator::class),
             changeRecorder: $this->changeRecorderFor($container, $storage),
         );

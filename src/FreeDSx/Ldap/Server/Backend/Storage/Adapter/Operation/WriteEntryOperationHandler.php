@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation;
 
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
@@ -26,6 +27,15 @@ use LogicException;
  */
 final class WriteEntryOperationHandler
 {
+    private readonly UpdateOperation $update;
+
+    public function __construct(
+        EqualityComparatorResolver $equalityResolver,
+        private readonly MoveOperation $move = new MoveOperation(),
+    ) {
+        $this->update = new UpdateOperation($equalityResolver);
+    }
+
     public function apply(
         Entry $entry,
         WriteRequestInterface $command,
@@ -34,8 +44,8 @@ final class WriteEntryOperationHandler
         $target = $entry->makeCopy();
 
         return match (true) {
-            $command instanceof UpdateCommand => (new UpdateOperation())->execute($target, $command),
-            $command instanceof MoveCommand => (new MoveOperation())->execute($target, $command),
+            $command instanceof UpdateCommand => $this->update->execute($target, $command),
+            $command instanceof MoveCommand => $this->move->execute($target, $command),
             default => throw new LogicException(
                 sprintf('No entry operation handler for %s', $command::class),
             ),

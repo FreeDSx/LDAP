@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Support\FreeDSx\Ldap\Backend\Storage;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
@@ -33,9 +34,12 @@ trait FilterEvaluatorFactoryTrait
         ?Schema $schema = null,
         ?EntryStorageInterface $storage = null,
     ): FilterEvaluator {
+        $schema ??= SchemaResource::Core->load();
+
         return new FilterEvaluator(
-            $schema ?? SchemaResource::Core->load(),
+            $schema,
             $this->makeDerivedResolver($storage),
+            new EqualityComparatorResolver($schema),
         );
     }
 
