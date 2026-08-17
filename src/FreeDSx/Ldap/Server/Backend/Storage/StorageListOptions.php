@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterAttributeContextInterface;
@@ -86,6 +87,11 @@ final readonly class StorageListOptions implements FilterAttributeContextInterfa
      */
     public function filterSupport(string $attribute): AttributeFilterSupport
     {
+        // Derived from the parent link, which SQL reads directly rather than needing a stored row.
+        if (self::describesType($attribute, AttributeTypeOid::NAME_HAS_SUBORDINATES)) {
+            return AttributeFilterSupport::Exact;
+        }
+
         // Derived on read rather than stored, so no rows answer it and only the evaluator can.
         if (self::describesAnyDerivedAttribute($attribute)) {
             return AttributeFilterSupport::NeedsEvaluator;

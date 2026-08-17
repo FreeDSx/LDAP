@@ -375,6 +375,91 @@ trait QueryTestsTrait
             ),
             8,
         ];
+
+        // X.501: only the suffix and ou=people have children, and it is derived rather than stored on any of them.
+        yield 'hasSubordinates matches only entries with children' => [
+            Filters::equal(
+                'hasSubordinates',
+                'TRUE',
+            ),
+            2,
+        ];
+        yield 'hasSubordinates matches every leaf' => [
+            Filters::equal(
+                'hasSubordinates',
+                'FALSE',
+            ),
+            6,
+        ];
+        yield 'hasSubordinates is present on every entry' => [
+            Filters::present('hasSubordinates'),
+            8,
+        ];
+        yield 'hasSubordinates matches by its oid' => [
+            Filters::equal(
+                '2.5.18.9',
+                'TRUE',
+            ),
+            2,
+        ];
+        yield 'a negated hasSubordinates leaves the leaves' => [
+            Filters::not(Filters::equal(
+                'hasSubordinates',
+                'TRUE',
+            )),
+            6,
+        ];
+
+        // The reference servers all resolve the indexed term first, so this must stay answerable alongside one.
+        yield 'hasSubordinates narrows an indexed conjunction' => [
+            Filters::and(
+                Filters::equal(
+                    'cn',
+                    'alice',
+                ),
+                Filters::equal(
+                    'hasSubordinates',
+                    'FALSE',
+                ),
+            ),
+            1,
+        ];
+        yield 'hasSubordinates excludes an indexed conjunction' => [
+            Filters::and(
+                Filters::equal(
+                    'cn',
+                    'alice',
+                ),
+                Filters::equal(
+                    'hasSubordinates',
+                    'TRUE',
+                ),
+            ),
+            0,
+        ];
+
+        // RFC 4517 3.3.3 admits only the uppercase literals, so anything else is an invalid assertion and Undefined.
+        yield 'a lowercase hasSubordinates assertion is undefined' => [
+            Filters::equal(
+                'hasSubordinates',
+                'true',
+            ),
+            0,
+        ];
+        yield 'a non boolean hasSubordinates assertion is undefined' => [
+            Filters::equal(
+                'hasSubordinates',
+                'BOGUS',
+            ),
+            0,
+        ];
+        yield 'a negated invalid hasSubordinates assertion stays undefined' => [
+            Filters::not(Filters::equal(
+                'hasSubordinates',
+                'BOGUS',
+            )),
+            0,
+        ];
     }
 
     #[DataProvider('filterProvider')]

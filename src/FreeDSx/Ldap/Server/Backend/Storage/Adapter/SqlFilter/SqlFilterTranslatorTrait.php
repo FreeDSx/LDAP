@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Text;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
@@ -29,6 +30,7 @@ use FreeDSx\Ldap\Search\Filter\OrFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterAttributeContextInterface;
 
@@ -39,6 +41,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterAttributeContextInterface;
  */
 trait SqlFilterTranslatorTrait
 {
+    use DerivedAttributeTrait;
+
     private ?SubstringIndexInterface $substringIndex = null;
 
     /**
@@ -170,8 +174,58 @@ trait SqlFilterTranslatorTrait
             : $condition;
     }
 
+    /**
+     * Whether the item asserts on hasSubordinates, which is computed rather than stored so no sidecar row answers it.
+     */
+    private function isSubordinateCheck(string $attributeDescription): bool
+    {
+        return self::describesType(
+            $attributeDescription,
+            AttributeTypeOid::NAME_HAS_SUBORDINATES,
+        );
+    }
+
+    /**
+     * Correlated against the outer row, which every filtered query resolves against the unaliased entries table.
+     */
+    private function translateHasSubordinates(string $value): ?SqlFilterResult
+    {
+        $exists = <<<SQL
+            EXISTS (
+                SELECT 1
+                FROM entries child
+                WHERE child.lc_parent_dn = entries.lc_dn)
+            SQL;
+
+        // The syntax check upstream leaves only the two Boolean literals; anything else is left to the evaluator.
+        $sql = match ($value) {
+            'TRUE' => $exists,
+            'FALSE' => "NOT $exists",
+            default => null,
+        };
+
+        if ($sql === null) {
+            return null;
+        }
+
+        return new SqlFilterResult(
+            $sql,
+            [],
+            correlatedSql: $sql,
+        );
+    }
+
     private function translatePresent(PresentFilter $filter): ?SqlFilterResult
     {
+        // Every entry has a subordinate state, so asserting its presence excludes nothing.
+        if ($this->isSubordinateCheck($filter->getAttribute())) {
+            return new SqlFilterResult(
+                '1 = 1',
+                [],
+                correlatedSql: '1 = 1',
+            );
+        }
+
         $attribute = $this->validateAttribute($filter->getAttribute());
 
         return new SqlFilterResult(
@@ -187,6 +241,10 @@ trait SqlFilterTranslatorTrait
 
     private function translateEquality(EqualityFilter $filter): ?SqlFilterResult
     {
+        if ($this->isSubordinateCheck($filter->getAttribute())) {
+            return $this->translateHasSubordinates($filter->getValue());
+        }
+
         $attribute = $this->validateAttribute($filter->getAttribute());
 
         $alias = $this->valueAlias();
