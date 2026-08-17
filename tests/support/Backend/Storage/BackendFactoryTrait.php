@@ -13,10 +13,13 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap\Backend\Storage;
 
+use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\WriteEntryOperationHandler;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
 use FreeDSx\Ldap\Server\Backend\Storage\SearchStreamBuilder;
@@ -36,12 +39,13 @@ trait BackendFactoryTrait
      * attribute type from one an entry merely lacks, so an empty schema would make every assertion Undefined.
      */
     private function makeWritableBackend(
-        EntryStorageInterface $storage,
-        ?SchemaValidator $validator = null,
+        ?EntryStorageInterface $storage = null,
+        ?SchemaValidationMode $validationMode = null,
         ?Schema $schema = null,
         ?SearchLimits $limits = null,
         ?ChangeRecorder $changeRecorder = null,
     ): WritableStorageBackend {
+        $storage ??= new InMemoryStorage();
         $schema ??= SchemaResource::Core->load();
         $limits ??= new SearchLimits();
         $filterEvaluator = $this->makeFilterEvaluator(
@@ -56,15 +60,19 @@ trait BackendFactoryTrait
                 $filterEvaluator,
                 $this->makeDerivedResolver($storage),
             ),
-            validator: $validator ?? new SchemaValidator(
+            // Built from the same schema the rest of the backend reads, so the two cannot disagree.
+            validator: new SchemaValidator(
                 $schema,
-                SchemaValidationMode::Off,
+                $validationMode ?? SchemaValidationMode::Off,
             ),
             listOptions: new StorageListOptionsFactory(
                 $schema,
                 $limits,
             ),
             filterEvaluator: $filterEvaluator,
+            entryHandler: new WriteEntryOperationHandler(
+                new EqualityComparatorResolver($schema),
+            ),
             changeRecorder: $changeRecorder,
         );
     }

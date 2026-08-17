@@ -22,7 +22,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
-use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
+use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
@@ -41,11 +41,16 @@ final class SchemaValidator
 
     private readonly AttributeSyntaxResolver $syntaxResolver;
 
+    private readonly EqualityComparatorResolver $equalityResolver;
+
     public function __construct(
         private readonly Schema $schema,
         private readonly SchemaValidationMode $mode,
+        ?AttributeSyntaxResolver $syntaxResolver = null,
+        ?EqualityComparatorResolver $equalityResolver = null,
     ) {
-        $this->syntaxResolver = new AttributeSyntaxResolver($schema);
+        $this->syntaxResolver = $syntaxResolver ?? new AttributeSyntaxResolver($schema);
+        $this->equalityResolver = $equalityResolver ?? new EqualityComparatorResolver($schema);
     }
 
     public function mode(): SchemaValidationMode
@@ -255,7 +260,7 @@ final class SchemaValidator
      */
     private function hasEquivalentValues(Attribute $attr): bool
     {
-        $comparator = $this->equalityComparatorFor($attr->getName());
+        $comparator = $this->equalityResolver->for($attr->getName());
         $seen = [];
 
         foreach ($attr->getValues() as $value) {
@@ -284,16 +289,6 @@ final class SchemaValidator
         }
 
         return false;
-    }
-
-    private function equalityComparatorFor(string $attribute): MatchingRuleComparatorInterface
-    {
-        $equalityOid = $this->schema->getAttributeType($attribute)?->equalityOid;
-        $comparator = $equalityOid !== null
-            ? $this->schema->getComparator($equalityOid)
-            : null;
-
-        return $comparator ?? new CaseIgnoreComparator();
     }
 
     /**

@@ -19,6 +19,8 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\UpdateOperation;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use PHPUnit\Framework\TestCase;
@@ -31,7 +33,9 @@ final class UpdateOperationTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new UpdateOperation();
+        $this->subject = new UpdateOperation(
+            new EqualityComparatorResolver(SchemaResource::Core->load()),
+        );
         $this->entry = new Entry(
             new Dn('cn=alice,dc=example,dc=com'),
             new Attribute('cn', 'alice'),

@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
+use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\Matching\Comparator\IntegerComparator;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
@@ -102,6 +103,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     public function __construct(
         private readonly Schema $schema,
         private readonly DerivedResolver $derivedResolver,
+        private readonly EqualityComparatorResolver $equalityResolver,
         ?AttributeSyntaxResolver $syntaxResolver = null,
         private readonly CaseIgnoreComparator $defaultComparator = new CaseIgnoreComparator(),
         private readonly IntegerComparator $integerComparator = new IntegerComparator(),
@@ -236,7 +238,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return FilterResult::False;
         }
 
-        $comparator = $this->resolveEqualityComparator($filter->getAttribute());
+        $comparator = $this->equalityResolver->for($filter->getAttribute());
         $filterValue = $filter->getValue();
 
         foreach ($values as $value) {
@@ -333,7 +335,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
         // No approximate rule is implemented, so this falls back to the type's own equality rather than a case
         // insensitive default, which would answer differently than the equality filter for the same assertion.
-        $comparator = $this->resolveEqualityComparator($filter->getAttribute());
+        $comparator = $this->equalityResolver->for($filter->getAttribute());
         $filterValue = $filter->getValue();
 
         foreach ($values as $value) {
@@ -454,7 +456,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         // RFC 4511 4.5.1.7.7: an absent matchingRule means the EQUALITY rule of the attribute type.
         if ($rule === null) {
             $comparator = $attribute !== null
-                ? $this->resolveEqualityComparator($attribute)
+                ? $this->equalityResolver->for($attribute)
                 : $this->defaultComparator;
 
             return $comparator->equals(...);
@@ -476,16 +478,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
                 => ((int) $v & (int) $a) !== 0,
             default => null,
         };
-    }
-
-    private function resolveEqualityComparator(string $attrName): MatchingRuleComparatorInterface
-    {
-        $attrType = $this->schema->getAttributeType($attrName);
-        $comparator = $attrType?->equalityOid !== null
-            ? $this->schema->getComparator($attrType->equalityOid)
-            : null;
-
-        return $comparator ?? $this->defaultComparator;
     }
 
     /**

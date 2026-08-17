@@ -18,6 +18,8 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
+use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 
 /**
@@ -27,6 +29,10 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
  */
 final class UpdateOperation
 {
+    public function __construct(
+        private readonly EqualityComparatorResolver $equalityResolver,
+    ) {}
+
     /**
      * @throws OperationException
      */
@@ -69,9 +75,10 @@ final class UpdateOperation
             $entry->add($attribute);
             return;
         }
+        $comparator = $this->equalityResolver->for($attribute->getName());
 
         foreach ($attribute->getValues() as $value) {
-            if ($existing->has($value, caseSensitive: false)) {
+            if ($this->matchesAny($comparator, $existing->getValues(), $value)) {
                 throw new OperationException(
                     sprintf('Attribute "%s" already contains the given value.', $attribute->getName()),
                     ResultCode::ATTRIBUTE_OR_VALUE_EXISTS,
@@ -147,15 +154,17 @@ final class UpdateOperation
             $entry,
             $attribute->getName(),
         );
+        $comparator = $this->equalityResolver->for($attribute->getName());
 
         foreach ($values as $value) {
-            if (!$existing->has($value, caseSensitive: false)) {
+            if (!$this->matchesAny($comparator, $existing->getValues(), $value)) {
                 throw new OperationException(
                     sprintf('The given value does not exist in attribute "%s".', $attribute->getName()),
                     ResultCode::NO_SUCH_ATTRIBUTE,
                 );
             }
 
+            // Folded rather than matched by rule, so the value naming the entry is protected however it is spelled.
             if ($rdnValue !== null && strcasecmp($value, $rdnValue) === 0) {
                 throw new OperationException(
                     sprintf(
@@ -167,15 +176,56 @@ final class UpdateOperation
             }
         }
 
-        $existing->removeValues(
+        $existing->removeValues($this->valuesMatching(
+            $comparator,
+            $existing->getValues(),
             $values,
-            caseSensitive: false,
-        );
+        ));
 
         // RFC 4511 §4.6: listing every value an attribute currently holds removes the attribute itself.
         if ($existing->getValues() === []) {
             $entry->reset($existing);
         }
+    }
+
+    /**
+     * The stored values a delete names, resolved by the type's equality rule rather than by their spelling.
+     *
+     * @param string[] $stored
+     * @param string[] $requested
+     * @return list<string>
+     */
+    private function valuesMatching(
+        MatchingRuleComparatorInterface $comparator,
+        array $stored,
+        array $requested,
+    ): array {
+        $matched = [];
+
+        foreach ($stored as $value) {
+            if ($this->matchesAny($comparator, $requested, $value)) {
+                $matched[] = $value;
+            }
+        }
+
+        return $matched;
+    }
+
+    /**
+     * @param string[] $values
+     */
+    private function matchesAny(
+        MatchingRuleComparatorInterface $comparator,
+        array $values,
+        string $candidate,
+    ): bool {
+        foreach ($values as $value) {
+            if ($comparator->equals($value, $candidate)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
