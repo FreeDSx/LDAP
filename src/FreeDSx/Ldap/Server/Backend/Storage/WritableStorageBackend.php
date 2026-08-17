@@ -411,6 +411,11 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             $this->assertNewSuperiorExists($storage, $command);
 
             $newEntry = $this->entryHandler->apply($entry, $command);
+            $this->validateForMove(
+                $command,
+                $newEntry,
+                $context,
+            );
             $normNew = $newEntry->getDn()->normalize();
 
             if ($storage->exists($normNew)) {
@@ -609,6 +614,28 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             $this->validator->validateModify(
                 $command,
                 $updated,
+                $context->isSystem(),
+            );
+        } catch (OperationException $e) {
+            $this->recordOrReject(
+                $e,
+                $context,
+            );
+        }
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function validateForMove(
+        MoveCommand $command,
+        Entry $moved,
+        WriteContext $context,
+    ): void {
+        try {
+            $this->validator->validateModifyDn(
+                $moved,
+                $command->newRdn,
                 $context->isSystem(),
             );
         } catch (OperationException $e) {

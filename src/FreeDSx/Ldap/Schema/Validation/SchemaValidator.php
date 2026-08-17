@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Schema\Validation;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
@@ -100,6 +101,52 @@ final class SchemaValidator
         $this->checkNoEquivalentValues($result);
         $this->checkStructuralClassUnchanged($result);
         $this->validateStructure($result);
+    }
+
+    /**
+     * Validates the entry resulting from a modifyDn, where the new RDN adds values and the old one may remove them.
+     *
+     * @param bool $isSystem Skip the NO-USER-MODIFICATION check for server-initiated writes.
+     * @throws OperationException
+     */
+    public function validateModifyDn(
+        Entry $result,
+        Rdn $newRdn,
+        bool $isSystem = false,
+    ): void {
+        if ($this->mode === SchemaValidationMode::Off) {
+            return;
+        }
+
+        // Checked first, since a caller relaxing an earlier violation would otherwise stop validation before this.
+        $this->checkAttributeSyntaxes($result);
+        if (!$isSystem) {
+            $this->checkNoUserModificationInRdn($newRdn);
+        }
+
+        $this->checkNoEquivalentValues($result);
+        $this->validateStructure($result);
+    }
+
+    /**
+     * The new RDN is client-supplied, so the values it puts on the entry face the same restriction as a modify.
+     *
+     * @throws OperationException
+     */
+    private function checkNoUserModificationInRdn(Rdn $rdn): void
+    {
+        foreach ($rdn->getAll() as $component) {
+            $attrType = $this->schema->getAttributeType($component->getName());
+
+            if ($attrType === null || !$attrType->noUserModification) {
+                continue;
+            }
+
+            $this->fail(
+                sprintf('Attribute "%s" cannot be set by users.', $component->getName()),
+                ResultCode::CONSTRAINT_VIOLATION,
+            );
+        }
     }
 
     /**

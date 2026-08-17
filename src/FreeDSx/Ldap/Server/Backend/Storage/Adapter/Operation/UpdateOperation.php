@@ -171,6 +171,11 @@ final class UpdateOperation
             $values,
             caseSensitive: false,
         );
+
+        // RFC 4511 §4.6: listing every value an attribute currently holds removes the attribute itself.
+        if ($existing->getValues() === []) {
+            $entry->reset($existing);
+        }
     }
 
     /**

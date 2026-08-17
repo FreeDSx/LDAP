@@ -462,6 +462,167 @@ trait WriteTestsTrait
         );
     }
 
+    public function testModifyDeletingEveryValueRemovesTheAttribute(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=dropmail,dc=foo,dc=bar',
+            [
+                'cn' => 'dropmail',
+                'sn' => 'Drop',
+                'mail' => ['one@foo.bar', 'two@foo.bar'],
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        $this->ldapClient()->send(Operations::modify(
+            'cn=dropmail,dc=foo,dc=bar',
+            Change::delete(new Attribute('mail', 'one@foo.bar', 'two@foo.bar')),
+        ));
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'mail')
+                ->base('cn=dropmail,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+        self::assertNull($found->first()?->get('mail'));
+
+        $this->ldapClient()->delete('cn=dropmail,dc=foo,dc=bar');
+    }
+
+    public function testModifyDeletingTheLastValueOfARequiredAttributeIsRefused(): void
+    {
+        $this->authenticateAdmin();
+
+        // Naming every value is the same removal as deleting the attribute outright, so sn must not survive empty.
+        try {
+            $this->ldapClient()->send(Operations::modify(
+                'cn=user,dc=foo,dc=bar',
+                Change::delete(new Attribute('sn', 'Admin')),
+            ));
+            self::fail('The schema violating modify should have been rejected.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::OBJECT_CLASS_VIOLATION,
+                $e->getCode(),
+            );
+        }
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'sn')
+                ->base('cn=user,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+        self::assertSame(
+            ['Admin'],
+            $found->first()?->get('sn')?->getValues(),
+        );
+    }
+
+    public function testRenameRemovingTheLastValueOfARequiredAttributeIsRefused(): void
+    {
+        $this->authenticateAdmin();
+
+        // cn=user is an inetOrgPerson, so deleting the old cn leaves it without an attribute person requires.
+        try {
+            $this->ldapClient()->rename('cn=user,dc=foo,dc=bar', 'sn=Admin', true);
+            self::fail('The schema violating rename should have been rejected.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::OBJECT_CLASS_VIOLATION,
+                $e->getCode(),
+            );
+        }
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'cn')
+                ->base('cn=user,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+        self::assertSame(
+            ['user'],
+            $found->first()?->get('cn')?->getValues(),
+        );
+    }
+
+    public function testRenameToAnUndefinedAttributeTypeIsRefused(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNDEFINED_ATTRIBUTE_TYPE);
+
+        $this->ldapClient()->rename('cn=user,dc=foo,dc=bar', 'undefinedType=user', false);
+    }
+
+    public function testRenameToAnAttributeNoObjectClassPermitsIsRefused(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);
+
+        $this->ldapClient()->rename('cn=user,dc=foo,dc=bar', 'dc=user', false);
+    }
+
+    public function testRenameToANoUserModificationAttributeIsRefused(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->ldapClient()->rename('cn=user,dc=foo,dc=bar', 'hasSubordinates=TRUE', false);
+    }
+
+    public function testRenameDropsAnRdnAttributeLeftWithNoValues(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'employeeNumber=E1,dc=foo,dc=bar',
+            [
+                'cn' => 'pruneme',
+                'sn' => 'Prune',
+                'employeeNumber' => 'E1',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        $this->ldapClient()->rename('employeeNumber=E1,dc=foo,dc=bar', 'cn=pruneme', true);
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'employeeNumber')
+                ->base('cn=pruneme,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+        self::assertNull($found->first()?->get('employeeNumber'));
+
+        $this->ldapClient()->delete('cn=pruneme,dc=foo,dc=bar');
+    }
+
+    public function testRenameKeepsAnRdnAttributeHoldingOtherValues(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=keepme,dc=foo,dc=bar',
+            ['cn' => ['keepme', 'kept'], 'sn' => 'Keep', 'objectClass' => 'inetOrgPerson'],
+        ));
+
+        $this->ldapClient()->rename('cn=keepme,dc=foo,dc=bar', 'cn=kept', true);
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'cn')
+                ->base('cn=kept,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+        self::assertSame(
+            ['kept'],
+            $found->first()?->get('cn')?->getValues(),
+        );
+
+        $this->ldapClient()->delete('cn=kept,dc=foo,dc=bar');
+    }
+
     public function testRenameChangesRdn(): void
     {
         $this->authenticateAdmin();
