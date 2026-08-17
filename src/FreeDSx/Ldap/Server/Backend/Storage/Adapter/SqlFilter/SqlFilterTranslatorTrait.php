@@ -198,7 +198,7 @@ trait SqlFilterTranslatorTrait
             SQL;
 
         // The syntax check upstream leaves only the two Boolean literals; anything else is left to the evaluator.
-        $sql = match ($value) {
+        $sql = match (strtoupper($value)) {
             'TRUE' => $exists,
             'FALSE' => "NOT $exists",
             default => null,

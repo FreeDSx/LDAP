@@ -88,7 +88,7 @@ final class CoreSchemaResourceTest extends TestCase
     public function test_has_expected_syntax_count(): void
     {
         self::assertCount(
-            25,
+            31,
             $this->schema->getLdapSyntaxes(),
         );
     }
@@ -104,7 +104,7 @@ final class CoreSchemaResourceTest extends TestCase
     public function test_has_expected_attribute_type_count(): void
     {
         self::assertCount(
-            59,
+            79,
             $this->schema->getAttributeTypes(),
         );
     }
@@ -112,7 +112,7 @@ final class CoreSchemaResourceTest extends TestCase
     public function test_has_expected_object_class_count(): void
     {
         self::assertCount(
-            15,
+            21,
             $this->schema->getObjectClasses(),
         );
     }

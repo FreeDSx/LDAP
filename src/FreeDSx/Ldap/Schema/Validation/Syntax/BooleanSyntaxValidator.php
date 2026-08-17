@@ -24,9 +24,14 @@ final class BooleanSyntaxValidator implements SyntaxValidatorInterface
 
     private const BOOLEAN_FALSE = 'FALSE';
 
+    /**
+     * RFC 5234 2.3 makes the quoted ABNF literals case-insensitive.
+     */
     public function isValid(string $value): bool
     {
-        return $value === self::BOOLEAN_TRUE
-            || $value === self::BOOLEAN_FALSE;
+        $upper = strtoupper($value);
+
+        return $upper === self::BOOLEAN_TRUE
+            || $upper === self::BOOLEAN_FALSE;
     }
 }

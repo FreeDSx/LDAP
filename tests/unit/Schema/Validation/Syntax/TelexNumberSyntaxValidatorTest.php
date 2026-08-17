@@ -13,27 +13,27 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Schema\Validation\Syntax;
 
-use FreeDSx\Ldap\Schema\Validation\Syntax\BooleanSyntaxValidator;
+use FreeDSx\Ldap\Schema\Validation\Syntax\TelexNumberSyntaxValidator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-final class BooleanSyntaxValidatorTest extends TestCase
+final class TelexNumberSyntaxValidatorTest extends TestCase
 {
-    private BooleanSyntaxValidator $subject;
+    private TelexNumberSyntaxValidator $subject;
 
     protected function setUp(): void
     {
-        $this->subject = new BooleanSyntaxValidator();
+        $this->subject = new TelexNumberSyntaxValidator();
     }
 
     #[DataProvider('validValuesProvider')]
-    public function test_it_accepts_the_exact_boolean_literals(string $value): void
+    public function test_it_accepts_all_three_components(string $value): void
     {
         self::assertTrue($this->subject->isValid($value));
     }
 
     #[DataProvider('invalidValuesProvider')]
-    public function test_it_rejects_anything_else(string $value): void
+    public function test_it_rejects_anything_outside_the_grammar(string $value): void
     {
         self::assertFalse($this->subject->isValid($value));
     }
@@ -44,11 +44,12 @@ final class BooleanSyntaxValidatorTest extends TestCase
     public static function validValuesProvider(): array
     {
         return [
-            'true' => ['TRUE'],
-            'false' => ['FALSE'],
-            // RFC 5234 2.3 makes the quoted ABNF literals case-insensitive.
-            'lowercase true' => ['true'],
-            'mixed case false' => ['False'],
+            'number, country and answerback' => [
+                '12345$US$ACME',
+            ],
+            'printable punctuation' => [
+                '(0)12-345$G.B.$ACME CO',
+            ],
         ];
     }
 
@@ -58,11 +59,21 @@ final class BooleanSyntaxValidatorTest extends TestCase
     public static function invalidValuesProvider(): array
     {
         return [
-            'empty' => [''],
-            'yes' => ['yes'],
-            'numeric one' => ['1'],
-            'numeric zero' => ['0'],
-            'trailing space' => ['TRUE '],
+            'empty' => [
+                '',
+            ],
+            'only two components' => [
+                '12345$US',
+            ],
+            'four components' => [
+                '1$2$3$4',
+            ],
+            'an empty component' => [
+                '12345$$ACME',
+            ],
+            'a component outside printable string' => [
+                "12345\$US\$ACME\x01",
+            ],
         ];
     }
 }

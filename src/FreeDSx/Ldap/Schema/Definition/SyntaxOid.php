@@ -72,6 +72,30 @@ final class SyntaxOid
 
     public const DESC_POSTAL_ADDRESS = 'Postal Address';
 
+    public const OID_DELIVERY_METHOD = '1.3.6.1.4.1.1466.115.121.1.14';
+
+    public const DESC_DELIVERY_METHOD = 'Delivery Method';
+
+    public const OID_FACSIMILE_TELEPHONE_NUMBER = '1.3.6.1.4.1.1466.115.121.1.22';
+
+    public const DESC_FACSIMILE_TELEPHONE_NUMBER = 'Facsimile Telephone Number';
+
+    public const OID_TELETEX_TERMINAL_IDENTIFIER = '1.3.6.1.4.1.1466.115.121.1.51';
+
+    public const DESC_TELETEX_TERMINAL_IDENTIFIER = 'Teletex Terminal Identifier';
+
+    public const OID_TELEX_NUMBER = '1.3.6.1.4.1.1466.115.121.1.52';
+
+    public const DESC_TELEX_NUMBER = 'Telex Number';
+
+    public const OID_GUIDE = '1.3.6.1.4.1.1466.115.121.1.25';
+
+    public const DESC_GUIDE = 'Guide';
+
+    public const OID_ENHANCED_GUIDE = '1.3.6.1.4.1.1466.115.121.1.21';
+
+    public const DESC_ENHANCED_GUIDE = 'Enhanced Guide';
+
     public const OID_JPEG = '1.3.6.1.4.1.1466.115.121.1.28';
 
     public const DESC_JPEG = 'JPEG';
