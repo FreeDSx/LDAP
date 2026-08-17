@@ -32,6 +32,11 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
 
     private const LISTEN_READ_TIMEOUT = 20;
 
+    /**
+     * The provider keepalives every poll, so a read never idles out; this bounds the wait for an expected result.
+     */
+    private const MAX_PERSIST_RESULTS = 5;
+
     public function setUp(): void
     {
         $this->setServerMode('ldap-server');
@@ -100,10 +105,11 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
         $dn = 'cn=persist-delete,dc=foo,dc=bar';
         $result = null;
         $wrote = false;
+        $seen = 0;
 
         $syncRepl = $this->boundSync();
 
-        $syncRepl->listen(function (SyncEntryResult $entry, Session $session) use (&$result, &$wrote, $dn): void {
+        $syncRepl->listen(function (SyncEntryResult $entry, Session $session) use (&$result, &$wrote, &$seen, $dn): void {
             if (!$session->isRefreshComplete()) {
                 if (!$wrote) {
                     $wrote = true;
@@ -125,8 +131,12 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
             }
 
             $result = $entry;
+            $seen++;
 
-            throw new CancelRequestException();
+            // A poll landing between the two writes reports them separately, so the removal can arrive second.
+            if ($entry->isDelete() || $seen >= self::MAX_PERSIST_RESULTS) {
+                throw new CancelRequestException();
+            }
         });
 
         self::assertInstanceOf(
