@@ -36,14 +36,34 @@ final class MoveOperation
         $newEntry = new Entry($newDn, ...$entry->getAttributes());
 
         if ($command->deleteOldRdn) {
-            foreach ($command->dn->getRdn()->getAll() as $component) {
-                $newEntry->get($component->getName())?->removeValues(
-                    [Rdn::unescape($component->getValue())],
-                    caseSensitive: false,
-                );
-            }
+            $this->removeOldRdnValues(
+                $newEntry,
+                $command->dn->getRdn(),
+            );
         }
 
         return $newEntry->mergeRdnAttributes();
+    }
+
+    /**
+     * An attribute cannot remain on an entry with no values.
+     */
+    private function removeOldRdnValues(
+        Entry $entry,
+        Rdn $oldRdn,
+    ): void {
+        foreach ($oldRdn->getAll() as $component) {
+            $existing = $entry->get($component->getName());
+            if ($existing === null) {
+                continue;
+            }
+            $existing->removeValues(
+                [Rdn::unescape($component->getValue())],
+                caseSensitive: false,
+            );
+            if ($existing->getValues() === []) {
+                $entry->reset($existing);
+            }
+        }
     }
 }
