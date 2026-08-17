@@ -14,13 +14,18 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Schema\Validation\Syntax;
 
 /**
- * Validates the Printable String syntax (RFC 4517 §3.3.27): one or more printable characters.
+ * Validates the Printable String syntax (RFC 4517 §3.3.29): one or more printable characters.
  *
  * e.g. "Example Co., Ltd."
  */
 final class PrintableStringSyntaxValidator implements SyntaxValidatorInterface
 {
-    private const PATTERN = '/^[A-Za-z0-9\'()+,\-.\/:? =]+$/D';
+    /**
+     * The §3.3.29 PrintableCharacter set, shared with the syntaxes that embed a PrintableString.
+     */
+    public const CHARACTER = '[A-Za-z0-9\'()+,\-.\/:? =]';
+
+    private const PATTERN = '/^' . self::CHARACTER . '+$/D';
 
     public function isValid(string $value): bool
     {

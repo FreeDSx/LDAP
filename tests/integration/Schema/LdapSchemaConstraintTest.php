@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 
 /**
@@ -391,5 +392,120 @@ final class LdapSchemaConstraintTest extends ServerTestCase
                 'objectClass' => 'posixGroup',
             ],
         ));
+    }
+
+    /**
+     * RFC 4519 3.10, whose MAY list is what pulled the remaining core attribute types into the schema.
+     */
+    public function test_an_organizational_role_is_accepted_with_its_optional_attributes(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=helpdesk,dc=foo,dc=bar',
+            [
+                'cn' => 'helpdesk',
+                'objectClass' => 'organizationalRole',
+                'roleOccupant' => 'cn=admin,dc=foo,dc=bar',
+                'preferredDeliveryMethod' => 'telephone',
+                'facsimileTelephoneNumber' => '+1 555 555 1234$fineResolution',
+                'telexNumber' => '12345$US$ACME',
+                'postalAddress' => '1234 Main St.$Anytown, CA 12345$USA',
+                'teletexTerminalIdentifier' => 'term1$graphic:on',
+            ],
+        ));
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'helpdesk'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            1,
+            $entries,
+        );
+        self::assertSame(
+            'cn=admin,dc=foo,dc=bar',
+            $entries->first()?->get('roleOccupant')?->firstValue(),
+        );
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public static function invalidCoreSyntaxProvider(): array
+    {
+        return [
+            'a delivery method outside the keywords' => [
+                'preferredDeliveryMethod',
+                'carrier-pigeon',
+            ],
+            'a fax parameter outside the keywords' => [
+                'facsimileTelephoneNumber',
+                '+1 555 555 1234$bogusParam',
+            ],
+            'a telex number missing a component' => [
+                'telexNumber',
+                '12345$US',
+            ],
+            'a postal address with a bare backslash' => [
+                'postalAddress',
+                'a\b',
+            ],
+            'a teletex key outside the keywords' => [
+                'teletexTerminalIdentifier',
+                'term1$bogus:x',
+            ],
+        ];
+    }
+
+    #[DataProvider('invalidCoreSyntaxProvider')]
+    public function test_a_value_the_new_core_syntaxes_reject_is_refused(
+        string $attribute,
+        string $value,
+    ): void {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=bad-core-syntax,dc=foo,dc=bar',
+            [
+                'cn' => 'bad-core-syntax',
+                'objectClass' => 'organizationalRole',
+                $attribute => $value,
+            ],
+        ));
+    }
+
+    /**
+     * RFC 5234 2.3 makes the quoted ABNF literals case-insensitive, which other implementations allow.
+     */
+    public function test_a_keyword_in_another_case_is_accepted(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=mixed-case-keyword,dc=foo,dc=bar',
+            [
+                'cn' => 'mixed-case-keyword',
+                'objectClass' => 'organizationalRole',
+                'preferredDeliveryMethod' => 'Telephone',
+                'facsimileTelephoneNumber' => '+1 555 555 1234$FineResolution',
+            ],
+        ));
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'mixed-case-keyword'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertCount(
+            1,
+            $entries,
+        );
     }
 }

@@ -43,6 +43,11 @@ final class SyntaxValidatorRegistry
             SyntaxOid::OID_BIT_STRING => new BitStringSyntaxValidator(),
             SyntaxOid::OID_SUBTREE_SPECIFICATION => new SubtreeSpecificationSyntaxValidator(),
             SyntaxOid::OID_UUID => new UuidSyntaxValidator(),
+            SyntaxOid::OID_DELIVERY_METHOD => new DeliveryMethodSyntaxValidator(),
+            SyntaxOid::OID_FACSIMILE_TELEPHONE_NUMBER => new FacsimileTelephoneNumberSyntaxValidator(),
+            SyntaxOid::OID_POSTAL_ADDRESS => new PostalAddressSyntaxValidator(),
+            SyntaxOid::OID_TELETEX_TERMINAL_IDENTIFIER => new TeletexTerminalIdentifierSyntaxValidator(),
+            SyntaxOid::OID_TELEX_NUMBER => new TelexNumberSyntaxValidator(),
         ]);
     }
 

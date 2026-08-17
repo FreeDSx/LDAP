@@ -28,7 +28,7 @@ use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 class FilterParser
 {
     /**
-     * ABNF string literals are case insensitive (RFC 4234 2.3), so ":dn" may be given in any case.
+     * ABNF string literals are case-insensitive (RFC 5234 2.3), so ":dn" may be given in any case.
      */
     private const MATCHING_RULE = '/^([a-zA-Z0-9\.]+)?(\:dn)?(\:([a-zA-Z0-9\.]+))?$/i';
 

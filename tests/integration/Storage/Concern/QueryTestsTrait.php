@@ -438,13 +438,13 @@ trait QueryTestsTrait
             0,
         ];
 
-        // RFC 4517 3.3.3 admits only the uppercase literals, so anything else is an invalid assertion and Undefined.
-        yield 'a lowercase hasSubordinates assertion is undefined' => [
+        // RFC 5234 2.3 makes the quoted ABNF literals case-insensitive.
+        yield 'a lowercase hasSubordinates assertion matches the same entries' => [
             Filters::equal(
                 'hasSubordinates',
                 'true',
             ),
-            0,
+            2,
         ];
         yield 'a non boolean hasSubordinates assertion is undefined' => [
             Filters::equal(
