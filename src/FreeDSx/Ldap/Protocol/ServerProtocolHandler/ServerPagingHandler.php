@@ -72,12 +72,22 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $pagingRequest = $this->findOrMakePagingRequest($message);
         $searchRequest = $this->getSearchRequestFromMessage($message);
 
+        $sortControl = $this->sortingControl($message);
+        $sortResponse = $this->sortingResponseControl(
+            $sortControl,
+            $this->schema,
+        );
+
         $response = null;
         $controls = [];
         $entriesReturned = 0;
         $failure = null;
         try {
             $this->assertBaseDnProvided($searchRequest);
+            $this->assertSortIsSatisfiable(
+                $sortControl,
+                $sortResponse,
+            );
 
             $response = $this->handlePaging(
                 $pagingRequest,
@@ -115,10 +125,6 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
             $controls[] = new PagingControl(0, '');
         }
 
-        $sortResponse = $this->sortingResponseControl(
-            $this->sortingControl($message),
-            $this->schema,
-        );
         if ($sortResponse !== null) {
             $controls[] = $sortResponse;
         }

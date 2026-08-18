@@ -851,6 +851,110 @@ class ServerPagingHandlerTest extends TestCase
         );
     }
 
+    public function test_an_unsortable_critical_sort_fails_the_paged_search_and_returns_no_entries(): void
+    {
+        $message = new LdapMessageRequest(
+            2,
+            $this->makeSearchRequest(),
+            new PagingControl(10, ''),
+            (new SortingControl(SortKey::ascending('bogusAttr')))->setCriticality(true),
+        );
+
+        $this->mockBackend
+            ->expects(self::never())
+            ->method('search');
+
+        $this->drive(
+            $this->subject,
+            $message,
+        );
+
+        self::assertCount(
+            1,
+            $this->sentMessages,
+            'No entries may be returned when a critical sort cannot be honored.',
+        );
+
+        $done = $this->doneMessage();
+        $response = $done->getResponse();
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $response,
+        );
+        self::assertSame(
+            ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+            $response->getResultCode(),
+        );
+        self::assertInstanceOf(
+            SortingResponseControl::class,
+            $done->controls()->get(Control::OID_SORTING_RESPONSE),
+        );
+    }
+
+    public function test_an_unsortable_critical_sort_discards_the_paged_result_set(): void
+    {
+        $message = new LdapMessageRequest(
+            2,
+            $this->makeSearchRequest(),
+            new PagingControl(10, ''),
+            (new SortingControl(SortKey::ascending('bogusAttr')))->setCriticality(true),
+        );
+
+        $this->drive(
+            $this->subject,
+            $message,
+        );
+
+        $paging = $this->doneMessage()->controls()->get(Control::OID_PAGING);
+        self::assertInstanceOf(
+            PagingControl::class,
+            $paging,
+        );
+        self::assertSame(
+            '',
+            $paging->getCookie(),
+        );
+        self::assertSame(
+            0,
+            $this->requestHistory->pagingRequest()->count(),
+        );
+    }
+
+    public function test_an_unsortable_non_critical_paged_sort_still_returns_entries(): void
+    {
+        $message = new LdapMessageRequest(
+            2,
+            $this->makeSearchRequest(),
+            new PagingControl(10, ''),
+            new SortingControl(SortKey::ascending('bogusAttr')),
+        );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturn(new EntryStream($this->makeGenerator(
+                Entry::create('dc=foo,dc=bar', ['cn' => 'foo']),
+            )));
+
+        $this->drive(
+            $this->subject,
+            $message,
+        );
+
+        $response = $this->doneMessage()->getResponse();
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $response,
+        );
+        self::assertSame(
+            ResultCode::SUCCESS,
+            $response->getResultCode(),
+        );
+        self::assertGreaterThan(
+            1,
+            count($this->sentMessages),
+        );
+    }
+
     public function test_no_sort_control_does_not_append_sorting_response_control(): void
     {
         $message = $this->makeSearchMessage(size: 10);
