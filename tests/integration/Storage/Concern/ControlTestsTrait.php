@@ -122,6 +122,52 @@ trait ControlTestsTrait
         }
     }
 
+    public function testACriticalSortThatCannotBePerformedFailsAPagedSearch(): void
+    {
+        $this->authenticateUser();
+
+        $paging = $this->ldapClient()
+            ->paging(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+                2,
+            )
+            ->useControls((new SortingControl(SortKey::ascending('bogusAttr')))->setCriticality(true));
+
+        try {
+            $entries = $paging->getEntries();
+            self::fail(sprintf(
+                'The critical sort should have failed the paged search, got %d entries.',
+                count($entries),
+            ));
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function testANonCriticalSortThatCannotBePerformedStillReturnsPagedEntries(): void
+    {
+        $this->authenticateUser();
+
+        $paging = $this->ldapClient()
+            ->paging(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+                2,
+            )
+            ->useControls(new SortingControl(SortKey::ascending('bogusAttr')));
+
+        self::assertCount(
+            2,
+            $paging->getEntries(),
+        );
+    }
+
     public function testANonCriticalSortThatCannotBePerformedStillReturnsEntries(): void
     {
         $this->authenticateUser();

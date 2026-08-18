@@ -282,6 +282,43 @@ trait ServerSearchTrait
     }
 
     /**
+     * RFC 2891 §1.2: the sort response for a sort demanded critically that the server cannot honor.
+     */
+    private function unsatisfiedCriticalSort(
+        ?SortingControl $sortControl,
+        ?SortingResponseControl $sortResponse,
+    ): ?SortingResponseControl {
+        if ($sortControl === null || !$sortControl->getCriticality()) {
+            return null;
+        }
+
+        if ($sortResponse === null || $sortResponse->getResult() === ResultCode::SUCCESS) {
+            return null;
+        }
+
+        return $sortResponse;
+    }
+
+    /**
+     * The refusal as an exception, for callers whose failure path already tears down per-request state.
+     *
+     * @throws OperationException
+     */
+    private function assertSortIsSatisfiable(
+        ?SortingControl $sortControl,
+        ?SortingResponseControl $sortResponse,
+    ): void {
+        if ($this->unsatisfiedCriticalSort($sortControl, $sortResponse) === null) {
+            return;
+        }
+
+        throw new OperationException(
+            'The requested sort could not be performed.',
+            ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+        );
+    }
+
+    /**
      * RFC 2891 §1.2: a critical sort the server cannot honor fails the search and returns no entries.
      */
     private function refuseUnsortableCriticalSearch(
@@ -289,11 +326,11 @@ trait ServerSearchTrait
         ?SortingControl $sortControl,
         ?SortingResponseControl $sortResponse,
     ): ?ResponseStream {
-        if ($sortControl === null || !$sortControl->getCriticality()) {
-            return null;
-        }
-
-        if ($sortResponse === null || $sortResponse->getResult() === ResultCode::SUCCESS) {
+        $unsatisfied = $this->unsatisfiedCriticalSort(
+            $sortControl,
+            $sortResponse,
+        );
+        if ($unsatisfied === null) {
             return null;
         }
 
@@ -304,7 +341,7 @@ trait ServerSearchTrait
                     ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
                     diagnosticMessage: 'The requested sort could not be performed.',
                 ),
-                $sortResponse,
+                $unsatisfied,
             )],
             OperationOutcomeResult::failed(ResultCode::UNAVAILABLE_CRITICAL_EXTENSION),
         );
