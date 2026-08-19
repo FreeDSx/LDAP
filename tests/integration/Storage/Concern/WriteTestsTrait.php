@@ -462,6 +462,83 @@ trait WriteTestsTrait
         );
     }
 
+    public function testAddAcceptsEveryAttributeGroupOfNamesPermits(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=allmay,dc=foo,dc=bar',
+            [
+                'objectClass' => 'groupOfNames',
+                'cn' => 'allmay',
+                'member' => 'cn=user,dc=foo,dc=bar',
+                'businessCategory' => 'operations',
+                'seeAlso' => 'cn=admin,dc=foo,dc=bar',
+                'owner' => 'cn=admin,dc=foo,dc=bar',
+                'ou' => 'people',
+                'o' => 'Example',
+                'description' => 'every attribute the class allows',
+            ],
+        ));
+
+        self::assertCount(
+            1,
+            $this->ldapClient()->search(
+                Operations::search(Filters::equal('cn', 'allmay'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+            ),
+        );
+
+        $this->ldapClient()->delete('cn=allmay,dc=foo,dc=bar');
+    }
+
+    public function testAddAcceptsEveryAttributeOrganizationalPersonPermits(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=allmayperson,dc=foo,dc=bar',
+            [
+                'objectClass' => 'organizationalPerson',
+                'cn' => 'allmayperson',
+                'sn' => 'Person',
+                // Inherited from person.
+                'userPassword' => 'secret',
+                'seeAlso' => 'cn=admin,dc=foo,dc=bar',
+                'description' => 'every attribute the class allows',
+                'title' => 'Director',
+                'x121Address' => '15 079 672 281',
+                'registeredAddress' => '1234 Main St.$Anytown, CA 12345$USA',
+                'destinationIndicator' => 'US',
+                'preferredDeliveryMethod' => 'telephone $ physical',
+                'telexNumber' => '12345$US$ACME',
+                'teletexTerminalIdentifier' => 'terminal-1$graphic:on',
+                'telephoneNumber' => '+1 555 555 1234',
+                'internationalISDNNumber' => '15 079 672 281',
+                'facsimileTelephoneNumber' => '+1 555 555 1234$fineResolution',
+                'street' => '123 Example Way',
+                'postOfficeBox' => '4242',
+                'postalCode' => '12345',
+                'postalAddress' => '1234 Main St.$Anytown, CA 12345$USA',
+                'physicalDeliveryOfficeName' => 'Example Depot',
+                'ou' => 'people',
+                'st' => 'CA',
+                'l' => 'Anytown',
+                'c' => 'US',
+            ],
+        ));
+
+        self::assertCount(
+            1,
+            $this->ldapClient()->search(
+                Operations::search(Filters::equal('cn', 'allmayperson'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+            ),
+        );
+
+        $this->ldapClient()->delete('cn=allmayperson,dc=foo,dc=bar');
+    }
+
     public function testAddAcceptsAUniqueMemberCarryingAnIdentifier(): void
     {
         $this->authenticateAdmin();
