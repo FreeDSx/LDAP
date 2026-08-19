@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Container\Provider;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackendBuilder;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackend;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
@@ -96,7 +96,7 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
             ));
         }
 
-        return $container->get(PdoBackendBuilder::class)->replicaPasswordStateStore();
+        return $container->get(PdoBackend::class)->replicaPasswordStateStore;
     }
 
     private function makePasswordModifyTargetResolver(Container $container): PasswordModifyTargetResolver

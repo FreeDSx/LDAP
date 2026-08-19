@@ -22,8 +22,10 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\CoroutineLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackendBuilder;
+use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackend;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\MysqlFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
@@ -36,6 +38,9 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\FileChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContext;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptionsFactory;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\JsonStorageConfig;
@@ -60,11 +65,42 @@ final class StorageContainerProvider implements ContainerProviderInterface
     public function factories(): array
     {
         return [
+            AttributeContextInterface::class => $this->makeAttributeContext(...),
+            SortKeyComparator::class => $this->makeSortKeyComparator(...),
+            StorageListOptionsFactory::class => $this->makeStorageListOptionsFactory(...),
             EntryStorageInterface::class => $this->makeStorage(...),
             PdoDialectInterface::class => $this->makePdoDialect(...),
             PdoStorageFactory::class => $this->makePdoStorageFactory(...),
-            PdoBackendBuilder::class => $this->makePdoBackendBuilder(...),
+            PdoBackend::class => $this->makePdoBackend(...),
         ];
+    }
+
+    /**
+     * The schema derived answers the filter translators and the sort-spec builder need about an attribute.
+     */
+    private function makeAttributeContext(Container $container): AttributeContextInterface
+    {
+        $schema = $container->get(ServerOptions::class)->getSchema();
+
+        return new AttributeContext(
+            $schema,
+            new AttributeSyntaxResolver($schema),
+        );
+    }
+
+    private function makeSortKeyComparator(Container $container): SortKeyComparator
+    {
+        return new SortKeyComparator($container->get(ServerOptions::class)->getSchema());
+    }
+
+    private function makeStorageListOptionsFactory(Container $container): StorageListOptionsFactory
+    {
+        $options = $container->get(ServerOptions::class);
+
+        return new StorageListOptionsFactory(
+            $options->getSchema(),
+            $options->makeSearchLimits(),
+        );
     }
 
     /**
@@ -77,7 +113,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
         $origin = $this->journalOrigin($container);
 
         return match (true) {
-            $config instanceof PdoConfig => $container->get(PdoBackendBuilder::class)->storage(),
+            $config instanceof PdoConfig => $container->get(PdoBackend::class)->storage,
             $config instanceof JsonStorageConfig => $this->makeJsonStorage(
                 $container,
                 $config,
@@ -89,6 +125,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
                     new InMemoryChangeJournal($origin),
                     $journalConfig,
                 ),
+                $container->get(SortKeyComparator::class),
             ),
             default => throw new RuntimeException(sprintf(
                 'Unsupported storage config "%s".',
@@ -123,20 +160,18 @@ final class StorageContainerProvider implements ContainerProviderInterface
                 $journalConfig,
             ),
             $config->logger() ?? new NullLogger(),
+            $container->get(SortKeyComparator::class),
         );
     }
 
     /**
-     * The PDO backend assembly (storage + replica password-state store on one connection).
+     * The PDO backend assembly (storage + replica password-state store on shared connections).
      */
-    private function makePdoBackendBuilder(Container $container): PdoBackendBuilder
+    private function makePdoBackend(Container $container): PdoBackend
     {
         $options = $container->get(ServerOptions::class);
 
-        return new PdoBackendBuilder(
-            $container->get(PdoStorageFactory::class),
-            $container->get(PdoDialectInterface::class),
-            $container->get(SleeperInterface::class),
+        return $container->get(PdoStorageFactory::class)->assemble(
             $options->getRunnerConfig()->getMode(),
             $this->requirePdoConfig($container)->getSerializeSwooleWrites(),
         );
@@ -154,7 +189,12 @@ final class StorageContainerProvider implements ContainerProviderInterface
         return new PdoStorageFactory(
             $config,
             $container->get(PdoDialectInterface::class),
-            $this->makePdoFilterTranslator($config, $substringIndex),
+            $this->makePdoFilterTranslator(
+                $config,
+                $container->get(AttributeContextInterface::class),
+                $substringIndex,
+            ),
+            $container->get(AttributeContextInterface::class),
             $substringIndex,
             $this->journalOrigin($container),
             $container->get(SleeperInterface::class),
@@ -172,11 +212,18 @@ final class StorageContainerProvider implements ContainerProviderInterface
 
     private function makePdoFilterTranslator(
         PdoConfig $config,
+        AttributeContextInterface $attributeContext,
         ?SubstringIndexInterface $substringIndex,
     ): FilterTranslatorInterface {
         return match ($config->getDriver()) {
-            PdoDriver::Sqlite => new SqliteFilterTranslator($substringIndex),
-            PdoDriver::Mysql => new MysqlFilterTranslator($substringIndex),
+            PdoDriver::Sqlite => new SqliteFilterTranslator(
+                $attributeContext,
+                $substringIndex,
+            ),
+            PdoDriver::Mysql => new MysqlFilterTranslator(
+                $attributeContext,
+                $substringIndex,
+            ),
         };
     }
 

@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
@@ -92,6 +93,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         private readonly PdoConnectionProviderInterface $provider,
         private readonly FilterTranslatorInterface $translator,
         private readonly PdoDialectInterface $dialect,
+        private readonly AttributeContextInterface $attributeContext,
         ?PdoStatementPool $statements = null,
         ?EntryIndexWriter $indexes = null,
         ?PdoTransactor $transactor = null,
@@ -184,10 +186,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             ? microtime(true) + $options->timeLimit
             : null;
 
-        $filterResult = $this->translator->translate(
-            $options->filter,
-            $options,
-        );
+        $filterResult = $this->translator->translate($options->filter);
 
         // A composed filter with a selective drivable leaf streams off that leaf; PHP re-evaluates the full filter.
         $composed = $this->tryComposedStreamingQuery($filterResult, $options);
@@ -414,17 +413,15 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     }
 
     /**
-     * Resolves each sort key against the schema here, since the query layer has no view of it.
-     *
      * @return list<SortKeySpec>
      */
     private function sortSpecs(StorageListOptions $options): array
     {
         return array_values(array_map(
-            static fn(SortKey $sortKey): SortKeySpec => new SortKeySpec(
+            fn(SortKey $sortKey): SortKeySpec => new SortKeySpec(
                 strtolower($sortKey->getAttribute()),
                 $sortKey->getUseReverseOrder() ? 'DESC' : 'ASC',
-                $options->isIntegerOrdered($sortKey->getAttribute()) === true,
+                $this->attributeContext->isIntegerOrdered($sortKey->getAttribute()) === true,
             ),
             $options->sortKeys,
         ));

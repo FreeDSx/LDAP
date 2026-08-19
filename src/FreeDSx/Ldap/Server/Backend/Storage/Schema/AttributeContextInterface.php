@@ -11,14 +11,16 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Storage\Filter;
+namespace FreeDSx\Ldap\Server\Backend\Storage\Schema;
+
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
 
 /**
- * The schema derived facts a filter translator needs, without handing it the schema itself.
+ * The schema derived facts the storage layer needs about an attribute, without handing it the schema itself.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-interface FilterAttributeContextInterface
+interface AttributeContextInterface
 {
     /**
      * Whether the attribute orders numerically, or null when it cannot be resolved.

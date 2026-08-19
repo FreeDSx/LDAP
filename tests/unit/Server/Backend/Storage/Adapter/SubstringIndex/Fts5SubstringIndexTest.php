@@ -19,17 +19,17 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use PDO;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\PdoStorageFactoryTrait;
 
 final class Fts5SubstringIndexTest extends TestCase
 {
+    use PdoStorageFactoryTrait;
+
     public function test_build_substring_predicate_declines_an_unindexed_attribute(): void
     {
         self::assertNull(
@@ -95,17 +95,9 @@ final class Fts5SubstringIndexTest extends TestCase
             $pdo,
             fn(): PDO => $pdo,
         );
-        $statements = new PdoStatementPool($provider);
-        $storage = new PdoStorage(
+        $storage = self::makePdoStorage(
             $provider,
-            new SqliteFilterTranslator($index),
-            new SqliteDialect(),
-            $statements,
-            new EntryIndexWriter(
-                new SqliteDialect(),
-                $statements,
-                $index,
-            ),
+            $index,
         );
 
         $storage->store(new Entry(

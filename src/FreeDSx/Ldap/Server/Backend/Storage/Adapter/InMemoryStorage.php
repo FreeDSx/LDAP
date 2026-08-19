@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\ArrayEntryStorageTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
@@ -46,7 +47,9 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
     public function __construct(
         array $entries = [],
         ?ChangeJournalInterface $journal = null,
+        SortKeyComparator $sortKeyComparator = new SortKeyComparator(),
     ) {
+        $this->sortKeyComparator = $sortKeyComparator;
         $this->journal = $journal;
 
         foreach ($entries as $entry) {

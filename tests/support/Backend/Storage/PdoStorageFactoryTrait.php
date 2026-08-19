@@ -13,10 +13,15 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap\Backend\Storage;
 
+use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Schema\SchemaResource;
+use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\MysqlFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
@@ -25,6 +30,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInt
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContext;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoDriver;
@@ -42,17 +49,67 @@ trait PdoStorageFactoryTrait
         PdoConfig $config,
         ?ChangeJournalConfig $journalConfig = null,
         ?SubstringIndexInterface $substringIndex = null,
+        ?AttributeContextInterface $attributeContext = null,
     ): PdoStorageFactory {
         $substringIndex ??= self::makeSubstringIndex($config);
+        $attributeContext ??= self::makeAttributeContext();
 
         return new PdoStorageFactory(
             $config,
             self::makePdoDialect($config->getDriver()),
-            self::makePdoFilterTranslator($config->getDriver(), $substringIndex),
+            self::makePdoFilterTranslator(
+                $config->getDriver(),
+                $attributeContext,
+                $substringIndex,
+            ),
+            $attributeContext,
             $substringIndex,
             new ReplicaId(),
             new BlockingSleeper(),
             $journalConfig,
+        );
+    }
+
+    /**
+     * Storage that opens its own shared connection, as the PCNTL path does.
+     */
+    private static function makeSharedPdoStorage(
+        PdoConfig $config,
+        ?ChangeJournalConfig $journalConfig = null,
+    ): PdoStorage {
+        $factory = self::makePdoStorageFactory(
+            $config,
+            $journalConfig,
+        );
+
+        return $factory->storageOn($factory->sharedProvider());
+    }
+
+    /**
+     * Storage over an already-open connection, wired the way the container wires it.
+     *
+     * The config only feeds connection opening, which the supplied provider has already done, so it is inert here.
+     */
+    private static function makePdoStorage(
+        PdoConnectionProviderInterface $provider,
+        ?SubstringIndexInterface $substringIndex = null,
+    ): PdoStorage {
+        return self::makePdoStorageFactory(
+            PdoConfig::forSqlite(':memory:'),
+            substringIndex: $substringIndex,
+        )->storageOn($provider);
+    }
+
+    /**
+     * @param ?Schema $schema Defaults to core, matching what a server is configured with unless a test says otherwise.
+     */
+    private static function makeAttributeContext(?Schema $schema = null): AttributeContextInterface
+    {
+        $schema ??= SchemaResource::Core->load();
+
+        return new AttributeContext(
+            $schema,
+            new AttributeSyntaxResolver($schema),
         );
     }
 
@@ -66,11 +123,18 @@ trait PdoStorageFactoryTrait
 
     private static function makePdoFilterTranslator(
         PdoDriver $driver,
+        AttributeContextInterface $attributeContext,
         ?SubstringIndexInterface $substringIndex = null,
     ): FilterTranslatorInterface {
         return match ($driver) {
-            PdoDriver::Sqlite => new SqliteFilterTranslator($substringIndex),
-            PdoDriver::Mysql => new MysqlFilterTranslator($substringIndex),
+            PdoDriver::Sqlite => new SqliteFilterTranslator(
+                $attributeContext,
+                $substringIndex,
+            ),
+            PdoDriver::Mysql => new MysqlFilterTranslator(
+                $attributeContext,
+                $substringIndex,
+            ),
         };
     }
 

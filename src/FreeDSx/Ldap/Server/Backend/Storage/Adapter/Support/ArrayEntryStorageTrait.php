@@ -31,6 +31,8 @@ trait ArrayEntryStorageTrait
 {
     use DefaultHasChildrenTrait;
 
+    private SortKeyComparator $sortKeyComparator;
+
     /**
      * @param array<string, Entry> $entries Entries keyed by normalised DN string
      */
@@ -76,7 +78,7 @@ trait ArrayEntryStorageTrait
             false,
         );
 
-        yield from (new SortKeyComparator($options->schema))->sort(
+        yield from $this->sortKeyComparator->sort(
             $collected,
             $options->sortKeys,
         );

@@ -32,7 +32,7 @@ use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterAttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 
 /**
  * Translates LDAP filters to SQL against the `entry_attribute_values` sidecar index.
@@ -45,27 +45,11 @@ trait SqlFilterTranslatorTrait
 
     private ?SubstringIndexInterface $substringIndex = null;
 
-    /**
-     * Schema derived answers for the current call, or null when the caller had no schema.
-     */
-    private ?FilterAttributeContextInterface $attributeContext = null;
+    private AttributeContextInterface $attributeContext;
 
-    public function translate(
-        FilterInterface $filter,
-        ?FilterAttributeContextInterface $attributeContext = null,
-    ): ?SqlFilterResult {
-        $this->attributeContext = $attributeContext;
-
-        return $this->dispatch($filter);
-    }
-
-    /**
-     * How faithfully SQL can answer an assertion on this attribute; Exact when the caller had no schema.
-     */
-    private function filterSupport(string $attribute): AttributeFilterSupport
+    public function translate(FilterInterface $filter): ?SqlFilterResult
     {
-        return $this->attributeContext?->filterSupport($attribute)
-            ?? AttributeFilterSupport::Exact;
+        return $this->dispatch($filter);
     }
 
     /**
@@ -73,12 +57,18 @@ trait SqlFilterTranslatorTrait
      */
     private function supportFor(FilterInterface $filter): AttributeFilterSupport
     {
-        if ($filter instanceof AttributeValueAssertionInterface && !$this->assertionValueConforms($filter)) {
+        $conforms = !$filter instanceof AttributeValueAssertionInterface
+            || $this->attributeContext->assertionValueConforms(
+                $filter->getAttribute(),
+                $filter->getValue(),
+            );
+
+        if (!$conforms) {
             return AttributeFilterSupport::NeverMatches;
         }
 
         // A substring item applies the type's SUBSTR rule, so a type declaring none cannot answer it.
-        if ($filter instanceof SubstringFilter && !$this->hasSubstringRule($filter->getAttribute())) {
+        if ($filter instanceof SubstringFilter && !$this->attributeContext->hasSubstringRule($filter->getAttribute())) {
             return AttributeFilterSupport::NeverMatches;
         }
 
@@ -88,23 +78,7 @@ trait SqlFilterTranslatorTrait
 
         return $attribute === null
             ? AttributeFilterSupport::Exact
-            : $this->filterSupport($attribute);
-    }
-
-    private function assertionValueConforms(AttributeValueAssertionInterface $filter): bool
-    {
-        return $this->attributeContext?->assertionValueConforms(
-            $filter->getAttribute(),
-            $filter->getValue(),
-        ) ?? true;
-    }
-
-    /**
-     * Whether the attribute defines a SUBSTR rule; true when the caller had no schema.
-     */
-    private function hasSubstringRule(string $attribute): bool
-    {
-        return $this->attributeContext?->hasSubstringRule($attribute) ?? true;
+            : $this->attributeContext->filterSupport($attribute);
     }
 
     private function dispatch(FilterInterface $filter): ?SqlFilterResult
@@ -252,7 +226,7 @@ trait SqlFilterTranslatorTrait
 
         // Stored text and the assertion can spell the same integer differently, so those compare as numbers. The
         // cast saturates at the platform integer, making it a superset the evaluator still has to check.
-        if ($this->attributeContext?->isIntegerOrdered($filter->getAttribute()) === true) {
+        if ($this->attributeContext->isIntegerOrdered($filter->getAttribute()) === true) {
             $condition = sprintf(
                 '%s = %s',
                 $this->castToNumeric($alias),
@@ -343,7 +317,7 @@ trait SqlFilterTranslatorTrait
         $attribute = $this->validateAttribute($rawAttribute);
         $hasOption = $this->attributeHasOption($rawAttribute);
 
-        if ($this->attributeContext?->isIntegerOrdered($rawAttribute) === true) {
+        if ($this->attributeContext->isIntegerOrdered($rawAttribute) === true) {
             $condition = sprintf(
                 '%s %s %s',
                 $this->castToNumeric($this->valueAlias()),
@@ -496,7 +470,7 @@ trait SqlFilterTranslatorTrait
      */
     private function matchesCaseFolded(string $attribute): bool
     {
-        return $this->attributeContext?->isCaseInsensitive($attribute) ?? true;
+        return $this->attributeContext->isCaseInsensitive($attribute) ?? true;
     }
 
     /**

@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
-use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
@@ -102,12 +101,9 @@ final readonly class SubentryPlacementGuard
         EntryStorageInterface $storage,
         Dn $dn,
     ): bool {
-        $stream = $storage->list(new StorageListOptions(
-            baseDn: $dn,
-            subtree: false,
-            filter: new AndFilter(),
-            sizeLimit: 1,
-            subentries: SubentryVisibility::Only,
+        $stream = $storage->list(StorageListOptions::firstChild(
+            $dn,
+            SubentryVisibility::Only,
         ));
 
         foreach ($stream->entries as $ignored) {

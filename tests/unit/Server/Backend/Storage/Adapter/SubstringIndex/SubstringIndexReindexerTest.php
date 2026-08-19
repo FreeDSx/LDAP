@@ -18,17 +18,17 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexReindexer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
 use PDO;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\PdoStorageFactoryTrait;
 
 final class SubstringIndexReindexerTest extends TestCase
 {
+    use PdoStorageFactoryTrait;
+
     private PDO $pdo;
 
     private PdoStorage $storage;
@@ -49,17 +49,9 @@ final class SubstringIndexReindexerTest extends TestCase
             $this->pdo,
             fn(): PDO => $this->pdo,
         );
-        $statements = new PdoStatementPool($provider);
-        $this->storage = new PdoStorage(
+        $this->storage = self::makePdoStorage(
             $provider,
-            new SqliteFilterTranslator($index),
-            new SqliteDialect(),
-            $statements,
-            new EntryIndexWriter(
-                new SqliteDialect(),
-                $statements,
-                $index,
-            ),
+            $index,
         );
 
         $this->dn = new Dn('cn=Smith,dc=example,dc=com');

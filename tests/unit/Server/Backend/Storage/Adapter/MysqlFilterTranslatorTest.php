@@ -26,7 +26,7 @@ use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\MysqlFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterAttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -36,7 +36,7 @@ final class MysqlFilterTranslatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new MysqlFilterTranslator();
+        $this->subject = new MysqlFilterTranslator($this->attributeContext());
     }
 
     public function test_present_filter_returns_sidecar_presence_exists(): void
@@ -208,15 +208,9 @@ final class MysqlFilterTranslatorTest extends TestCase
 
     public function test_gte_emits_numeric_cast_for_integer_ordered_attribute(): void
     {
-        $context = $this->createMock(FilterAttributeContextInterface::class);
-        $context->method('isIntegerOrdered')->willReturn(true);
-        $context->method('filterSupport')->willReturn(AttributeFilterSupport::Exact);
-        $context->method('assertionValueConforms')->willReturn(true);
+        $translator = new MysqlFilterTranslator($this->attributeContext(integerOrdered: true));
 
-        $result = $this->subject->translate(
-            new GreaterThanOrEqualFilter('uidNumber', '30'),
-            $context,
-        );
+        $result = $translator->translate(new GreaterThanOrEqualFilter('uidNumber', '30'));
 
         self::assertNotNull($result);
         self::assertStringContainsString(
@@ -737,5 +731,20 @@ final class MysqlFilterTranslatorTest extends TestCase
             ['alice', 'person'],
             $result->params,
         );
+    }
+
+    private function attributeContext(
+        ?bool $integerOrdered = null,
+        AttributeFilterSupport $support = AttributeFilterSupport::Exact,
+        bool $assertionConforms = true,
+        bool $hasSubstringRule = true,
+    ): AttributeContextInterface {
+        $context = $this->createMock(AttributeContextInterface::class);
+        $context->method('isIntegerOrdered')->willReturn($integerOrdered);
+        $context->method('filterSupport')->willReturn($support);
+        $context->method('assertionValueConforms')->willReturn($assertionConforms);
+        $context->method('hasSubstringRule')->willReturn($hasSubstringRule);
+
+        return $context;
     }
 }

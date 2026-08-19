@@ -63,7 +63,7 @@ final readonly class SubstringIndexReindexer
         foreach ($this->storage->namingContexts() as $namingContext) {
             $stream = $this->storage->list(StorageListOptions::matchAll(
                 $namingContext,
-                true,
+                subtree: true,
             ));
 
             foreach ($stream->entries as $entry) {
