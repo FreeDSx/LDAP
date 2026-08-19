@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\StorageLockInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\ArrayEntryStorageTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\JsonEntryBuffer;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
@@ -64,7 +65,9 @@ final class JsonFileStorage implements EntryStorageInterface, ChangeJournalingIn
         private readonly StorageLockInterface $lock,
         ?ChangeJournalInterface $journal = null,
         private readonly LoggerInterface $logger = new NullLogger(),
+        SortKeyComparator $sortKeyComparator = new SortKeyComparator(),
     ) {
+        $this->sortKeyComparator = $sortKeyComparator;
         $this->journal = $journal;
     }
 

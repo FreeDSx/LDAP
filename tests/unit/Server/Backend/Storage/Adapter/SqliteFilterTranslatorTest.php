@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\LessThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
@@ -23,11 +24,12 @@ use FreeDSx\Ldap\Search\Filter\NotFilter;
 use FreeDSx\Ldap\Search\Filter\OrFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Search\Filter\SubstringFilter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterAttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -37,7 +39,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new SqliteFilterTranslator();
+        $this->subject = new SqliteFilterTranslator($this->attributeContext());
     }
 
     public function test_present_emits_sidecar_presence_exists(): void
@@ -252,7 +254,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_an_attribute_the_schema_does_not_define_can_never_match(): void
     {
-        $result = $this->subject->translate(
+        $result = $this->translateWith(
             new EqualityFilter('shoeSize', '12'),
             $this->attributeContext(support: AttributeFilterSupport::NeverMatches),
         );
@@ -268,7 +270,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_negating_an_attribute_the_schema_does_not_define_can_never_match(): void
     {
-        $result = $this->subject->translate(
+        $result = $this->translateWith(
             new NotFilter(new EqualityFilter('shoeSize', '12')),
             $this->attributeContext(support: AttributeFilterSupport::NeverMatches),
         );
@@ -282,7 +284,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_an_assertion_value_the_syntax_rejects_selects_nothing_and_stays_inexact(): void
     {
-        $result = $this->subject->translate(
+        $result = $this->translateWith(
             new EqualityFilter('uidNumber', 'abc'),
             $this->attributeContext(assertionConforms: false),
         );
@@ -297,7 +299,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_a_negated_assertion_the_syntax_rejects_stays_inexact_so_the_evaluator_decides(): void
     {
-        $result = $this->subject->translate(
+        $result = $this->translateWith(
             new NotFilter(new EqualityFilter('uidNumber', 'abc')),
             $this->attributeContext(assertionConforms: false),
         );
@@ -308,7 +310,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_a_substring_filter_is_not_subject_to_the_assertion_syntax_check(): void
     {
-        $result = $this->subject->translate(
+        $result = $this->translateWith(
             new SubstringFilter('uidNumber', '1'),
             $this->attributeContext(assertionConforms: false),
         );
@@ -322,7 +324,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_a_substring_on_a_type_with_no_substring_rule_selects_nothing(): void
     {
-        $result = $this->subject->translate(
+        $result = $this->translateWith(
             new SubstringFilter('uidNumber', '1'),
             $this->attributeContext(hasSubstringRule: false),
         );
@@ -337,7 +339,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_an_attribute_with_subtypes_is_left_to_the_evaluator(): void
     {
-        $result = $this->subject->translate(
+        $result = $this->translateWith(
             new EqualityFilter('name', 'alice'),
             $this->attributeContext(support: AttributeFilterSupport::NeedsEvaluator),
         );
@@ -347,7 +349,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_gte_emits_numeric_cast_for_integer_ordered_attribute(): void
     {
-        $result = $this->subject->translate(
+        $result = $this->translateWith(
             new GreaterThanOrEqualFilter('uidNumber', '30'),
             $this->attributeContext(integerOrdered: true),
         );
@@ -366,7 +368,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_gte_emits_lexical_comparison_for_non_integer_attribute(): void
     {
-        $result = $this->subject->translate(
+        $result = $this->translateWith(
             new GreaterThanOrEqualFilter('cn', '30'),
             $this->attributeContext(integerOrdered: false),
         );
@@ -415,7 +417,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_lte_emits_numeric_cast_for_integer_ordered_attribute(): void
     {
-        $result = $this->subject->translate(
+        $result = $this->translateWith(
             new LessThanOrEqualFilter('uidNumber', '50'),
             $this->attributeContext(integerOrdered: true),
         );
@@ -587,7 +589,10 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_contains_uses_the_substring_index_when_present(): void
     {
-        $translator = new SqliteFilterTranslator(new TrigramSubstringIndex(['cn']));
+        $translator = new SqliteFilterTranslator(
+            $this->attributeContext(),
+            new TrigramSubstringIndex(['cn']),
+        );
 
         $result = $translator->translate(new SubstringFilter(
             'cn',
@@ -606,7 +611,10 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_suffix_uses_the_substring_index_when_present(): void
     {
-        $translator = new SqliteFilterTranslator(new TrigramSubstringIndex(['cn']));
+        $translator = new SqliteFilterTranslator(
+            $this->attributeContext(),
+            new TrigramSubstringIndex(['cn']),
+        );
 
         $result = $translator->translate(new SubstringFilter(
             'cn',
@@ -640,7 +648,10 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_prefix_ignores_the_substring_index(): void
     {
-        $translator = new SqliteFilterTranslator(new TrigramSubstringIndex(['cn']));
+        $translator = new SqliteFilterTranslator(
+            $this->attributeContext(),
+            new TrigramSubstringIndex(['cn']),
+        );
 
         $result = $translator->translate(new SubstringFilter(
             'cn',
@@ -1014,7 +1025,10 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_indexed_substring_leaves_the_sidecar_condition_null(): void
     {
-        $translator = new SqliteFilterTranslator(new TrigramSubstringIndex(['cn']));
+        $translator = new SqliteFilterTranslator(
+            $this->attributeContext(),
+            new TrigramSubstringIndex(['cn']),
+        );
 
         $result = $translator->translate((new SubstringFilter('cn'))->setContains('smith'));
 
@@ -1079,13 +1093,23 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
     }
 
+    /**
+     * The context is fixed at construction, so a test wanting different schema answers needs its own translator.
+     */
+    private function translateWith(
+        FilterInterface $filter,
+        AttributeContextInterface $context,
+    ): ?SqlFilterResult {
+        return (new SqliteFilterTranslator($context))->translate($filter);
+    }
+
     private function attributeContext(
         ?bool $integerOrdered = null,
         AttributeFilterSupport $support = AttributeFilterSupport::Exact,
         bool $assertionConforms = true,
         bool $hasSubstringRule = true,
-    ): FilterAttributeContextInterface {
-        $context = $this->createMock(FilterAttributeContextInterface::class);
+    ): AttributeContextInterface {
+        $context = $this->createMock(AttributeContextInterface::class);
         $context->method('isIntegerOrdered')->willReturn($integerOrdered);
         $context->method('filterSupport')->willReturn($support);
         $context->method('assertionValueConforms')->willReturn($assertionConforms);

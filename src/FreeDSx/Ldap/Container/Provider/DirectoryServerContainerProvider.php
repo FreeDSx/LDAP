@@ -26,7 +26,7 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributeAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackendBuilder;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackend;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
@@ -221,10 +221,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             storage: $storage,
             searchStream: $container->get(SearchStreamBuilder::class),
             validator: $this->buildSchemaValidator($container),
-            listOptions: new StorageListOptionsFactory(
-                $options->getSchema(),
-                $options->makeSearchLimits(),
-            ),
+            listOptions: $container->get(StorageListOptionsFactory::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
             entryHandler: new WriteEntryOperationHandler(
                 $this->makeEqualityComparatorResolver($container),
@@ -364,7 +361,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
         // On the PDO path, share the builder so the reloaded replica store stays on the storage's connection.
         if ($container->get(ServerOptions::class)->getStorageConfig() instanceof PdoConfig) {
-            $instances[PdoBackendBuilder::class] = $container->get(PdoBackendBuilder::class);
+            $instances[PdoBackend::class] = $container->get(PdoBackend::class);
         }
 
         return new DirectoryListenerContributor(

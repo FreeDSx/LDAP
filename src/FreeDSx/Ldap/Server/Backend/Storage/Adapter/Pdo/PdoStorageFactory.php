@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
+use Closure;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\CoroutinePdoConnectionProvider;
@@ -20,19 +21,25 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProv
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SwooleWriterQueue;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
+use FreeDSx\Ldap\Server\PasswordPolicy\Replica\SerializingReplicaPasswordStateStore;
+use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use PDO;
 
 /**
- * Low-level PDO connection and storage primitives; {@see PdoBackendBuilder} composes these plus the replica store.
+ * Builds the PDO connections and the storage, journal and replica store that run on them.
  *
  * @internal the container builds storage from PdoConfig via ServerOptions::setStorageConfig()
  *
@@ -49,6 +56,7 @@ final readonly class PdoStorageFactory
         private PdoConfig $config,
         private PdoDialectInterface $dialect,
         private FilterTranslatorInterface $translator,
+        private AttributeContextInterface $attributeContext,
         private ?SubstringIndexInterface $substringIndex,
         private ReplicaId $origin,
         private SleeperInterface $sleeper,
@@ -71,11 +79,21 @@ final readonly class PdoStorageFactory
     }
 
     /**
-     * Storage over a single connection shared by every forked child.
+     * The storage and replica password-state store for a runner, sharing the connections they are assembled on.
+     *
+     * @param bool $serializeWrites Funnels writes through one connection, honoured only under the Swoole runner.
      */
-    public function sharedStorage(): PdoStorage
-    {
-        return $this->storageOn($this->sharedProvider());
+    public function assemble(
+        RunnerMode $runner,
+        bool $serializeWrites,
+    ): PdoBackend {
+        if ($runner === RunnerMode::Swoole && $serializeWrites) {
+            return $this->assembleSerializedSwoole();
+        }
+
+        return $this->assembleOnSingleProvider($runner === RunnerMode::Swoole
+            ? $this->coroutineProvider()
+            : $this->sharedProvider());
     }
 
     public function storageOn(PdoConnectionProviderInterface $provider): PdoStorage
@@ -93,6 +111,7 @@ final readonly class PdoStorageFactory
             $provider,
             $this->translator,
             $this->dialect,
+            $this->attributeContext,
             $statements,
             new EntryIndexWriter(
                 $this->dialect,
@@ -108,6 +127,58 @@ final readonly class PdoStorageFactory
                     $this->origin,
                 ),
                 $this->journalConfig,
+            ),
+        );
+    }
+
+    public function replicaStoreOn(PdoConnectionProviderInterface $provider): PdoReplicaPasswordStateStore
+    {
+        return new PdoReplicaPasswordStateStore(
+            new PdoTransactor(
+                $provider,
+                $this->dialect,
+                $this->sleeper,
+            ),
+            $this->dialect,
+            new PdoStatementPool($provider),
+        );
+    }
+
+    /**
+     * PCNTL (shared) and Swoole-without-write-serialization (per-coroutine) run storage and the store on one provider.
+     */
+    private function assembleOnSingleProvider(PdoConnectionProviderInterface $provider): PdoBackend
+    {
+        return new PdoBackend(
+            $this->storageOn($provider),
+            $this->replicaStoreOn($provider),
+        );
+    }
+
+    /**
+     * Swoole with write serialization: reads run per-coroutine, writes funnel through one shared writer coroutine.
+     */
+    private function assembleSerializedSwoole(): PdoBackend
+    {
+        $reads = $this->coroutineProvider();
+        $writes = $this->sharedProvider();
+        // Each side journals on its own connection: the writer captures changes, the reader serves sync polls.
+        $writeStorage = $this->storageOn($writes);
+        $readStorage = $this->storageOn($reads);
+        $queue = new SwooleWriterQueue(
+            batchWrapper: static fn(Closure $cb) => $writeStorage->atomic(static fn() => $cb()),
+        );
+
+        return new PdoBackend(
+            new WriteSerializingStorage(
+                reads: $readStorage,
+                writes: $writeStorage,
+                queue: $queue,
+            ),
+            new SerializingReplicaPasswordStateStore(
+                reads: $this->replicaStoreOn($reads),
+                writes: $this->replicaStoreOn($writes),
+                queue: $queue,
             ),
         );
     }

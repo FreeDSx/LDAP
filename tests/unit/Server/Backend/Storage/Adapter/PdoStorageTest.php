@@ -31,9 +31,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
@@ -82,7 +80,7 @@ final class PdoStorageTest extends TestCase
             new Attribute('userPassword', 'secret'),
         );
 
-        $this->storage = self::makePdoStorageFactory(PdoConfig::forSqlite(':memory:'))->sharedStorage();
+        $this->storage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
         $this->subject = self::makeWritableBackend($this->storage);
         $this->subject->add(
             new AddCommand(
@@ -138,8 +136,9 @@ final class PdoStorageTest extends TestCase
         );
         $storage = new PdoStorage(
             new SharedPdoConnectionProvider($pdo),
-            new SqliteFilterTranslator(),
+            new SqliteFilterTranslator(self::makeAttributeContext()),
             new SqliteDialect(),
+            self::makeAttributeContext(),
         );
         foreach (range(1, 3) as $i) {
             $storage->store(new Entry(
@@ -374,17 +373,9 @@ final class PdoStorageTest extends TestCase
             $pdo,
             fn(): PDO => $pdo,
         );
-        $statements = new PdoStatementPool($provider);
-        $storage = new PdoStorage(
+        $storage = self::makePdoStorage(
             $provider,
-            new SqliteFilterTranslator(),
-            new SqliteDialect(),
-            $statements,
-            new EntryIndexWriter(
-                new SqliteDialect(),
-                $statements,
-                $index,
-            ),
+            $index,
         );
         $storage->store(new Entry(
             new Dn('cn=Smith,dc=example,dc=com'),
@@ -475,10 +466,10 @@ final class PdoStorageTest extends TestCase
         $dsn = 'file:freedsx_init_off?mode=memory&cache=shared';
 
         // Hold the storage's connection open so the shared in-memory database survives the probe read.
-        $storage = self::makePdoStorageFactory(
+        $storage = self::makeSharedPdoStorage(
             PdoConfig::forSqlite($dsn)
                 ->setInitializeSchema(false),
-        )->sharedStorage();
+        );
 
         $probe = new PDO(
             'sqlite:' . $dsn,
@@ -527,7 +518,7 @@ final class PdoStorageTest extends TestCase
 
     public function test_get_on_empty_database_returns_null(): void
     {
-        $storage = self::makePdoStorageFactory(PdoConfig::forSqlite(':memory:'))->sharedStorage();
+        $storage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
         $backend = self::makeWritableBackend($storage);
 
         self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
@@ -849,7 +840,7 @@ final class PdoStorageTest extends TestCase
 
     public function test_search_inexact_filter_trips_lookthrough_limit(): void
     {
-        $storage = self::makePdoStorageFactory(PdoConfig::forSqlite(':memory:'))->sharedStorage();
+        $storage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
         $backend = self::makeWritableBackend(
             $storage,
             limits: new SearchLimits(maxSearchLookthrough: 2),
@@ -879,7 +870,7 @@ final class PdoStorageTest extends TestCase
 
     public function test_search_exact_filter_is_not_subject_to_lookthrough(): void
     {
-        $storage = self::makePdoStorageFactory(PdoConfig::forSqlite(':memory:'))->sharedStorage();
+        $storage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
         $backend = self::makeWritableBackend(
             $storage,
             limits: new SearchLimits(maxSearchLookthrough: 1),
@@ -910,7 +901,7 @@ final class PdoStorageTest extends TestCase
 
     public function test_search_exact_filter_bounds_transfer_at_lookthrough(): void
     {
-        $storage = self::makePdoStorageFactory(PdoConfig::forSqlite(':memory:'))->sharedStorage();
+        $storage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
         $backend = self::makeWritableBackend(
             $storage,
             limits: new SearchLimits(maxSearchLookthrough: 2),
@@ -992,11 +983,7 @@ final class PdoStorageTest extends TestCase
                 return 0;
             });
 
-        $storage = new PdoStorage(
-            new SharedPdoConnectionProvider($mockPdo),
-            $this->createMock(FilterTranslatorInterface::class),
-            new SqliteDialect(),
-        );
+        $storage = $this->storageOver($mockPdo);
 
         // First call: BEGIN IMMEDIATE throws; txDepth must recover to 0.
         try {
@@ -1032,11 +1019,7 @@ final class PdoStorageTest extends TestCase
                 return 0;
             });
 
-        $storage = new PdoStorage(
-            new SharedPdoConnectionProvider($mockPdo),
-            $this->createMock(FilterTranslatorInterface::class),
-            new SqliteDialect(),
-        );
+        $storage = $this->storageOver($mockPdo);
 
         try {
             $storage->atomic(function ($storage): void {
@@ -1076,11 +1059,7 @@ final class PdoStorageTest extends TestCase
                 return 0;
             });
 
-        $storage = new PdoStorage(
-            new SharedPdoConnectionProvider($mockPdo),
-            $this->createMock(FilterTranslatorInterface::class),
-            new SqliteDialect(),
-        );
+        $storage = $this->storageOver($mockPdo);
 
         $storage->atomic(function ($storage): void {
             try {
@@ -1115,11 +1094,7 @@ final class PdoStorageTest extends TestCase
                 return 0;
             });
 
-        $storage = new PdoStorage(
-            new SharedPdoConnectionProvider($mockPdo),
-            $this->createMock(FilterTranslatorInterface::class),
-            new SqliteDialect(),
-        );
+        $storage = $this->storageOver($mockPdo);
 
         $storage->atomic(function ($storage): void {
             try {
@@ -1139,11 +1114,7 @@ final class PdoStorageTest extends TestCase
                 return 0;
             });
 
-        $storage = new PdoStorage(
-            new SharedPdoConnectionProvider($mockPdo),
-            $this->createMock(FilterTranslatorInterface::class),
-            new SqliteDialect(),
-        );
+        $storage = $this->storageOver($mockPdo);
 
         $storage->atomic(fn() => null);
 
@@ -1164,11 +1135,7 @@ final class PdoStorageTest extends TestCase
             . "('cn=corrupt,dc=example,dc=com', 'cn=Corrupt,dc=example,dc=com', 'dc=example,dc=com', 'NOT_VALID_BLOB')",
         );
 
-        $storage = new PdoStorage(
-            new SharedPdoConnectionProvider($pdo),
-            $this->createMock(FilterTranslatorInterface::class),
-            $dialect,
-        );
+        $storage = $this->storageOver($pdo, $dialect);
 
         $this->expectException(StorageIoException::class);
 
@@ -1190,11 +1157,7 @@ final class PdoStorageTest extends TestCase
             . "('cn=corrupt,dc=example,dc=com', 'cn=Corrupt,dc=example,dc=com', 'dc=example,dc=com', 'NOT_VALID_BLOB')",
         );
 
-        $storage = new PdoStorage(
-            new SharedPdoConnectionProvider($pdo),
-            $this->createMock(FilterTranslatorInterface::class),
-            $dialect,
-        );
+        $storage = $this->storageOver($pdo, $dialect);
 
         $this->expectException(StorageIoException::class);
 
@@ -1253,7 +1216,7 @@ final class PdoStorageTest extends TestCase
 
     public function test_subtree_does_not_match_escaped_comma_suffix_collision(): void
     {
-        $storage = self::makePdoStorageFactory(PdoConfig::forSqlite(':memory:'))->sharedStorage();
+        $storage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
         $backend = self::makeWritableBackend($storage);
 
         $base = new Entry(
@@ -1288,7 +1251,7 @@ final class PdoStorageTest extends TestCase
 
     public function test_subtree_includes_entries_with_escaped_comma_under_correct_parent(): void
     {
-        $storage = self::makePdoStorageFactory(PdoConfig::forSqlite(':memory:'))->sharedStorage();
+        $storage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
         $backend = self::makeWritableBackend($storage);
 
         $base = new Entry(
@@ -1380,7 +1343,7 @@ final class PdoStorageTest extends TestCase
 
     public function test_naming_contexts_is_empty_when_storage_is_empty(): void
     {
-        $emptyStorage = self::makePdoStorageFactory(PdoConfig::forSqlite(':memory:'))->sharedStorage();
+        $emptyStorage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
 
         self::assertSame(
             [],
@@ -1390,10 +1353,10 @@ final class PdoStorageTest extends TestCase
 
     public function test_a_journal_append_rolls_back_with_the_enclosing_write_transaction(): void
     {
-        $storage = self::makePdoStorageFactory(
+        $storage = self::makeSharedPdoStorage(
             PdoConfig::forSqlite(':memory:'),
             new ChangeJournalConfig(),
-        )->sharedStorage();
+        );
         $journal = $storage->changeJournal() ?? self::fail('Expected the storage to have a journal.');
 
         try {
@@ -1426,9 +1389,25 @@ final class PdoStorageTest extends TestCase
 
         return new PdoStorage(
             self::makePdoStorageFactory($config)->sharedProvider(),
-            new SqliteFilterTranslator(),
+            new SqliteFilterTranslator(self::makeAttributeContext()),
             self::makePdoDialect($config->getDriver()),
+            self::makeAttributeContext(),
             journal: $journal,
+        );
+    }
+
+    /**
+     * Storage over a connection, for tests asserting transaction or IO behavior rather than filter translation.
+     */
+    private function storageOver(
+        PDO $pdo,
+        ?PdoDialectInterface $dialect = null,
+    ): PdoStorage {
+        return new PdoStorage(
+            new SharedPdoConnectionProvider($pdo),
+            $this->createMock(FilterTranslatorInterface::class),
+            $dialect ?? new SqliteDialect(),
+            self::makeAttributeContext(),
         );
     }
 
@@ -1544,10 +1523,6 @@ final class PdoStorageTest extends TestCase
 
         PdoStorage::initialize($pdo, $dialect);
 
-        return new PdoStorage(
-            new SharedPdoConnectionProvider($pdo),
-            $this->createMock(FilterTranslatorInterface::class),
-            $dialect,
-        );
+        return $this->storageOver($pdo, $dialect);
     }
 }

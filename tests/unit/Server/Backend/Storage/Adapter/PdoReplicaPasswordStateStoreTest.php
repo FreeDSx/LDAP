@@ -25,15 +25,17 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 use PDO;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\PdoStorageFactoryTrait;
 
 final class PdoReplicaPasswordStateStoreTest extends TestCase
 {
+    use PdoStorageFactoryTrait;
+
     private const DN = 'cn=foo,dc=example,dc=com';
 
     private PDO $pdo;
@@ -53,11 +55,7 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
             $this->pdo,
             fn(): PDO => $this->pdo,
         );
-        $this->storage = new PdoStorage(
-            $provider,
-            new SqliteFilterTranslator(),
-            new SqliteDialect(),
-        );
+        $this->storage = self::makePdoStorage($provider);
         $this->subject = new PdoReplicaPasswordStateStore(
             new PdoTransactor(
                 $provider,

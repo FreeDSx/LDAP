@@ -67,7 +67,6 @@ final readonly class StorageListOptionsFactory
             lookthroughLimit: $limits->maxSearchLookthrough,
             attributes: $this->materializedAttributes($request),
             subentries: $subentries,
-            schema: $this->schema,
         );
     }
 
