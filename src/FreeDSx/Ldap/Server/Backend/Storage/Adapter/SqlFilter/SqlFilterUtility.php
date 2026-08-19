@@ -50,6 +50,25 @@ final class SqlFilterUtility
     }
 
     /**
+     * The bound-parameter markers for a statement whose width is only known at run time.
+     *
+     * @param string $marker A single value by default, or a parenthesised tuple for a multi-column row.
+     */
+    public static function markers(
+        int $count,
+        string $marker = '?',
+    ): string {
+        return implode(
+            ', ',
+            array_fill(
+                0,
+                $count,
+                $marker,
+            ),
+        );
+    }
+
+    /**
      * Escape LIKE specials using `!` as the escape char.
      */
     public static function escape(string $value): string

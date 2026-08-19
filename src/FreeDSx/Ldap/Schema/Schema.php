@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Schema\Definition\MatchingRule;
 use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
+use FreeDSx\Ldap\Schema\Matching\Comparator\ObjectIdentifierComparator;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 
 /**
@@ -47,6 +48,11 @@ final class Schema
      * @var array<string, true>|null
      */
     private ?array $superTypeOids = null;
+
+    /**
+     * Bound to this schema, so it is built once rather than per lookup.
+     */
+    private ?ObjectIdentifierComparator $objectIdentifierComparator = null;
 
     /**
      * @var array<string, ObjectClass>
@@ -221,6 +227,38 @@ final class Schema
         );
     }
 
+    /**
+     * The OID a descriptor aliases (RFC 4512 §1.4), or null when nothing here defines it.
+     */
+    public function oidFor(string $nameOrOid): ?string
+    {
+        return $this->getObjectClass($nameOrOid)->oid
+            ?? $this->getAttributeType($nameOrOid)->oid
+            ?? $this->getMatchingRule($nameOrOid)?->oid;
+    }
+
+    /**
+     * Every spelling of one object identifier, so a store comparing text can still be asked about it.
+     *
+     * @return list<string>|null null when nothing here defines the value
+     */
+    public function oidSpellings(string $nameOrOid): ?array
+    {
+        $names = $this->getObjectClass($nameOrOid)->names
+            ?? $this->getAttributeType($nameOrOid)->names
+            ?? $this->getMatchingRule($nameOrOid)?->names;
+        $oid = $this->oidFor($nameOrOid);
+
+        if ($oid === null) {
+            return null;
+        }
+
+        return array_values(array_unique([
+            $oid,
+            ...($names ?? []),
+        ]));
+    }
+
     public function getObjectClass(string $nameOrOid): ?ObjectClass
     {
         return $this->objectClasses[$nameOrOid]
@@ -242,7 +280,18 @@ final class Schema
 
     public function getComparator(string $ruleNameOrOid): ?MatchingRuleComparatorInterface
     {
-        return $this->getMatchingRule($ruleNameOrOid)?->comparator;
+        $rule = $this->getMatchingRule($ruleNameOrOid);
+
+        if ($rule === null) {
+            return null;
+        }
+
+        // Resolving a descriptor needs the schema, which does not exist yet when the rule is parsed.
+        if ($rule->oid === MatchingRuleOid::OID_OBJECT_IDENTIFIER_MATCH) {
+            return $this->objectIdentifierComparator ??= new ObjectIdentifierComparator($this);
+        }
+
+        return $rule->comparator;
     }
 
     /**

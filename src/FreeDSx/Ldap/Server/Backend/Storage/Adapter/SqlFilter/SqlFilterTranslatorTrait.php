@@ -224,6 +224,34 @@ trait SqlFilterTranslatorTrait
         $alias = $this->valueAlias();
         $value = $filter->getValue();
 
+        // One object identifier has several spellings, so every one of them has to be offered to the index. Which
+        // of them the stored value uses is left to the evaluator.
+        $spellings = $this->attributeContext->oidSpellings(
+            $filter->getAttribute(),
+            $value,
+        );
+
+        if ($spellings !== null) {
+            $condition = sprintf(
+                '%s IN (%s)',
+                $alias,
+                SqlFilterUtility::markers(count($spellings)),
+            );
+
+            return new SqlFilterResult(
+                $this->buildValueExists($attribute, $condition),
+                array_map(
+                    fn(string $spelling): string => $this->prepareMatchValue($spelling),
+                    $spellings,
+                ),
+                isExact: false,
+                sidecarCondition: $this->sidecarCondition(
+                    $attribute,
+                    $condition,
+                ),
+            );
+        }
+
         // Stored text and the assertion can spell the same integer differently, so those compare as numbers. The
         // cast saturates at the platform integer, making it a superset the evaluator still has to check.
         if ($this->attributeContext->isIntegerOrdered($filter->getAttribute()) === true) {

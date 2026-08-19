@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 
 /**
  * Portable substring index: a generic trigram table usable across every PDO dialect.
@@ -133,14 +134,7 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
             return null;
         }
 
-        $markers = implode(
-            ', ',
-            array_fill(
-                0,
-                count($trigrams),
-                '?',
-            ),
-        );
+        $markers = SqlFilterUtility::markers(count($trigrams));
 
         return new SqlFilterResult(
             sprintf(
@@ -185,13 +179,9 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
 
     private function placeholders(int $count): string
     {
-        return implode(
-            ', ',
-            array_fill(
-                0,
-                $count,
-                '(?, ?, ?)',
-            ),
+        return SqlFilterUtility::markers(
+            $count,
+            '(?, ?, ?)',
         );
     }
 

@@ -49,4 +49,16 @@ interface AttributeContextInterface
      * Whether the attribute defines a SUBSTR rule (false makes a substring item Undefined per RFC 4511 4.5.1.7).
      */
     public function hasSubstringRule(string $attribute): bool;
+
+    /**
+     * Every spelling of the object identifier a value names, or null when the attribute does not match on OIDs.
+     *
+     * A store comparing text needs each spelling to narrow on an assertion the schema treats as one value.
+     *
+     * @return list<string>|null
+     */
+    public function oidSpellings(
+        string $attribute,
+        string $value,
+    ): ?array;
 }

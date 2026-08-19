@@ -376,6 +376,65 @@ trait QueryTestsTrait
             8,
         ];
 
+        // RFC 4517 4.2.26: objectClass matches on the identifier, so either spelling of it names the same classes.
+        yield 'objectClass matches a stored descriptor by its oid' => [
+            Filters::equal(
+                'objectClass',
+                '2.5.6.9',
+            ),
+            3,
+        ];
+        yield 'objectClass matches the same classes by descriptor' => [
+            Filters::equal(
+                'objectClass',
+                'groupOfNames',
+            ),
+            3,
+        ];
+        yield 'objectClass matches a long form oid' => [
+            Filters::equal(
+                'objectClass',
+                '2.16.840.1.113730.3.2.2',
+            ),
+            3,
+        ];
+        yield 'a negated objectClass oid leaves the rest' => [
+            Filters::not(Filters::equal(
+                'objectClass',
+                '2.5.6.9',
+            )),
+            5,
+        ];
+        yield 'an objectClass oid narrows an indexed conjunction' => [
+            Filters::and(
+                Filters::equal(
+                    'cn',
+                    'alice',
+                ),
+                Filters::equal(
+                    'objectClass',
+                    '2.16.840.1.113730.3.2.2',
+                ),
+            ),
+            1,
+        ];
+
+        // RFC 4517 4.2.26: a descriptor the schema does not define makes the item Undefined, not merely unmatched.
+        yield 'an unknown objectClass descriptor matches nothing' => [
+            Filters::equal(
+                'objectClass',
+                'bogusClass',
+            ),
+            0,
+        ];
+        yield 'a negated unknown objectClass descriptor stays undefined' => [
+            Filters::not(Filters::equal(
+                'objectClass',
+                'bogusClass',
+            )),
+            0,
+        ];
+
         // X.501: only the suffix and ou=people have children, and it is derived rather than stored on any of them.
         yield 'hasSubordinates matches only entries with children' => [
             Filters::equal(

@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 use PDO;
 
 use function strtolower;
@@ -152,10 +153,7 @@ trait PdoDialectTrait
 
     public function queryDeleteIn(int $count): string
     {
-        $markers = implode(
-            ', ',
-            array_fill(0, $count, '?'),
-        );
+        $markers = SqlFilterUtility::markers($count);
 
         return <<<SQL
             DELETE FROM entries
@@ -173,10 +171,7 @@ trait PdoDialectTrait
 
     public function querySidecarDeleteNames(int $count): string
     {
-        $markers = implode(
-            ', ',
-            array_fill(0, $count, '?'),
-        );
+        $markers = SqlFilterUtility::markers($count);
 
         return <<<SQL
             DELETE FROM entry_attribute_values

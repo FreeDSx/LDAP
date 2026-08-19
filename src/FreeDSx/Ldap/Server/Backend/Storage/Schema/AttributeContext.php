@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Schema;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
+use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
@@ -81,5 +82,19 @@ final readonly class AttributeContext implements AttributeContextInterface
     public function isCaseInsensitive(string $attribute): ?bool
     {
         return $this->schema->isCaseInsensitiveMatched($attribute);
+    }
+
+    public function oidSpellings(
+        string $attribute,
+        string $value,
+    ): ?array {
+        // Options are not part of the type, so they are dropped before asking the schema about it.
+        $equalityOid = $this->schema
+            ->getAttributeType(Attribute::normalizeName($attribute))
+            ?->equalityOid;
+
+        return $equalityOid === MatchingRuleOid::OID_OBJECT_IDENTIFIER_MATCH
+            ? $this->schema->oidSpellings($value)
+            : null;
     }
 }

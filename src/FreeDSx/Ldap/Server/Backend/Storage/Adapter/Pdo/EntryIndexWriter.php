@@ -171,9 +171,9 @@ final readonly class EntryIndexWriter
             return;
         }
 
-        $placeholders = implode(
-            ', ',
-            array_fill(0, count($rows), '(?, ?, ?, ?)'),
+        $placeholders = SqlFilterUtility::markers(
+            count($rows),
+            '(?, ?, ?, ?)',
         );
         $params = [];
         foreach ($rows as $row) {
