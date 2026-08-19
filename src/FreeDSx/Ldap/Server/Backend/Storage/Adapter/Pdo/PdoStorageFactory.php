@@ -14,18 +14,21 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\CoroutinePdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoChangeJournal;
-use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use PDO;
 
 /**
@@ -35,23 +38,26 @@ use PDO;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class PdoStorageFactory
+final readonly class PdoStorageFactory
 {
     /**
-     * Storage without a journal, so it authors no changes an identity would be stamped on.
+     * @param ?SubstringIndexInterface $substringIndex Shared by the translator, the index writer and schema setup.
+     * @param ReplicaId $origin Stamped on the changes this server authors.
+     * @param ?ChangeJournalConfig $journalConfig Attaches a journal on each connection when journaling is enabled.
      */
-    public static function forPcntl(PdoConfig $config): PdoStorage
-    {
-        return self::storageOn(
-            $config,
-            self::sharedProvider($config),
-            new ReplicaId(),
-        );
-    }
+    public function __construct(
+        private PdoConfig $config,
+        private PdoDialectInterface $dialect,
+        private FilterTranslatorInterface $translator,
+        private ?SubstringIndexInterface $substringIndex,
+        private ReplicaId $origin,
+        private SleeperInterface $sleeper,
+        private ?ChangeJournalConfig $journalConfig,
+    ) {}
 
-    public static function sharedProvider(PdoConfig $config): SharedPdoConnectionProvider
+    public function sharedProvider(): SharedPdoConnectionProvider
     {
-        $open = static fn(): PDO => self::open($config);
+        $open = fn(): PDO => $this->open();
 
         return new SharedPdoConnectionProvider(
             $open(),
@@ -59,79 +65,80 @@ final class PdoStorageFactory
         );
     }
 
-    public static function coroutineProvider(PdoConfig $config): CoroutinePdoConnectionProvider
+    public function coroutineProvider(): CoroutinePdoConnectionProvider
     {
-        return new CoroutinePdoConnectionProvider(static fn(): PDO => self::open($config));
+        return new CoroutinePdoConnectionProvider(fn(): PDO => $this->open());
     }
 
     /**
-     * @param ?ChangeJournalConfig $journalConfig Attaches a journal on this connection when journaling is enabled.
-     * @param ReplicaId $origin Stamped on the changes this server authors.
+     * Storage over a single connection shared by every forked child.
      */
-    public static function storageOn(
-        PdoConfig $config,
-        PdoConnectionProviderInterface $provider,
-        ReplicaId $origin,
-        ?SleeperInterface $sleeper = null,
-        ?ChangeJournalConfig $journalConfig = null,
-    ): PdoStorage {
+    public function sharedStorage(): PdoStorage
+    {
+        return $this->storageOn($this->sharedProvider());
+    }
+
+    public function storageOn(PdoConnectionProviderInterface $provider): PdoStorage
+    {
         // Storage and its index writer share one statement pool, so both draw from the same connection and cache.
         $statements = new PdoStatementPool($provider);
         // The journal shares the transactor so an append joins the write transaction it belongs to.
         $transactor = new PdoTransactor(
             $provider,
-            $config->getDialect(),
-            $sleeper ?? new BlockingSleeper(),
+            $this->dialect,
+            $this->sleeper,
         );
 
         return new PdoStorage(
             $provider,
-            $config->getDialect()->createFilterTranslator($config->getSubstringIndex()),
-            $config->getDialect(),
+            $this->translator,
+            $this->dialect,
             $statements,
             new EntryIndexWriter(
-                $config->getDialect(),
+                $this->dialect,
                 $statements,
-                $config->getSubstringIndex(),
+                $this->substringIndex,
             ),
             $transactor,
-            $journalConfig === null ? null : AuditingChangeJournal::wrap(
+            $this->journalConfig === null ? null : AuditingChangeJournal::wrap(
                 new PdoChangeJournal(
                     $transactor,
-                    $config->getDialect(),
+                    $this->dialect,
                     $statements,
-                    $origin,
+                    $this->origin,
                 ),
-                $journalConfig,
+                $this->journalConfig,
             ),
         );
     }
 
-    private static function open(PdoConfig $config): PDO
+    private function open(): PDO
     {
-        if (!extension_loaded($config->getDriverExtension())) {
+        $extension = $this->config->getDriver()->extension();
+
+        if (!extension_loaded($extension)) {
             throw new RuntimeException(sprintf(
                 'The "%s" extension is required for this PDO storage backend.',
-                $config->getDriverExtension(),
+                $extension,
             ));
         }
 
         $pdo = new PDO(
-            $config->getDsn(),
-            $config->getUsername(),
-            $config->getPassword(),
-            $config->getPdoOptions(),
+            $this->config->getDsn(),
+            $this->config->getUsername(),
+            $this->config->getPassword(),
+            $this->config->getPdoOptions(),
         );
 
-        foreach ($config->getSessionStatements() as $statement) {
+        foreach ($this->config->getSessionStatements() as $statement) {
             $pdo->exec($statement);
         }
 
-        if ($config->getInitializeSchema()) {
+        if ($this->config->getInitializeSchema()) {
             PdoStorage::initialize(
                 $pdo,
-                $config->getDialect(),
-                $config->getSubstringIndex(),
+                $this->dialect,
+                $this->substringIndex,
             );
         }
 

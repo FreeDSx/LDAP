@@ -11,10 +11,10 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Storage\Config;
+namespace FreeDSx\Ldap\Server\Config\Storage;
 
 /**
- * Configures the storage backend for the server; pass one to ServerOptions::setStorage().
+ * Configures the storage backend for the server; pass one to ServerOptions::setStorageConfig().
  *
  * @api
  *

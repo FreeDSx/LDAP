@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
 use Closure;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
@@ -21,9 +22,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SwooleWriterQueue;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
-use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\SerializingReplicaPasswordStateStore;
@@ -44,22 +42,21 @@ final class PdoBackendBuilder
 
     /**
      * @param SleeperInterface $sleeper Paces a retried transaction.
-     * @param ?ChangeJournalConfig $journalConfig Attaches a change journal when journaling is enabled.
-     * @param ReplicaId $origin Stamped on the changes this server authors.
+     * @param bool $serializeWrites Funnels writes through one connection, honoured only under the Swoole runner.
      */
     public function __construct(
-        private readonly PdoConfig $config,
+        private readonly PdoStorageFactory $storageFactory,
+        private readonly PdoDialectInterface $dialect,
+        private readonly SleeperInterface $sleeper,
         RunnerMode $runner,
-        private readonly ReplicaId $origin,
-        private readonly SleeperInterface $sleeper = new BlockingSleeper(),
-        private readonly ?ChangeJournalConfig $journalConfig = null,
+        bool $serializeWrites,
     ) {
-        if ($runner === RunnerMode::Swoole && $config->getSerializeSwooleWrites()) {
+        if ($runner === RunnerMode::Swoole && $serializeWrites) {
             $this->assembleSerializedSwoole();
         } else {
             $this->assembleOnSingleProvider($runner === RunnerMode::Swoole
-                ? PdoStorageFactory::coroutineProvider($config)
-                : PdoStorageFactory::sharedProvider($config));
+                ? $storageFactory->coroutineProvider()
+                : $storageFactory->sharedProvider());
         }
     }
 
@@ -78,13 +75,7 @@ final class PdoBackendBuilder
      */
     private function assembleOnSingleProvider(PdoConnectionProviderInterface $provider): void
     {
-        $this->storage = PdoStorageFactory::storageOn(
-            $this->config,
-            $provider,
-            $this->origin,
-            $this->sleeper,
-            $this->journalConfig,
-        );
+        $this->storage = $this->storageFactory->storageOn($provider);
         $this->replicaPasswordStateStore = $this->replicaStore($provider);
     }
 
@@ -93,23 +84,11 @@ final class PdoBackendBuilder
      */
     private function assembleSerializedSwoole(): void
     {
-        $reads = PdoStorageFactory::coroutineProvider($this->config);
-        $writes = PdoStorageFactory::sharedProvider($this->config);
+        $reads = $this->storageFactory->coroutineProvider();
+        $writes = $this->storageFactory->sharedProvider();
         // Each side journals on its own connection: the writer captures changes, the reader serves sync polls.
-        $writeStorage = PdoStorageFactory::storageOn(
-            $this->config,
-            $writes,
-            $this->origin,
-            $this->sleeper,
-            $this->journalConfig,
-        );
-        $readStorage = PdoStorageFactory::storageOn(
-            $this->config,
-            $reads,
-            $this->origin,
-            $this->sleeper,
-            $this->journalConfig,
-        );
+        $writeStorage = $this->storageFactory->storageOn($writes);
+        $readStorage = $this->storageFactory->storageOn($reads);
         $queue = new SwooleWriterQueue(
             batchWrapper: static fn(Closure $cb) => $writeStorage->atomic(static fn() => $cb()),
         );
@@ -131,10 +110,10 @@ final class PdoBackendBuilder
         return new PdoReplicaPasswordStateStore(
             new PdoTransactor(
                 $provider,
-                $this->config->getDialect(),
+                $this->dialect,
                 $this->sleeper,
             ),
-            $this->config->getDialect(),
+            $this->dialect,
             new PdoStatementPool($provider),
         );
     }

@@ -461,7 +461,7 @@ resulting storage.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 $server = new LdapServer(new ServerOptions(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')));

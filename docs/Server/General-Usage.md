@@ -61,7 +61,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
+use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 $passwordHash = '{SHA}' . base64_encode(sha1('secret', true));
@@ -91,7 +91,7 @@ searching for an entry where the `uid` attribute matches.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
+use FreeDSx\Ldap\Server\Config\Storage\JsonStorageConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 $options = (new ServerOptions())
@@ -119,7 +119,7 @@ For full control over credential storage, such as delegating to an external user
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
-use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
+use FreeDSx\Ldap\Server\Config\Storage\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Sasl\Mechanism\MechanismName;
@@ -302,7 +302,7 @@ for testing only.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
+use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 
 $server = new LdapServer(new ServerOptions(InMemoryStorageConfig::withEntries($entries)));
 $server->run();
@@ -313,7 +313,7 @@ Each config is a value object. The container builds the runner-appropriate stora
 
 ```php
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 
 $server = new LdapServer(new ServerOptions(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')));
 $server->run();
@@ -352,7 +352,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
+use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 $passwordHash = '{SHA}' . base64_encode(sha1('secret', true));
@@ -381,7 +381,7 @@ I/O) to match the configured runner:
 
 ```php
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
+use FreeDSx\Ldap\Server\Config\Storage\JsonStorageConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 $server = new LdapServer(new ServerOptions(JsonStorageConfig::forFile('/var/lib/myapp/ldap.json')));
@@ -415,7 +415,7 @@ Pass a `PdoConfig::forSqlite()` to the `ServerOptions` constructor. The containe
 
 ```php
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 $server = new LdapServer(new ServerOptions(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')));
@@ -437,11 +437,15 @@ or per-coroutine (Swoole) storage to match the configured runner:
 
 ```php
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 $server = new LdapServer(new ServerOptions(
-    PdoConfig::forMysql('mysql:host=localhost;dbname=ldap', 'user', 'secret'),
+    PdoConfig::forMysql(
+        'mysql:host=localhost;dbname=ldap',
+        'user',
+        'secret',
+    ),
 ));
 $server->run();
 ```
@@ -449,28 +453,52 @@ $server->run();
 The DSN follows the standard PDO MySQL format. The character set is automatically configured to `utf8mb4`
 and the time zone to UTC on each connection.
 
-##### Custom PDO driver
+##### Tuning a PDO config
 
-`PdoConfig::forSqlite()` and `PdoConfig::forMysql()` are conveniences over the generic `PdoConfig::forDriver()`,
-which builds a config for any PDO driver. Supply your `PdoDialectInterface`, the DSN, and the required PDO driver
-extension, then tune the rest with the setters. Your dialect's `createFilterTranslator()` supplies the paired
-`FilterTranslatorInterface` (with the substring index injected):
+`forSqlite()` and `forMysql()` pick the database engine, and everything that follows from it. The PDO options,
+per-connection session statements, and whether writes are serialized under Swoole all come from the driver.
+Override any of them with the setters:
 
 ```php
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 
-$config = PdoConfig::forDriver(
-    new MyPostgresDialect(),
-    'pgsql:host=localhost;dbname=ldap',
-    'pdo_pgsql',
+$config = PdoConfig::forMysql(
+    'mysql:host=localhost;dbname=ldap',
+    'user',
+    'secret',
 )
-    ->setUsername('user')
-    ->setPassword('secret')
-    ->setSessionStatements(["SET client_encoding = 'UTF8'"]);
+    ->setSessionStatements([
+        'SET NAMES utf8mb4',
+        "SET time_zone = '+00:00'",
+        "SET SESSION sql_mode = 'STRICT_ALL_TABLES'",
+    ])
+    ->setSerializeSwooleWrites(true);
 ```
 
 `PdoConfig` implements `StorageConfigInterface`, so pass `$config` to `setStorageConfig()` or the `ServerOptions`
 constructor like any other backend config.
+
+##### Substring index
+
+Substring filters such as `(cn=*smith*)` are narrowed by an index the storage maintains alongside the entries.
+Choose it with `setSubstringIndexMode()`:
+
+| Mode | Behavior |
+| --- | --- |
+| `SubstringIndexMode::Auto` | The default. FTS5 on SQLite where the build provides it, trigram everywhere else. |
+| `SubstringIndexMode::Trigram` | The portable trigram table, supported by every driver. |
+| `SubstringIndexMode::None` | No index. Substring filters scan instead. |
+
+```php
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
+
+$config = PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')
+    ->setSubstringIndexMode(SubstringIndexMode::None);
+```
+
+The index adds write cost and disk, so turn it off for a directory that never runs substring filters. Changing
+the mode on a directory that already holds entries needs the index rebuilt before those filters match again.
 
 ## LDIF Data
 
@@ -490,7 +518,7 @@ stamping (`createTimestamp`, `entryUUID`, etc.) applied. Use it to populate a pe
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 $server = new LdapServer(
@@ -560,7 +588,7 @@ entries exactly as they were.
 ```php
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Output\FileLdifOutput;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 $server = new LdapServer(

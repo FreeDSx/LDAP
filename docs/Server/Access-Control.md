@@ -147,7 +147,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 
 $server = new LdapServer(
     (new ServerOptions())

@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Container\Contributor;
 
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageType;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Config\Storage\StorageType;
 
 /**
  * A directory server's contribution: its backend is reset per fork and carried, with its storage, across a reload.
