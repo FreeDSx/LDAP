@@ -56,6 +56,10 @@ final class SyntaxOid
 
     public const DESC_BIT_STRING = 'Bit String';
 
+    public const OID_NAME_AND_OPTIONAL_UID = '1.3.6.1.4.1.1466.115.121.1.34';
+
+    public const DESC_NAME_AND_OPTIONAL_UID = 'Name And Optional UID';
+
     public const OID_NUMERIC_STRING = '1.3.6.1.4.1.1466.115.121.1.36';
 
     public const DESC_NUMERIC_STRING = 'Numeric String';

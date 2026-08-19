@@ -462,6 +462,111 @@ trait WriteTestsTrait
         );
     }
 
+    public function testAddAcceptsAUniqueMemberCarryingAnIdentifier(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=uidgroup,dc=foo,dc=bar',
+            [
+                'cn' => 'uidgroup',
+                'uniqueMember' => "cn=user,dc=foo,dc=bar#'0101'B",
+                'objectClass' => 'groupOfUniqueNames',
+            ],
+        ));
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'uniqueMember')
+                ->base('cn=uidgroup,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+        self::assertSame(
+            ["cn=user,dc=foo,dc=bar#'0101'B"],
+            $found->first()?->get('uniqueMember')?->getValues(),
+        );
+
+        $this->ldapClient()->delete('cn=uidgroup,dc=foo,dc=bar');
+    }
+
+    public function testAddRejectsAUniqueMemberWhoseNameIsNotADn(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=baduid,dc=foo,dc=bar',
+            [
+                'cn' => 'baduid',
+                'uniqueMember' => "not a dn#'0101'B",
+                'objectClass' => 'groupOfUniqueNames',
+            ],
+        ));
+    }
+
+    /**
+     * RFC 4517 3.3.21 leaves '#' unescaped inside the name, so a tail that is not a bit string belongs to the DN.
+     */
+    public function testAddAcceptsAUniqueMemberWhoseTailIsNotABitString(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=notabitstring,dc=foo,dc=bar',
+            [
+                'cn' => 'notabitstring',
+                'uniqueMember' => "cn=user,dc=foo,dc=bar#'0102'B",
+                'objectClass' => 'groupOfUniqueNames',
+            ],
+        ));
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'uniqueMember')
+                ->base('cn=notabitstring,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+        self::assertSame(
+            ["cn=user,dc=foo,dc=bar#'0102'B"],
+            $found->first()?->get('uniqueMember')?->getValues(),
+        );
+
+        $this->ldapClient()->delete('cn=notabitstring,dc=foo,dc=bar');
+    }
+
+    public function testUniqueMemberMatchesOnTheNameAndTheIdentifierTogether(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=uidmatch,dc=foo,dc=bar',
+            [
+                'cn' => 'uidmatch',
+                'uniqueMember' => "cn=user,dc=foo,dc=bar#'0101'B",
+                'objectClass' => 'groupOfUniqueNames',
+            ],
+        ));
+
+        $matches = fn(string $assertion): int => count($this->ldapClient()->search(
+            Operations::search(Filters::equal('uniqueMember', $assertion))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        ));
+
+        self::assertSame(
+            1,
+            $matches("cn=user,dc=foo,dc=bar#'0101'B"),
+        );
+        // RFC 4517 4.2.34: absent from one side and present on the other is a mismatch.
+        self::assertSame(
+            0,
+            $matches('cn=user,dc=foo,dc=bar'),
+        );
+        self::assertSame(
+            0,
+            $matches("cn=user,dc=foo,dc=bar#'1111'B"),
+        );
+
+        $this->ldapClient()->delete('cn=uidmatch,dc=foo,dc=bar');
+    }
+
     public function testModifyAddOfACaseVariantOnACaseExactAttributeIsANewValue(): void
     {
         $this->authenticateAdmin();
