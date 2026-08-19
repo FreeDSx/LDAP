@@ -23,13 +23,24 @@ final class OidSyntaxValidator implements SyntaxValidatorInterface
     /**
      * RFC 4512 1.4: an arc carries no leading zero, and a numericoid needs at least one dot.
      */
-    private const PATTERN = '/^('
-        . '(?:0|[1-9][0-9]*)(?:\.(?:0|[1-9][0-9]*))+'
-        . '|[A-Za-z][A-Za-z0-9-]*'
-        . ')$/D';
+    private const NUMERICOID = '(?:0|[1-9][0-9]*)(?:\.(?:0|[1-9][0-9]*))+';
+
+    private const DESCR = '[A-Za-z][A-Za-z0-9-]*';
+
+    private const PATTERN = '/^(' . self::NUMERICOID . '|' . self::DESCR . ')$/D';
+
+    private const NUMERICOID_PATTERN = '/^' . self::NUMERICOID . '$/D';
 
     public function isValid(string $value): bool
     {
         return preg_match(self::PATTERN, $value) === 1;
+    }
+
+    /**
+     * Whether the value spells an object identifier explicitly, needing no descriptor lookup to name one.
+     */
+    public static function isNumericForm(string $value): bool
+    {
+        return preg_match(self::NUMERICOID_PATTERN, $value) === 1;
     }
 }

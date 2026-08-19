@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
@@ -26,6 +27,7 @@ use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
+use FreeDSx\Ldap\Schema\Validation\Syntax\OidSyntaxValidator;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\AttributeValueAssertionInterface;
@@ -92,6 +94,11 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     private WeakMap $recognizedAttributeCache;
 
     /**
+     * @var WeakMap<object, bool>
+     */
+    private WeakMap $recognizedDescriptorCache;
+
+    /**
      * Resolved SUBSTR rule OID per filter, with false standing for a type that declares none.
      *
      * @var WeakMap<object, string|false>
@@ -112,6 +119,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         $this->substringCache = new WeakMap();
         $this->assertionSyntaxCache = new WeakMap();
         $this->recognizedAttributeCache = new WeakMap();
+        $this->recognizedDescriptorCache = new WeakMap();
         $this->substringRuleCache = new WeakMap();
     }
 
@@ -225,6 +233,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         EqualityFilter $filter,
     ): FilterResult {
         if (!$this->assertionSyntaxIsValid($filter)) {
+            return FilterResult::Undefined;
+        }
+
+        if (!$this->assertionDescriptorIsRecognized($filter)) {
             return FilterResult::Undefined;
         }
 
@@ -656,6 +668,38 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             $filter->getAttribute(),
             $filter->getValue(),
         );
+    }
+
+    /**
+     * RFC 4517 §4.2.26: an OID assertion naming a descriptor the schema does not define is Undefined.
+     *
+     * The answer depends only on the filter, so it is memoized rather than recomputed for every entry tested.
+     */
+    private function assertionDescriptorIsRecognized(AttributeValueAssertionInterface $filter): bool
+    {
+        return $this->recognizedDescriptorCache[$filter] ??= $this->descriptorIsResolvable(
+            $filter->getAttribute(),
+            $filter->getValue(),
+        );
+    }
+
+    /**
+     * Only the descr form has to be recognized; a numeric OID names itself whether the schema defines it or not.
+     */
+    private function descriptorIsResolvable(
+        string $attribute,
+        string $value,
+    ): bool {
+        $equalityOid = $this->schema
+            ->getAttributeType(Attribute::normalizeName($attribute))
+            ?->equalityOid;
+
+        if ($equalityOid !== MatchingRuleOid::OID_OBJECT_IDENTIFIER_MATCH) {
+            return true;
+        }
+
+        return OidSyntaxValidator::isNumericForm($value)
+            || $this->schema->oidFor($value) !== null;
     }
 
     /**
