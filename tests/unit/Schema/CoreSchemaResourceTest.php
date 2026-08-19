@@ -85,10 +85,32 @@ final class CoreSchemaResourceTest extends TestCase
         );
     }
 
+    public function test_unique_member_uses_the_name_and_optional_uid_syntax(): void
+    {
+        $uniqueMember = $this->schema->getAttributeType('uniqueMember');
+
+        self::assertNotNull($uniqueMember);
+        self::assertSame(
+            '1.3.6.1.4.1.1466.115.121.1.34',
+            $uniqueMember->syntaxOid,
+            'RFC 4519 2.40 defines uniqueMember with the Name And Optional UID syntax.',
+        );
+        self::assertSame(
+            '2.5.13.23',
+            $uniqueMember->equalityOid,
+            'RFC 4519 2.40 defines uniqueMember with uniqueMemberMatch.',
+        );
+        self::assertSame(
+            '1.3.6.1.4.1.1466.115.121.1.34',
+            $this->schema->getMatchingRule('uniqueMemberMatch')?->syntaxOid,
+            'RFC 4517 4.2.34 defines uniqueMemberMatch over the Name And Optional UID syntax.',
+        );
+    }
+
     public function test_has_expected_syntax_count(): void
     {
         self::assertCount(
-            31,
+            32,
             $this->schema->getLdapSyntaxes(),
         );
     }

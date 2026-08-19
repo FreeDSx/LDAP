@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Schema\Matching\Comparator\DistinguishedNameComparator;
 use FreeDSx\Ldap\Schema\Matching\Comparator\FirstComponentComparator;
 use FreeDSx\Ldap\Schema\Matching\Comparator\GeneralizedTimeComparator;
 use FreeDSx\Ldap\Schema\Matching\Comparator\IntegerComparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\NameAndOptionalUidComparator;
 use FreeDSx\Ldap\Schema\Matching\Comparator\NumericStringComparator;
 use FreeDSx\Ldap\Schema\Matching\Comparator\OctetStringComparator;
 use FreeDSx\Ldap\Schema\Matching\Comparator\TelephoneNumberComparator;
@@ -61,7 +62,7 @@ final readonly class MatchingRuleComparatorRegistry
         return new self([
             MatchingRuleOid::OID_OBJECT_IDENTIFIER_MATCH => $caseIgnore,
             MatchingRuleOid::OID_DISTINGUISHED_NAME_MATCH => $distinguishedName,
-            MatchingRuleOid::OID_UNIQUE_MEMBER_MATCH => $distinguishedName,
+            MatchingRuleOid::OID_UNIQUE_MEMBER_MATCH => new NameAndOptionalUidComparator($distinguishedName),
             MatchingRuleOid::OID_CASE_IGNORE_MATCH => $caseIgnore,
             MatchingRuleOid::OID_CASE_IGNORE_ORDERING_MATCH => $caseIgnore,
             MatchingRuleOid::OID_CASE_IGNORE_SUBSTRINGS_MATCH => $caseIgnore,
