@@ -13,9 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use PDO;
 use PDOException;
 
@@ -39,11 +36,6 @@ final class SqliteDialect implements PdoDialectInterface
      * A table in the database is locked, which the busy handler is never invoked for.
      */
     private const ERROR_LOCKED = 6;
-
-    public function createFilterTranslator(?SubstringIndexInterface $substringIndex): FilterTranslatorInterface
-    {
-        return new SqliteFilterTranslator($substringIndex);
-    }
 
     /**
      * `busy_timeout` absorbs most contention by waiting, but it still gives up once the timeout is exhausted.

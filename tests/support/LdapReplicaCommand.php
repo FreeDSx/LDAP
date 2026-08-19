@@ -8,7 +8,7 @@ use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;

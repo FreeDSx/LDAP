@@ -11,9 +11,9 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Config;
+namespace Tests\Unit\FreeDSx\Ldap\Server\Config\Storage;
 
-use FreeDSx\Ldap\Server\Backend\Storage\Config\StorageType;
+use FreeDSx\Ldap\Server\Config\Storage\StorageType;
 use PHPUnit\Framework\TestCase;
 
 final class StorageTypeTest extends TestCase

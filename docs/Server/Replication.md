@@ -31,7 +31,7 @@ use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -178,7 +178,7 @@ server options. The replica's own listener and storage are configured as usual.
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Sync\Consumer\Checkpoint\FileReplicationCheckpoint;

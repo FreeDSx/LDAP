@@ -38,7 +38,7 @@ DDL on startup. Turn automatic setup off with the `initializeSchema` flag on the
 `setStorageConfig()` or the `ServerOptions` constructor:
 
 ```php
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 
 $storageConfig = PdoConfig::forSqlite('/var/lib/freedsx/directory.sqlite')
     ->setInitializeSchema(false);

@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Container\Provider\HandlerContainerProvider;
 use FreeDSx\Ldap\Container\Provider\PasswordPolicyContainerProvider;
 use FreeDSx\Ldap\Container\Provider\ProxyServerContainerProvider;
 use FreeDSx\Ldap\Container\Provider\ServerListenerContainerProvider;
+use FreeDSx\Ldap\Container\Provider\StorageContainerProvider;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 
@@ -177,6 +178,7 @@ class Container
 
         if (isset($this->instances[ServerOptions::class])) {
             $providers[] = new ServerListenerContainerProvider();
+            $providers[] = new StorageContainerProvider();
             $providers[] = new DirectoryServerContainerProvider();
             $providers[] = new PasswordPolicyContainerProvider();
             $providers[] = new ConnectionGraphContainerProvider();

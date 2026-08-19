@@ -13,9 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\MysqlFilterTranslator;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use PDO;
 use PDOException;
 
@@ -39,11 +36,6 @@ final class MysqlDialect implements PdoDialectInterface
      * Lock wait timeout exceeded.
      */
     private const ERROR_LOCK_WAIT_TIMEOUT = 1205;
-
-    public function createFilterTranslator(?SubstringIndexInterface $substringIndex): FilterTranslatorInterface
-    {
-        return new MysqlFilterTranslator($substringIndex);
-    }
 
     /**
      * InnoDB resolves lock conflicts by failing one transaction, which is then safe to reissue unchanged.

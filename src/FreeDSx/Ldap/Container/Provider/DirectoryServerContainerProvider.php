@@ -26,28 +26,16 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributeAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\CoroutineLock;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackendBuilder;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Config\InMemoryStorageConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Config\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestReplayer;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\FileChangeJournal;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionSweeper;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
@@ -61,6 +49,7 @@ use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\CoroutineSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Clock\SystemClock;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\ConnectionHandlerBuilderInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\AttributeSearchBindNameResolver;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverChain;
@@ -93,10 +82,6 @@ use Psr\Log\NullLogger;
  */
 final class DirectoryServerContainerProvider implements ContainerProviderInterface
 {
-    private const JOURNAL_SUFFIX = '.journal.jsonl';
-
-    private const SEQ_SUFFIX = '.journal.seq';
-
     public function factories(): array
     {
         return [
@@ -104,12 +89,10 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             BindNameResolverInterface::class => $this->makeIdentityResolverChain(...),
             PasswordAuthenticatableInterface::class => $this->makePasswordAuthenticator(...),
             FilterEvaluatorInterface::class => $this->makeFilterEvaluator(...),
-            EntryStorageInterface::class => $this->makeStorage(...),
             DirectoryDumper::class => $this->makeDirectoryDumper(...),
             OperationalAttributeGenerator::class => $this->makeOperationalAttributeGenerator(...),
             SearchStreamBuilder::class => $this->makeSearchStreamBuilder(...),
             LdapImporter::class => $this->makeLdapImporter(...),
-            PdoBackendBuilder::class => $this->makePdoBackendBuilder(...),
             WritableStorageBackend::class => $this->makeBackend(...),
             WriteRequestReplayer::class => $this->makeWriteRequestReplayer(...),
             ServerProtocolFactory::class => $this->makeServerProtocolFactory(...),
@@ -218,84 +201,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     }
 
     /**
-     * Build the runner-appropriate storage backend from the configured StorageConfigInterface.
-     */
-    private function makeStorage(Container $container): EntryStorageInterface
-    {
-        $config = $container->get(ServerOptions::class)->getStorageConfig();
-        $journalConfig = $this->journalConfig($container);
-        $origin = $this->journalOrigin($container);
-
-        return match (true) {
-            $config instanceof PdoConfig => $container->get(PdoBackendBuilder::class)->storage(),
-            $config instanceof JsonStorageConfig => $this->makeJsonStorage(
-                $container,
-                $config,
-                $journalConfig,
-            ),
-            $config instanceof InMemoryStorageConfig => new InMemoryStorage(
-                $config->entries(),
-                $journalConfig === null ? null : AuditingChangeJournal::wrap(
-                    new InMemoryChangeJournal($origin),
-                    $journalConfig,
-                ),
-            ),
-            default => throw new RuntimeException(sprintf(
-                'Unsupported storage config "%s".',
-                $config::class,
-            )),
-        };
-    }
-
-    /**
-     * The journal and storage share one lock, so a journal append re-enters the write it belongs to.
-     */
-    private function makeJsonStorage(
-        Container $container,
-        JsonStorageConfig $config,
-        ?ChangeJournalConfig $journalConfig,
-    ): JsonFileStorage {
-        // Coroutines need a lock that yields rather than blocking the whole worker.
-        $lock = $container->get(ServerOptions::class)->isRunnerMode(RunnerMode::Swoole)
-            ? new CoroutineLock($config->path())
-            : new FileLock($config->path());
-
-        return new JsonFileStorage(
-            $config->path(),
-            $lock,
-            $journalConfig === null ? null : AuditingChangeJournal::wrap(
-                new FileChangeJournal(
-                    $lock,
-                    $config->path() . self::JOURNAL_SUFFIX,
-                    $config->path() . self::SEQ_SUFFIX,
-                    $this->journalOrigin($container),
-                ),
-                $journalConfig,
-            ),
-            $config->logger() ?? new NullLogger(),
-        );
-    }
-
-    /**
-     * The journal settings to build storage against, or null when nothing is recorded.
-     */
-    private function journalConfig(Container $container): ?ChangeJournalConfig
-    {
-        return $container->get(ServerOptions::class)
-            ->getChangeJournalConfig();
-    }
-
-    /**
-     * The identity stamped on changes this server authors.
-     */
-    private function journalOrigin(Container $container): ReplicaId
-    {
-        return $container->get(ServerOptions::class)
-            ->getReplicationConfig()
-            ->getId();
-    }
-
-    /**
      * The journal the storage was built with, or null when it has none.
      */
     private function changeJournal(Container $container): ?ChangeJournalInterface
@@ -305,27 +210,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return $storage instanceof ChangeJournalingInterface
             ? $storage->changeJournal()
             : null;
-    }
-
-    /**
-     * The PDO backend assembly (storage + replica password-state store on one connection).
-     */
-    private function makePdoBackendBuilder(Container $container): PdoBackendBuilder
-    {
-        $options = $container->get(ServerOptions::class);
-        $config = $options->getStorageConfig();
-
-        if (!$config instanceof PdoConfig) {
-            throw new RuntimeException('The PDO backend builder requires a PdoConfig storage config.');
-        }
-
-        return new PdoBackendBuilder(
-            $config,
-            $options->getRunnerConfig()->getMode(),
-            $this->journalOrigin($container),
-            $container->get(SleeperInterface::class),
-            $this->journalConfig($container),
-        );
     }
 
     private function makeBackend(Container $container): WritableStorageBackend
