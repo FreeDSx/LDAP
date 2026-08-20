@@ -497,15 +497,14 @@ final class FilterEvaluator implements FilterEvaluatorInterface
      */
     private function resolveOrderingComparator(string $attrName): MatchingRuleComparatorInterface
     {
-        $attrType = $this->schema->getAttributeType($attrName);
-
-        if ($attrType === null) {
+        if ($this->schema->getAttributeType($attrName) === null) {
             return $this->defaultComparator;
         }
 
         // An explicit, registered ordering rule wins
-        $comparator = $attrType->orderingOid !== null
-            ? $this->schema->getComparator($attrType->orderingOid)
+        $orderingOid = $this->schema->getOrderingRuleOid($attrName);
+        $comparator = $orderingOid !== null
+            ? $this->schema->getComparator($orderingOid)
             : null;
 
         if ($comparator !== null) {
@@ -513,7 +512,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         }
 
         // Otherwise infer numeric ordering from an INTEGER syntax, else order as a string.
-        return $attrType->syntaxOid === SyntaxOid::OID_INTEGER
+        return $this->schema->getSyntaxOid($attrName) === SyntaxOid::OID_INTEGER
             ? $this->integerComparator
             : $this->defaultComparator;
     }
@@ -690,9 +689,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         string $attribute,
         string $value,
     ): bool {
-        $equalityOid = $this->schema
-            ->getAttributeType(Attribute::normalizeName($attribute))
-            ?->equalityOid;
+        $equalityOid = $this->schema->getEqualityRuleOid(Attribute::normalizeName($attribute));
 
         if ($equalityOid !== MatchingRuleOid::OID_OBJECT_IDENTIFIER_MATCH) {
             return true;

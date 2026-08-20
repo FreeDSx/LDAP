@@ -407,4 +407,124 @@ final class SchemaTest extends TestCase
 
         self::assertFalse($this->subject->isIntegerOrdered('stringOrdered'));
     }
+
+    public function test_equality_rule_oid_is_taken_from_the_supertype_when_the_type_declares_none(): void
+    {
+        $this->seedSupertypeChain();
+
+        self::assertSame(
+            MatchingRuleOid::OID_DISTINGUISHED_NAME_MATCH,
+            $this->subject->getEqualityRuleOid('subordinate'),
+        );
+    }
+
+    public function test_equality_rule_oid_prefers_the_rule_the_type_declares_itself(): void
+    {
+        $this->seedSupertypeChain();
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.11',
+            names: ['ownRule'],
+            equalityOid: MatchingRuleOid::OID_CASE_IGNORE_MATCH,
+            superTypeOid: '1.2.3.10',
+        ));
+
+        self::assertSame(
+            MatchingRuleOid::OID_CASE_IGNORE_MATCH,
+            $this->subject->getEqualityRuleOid('ownRule'),
+        );
+    }
+
+    public function test_equality_rule_oid_is_null_when_no_type_in_the_chain_declares_one(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.13',
+            names: ['ruleless'],
+        ));
+
+        self::assertNull($this->subject->getEqualityRuleOid('ruleless'));
+    }
+
+    public function test_equality_rule_oid_stops_on_a_supertype_cycle(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.14',
+            names: ['loopA'],
+            superTypeOid: '1.2.3.15',
+        ));
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.15',
+            names: ['loopB'],
+            superTypeOid: '1.2.3.14',
+        ));
+
+        self::assertNull($this->subject->getEqualityRuleOid('loopA'));
+    }
+
+    public function test_ordering_rule_oid_is_taken_from_the_supertype_when_the_type_declares_none(): void
+    {
+        $this->seedSupertypeChain();
+
+        self::assertSame(
+            MatchingRuleOid::OID_CASE_IGNORE_ORDERING_MATCH,
+            $this->subject->getOrderingRuleOid('subordinate'),
+        );
+    }
+
+    public function test_syntax_oid_is_taken_from_the_supertype_when_the_type_declares_none(): void
+    {
+        $this->seedSupertypeChain();
+
+        self::assertSame(
+            SyntaxOid::OID_DIRECTORY_STRING,
+            $this->subject->getSyntaxOid('subordinate'),
+        );
+    }
+
+    public function test_is_integer_ordered_uses_an_ordering_rule_inherited_from_the_supertype(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.16',
+            names: ['numericSuper'],
+            orderingOid: MatchingRuleOid::OID_INTEGER_ORDERING_MATCH,
+            syntaxOid: SyntaxOid::OID_INTEGER,
+        ));
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.17',
+            names: ['numericSub'],
+            superTypeOid: '1.2.3.16',
+        ));
+
+        self::assertTrue($this->subject->isIntegerOrdered('numericSub'));
+    }
+
+    public function test_is_case_insensitive_matched_uses_an_equality_rule_inherited_from_the_supertype(): void
+    {
+        $this->seedSupertypeChain();
+
+        self::assertFalse($this->subject->isCaseInsensitiveMatched('subordinate'));
+    }
+
+    /**
+     * A supertype declaring every rule, an intermediate declaring none, and a subtype declaring none.
+     */
+    private function seedSupertypeChain(): void
+    {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.10',
+            names: ['supertype'],
+            equalityOid: MatchingRuleOid::OID_DISTINGUISHED_NAME_MATCH,
+            orderingOid: MatchingRuleOid::OID_CASE_IGNORE_ORDERING_MATCH,
+            syntaxOid: SyntaxOid::OID_DIRECTORY_STRING,
+        ));
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.20',
+            names: ['intermediate'],
+            superTypeOid: '1.2.3.10',
+        ));
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.21',
+            names: ['subordinate'],
+            superTypeOid: '1.2.3.20',
+        ));
+    }
 }

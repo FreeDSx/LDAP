@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaResource;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -110,7 +111,7 @@ final class CoreSchemaResourceTest extends TestCase
     public function test_has_expected_syntax_count(): void
     {
         self::assertCount(
-            32,
+            33,
             $this->schema->getLdapSyntaxes(),
         );
     }
@@ -395,7 +396,7 @@ final class CoreSchemaResourceTest extends TestCase
     /**
      * @param string $name
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('rootDseAttributes')]
+    #[DataProvider('rootDseAttributes')]
     public function test_root_dse_attributes_are_dsa_operational(string $name): void
     {
         $attr = $this->schema->getAttributeType($name);
@@ -459,5 +460,56 @@ final class CoreSchemaResourceTest extends TestCase
         self::assertNotNull(
             $this->schema->getObjectClass(ObjectClassOid::OID_SUBENTRY),
         );
+    }
+
+    /**
+     * RFC 4519 defines these three with a SUP and no rules of their own, so the rules can only be inherited.
+     *
+     * @param array{?string, ?string, ?string} $expected
+     */
+    #[DataProvider('inheritedRuleProvider')]
+    public function test_a_type_rfc_4519_defines_only_by_its_supertype_inherits_its_rules(
+        string $name,
+        array $expected,
+    ): void {
+        self::assertSame(
+            $expected,
+            [
+                $this->schema->getEqualityRuleOid($name),
+                $this->schema->getOrderingRuleOid($name),
+                $this->schema->getSyntaxOid($name),
+            ],
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, array{?string, ?string, ?string}}>
+     */
+    public static function inheritedRuleProvider(): iterable
+    {
+        yield 'roleOccupant SUP distinguishedName' => [
+            'roleOccupant',
+            [
+                MatchingRuleOid::OID_DISTINGUISHED_NAME_MATCH,
+                null,
+                SyntaxOid::OID_DISTINGUISHED_NAME,
+            ],
+        ];
+        yield 'generationQualifier SUP name' => [
+            'generationQualifier',
+            [
+                MatchingRuleOid::OID_CASE_IGNORE_MATCH,
+                MatchingRuleOid::OID_CASE_IGNORE_ORDERING_MATCH,
+                SyntaxOid::OID_DIRECTORY_STRING,
+            ],
+        ];
+        yield 'registeredAddress SUP postalAddress' => [
+            'registeredAddress',
+            [
+                MatchingRuleOid::OID_CASE_IGNORE_LIST_MATCH,
+                null,
+                SyntaxOid::OID_POSTAL_ADDRESS,
+            ],
+        ];
     }
 }

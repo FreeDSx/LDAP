@@ -72,6 +72,10 @@ final class SyntaxOid
 
     public const DESC_PRINTABLE_STRING = 'Printable String';
 
+    public const OID_COUNTRY_STRING = '1.3.6.1.4.1.1466.115.121.1.11';
+
+    public const DESC_COUNTRY_STRING = 'Country String';
+
     public const OID_POSTAL_ADDRESS = '1.3.6.1.4.1.1466.115.121.1.41';
 
     public const DESC_POSTAL_ADDRESS = 'Postal Address';

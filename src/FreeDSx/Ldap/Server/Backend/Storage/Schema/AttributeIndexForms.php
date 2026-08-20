@@ -108,13 +108,11 @@ readonly class AttributeIndexForms
     }
 
     /**
-     * Only a declared rule counts, since a type without one has no ordering the stored key could honour.
+     * A type with no rule of its own or from its supertypes has no ordering the stored key could honour.
      */
     private function orderingComparator(string $attribute): ?MatchingRuleComparatorInterface
     {
-        $orderingOid = $this->schema
-            ->getAttributeType(Attribute::normalizeName($attribute))
-            ?->orderingOid;
+        $orderingOid = $this->schema->getOrderingRuleOid(Attribute::normalizeName($attribute));
 
         return $orderingOid === null
             ? null

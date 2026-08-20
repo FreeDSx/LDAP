@@ -39,6 +39,7 @@ final class SyntaxValidatorRegistry
             SyntaxOid::OID_OID => new OidSyntaxValidator(),
             SyntaxOid::OID_NUMERIC_STRING => new NumericStringSyntaxValidator(),
             SyntaxOid::OID_PRINTABLE_STRING => new PrintableStringSyntaxValidator(),
+            SyntaxOid::OID_COUNTRY_STRING => new CountryStringSyntaxValidator(),
             SyntaxOid::OID_IA5_STRING => new Ia5StringSyntaxValidator(),
             SyntaxOid::OID_BIT_STRING => new BitStringSyntaxValidator(),
             SyntaxOid::OID_NAME_AND_OPTIONAL_UID => new NameAndOptionalUidSyntaxValidator(),

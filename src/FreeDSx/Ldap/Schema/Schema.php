@@ -119,17 +119,39 @@ final class Schema
      */
     public function isIntegerOrdered(string $nameOrOid): ?bool
     {
-        $attributeType = $this->getAttributeType($nameOrOid);
-
-        if ($attributeType === null) {
+        if ($this->getAttributeType($nameOrOid) === null) {
             return null;
         }
 
-        if ($attributeType->orderingOid !== null) {
-            return $attributeType->orderingOid === MatchingRuleOid::OID_INTEGER_ORDERING_MATCH;
+        $orderingOid = $this->getOrderingRuleOid($nameOrOid);
+
+        if ($orderingOid !== null) {
+            return $orderingOid === MatchingRuleOid::OID_INTEGER_ORDERING_MATCH;
         }
 
-        return $attributeType->syntaxOid === SyntaxOid::OID_INTEGER;
+        return $this->getSyntaxOid($nameOrOid) === SyntaxOid::OID_INTEGER;
+    }
+
+    /**
+     * The effective EQUALITY rule OID, walking the SUP chain when the type declares none directly.
+     */
+    public function getEqualityRuleOid(string $nameOrOid): ?string
+    {
+        return $this->inheritedRuleOid(
+            $nameOrOid,
+            static fn(AttributeType $type): ?string => $type->equalityOid,
+        );
+    }
+
+    /**
+     * The effective ORDERING rule OID, walking the SUP chain when the type declares none directly.
+     */
+    public function getOrderingRuleOid(string $nameOrOid): ?string
+    {
+        return $this->inheritedRuleOid(
+            $nameOrOid,
+            static fn(AttributeType $type): ?string => $type->orderingOid,
+        );
     }
 
     /**
@@ -137,21 +159,21 @@ final class Schema
      */
     public function getSubstringRuleOid(string $nameOrOid): ?string
     {
-        $attributeType = $this->getAttributeType($nameOrOid);
-        $seen = [];
+        return $this->inheritedRuleOid(
+            $nameOrOid,
+            static fn(AttributeType $type): ?string => $type->substringOid,
+        );
+    }
 
-        while ($attributeType !== null && !isset($seen[$attributeType->oid])) {
-            if ($attributeType->substringOid !== null) {
-                return $attributeType->substringOid;
-            }
-
-            $seen[$attributeType->oid] = true;
-            $attributeType = $attributeType->superTypeOid !== null
-                ? $this->getAttributeType($attributeType->superTypeOid)
-                : null;
-        }
-
-        return null;
+    /**
+     * The effective SYNTAX OID, walking the SUP chain when the type declares none directly.
+     */
+    public function getSyntaxOid(string $nameOrOid): ?string
+    {
+        return $this->inheritedRuleOid(
+            $nameOrOid,
+            static fn(AttributeType $type): ?string => $type->syntaxOid,
+        );
     }
 
     /**
@@ -214,14 +236,14 @@ final class Schema
      */
     public function isCaseInsensitiveMatched(string $nameOrOid): ?bool
     {
-        $attributeType = $this->getAttributeType($nameOrOid);
+        $equalityOid = $this->getEqualityRuleOid($nameOrOid);
 
-        if ($attributeType?->equalityOid === null) {
+        if ($equalityOid === null) {
             return null;
         }
 
         return in_array(
-            $attributeType->equalityOid,
+            $equalityOid,
             self::CASE_INSENSITIVE_EQUALITY_OIDS,
             true,
         );
@@ -350,6 +372,34 @@ final class Schema
         }
 
         return $merged;
+    }
+
+    /**
+     * The first OID the accessor finds walking up from the type, per the inheritance RFC 4512 §2.5.1 defines.
+     *
+     * @param callable(AttributeType): ?string $ruleOid
+     */
+    private function inheritedRuleOid(
+        string $nameOrOid,
+        callable $ruleOid,
+    ): ?string {
+        $attributeType = $this->getAttributeType($nameOrOid);
+        $seen = [];
+
+        while ($attributeType !== null && !isset($seen[$attributeType->oid])) {
+            $oid = $ruleOid($attributeType);
+
+            if ($oid !== null) {
+                return $oid;
+            }
+
+            $seen[$attributeType->oid] = true;
+            $attributeType = $attributeType->superTypeOid !== null
+                ? $this->getAttributeType($attributeType->superTypeOid)
+                : null;
+        }
+
+        return null;
     }
 
     private function carriedAttributeType(AttributeType $incoming): AttributeType

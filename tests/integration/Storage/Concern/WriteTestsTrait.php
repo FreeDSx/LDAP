@@ -564,6 +564,49 @@ trait WriteTestsTrait
         $this->ldapClient()->delete('cn=uidgroup,dc=foo,dc=bar');
     }
 
+    /**
+     * RFC 4517 3.3.4 makes a country string exactly two printable characters.
+     */
+    public function testAddRejectsACountryCodeThatIsNotTwoCharacters(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'o=badcountry,dc=foo,dc=bar',
+            [
+                'o' => 'badcountry',
+                'c' => 'UnitedStates',
+                'objectClass' => 'organization',
+            ],
+        ));
+    }
+
+    public function testAddAcceptsATwoCharacterCountryCode(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'o=goodcountry,dc=foo,dc=bar',
+            [
+                'o' => 'goodcountry',
+                'c' => 'US',
+                'objectClass' => 'organization',
+            ],
+        ));
+
+        $found = $this->ldapClient()->read('o=goodcountry,dc=foo,dc=bar', ['c']);
+
+        self::assertSame(
+            ['US'],
+            $found?->get('c')?->getValues(),
+        );
+
+        $this->ldapClient()->delete('o=goodcountry,dc=foo,dc=bar');
+    }
+
     public function testAddRejectsAUniqueMemberWhoseNameIsNotADn(): void
     {
         $this->authenticateAdmin();

@@ -81,6 +81,8 @@ class ServerSubschemaHandler implements ServerProtocolHandlerInterface
     }
 
     /**
+     * Rules are resolved through the SUP chain, so a subtype inheriting one is listed alongside its supertype.
+     *
      * @return list<string>
      */
     private function buildMatchingRuleUse(Schema $schema): array
@@ -88,17 +90,15 @@ class ServerSubschemaHandler implements ServerProtocolHandlerInterface
         $ruleToAttrs = [];
         foreach ($schema->getAttributeTypes() as $attrType) {
             $name = $attrType->names[0] ?? $attrType->oid;
+            $ruleOids = [
+                $schema->getEqualityRuleOid($attrType->oid),
+                $schema->getOrderingRuleOid($attrType->oid),
+                $schema->getSubstringRuleOid($attrType->oid),
+            ];
 
-            if ($attrType->equalityOid !== null) {
-                $ruleToAttrs[$attrType->equalityOid][] = $name;
-            }
-
-            if ($attrType->orderingOid !== null) {
-                $ruleToAttrs[$attrType->orderingOid][] = $name;
-            }
-
-            if ($attrType->substringOid !== null) {
-                $ruleToAttrs[$attrType->substringOid][] = $name;
+            // A type naming one rule in two roles would otherwise be listed against it twice.
+            foreach (array_unique(array_filter($ruleOids)) as $ruleOid) {
+                $ruleToAttrs[$ruleOid][] = $name;
             }
         }
 

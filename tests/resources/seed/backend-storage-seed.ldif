@@ -54,6 +54,8 @@ labeledURI: A1b2C3
 displayName: Straße
 # Decorated spelling of the identifier cn=Smith\, John holds canonically, for the uniqueMember rule.
 uniqueMember: CN=Admin, DC=Foo, DC=Bar
+# roleOccupant names no rule of its own, so it shows whether the supertype's is inherited.
+roleOccupant: CN=Admin, DC=Foo, DC=Bar
 
 dn: cn=nosn,dc=foo,dc=bar
 objectClass: groupOfNames
@@ -69,3 +71,4 @@ cn: Smith, John
 member: cn=user,dc=foo,dc=bar
 uidNumber: 100
 uniqueMember: cn=admin,dc=foo,dc=bar
+roleOccupant: cn=admin,dc=foo,dc=bar

@@ -384,7 +384,10 @@ trait ServerSearchTrait
             $unknownRule = $orderingRule !== null
                 && $schema->getMatchingRule($orderingRule) === null;
 
-            if ($unknownRule || ($orderingRule === null && $attributeType->orderingOid === null)) {
+            $noOrdering = $orderingRule === null
+                && $schema->getOrderingRuleOid($attribute) === null;
+
+            if ($unknownRule || $noOrdering) {
                 return new SortingResponseControl(
                     ResultCode::INAPPROPRIATE_MATCHING,
                     $attribute,

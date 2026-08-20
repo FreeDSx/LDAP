@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
 use FreeDSx\Ldap\Schema\Schema;
 
 /**
- * Resolves the EQUALITY rule an attribute type declares, so every path deciding value equality asks the same question.
+ * Resolves the EQUALITY rule an attribute type has, so every path deciding value equality asks the same question.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -35,9 +35,7 @@ final readonly class EqualityComparatorResolver
     public function for(string $attributeName): MatchingRuleComparatorInterface
     {
         // Options are not part of the type, so they are dropped before asking the schema about it.
-        $equalityOid = $this->schema
-            ->getAttributeType(Attribute::normalizeName($attributeName))
-            ?->equalityOid;
+        $equalityOid = $this->schema->getEqualityRuleOid(Attribute::normalizeName($attributeName));
         $comparator = $equalityOid !== null
             ? $this->schema->getComparator($equalityOid)
             : null;

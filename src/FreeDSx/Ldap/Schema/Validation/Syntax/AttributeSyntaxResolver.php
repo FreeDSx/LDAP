@@ -52,32 +52,10 @@ final readonly class AttributeSyntaxResolver
      */
     public function validatorFor(AttributeType $type): ?SyntaxValidatorInterface
     {
-        $syntaxOid = $this->resolveSyntaxOid($type);
+        $syntaxOid = $this->schema->getSyntaxOid($type->oid);
 
         return $syntaxOid === null
             ? null
             : $this->registry->get($syntaxOid);
-    }
-
-    /**
-     * Resolves the effective syntax OID, walking the SUP chain when not set directly.
-     */
-    private function resolveSyntaxOid(AttributeType $type): ?string
-    {
-        $visited = [];
-        $current = $type;
-
-        while ($current !== null && !isset($visited[$current->oid])) {
-            if ($current->syntaxOid !== null) {
-                return $current->syntaxOid;
-            }
-
-            $visited[$current->oid] = true;
-            $current = $current->superTypeOid !== null
-                ? $this->schema->getAttributeType($current->superTypeOid)
-                : null;
-        }
-
-        return null;
     }
 }
