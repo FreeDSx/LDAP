@@ -89,9 +89,7 @@ final readonly class AttributeContext implements AttributeContextInterface
         string $value,
     ): ?array {
         // Options are not part of the type, so they are dropped before asking the schema about it.
-        $equalityOid = $this->schema
-            ->getAttributeType(Attribute::normalizeName($attribute))
-            ?->equalityOid;
+        $equalityOid = $this->schema->getEqualityRuleOid(Attribute::normalizeName($attribute));
 
         return $equalityOid === MatchingRuleOid::OID_OBJECT_IDENTIFIER_MATCH
             ? $this->schema->oidSpellings($value)

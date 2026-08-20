@@ -111,7 +111,7 @@ final class SortKeyComparator
             return $schema->getComparator($rule);
         }
 
-        $orderingOid = $schema->getAttributeType($sortKey->getAttribute())?->orderingOid;
+        $orderingOid = $schema->getOrderingRuleOid($sortKey->getAttribute());
 
         if ($orderingOid !== null) {
             return $schema->getComparator($orderingOid);

@@ -139,6 +139,19 @@ trait QueryTestsTrait
             Filters::equal('name', 'alice'),
             1,
         ];
+        // RFC 4519 gives ou SUP name, so an assertion on name reaches an ou value too.
+        yield 'name reaches an organizational unit value' => [
+            Filters::equal('name', 'people'),
+            1,
+        ];
+        // member, seeAlso and roleOccupant are all SUP distinguishedName, the last inheriting its rule as well.
+        yield 'distinguishedName reaches its DN-valued subtypes' => [
+            Filters::equal(
+                'distinguishedName',
+                'cn=admin,dc=foo,dc=bar',
+            ),
+            5,
+        ];
 
         // RFC 4511 4.5.1.7.7.
         yield 'extensible with an explicit matching rule' => [
@@ -540,6 +553,14 @@ trait QueryTestsTrait
             Filters::equal(
                 'uniqueMember',
                 'cn=admin,dc=foo,dc=bar',
+            ),
+            2,
+        ];
+        // roleOccupant declares no EQUALITY, so this only holds if the supertype's rule is inherited.
+        yield 'an inherited distinguishedNameMatch ignores RDN spacing and case' => [
+            Filters::equal(
+                'roleOccupant',
+                'CN=Admin,  DC=Foo,  DC=Bar',
             ),
             2,
         ];
