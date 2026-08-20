@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
+use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
@@ -37,25 +38,20 @@ use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyService;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyTargetResolver;
-use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\AllowUserChangeConstraint;
-use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\HistoryConstraint;
-use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\MinAgeConstraint;
-use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\PasswordChangeConstraintChain;
-use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\QualityConstraint;
-use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\SafeModifyConstraint;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyChangeGuard;
 use FreeDSx\Ldap\Server\PasswordPolicy\HistoryEntry;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
-use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\DefaultPasswordQualityChecker;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordChangeRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordQualityRules;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPasswordModifyHandler;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\TestCase;
+use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
 
@@ -269,6 +265,11 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
         );
     }
 
+    protected function makeServerOptions(): ServerOptions
+    {
+        return TestServerOptions::cheaplyHashed();
+    }
+
     /**
      * @param array<string, string> $extra
      */
@@ -320,15 +321,9 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
 
     private function engine(): PasswordPolicyEngine
     {
-        return new PasswordPolicyEngine(
-            clock: $this->clock,
-            changeConstraints: new PasswordChangeConstraintChain([
-                new AllowUserChangeConstraint(),
-                new SafeModifyConstraint(),
-                new MinAgeConstraint($this->clock),
-                new QualityConstraint(new DefaultPasswordQualityChecker()),
-                new HistoryConstraint(new PasswordHashService(hashCost: 4)),
-            ]),
+        return $this->fromContainer(
+            PasswordPolicyEngine::class,
+            [ClockInterface::class => $this->clock],
         );
     }
 

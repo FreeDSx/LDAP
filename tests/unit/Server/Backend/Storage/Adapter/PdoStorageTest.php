@@ -1467,6 +1467,14 @@ final class PdoStorageTest extends TestCase
         );
     }
 
+    /**
+     * The subject is the adapter rather than schema enforcement, so its fixtures are not held to one.
+     */
+    protected function makeServerOptions(): ServerOptions
+    {
+        return TestServerOptions::unvalidatedCore();
+    }
+
     protected function makeJournalingStorage(?ChangeJournalInterface $journal = null): ChangeJournalingInterface
     {
         // Built by hand only because the contract injects the journal, which the factory derives from config instead.

@@ -72,7 +72,8 @@ final class LdapPasswordPolicyCommand extends Command
 
         // Left unset for the subentry run, so any enforcement observed can only come from the DIT.
         if (!$useSubentries) {
-            $options->setPasswordPolicy(new PasswordPolicy());
+            $options->getPasswordConfig()
+                ->setPolicy(new PasswordPolicy());
         }
 
         $server = new LdapServer($options);

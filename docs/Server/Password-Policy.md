@@ -43,12 +43,13 @@ Configure a policy on `ServerOptions`, either in memory or by pointing at a poli
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordQualityRules;
 
-$options = (new ServerOptions())
-    ->setPasswordPolicy(new PasswordPolicy(
+$passwordConfig = (new PasswordConfig())
+    ->setPolicy(new PasswordPolicy(
         quality: new PasswordQualityRules(minLength: 8),
         lockout: new PasswordLockoutRules(
             enabled: true,
@@ -57,10 +58,10 @@ $options = (new ServerOptions())
         ),
     ));
 
-$ldap = new LdapServer($options);
+$ldap = new LdapServer(new ServerOptions(passwordConfig: $passwordConfig));
 ```
 
-Password policy is active when either `setPasswordPolicy()` or `setDefaultPasswordPolicyDn()` has been called
+Password policy is active when either `setPolicy()` or `setDefaultPolicyDn()` has been called
 (`ServerOptions::isPasswordPolicyEnabled()`). When active, the policy schema (the `pwdPolicy` auxiliary class and the
 `pwd*` attribute types) is merged into the server schema automatically.
 
@@ -137,8 +138,13 @@ Register it as the default:
 
 ```php
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Server\Config\PasswordConfig;
+use FreeDSx\Ldap\ServerOptions;
 
-$options->setDefaultPasswordPolicyDn(new Dn('cn=default,ou=policies,dc=example,dc=com'));
+$passwordConfig = (new PasswordConfig())
+    ->setDefaultPolicyDn(new Dn('cn=default,ou=policies,dc=example,dc=com'));
+
+$options = new ServerOptions(passwordConfig: $passwordConfig);
 ```
 
 Per-user policies are supported by setting `pwdPolicySubentry` on the user entry to the DN of a `pwdPolicy` entry.
@@ -177,8 +183,8 @@ For a given user the governing policy is resolved as:
 
 1. The `pwdPolicy` entry named by the user's `pwdPolicySubentry` (if present).
 2. The nearest governing `pwdPolicy` subentry whose `subtreeSpecification` covers the user.
-3. The default DN from `setDefaultPasswordPolicyDn()` (if configured).
-4. The in-memory policy from `setPasswordPolicy()` (if configured).
+3. The default DN from `PasswordConfig::setDefaultPolicyDn()` (if configured).
+4. The in-memory policy from `PasswordConfig::setPolicy()` (if configured).
 
 If none apply, then no policy is enforced for the user.
 
@@ -301,7 +307,10 @@ final class ContainsDigitChecker implements PasswordQualityCheckerInterface
     }
 }
 
-$options->setPasswordQualityChecker(new ContainsDigitChecker());
+$passwordConfig = (new PasswordConfig())
+    ->setQualityChecker(new ContainsDigitChecker());
+
+$options = new ServerOptions(passwordConfig: $passwordConfig);
 ```
 
 The default checker (`DefaultPasswordQualityChecker`) enforces `pwdMinLength` / `pwdMaxLength` and honours

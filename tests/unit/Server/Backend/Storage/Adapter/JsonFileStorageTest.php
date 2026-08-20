@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\FileChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Control\ControlBag;
@@ -450,6 +451,14 @@ final class JsonFileStorageTest extends TestCase
         }
 
         self::assertNotNull($backend->get(new Dn('dc=example,dc=com')));
+    }
+
+    /**
+     * The subject is the adapter rather than schema enforcement, so its fixtures are not held to one.
+     */
+    protected function makeServerOptions(): ServerOptions
+    {
+        return TestServerOptions::unvalidatedCore();
     }
 
     protected function makeJournalingStorage(?ChangeJournalInterface $journal = null): ChangeJournalingInterface

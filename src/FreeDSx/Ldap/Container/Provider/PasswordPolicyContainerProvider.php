@@ -68,7 +68,7 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
             new AllowUserChangeConstraint(),
             new SafeModifyConstraint(),
             new MinAgeConstraint($clock),
-            new QualityConstraint($options->getPasswordQualityChecker()),
+            new QualityConstraint($options->getPasswordConfig()->getQualityChecker()),
             new HistoryConstraint($container->get(PasswordHashService::class)),
         ]);
 
@@ -109,7 +109,12 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
 
     private function makePasswordHashService(Container $container): PasswordHashService
     {
-        return new PasswordHashService($container->get(ServerOptions::class)->getPasswordHashScheme());
+        $config = $container->get(ServerOptions::class)->getPasswordConfig();
+
+        return new PasswordHashService(
+            $config->getHashScheme(),
+            $config->getHashCost(),
+        );
     }
 
     private function makePasswordPolicyResolver(Container $container): PasswordPolicyResolver
@@ -119,8 +124,8 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
 
         return new PasswordPolicyResolver(
             $backend,
-            $options->getDefaultPasswordPolicyDn(),
-            $options->getPasswordPolicy(),
+            $options->getPasswordConfig()->getDefaultPolicyDn(),
+            $options->getPasswordConfig()->getPolicy(),
             new GoverningSubentryResolver(
                 $backend,
                 new SubtreeSpecificationEvaluator($container->get(FilterEvaluatorInterface::class)),

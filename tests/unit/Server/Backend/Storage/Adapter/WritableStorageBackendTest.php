@@ -37,6 +37,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -1973,6 +1974,14 @@ final class WritableStorageBackendTest extends TestCase
             0,
             $journal->latestSeq(),
         );
+    }
+
+    /**
+     * Validation is opted into by the tests that assert on it, rather than applied to every fixture here.
+     */
+    protected function makeServerOptions(): ServerOptions
+    {
+        return TestServerOptions::unvalidatedCore();
     }
 
     private function aliasEntry(): Entry

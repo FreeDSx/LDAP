@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server;
 
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Server\ConnectionHandlerBuilderInterface;
+use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Socket\Socket;
@@ -36,7 +37,9 @@ final class ConnectionHandlerBuilderTest extends TestCase
     {
         $this->expectNotToPerformAssertions();
 
-        $options = (new ServerOptions())->setPasswordPolicy(new PasswordPolicy());
+        $options = new ServerOptions(
+            passwordConfig: (new PasswordConfig())->setPolicy(new PasswordPolicy()),
+        );
         $this->builderFor($options)->build($this->createMock(Socket::class));
     }
 
