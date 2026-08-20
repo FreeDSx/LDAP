@@ -752,6 +752,23 @@ final class LdapServerTest extends ServerTestCase
         );
     }
 
+    /**
+     * RFC 4513 5.1.2 names unwillingToPerform for a bind supplying a name but no password.
+     */
+    public function testABindWithANameAndNoPasswordIsRefusedAsUnwillingToPerform(): void
+    {
+        // Built directly, since the client refuses to send a simple bind carrying an empty password.
+        try {
+            $this->ldapClient()->send(Operations::bindAnonymously('cn=admin,dc=foo,dc=bar'));
+            $this->fail('A name with an empty password should not have been accepted.');
+        } catch (BindException $e) {
+            $this->assertSame(
+                ResultCode::UNWILLING_TO_PERFORM,
+                $e->getCode(),
+            );
+        }
+    }
+
     public function testRenameWithoutDeleteKeepsOldRdn(): void
     {
         $this->authenticateAdmin();

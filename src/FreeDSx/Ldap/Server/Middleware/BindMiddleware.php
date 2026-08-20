@@ -59,10 +59,17 @@ final readonly class BindMiddleware implements MiddlewareInterface
         $this->criticalControls->assertSupportedForBind($context->message->controls());
 
         if (!$this->authorization->isAuthenticationTypeSupported($request)) {
-            throw new OperationException(
-                'The requested authentication type is not supported.',
-                ResultCode::AUTH_METHOD_UNSUPPORTED,
-            );
+            // RFC 4513 5.1.2 names unwillingToPerform for a bind carrying a name but no password, which is a
+            // different refusal than the method itself being unavailable.
+            throw $this->authorization->isUnauthenticatedBind($request)
+                ? new OperationException(
+                    'Unauthenticated bind is not supported.',
+                    ResultCode::UNWILLING_TO_PERFORM,
+                )
+                : new OperationException(
+                    'The requested authentication type is not supported.',
+                    ResultCode::AUTH_METHOD_UNSUPPORTED,
+                );
         }
 
         // The authenticator writes the bind response itself (an interactive sub-protocol); carry only the outcome.

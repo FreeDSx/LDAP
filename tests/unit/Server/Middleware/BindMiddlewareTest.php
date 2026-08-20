@@ -182,7 +182,7 @@ final class BindMiddlewareTest extends TestCase
             $this->subject()->process(
                 new ServerRequestContext(new LdapMessageRequest(
                     1,
-                    new AnonBindRequest('foo'),
+                    new AnonBindRequest(),
                 )),
                 $this->next,
             );
@@ -190,6 +190,29 @@ final class BindMiddlewareTest extends TestCase
         } catch (OperationException $e) {
             self::assertSame(
                 ResultCode::AUTH_METHOD_UNSUPPORTED,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function test_a_name_with_an_empty_password_is_refused_as_unwilling_to_perform(): void
+    {
+        $this->authenticator
+            ->expects(self::never())
+            ->method('bind');
+
+        try {
+            $this->subject()->process(
+                new ServerRequestContext(new LdapMessageRequest(
+                    1,
+                    new AnonBindRequest('cn=foo,dc=foo,dc=bar'),
+                )),
+                $this->next,
+            );
+            self::fail('Expected an OperationException.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::UNWILLING_TO_PERFORM,
                 $e->getCode(),
             );
         }
