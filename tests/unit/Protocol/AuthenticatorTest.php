@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Protocol\Authenticator;
 use FreeDSx\Ldap\Protocol\Bind\BindInterface;
+use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -36,10 +37,13 @@ final class AuthenticatorTest extends TestCase
         $this->authOne = $this->createMock(BindInterface::class);
         $this->authTwo = $this->createMock(BindInterface::class);
 
-        $this->subject = new Authenticator([
-            $this->authOne,
-            $this->authTwo,
-        ]);
+        $this->subject = new Authenticator(
+            [
+                $this->authOne,
+                $this->authTwo,
+            ],
+            $this->createMock(ServerQueue::class),
+        );
     }
 
     public function test_it_should_throw_an_exception_on_an_unknown_bind_type(): void

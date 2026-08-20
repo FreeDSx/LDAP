@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Operation\Request;
 
 use FreeDSx\Asn1\Asn1;
-use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
@@ -83,11 +82,18 @@ final class SaslBindRequestTest extends TestCase
         SaslBindRequest::fromAsn1($malformedAuth);
     }
 
-    public function test_sasl_bind_request_throws_when_the_mechanism_is_empty(): void
+    /**
+     * RFC 4511 4.2.1 uses an empty mechanism to abort a negotiation, so a client has to be able to send one.
+     */
+    public function test_an_empty_mechanism_can_be_encoded(): void
     {
-        self::expectException(BindException::class);
+        $request = new SaslBindRequest('');
+        $request->toAsn1();
 
-        (new SaslBindRequest(''))->toAsn1();
+        self::assertSame(
+            '',
+            $request->getMechanism(),
+        );
     }
 
     public function test_it_can_change_the_mechanism(): void

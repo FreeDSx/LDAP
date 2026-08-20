@@ -85,7 +85,7 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
                 ),
                 new BindMiddleware(
                     $serverAuthorization,
-                    new Authenticator($authenticators),
+                    new Authenticator($authenticators, $queue),
                     new CriticalControlValidator(),
                 ),
                 new AuthorizationResolutionMiddleware(

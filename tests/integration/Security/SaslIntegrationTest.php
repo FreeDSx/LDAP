@@ -20,11 +20,13 @@ use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\Response\ResponseInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Options\CramMD5Options;
 use FreeDSx\Sasl\Options\PlainOptions;
 use FreeDSx\Sasl\Options\ScramOptions;
+use FreeDSx\Sasl\Sasl;
 use FreeDSx\Socket\SocketOptions;
 use FreeDSx\Socket\SocketPool;
 use FreeDSx\Socket\SocketPoolOptions;
@@ -191,6 +193,163 @@ final class SaslIntegrationTest extends ServerTestCase
     }
 
     /**
+     * RFC 4511 4.1.1 reserves disconnection for an unparseable PDU; bad credentials are an ordinary bind failure.
+     */
+    public function testMalformedPlainCredentialsAreAnsweredWithABindResponse(): void
+    {
+        $response = $this->sendRawBind(new SaslBindRequest(
+            'PLAIN',
+            'no-nul-separators-here',
+        ));
+
+        self::assertInstanceOf(
+            BindResponse::class,
+            $response,
+        );
+        self::assertNotSame(
+            ResultCode::SUCCESS,
+            $response->getResultCode(),
+        );
+    }
+
+    public function testMalformedPlainCredentialsLeaveTheSessionUsable(): void
+    {
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                new SaslBindRequest('PLAIN', 'no-nul-separators-here'),
+            ));
+            $queue->getMessage(1);
+
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                new SaslBindRequest('PLAIN', "\x00user\x0012345"),
+            ));
+
+            self::assertSame(
+                ResultCode::SUCCESS,
+                $this->resultCodeOf($queue->getMessage(2)),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
+    /**
+     * RFC 4511 4.2.1: an empty mechanism aborts the negotiation and MUST answer authMethodNotSupported.
+     */
+    public function testAnEmptyMechanismMidNegotiationAbortsWithAuthMethodNotSupported(): void
+    {
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                new SaslBindRequest('CRAM-MD5'),
+            ));
+            self::assertSame(
+                ResultCode::SASL_BIND_IN_PROGRESS,
+                $this->resultCodeOf($queue->getMessage(1)),
+            );
+
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                new SaslBindRequest(''),
+            ));
+
+            self::assertSame(
+                ResultCode::AUTH_METHOD_UNSUPPORTED,
+                $this->resultCodeOf($queue->getMessage(2)),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
+    /**
+     * RFC 4511 4.2.1 names a different mechanism as a way to abort the negotiation in progress.
+     */
+    public function testSwitchingMechanismMidNegotiationRestartsTheExchange(): void
+    {
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                new SaslBindRequest('CRAM-MD5'),
+            ));
+            $queue->getMessage(1);
+
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                new SaslBindRequest('PLAIN', "\x00user\x0012345"),
+            ));
+
+            self::assertSame(
+                ResultCode::SUCCESS,
+                $this->resultCodeOf($queue->getMessage(2)),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
+    /**
+     * RFC 4513 5.2.1.2: server-final data rides out with the success rather than costing another round trip.
+     */
+    public function testScramReturnsServerFinalDataWithTheSuccessResponse(): void
+    {
+        $options = (new ScramOptions())
+            ->setUsername('user')
+            ->setPassword('12345');
+        $challenge = (new Sasl())
+            ->get(MechanismName::SCRAM_SHA256)
+            ->challenge();
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                new SaslBindRequest(
+                    'SCRAM-SHA-256',
+                    $challenge->challenge(null, $options)->getResponse(),
+                ),
+            ));
+            $first = $queue->getMessage(1)->getResponse();
+            self::assertInstanceOf(
+                BindResponse::class,
+                $first,
+            );
+
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                new SaslBindRequest(
+                    'SCRAM-SHA-256',
+                    $challenge->challenge($first->getSaslCredentials(), $options)->getResponse(),
+                ),
+            ));
+            $second = $queue->getMessage(2)->getResponse();
+
+            self::assertInstanceOf(
+                BindResponse::class,
+                $second,
+            );
+            self::assertSame(
+                ResultCode::SUCCESS,
+                $second->getResultCode(),
+            );
+            self::assertStringStartsWith(
+                'v=',
+                (string) $second->getSaslCredentials(),
+            );
+        } finally {
+            $queue->close();
+        }
+    }
+
+    /**
      * The stock client never puts these credentials in an initial bind, so the request is sent raw.
      */
     private function sendRawBind(SaslBindRequest $request): ResponseInterface
@@ -205,6 +364,17 @@ final class SaslIntegrationTest extends ServerTestCase
         $queue->close();
 
         return $response;
+    }
+
+    private function resultCodeOf(LdapMessageResponse $message): int
+    {
+        $response = $message->getResponse();
+        self::assertInstanceOf(
+            BindResponse::class,
+            $response,
+        );
+
+        return $response->getResultCode();
     }
 
     private function rawQueue(): ClientQueue

@@ -398,7 +398,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                     : []),
                 new BindMiddleware(
                     $authorization,
-                    new Authenticator($authenticators),
+                    new Authenticator($authenticators, $queue),
                     $this->container->get(CriticalControlValidator::class),
                 ),
                 new AuthorizationResolutionMiddleware(

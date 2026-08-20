@@ -17,7 +17,6 @@ use FreeDSx\Asn1\Asn1;
 use FreeDSx\Asn1\Type\AbstractType;
 use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\OctetStringType;
-use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Sasl\Options\ChallengeOptionsInterface;
@@ -121,12 +120,7 @@ class SaslBindRequest extends BindRequest
     }
 
     /**
-     * @throws BindException
+     * RFC 4511 4.2.1 gives an empty mechanism a meaning of its own, so nothing here is rejected.
      */
-    protected function validate(): void
-    {
-        if ($this->mechanism === '') {
-            throw new BindException('The mechanism name cannot be empty.');
-        }
-    }
+    protected function validate(): void {}
 }

@@ -24,13 +24,22 @@ use FreeDSx\Sasl\SaslContext;
  */
 final readonly class SaslExchangeResult
 {
+    /**
+     * @param ?string $serverFinal Data the mechanism produced last, for the success response to carry.
+     */
     public function __construct(
         private SaslContext $context,
         private LdapMessageRequest $lastMessage,
         private ?string $username,
         private ?Dn $resolvedDn = null,
         private ?Dn $authorizingDn = null,
+        private ?string $serverFinal = null,
     ) {}
+
+    public function getServerFinal(): ?string
+    {
+        return $this->serverFinal;
+    }
 
     public function getContext(): SaslContext
     {
