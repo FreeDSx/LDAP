@@ -932,6 +932,29 @@ trait WriteTestsTrait
         $this->ldapClient()->delete('cn=kept,dc=foo,dc=bar');
     }
 
+    public function testRenameCanRespellTheRdnInADifferentCase(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=Recase,dc=foo,dc=bar',
+            ['cn' => 'Recase', 'sn' => 'Recase', 'objectClass' => 'inetOrgPerson'],
+        ));
+
+        $this->ldapClient()->rename('cn=Recase,dc=foo,dc=bar', 'cn=recase', true);
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'cn')
+                ->base('cn=recase,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+        self::assertSame(
+            ['recase'],
+            $found->first()?->get('cn')?->getValues(),
+        );
+
+        $this->ldapClient()->delete('cn=recase,dc=foo,dc=bar');
+    }
+
     public function testRenameChangesRdn(): void
     {
         $this->authenticateAdmin();

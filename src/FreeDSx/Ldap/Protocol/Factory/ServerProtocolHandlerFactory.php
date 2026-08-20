@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
@@ -60,10 +61,11 @@ readonly class ServerProtocolHandlerFactory implements HandlerRouteResolverInter
         if (!$request instanceof SearchRequest) {
             return false;
         }
-        $subschemaEntry = $this->options->getSubschemaEntry()->toString();
 
-        return $request->getScope() === SearchRequest::SCOPE_BASE_OBJECT
-            && strtolower((string) $request->getBaseDn()) === strtolower($subschemaEntry);
+        return $this->isBaseSearchFor(
+            $request,
+            $this->options->getSubschemaEntry(),
+        );
     }
 
     private function isMonitorSearch(RequestInterface $request): bool
@@ -72,8 +74,24 @@ readonly class ServerProtocolHandlerFactory implements HandlerRouteResolverInter
             return false;
         }
 
+        return $this->isBaseSearchFor(
+            $request,
+            new Dn(ServerMonitorHandler::DN),
+        );
+    }
+
+    /**
+     * Compared as names rather than as text, so a client spelling the DN differently still reaches the handler.
+     */
+    private function isBaseSearchFor(
+        SearchRequest $request,
+        Dn $dn,
+    ): bool {
+        $baseDn = $request->getBaseDn();
+
         return $request->getScope() === SearchRequest::SCOPE_BASE_OBJECT
-            && strtolower((string) $request->getBaseDn()) === ServerMonitorHandler::DN;
+            && $baseDn !== null
+            && $baseDn->equals($dn);
     }
 
     private function isRootDseSearch(RequestInterface $request): bool
