@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Matching;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
 use FreeDSx\Ldap\Schema\Schema;
 
@@ -33,7 +34,10 @@ final readonly class EqualityComparatorResolver
      */
     public function for(string $attributeName): MatchingRuleComparatorInterface
     {
-        $equalityOid = $this->schema->getAttributeType($attributeName)?->equalityOid;
+        // Options are not part of the type, so they are dropped before asking the schema about it.
+        $equalityOid = $this->schema
+            ->getAttributeType(Attribute::normalizeName($attributeName))
+            ?->equalityOid;
         $comparator = $equalityOid !== null
             ? $this->schema->getComparator($equalityOid)
             : null;

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
+use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\StringPrep;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
@@ -20,8 +21,10 @@ use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 /**
  * Numeric string comparator treating spaces as insignificant (RFC 4517 section 4.2.22).
  */
-final class NumericStringComparator implements MatchingRuleComparatorInterface
+final class NumericStringComparator implements MatchingRuleComparatorInterface, IndexableComparatorInterface
 {
+    use NormalizedIndexFormsTrait;
+
     public function __construct(
         private readonly StringPrep $prep = new StringPrep(),
     ) {}

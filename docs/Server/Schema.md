@@ -227,7 +227,7 @@ Matching rules are skipped, since a matching rule carries the comparator that im
 cannot express one. A loaded schema uses the comparators of the schema it is merged into.
 
 An attribute keeps its `EQUALITY`, `ORDERING` and `SUBSTR` values even when no rule of that name is registered.
-Filters against such an attribute fall back to byte-exact comparison rather than failing.
+Filters against such an attribute fall back to case-insensitive comparison rather than failing.
 
 ------------------
 #### SchemaLoadMode

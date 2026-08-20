@@ -85,7 +85,7 @@ attributeTypes: ( 2.5.4.13 NAME 'description' DESC 'descriptive information' EQU
 attributeTypes: ( 2.5.4.34 NAME 'seeAlso' DESC 'distinguished name(s) of objects related to the entity' EQUALITY 2.5.13.1 SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 )
 attributeTypes: ( 2.5.4.32 NAME 'owner' DESC 'distinguished name(s) of the entity responsible for the object' EQUALITY 2.5.13.1 SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 )
 attributeTypes: ( 2.5.4.5 NAME 'serialNumber' DESC 'serial number of a device' EQUALITY 2.5.13.2 SUBSTR 2.5.13.4 SYNTAX 1.3.6.1.4.1.1466.115.121.1.44 )
-attributeTypes: ( 2.5.4.20 NAME 'telephoneNumber' DESC 'telephone numbers' EQUALITY 2.5.13.20 SUBSTR 2.5.13.4 SYNTAX 1.3.6.1.4.1.1466.115.121.1.50 )
+attributeTypes: ( 2.5.4.20 NAME 'telephoneNumber' DESC 'telephone numbers' EQUALITY 2.5.13.20 SUBSTR 2.5.13.21 SYNTAX 1.3.6.1.4.1.1466.115.121.1.50 )
 attributeTypes: ( 2.5.4.6 NAME ( 'c' 'countryName' ) DESC 'two-letter ISO 3166 country code' EQUALITY 2.5.13.2 SUBSTR 2.5.13.4 SYNTAX 1.3.6.1.4.1.1466.115.121.1.44 SINGLE-VALUE )
 attributeTypes: ( 2.5.4.7 NAME ( 'l' 'localityName' ) DESC 'locality in which the entity resides' EQUALITY 2.5.13.2 ORDERING 2.5.13.3 SUBSTR 2.5.13.4 SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
 attributeTypes: ( 2.5.4.8 NAME ( 'st' 'stateOrProvinceName' ) DESC 'state or province in which the entity resides' EQUALITY 2.5.13.2 ORDERING 2.5.13.3 SUBSTR 2.5.13.4 SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )

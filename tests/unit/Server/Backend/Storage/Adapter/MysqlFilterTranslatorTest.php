@@ -26,7 +26,12 @@ use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\MysqlFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
+use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
+use FreeDSx\Ldap\Schema\SchemaResource;
+use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -34,9 +39,25 @@ final class MysqlFilterTranslatorTest extends TestCase
 {
     private MysqlFilterTranslator $subject;
 
+    private AttributeIndexForms $indexForms;
+
+    private AttributeContext $schemaContext;
+
     protected function setUp(): void
     {
-        $this->subject = new MysqlFilterTranslator($this->attributeContext());
+        $schema = SchemaResource::Core->load();
+        $this->schemaContext = new AttributeContext(
+            $schema,
+            new AttributeSyntaxResolver($schema),
+        );
+        $this->indexForms = new AttributeIndexForms(
+            $schema,
+            new EqualityComparatorResolver($schema),
+        );
+        $this->subject = new MysqlFilterTranslator(
+            $this->attributeContext(),
+            $this->indexForms,
+        );
     }
 
     public function test_present_filter_returns_sidecar_presence_exists(): void
@@ -187,13 +208,13 @@ final class MysqlFilterTranslatorTest extends TestCase
     public function test_gte_filter_emits_sidecar_value_gte(): void
     {
         $result = $this->subject->translate(new GreaterThanOrEqualFilter(
-            'age',
-            '30',
+            'sn',
+            'Smith',
         ));
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            "s.attr_name_lower = 'age'",
+            "s.attr_name_lower = 'sn'",
             $result->sql,
         );
         self::assertStringContainsString(
@@ -201,14 +222,17 @@ final class MysqlFilterTranslatorTest extends TestCase
             $result->sql,
         );
         self::assertSame(
-            ['30'],
+            ['smith'],
             $result->params,
         );
     }
 
     public function test_gte_emits_numeric_cast_for_integer_ordered_attribute(): void
     {
-        $translator = new MysqlFilterTranslator($this->attributeContext(integerOrdered: true));
+        $translator = new MysqlFilterTranslator(
+            $this->attributeContext(integerOrdered: true),
+            $this->indexForms,
+        );
 
         $result = $translator->translate(new GreaterThanOrEqualFilter('uidNumber', '30'));
 
@@ -223,7 +247,7 @@ final class MysqlFilterTranslatorTest extends TestCase
     public function test_gte_filter_with_digit_value_is_inexact(): void
     {
         $result = $this->subject->translate(new GreaterThanOrEqualFilter(
-            'uidNumber',
+            'sn',
             '100',
         ));
 
@@ -256,13 +280,13 @@ final class MysqlFilterTranslatorTest extends TestCase
     public function test_lte_filter_emits_sidecar_value_lte(): void
     {
         $result = $this->subject->translate(new LessThanOrEqualFilter(
-            'age',
-            '50',
+            'sn',
+            'Smith',
         ));
 
         self::assertNotNull($result);
         self::assertStringContainsString(
-            "s.attr_name_lower = 'age'",
+            "s.attr_name_lower = 'sn'",
             $result->sql,
         );
         self::assertStringContainsString(
@@ -270,7 +294,7 @@ final class MysqlFilterTranslatorTest extends TestCase
             $result->sql,
         );
         self::assertSame(
-            ['50'],
+            ['smith'],
             $result->params,
         );
     }
@@ -510,7 +534,7 @@ final class MysqlFilterTranslatorTest extends TestCase
         $result = $this->subject->translate(new AndFilter(
             new PresentFilter('cn'),
             new EqualityFilter(
-                'objectClass',
+                'sn',
                 'person',
             ),
         ));
@@ -564,7 +588,7 @@ final class MysqlFilterTranslatorTest extends TestCase
         $result = $this->subject->translate(new OrFilter(
             new PresentFilter('cn'),
             new EqualityFilter(
-                'objectClass',
+                'sn',
                 'person',
             ),
         ));
@@ -721,7 +745,7 @@ final class MysqlFilterTranslatorTest extends TestCase
                 'Alice',
             ),
             new EqualityFilter(
-                'objectClass',
+                'sn',
                 'person',
             ),
         ));
@@ -744,6 +768,8 @@ final class MysqlFilterTranslatorTest extends TestCase
         $context->method('filterSupport')->willReturn($support);
         $context->method('assertionValueConforms')->willReturn($assertionConforms);
         $context->method('hasSubstringRule')->willReturn($hasSubstringRule);
+        // Answered from the schema, since which branch an OID-matched attribute takes is not what these pin.
+        $context->method('oidSpellings')->willReturnCallback($this->schemaContext->oidSpellings(...));
 
         return $context;
     }

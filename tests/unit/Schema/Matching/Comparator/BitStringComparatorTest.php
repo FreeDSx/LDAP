@@ -95,4 +95,28 @@ final class BitStringComparatorTest extends TestCase
 
         self::assertTrue($result);
     }
+
+    public function test_index_key_is_shared_by_values_holding_the_same_bits(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey(" '0101'B "),
+            $this->subject->indexKey("'0101'B"),
+        );
+    }
+
+    public function test_index_key_differs_when_the_bits_differ(): void
+    {
+        self::assertNotSame(
+            $this->subject->indexKey("'0101'B"),
+            $this->subject->indexKey("'1010'B"),
+        );
+    }
+
+    public function test_index_fragment_is_the_fragment_untouched(): void
+    {
+        self::assertSame(
+            '111',
+            $this->subject->indexFragment('111'),
+        );
+    }
 }

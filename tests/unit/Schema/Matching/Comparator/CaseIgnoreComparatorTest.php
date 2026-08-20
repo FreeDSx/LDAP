@@ -210,4 +210,31 @@ final class CaseIgnoreComparatorTest extends TestCase
 
         self::assertSame(0, $result);
     }
+
+    public function test_index_key_is_shared_by_values_the_rule_calls_equal(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey('Foo  Bar'),
+            $this->subject->indexKey('foo bar'),
+        );
+    }
+
+    public function test_index_key_differs_for_values_the_rule_keeps_apart(): void
+    {
+        self::assertNotSame(
+            $this->subject->indexKey('foo'),
+            $this->subject->indexKey('bar'),
+        );
+    }
+
+    /**
+     * A fragment keeps its edge spaces where a whole value would have them trimmed.
+     */
+    public function test_index_fragment_keeps_its_edge_spaces(): void
+    {
+        self::assertSame(
+            ' foo',
+            $this->subject->indexFragment(' Foo'),
+        );
+    }
 }

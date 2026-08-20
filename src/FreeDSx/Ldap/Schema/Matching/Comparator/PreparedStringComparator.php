@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
+use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\StringPrep;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
@@ -20,7 +21,7 @@ use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 /**
  * String comparator that applies an RFC 4518 preparation profile, then matches byte-exact.
  */
-final readonly class PreparedStringComparator implements MatchingRuleComparatorInterface
+final readonly class PreparedStringComparator implements MatchingRuleComparatorInterface, IndexableComparatorInterface
 {
     private OctetStringComparator $matcher;
 
@@ -56,6 +57,16 @@ final readonly class PreparedStringComparator implements MatchingRuleComparatorI
             $this->prep->prepareForEquality($value),
             $this->prepareAssertion($assertion),
         );
+    }
+
+    public function indexKey(string $value): string
+    {
+        return $this->prep->prepareForEquality($value);
+    }
+
+    public function indexFragment(string $fragment): string
+    {
+        return $this->prep->prepareFragment($fragment);
     }
 
     private function prepareAssertion(SubstringAssertion $assertion): SubstringAssertion

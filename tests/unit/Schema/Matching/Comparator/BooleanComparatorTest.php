@@ -70,4 +70,25 @@ final class BooleanComparatorTest extends TestCase
 
         self::assertFalse($result);
     }
+
+    public function test_index_key_is_shared_by_either_spelling_of_a_literal(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey('true'),
+            $this->subject->indexKey('TRUE'),
+        );
+    }
+
+    public function test_index_key_differs_between_the_two_literals(): void
+    {
+        self::assertNotSame(
+            $this->subject->indexKey('TRUE'),
+            $this->subject->indexKey('FALSE'),
+        );
+    }
+
+    public function test_index_fragment_is_null_because_the_rule_has_no_substring_form(): void
+    {
+        self::assertNull($this->subject->indexFragment('T'));
+    }
 }

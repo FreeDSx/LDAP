@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
+use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\StringPrep;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
@@ -20,8 +21,10 @@ use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 /**
  * Telephone number comparator (telephoneNumberMatch): strips spaces and hyphens before comparing case-insensitively.
  */
-final class TelephoneNumberComparator implements MatchingRuleComparatorInterface
+final class TelephoneNumberComparator implements MatchingRuleComparatorInterface, IndexableComparatorInterface
 {
+    use NormalizedIndexFormsTrait;
+
     /**
      * The hyphens and the space RFC 4518 2.6.3 calls insignificant.
      */

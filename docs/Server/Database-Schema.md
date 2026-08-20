@@ -8,6 +8,7 @@ how to manage it yourself.
 * [The Schema Files](#the-schema-files)
 * [Managing the Schema Yourself](#managing-the-schema-yourself)
 * [Versioning](#versioning)
+* [Rebuilding the Indexes](#rebuilding-the-indexes)
 * [The Change Journal Tables](#the-change-journal-tables)
 
 ## Automatic Setup
@@ -53,6 +54,19 @@ apply it.
 `PdoStorage::SCHEMA_VERSION` is the current schema revision. Each release notes any schema change in the CHANGELOG, so
 you can tell whether an upgrade needs a migration and which delta to apply. A fresh database applies the baseline; an
 existing database applies the delta files newer than its current version, with your own migration tool.
+
+## Rebuilding the Indexes
+
+The secondary index tables are derived from each entry as it is written, so a change to how values are indexed only
+reaches entries stored afterwards. Rebuild them with `reindex()`:
+
+```php
+$server->reindex();
+```
+
+It re-stores every entry in one transaction, leaving operational attributes untouched and journaling nothing. Run it
+after enabling substring indexing, changing which attributes it covers, or changing an attribute's `EQUALITY` or
+`SUBSTR` rule. It rewrites every row, so treat it as maintenance rather than a startup step.
 
 ## The Change Journal Tables
 

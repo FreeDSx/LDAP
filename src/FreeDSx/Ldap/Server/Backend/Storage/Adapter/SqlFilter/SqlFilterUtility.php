@@ -42,14 +42,6 @@ final class SqlFilterUtility
     }
 
     /**
-     * The sidecar form of a substring fragment, which keeps its edge spaces where a whole value would not.
-     */
-    public static function normalizeFragment(string $fragment): string
-    {
-        return self::truncate(self::prep()->prepareFragment($fragment));
-    }
-
-    /**
      * The bound-parameter markers for a statement whose width is only known at run time.
      *
      * @param string $marker A single value by default, or a parenthesised tuple for a multi-column row.
@@ -80,15 +72,10 @@ final class SqlFilterUtility
         );
     }
 
-    private static function prep(): StringPrep
-    {
-        return self::$prep ??= new StringPrep(foldCase: true);
-    }
-
     /**
-     * Non-UTF-8 returns '', which matches binary-syntax rows only.
+     * A prepared value cut to what the column holds; non-UTF-8 returns '', which matches binary-syntax rows only.
      */
-    private static function truncate(string $value): string
+    public static function truncate(string $value): string
     {
         if (!Text::isUtf8($value)) {
             return '';
@@ -100,5 +87,10 @@ final class SqlFilterUtility
             self::MAX_INDEXED_VALUE_CHARS,
             'UTF-8',
         );
+    }
+
+    private static function prep(): StringPrep
+    {
+        return self::$prep ??= new StringPrep(foldCase: true);
     }
 }

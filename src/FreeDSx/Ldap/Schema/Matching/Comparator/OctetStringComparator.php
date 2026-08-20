@@ -13,19 +13,30 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
+use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 
 /**
  * Exact byte-for-byte comparator (octetStringMatch): no case folding or normalization.
  */
-final class OctetStringComparator implements MatchingRuleComparatorInterface
+final class OctetStringComparator implements MatchingRuleComparatorInterface, IndexableComparatorInterface
 {
     public function equals(
         string $a,
         string $b,
     ): bool {
         return $a === $b;
+    }
+
+    public function indexKey(string $value): string
+    {
+        return $value;
+    }
+
+    public function indexFragment(string $fragment): string
+    {
+        return $fragment;
     }
 
     public function compare(

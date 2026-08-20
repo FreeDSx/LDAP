@@ -105,4 +105,52 @@ final class GeneralizedTimeComparatorTest extends TestCase
 
         self::assertFalse($result);
     }
+
+    public function test_index_key_is_shared_by_spellings_of_one_instant(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey('20260101070000-0500'),
+            $this->subject->indexKey('20260101120000Z'),
+        );
+    }
+
+    public function test_index_key_reads_a_bare_spelling_as_utc(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey('20260101120000'),
+            $this->subject->indexKey('20260101120000Z'),
+        );
+    }
+
+    public function test_index_key_differs_for_different_instants(): void
+    {
+        self::assertNotSame(
+            $this->subject->indexKey('20260101120000Z'),
+            $this->subject->indexKey('20260101120001Z'),
+        );
+    }
+
+    /**
+     * A lexical comparison over the key has to agree with the rule's own ordering.
+     */
+    public function test_index_keys_sort_in_chronological_order(): void
+    {
+        self::assertLessThan(
+            0,
+            strcmp(
+                (string) $this->subject->indexKey('20260101070000-0500'),
+                (string) $this->subject->indexKey('20260101120001Z'),
+            ),
+        );
+    }
+
+    public function test_index_key_is_null_for_an_unparseable_value(): void
+    {
+        self::assertNull($this->subject->indexKey('not-a-time'));
+    }
+
+    public function test_index_fragment_is_null_because_the_rule_has_no_substring_form(): void
+    {
+        self::assertNull($this->subject->indexFragment('2026'));
+    }
 }

@@ -29,7 +29,12 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
+use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
+use FreeDSx\Ldap\Schema\SchemaResource;
+use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -37,9 +42,25 @@ final class SqliteFilterTranslatorTest extends TestCase
 {
     private SqliteFilterTranslator $subject;
 
+    private AttributeIndexForms $indexForms;
+
+    private AttributeContext $schemaContext;
+
     protected function setUp(): void
     {
-        $this->subject = new SqliteFilterTranslator($this->attributeContext());
+        $schema = SchemaResource::Core->load();
+        $this->schemaContext = new AttributeContext(
+            $schema,
+            new AttributeSyntaxResolver($schema),
+        );
+        $this->indexForms = new AttributeIndexForms(
+            $schema,
+            new EqualityComparatorResolver($schema),
+        );
+        $this->subject = new SqliteFilterTranslator(
+            $this->attributeContext(),
+            $this->indexForms,
+        );
     }
 
     public function test_present_emits_sidecar_presence_exists(): void
@@ -382,10 +403,9 @@ final class SqliteFilterTranslatorTest extends TestCase
 
     public function test_gte_with_digit_value_is_inexact(): void
     {
-        // Critical: PHP compareOrdered does integer compare when both sides
-        // are ctype_digit, so SQL byte compare would diverge. Must stay inexact.
+        // A digit-shaped assertion against a lexically ordered type stays inexact, so a numeric reading cannot diverge.
         $result = $this->subject->translate(new GreaterThanOrEqualFilter(
-            'uidNumber',
+            'sn',
             '100',
         ));
 
@@ -591,6 +611,7 @@ final class SqliteFilterTranslatorTest extends TestCase
     {
         $translator = new SqliteFilterTranslator(
             $this->attributeContext(),
+            $this->indexForms,
             new TrigramSubstringIndex(['cn']),
         );
 
@@ -613,6 +634,7 @@ final class SqliteFilterTranslatorTest extends TestCase
     {
         $translator = new SqliteFilterTranslator(
             $this->attributeContext(),
+            $this->indexForms,
             new TrigramSubstringIndex(['cn']),
         );
 
@@ -650,6 +672,7 @@ final class SqliteFilterTranslatorTest extends TestCase
     {
         $translator = new SqliteFilterTranslator(
             $this->attributeContext(),
+            $this->indexForms,
             new TrigramSubstringIndex(['cn']),
         );
 
@@ -743,7 +766,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         $result = $this->subject->translate(new AndFilter(
             new PresentFilter('cn'),
             new EqualityFilter(
-                'objectClass',
+                'sn',
                 'person',
             ),
         ));
@@ -797,7 +820,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         $result = $this->subject->translate(new OrFilter(
             new PresentFilter('cn'),
             new EqualityFilter(
-                'objectClass',
+                'sn',
                 'person',
             ),
         ));
@@ -948,7 +971,7 @@ final class SqliteFilterTranslatorTest extends TestCase
                 'Alice',
             ),
             new EqualityFilter(
-                'objectClass',
+                'sn',
                 'person',
             ),
         ));
@@ -1027,6 +1050,7 @@ final class SqliteFilterTranslatorTest extends TestCase
     {
         $translator = new SqliteFilterTranslator(
             $this->attributeContext(),
+            $this->indexForms,
             new TrigramSubstringIndex(['cn']),
         );
 
@@ -1039,7 +1063,7 @@ final class SqliteFilterTranslatorTest extends TestCase
     public function test_composed_and_exposes_each_childs_drivable_leaf(): void
     {
         $result = $this->subject->translate(new AndFilter(
-            new EqualityFilter('objectClass', 'person'),
+            new EqualityFilter('sn', 'person'),
             new EqualityFilter('cn', 'alice'),
         ));
 
@@ -1049,7 +1073,7 @@ final class SqliteFilterTranslatorTest extends TestCase
             $result->drivableLeaves,
         );
         self::assertSame(
-            "s.attr_name_lower = 'objectclass' AND s.value_lower = ?",
+            "s.attr_name_lower = 'sn' AND s.value_lower = ?",
             $result->drivableLeaves[0]->condition,
         );
         self::assertSame(
@@ -1100,7 +1124,10 @@ final class SqliteFilterTranslatorTest extends TestCase
         FilterInterface $filter,
         AttributeContextInterface $context,
     ): ?SqlFilterResult {
-        return (new SqliteFilterTranslator($context))->translate($filter);
+        return (new SqliteFilterTranslator(
+            $context,
+            $this->indexForms,
+        ))->translate($filter);
     }
 
     private function attributeContext(
@@ -1114,6 +1141,8 @@ final class SqliteFilterTranslatorTest extends TestCase
         $context->method('filterSupport')->willReturn($support);
         $context->method('assertionValueConforms')->willReturn($assertionConforms);
         $context->method('hasSubstringRule')->willReturn($hasSubstringRule);
+        // Answered from the schema, since which branch an OID-matched attribute takes is not what these pin.
+        $context->method('oidSpellings')->willReturnCallback($this->schemaContext->oidSpellings(...));
 
         return $context;
     }

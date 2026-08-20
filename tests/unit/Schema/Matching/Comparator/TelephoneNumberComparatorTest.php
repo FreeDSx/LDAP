@@ -107,4 +107,28 @@ final class TelephoneNumberComparatorTest extends TestCase
 
         self::assertTrue($result);
     }
+
+    public function test_index_key_is_shared_by_numbers_the_rule_calls_equal(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey('+1 408 555 1212'),
+            $this->subject->indexKey('+1-408-555-1212'),
+        );
+    }
+
+    public function test_index_key_differs_when_the_digits_differ(): void
+    {
+        self::assertNotSame(
+            $this->subject->indexKey('+1-408-555-1212'),
+            $this->subject->indexKey('+1-408-555-1213'),
+        );
+    }
+
+    public function test_index_fragment_strips_formatting_the_same_way_a_whole_value_does(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey('+1 408'),
+            $this->subject->indexFragment('+1-408'),
+        );
+    }
 }

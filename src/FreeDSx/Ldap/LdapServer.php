@@ -23,6 +23,8 @@ use FreeDSx\Ldap\Ldif\LdifParser;
 use FreeDSx\Ldap\Ldif\Loader\LdifLoaderInterface;
 use FreeDSx\Ldap\Ldif\Output\LdifOutputInterface;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\EntryIndexReindexer;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
@@ -124,6 +126,19 @@ class LdapServer
         $output->write(
             $this->container->get(DirectoryDumper::class)->dump($options),
         );
+
+        return $this;
+    }
+
+    /**
+     * Rebuilds the configured backend's secondary indexes from the entries themselves.
+     *
+     * Needed after changing substring indexing or an attribute's matching rules, since both decide how a value is indexed.
+     */
+    public function reindex(): self
+    {
+        (new EntryIndexReindexer($this->container->get(EntryStorageInterface::class)))
+            ->reindex();
 
         return $this;
     }

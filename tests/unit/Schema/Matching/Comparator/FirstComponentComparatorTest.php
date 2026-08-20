@@ -153,4 +153,17 @@ final class FirstComponentComparatorTest extends TestCase
 
         self::assertFalse($result);
     }
+
+    public function test_index_key_is_shared_by_a_definition_and_its_bare_first_component(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey(self::OBJECT_CLASS_DEFINITION),
+            $this->subject->indexKey('2.5.6.6'),
+        );
+    }
+
+    public function test_index_key_is_null_when_the_component_comparator_is_not_indexable(): void
+    {
+        self::assertNull($this->integerSubject->indexKey('( 42 NAME )'));
+    }
 }

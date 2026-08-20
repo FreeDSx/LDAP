@@ -86,4 +86,28 @@ final class OctetStringComparatorTest extends TestCase
 
         self::assertTrue($result);
     }
+
+    public function test_index_key_is_the_value_untouched(): void
+    {
+        self::assertSame(
+            ' Foo ',
+            $this->subject->indexKey(' Foo '),
+        );
+    }
+
+    public function test_index_key_keeps_case_significant(): void
+    {
+        self::assertNotSame(
+            $this->subject->indexKey('Foo'),
+            $this->subject->indexKey('foo'),
+        );
+    }
+
+    public function test_index_fragment_is_the_fragment_untouched(): void
+    {
+        self::assertSame(
+            ' Bar',
+            $this->subject->indexFragment(' Bar'),
+        );
+    }
 }

@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoEntryDialectInterface
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 
 /**
  * Keeps an entry's secondary indexes, the attribute-value sidecar and any substring index, in step with its row.
@@ -29,6 +30,7 @@ final readonly class EntryIndexWriter
     public function __construct(
         private PdoEntryDialectInterface $dialect,
         private PdoStatementPool $statements,
+        private AttributeIndexForms $indexForms,
         private ?SubstringIndexInterface $substringIndex = null,
     ) {}
 
@@ -211,7 +213,7 @@ final readonly class EntryIndexWriter
                 $rows[] = [
                     $lcDn,
                     $attrNameLower,
-                    $this->valueLower($value),
+                    $this->valueLower($attrNameLower, $value),
                     $value,
                 ];
             }
@@ -220,8 +222,17 @@ final readonly class EntryIndexWriter
         return $rows;
     }
 
-    private function valueLower(string $value): string
-    {
-        return SqlFilterUtility::normalize($value);
+    /**
+     * A value its rule cannot key still gets a row, so presence, sorting and scope checks keep seeing it.
+     */
+    private function valueLower(
+        string $attribute,
+        string $value,
+    ): string {
+        $key = $this->indexForms->key($attribute, $value);
+
+        return $key === null
+            ? SqlFilterUtility::normalize($value)
+            : SqlFilterUtility::truncate($key);
     }
 }

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
+use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\StringPrep;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
@@ -20,7 +21,7 @@ use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 /**
  * Case-sensitive comparator (caseExactMatch / caseExactSubstringsMatch / caseExactOrderingMatch) using RFC 4518 prep without case folding.
  */
-final readonly class CaseExactComparator implements MatchingRuleComparatorInterface
+final readonly class CaseExactComparator implements MatchingRuleComparatorInterface, IndexableComparatorInterface
 {
     private PreparedStringComparator $inner;
 
@@ -51,5 +52,15 @@ final readonly class CaseExactComparator implements MatchingRuleComparatorInterf
             $value,
             $assertion,
         );
+    }
+
+    public function indexKey(string $value): string
+    {
+        return $this->inner->indexKey($value);
+    }
+
+    public function indexFragment(string $fragment): string
+    {
+        return $this->inner->indexFragment($fragment);
     }
 }

@@ -102,7 +102,7 @@ trait QueryTestsTrait
             0,
         ];
         yield 'negating an absent but defined attribute matches everything' => [
-            Filters::not(Filters::present('telephoneNumber')),
+            Filters::not(Filters::present('title')),
             8,
         ];
         yield 'negating a value assertion on an unrecognized type matches nothing' => [
@@ -518,6 +518,75 @@ trait QueryTestsTrait
                 'BOGUS',
             )),
             0,
+        ];
+
+        // The seed spells each of these two ways, so a store keying values by anything but the attribute's own
+        // rule answers with only the spelling it was handed.
+        yield 'distinguishedNameMatch ignores RDN spacing and case' => [
+            Filters::equal(
+                'seeAlso',
+                'cn=admin,dc=foo,dc=bar',
+            ),
+            2,
+        ];
+        yield 'distinguishedNameMatch matches a decorated assertion too' => [
+            Filters::equal(
+                'seeAlso',
+                'CN=Admin,  DC=Foo,  DC=Bar',
+            ),
+            2,
+        ];
+        yield 'uniqueMemberMatch ignores RDN spacing and case' => [
+            Filters::equal(
+                'uniqueMember',
+                'cn=admin,dc=foo,dc=bar',
+            ),
+            2,
+        ];
+        yield 'telephoneNumberMatch ignores hyphens and spaces' => [
+            Filters::equal(
+                'telephoneNumber',
+                '+14085551212',
+            ),
+            2,
+        ];
+        yield 'telephoneNumberMatch approximates on the same profile' => [
+            Filters::approximate(
+                'telephoneNumber',
+                '+14085551212',
+            ),
+            2,
+        ];
+        yield 'numericStringMatch ignores spaces' => [
+            Filters::equal(
+                'x121Address',
+                '11112222',
+            ),
+            2,
+        ];
+        yield 'numericStringMatch matches a spaced assertion too' => [
+            Filters::equal(
+                'x121Address',
+                '1111 2222',
+            ),
+            2,
+        ];
+        // RFC 4519 2.35 wires telephoneNumber to telephoneNumberSubstringsMatch, which drops the punctuation.
+        yield 'a telephone substring ignores the punctuation around it' => [
+            Filters::substring(
+                'telephoneNumber',
+                null,
+                '4085551212',
+            ),
+            2,
+        ];
+        yield 'a telephone prefix ignores the punctuation around it' => [
+            Filters::substring(
+                'telephoneNumber',
+                '+1408',
+                null,
+            ),
+            2,
         ];
     }
 

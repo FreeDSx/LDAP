@@ -93,4 +93,28 @@ final class NumericStringComparatorTest extends TestCase
 
         self::assertTrue($result);
     }
+
+    public function test_index_key_is_shared_by_values_the_rule_calls_equal(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey('1111 2222'),
+            $this->subject->indexKey('11112222'),
+        );
+    }
+
+    public function test_index_key_differs_when_the_digits_differ(): void
+    {
+        self::assertNotSame(
+            $this->subject->indexKey('1111 2222'),
+            $this->subject->indexKey('1111 2223'),
+        );
+    }
+
+    public function test_index_fragment_strips_spaces_the_same_way_a_whole_value_does(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey('1111'),
+            $this->subject->indexFragment('11 11'),
+        );
+    }
 }
