@@ -17,12 +17,15 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Operation\LdapResult;
+use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchangeInput;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchangeResult;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapper\SaslMessageWrapper;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslBindPolicyEnforcer;
@@ -239,7 +242,13 @@ class SaslBind implements BindInterface
         $mustChangePassword = $this->policyEnforcer?->mustChangePassword() ?? false;
 
         // The success response must be sent before activating the security layer.
-        $this->queue->sendMessage($this->responseFactory->getStandardResponse($message));
+        $this->queue->sendMessage(new LdapMessageResponse(
+            $message->getMessageId(),
+            new BindResponse(
+                new LdapResult(ResultCode::SUCCESS),
+                $result->getServerFinal(),
+            ),
+        ));
 
         if ($context->hasSecurityLayer()) {
             $mech = $this->sasl->get($mechName);

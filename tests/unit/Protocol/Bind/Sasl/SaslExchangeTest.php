@@ -14,7 +14,8 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\Bind\Sasl;
 
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\SaslNegotiationAbortedException;
+use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
@@ -127,38 +128,38 @@ final class SaslExchangeTest extends TestCase
         );
     }
 
-    public function test_it_breaks_on_context_already_complete_at_top_of_loop(): void
+    /**
+     * RFC 4513 5.2.1.2: server-final data is carried by the success rather than prompting another round.
+     */
+    public function test_it_completes_on_a_server_final_rather_than_awaiting_an_ack(): void
     {
-        // DIGEST-MD5 pattern: server sends a server-final (isComplete=true, response!=null),
-        // client sends an empty ack, and on the next loop iteration the context is already
-        // complete so we break before calling challenge() again.
         $this->mockChallenge
             ->expects(self::exactly(2))
             ->method('challenge')
             ->willReturnOnConsecutiveCalls(
                 $this->makeContext(isComplete: false, response: 'server-challenge'),
-                $this->makeContext(isComplete: true, response: 'rspauth=xyz'), // server-final
+                $this->makeContext(isComplete: true, response: 'rspauth=xyz'),
             );
 
-        // Two sendMessage calls: one challenge prompt + one server-final.
+        // Only the challenge prompt goes out; the server-final rides on the success the caller sends.
         $this->mockQueue
-            ->expects(self::exactly(2))
+            ->expects(self::once())
             ->method('sendMessage');
 
         $this->mockQueue
-            ->expects(self::exactly(2))
+            ->expects(self::once())
             ->method('getMessage')
-            ->willReturnOnConsecutiveCalls(
-                new LdapMessageRequest(2, new SaslBindRequest(self::MECH, 'client-response')),
-                new LdapMessageRequest(3, new SaslBindRequest(self::MECH)), // empty ack
-            );
+            ->willReturn(new LdapMessageRequest(2, new SaslBindRequest(self::MECH, 'client-response')));
 
         $result = $this->subject->run($this->makeInput());
 
         self::assertTrue($result->getContext()->isAuthenticated());
-        // The last message is the empty ack (message ID 3).
         self::assertSame(
-            3,
+            'rspauth=xyz',
+            $result->getServerFinal(),
+        );
+        self::assertSame(
+            2,
             $result->getLastMessage()->getMessageId(),
         );
     }
@@ -207,7 +208,45 @@ final class SaslExchangeTest extends TestCase
         );
     }
 
-    public function test_it_throws_protocol_error_when_non_sasl_request_received_mid_exchange(): void
+    /**
+     * RFC 4511 4.2.1 names an AuthenticationChoice other than sasl as a way to abandon the negotiation.
+     */
+    public function test_a_simple_bind_mid_exchange_aborts_the_negotiation(): void
+    {
+        $simpleBind = new LdapMessageRequest(
+            2,
+            new SimpleBindRequest('cn=user', 'pass'),
+        );
+
+        $this->mockChallenge
+            ->method('challenge')
+            ->willReturn($this->makeContext(isComplete: false, response: 'server-challenge'));
+
+        // Only the challenge prompt; the aborting bind is answered where it is dispatched, not refused here.
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage');
+
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('getMessage')
+            ->willReturn($simpleBind);
+
+        try {
+            $this->subject->run($this->makeInput());
+            self::fail('The negotiation was not aborted.');
+        } catch (SaslNegotiationAbortedException $e) {
+            self::assertSame(
+                $simpleBind,
+                $e->request,
+            );
+        }
+    }
+
+    /**
+     * RFC 4511 4.2.1 makes an empty mechanism the abort the server answers itself.
+     */
+    public function test_an_empty_mechanism_mid_exchange_is_refused_as_an_unsupported_auth_method(): void
     {
         $this->mockChallenge
             ->method('challenge')
@@ -215,17 +254,51 @@ final class SaslExchangeTest extends TestCase
 
         $this->mockQueue
             ->expects(self::exactly(2))
-            ->method('sendMessage'); // SASL_BIND_IN_PROGRESS + error response
+            ->method('sendMessage'); // SASL_BIND_IN_PROGRESS + the refusal
 
         $this->mockQueue
             ->expects(self::once())
             ->method('getMessage')
-            ->willReturn(new LdapMessageRequest(2, new SimpleBindRequest('cn=user', 'pass')));
+            ->willReturn(new LdapMessageRequest(2, new SaslBindRequest('')));
 
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::PROTOCOL_ERROR);
+        self::expectException(ResponseAlreadySentException::class);
+        self::expectExceptionCode(ResultCode::AUTH_METHOD_UNSUPPORTED);
 
         $this->subject->run($this->makeInput());
+    }
+
+    /**
+     * A different mechanism replaces the negotiation rather than continuing it.
+     */
+    public function test_a_different_mechanism_mid_exchange_aborts_the_negotiation(): void
+    {
+        $other = new LdapMessageRequest(
+            2,
+            new SaslBindRequest('CRAM-MD5'),
+        );
+
+        $this->mockChallenge
+            ->method('challenge')
+            ->willReturn($this->makeContext(isComplete: false, response: 'server-challenge'));
+
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('sendMessage');
+
+        $this->mockQueue
+            ->expects(self::once())
+            ->method('getMessage')
+            ->willReturn($other);
+
+        try {
+            $this->subject->run($this->makeInput());
+            self::fail('The negotiation was not aborted.');
+        } catch (SaslNegotiationAbortedException $e) {
+            self::assertSame(
+                $other,
+                $e->request,
+            );
+        }
     }
 
     public function test_it_rejects_a_continuation_carrying_a_zero_message_id(): void

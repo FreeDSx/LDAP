@@ -18,7 +18,10 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
+use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
+use FreeDSx\Ldap\Exception\SaslNegotiationAbortedException;
 use FreeDSx\Ldap\Operation\LdapResult;
+use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -32,6 +35,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
+use FreeDSx\Sasl\Exception\SaslException;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\SaslContext;
 use Throwable;
@@ -63,20 +67,33 @@ final class SaslExchange
         $message = $input->getInitialMessage();
 
         /** @var Closure(?string): SaslContext $challengeProcessor */
-        $challengeProcessor = fn(?string $challengeReceived): SaslContext => $input->getChallenge()->challenge(
-            $challengeReceived,
-            $optionsBuilder->buildOptions($challengeReceived, $mechName),
-        );
+        $challengeProcessor = function (?string $challengeReceived) use ($input, $optionsBuilder, $mechName): SaslContext {
+            try {
+                return $input->getChallenge()->challenge(
+                    $challengeReceived,
+                    $optionsBuilder->buildOptions($challengeReceived, $mechName),
+                );
+            } catch (SaslException $e) {
+                // Re-thrown so it carries a bind result code.
+                throw new OperationException(
+                    'Invalid credentials.',
+                    ResultCode::INVALID_CREDENTIALS,
+                    $e,
+                );
+            }
+        };
 
         try {
-            [$context, $usernameCredentials] = $this->runExchangeLoop(
+            $completed = $this->runExchangeLoop(
                 $challengeProcessor,
                 $input->getInitialCredentials(),
                 $message,
+                $mechName,
             );
+            $context = $completed->context;
 
             $username = $optionsBuilder->getUsername() ?? $this->extractUsername(
-                $usernameCredentials,
+                $completed->usernameCredentials,
                 $mechName,
             );
             $resolvedDn = $optionsBuilder->getResolvedDn();
@@ -103,6 +120,13 @@ final class SaslExchange
                     $e->getCode(),
                     $e->getMessage(),
                 ));
+
+                // Signals the dispatcher that this message is answered, so it does not add one for the initial ID.
+                throw new ResponseAlreadySentException(
+                    $e->getMessage(),
+                    $e->getCode(),
+                    $e,
+                );
             }
 
             throw $e;
@@ -114,6 +138,7 @@ final class SaslExchange
             $username,
             $resolvedDn,
             $authorizingDn,
+            $completed->serverFinal,
         );
     }
 
@@ -201,39 +226,35 @@ final class SaslExchange
      * $message is passed by reference so the caller's catch block always holds the latest message ID.
      *
      * @param Closure(?string): SaslContext $challengeProcessor
-     * @return array{SaslContext, ?string} [context, usernameCredentials]
      * @throws OperationException
      */
     private function runExchangeLoop(
         Closure $challengeProcessor,
         ?string $received,
         LdapMessageRequest &$message,
-    ): array {
-        $context = null;
+        MechanismName $mechName,
+    ): CompletedExchange {
         $prevContextResponse = null;
         // PLAIN: credentials are in $received from the start; others: first non-null continuation.
         $usernameCredentials = $received;
 
         while (true) {
-            // DIGEST-MD5 re-entry: context is already complete from the previous iteration
-            // (server-final sent, client ack received) — break to preserve the authenticated context.
-            if ($context !== null && $context->isComplete()) {
-                break;
-            }
-
             $advancement = $this->advanceChallenge(
                 $challengeProcessor,
                 $received,
                 $prevContextResponse,
             );
-            $context = $advancement->context;
-            $prevContextResponse = $context->getResponse();
+            $prevContextResponse = $advancement->context->getResponse();
             if ($advancement->complete) {
-                break;
+                return new CompletedExchange(
+                    $advancement->context,
+                    $usernameCredentials,
+                    $advancement->serverFinal,
+                );
             }
 
-            // Send the server's message to the client: a challenge, an empty credential prompt
-            // (e.g. PLAIN when credentials are absent from the initial bind), or a server-final.
+            // Send the server's message to the client: a challenge, or an empty credential prompt
+            // (e.g. PLAIN when credentials are absent from the initial bind).
             $this->sendBindInProgress(
                 $message,
                 $prevContextResponse,
@@ -241,17 +262,12 @@ final class SaslExchange
 
             // Update $message so the correct ID is available if an error occurs in a later step.
             $message = $this->queue->getMessage();
-            $received = $this->requireSaslContinuation($message)->getCredentials();
+            $received = $this->requireSaslContinuation($message, $mechName)->getCredentials();
 
             if ($usernameCredentials === null && $received !== null) {
                 $usernameCredentials = $received;
             }
         }
-
-        return [
-            $context,
-            $usernameCredentials,
-        ];
     }
 
     /**
@@ -283,6 +299,16 @@ final class SaslExchange
             return new ChallengeAdvancement($context, complete: true);
         }
 
+        // RFC 4513 5.2.1.2 lets server-final data ride out with the success notification, which is what a
+        // client treating that data as terminal expects rather than a further round.
+        if ($context->isComplete()) {
+            return new ChallengeAdvancement(
+                $context,
+                complete: true,
+                serverFinal: $contextResponse,
+            );
+        }
+
         return new ChallengeAdvancement($context, complete: false);
     }
 
@@ -301,13 +327,16 @@ final class SaslExchange
     }
 
     /**
-     * Validates that the message received mid-exchange is a SASL bind continuation.
+     * The message received mid-exchange, as a continuation of the mechanism currently running.
      *
-     * @throws OperationException if the client sends a non-SASL request.
+     * @throws OperationException when an empty mechanism aborts, or the message is not a bind at all.
+     * @throws SaslNegotiationAbortedException when another bind replaces the one in progress.
      * @throws RequestValidationException if the continuation carries an unusable message ID.
      */
-    private function requireSaslContinuation(LdapMessageRequest $message): SaslBindRequest
-    {
+    private function requireSaslContinuation(
+        LdapMessageRequest $message,
+        MechanismName $mechName,
+    ): SaslBindRequest {
         // Continuations skip the validation middleware, and the challenge echoes back whatever ID arrives.
         if ($message->getMessageId() === 0) {
             throw new RequestValidationException('The message ID 0 cannot be used in a client request.');
@@ -315,8 +344,21 @@ final class SaslExchange
 
         $request = $message->getRequest();
 
-        if ($request instanceof SaslBindRequest) {
+        // RFC 4511 4.2.1 gives a client three ways to abandon a negotiation, and an empty mechanism is the
+        // one the server answers itself rather than treating as a replacement bind.
+        if ($request instanceof SaslBindRequest && $request->getMechanism() === '') {
+            throw new OperationException(
+                'The requested authentication type is not supported.',
+                ResultCode::AUTH_METHOD_UNSUPPORTED,
+            );
+        }
+
+        if ($request instanceof SaslBindRequest && $request->getMechanism() === $mechName->value) {
             return $request;
+        }
+
+        if ($request instanceof BindRequest) {
+            throw new SaslNegotiationAbortedException($message);
         }
 
         throw new OperationException(

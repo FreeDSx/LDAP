@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\Bind;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\SaslNegotiationAbortedException;
 use FreeDSx\Ldap\Exception\ResponseAlreadySentException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
@@ -118,7 +119,7 @@ final class SaslBindTest extends TestCase
 
     public function test_it_can_authenticate_with_plain(): void
     {
-        // PLAIN credential format: "authzid\x00authcid\x00passwd"; the client sends authzid == authcid (bind as self).
+        // PLAIN credential format: "authzid\x00authcid\x00passwd", with an explicit authzid naming the same identity.
         $credentials = "cn=user,dc=foo,dc=bar\x00cn=user,dc=foo,dc=bar\x0012345";
         $identity = new SaslIdentity('12345', new Dn('cn=user,dc=foo,dc=bar'));
 
@@ -328,7 +329,10 @@ final class SaslBindTest extends TestCase
         ));
     }
 
-    public function test_it_throws_protocol_error_when_non_sasl_request_received_during_exchange(): void
+    /**
+     * RFC 4511 4.2.1 names an AuthenticationChoice other than sasl as a way to abandon the negotiation.
+     */
+    public function test_a_simple_bind_during_the_exchange_aborts_the_negotiation(): void
     {
         $subject = new SaslBind(
             queue: $this->mockQueue,
@@ -341,12 +345,11 @@ final class SaslBindTest extends TestCase
             mechanisms: [ServerOptions::SASL_CRAM_MD5],
         );
 
-        // First sendMessage is the SASL_BIND_IN_PROGRESS challenge; second is the error response.
+        // Only the challenge; the aborting bind is answered where it is dispatched, not refused here.
         $this->mockQueue
-            ->expects(self::exactly(2))
+            ->expects(self::once())
             ->method('sendMessage');
 
-        // Client sends the wrong request type during the exchange
         $this->mockQueue
             ->expects(self::once())
             ->method('getMessage')
@@ -355,8 +358,7 @@ final class SaslBindTest extends TestCase
                 new SimpleBindRequest('foo', 'bar'),
             ));
 
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::PROTOCOL_ERROR);
+        self::expectException(SaslNegotiationAbortedException::class);
 
         $subject->bind(new LdapMessageRequest(
             1,

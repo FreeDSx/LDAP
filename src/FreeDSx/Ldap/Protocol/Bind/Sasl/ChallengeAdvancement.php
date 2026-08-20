@@ -22,8 +22,12 @@ use FreeDSx\Sasl\SaslContext;
  */
 final class ChallengeAdvancement
 {
+    /**
+     * @param ?string $serverFinal Data produced on a completing step, which the success response carries.
+     */
     public function __construct(
         public readonly SaslContext $context,
         public readonly bool $complete,
+        public readonly ?string $serverFinal = null,
     ) {}
 }
