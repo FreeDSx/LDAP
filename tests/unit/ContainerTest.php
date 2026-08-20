@@ -33,6 +33,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
+use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
@@ -119,11 +121,15 @@ class ContainerTest extends TestCase
         );
     }
 
-    public function test_the_storage_is_a_shared_singleton(): void
+    /**
+     * @param class-string $class
+     */
+    #[DataProvider('sharedSingletonDataProvider')]
+    public function test_it_shares_one_instance(string $class): void
     {
         self::assertSame(
-            $this->subject->get(EntryStorageInterface::class),
-            $this->subject->get(EntryStorageInterface::class),
+            $this->subject->get($class),
+            $this->subject->get($class),
         );
     }
 
@@ -172,6 +178,20 @@ class ContainerTest extends TestCase
     }
 
     /**
+     * Services a second consumer must not get its own copy of.
+     *
+     * @return array<array{class-string}>
+     */
+    public static function sharedSingletonDataProvider(): array
+    {
+        return [
+            [EntryStorageInterface::class],
+            [DerivedResolver::class],
+            [SchemaValidator::class],
+        ];
+    }
+
+    /**
      * @return array<array{class-string}>
      */
     public static function serverDependenciesDataProvider(): array
@@ -189,6 +209,8 @@ class ContainerTest extends TestCase
             [PasswordPolicyBindStrategyInterface::class],
             [PasswordPolicyResolver::class],
             [LdapImporter::class],
+            [DerivedResolver::class],
+            [SchemaValidator::class],
             [OperationalAttributeGenerator::class],
             [SearchLimitResolver::class],
             [AssertionEvaluator::class],

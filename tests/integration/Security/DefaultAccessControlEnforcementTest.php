@@ -31,14 +31,14 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\ManagerToken;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Backend\Storage\BackendFactoryTrait;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 /**
  * Composes the real manager authenticator with the bypass-wrapped secure-default ACL, as the server wires them.
  */
 final class DefaultAccessControlEnforcementTest extends TestCase
 {
-    use BackendFactoryTrait;
+    use ServerContainerTrait;
 
     private const MANAGER_DN = 'cn=manager';
 
@@ -56,7 +56,7 @@ final class DefaultAccessControlEnforcementTest extends TestCase
 
     protected function setUp(): void
     {
-        $backend = self::makeWritableBackend(new InMemoryStorage([
+        $backend = $this->backendFor(new InMemoryStorage([
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [

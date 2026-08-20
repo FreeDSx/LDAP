@@ -25,11 +25,11 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\GeneratedEntryResponder;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerRootDseHandler;
-use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use Tests\Support\FreeDSx\Ldap\Backend\Storage\FilterEvaluatorFactoryTrait;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -37,7 +37,7 @@ use PHPUnit\Framework\TestCase;
 
 final class ServerRootDseHandlerTest extends TestCase
 {
-    use FilterEvaluatorFactoryTrait;
+    use ServerContainerTrait;
 
     private ServerRootDseHandler $subject;
 
@@ -143,7 +143,7 @@ final class ServerRootDseHandlerTest extends TestCase
         $this->subject = new ServerRootDseHandler(
             $this->options,
             $this->mockStorage,
-            $this->responder($this->options->getSchema()),
+            $this->responder(),
             true,
         );
 
@@ -387,16 +387,19 @@ final class ServerRootDseHandlerTest extends TestCase
         $this->subject = new ServerRootDseHandler(
             $this->options,
             $this->mockStorage,
-            $this->responder($this->options->getSchema()),
+            $this->responder(),
         );
     }
 
-    private function responder(Schema $schema): GeneratedEntryResponder
+    private function responder(): GeneratedEntryResponder
     {
         return new GeneratedEntryResponder(
             new RuleBasedAccessControl(),
-            $this->makeFilterEvaluator($schema),
-            $schema,
+            $this->fromContainer(
+                FilterEvaluatorInterface::class,
+                options: $this->options,
+            ),
+            $this->options->getSchema(),
         );
     }
 }

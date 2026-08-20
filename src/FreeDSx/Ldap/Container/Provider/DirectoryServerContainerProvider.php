@@ -89,6 +89,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             BindNameResolverInterface::class => $this->makeIdentityResolverChain(...),
             PasswordAuthenticatableInterface::class => $this->makePasswordAuthenticator(...),
             FilterEvaluatorInterface::class => $this->makeFilterEvaluator(...),
+            DerivedResolver::class => $this->makeDerivedResolver(...),
+            SchemaValidator::class => $this->buildSchemaValidator(...),
             EqualityComparatorResolver::class => $this->makeEqualityComparatorResolver(...),
             DirectoryDumper::class => $this->makeDirectoryDumper(...),
             OperationalAttributeGenerator::class => $this->makeOperationalAttributeGenerator(...),
@@ -157,7 +159,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     {
         return new FilterEvaluator(
             $container->get(ServerOptions::class)->getSchema(),
-            $this->makeDerivedResolver($container),
+            $container->get(DerivedResolver::class),
             $container->get(EqualityComparatorResolver::class),
             $this->makeAttributeSyntaxResolver($container),
         );
@@ -221,7 +223,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return new WritableStorageBackend(
             storage: $storage,
             searchStream: $container->get(SearchStreamBuilder::class),
-            validator: $this->buildSchemaValidator($container),
+            validator: $container->get(SchemaValidator::class),
             listOptions: $container->get(StorageListOptionsFactory::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
             entryHandler: new WriteEntryOperationHandler(
@@ -242,7 +244,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return new SearchStreamBuilder(
             $options->makeSearchLimits(),
             $container->get(FilterEvaluatorInterface::class),
-            $this->makeDerivedResolver($container),
+            $container->get(DerivedResolver::class),
         );
     }
 
@@ -254,7 +256,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return new LdapImporter(
             $container->get(EntryStorageInterface::class),
             $container->get(OperationalAttributeGenerator::class),
-            $this->buildSchemaValidator($container),
+            $container->get(SchemaValidator::class),
         );
     }
 

@@ -19,16 +19,20 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
 use PDO;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Backend\Storage\PdoStorageFactoryTrait;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class Fts5SubstringIndexTest extends TestCase
 {
-    use PdoStorageFactoryTrait;
+    use ServerContainerTrait;
 
     public function test_build_substring_predicate_declines_an_unindexed_attribute(): void
     {
@@ -95,10 +99,14 @@ final class Fts5SubstringIndexTest extends TestCase
             $pdo,
             fn(): PDO => $pdo,
         );
-        $storage = self::makePdoStorage(
-            $provider,
-            $index,
-        );
+        // Auto resolves to FTS5 on a build that has it, which the skip above has already established.
+        $storage = $this->fromContainer(
+            PdoStorageFactory::class,
+            options: TestServerOptions::forStorage(
+                PdoConfig::forSqlite(':memory:')
+                    ->setSubstringIndexMode(SubstringIndexMode::Auto),
+            ),
+        )->storageOn($provider);
 
         $storage->store(new Entry(
             new Dn('cn=blacksmith,dc=example,dc=com'),

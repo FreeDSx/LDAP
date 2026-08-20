@@ -31,9 +31,14 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
+use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
@@ -44,7 +49,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
-use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
@@ -55,19 +59,17 @@ use PDO;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Backend\Storage\BackendFactoryTrait;
-use Tests\Support\FreeDSx\Ldap\Backend\Storage\PdoStorageFactoryTrait;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
 
 final class PdoStorageTest extends TestCase
 {
-    use BackendFactoryTrait;
+    use ServerContainerTrait;
 
     use JournalingStorageContractTests;
-
-    use PdoStorageFactoryTrait;
 
     private WritableStorageBackend $subject;
 
@@ -83,8 +85,8 @@ final class PdoStorageTest extends TestCase
             new Attribute('userPassword', 'secret'),
         );
 
-        $this->storage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
-        $this->subject = self::makeWritableBackend($this->storage);
+        $this->storage = $this->pdoStorage(TestServerOptions::sqlite());
+        $this->subject = $this->backendFor($this->storage);
         $this->subject->add(
             new AddCommand(
                 new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
@@ -137,19 +139,7 @@ final class PdoStorageTest extends TestCase
             $pdo,
             new SqliteDialect(),
         );
-        $provider = new SharedPdoConnectionProvider($pdo);
-        $statements = new PdoStatementPool($provider);
-        $storage = new PdoStorage(
-            $provider,
-            new SqliteFilterTranslator(
-                self::makeAttributeContext(),
-                self::makeAttributeIndexForms(),
-            ),
-            new SqliteDialect(),
-            self::makeAttributeContext(),
-            self::makeEntryIndexWriter(new SqliteDialect(), $statements),
-            $statements,
-        );
+        $storage = $this->storageOver($pdo);
         foreach (range(1, 3) as $i) {
             $storage->store(new Entry(
                 new Dn("cn=e{$i},dc=example,dc=com"),
@@ -354,14 +344,12 @@ final class PdoStorageTest extends TestCase
      */
     public function test_a_generalized_time_value_matches_an_assertion_naming_the_same_instant(): void
     {
-        $schema = SchemaResource::Core->load()
-            ->merge(SchemaResource::PasswordPolicy->load());
-        $factory = self::makePdoStorageFactory(
-            PdoConfig::forSqlite(':memory:'),
-            attributeContext: self::makeAttributeContext($schema),
-            indexForms: self::makeAttributeIndexForms($schema),
-        );
-        $storage = $factory->storageOn($factory->sharedProvider());
+        // The policy schema is added for pwdChangedTime, whose syntax decides how the value is indexed.
+        $options = TestServerOptions::sqlite();
+        $options->getSchemaConfig()
+            ->addSource(SchemaResource::PasswordPolicy);
+
+        $storage = $this->pdoStorage($options);
 
         $storage->store(new Entry(
             new Dn('cn=stamped,dc=example,dc=com'),
@@ -462,10 +450,13 @@ final class PdoStorageTest extends TestCase
             $pdo,
             fn(): PDO => $pdo,
         );
-        $storage = self::makePdoStorage(
-            $provider,
-            $index,
-        );
+        $storage = $this->fromContainer(
+            PdoStorageFactory::class,
+            options: TestServerOptions::forStorage(
+                PdoConfig::forSqlite(':memory:')
+                    ->setSubstringIndexMode(SubstringIndexMode::Trigram),
+            ),
+        )->storageOn($provider);
         $storage->store(new Entry(
             new Dn('cn=Smith,dc=example,dc=com'),
             new Attribute('cn', 'Smith'),
@@ -555,10 +546,10 @@ final class PdoStorageTest extends TestCase
         $dsn = 'file:freedsx_init_off?mode=memory&cache=shared';
 
         // Hold the storage's connection open so the shared in-memory database survives the probe read.
-        $storage = self::makeSharedPdoStorage(
+        $storage = $this->pdoStorage(TestServerOptions::forStorage(
             PdoConfig::forSqlite($dsn)
                 ->setInitializeSchema(false),
-        );
+        ));
 
         $probe = new PDO(
             'sqlite:' . $dsn,
@@ -607,8 +598,8 @@ final class PdoStorageTest extends TestCase
 
     public function test_get_on_empty_database_returns_null(): void
     {
-        $storage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
-        $backend = self::makeWritableBackend($storage);
+        $storage = $this->pdoStorage(TestServerOptions::sqlite());
+        $backend = $this->backendFor($storage);
 
         self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
@@ -929,10 +920,11 @@ final class PdoStorageTest extends TestCase
 
     public function test_search_inexact_filter_trips_lookthrough_limit(): void
     {
-        $storage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
-        $backend = self::makeWritableBackend(
+        $storage = $this->pdoStorage(TestServerOptions::sqlite());
+        $backend = $this->backendFor(
             $storage,
-            limits: new SearchLimits(maxSearchLookthrough: 2),
+            TestServerOptions::unvalidatedCore()
+                ->setMaxSearchLookthrough(2),
         );
         $backend->add(
             new AddCommand(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
@@ -959,10 +951,11 @@ final class PdoStorageTest extends TestCase
 
     public function test_search_exact_filter_is_not_subject_to_lookthrough(): void
     {
-        $storage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
-        $backend = self::makeWritableBackend(
+        $storage = $this->pdoStorage(TestServerOptions::sqlite());
+        $backend = $this->backendFor(
             $storage,
-            limits: new SearchLimits(maxSearchLookthrough: 1),
+            TestServerOptions::unvalidatedCore()
+                ->setMaxSearchLookthrough(1),
         );
         $backend->add(
             new AddCommand(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
@@ -990,10 +983,11 @@ final class PdoStorageTest extends TestCase
 
     public function test_search_exact_filter_bounds_transfer_at_lookthrough(): void
     {
-        $storage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
-        $backend = self::makeWritableBackend(
+        $storage = $this->pdoStorage(TestServerOptions::sqlite());
+        $backend = $this->backendFor(
             $storage,
-            limits: new SearchLimits(maxSearchLookthrough: 2),
+            TestServerOptions::unvalidatedCore()
+                ->setMaxSearchLookthrough(2),
         );
         $backend->add(
             new AddCommand(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
@@ -1224,7 +1218,7 @@ final class PdoStorageTest extends TestCase
             . "('cn=corrupt,dc=example,dc=com', 'cn=Corrupt,dc=example,dc=com', 'dc=example,dc=com', 'NOT_VALID_BLOB')",
         );
 
-        $storage = $this->storageOver($pdo, $dialect);
+        $storage = $this->storageOver($pdo);
 
         $this->expectException(StorageIoException::class);
 
@@ -1246,7 +1240,7 @@ final class PdoStorageTest extends TestCase
             . "('cn=corrupt,dc=example,dc=com', 'cn=Corrupt,dc=example,dc=com', 'dc=example,dc=com', 'NOT_VALID_BLOB')",
         );
 
-        $storage = $this->storageOver($pdo, $dialect);
+        $storage = $this->storageOver($pdo);
 
         $this->expectException(StorageIoException::class);
 
@@ -1278,7 +1272,7 @@ final class PdoStorageTest extends TestCase
     public function test_add_translates_dn_too_long_to_admin_limit_exceeded(): void
     {
         $storage = $this->createPdoStorageWithMaxDnLength(5);
-        $backend = self::makeWritableBackend($storage);
+        $backend = $this->backendFor($storage);
 
         $entry = new Entry(
             new Dn('cn=TooLong,dc=example'),
@@ -1305,8 +1299,8 @@ final class PdoStorageTest extends TestCase
 
     public function test_subtree_does_not_match_escaped_comma_suffix_collision(): void
     {
-        $storage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
-        $backend = self::makeWritableBackend($storage);
+        $storage = $this->pdoStorage(TestServerOptions::sqlite());
+        $backend = $this->backendFor($storage);
 
         $base = new Entry(
             new Dn('dc=example,dc=com'),
@@ -1340,8 +1334,8 @@ final class PdoStorageTest extends TestCase
 
     public function test_subtree_includes_entries_with_escaped_comma_under_correct_parent(): void
     {
-        $storage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
-        $backend = self::makeWritableBackend($storage);
+        $storage = $this->pdoStorage(TestServerOptions::sqlite());
+        $backend = $this->backendFor($storage);
 
         $base = new Entry(
             new Dn('dc=example,dc=com'),
@@ -1432,7 +1426,7 @@ final class PdoStorageTest extends TestCase
 
     public function test_naming_contexts_is_empty_when_storage_is_empty(): void
     {
-        $emptyStorage = self::makeSharedPdoStorage(PdoConfig::forSqlite(':memory:'));
+        $emptyStorage = $this->pdoStorage(TestServerOptions::sqlite());
 
         self::assertSame(
             [],
@@ -1442,10 +1436,11 @@ final class PdoStorageTest extends TestCase
 
     public function test_a_journal_append_rolls_back_with_the_enclosing_write_transaction(): void
     {
-        $storage = self::makeSharedPdoStorage(
-            PdoConfig::forSqlite(':memory:'),
-            new ChangeJournalConfig(),
+        $storage = $this->pdoStorage(
+            TestServerOptions::sqlite()
+                ->setChangeJournalConfig(new ChangeJournalConfig()),
         );
+
         $journal = $storage->changeJournal() ?? self::fail('Expected the storage to have a journal.');
 
         try {
@@ -1474,44 +1469,63 @@ final class PdoStorageTest extends TestCase
 
     protected function makeJournalingStorage(?ChangeJournalInterface $journal = null): ChangeJournalingInterface
     {
-        $config = PdoConfig::forSqlite(':memory:');
-        $dialect = self::makePdoDialect($config->getDriver());
-        $provider = self::makePdoStorageFactory($config)->sharedProvider();
+        // Built by hand only because the contract injects the journal, which the factory derives from config instead.
+        $factory = $this->fromContainer(
+            PdoStorageFactory::class,
+            options: TestServerOptions::sqlite(),
+        );
+        $provider = $factory->sharedProvider();
         $statements = new PdoStatementPool($provider);
+        $dialect = $this->fromContainer(
+            PdoDialectInterface::class,
+            options: TestServerOptions::sqlite(),
+        );
 
         return new PdoStorage(
             $provider,
             new SqliteFilterTranslator(
-                self::makeAttributeContext(),
-                self::makeAttributeIndexForms(),
+                $this->fromContainer(AttributeContextInterface::class),
+                $this->fromContainer(AttributeIndexForms::class),
             ),
             $dialect,
-            self::makeAttributeContext(),
-            self::makeEntryIndexWriter($dialect, $statements),
+            $this->fromContainer(AttributeContextInterface::class),
+            new EntryIndexWriter(
+                $dialect,
+                $statements,
+                $this->fromContainer(AttributeIndexForms::class),
+            ),
             $statements,
             journal: $journal,
         );
     }
 
     /**
-     * Storage over a connection, for tests asserting transaction or IO behavior rather than filter translation.
+     * The container vends the storage interface, while this file asserts on the PDO adapter specifically.
+     */
+    private function pdoStorage(ServerOptions $options): PdoStorage
+    {
+        $storage = $this->storageFor($options);
+
+        // Narrowed without asserting, since setUp runs this and some tests expect to perform no assertions.
+        return $storage instanceof PdoStorage
+            ? $storage
+            : self::fail('Expected a PDO configuration to build PDO storage.');
+    }
+
+    /**
+     * Storage the providers build over a connection the test owns, so it can seed or observe what the driver sees.
+     *
+     * @param ?PdoDialectInterface $dialect Pass one only to stub what the driver reports, such as its DN limit.
      */
     private function storageOver(
         PDO $pdo,
         ?PdoDialectInterface $dialect = null,
     ): PdoStorage {
-        $dialect ??= new SqliteDialect();
-        $provider = new SharedPdoConnectionProvider($pdo);
-        $statements = new PdoStatementPool($provider);
-
-        return new PdoStorage(
-            $provider,
-            $this->createMock(FilterTranslatorInterface::class),
-            $dialect,
-            self::makeAttributeContext(),
-            self::makeEntryIndexWriter($dialect, $statements),
-            $statements,
-        );
+        return $this->fromContainer(
+            PdoStorageFactory::class,
+            $dialect === null ? [] : [PdoDialectInterface::class => $dialect],
+            TestServerOptions::sqlite(),
+        )->storageOn(new SharedPdoConnectionProvider($pdo));
     }
 
     /**
@@ -1626,6 +1640,9 @@ final class PdoStorageTest extends TestCase
 
         PdoStorage::initialize($pdo, $dialect);
 
-        return $this->storageOver($pdo, $dialect);
+        return $this->storageOver(
+            $pdo,
+            $dialect,
+        );
     }
 }

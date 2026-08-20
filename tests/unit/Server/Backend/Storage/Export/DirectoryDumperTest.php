@@ -28,11 +28,11 @@ use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Backend\Storage\FilterEvaluatorFactoryTrait;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class DirectoryDumperTest extends TestCase
 {
-    use FilterEvaluatorFactoryTrait;
+    use ServerContainerTrait;
 
     public function test_it_yields_the_version_header_first_when_enabled(): void
     {
@@ -219,7 +219,7 @@ final class DirectoryDumperTest extends TestCase
         return new DirectoryDumper(
             $storage ?? $this->storageWithEntries(),
             [new Dn('dc=foo,dc=bar')],
-            $filterEvaluator ?? $this->makeFilterEvaluator(),
+            $filterEvaluator ?? $this->fromContainer(FilterEvaluatorInterface::class),
             $writer ?? new LdifWriter(),
         );
     }

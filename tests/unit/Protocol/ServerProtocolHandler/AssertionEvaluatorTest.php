@@ -18,7 +18,8 @@ use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use Tests\Support\FreeDSx\Ldap\Backend\Storage\FilterEvaluatorFactoryTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -26,7 +27,7 @@ use PHPUnit\Framework\TestCase;
 
 final class AssertionEvaluatorTest extends TestCase
 {
-    use FilterEvaluatorFactoryTrait;
+    use ServerContainerTrait;
 
     private LdapBackendInterface&MockObject $backend;
 
@@ -42,7 +43,7 @@ final class AssertionEvaluatorTest extends TestCase
         $this->targetDn = new Dn('cn=foo,dc=ex,dc=com');
         $this->token = BindToken::fromDn('cn=foo,dc=ex,dc=com');
         $this->subject = new AssertionEvaluator(
-            $this->makeFilterEvaluator(),
+            $this->fromContainer(FilterEvaluatorInterface::class),
             $this->backend,
             new RuleBasedAccessControl(AclRules::fromEmpty()),
         );
@@ -164,7 +165,7 @@ final class AssertionEvaluatorTest extends TestCase
     private function denyingUserPassword(): AssertionEvaluator
     {
         return new AssertionEvaluator(
-            $this->makeFilterEvaluator(),
+            $this->fromContainer(FilterEvaluatorInterface::class),
             $this->backend,
             new RuleBasedAccessControl(AclRules::fromEmpty(attributes: [
                 AttributeRule::deny(
