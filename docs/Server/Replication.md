@@ -250,7 +250,7 @@ several replicas is caught the same as one against a single server.
 
 To turn this on:
 
-- Enable a password policy on both the provider and the replica with `setPasswordPolicy(...)`.
+- Enable a password policy on both the provider and the replica with `PasswordConfig::setPolicy(...)`.
 - On the provider, grant the replica's bind identity with `withReplicaGrants(...)`. It sets up everything a replica
   identity needs, so use it in place of the sync-only grant from the Quick Start.
 - Give the replica PDO storage (SQLite or MySQL), as every replica requires.

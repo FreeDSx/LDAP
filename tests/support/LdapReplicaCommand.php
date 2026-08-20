@@ -10,6 +10,7 @@ use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
@@ -96,19 +97,21 @@ final class LdapReplicaCommand extends Command
             ->setSocketAcceptTimeout(0.1)
             ->setShutdownTimeout(0);
 
+        $policy = new PasswordPolicy(
+            lockout: new PasswordLockoutRules(
+                enabled: true,
+                maxFailure: 2,
+            ),
+        );
+
         $server = new LdapServer(
             (new ServerOptions(
                 storageConfig: $this->createReplicaStorageConfig(),
                 networkConfig: $network,
                 runnerConfig: new RunnerConfig($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl),
                 replicationConfig: ReplicationConfig::forReplica($consumerConfig),
+                passwordConfig: (new PasswordConfig())->setPolicy($policy),
             ))
-                ->setPasswordPolicy(new PasswordPolicy(
-                    lockout: new PasswordLockoutRules(
-                        enabled: true,
-                        maxFailure: 2,
-                    ),
-                ))
                 ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL)),
         );
 

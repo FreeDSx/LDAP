@@ -17,7 +17,6 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\ServerOptions;
-use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 
 /**
  * Resolves real collaborators from the production wiring, so tests do not restate what the providers already build.
@@ -39,11 +38,11 @@ trait ServerContainerTrait
     }
 
     /**
-     * The hook for a test class needing different configuration.
+     * Defaults to what a real server runs, so relaxing anything is a choice a test states rather than one it inherits.
      */
     protected function makeServerOptions(): ServerOptions
     {
-        return TestServerOptions::unvalidatedCore();
+        return new ServerOptions();
     }
 
     /**

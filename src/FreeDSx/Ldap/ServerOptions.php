@@ -19,14 +19,10 @@ use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\SchemaParseException;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
-use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Sasl\External\ExternalCredentialMapperInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
-use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
-use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\DefaultPasswordQualityChecker;
-use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\PasswordQualityCheckerInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
@@ -34,6 +30,7 @@ use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
@@ -132,14 +129,6 @@ final class ServerOptions implements ServerListenerOptionsInterface
 
     private ?AclRules $defaultAclRules = null;
 
-    private ?PasswordPolicy $passwordPolicy = null;
-
-    private ?Dn $defaultPasswordPolicyDn = null;
-
-    private PasswordHashScheme $passwordHashScheme = PasswordHashScheme::Bcrypt;
-
-    private ?PasswordQualityCheckerInterface $passwordQualityChecker = null;
-
     private ?ServerRunnerInterface $serverRunner = null;
 
     private ?ChangeJournalConfig $changeJournalConfig = null;
@@ -170,6 +159,7 @@ final class ServerOptions implements ServerListenerOptionsInterface
      * @param NetworkConfig $networkConfig Listener and TLS settings; defaults to a plaintext listener on 0.0.0.0:389.
      * @param SchemaConfig $schemaConfig Schema sources and validation; defaults to the schemas this package ships.
      * @param ReplicationConfig $replicationConfig Replication role; defaults to playing none.
+     * @param PasswordConfig $passwordConfig How passwords are governed and stored; defaults to enforcing no policy.
      */
     public function __construct(
         ?StorageConfigInterface $storageConfig = null,
@@ -177,6 +167,7 @@ final class ServerOptions implements ServerListenerOptionsInterface
         private RunnerConfig $runnerConfig = new RunnerConfig(),
         private SchemaConfig $schemaConfig = new SchemaConfig(),
         private ReplicationConfig $replicationConfig = new ReplicationConfig(),
+        private PasswordConfig $passwordConfig = new PasswordConfig(),
     ) {
         $this->storageConfig = $storageConfig ?? InMemoryStorageConfig::withEntries();
     }
@@ -366,62 +357,14 @@ final class ServerOptions implements ServerListenerOptionsInterface
             ));
     }
 
-    /**
-     * In-memory fallback policy applied to users that do not resolve a pwdPolicy entry from the DIT.
-     */
-    public function getPasswordPolicy(): ?PasswordPolicy
+    public function getPasswordConfig(): PasswordConfig
     {
-        return $this->passwordPolicy;
+        return $this->passwordConfig;
     }
 
-    public function setPasswordPolicy(?PasswordPolicy $policy): self
+    public function setPasswordConfig(PasswordConfig $passwordConfig): self
     {
-        $this->passwordPolicy = $policy;
-
-        return $this;
-    }
-
-    /**
-     * DN of the default pwdPolicy entry used when a user has no pwdPolicySubentry pointer.
-     */
-    public function getDefaultPasswordPolicyDn(): ?Dn
-    {
-        return $this->defaultPasswordPolicyDn;
-    }
-
-    public function setDefaultPasswordPolicyDn(?Dn $dn): self
-    {
-        $this->defaultPasswordPolicyDn = $dn;
-
-        return $this;
-    }
-
-    /**
-     * Output scheme used by the password hasher when writing a new password.
-     */
-    public function getPasswordHashScheme(): PasswordHashScheme
-    {
-        return $this->passwordHashScheme;
-    }
-
-    public function setPasswordHashScheme(PasswordHashScheme $scheme): self
-    {
-        $this->passwordHashScheme = $scheme;
-
-        return $this;
-    }
-
-    /**
-     * Quality check applied to new passwords before they are hashed and stored.
-     */
-    public function getPasswordQualityChecker(): PasswordQualityCheckerInterface
-    {
-        return $this->passwordQualityChecker ??= new DefaultPasswordQualityChecker();
-    }
-
-    public function setPasswordQualityChecker(PasswordQualityCheckerInterface $checker): self
-    {
-        $this->passwordQualityChecker = $checker;
+        $this->passwordConfig = $passwordConfig;
 
         return $this;
     }

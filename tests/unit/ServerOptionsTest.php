@@ -20,15 +20,12 @@ use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\Nis\AttributeTypeOid as NisAttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Schema\SchemaResource;
-use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashScheme;
+use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
-use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\DefaultPasswordQualityChecker;
-use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\PasswordQualityCheckerInterface;
-use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordQualityRules;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Sasl\External\ExternalCredentialMapperInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
@@ -594,33 +591,15 @@ final class ServerOptionsTest extends TestCase
         );
     }
 
-    public function test_no_password_policy_source_is_configured_by_default(): void
+    public function test_the_password_config_is_round_tripped(): void
     {
-        self::assertNull($this->subject->getPasswordPolicy());
-        self::assertNull($this->subject->getDefaultPasswordPolicyDn());
-    }
+        $config = new PasswordConfig();
 
-    public function test_the_in_memory_policy_is_retained(): void
-    {
-        $policy = new PasswordPolicy(quality: new PasswordQualityRules(minLength: 8));
-
-        $this->subject->setPasswordPolicy($policy);
+        $this->subject->setPasswordConfig($config);
 
         self::assertSame(
-            $policy,
-            $this->subject->getPasswordPolicy(),
-        );
-    }
-
-    public function test_the_default_policy_dn_is_retained(): void
-    {
-        $dn = new Dn('cn=default,ou=policies,dc=example,dc=com');
-
-        $this->subject->setDefaultPasswordPolicyDn($dn);
-
-        self::assertSame(
-            $dn,
-            $this->subject->getDefaultPasswordPolicyDn(),
+            $config,
+            $this->subject->getPasswordConfig(),
         );
     }
 
@@ -640,7 +619,8 @@ final class ServerOptionsTest extends TestCase
     public function test_the_schema_carries_password_policy_whenever_a_policy_is_configured(): void
     {
         $this->subject->getSchema();
-        $this->subject->setPasswordPolicy(new PasswordPolicy());
+        $this->subject->getPasswordConfig()
+            ->setPolicy(new PasswordPolicy());
 
         self::assertNotNull(
             $this->subject->getSchema()
@@ -650,7 +630,8 @@ final class ServerOptionsTest extends TestCase
 
     public function test_a_custom_source_list_still_carries_password_policy(): void
     {
-        $this->subject->setPasswordPolicy(new PasswordPolicy());
+        $this->subject->getPasswordConfig()
+            ->setPolicy(new PasswordPolicy());
         $this->subject->getSchemaConfig()
             ->setSources(SchemaResource::Core, SchemaResource::PasswordPolicy);
 
@@ -675,51 +656,6 @@ final class ServerOptionsTest extends TestCase
         self::assertNotSame(
             $first,
             $this->subject->getSchema(),
-        );
-    }
-
-    public function test_password_hash_scheme_defaults_to_bcrypt(): void
-    {
-        self::assertSame(
-            PasswordHashScheme::Bcrypt,
-            $this->subject->getPasswordHashScheme(),
-        );
-    }
-
-    public function test_setting_password_hash_scheme_is_round_tripped(): void
-    {
-        $this->subject->setPasswordHashScheme(PasswordHashScheme::Argon2);
-
-        self::assertSame(
-            PasswordHashScheme::Argon2,
-            $this->subject->getPasswordHashScheme(),
-        );
-    }
-
-    public function test_password_quality_checker_defaults_to_the_built_in_checker(): void
-    {
-        self::assertInstanceOf(
-            DefaultPasswordQualityChecker::class,
-            $this->subject->getPasswordQualityChecker(),
-        );
-    }
-
-    public function test_setting_password_quality_checker_is_round_tripped(): void
-    {
-        $custom = new class implements PasswordQualityCheckerInterface {
-            public function check(
-                string $plain,
-                PasswordQualityRules $rules,
-            ): ?int {
-                return null;
-            }
-        };
-
-        $this->subject->setPasswordQualityChecker($custom);
-
-        self::assertSame(
-            $custom,
-            $this->subject->getPasswordQualityChecker(),
         );
     }
 

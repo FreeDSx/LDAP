@@ -16,6 +16,7 @@ namespace Tests\Support\FreeDSx\Ldap\Server\Configuration;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\SchemaSourceInterface;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
+use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\Config\SchemaConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
@@ -26,6 +27,8 @@ use FreeDSx\Ldap\ServerOptions;
  */
 final class TestServerOptions
 {
+    public const TEST_HASH_COST = 4;
+
     /**
      * What a test asserting on storage or filter semantics wants, rather than on schema enforcement.
      */
@@ -73,6 +76,17 @@ final class TestServerOptions
         return new ServerOptions(
             $storageConfig,
             schemaConfig: self::unvalidatedCoreSchema(),
+        );
+    }
+
+    /**
+     * The lowest bcrypt cost, since hashing at the production factor dominates the runtime of a password test.
+     */
+    public static function cheaplyHashed(): ServerOptions
+    {
+        return new ServerOptions(
+            schemaConfig: self::unvalidatedCoreSchema(),
+            passwordConfig: (new PasswordConfig())->setHashCost(self::TEST_HASH_COST),
         );
     }
 

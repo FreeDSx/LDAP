@@ -375,13 +375,16 @@ final class LdapServerCommand extends Command
         }
 
         if ($input->getOption('allow-ppolicy-forward') === true) {
+            $policy = new PasswordPolicy(
+                lockout: new PasswordLockoutRules(
+                    enabled: true,
+                    maxFailure: 2,
+                ),
+            );
+
+            $options->getPasswordConfig()
+                ->setPolicy($policy);
             $options
-                ->setPasswordPolicy(new PasswordPolicy(
-                    lockout: new PasswordLockoutRules(
-                        enabled: true,
-                        maxFailure: 2,
-                    ),
-                ))
                 ->setAclRules(
                     $options->getAclRules()
                         ->appendExtendedOperationRules(

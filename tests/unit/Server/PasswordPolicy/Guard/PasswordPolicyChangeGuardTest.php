@@ -20,14 +20,8 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
-use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\AllowUserChangeConstraint;
-use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\HistoryConstraint;
-use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\MinAgeConstraint;
-use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\PasswordChangeConstraintChain;
-use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\QualityConstraint;
-use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\SafeModifyConstraint;
+use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordModifyAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyChangeGuard;
 use FreeDSx\Ldap\Server\PasswordPolicy\HistoryEntry;
@@ -35,18 +29,22 @@ use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
-use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\DefaultPasswordQualityChecker;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordChangeRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordQualityRules;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use PHPUnit\Framework\TestCase;
+use FreeDSx\Ldap\ServerOptions;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
 
 final class PasswordPolicyChangeGuardTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private const NOW = '2026-05-20T12:00:00Z';
 
     private const DN = 'cn=user,dc=foo,dc=bar';
@@ -187,6 +185,11 @@ final class PasswordPolicyChangeGuardTest extends TestCase
         );
     }
 
+    protected function makeServerOptions(): ServerOptions
+    {
+        return TestServerOptions::cheaplyHashed();
+    }
+
     private function assertRejectedWith(
         int $expectedError,
         int $expectedResultCode,
@@ -230,19 +233,11 @@ final class PasswordPolicyChangeGuardTest extends TestCase
 
     private function guard(?PasswordPolicy $policy): PasswordPolicyChangeGuard
     {
-        $engine = new PasswordPolicyEngine(
-            clock: $this->clock,
-            changeConstraints: new PasswordChangeConstraintChain([
-                new AllowUserChangeConstraint(),
-                new SafeModifyConstraint(),
-                new MinAgeConstraint($this->clock),
-                new QualityConstraint(new DefaultPasswordQualityChecker()),
-                new HistoryConstraint(new PasswordHashService(hashCost: 4)),
-            ]),
-        );
-
         return new PasswordPolicyChangeGuard(
-            $engine,
+            $this->fromContainer(
+                PasswordPolicyEngine::class,
+                [ClockInterface::class => $this->clock],
+            ),
             new PasswordPolicyResolver(
                 $this->createMock(LdapBackendInterface::class),
                 null,
