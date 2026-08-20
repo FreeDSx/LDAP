@@ -236,6 +236,10 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 $command->entry,
                 $context,
             );
+            $this->applySystemChanges(
+                $command->entry,
+                $command->systemChanges,
+            );
             $storage->store(
                 $command->entry,
                 rebuildIndexes: true,
@@ -672,6 +676,26 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 $violation,
                 $context->schemaViolations(),
             );
+        }
+    }
+
+    /**
+     * Applied alongside the operational attributes, so what the server stamps is never held to the user rules.
+     *
+     * @param list<Change> $changes
+     */
+    private function applySystemChanges(
+        Entry $entry,
+        array $changes,
+    ): void {
+        foreach ($changes as $change) {
+            if ($change->getType() === Change::TYPE_REPLACE) {
+                $entry->set($change->getAttribute());
+
+                continue;
+            }
+
+            $entry->reset($change->getAttribute());
         }
     }
 

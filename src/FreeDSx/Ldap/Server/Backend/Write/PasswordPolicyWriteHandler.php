@@ -24,7 +24,6 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriterInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordModifyAttempt;
-use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyChangeGuard;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 
@@ -94,13 +93,13 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
             $this->isSelf($context, $request->entry->getDn()),
         ));
 
-        // Folded in rather than written after, so the entry is never stored without the state governing it.
-        $this->applyOperationalChanges(
-            $request->entry,
-            $deltas,
-        );
+        // Carried on the command rather than written after, so the entry is never stored without the state governing
+        // it, and rather than folded into the entry, so validation still judges only what the requester supplied.
         $this->backend->handle(
-            $request,
+            new AddCommand(
+                $request->entry,
+                $deltas->changes,
+            ),
             $context,
         );
     }
@@ -197,21 +196,6 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
         return array_values(
             $entry->get(AttributeTypeOid::NAME_USER_PASSWORD)?->getValues() ?? [],
         );
-    }
-
-    private function applyOperationalChanges(
-        Entry $entry,
-        OperationalChanges $deltas,
-    ): void {
-        foreach ($deltas->changes as $change) {
-            if ($change->getType() === Change::TYPE_REPLACE) {
-                $entry->set($change->getAttribute());
-
-                continue;
-            }
-
-            $entry->reset($change->getAttribute());
-        }
     }
 
     /**

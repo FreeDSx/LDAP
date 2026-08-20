@@ -17,7 +17,9 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
 use FreeDSx\Ldap\Controls;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
@@ -25,6 +27,8 @@ use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 
 final class LdapPasswordPolicyServerTest extends ServerTestCase
 {
+    private const ADMIN_DN = 'cn=admin,dc=foo,dc=bar';
+
     private const PASSWORD = '12345';
 
     private const WRONG_PASSWORD = 'nope';
@@ -62,6 +66,30 @@ final class LdapPasswordPolicyServerTest extends ServerTestCase
             PwdPolicyError::CHANGE_AFTER_RESET,
             $control->getError(),
         );
+    }
+
+    public function testAddingAnEntryWithAPasswordStampsItsPolicyState(): void
+    {
+        $dn = 'cn=added-user,dc=foo,dc=bar';
+        $client = $this->ldapClient();
+        $client->bind(self::ADMIN_DN, self::PASSWORD);
+
+        $client->create(Entry::fromArray(
+            $dn,
+            [
+                'objectClass' => ['inetOrgPerson'],
+                'cn' => ['added-user'],
+                'sn' => ['Added'],
+                'userPassword' => [self::PASSWORD],
+            ],
+        ));
+
+        $entry = $client->readOrFail(
+            $dn,
+            [PasswordPolicyOid::NAME_PWD_CHANGED_TIME],
+        );
+
+        $this->assertNotNull($entry->get(PasswordPolicyOid::NAME_PWD_CHANGED_TIME));
     }
 
     public function testBindWithoutPolicyStateCarriesNoControl(): void

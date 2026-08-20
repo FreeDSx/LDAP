@@ -6,6 +6,7 @@ namespace Tests\Support\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
+use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\ServerOptions;
@@ -17,6 +18,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class LdapPasswordPolicyCommand extends Command
 {
     use ConsoleOptionsTrait;
+
+    private const ADMIN_DN = 'cn=admin,dc=foo,dc=bar';
 
     private const POLICY_SEED_LDIF = __DIR__ . '/../resources/seed/password-policy-seed.ldif';
 
@@ -64,6 +67,7 @@ final class LdapPasswordPolicyCommand extends Command
 
         $options = (new ServerOptions(networkConfig: $network))
             ->setSaslMechanisms(ServerOptions::SASL_PLAIN)
+            ->setAdministrators(Subject::dn(self::ADMIN_DN))
             ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));
 
         // Left unset for the subentry run, so any enforcement observed can only come from the DIT.

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Command;
 
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 
@@ -23,5 +24,11 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
  */
 final class AddCommand implements WriteRequestInterface
 {
-    public function __construct(public readonly Entry $entry) {}
+    /**
+     * @param list<Change> $systemChanges Stamped by the server, so they are applied after the caller's entry is validated.
+     */
+    public function __construct(
+        public readonly Entry $entry,
+        public readonly array $systemChanges = [],
+    ) {}
 }

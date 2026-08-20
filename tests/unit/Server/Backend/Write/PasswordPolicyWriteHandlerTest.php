@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\PasswordPolicyWriteHandler;
@@ -48,6 +49,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\QualityCheck\DefaultPasswordQualityChecke
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordChangeRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordQualityRules;
 use FreeDSx\Ldap\Server\Token\BindToken;
+use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
@@ -293,12 +295,39 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
         self::assertNull($entry->get(PasswordPolicyOid::NAME_PWD_CHANGED_TIME));
     }
 
+    public function test_an_add_stamps_its_bookkeeping_under_an_enforcing_schema(): void
+    {
+        $handler = $this->handler(
+            policy: new PasswordPolicy(quality: new PasswordQualityRules(inHistory: 3)),
+            options: new ServerOptions(),
+        );
+        $dn = new Dn('cn=new,dc=foo,dc=bar');
+
+        $handler->handle(
+            new AddCommand(Entry::fromArray(
+                $dn->toString(),
+                [
+                    'objectClass' => ['inetOrgPerson'],
+                    'cn' => ['new'],
+                    'sn' => ['New'],
+                    'userPassword' => ['a-fresh-password'],
+                ],
+            )),
+            $this->writeContext(),
+        );
+
+        $entry = $this->backend->get($dn);
+        self::assertNotNull($entry);
+        self::assertNotNull($entry->get(PasswordPolicyOid::NAME_PWD_CHANGED_TIME));
+    }
+
     /**
      * @param array<string, string> $userAttrs
      */
     private function handler(
         ?PasswordPolicy $policy,
         array $userAttrs = [],
+        ?ServerOptions $options = null,
     ): PasswordPolicyWriteHandler {
         $this->backend = $this->backendFor(new InMemoryStorage([
             Entry::fromArray(
@@ -317,7 +346,7 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
                     'userPassword' => ['original-pass'],
                 ] + $userAttrs,
             ),
-        ]));
+        ]), $options);
 
         $guard = new PasswordPolicyChangeGuard(
             new PasswordPolicyEngine(
