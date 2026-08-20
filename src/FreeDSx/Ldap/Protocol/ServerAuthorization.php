@@ -66,6 +66,15 @@ class ServerAuthorization
     }
 
     /**
+     * RFC 4513 5.1.2: a name of non-zero length with an empty password, which the RFC refuses by its own result code.
+     */
+    public function isUnauthenticatedBind(RequestInterface $request): bool
+    {
+        return $request instanceof AnonBindRequest
+            && $request->getUsername() !== '';
+    }
+
+    /**
      * Determine if the bind type is actually supported. Anonymous binding may be disabled.
      */
     public function isAuthenticationTypeSupported(RequestInterface $request): bool

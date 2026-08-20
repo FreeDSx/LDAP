@@ -31,6 +31,8 @@ final class ServerControlRegistry
      * RFC 4370 eligibility gate runs upstream in ProxiedAuthorizationResolver, not here. ManageDsaIT is global
      * because it is recognized server-wide and treated as inert (no referral entries to reinterpret). The password
      * policy request control is global because it may accompany any request, and its criticality may be TRUE.
+     *
+     * A content sync carries ManageDsaIT critically, so dropping it here would refuse every replication request.
      */
     private const GLOBAL_CONTROLS = [
         Control::OID_PROXY_AUTHORIZATION,
