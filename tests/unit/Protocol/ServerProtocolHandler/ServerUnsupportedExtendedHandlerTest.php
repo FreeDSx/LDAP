@@ -37,7 +37,7 @@ final class ServerUnsupportedExtendedHandlerTest extends TestCase
         $this->subject = new ServerUnsupportedExtendedHandler();
     }
 
-    public function test_it_returns_protocol_error_with_response_name_echoing_the_request(): void
+    public function test_it_returns_protocol_error_without_naming_a_response(): void
     {
         $oid = '1.2.3.4.5.6.7.8.9';
         $request = new LdapMessageRequest(
@@ -59,7 +59,6 @@ final class ServerUnsupportedExtendedHandlerTest extends TestCase
                         '',
                         sprintf('The extended operation "%s" is not supported.', $oid),
                     ),
-                    $oid,
                 ),
             )],
             [...$stream->messages],

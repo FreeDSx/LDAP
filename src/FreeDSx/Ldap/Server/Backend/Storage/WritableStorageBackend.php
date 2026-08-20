@@ -418,7 +418,10 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             );
             $normNew = $newEntry->getDn()->normalize();
 
-            if ($storage->exists($normNew)) {
+            // Respelling the RDN resolves to the entry being renamed, which is not a collision with another one.
+            $isRespelling = $normNew->toString() === $normOld->toString();
+
+            if (!$isRespelling && $storage->exists($normNew)) {
                 $this->throwEntryAlreadyExists($newEntry->getDn());
             }
 

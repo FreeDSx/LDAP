@@ -43,13 +43,13 @@ final readonly class ServerUnsupportedExtendedHandler implements ServerProtocolH
         return ResponseStream::reply(
             $message,
             OperationOutcomeResult::failed(ResultCode::PROTOCOL_ERROR),
+            // RFC 4511 4.12: the response names no OID when the request's own name was not recognized.
             new ExtendedResponse(
                 new LdapResult(
                     ResultCode::PROTOCOL_ERROR,
                     '',
                     sprintf('The extended operation "%s" is not supported.', $request->getName()),
                 ),
-                $request->getName(),
             ),
         );
     }

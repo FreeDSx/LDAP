@@ -94,6 +94,24 @@ final class LdapSchemaConstraintTest extends ServerTestCase
         );
     }
 
+    /**
+     * RFC 4514 permits optional whitespace around the separator, so the same name may be spelled several ways.
+     */
+    public function test_the_subschema_is_reachable_by_an_equivalent_spelling_of_its_dn(): void
+    {
+        $this->authenticateAdmin();
+
+        $subschema = $this->ldapClient()->read(
+            'cn = Subschema',
+            ['subschemaSubentry'],
+        );
+
+        self::assertSame(
+            ['cn=Subschema'],
+            $subschema?->get('subschemaSubentry')?->getValues(),
+        );
+    }
+
     public function test_the_subschema_entry_names_itself_as_its_own_subschema(): void
     {
         $this->authenticateAdmin();
