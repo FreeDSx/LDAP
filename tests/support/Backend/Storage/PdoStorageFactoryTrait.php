@@ -13,14 +13,18 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap\Backend\Storage;
 
+use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoEntryDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\MysqlFilterTranslator;
@@ -32,6 +36,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoDriver;
@@ -50,9 +55,11 @@ trait PdoStorageFactoryTrait
         ?ChangeJournalConfig $journalConfig = null,
         ?SubstringIndexInterface $substringIndex = null,
         ?AttributeContextInterface $attributeContext = null,
+        ?AttributeIndexForms $indexForms = null,
     ): PdoStorageFactory {
         $substringIndex ??= self::makeSubstringIndex($config);
         $attributeContext ??= self::makeAttributeContext();
+        $indexForms ??= self::makeAttributeIndexForms();
 
         return new PdoStorageFactory(
             $config,
@@ -60,9 +67,11 @@ trait PdoStorageFactoryTrait
             self::makePdoFilterTranslator(
                 $config->getDriver(),
                 $attributeContext,
+                $indexForms,
                 $substringIndex,
             ),
             $attributeContext,
+            $indexForms,
             $substringIndex,
             new ReplicaId(),
             new BlockingSleeper(),
@@ -113,6 +122,35 @@ trait PdoStorageFactoryTrait
         );
     }
 
+    /**
+     * @param ?Schema $schema Defaults to core, matching what a server is configured with unless a test says otherwise.
+     */
+    private static function makeAttributeIndexForms(?Schema $schema = null): AttributeIndexForms
+    {
+        $schema ??= SchemaResource::Core->load();
+
+        return new AttributeIndexForms(
+            $schema,
+            new EqualityComparatorResolver($schema),
+        );
+    }
+
+    /**
+     * The index writer paired with a storage's own statement pool, for tests constructing PdoStorage directly.
+     */
+    private static function makeEntryIndexWriter(
+        PdoEntryDialectInterface $dialect,
+        PdoStatementPool $statements,
+        ?SubstringIndexInterface $substringIndex = null,
+    ): EntryIndexWriter {
+        return new EntryIndexWriter(
+            $dialect,
+            $statements,
+            self::makeAttributeIndexForms(),
+            $substringIndex,
+        );
+    }
+
     private static function makePdoDialect(PdoDriver $driver): PdoDialectInterface
     {
         return match ($driver) {
@@ -124,15 +162,18 @@ trait PdoStorageFactoryTrait
     private static function makePdoFilterTranslator(
         PdoDriver $driver,
         AttributeContextInterface $attributeContext,
+        AttributeIndexForms $indexForms,
         ?SubstringIndexInterface $substringIndex = null,
     ): FilterTranslatorInterface {
         return match ($driver) {
             PdoDriver::Sqlite => new SqliteFilterTranslator(
                 $attributeContext,
+                $indexForms,
                 $substringIndex,
             ),
             PdoDriver::Mysql => new MysqlFilterTranslator(
                 $attributeContext,
+                $indexForms,
                 $substringIndex,
             ),
         };

@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
@@ -30,6 +31,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
@@ -50,6 +52,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use PDO;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Backend\Storage\BackendFactoryTrait;
@@ -134,11 +137,18 @@ final class PdoStorageTest extends TestCase
             $pdo,
             new SqliteDialect(),
         );
+        $provider = new SharedPdoConnectionProvider($pdo);
+        $statements = new PdoStatementPool($provider);
         $storage = new PdoStorage(
-            new SharedPdoConnectionProvider($pdo),
-            new SqliteFilterTranslator(self::makeAttributeContext()),
+            $provider,
+            new SqliteFilterTranslator(
+                self::makeAttributeContext(),
+                self::makeAttributeIndexForms(),
+            ),
             new SqliteDialect(),
             self::makeAttributeContext(),
+            self::makeEntryIndexWriter(new SqliteDialect(), $statements),
+            $statements,
         );
         foreach (range(1, 3) as $i) {
             $storage->store(new Entry(
@@ -287,6 +297,85 @@ final class PdoStorageTest extends TestCase
             [],
             $this->dnsMatching(Filters::present('sn')),
         );
+    }
+
+    /**
+     * The SQL predicate has to answer the attribute's own EQUALITY rule, not a case-folded comparison.
+     *
+     * @param non-empty-string $attribute
+     */
+    #[DataProvider('rewrittenSpellingProvider')]
+    public function test_a_value_matches_an_assertion_spelled_differently_under_its_matching_rule(
+        string $attribute,
+        string $stored,
+        string $asserted,
+    ): void {
+        $this->storage->store(new Entry(
+            new Dn('cn=spelling,dc=example,dc=com'),
+            new Attribute('cn', 'spelling'),
+            new Attribute($attribute, $stored),
+        ));
+
+        self::assertContains(
+            'cn=spelling,dc=example,dc=com',
+            $this->dnsMatching(Filters::equal($attribute, $asserted)),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function rewrittenSpellingProvider(): iterable
+    {
+        yield 'distinguishedNameMatch ignores RDN spacing and case' => [
+            'member',
+            'CN=Alice, DC=Example, DC=Com',
+            'cn=alice,dc=example,dc=com',
+        ];
+        yield 'uniqueMemberMatch ignores RDN spacing and case' => [
+            'uniqueMember',
+            'CN=Alice, DC=Example, DC=Com',
+            'cn=alice,dc=example,dc=com',
+        ];
+        yield 'telephoneNumberMatch ignores hyphens and spaces' => [
+            'telephoneNumber',
+            '+1-408-555-1212',
+            '+1 408 555 1212',
+        ];
+        yield 'numericStringMatch ignores spaces' => [
+            'x121Address',
+            '1111 2222',
+            '11112222',
+        ];
+    }
+
+    /**
+     * Its only stored attribute type lives in the password policy schema, so this one needs both sources merged.
+     */
+    public function test_a_generalized_time_value_matches_an_assertion_naming_the_same_instant(): void
+    {
+        $schema = SchemaResource::Core->load()
+            ->merge(SchemaResource::PasswordPolicy->load());
+        $factory = self::makePdoStorageFactory(
+            PdoConfig::forSqlite(':memory:'),
+            attributeContext: self::makeAttributeContext($schema),
+            indexForms: self::makeAttributeIndexForms($schema),
+        );
+        $storage = $factory->storageOn($factory->sharedProvider());
+
+        $storage->store(new Entry(
+            new Dn('cn=stamped,dc=example,dc=com'),
+            new Attribute('cn', 'stamped'),
+            new Attribute('pwdChangedTime', '20260101070000-0500'),
+        ));
+
+        $entries = iterator_to_array($storage->list(new StorageListOptions(
+            baseDn: new Dn('dc=example,dc=com'),
+            subtree: true,
+            filter: Filters::equal('pwdChangedTime', '20260101120000Z'),
+        ))->entries);
+
+        self::assertCount(1, $entries);
     }
 
     public function test_initialize_creates_the_baseline_schema(): void
@@ -1386,12 +1475,20 @@ final class PdoStorageTest extends TestCase
     protected function makeJournalingStorage(?ChangeJournalInterface $journal = null): ChangeJournalingInterface
     {
         $config = PdoConfig::forSqlite(':memory:');
+        $dialect = self::makePdoDialect($config->getDriver());
+        $provider = self::makePdoStorageFactory($config)->sharedProvider();
+        $statements = new PdoStatementPool($provider);
 
         return new PdoStorage(
-            self::makePdoStorageFactory($config)->sharedProvider(),
-            new SqliteFilterTranslator(self::makeAttributeContext()),
-            self::makePdoDialect($config->getDriver()),
+            $provider,
+            new SqliteFilterTranslator(
+                self::makeAttributeContext(),
+                self::makeAttributeIndexForms(),
+            ),
+            $dialect,
             self::makeAttributeContext(),
+            self::makeEntryIndexWriter($dialect, $statements),
+            $statements,
             journal: $journal,
         );
     }
@@ -1403,11 +1500,17 @@ final class PdoStorageTest extends TestCase
         PDO $pdo,
         ?PdoDialectInterface $dialect = null,
     ): PdoStorage {
+        $dialect ??= new SqliteDialect();
+        $provider = new SharedPdoConnectionProvider($pdo);
+        $statements = new PdoStatementPool($provider);
+
         return new PdoStorage(
-            new SharedPdoConnectionProvider($pdo),
+            $provider,
             $this->createMock(FilterTranslatorInterface::class),
-            $dialect ?? new SqliteDialect(),
+            $dialect,
             self::makeAttributeContext(),
+            self::makeEntryIndexWriter($dialect, $statements),
+            $statements,
         );
     }
 

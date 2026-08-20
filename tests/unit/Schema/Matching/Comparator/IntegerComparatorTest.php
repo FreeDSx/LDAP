@@ -13,7 +13,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Schema\Matching\Comparator;
 
+use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Matching\Comparator\IntegerComparator;
+use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
+use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorRegistry;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 use PHPUnit\Framework\TestCase;
 
@@ -157,5 +160,16 @@ final class IntegerComparatorTest extends TestCase
         );
 
         self::assertFalse($result);
+    }
+
+    /**
+     * A store narrows integers with a numeric comparison instead, which a lexical key would not agree with.
+     */
+    public function test_the_rule_resolves_to_a_comparator_that_is_deliberately_not_indexable(): void
+    {
+        self::assertNotInstanceOf(
+            IndexableComparatorInterface::class,
+            MatchingRuleComparatorRegistry::default()->get(MatchingRuleOid::OID_INTEGER_MATCH),
+        );
     }
 }

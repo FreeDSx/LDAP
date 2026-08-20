@@ -63,4 +63,28 @@ final class CaseIgnoreIa5ComparatorTest extends TestCase
 
         self::assertTrue($result);
     }
+
+    public function test_index_key_is_shared_by_values_the_rule_calls_equal(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey('Alice@Foo.Bar'),
+            $this->subject->indexKey('alice@foo.bar'),
+        );
+    }
+
+    public function test_index_key_differs_for_values_the_rule_keeps_apart(): void
+    {
+        self::assertNotSame(
+            $this->subject->indexKey('alice@foo.bar'),
+            $this->subject->indexKey('bob@foo.bar'),
+        );
+    }
+
+    public function test_index_fragment_folds_case(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey('user'),
+            $this->subject->indexFragment('USER'),
+        );
+    }
 }

@@ -13,13 +13,14 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
+use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 
 /**
  * Compares only the leading component of a parenthesised definition (RFC 4517 sections 4.2.15 and 4.2.26).
  */
-final readonly class FirstComponentComparator implements MatchingRuleComparatorInterface
+final readonly class FirstComponentComparator implements MatchingRuleComparatorInterface, IndexableComparatorInterface
 {
     public function __construct(private MatchingRuleComparatorInterface $component) {}
 
@@ -51,6 +52,20 @@ final readonly class FirstComponentComparator implements MatchingRuleComparatorI
             $this->firstComponent($value),
             $assertion,
         );
+    }
+
+    public function indexKey(string $value): ?string
+    {
+        return $this->component instanceof IndexableComparatorInterface
+            ? $this->component->indexKey($this->firstComponent($value))
+            : null;
+    }
+
+    public function indexFragment(string $fragment): ?string
+    {
+        return $this->component instanceof IndexableComparatorInterface
+            ? $this->component->indexFragment($fragment)
+            : null;
     }
 
     /**

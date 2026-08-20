@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\SerializingReplicaPasswordStateStore;
@@ -57,6 +58,7 @@ final readonly class PdoStorageFactory
         private PdoDialectInterface $dialect,
         private FilterTranslatorInterface $translator,
         private AttributeContextInterface $attributeContext,
+        private AttributeIndexForms $indexForms,
         private ?SubstringIndexInterface $substringIndex,
         private ReplicaId $origin,
         private SleeperInterface $sleeper,
@@ -112,12 +114,13 @@ final readonly class PdoStorageFactory
             $this->translator,
             $this->dialect,
             $this->attributeContext,
-            $statements,
             new EntryIndexWriter(
                 $this->dialect,
                 $statements,
+                $this->indexForms,
                 $this->substringIndex,
             ),
+            $statements,
             $transactor,
             $this->journalConfig === null ? null : AuditingChangeJournal::wrap(
                 new PdoChangeJournal(

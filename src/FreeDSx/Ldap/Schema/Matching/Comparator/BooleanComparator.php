@@ -13,13 +13,14 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
+use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 
 /**
  * Boolean comparator (booleanMatch): compares RFC 4517 boolean literals TRUE/FALSE case-insensitively.
  */
-final class BooleanComparator implements MatchingRuleComparatorInterface
+final class BooleanComparator implements MatchingRuleComparatorInterface, IndexableComparatorInterface
 {
     public function equals(
         string $a,
@@ -40,5 +41,15 @@ final class BooleanComparator implements MatchingRuleComparatorInterface
         SubstringAssertion $assertion,
     ): bool {
         return false;
+    }
+
+    public function indexKey(string $value): string
+    {
+        return strtoupper($value);
+    }
+
+    public function indexFragment(string $fragment): ?string
+    {
+        return null;
     }
 }

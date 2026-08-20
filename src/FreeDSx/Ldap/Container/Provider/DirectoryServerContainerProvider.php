@@ -89,6 +89,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             BindNameResolverInterface::class => $this->makeIdentityResolverChain(...),
             PasswordAuthenticatableInterface::class => $this->makePasswordAuthenticator(...),
             FilterEvaluatorInterface::class => $this->makeFilterEvaluator(...),
+            EqualityComparatorResolver::class => $this->makeEqualityComparatorResolver(...),
             DirectoryDumper::class => $this->makeDirectoryDumper(...),
             OperationalAttributeGenerator::class => $this->makeOperationalAttributeGenerator(...),
             SearchStreamBuilder::class => $this->makeSearchStreamBuilder(...),
@@ -157,7 +158,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return new FilterEvaluator(
             $container->get(ServerOptions::class)->getSchema(),
             $this->makeDerivedResolver($container),
-            $this->makeEqualityComparatorResolver($container),
+            $container->get(EqualityComparatorResolver::class),
             $this->makeAttributeSyntaxResolver($container),
         );
     }
@@ -224,7 +225,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             listOptions: $container->get(StorageListOptionsFactory::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
             entryHandler: new WriteEntryOperationHandler(
-                $this->makeEqualityComparatorResolver($container),
+                $container->get(EqualityComparatorResolver::class),
             ),
             operationalAttrs: $container->get(OperationalAttributeGenerator::class),
             changeRecorder: $this->changeRecorderFor($container, $storage),

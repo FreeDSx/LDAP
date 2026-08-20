@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 
 /**
  * SQLite SQL WHERE translator for LDAP filters; targets the `entry_attribute_values` sidecar index.
@@ -27,9 +28,11 @@ final class SqliteFilterTranslator implements FilterTranslatorInterface
 
     public function __construct(
         AttributeContextInterface $attributeContext,
+        AttributeIndexForms $indexForms,
         ?SubstringIndexInterface $substringIndex = null,
     ) {
         $this->attributeContext = $attributeContext;
+        $this->indexForms = $indexForms;
         $this->substringIndex = $substringIndex;
     }
 

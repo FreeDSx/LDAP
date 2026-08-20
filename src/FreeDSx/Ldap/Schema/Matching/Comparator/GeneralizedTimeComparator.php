@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
 use DateTimeImmutable;
 use DateTimeZone;
+use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 
@@ -22,7 +23,7 @@ use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
  * Generalized time comparator (generalizedTimeMatch / generalizedTimeOrderingMatch).
  * Timestamps are parsed and compared as UTC Unix timestamps.
  */
-final class GeneralizedTimeComparator implements MatchingRuleComparatorInterface
+final class GeneralizedTimeComparator implements MatchingRuleComparatorInterface, IndexableComparatorInterface
 {
     /**
      * RFC 4517 §3.3.13 allows three forms:
@@ -64,6 +65,23 @@ final class GeneralizedTimeComparator implements MatchingRuleComparatorInterface
         SubstringAssertion $assertion,
     ): bool {
         return false;
+    }
+
+    /**
+     * A fixed-width UTC spelling rather than the timestamp itself, so the key still orders lexically.
+     */
+    public function indexKey(string $value): ?string
+    {
+        $timestamp = $this->toTimestamp($value);
+
+        return $timestamp === null
+            ? null
+            : gmdate('YmdHis\Z', $timestamp);
+    }
+
+    public function indexFragment(string $fragment): ?string
+    {
+        return null;
     }
 
     private function toTimestamp(string $value): ?int

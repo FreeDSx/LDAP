@@ -81,11 +81,9 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     private readonly PdoStatementPool $statements;
 
-    private readonly EntryIndexWriter $indexes;
-
     /**
+     * @param EntryIndexWriter $indexes Must share $statements, so the two see one connection and one cache.
      * @param ?PdoStatementPool $statements Must draw from $provider; defaults to a pool of its own over that connection.
-     * @param ?EntryIndexWriter $indexes Must share $statements; defaults to one with no substring index attached.
      * @param ?PdoTransactor $transactor Must draw from $provider; defaults to one of its own over that connection.
      * @param ?ChangeJournalInterface $journal Must share $transactor so an append joins the write it belongs to.
      */
@@ -94,8 +92,8 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         private readonly FilterTranslatorInterface $translator,
         private readonly PdoDialectInterface $dialect,
         private readonly AttributeContextInterface $attributeContext,
+        private readonly EntryIndexWriter $indexes,
         ?PdoStatementPool $statements = null,
-        ?EntryIndexWriter $indexes = null,
         ?PdoTransactor $transactor = null,
         ?ChangeJournalInterface $journal = null,
     ) {
@@ -112,10 +110,6 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             new BlockingSleeper(),
         );
         $this->statements = $statements ?? new PdoStatementPool($provider);
-        $this->indexes = $indexes ?? new EntryIndexWriter(
-            $dialect,
-            $this->statements,
-        );
         $this->journal = $journal;
     }
 

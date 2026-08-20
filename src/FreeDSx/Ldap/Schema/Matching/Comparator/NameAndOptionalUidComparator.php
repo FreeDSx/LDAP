@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
+use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\NameAndOptionalUid;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
@@ -22,7 +23,7 @@ use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class NameAndOptionalUidComparator implements MatchingRuleComparatorInterface
+final readonly class NameAndOptionalUidComparator implements MatchingRuleComparatorInterface, IndexableComparatorInterface
 {
     public function __construct(
         private MatchingRuleComparatorInterface $name = new DistinguishedNameComparator(),
@@ -71,5 +72,37 @@ final readonly class NameAndOptionalUidComparator implements MatchingRuleCompara
         SubstringAssertion $assertion,
     ): bool {
         return false;
+    }
+
+    /**
+     * The identifier is appended after a '#' only when it is present.
+     */
+    public function indexKey(string $value): ?string
+    {
+        if (!$this->name instanceof IndexableComparatorInterface || !$this->uid instanceof IndexableComparatorInterface) {
+            return null;
+        }
+
+        $parsed = NameAndOptionalUid::parse($value);
+        $nameKey = $this->name->indexKey($parsed->name);
+
+        if ($nameKey === null) {
+            return null;
+        }
+
+        if ($parsed->uid === null) {
+            return $nameKey;
+        }
+
+        $uidKey = $this->uid->indexKey($parsed->uid);
+
+        return $uidKey === null
+            ? null
+            : $nameKey . '#' . $uidKey;
+    }
+
+    public function indexFragment(string $fragment): ?string
+    {
+        return null;
     }
 }

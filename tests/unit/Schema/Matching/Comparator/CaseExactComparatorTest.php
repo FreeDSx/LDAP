@@ -104,4 +104,28 @@ final class CaseExactComparatorTest extends TestCase
             new SubstringAssertion(initial: 'foo bar'),
         ));
     }
+
+    public function test_index_key_is_shared_after_space_collapse(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey('Foo  Bar'),
+            $this->subject->indexKey('Foo Bar'),
+        );
+    }
+
+    public function test_index_key_keeps_case_significant(): void
+    {
+        self::assertNotSame(
+            $this->subject->indexKey('Foo'),
+            $this->subject->indexKey('foo'),
+        );
+    }
+
+    public function test_index_fragment_keeps_its_edge_spaces(): void
+    {
+        self::assertSame(
+            ' Foo',
+            $this->subject->indexFragment(' Foo'),
+        );
+    }
 }

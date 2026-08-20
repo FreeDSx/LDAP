@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\CoroutineLock;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
+use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackend;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
@@ -40,6 +41,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptionsFactory;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
@@ -66,6 +68,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
     {
         return [
             AttributeContextInterface::class => $this->makeAttributeContext(...),
+            AttributeIndexForms::class => $this->makeAttributeIndexForms(...),
             SortKeyComparator::class => $this->makeSortKeyComparator(...),
             StorageListOptionsFactory::class => $this->makeStorageListOptionsFactory(...),
             EntryStorageInterface::class => $this->makeStorage(...),
@@ -85,6 +88,19 @@ final class StorageContainerProvider implements ContainerProviderInterface
         return new AttributeContext(
             $schema,
             new AttributeSyntaxResolver($schema),
+        );
+    }
+
+    /**
+     * The index forms a store must key values by for its index to answer the rule the evaluator applies.
+     */
+    private function makeAttributeIndexForms(Container $container): AttributeIndexForms
+    {
+        $schema = $container->get(ServerOptions::class)->getSchema();
+
+        return new AttributeIndexForms(
+            $schema,
+            $container->get(EqualityComparatorResolver::class),
         );
     }
 
@@ -192,9 +208,11 @@ final class StorageContainerProvider implements ContainerProviderInterface
             $this->makePdoFilterTranslator(
                 $config,
                 $container->get(AttributeContextInterface::class),
+                $container->get(AttributeIndexForms::class),
                 $substringIndex,
             ),
             $container->get(AttributeContextInterface::class),
+            $container->get(AttributeIndexForms::class),
             $substringIndex,
             $this->journalOrigin($container),
             $container->get(SleeperInterface::class),
@@ -213,15 +231,18 @@ final class StorageContainerProvider implements ContainerProviderInterface
     private function makePdoFilterTranslator(
         PdoConfig $config,
         AttributeContextInterface $attributeContext,
+        AttributeIndexForms $indexForms,
         ?SubstringIndexInterface $substringIndex,
     ): FilterTranslatorInterface {
         return match ($config->getDriver()) {
             PdoDriver::Sqlite => new SqliteFilterTranslator(
                 $attributeContext,
+                $indexForms,
                 $substringIndex,
             ),
             PdoDriver::Mysql => new MysqlFilterTranslator(
                 $attributeContext,
+                $indexForms,
                 $substringIndex,
             ),
         };

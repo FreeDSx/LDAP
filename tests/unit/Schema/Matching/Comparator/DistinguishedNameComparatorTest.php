@@ -95,4 +95,33 @@ final class DistinguishedNameComparatorTest extends TestCase
 
         self::assertFalse($result);
     }
+
+    public function test_index_key_is_shared_by_dns_the_rule_calls_equal(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey('CN=John  Smith , DC=Example , DC=Com'),
+            $this->subject->indexKey('cn=john smith,dc=example,dc=com'),
+        );
+    }
+
+    public function test_index_key_is_shared_regardless_of_multivalued_rdn_order(): void
+    {
+        self::assertSame(
+            $this->subject->indexKey('cn=a+uid=b,dc=com'),
+            $this->subject->indexKey('uid=b+cn=a,dc=com'),
+        );
+    }
+
+    public function test_index_key_differs_for_dns_naming_different_entries(): void
+    {
+        self::assertNotSame(
+            $this->subject->indexKey('cn=foo,dc=example,dc=com'),
+            $this->subject->indexKey('cn=bar,dc=example,dc=com'),
+        );
+    }
+
+    public function test_index_fragment_is_null_because_the_rule_matches_over_parsed_rdns(): void
+    {
+        self::assertNull($this->subject->indexFragment('cn=foo'));
+    }
 }

@@ -11,27 +11,27 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex;
+namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
- * Backfills the substring index by re-storing every entry; run it after enabling indexing on an existing directory or changing the indexed attributes.
+ * Rebuilds every secondary index by re-storing each entry; run it after enabling substring indexing on an existing directory, changing the indexed attributes, or changing an attribute's matching rules.
  *
  * @api
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class SubstringIndexReindexer
+final readonly class EntryIndexReindexer
 {
     public function __construct(
         private EntryStorageInterface $storage,
     ) {}
 
     /**
-     * Re-store every entry in one transaction via raw storage: the substring index is rebuilt while operational attributes are preserved verbatim and no change is journaled.
+     * Re-store every entry in one transaction via raw storage: the indexes are rebuilt while operational attributes are preserved verbatim and no change is journaled.
      */
     public function reindex(): void
     {

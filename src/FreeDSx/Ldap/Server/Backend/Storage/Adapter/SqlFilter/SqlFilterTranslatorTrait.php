@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInt
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 
 /**
  * Translates LDAP filters to SQL against the `entry_attribute_values` sidecar index.
@@ -46,6 +47,8 @@ trait SqlFilterTranslatorTrait
     private ?SubstringIndexInterface $substringIndex = null;
 
     private AttributeContextInterface $attributeContext;
+
+    private AttributeIndexForms $indexForms;
 
     public function translate(FilterInterface $filter): ?SqlFilterResult
     {
@@ -272,16 +275,10 @@ trait SqlFilterTranslatorTrait
             );
         }
 
-        return new SqlFilterResult(
-            $this->buildValueExists($attribute, "$alias = ?"),
-            [$this->prepareMatchValue($value)],
-            isExact: $this->isExactEquality($value)
-                && $this->matchesCaseFolded($attribute)
-                && !$this->attributeHasOption($filter->getAttribute()),
-            sidecarCondition: $this->sidecarCondition(
-                $attribute,
-                "$alias = ?",
-            ),
+        return $this->translateRuleEquality(
+            $filter->getAttribute(),
+            $attribute,
+            $value,
         );
     }
 
@@ -289,19 +286,43 @@ trait SqlFilterTranslatorTrait
     {
         $attribute = $this->validateAttribute($filter->getAttribute());
 
-        $alias = $this->valueAlias();
-        $value = $filter->getValue();
+        // Implementation-defined (RFC 4511 §4.5.1.7.6); mirror FilterEvaluator's fallback to the equality rule.
+        return $this->translateRuleEquality(
+            $filter->getAttribute(),
+            $attribute,
+            $filter->getValue(),
+        );
+    }
 
-        // Implementation-defined (RFC 4511 §4.5.1.7.6); mirror FilterEvaluator's case-insensitive equality.
+    /**
+     * Equality against the column the writer keyed by the attribute's own rule; untranslatable when it has no key.
+     *
+     * @param string $rawAttribute The description as asserted, whose options bound how faithful the match can be.
+     * @param string $attribute Pre-validated; safe to embed in SQL.
+     */
+    private function translateRuleEquality(
+        string $rawAttribute,
+        string $attribute,
+        string $value,
+    ): ?SqlFilterResult {
+        $key = $this->indexForms->key($rawAttribute, $value);
+
+        if ($key === null) {
+            return null;
+        }
+
+        $condition = $this->valueAlias() . ' = ?';
+
+        // Exactness is judged before truncation, since a cut key can collide with another value's.
         return new SqlFilterResult(
-            $this->buildValueExists($attribute, "$alias = ?"),
-            [$this->prepareMatchValue($value)],
-            isExact: $this->isExactEquality($value)
+            $this->buildValueExists($attribute, $condition),
+            [SqlFilterUtility::truncate($key)],
+            isExact: $this->isExactEquality($key)
                 && $this->matchesCaseFolded($attribute)
-                && !$this->attributeHasOption($filter->getAttribute()),
+                && !$this->attributeHasOption($rawAttribute),
             sidecarCondition: $this->sidecarCondition(
                 $attribute,
-                "$alias = ?",
+                $condition,
             ),
         );
     }
@@ -341,7 +362,7 @@ trait SqlFilterTranslatorTrait
         string $value,
         string $operator,
         bool $lexicalCanBeExact,
-    ): SqlFilterResult {
+    ): ?SqlFilterResult {
         $attribute = $this->validateAttribute($rawAttribute);
         $hasOption = $this->attributeHasOption($rawAttribute);
 
@@ -361,13 +382,19 @@ trait SqlFilterTranslatorTrait
             );
         }
 
+        $key = $this->indexForms->orderingKey($rawAttribute, $value);
+
+        if ($key === null) {
+            return null;
+        }
+
         $condition = $this->valueAlias() . " $operator ?";
 
         return new SqlFilterResult(
             $this->buildValueExists($attribute, $condition),
-            [$this->prepareMatchValue($value)],
+            [SqlFilterUtility::truncate($key)],
             isExact: $lexicalCanBeExact
-                && $this->isExactOrdered($value)
+                && $this->isExactOrdered($key)
                 && $this->matchesCaseFolded($attribute)
                 && !$hasOption,
             sidecarCondition: $this->sidecarCondition(
@@ -390,6 +417,7 @@ trait SqlFilterTranslatorTrait
         }
 
         $indexed = $this->indexedSubstring(
+            $filter->getAttribute(),
             $attribute,
             $startsWith,
             $contains,
@@ -401,16 +429,17 @@ trait SqlFilterTranslatorTrait
 
         // Prefix-anchored LIKE is the only valid superset under truncation; other fragments fall back to presence + PHP re-eval.
         $alias = $this->valueAlias();
+        $prefix = $startsWith === null
+            ? null
+            : $this->indexForms->fragment($filter->getAttribute(), $startsWith);
 
-        if ($startsWith !== null) {
-            // A fragment keeps its edge spaces, which a whole value would have trimmed.
-            $prefix = SqlFilterUtility::normalizeFragment($startsWith);
+        if ($prefix !== null) {
             $inner = "$alias LIKE ? ESCAPE '!'";
             $sql = $this->buildValueExists(
                 $attribute,
                 $inner,
             );
-            $params = [SqlFilterUtility::escape($prefix) . '%'];
+            $params = [SqlFilterUtility::escape(SqlFilterUtility::truncate($prefix)) . '%'];
             $sidecar = $this->sidecarCondition(
                 $attribute,
                 $inner,
@@ -424,11 +453,12 @@ trait SqlFilterTranslatorTrait
             );
         }
 
-        $fragmentsAreExact = $this->isExactSubstring(
-            $startsWith,
-            $contains,
-            $endsWith,
-        );
+        $fragmentsAreExact = $prefix !== null
+            && $this->isExactSubstring(
+                $startsWith,
+                $contains,
+                $endsWith,
+            );
 
         $isExact = $fragmentsAreExact
             && $this->matchesCaseFolded($attribute)
@@ -445,15 +475,23 @@ trait SqlFilterTranslatorTrait
     /**
      * The substring index's candidate-narrowing predicate for an infix/suffix filter, or null when it does not apply.
      *
+     * @param string $rawAttribute The description as asserted, which resolves the SUBSTR rule the index must suit.
+     * @param string $attribute Pre-validated; safe to embed in SQL.
      * @param array<string> $contains
      */
     private function indexedSubstring(
+        string $rawAttribute,
         string $attribute,
         ?string $startsWith,
         array $contains,
         ?string $endsWith,
     ): ?SqlFilterResult {
         if ($startsWith !== null || $this->substringIndex === null) {
+            return null;
+        }
+
+        // The index holds plainly lowercased values, so a rule matching over some other form cannot narrow on it.
+        if (!$this->indexForms->substringIndexApplies($rawAttribute)) {
             return null;
         }
 
