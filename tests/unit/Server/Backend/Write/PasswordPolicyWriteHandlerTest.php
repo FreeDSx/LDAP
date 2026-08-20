@@ -186,7 +186,10 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
         );
     }
 
-    public function test_multi_value_set_records_each_new_value_in_history(): void
+    /**
+     * draft-behera-11 §8.2.7 retains the password being replaced, so a multi-valued set records what it superseded.
+     */
+    public function test_multi_value_set_records_the_replaced_values_in_history(): void
     {
         $handler = $this->handler(new PasswordPolicy(
             quality: new PasswordQualityRules(inHistory: 5),
@@ -206,14 +209,35 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
             static fn(string $value): string => HistoryEntry::decode($value)->data,
             $entry->get(PasswordPolicyOid::NAME_PWD_HISTORY)?->getValues() ?? [],
         );
-        // Both new values must be retained so neither can be reused after a multi-valued set.
-        self::assertContains(
-            'first-new-pass',
+        self::assertSame(
+            ['original-pass'],
             $stored,
         );
-        self::assertContains(
-            'second-new-pass',
-            $stored,
+    }
+
+    /**
+     * The new values are not in history, so §8.2.6's current-password clause is what stops either being reused.
+     */
+    public function test_a_value_just_set_cannot_be_set_again(): void
+    {
+        $handler = $this->handler(new PasswordPolicy(
+            quality: new PasswordQualityRules(inHistory: 5),
+        ));
+        $handler->handle(
+            new UpdateCommand(
+                new Dn(self::USER_DN),
+                [Change::replace('userPassword', 'first-new-pass')],
+            ),
+            $this->writeContext(),
+        );
+
+        $this->expectException(OperationException::class);
+        $handler->handle(
+            new UpdateCommand(
+                new Dn(self::USER_DN),
+                [Change::replace('userPassword', 'first-new-pass')],
+            ),
+            $this->writeContext(),
         );
     }
 
@@ -257,7 +281,7 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
             self::fail('Expected an OperationException.');
         } catch (OperationException $e) {
             self::assertSame(
-                ResultCode::CONSTRAINT_VIOLATION,
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
                 $e->getCode(),
             );
         }

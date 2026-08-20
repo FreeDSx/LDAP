@@ -9,6 +9,7 @@ use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
+use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordChangeRules;
 use FreeDSx\Ldap\ServerOptions;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -20,6 +21,10 @@ final class LdapPasswordPolicyCommand extends Command
     use ConsoleOptionsTrait;
 
     private const ADMIN_DN = 'cn=admin,dc=foo,dc=bar';
+
+    private const SSL_KEY = __DIR__ . '/../resources/cert/slapd.key';
+
+    private const SSL_CERT = __DIR__ . '/../resources/cert/slapd.crt';
 
     private const POLICY_SEED_LDIF = __DIR__ . '/../resources/seed/password-policy-seed.ldif';
 
@@ -63,6 +68,9 @@ final class LdapPasswordPolicyCommand extends Command
         $network = (new NetworkConfig())
             ->setPort($port)
             ->setTransport($transport)
+            // StartTLS has to be reachable, since the reset gate is required to permit it.
+            ->setSslCert(self::SSL_CERT)
+            ->setSslCertKey(self::SSL_KEY)
             ->setSocketAcceptTimeout(0.1);
 
         $options = (new ServerOptions(networkConfig: $network))
@@ -73,7 +81,10 @@ final class LdapPasswordPolicyCommand extends Command
         // Left unset for the subentry run, so any enforcement observed can only come from the DIT.
         if (!$useSubentries) {
             $options->getPasswordConfig()
-                ->setPolicy(new PasswordPolicy());
+                // pwdMustChange is what makes the seeded pwdReset binding, per draft-behera-11 7.2.
+                ->setPolicy(new PasswordPolicy(
+                    change: new PasswordChangeRules(mustChange: true),
+                ));
         }
 
         $server = new LdapServer($options);

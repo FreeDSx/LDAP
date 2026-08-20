@@ -26,7 +26,6 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\PasswordChangeConstraintChain;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\PasswordPolicyOutcome;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\RecordedOutcome;
-use SensitiveParameter;
 
 /**
  * Core decision / tracking engine for draft-behera-10 password policy.
@@ -216,25 +215,8 @@ final readonly class PasswordPolicyEngine
     /**
      * Evaluate a password change against the configured constraint chain.
      */
-    public function evaluatePasswordChange(
-        #[SensitiveParameter]
-        string $newPassword,
-        #[SensitiveParameter]
-        ?string $oldPassword,
-        UserPasswordState $state,
-        PasswordPolicy $policy,
-        bool $isSelf,
-        bool $passwordIsCleartext = true,
-    ): PasswordPolicyOutcome {
-        $attempt = new PasswordChangeAttempt(
-            newPassword: $newPassword,
-            oldPassword: $oldPassword,
-            state: $state,
-            policy: $policy,
-            isSelf: $isSelf,
-            passwordIsCleartext: $passwordIsCleartext,
-        );
-
+    public function evaluatePasswordChange(PasswordChangeAttempt $attempt): PasswordPolicyOutcome
+    {
         return $this->changeConstraints->evaluate($attempt)
             ?? PasswordPolicyOutcome::allow();
     }
@@ -243,10 +225,10 @@ final readonly class PasswordPolicyEngine
      * Stamp pwdChangedTime, rotate pwdHistory, set/clear pwdReset, and clear pwdFailureTime / pwdAccountLockedTime /
      * pwdGraceUseTime.
      *
-     * @param non-empty-list<string> $hashedNewPasswords stored values being set (newest first - one per password value)
+     * @param list<string> $replacedPasswords stored values the entry held before this change, empty when it held none
      */
     public function recordPasswordChange(
-        array $hashedNewPasswords,
+        array $replacedPasswords,
         UserPasswordState $state,
         PasswordPolicy $policy,
         bool $isSelf = true,
@@ -258,7 +240,7 @@ final readonly class PasswordPolicyEngine
         )];
 
         $historyChange = $this->buildHistoryChange(
-            $hashedNewPasswords,
+            $replacedPasswords,
             $state,
             $policy,
             $now,
@@ -392,17 +374,15 @@ final readonly class PasswordPolicyEngine
         PasswordPolicy $policy,
     ): ?PasswordPolicyOutcome {
         $maxIdle = $policy->expiration->maxIdle;
-        // Use the most recent activity, which is one of these.
-        $since = $this->latestOf(
-            $state->lastSuccess,
-            $state->changedAt,
-        );
+        // draft-behera-11 §7.1 counts from the last successful bind, falling back to the change time only when
+        // no bind has been recorded, so a password change does not itself refresh idleness.
+        $since = $state->lastSuccess ?? $state->changedAt;
         if ($maxIdle === null || $maxIdle === 0 || $since === null) {
             return null;
         }
 
         $idleSeconds = $this->clock->now()->getTimestamp() - $since->getTimestamp();
-        if ($idleSeconds <= $maxIdle) {
+        if ($idleSeconds < $maxIdle) {
             return null;
         }
 
@@ -427,7 +407,8 @@ final readonly class PasswordPolicyEngine
                 diagnostic: 'Password is not yet valid.',
             );
         }
-        if ($state->endTime !== null && $now > $state->endTime) {
+        // draft-behera-11 §7.1 locks at the instant pwdEndTime is reached, not the second after it.
+        if ($state->endTime !== null && $now >= $state->endTime) {
             return PasswordPolicyOutcome::deny(
                 PwdPolicyError::PASSWORD_EXPIRED,
                 ResultCode::INVALID_CREDENTIALS,
@@ -631,7 +612,7 @@ final readonly class PasswordPolicyEngine
         ?int $secondsRemaining,
         bool $isExpired,
     ): PasswordPolicyOutcome {
-        $errorCode = $state->mustChange ? PwdPolicyError::CHANGE_AFTER_RESET : null;
+        $errorCode = $state->mustChangeUnder($policy) ? PwdPolicyError::CHANGE_AFTER_RESET : null;
         $graceWarning = $isExpired
             ? $this->graceRemaining($state, $policy) - 1
             : null;
@@ -684,10 +665,13 @@ final readonly class PasswordPolicyEngine
     }
 
     /**
-     * @param non-empty-list<string> $hashedNewPasswords
+     * draft-behera-11 §8.2.7 retains the password being replaced, not the one being set, so the window holds
+     * pwdInHistory superseded values alongside the current one.
+     *
+     * @param list<string> $replacedPasswords
      */
     private function buildHistoryChange(
-        array $hashedNewPasswords,
+        array $replacedPasswords,
         UserPasswordState $state,
         PasswordPolicy $policy,
         DateTimeImmutable $now,
@@ -702,7 +686,7 @@ final readonly class PasswordPolicyEngine
                 $now,
                 $hash,
             ),
-            $hashedNewPasswords,
+            $replacedPasswords,
         );
         $retained = array_slice(
             [...$newest, ...$state->history],

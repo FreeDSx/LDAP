@@ -76,7 +76,7 @@ final class AuthorizationResolutionMiddlewareTest extends TestCase
             self::fail('Expected an OperationException.');
         } catch (OperationException $e) {
             self::assertSame(
-                ResultCode::UNWILLING_TO_PERFORM,
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
                 $e->getCode(),
             );
         }

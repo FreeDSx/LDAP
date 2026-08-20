@@ -34,6 +34,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
+use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordChangeRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
@@ -126,7 +127,9 @@ final class SaslBindPolicyEnforcerTest extends TestCase
     public function test_must_change_flags_the_context_and_surfaces_a_control(): void
     {
         $enforcer = $this->enforcer(
-            new PasswordPolicy(),
+            new PasswordPolicy(
+                change: new PasswordChangeRules(mustChange: true),
+            ),
             [PasswordPolicyOid::NAME_PWD_RESET => 'TRUE'],
         );
 

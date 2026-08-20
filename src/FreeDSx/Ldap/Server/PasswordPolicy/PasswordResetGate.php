@@ -27,6 +27,14 @@ use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 final class PasswordResetGate
 {
     /**
+     * StartTLS is named by §8.1.2.2, and RFC 3062 §4 wants password modify run under confidentiality.
+     */
+    private const PERMITTED_EXTENDED_OIDS = [
+        ExtendedRequest::OID_PWD_MODIFY,
+        ExtendedRequest::OID_START_TLS,
+    ];
+
+    /**
      * Whether the request is permitted while the bound identity must change its password (draft-behera-10 §8.1.2).
      */
     public function isPermitted(
@@ -37,7 +45,11 @@ final class PasswordResetGate
             return true;
         }
         if ($request instanceof ExtendedRequest) {
-            return $request->getName() === ExtendedRequest::OID_PWD_MODIFY;
+            return in_array(
+                $request->getName(),
+                self::PERMITTED_EXTENDED_OIDS,
+                true,
+            );
         }
 
         return $request instanceof ModifyRequest

@@ -73,6 +73,15 @@ final readonly class UserPasswordState
     }
 
     /**
+     * draft-behera-11 §7.2 needs pwdMustChange and pwdReset both true, so clearing the policy flag releases the entry.
+     */
+    public function mustChangeUnder(PasswordPolicy $policy): bool
+    {
+        return $this->mustChange
+            && $policy->change->mustChange === true;
+    }
+
+    /**
      * True when $authoritative (the primary's replicated entry) supersedes this local volatile state so it can be
      * dropped, which holds when the entry:
      *

@@ -91,6 +91,7 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
             $newPasswords,
             null,
             $this->isSelf($context, $request->entry->getDn()),
+            isNewEntry: true,
         ));
 
         // Carried on the command rather than written after, so the entry is never stored without the state governing
@@ -160,15 +161,16 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
         array $newPasswords,
         ?string $oldPassword,
         bool $isSelf,
+        bool $isNewEntry = false,
     ): array {
         return array_map(
             fn(string $newPassword): PasswordModifyAttempt => new PasswordModifyAttempt(
                 target: $target,
                 newPassword: $newPassword,
-                hashedNewPassword: $newPassword,
                 oldPassword: $oldPassword,
                 isSelf: $isSelf,
                 passwordIsCleartext: !$this->hashService->isHashed($newPassword),
+                isNewEntry: $isNewEntry,
             ),
             $newPasswords,
         );

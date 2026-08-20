@@ -21,14 +21,18 @@ use SensitiveParameter;
  */
 final readonly class PasswordModifyAttempt
 {
+    /**
+     * @param bool $isNewEntry Whether the target is being created here, so its password values are the new ones
+     *                         rather than any it previously held.
+     */
     public function __construct(
         public Entry $target,
         #[SensitiveParameter]
         public string $newPassword,
-        public string $hashedNewPassword,
         #[SensitiveParameter]
         public ?string $oldPassword,
         public bool $isSelf,
         public bool $passwordIsCleartext = true,
+        public bool $isNewEntry = false,
     ) {}
 }

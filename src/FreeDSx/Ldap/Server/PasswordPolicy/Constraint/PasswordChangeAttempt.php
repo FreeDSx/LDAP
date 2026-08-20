@@ -22,6 +22,9 @@ use SensitiveParameter;
  */
 final readonly class PasswordChangeAttempt
 {
+    /**
+     * @param list<string> $currentPasswords Stored values the entry holds before the change, empty when it holds none.
+     */
     public function __construct(
         #[SensitiveParameter]
         public string $newPassword,
@@ -31,5 +34,7 @@ final readonly class PasswordChangeAttempt
         public PasswordPolicy $policy,
         public bool $isSelf,
         public bool $passwordIsCleartext = true,
+        #[SensitiveParameter]
+        public array $currentPasswords = [],
     ) {}
 }

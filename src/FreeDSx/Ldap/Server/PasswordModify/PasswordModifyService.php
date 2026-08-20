@@ -105,7 +105,6 @@ final readonly class PasswordModifyService
         $deltas = $this->changeGuard?->enforce(new PasswordModifyAttempt(
             target: $entry,
             newPassword: $newPassword,
-            hashedNewPassword: $hashed,
             oldPassword: $request->getOldPassword(),
             isSelf: $isSelf,
             passwordIsCleartext: true,
