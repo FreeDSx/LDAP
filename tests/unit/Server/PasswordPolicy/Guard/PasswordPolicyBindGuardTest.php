@@ -34,6 +34,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordBindAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
+use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordChangeRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordExpirationRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
@@ -281,7 +282,12 @@ final class PasswordPolicyBindGuardTest extends TestCase
 
     public function test_recordSuccess_surfaces_must_change(): void
     {
-        $this->subject->recordSuccess($this->attempt(new UserPasswordState(mustChange: true)));
+        $this->subject->recordSuccess($this->attempt(
+            new UserPasswordState(mustChange: true),
+            new PasswordPolicy(
+                change: new PasswordChangeRules(mustChange: true),
+            ),
+        ));
 
         self::assertSame(
             PwdPolicyError::CHANGE_AFTER_RESET,

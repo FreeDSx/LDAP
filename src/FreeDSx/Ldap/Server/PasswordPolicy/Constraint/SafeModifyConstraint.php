@@ -24,6 +24,9 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Decision\PasswordPolicyOutcome;
  */
 final readonly class SafeModifyConstraint implements PasswordChangeConstraint
 {
+    /**
+     * draft-behera-11 §8.2.1 pairs mustSupplyOldPassword with insufficientAccessRights.
+     */
     public function check(PasswordChangeAttempt $attempt): ?PasswordPolicyOutcome
     {
         if (!$attempt->isSelf || $attempt->policy->change->safeModify !== true || ($attempt->oldPassword ?? '') !== '') {
@@ -32,7 +35,7 @@ final readonly class SafeModifyConstraint implements PasswordChangeConstraint
 
         return PasswordPolicyOutcome::deny(
             PwdPolicyError::MUST_SUPPLY_OLD_PASSWORD,
-            ResultCode::CONSTRAINT_VIOLATION,
+            ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
             'The existing password must be supplied.',
         );
     }

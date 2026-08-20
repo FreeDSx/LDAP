@@ -119,7 +119,7 @@ final class PasswordPolicyChangeGuardTest extends TestCase
     {
         $this->assertRejectedWith(
             PwdPolicyError::MUST_SUPPLY_OLD_PASSWORD,
-            ResultCode::CONSTRAINT_VIOLATION,
+            ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
             fn(): mixed => $this->guard(new PasswordPolicy(
                 change: new PasswordChangeRules(safeModify: true),
             ))->enforce($this->attempt($this->entry(), 'a-fresh-password')),
@@ -218,14 +218,12 @@ final class PasswordPolicyChangeGuardTest extends TestCase
     private function attempt(
         Entry $target,
         string $newPassword,
-        string $hashedNewPassword = '{BCRYPT}hash',
         ?string $oldPassword = null,
         bool $isSelf = true,
     ): PasswordModifyAttempt {
         return new PasswordModifyAttempt(
             target: $target,
             newPassword: $newPassword,
-            hashedNewPassword: $hashedNewPassword,
             oldPassword: $oldPassword,
             isSelf: $isSelf,
         );

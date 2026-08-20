@@ -19,8 +19,10 @@ use FreeDSx\Ldap\Control\PwdPolicyResponseControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
@@ -65,6 +67,55 @@ final class LdapPasswordPolicyServerTest extends ServerTestCase
         $this->assertSame(
             PwdPolicyError::CHANGE_AFTER_RESET,
             $control->getError(),
+        );
+    }
+
+    /**
+     * draft-behera-11 §8.3 pairs changeAfterReset with insufficientAccessRights, not unwillingToPerform.
+     */
+    public function testAnOperationUnderResetIsRefusedWithInsufficientAccessRights(): void
+    {
+        $client = $this->ldapClient();
+        $client->bind('cn=reset-user,dc=foo,dc=bar', self::PASSWORD);
+
+        try {
+            $client->search(
+                Operations::search(Filters::equal('cn', 'reset-user'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+                Controls::pwdPolicy(),
+            );
+            $this->fail('Expected the reset gate to refuse the search.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+                $e->getCode(),
+            );
+        }
+    }
+
+    /**
+     * draft-behera-11 §8.1.2.2 names StartTLS among the operations a pwdReset identity may still perform.
+     */
+    public function testStartTlsIsPermittedUnderResetSoTheIdentityCanComply(): void
+    {
+        $dn = 'cn=reset-user,dc=foo,dc=bar';
+        $client = $this->ldapClient();
+        $client->bind($dn, self::PASSWORD);
+
+        $client->startTls();
+        $client->send(Operations::passwordModify(
+            $dn,
+            self::PASSWORD,
+            'a-fresh-password',
+        ));
+
+        // Binding with the new password proves StartTLS was permitted and the change it protects went through.
+        $client->bind($dn, 'a-fresh-password');
+
+        $this->assertSame(
+            'dn:' . $dn,
+            $client->whoami(),
         );
     }
 

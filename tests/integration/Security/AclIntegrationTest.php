@@ -732,6 +732,23 @@ final class AclIntegrationTest extends ServerTestCase
         );
     }
 
+    /**
+     * Authenticating by Compare is not supported, so the password is never comparable and policy cannot be bypassed.
+     */
+    public function testComparingYourOwnPasswordIsDenied(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->ldapClient()->compare(
+            'cn=user,dc=foo,dc=bar',
+            'userPassword',
+            '12345',
+        );
+    }
+
     public function testACustomConfidentialAttributeIsHiddenWithoutAGrant(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');

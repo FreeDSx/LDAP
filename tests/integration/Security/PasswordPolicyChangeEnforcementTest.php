@@ -100,6 +100,51 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
         $this->assertControlError(PwdPolicyError::PASSWORD_IN_HISTORY);
     }
 
+    /**
+     * draft-behera-11 §8.2.6 checks the current password attribute as well as the history.
+     */
+    public function test_setting_the_current_password_again_is_rejected(): void
+    {
+        $handler = $this->handlerFor(
+            new PasswordPolicy(quality: new PasswordQualityRules(inHistory: 5)),
+        );
+
+        $this->handle(
+            $handler,
+            $this->request(self::OLD_PASSWORD, self::OLD_PASSWORD),
+            $this->selfToken(),
+        );
+
+        $this->assertResultCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->assertControlError(PwdPolicyError::PASSWORD_IN_HISTORY);
+    }
+
+    /**
+     * §8.2.7 retains the replaced password, so the immediately previous one cannot come straight back.
+     */
+    public function test_the_password_being_replaced_is_what_enters_history(): void
+    {
+        $handler = $this->handlerFor(
+            new PasswordPolicy(quality: new PasswordQualityRules(inHistory: 3)),
+        );
+
+        $this->handle(
+            $handler,
+            $this->request(self::OLD_PASSWORD, 'a-fresh-password'),
+            $this->selfToken(),
+        );
+        $this->assertResultCode(ResultCode::SUCCESS);
+
+        $this->handle(
+            $handler,
+            $this->request('a-fresh-password', self::OLD_PASSWORD),
+            $this->selfToken(),
+        );
+
+        $this->assertResultCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->assertControlError(PwdPolicyError::PASSWORD_IN_HISTORY);
+    }
+
     public function test_change_within_min_age_is_rejected(): void
     {
         $handler = $this->handlerFor(
@@ -117,6 +162,32 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
         $this->assertControlError(PwdPolicyError::PASSWORD_TOO_YOUNG);
     }
 
+    /**
+     * draft-behera-11 §7.8: an administrative reset stamps pwdChangedTime, so without the waiver pwdMinAge
+     * refuses the one operation §8.1.2.2 leaves the account.
+     */
+    public function test_a_must_change_identity_may_change_within_min_age(): void
+    {
+        $handler = $this->handlerFor(
+            new PasswordPolicy(change: new PasswordChangeRules(
+                minAge: 3600,
+                mustChange: true,
+            )),
+            [
+                PasswordPolicyOid::NAME_PWD_CHANGED_TIME => $this->minutesAgo(30),
+                PasswordPolicyOid::NAME_PWD_RESET => 'TRUE',
+            ],
+        );
+
+        $this->handle(
+            $handler,
+            $this->request(self::OLD_PASSWORD, 'a-fresh-password'),
+            $this->selfToken(),
+        );
+
+        $this->assertResultCode(ResultCode::SUCCESS);
+    }
+
     public function test_safe_modify_without_old_password_is_rejected(): void
     {
         $handler = $this->handlerFor(
@@ -129,7 +200,7 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
             $this->selfToken(),
         );
 
-        $this->assertResultCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->assertResultCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
         $this->assertControlError(PwdPolicyError::MUST_SUPPLY_OLD_PASSWORD);
     }
 

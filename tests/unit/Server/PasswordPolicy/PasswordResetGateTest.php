@@ -60,6 +60,17 @@ final class PasswordResetGateTest extends TestCase
         ));
     }
 
+    /**
+     * draft-behera-11 §8.1.2.2 names StartTLS, and RFC 3062 §4 wants password modify run under confidentiality.
+     */
+    public function test_start_tls_extended_op_is_permitted(): void
+    {
+        self::assertTrue($this->subject->isPermitted(
+            new ExtendedRequest(ExtendedRequest::OID_START_TLS),
+            $this->token(),
+        ));
+    }
+
     public function test_other_extended_op_is_not_permitted(): void
     {
         self::assertFalse($this->subject->isPermitted(

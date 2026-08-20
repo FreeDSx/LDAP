@@ -207,18 +207,20 @@ map to `CONSTRAINT_VIOLATION`.
 
 ### History
 
-With `pwdInHistory` set, the server retains that many previous values in `pwdHistory` and rejects a new password that
-matches any retained value with `passwordInHistory` (`CONSTRAINT_VIOLATION`).
+With `pwdInHistory` set, the server retains that many superseded values in `pwdHistory` and rejects a new password that
+matches any of them, or the current password, with `passwordInHistory` (`CONSTRAINT_VIOLATION`). The value recorded is
+the one being replaced, so the window is the current password plus that many previous ones.
 
 ### Minimum Age
 
 `pwdMinAge` rejects a change attempted within that many seconds of the last change (`pwdChangedTime`) with
-`passwordTooYoung` (`CONSTRAINT_VIOLATION`).
+`passwordTooYoung` (`CONSTRAINT_VIOLATION`). An entry that must change its password is exempt, since the reset
+restriction would otherwise leave it no permitted operation.
 
 ### Safe Modify
 
 When `pwdSafeModify` is `TRUE`, a change must supply the current password. A missing existing password returns
-`mustSupplyOldPassword` (`CONSTRAINT_VIOLATION`). A supplied-but-incorrect one returns `INVALID_CREDENTIALS`.
+`mustSupplyOldPassword` (`INSUFFICIENT_ACCESS_RIGHTS`). A supplied-but-incorrect one returns `INVALID_CREDENTIALS`.
 
 ### Self-Service Changes
 
@@ -272,10 +274,16 @@ bind), falling back to `pwdChangedTime` when no successful bind has been recorde
 ### Change After Reset
 
 When `pwdMustChange` is `TRUE` and an administrator changes another user's password, the server sets `pwdReset`. At the
-user's next bind the response control reports `changeAfterReset`, and the session is restricted to bind, unbind, the
-RFC 3062 Password Modify, and a modify of the user's own password. Any other operation is rejected
-`UNWILLING_TO_PERFORM` with `changeAfterReset` until the password is changed. A successful self-change clears
+user's next bind the response control reports `changeAfterReset`, and the session is restricted to bind, unbind,
+StartTLS, the RFC 3062 Password Modify, and a modify of the user's own password. Any other operation is rejected
+`INSUFFICIENT_ACCESS_RIGHTS` with `changeAfterReset` until the password is changed. A successful self-change clears
 `pwdReset` and lifts the restriction without a rebind.
+
+StartTLS is permitted so a client that bound in the clear can protect the connection before changing its password.
+
+Both flags are required, so an entry marked `pwdReset` is only held to a change while `pwdMustChange` is `TRUE`.
+Clearing the policy flag releases entries already marked, and leaving it unset turns the feature off entirely: nothing
+sets `pwdReset` and nothing enforces it.
 
 ### Validity Window
 

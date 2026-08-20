@@ -64,18 +64,20 @@ final readonly class AuthorizationResolutionMiddleware implements MiddlewareInte
 
     /**
      * The response control rides out via {@see \FreeDSx\Ldap\Protocol\Queue\Response\PasswordPolicyResponseInterceptor}.
+     *
+     * draft-behera-11 §8.3 pairs changeAfterReset with insufficientAccessRights.
      */
     private function passwordChangeRequired(): OperationException
     {
         $this->passwordPolicyContext?->setOutcome(PasswordPolicyOutcome::deny(
             PwdPolicyError::CHANGE_AFTER_RESET,
-            ResultCode::UNWILLING_TO_PERFORM,
+            ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
             self::PASSWORD_CHANGE_REQUIRED,
         ));
 
         return new OperationException(
             self::PASSWORD_CHANGE_REQUIRED,
-            ResultCode::UNWILLING_TO_PERFORM,
+            ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
         );
     }
 }

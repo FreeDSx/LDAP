@@ -94,7 +94,7 @@ final readonly class PasswordPolicyAwareAuthenticator implements PasswordAuthent
 
         $this->guard->recordSuccess($attempt);
 
-        if ($attempt->state->mustChange) {
+        if ($attempt->state->mustChangeUnder($policy)) {
             $token->markMustChangePassword();
         }
 

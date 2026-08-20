@@ -104,6 +104,22 @@ final class MinAgeConstraintTest extends TestCase
         );
     }
 
+    /**
+     * draft-behera-11 §7.8: the reset gate permits only a password change, so pwdMinAge must not refuse it too.
+     */
+    public function test_a_must_change_identity_is_exempt_from_min_age(): void
+    {
+        self::assertNull(
+            $this->subject->check(
+                $this->attempt(
+                    minAge: 3600,
+                    changedAt: $this->utc('2026-05-20T11:30:00Z'),
+                    mustChange: true,
+                ),
+            ),
+        );
+    }
+
     public function test_age_exactly_at_boundary_passes(): void
     {
         self::assertNull(
@@ -135,13 +151,20 @@ final class MinAgeConstraintTest extends TestCase
         ?int $minAge,
         ?DateTimeImmutable $changedAt,
         bool $isSelf = true,
+        bool $mustChange = false,
     ): PasswordChangeAttempt {
         return new PasswordChangeAttempt(
             newPassword: 'newpw',
             oldPassword: null,
-            state: new UserPasswordState(changedAt: $changedAt),
+            state: new UserPasswordState(
+                changedAt: $changedAt,
+                mustChange: $mustChange,
+            ),
             policy: new PasswordPolicy(
-                change: new PasswordChangeRules(minAge: $minAge),
+                change: new PasswordChangeRules(
+                    minAge: $minAge,
+                    mustChange: $mustChange,
+                ),
             ),
             isSelf: $isSelf,
         );

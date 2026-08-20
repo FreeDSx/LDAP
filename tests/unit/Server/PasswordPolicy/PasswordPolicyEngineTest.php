@@ -21,12 +21,14 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
+use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\PasswordChangeAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\PasswordChangeConstraint;
 use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\PasswordChangeConstraintChain;
 use FreeDSx\Ldap\Server\PasswordPolicy\HistoryEntry;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\PasswordPolicyOutcome;
+use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordChangeRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordExpirationRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
@@ -163,13 +165,63 @@ final class PasswordPolicyEngineTest extends TestCase
         );
     }
 
-    public function test_evaluatePreBind_idle_baseline_uses_most_recent_activity(): void
+    /**
+     * §7.1 locks on reaching pwdMaxIdle, so the boundary second is already too idle.
+     */
+    public function test_evaluatePreBind_idle_locks_exactly_at_max_idle(): void
+    {
+        $outcome = $this->subject->evaluatePreBind(
+            new UserPasswordState(lastSuccess: $this->minutesAgo(60)),
+            new PasswordPolicy(
+                expiration: new PasswordExpirationRules(maxIdle: 3600),
+            ),
+        );
+
+        self::assertTrue($outcome->denied);
+    }
+
+    /**
+     * §7.1 locks when the current time reaches pwdEndTime, not the second after it.
+     */
+    public function test_evaluatePreBind_denies_exactly_at_the_end_time(): void
+    {
+        $outcome = $this->subject->evaluatePreBind(
+            new UserPasswordState(endTime: $this->clock->now()),
+            new PasswordPolicy(),
+        );
+
+        self::assertTrue($outcome->denied);
+        self::assertSame(
+            PwdPolicyError::PASSWORD_EXPIRED,
+            $outcome->errorCode,
+        );
+    }
+
+    /**
+     * draft-behera-11 §7.1 counts idleness from pwdLastSuccess, so changing the password does not refresh it.
+     */
+    public function test_evaluatePreBind_idle_baseline_ignores_a_recent_password_change(): void
     {
         $outcome = $this->subject->evaluatePreBind(
             new UserPasswordState(
                 changedAt: $this->minutesAgo(1),
                 lastSuccess: $this->minutesAgo(120),
             ),
+            new PasswordPolicy(
+                expiration: new PasswordExpirationRules(maxIdle: 3600),
+            ),
+        );
+
+        self::assertTrue($outcome->denied);
+    }
+
+    /**
+     * §7.1 falls back to pwdChangedTime only when no successful bind has been recorded.
+     */
+    public function test_evaluatePreBind_idle_baseline_falls_back_to_the_change_time(): void
+    {
+        $outcome = $this->subject->evaluatePreBind(
+            new UserPasswordState(changedAt: $this->minutesAgo(1)),
             new PasswordPolicy(
                 expiration: new PasswordExpirationRules(maxIdle: 3600),
             ),
@@ -564,7 +616,9 @@ final class PasswordPolicyEngineTest extends TestCase
     {
         $result = $this->subject->recordBindSuccess(
             new UserPasswordState(mustChange: true),
-            new PasswordPolicy(),
+            new PasswordPolicy(
+                change: new PasswordChangeRules(mustChange: true),
+            ),
         );
 
         self::assertFalse($result->outcome->denied);
@@ -572,6 +626,19 @@ final class PasswordPolicyEngineTest extends TestCase
             PwdPolicyError::CHANGE_AFTER_RESET,
             $result->outcome->errorCode,
         );
+    }
+
+    /**
+     * draft-behera-11 §7.2 needs both flags, so clearing pwdMustChange releases an entry still marked pwdReset.
+     */
+    public function test_recordBindSuccess_ignores_pwd_reset_when_the_policy_does_not_require_a_change(): void
+    {
+        $result = $this->subject->recordBindSuccess(
+            new UserPasswordState(mustChange: true),
+            new PasswordPolicy(),
+        );
+
+        self::assertNull($result->outcome->errorCode);
     }
 
     public function test_evaluatePasswordChange_delegates_to_constraint_chain(): void
@@ -583,13 +650,7 @@ final class PasswordPolicyEngineTest extends TestCase
         );
         $engine = $this->engineWith($this->stubConstraint($deny));
 
-        $outcome = $engine->evaluatePasswordChange(
-            newPassword: 'newpw',
-            oldPassword: null,
-            state: new UserPasswordState(),
-            policy: new PasswordPolicy(),
-            isSelf: true,
-        );
+        $outcome = $engine->evaluatePasswordChange($this->changeAttempt());
 
         self::assertSame(
             $deny,
@@ -601,13 +662,7 @@ final class PasswordPolicyEngineTest extends TestCase
     {
         $outcome = $this
             ->engineWith($this->stubConstraint(null))
-            ->evaluatePasswordChange(
-                newPassword: 'newpw',
-                oldPassword: null,
-                state: new UserPasswordState(),
-                policy: new PasswordPolicy(),
-                isSelf: true,
-            );
+            ->evaluatePasswordChange($this->changeAttempt());
 
         self::assertFalse($outcome->denied);
     }
@@ -618,36 +673,19 @@ final class PasswordPolicyEngineTest extends TestCase
         $policy = new PasswordPolicy();
         $constraint = new RecordingPasswordChangeConstraint();
 
-        $this->engineWith($constraint)->evaluatePasswordChange(
-            newPassword: 'newpw',
-            oldPassword: 'oldpw',
+        $given = $this->changeAttempt(
             state: $state,
             policy: $policy,
+            oldPassword: 'oldpw',
             isSelf: false,
         );
 
-        self::assertCount(
-            1,
+        $this->engineWith($constraint)->evaluatePasswordChange($given);
+
+        self::assertSame(
+            [$given],
             $constraint->invocations,
         );
-        $attempt = $constraint->invocations[0];
-        self::assertSame(
-            'newpw',
-            $attempt->newPassword,
-        );
-        self::assertSame(
-            'oldpw',
-            $attempt->oldPassword,
-        );
-        self::assertSame(
-            $state,
-            $attempt->state,
-        );
-        self::assertSame(
-            $policy,
-            $attempt->policy,
-        );
-        self::assertFalse($attempt->isSelf);
     }
 
     public function test_recordPasswordChange_stamps_changed_time(): void
@@ -696,7 +734,7 @@ final class PasswordPolicyEngineTest extends TestCase
         );
 
         $changes = $this->subject->recordPasswordChange(
-            ['{BCRYPT}brand-new'],
+            ['{BCRYPT}replaced'],
             new UserPasswordState(history: [
                 $newer,
                 $oldest,
@@ -716,7 +754,7 @@ final class PasswordPolicyEngineTest extends TestCase
             $values,
         );
         self::assertStringContainsString(
-            '{BCRYPT}brand-new',
+            '{BCRYPT}replaced',
             $values[0],
         );
         self::assertStringContainsString(
@@ -926,6 +964,21 @@ final class PasswordPolicyEngineTest extends TestCase
         );
 
         self::assertTrue($changes->isEmpty());
+    }
+
+    private function changeAttempt(
+        ?UserPasswordState $state = null,
+        ?PasswordPolicy $policy = null,
+        ?string $oldPassword = null,
+        bool $isSelf = true,
+    ): PasswordChangeAttempt {
+        return new PasswordChangeAttempt(
+            newPassword: 'newpw',
+            oldPassword: $oldPassword,
+            state: $state ?? new UserPasswordState(),
+            policy: $policy ?? new PasswordPolicy(),
+            isSelf: $isSelf,
+        );
     }
 
     private function engineWith(PasswordChangeConstraint $constraint): PasswordPolicyEngine

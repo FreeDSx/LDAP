@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordModifyAttempt;
+use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\PasswordChangeAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\PasswordPolicyOutcome;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
@@ -65,16 +66,22 @@ final readonly class PasswordPolicyChangeGuard
         }
 
         $state = UserPasswordState::fromEntry($primary->target);
+        // The values being replaced serve both §8.2.6's current-password check and §8.2.7's history rotation.
+        // An entry created by this same operation holds the new values, not superseded ones.
+        $replaced = $primary->isNewEntry
+            ? []
+            : array_values($primary->target->get($policy->pwdAttribute)?->getValues() ?? []);
 
         foreach ($attempts as $attempt) {
-            $outcome = $this->engine->evaluatePasswordChange(
-                $attempt->newPassword,
-                $attempt->oldPassword,
-                $state,
-                $policy,
-                $attempt->isSelf,
-                $attempt->passwordIsCleartext,
-            );
+            $outcome = $this->engine->evaluatePasswordChange(new PasswordChangeAttempt(
+                newPassword: $attempt->newPassword,
+                oldPassword: $attempt->oldPassword,
+                state: $state,
+                policy: $policy,
+                isSelf: $attempt->isSelf,
+                passwordIsCleartext: $attempt->passwordIsCleartext,
+                currentPasswords: $replaced,
+            ));
             if ($outcome->denied) {
                 $this->reject(
                     $outcome,
@@ -89,10 +96,7 @@ final readonly class PasswordPolicyChangeGuard
         );
 
         return $this->engine->recordPasswordChange(
-            array_map(
-                static fn(PasswordModifyAttempt $attempt): string => $attempt->hashedNewPassword,
-                $attempts,
-            ),
+            $replaced,
             $state,
             $policy,
             $primary->isSelf,

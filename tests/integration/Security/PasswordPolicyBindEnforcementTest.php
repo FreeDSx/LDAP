@@ -37,6 +37,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use Tests\Support\FreeDSx\Ldap\Server\Clock\RecordingSleeper;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
+use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordChangeRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordExpirationRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use PHPUnit\Framework\TestCase;
@@ -391,11 +392,44 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
         }
     }
 
-    public function test_recent_password_change_recovers_an_idle_locked_account(): void
+    /**
+     * draft-behera-11 §7.1 counts idleness from pwdLastSuccess, so a password change does not refresh it.
+     */
+    public function test_a_recent_password_change_does_not_recover_an_idle_locked_account(): void
     {
         $authenticator = $this->authenticatorFor(
             $this->user([
                 PasswordPolicyOid::NAME_PWD_LAST_SUCCESS => $this->minutesAgo(120),
+                PasswordPolicyOid::NAME_PWD_CHANGED_TIME => $this->minutesAgo(1),
+            ]),
+            new PasswordPolicy(
+                expiration: new PasswordExpirationRules(maxIdle: 3600),
+            ),
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_CREDENTIALS);
+
+        try {
+            $authenticator->authenticate(
+                self::USER_DN,
+                self::PASSWORD,
+            );
+        } finally {
+            self::assertSame(
+                PwdPolicyError::ACCOUNT_LOCKED,
+                $this->context->getOutcome()?->errorCode,
+            );
+        }
+    }
+
+    /**
+     * §7.1 falls back to pwdChangedTime only when no successful bind has been recorded.
+     */
+    public function test_idle_falls_back_to_the_change_time_when_no_bind_was_recorded(): void
+    {
+        $authenticator = $this->authenticatorFor(
+            $this->user([
                 PasswordPolicyOid::NAME_PWD_CHANGED_TIME => $this->minutesAgo(1),
             ]),
             new PasswordPolicy(
@@ -478,7 +512,9 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
             $this->user([
                 PasswordPolicyOid::NAME_PWD_RESET => 'TRUE',
             ]),
-            new PasswordPolicy(),
+            new PasswordPolicy(
+                change: new PasswordChangeRules(mustChange: true),
+            ),
         );
 
         $authenticator->authenticate(
@@ -493,13 +529,36 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
         $this->assertEventRecorded(ServerEvent::PasswordPolicyMustChange);
     }
 
-    public function test_pwd_reset_marks_token_for_required_change(): void
+    /**
+     * draft-behera-11 §7.2 needs both flags, so clearing pwdMustChange releases an entry still marked pwdReset.
+     */
+    public function test_pwd_reset_is_ignored_when_the_policy_does_not_require_a_change(): void
     {
         $authenticator = $this->authenticatorFor(
             $this->user([
                 PasswordPolicyOid::NAME_PWD_RESET => 'TRUE',
             ]),
             new PasswordPolicy(),
+        );
+
+        $token = $authenticator->authenticate(
+            self::USER_DN,
+            self::PASSWORD,
+        );
+
+        self::assertFalse($token->mustChangePassword());
+        self::assertNull($this->context->getOutcome()?->errorCode);
+    }
+
+    public function test_pwd_reset_marks_token_for_required_change(): void
+    {
+        $authenticator = $this->authenticatorFor(
+            $this->user([
+                PasswordPolicyOid::NAME_PWD_RESET => 'TRUE',
+            ]),
+            new PasswordPolicy(
+                change: new PasswordChangeRules(mustChange: true),
+            ),
         );
 
         $token = $authenticator->authenticate(

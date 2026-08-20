@@ -35,6 +35,12 @@ final readonly class MinAgeConstraint implements PasswordChangeConstraint
             return null;
         }
 
+        // draft-behera-11 §7.8: an identity that must change its password is exempt, since the reset gate
+        // leaves it no other operation and the two rules would otherwise trap the account.
+        if ($attempt->state->mustChangeUnder($attempt->policy)) {
+            return null;
+        }
+
         $age = $this->clock->now()->getTimestamp() - $changedAt->getTimestamp();
         if ($age >= $minAge) {
             return null;
