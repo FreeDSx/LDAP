@@ -18,7 +18,6 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
@@ -29,25 +28,31 @@ use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\SchemaResource;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Backend\Storage\FilterEvaluatorFactoryTrait;
+use Tests\Support\FreeDSx\Ldap\Schema\FixedSchemaSource;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class FilterEvaluatorTest extends TestCase
 {
-    use FilterEvaluatorFactoryTrait;
+    use ServerContainerTrait;
 
-    private FilterEvaluator $subject;
+    private FilterEvaluatorInterface $subject;
 
     private Entry $entry;
 
     protected function setUp(): void
     {
         // NIS is merged in for uidNumber: an unrecognized type is Undefined, so the fixture must define what it asserts on.
-        $this->subject = $this->makeFilterEvaluator(
-            SchemaResource::Core->load()->merge(SchemaResource::Nis->load()),
+        $this->subject = $this->fromContainer(
+            FilterEvaluatorInterface::class,
+            options: TestServerOptions::unvalidated(
+                SchemaResource::Core,
+                SchemaResource::Nis,
+            ),
         );
 
         $this->entry = new Entry(
@@ -876,7 +881,7 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_equality_uses_octet_string_match_for_userpassword(): void
     {
-        $subject = $this->makeFilterEvaluator();
+        $subject = $this->fromContainer(FilterEvaluatorInterface::class);
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),
             new Attribute('userPassword', 'Secret'),
@@ -892,7 +897,7 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_equality_collapses_whitespace_for_cn(): void
     {
-        $subject = $this->makeFilterEvaluator();
+        $subject = $this->fromContainer(FilterEvaluatorInterface::class);
         $entry = new Entry(
             new Dn('cn=Foo  Bar,dc=example,dc=com'),
             new Attribute('cn', 'Foo  Bar'),
@@ -908,7 +913,7 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_substring_matches_across_collapsed_spaces(): void
     {
-        $subject = $this->makeFilterEvaluator();
+        $subject = $this->fromContainer(FilterEvaluatorInterface::class);
         $entry = new Entry(
             new Dn('cn=Foo  Bar Baz,dc=example,dc=com'),
             new Attribute('cn', 'Foo  Bar Baz'),
@@ -951,7 +956,10 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_schema_gte_uses_digit_heuristic_for_attribute_unknown_to_schema(): void
     {
-        $subject = $this->makeFilterEvaluator(SchemaResource::Core->load());
+        $subject = $this->fromContainer(
+            FilterEvaluatorInterface::class,
+            options: TestServerOptions::unvalidatedCore(),
+        );
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),
             new Attribute('uidNumber', '99'),
@@ -1061,14 +1069,18 @@ final class FilterEvaluatorTest extends TestCase
      */
     public function test_a_substring_fragment_is_not_subject_to_the_assertion_syntax_check(): void
     {
-        $subject = $this->makeFilterEvaluator(
-            SchemaResource::Core->load()->addAttributeType(new AttributeType(
-                oid: '1.3.6.1.4.1.99999.5.1',
-                names: ['serialCode'],
-                equalityOid: MatchingRuleOid::OID_INTEGER_MATCH,
-                substringOid: MatchingRuleOid::OID_CASE_IGNORE_SUBSTRINGS_MATCH,
-                syntaxOid: SyntaxOid::OID_INTEGER,
-            )),
+        $subject = $this->fromContainer(
+            FilterEvaluatorInterface::class,
+            options: TestServerOptions::unvalidated(
+                SchemaResource::Core,
+                FixedSchemaSource::withAttributeTypes(new AttributeType(
+                    oid: '1.3.6.1.4.1.99999.5.1',
+                    names: ['serialCode'],
+                    equalityOid: MatchingRuleOid::OID_INTEGER_MATCH,
+                    substringOid: MatchingRuleOid::OID_CASE_IGNORE_SUBSTRINGS_MATCH,
+                    syntaxOid: SyntaxOid::OID_INTEGER,
+                )),
+            ),
         );
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),
@@ -1165,13 +1177,17 @@ final class FilterEvaluatorTest extends TestCase
 
     public function test_a_substring_rule_is_inherited_through_the_sup_chain(): void
     {
-        $subject = $this->makeFilterEvaluator(
-            SchemaResource::Core->load()->addAttributeType(new AttributeType(
-                oid: '1.3.6.1.4.1.99999.5.2',
-                names: ['nickName'],
-                equalityOid: MatchingRuleOid::OID_CASE_IGNORE_MATCH,
-                superTypeOid: '2.5.4.41',
-            )),
+        $subject = $this->fromContainer(
+            FilterEvaluatorInterface::class,
+            options: TestServerOptions::unvalidated(
+                SchemaResource::Core,
+                FixedSchemaSource::withAttributeTypes(new AttributeType(
+                    oid: '1.3.6.1.4.1.99999.5.2',
+                    names: ['nickName'],
+                    equalityOid: MatchingRuleOid::OID_CASE_IGNORE_MATCH,
+                    superTypeOid: '2.5.4.41',
+                )),
+            ),
         );
         $entry = new Entry(
             new Dn('cn=Test,dc=example,dc=com'),

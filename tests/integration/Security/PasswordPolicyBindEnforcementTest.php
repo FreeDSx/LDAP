@@ -40,7 +40,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordExpirationRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Backend\Storage\BackendFactoryTrait;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
 use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
 
@@ -49,7 +49,7 @@ use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
  */
 final class PasswordPolicyBindEnforcementTest extends TestCase
 {
-    use BackendFactoryTrait;
+    use ServerContainerTrait;
 
     private const NOW = '2026-05-20T12:00:00Z';
 
@@ -545,7 +545,7 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
         Entry $user,
         PasswordPolicy $policy,
     ): PasswordPolicyAwareAuthenticator {
-        $this->backend = self::makeWritableBackend(new InMemoryStorage([
+        $this->backend = $this->backendFor(new InMemoryStorage([
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [

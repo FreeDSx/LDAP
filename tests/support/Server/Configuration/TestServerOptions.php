@@ -1,0 +1,85 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * This file is part of the FreeDSx LDAP package.
+ *
+ * (c) Chad Sikorra <Chad.Sikorra@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+namespace Tests\Support\FreeDSx\Ldap\Server\Configuration;
+
+use FreeDSx\Ldap\Schema\SchemaResource;
+use FreeDSx\Ldap\Schema\SchemaSourceInterface;
+use FreeDSx\Ldap\Schema\SchemaValidationMode;
+use FreeDSx\Ldap\Server\Config\SchemaConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
+use FreeDSx\Ldap\ServerOptions;
+
+/**
+ * Configuration presets for tests, so the container is the only thing assembling services.
+ */
+final class TestServerOptions
+{
+    /**
+     * What a test asserting on storage or filter semantics wants, rather than on schema enforcement.
+     */
+    public static function unvalidatedCore(): ServerOptions
+    {
+        return self::unvalidated(SchemaResource::Core);
+    }
+
+    /**
+     * Core definitions enforced at the given mode, for a test asserting on schema enforcement itself.
+     */
+    public static function validatedCore(SchemaValidationMode $mode): ServerOptions
+    {
+        return new ServerOptions(
+            schemaConfig: (new SchemaConfig())
+                ->setSources(SchemaResource::Core)
+                ->setValidationMode($mode),
+        );
+    }
+
+    /**
+     * Sources merge in order, so a later one may build on an earlier one.
+     */
+    public static function unvalidated(SchemaSourceInterface ...$sources): ServerOptions
+    {
+        return new ServerOptions(
+            schemaConfig: self::unvalidatedCoreSchema()
+                ->setSources(...$sources),
+        );
+    }
+
+    /**
+     * A transient database, which is what a storage test wants unless it needs one that outlives the connection.
+     */
+    public static function sqlite(): ServerOptions
+    {
+        return self::forStorage(PdoConfig::forSqlite(':memory:'));
+    }
+
+    /**
+     * The given storage, for a test that has to configure the adapter itself.
+     */
+    public static function forStorage(StorageConfigInterface $storageConfig): ServerOptions
+    {
+        return new ServerOptions(
+            $storageConfig,
+            schemaConfig: self::unvalidatedCoreSchema(),
+        );
+    }
+
+    private static function unvalidatedCoreSchema(): SchemaConfig
+    {
+        return (new SchemaConfig())
+            ->setSources(SchemaResource::Core)
+            ->setValidationMode(SchemaValidationMode::Off);
+    }
+}

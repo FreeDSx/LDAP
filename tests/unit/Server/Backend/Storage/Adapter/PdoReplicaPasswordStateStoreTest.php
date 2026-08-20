@@ -19,51 +19,39 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoReplicaPasswordStateStore;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
-use PDO;
+use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Backend\Storage\PdoStorageFactoryTrait;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class PdoReplicaPasswordStateStoreTest extends TestCase
 {
-    use PdoStorageFactoryTrait;
+    use ServerContainerTrait;
 
     private const DN = 'cn=foo,dc=example,dc=com';
 
-    private PDO $pdo;
-
-    private PdoStorage $storage;
+    private EntryStorageInterface $storage;
 
     private ReplicaPasswordStateStoreInterface $subject;
 
+    /**
+     * Both come from one container, so the store and the storage share the connection they are assembled on.
+     *
+     * State rows are foreign-keyed to the entry they describe, so the entry has to exist before any state does.
+     */
     protected function setUp(): void
     {
-        $this->pdo = new PDO('sqlite::memory:');
-        PdoStorage::initialize(
-            $this->pdo,
-            new SqliteDialect(),
-        );
-        $provider = new SharedPdoConnectionProvider(
-            $this->pdo,
-            fn(): PDO => $this->pdo,
-        );
-        $this->storage = self::makePdoStorage($provider);
-        $this->subject = new PdoReplicaPasswordStateStore(
-            new PdoTransactor(
-                $provider,
-                new SqliteDialect(),
-            ),
-            new SqliteDialect(),
-            new PdoStatementPool($provider),
-        );
+        $this->storage = $this->fromContainer(EntryStorageInterface::class);
+        $this->subject = $this->fromContainer(ReplicaPasswordStateStoreInterface::class);
+
+        $this->storage->store(new Entry(
+            new Dn(self::DN),
+            new Attribute('cn', 'foo'),
+        ));
     }
 
     public function test_load_is_empty_when_nothing_was_recorded(): void
@@ -295,6 +283,11 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         );
 
         self::assertFalse($this->subject->load(new Dn(self::DN))->isEmpty());
+    }
+
+    protected function makeServerOptions(): ServerOptions
+    {
+        return TestServerOptions::sqlite();
     }
 
     private function applyFailure(string $time): void

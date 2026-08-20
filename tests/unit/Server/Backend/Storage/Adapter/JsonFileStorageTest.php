@@ -22,7 +22,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeAppenderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
@@ -37,7 +37,8 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Backend\Storage\BackendFactoryTrait;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
@@ -45,7 +46,7 @@ use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
 
 final class JsonFileStorageTest extends TestCase
 {
-    use BackendFactoryTrait;
+    use ServerContainerTrait;
 
     use JournalingStorageContractTests;
 
@@ -73,7 +74,7 @@ final class JsonFileStorageTest extends TestCase
         );
 
         $this->storage = $this->makeStorage($this->tempFile);
-        $this->subject = self::makeWritableBackend($this->storage);
+        $this->subject = $this->backendFor($this->storage);
         $this->subject->add(
             new AddCommand(
                 new Entry(
@@ -158,7 +159,7 @@ final class JsonFileStorageTest extends TestCase
     public function test_get_on_nonexistent_file_returns_null(): void
     {
         $storage = $this->makeStorage($this->tempFile . '.nonexistent');
-        $backend = self::makeWritableBackend($storage);
+        $backend = $this->backendFor($storage);
 
         self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
@@ -167,7 +168,7 @@ final class JsonFileStorageTest extends TestCase
     {
         file_put_contents($this->tempFile, '');
         $storage = $this->makeStorage($this->tempFile);
-        $backend = self::makeWritableBackend($storage);
+        $backend = $this->backendFor($storage);
 
         self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
@@ -176,7 +177,7 @@ final class JsonFileStorageTest extends TestCase
     {
         file_put_contents($this->tempFile, 'not valid json {{{');
         $storage = $this->makeStorage($this->tempFile);
-        $backend = self::makeWritableBackend($storage);
+        $backend = $this->backendFor($storage);
 
         self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
@@ -190,7 +191,7 @@ final class JsonFileStorageTest extends TestCase
         );
 
         // A second independent backend reading the same file should see the new entry.
-        $backend2 = self::makeWritableBackend($this->makeStorage($this->tempFile));
+        $backend2 = $this->backendFor($this->makeStorage($this->tempFile));
 
         self::assertNotNull($backend2->get(new Dn('cn=Persistent,dc=example,dc=com')));
     }
@@ -202,7 +203,7 @@ final class JsonFileStorageTest extends TestCase
             $this->context(),
         );
 
-        $backend2 = self::makeWritableBackend($this->makeStorage($this->tempFile));
+        $backend2 = $this->backendFor($this->makeStorage($this->tempFile));
 
         self::assertNull($backend2->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
@@ -227,7 +228,7 @@ final class JsonFileStorageTest extends TestCase
     public function test_cache_is_invalidated_after_write(): void
     {
         $storage = $this->makeStorage($this->tempFile);
-        $backend = self::makeWritableBackend($storage);
+        $backend = $this->backendFor($storage);
 
         // Prime the cache with a valid file (contains Alice).
         self::assertNotNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
@@ -358,9 +359,11 @@ final class JsonFileStorageTest extends TestCase
     public function test_a_recorded_write_is_journaled_through_the_buffer(): void
     {
         $storage = $this->makeJournaledStorage($this->registerTemp());
-        $backend = self::makeWritableBackend(
-            storage: $storage,
-            changeRecorder: new ChangeRecorder(),
+        $backend = $this->backendFor(
+            $storage,
+            // A recorder is only wired when a journal is configured and the storage can journal.
+            TestServerOptions::unvalidatedCore()
+                ->setChangeJournalConfig(new ChangeJournalConfig()),
         );
 
         $backend->add(
@@ -423,9 +426,11 @@ final class JsonFileStorageTest extends TestCase
             $base,
             $logger,
         );
-        $backend = self::makeWritableBackend(
-            storage: $storage,
-            changeRecorder: new ChangeRecorder(),
+        $backend = $this->backendFor(
+            $storage,
+            // A recorder is only wired when a journal is configured and the storage can journal.
+            TestServerOptions::unvalidatedCore()
+                ->setChangeJournalConfig(new ChangeJournalConfig()),
         );
 
         // Swallow the E_WARNING fopen() raises on the directory sidecar; the thrown StorageIoException is the point.

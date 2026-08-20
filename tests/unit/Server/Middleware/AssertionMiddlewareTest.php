@@ -28,7 +28,8 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use Tests\Support\FreeDSx\Ldap\Backend\Storage\FilterEvaluatorFactoryTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -39,7 +40,7 @@ use Tests\Support\FreeDSx\Ldap\Middleware\RecordingMiddlewareHandler;
 
 final class AssertionMiddlewareTest extends TestCase
 {
-    use FilterEvaluatorFactoryTrait;
+    use ServerContainerTrait;
 
     private LdapBackendInterface&MockObject $backend;
 
@@ -58,7 +59,7 @@ final class AssertionMiddlewareTest extends TestCase
             ));
 
         $this->subject = new AssertionMiddleware(new AssertionEvaluator(
-            $this->makeFilterEvaluator(),
+            $this->fromContainer(FilterEvaluatorInterface::class),
             $this->backend,
             new RuleBasedAccessControl(AclRules::fromEmpty()),
         ));

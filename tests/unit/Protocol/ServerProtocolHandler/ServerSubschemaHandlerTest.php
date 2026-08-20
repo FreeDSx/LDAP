@@ -22,11 +22,11 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\GeneratedEntryResponder;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSubschemaHandler;
-use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
-use Tests\Support\FreeDSx\Ldap\Backend\Storage\FilterEvaluatorFactoryTrait;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -34,7 +34,7 @@ use PHPUnit\Framework\TestCase;
 
 final class ServerSubschemaHandlerTest extends TestCase
 {
-    use FilterEvaluatorFactoryTrait;
+    use ServerContainerTrait;
 
     private TokenInterface&MockObject $mockToken;
 
@@ -49,7 +49,7 @@ final class ServerSubschemaHandlerTest extends TestCase
 
         $this->subject = new ServerSubschemaHandler(
             options: $this->options,
-            responder: $this->responder($this->options->getSchema()),
+            responder: $this->responder(),
         );
     }
 
@@ -162,12 +162,15 @@ final class ServerSubschemaHandlerTest extends TestCase
         );
     }
 
-    private function responder(Schema $schema): GeneratedEntryResponder
+    private function responder(): GeneratedEntryResponder
     {
         return new GeneratedEntryResponder(
             new RuleBasedAccessControl(),
-            $this->makeFilterEvaluator($schema),
-            $schema,
+            $this->fromContainer(
+                FilterEvaluatorInterface::class,
+                options: $this->options,
+            ),
+            $this->options->getSchema(),
         );
     }
 

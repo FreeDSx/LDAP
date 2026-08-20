@@ -15,14 +15,15 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Subentry;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use Tests\Support\FreeDSx\Ldap\Backend\Storage\FilterEvaluatorFactoryTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\Subentry\SubtreeSpecificationEvaluator;
 use FreeDSx\Ldap\Server\Subentry\SubtreeSpecificationParser;
 use PHPUnit\Framework\TestCase;
 
 final class SubtreeSpecificationEvaluatorTest extends TestCase
 {
-    use FilterEvaluatorFactoryTrait;
+    use ServerContainerTrait;
 
     private const ADMIN_POINT = 'ou=area,dc=foo,dc=bar';
 
@@ -33,7 +34,7 @@ final class SubtreeSpecificationEvaluatorTest extends TestCase
     protected function setUp(): void
     {
         $this->subject = new SubtreeSpecificationEvaluator(
-            $this->makeFilterEvaluator(),
+            $this->fromContainer(FilterEvaluatorInterface::class),
         );
         $this->parser = new SubtreeSpecificationParser();
     }
