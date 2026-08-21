@@ -83,6 +83,42 @@ final class MysqlDialect implements PdoDialectInterface
         return 768;
     }
 
+    protected function charLength(string $column): string
+    {
+        return "CHAR_LENGTH($column)";
+    }
+
+    protected function concat(
+        string $left,
+        string $right,
+    ): string {
+        return "CONCAT($left, $right)";
+    }
+
+    /**
+     * The entry table's collation is case-insensitive, so the comparison is taken to bytes to match every other adapter.
+     */
+    protected function binaryCompare(
+        string $left,
+        string $right,
+    ): string {
+        return "CAST($left AS BINARY) = CAST($right AS BINARY)";
+    }
+
+    /**
+     * Wrapped in a derived table, which MySQL materializes.
+     *
+     * A subquery is otherwise refused for reading the table the statement is updating.
+     */
+    protected function scopedSubtreeIds(): string
+    {
+        $walk = $this->subtreeWalk();
+
+        return <<<SQL
+            SELECT scoped.entry_id FROM ($walk) AS scoped
+        SQL;
+    }
+
     protected function schemaName(): string
     {
         return 'mysql';

@@ -67,6 +67,16 @@ final readonly class WriteSerializingStorage implements EntryStorageInterface, R
         ));
     }
 
+    public function renameSubtree(
+        Dn $from,
+        Dn $to,
+    ): void {
+        $this->queue->run(fn() => $this->writes->renameSubtree(
+            $from,
+            $to,
+        ));
+    }
+
     public function remove(Dn $dn): void
     {
         $this->queue->run(fn() => $this->writes->remove($dn));

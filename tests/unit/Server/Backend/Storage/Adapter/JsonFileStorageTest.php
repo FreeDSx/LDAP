@@ -44,12 +44,15 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
+use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 
 final class JsonFileStorageTest extends TestCase
 {
     use ServerContainerTrait;
 
     use JournalingStorageContractTests;
+
+    use SubtreeRenameStorageContractTests;
 
     private WritableStorageBackend $subject;
 
@@ -467,6 +470,19 @@ final class JsonFileStorageTest extends TestCase
             $this->registerTemp(),
             $journal,
         );
+    }
+
+    protected function makeRenameStorage(Entry ...$entries): EntryStorageInterface
+    {
+        $storage = $this->makeStorage($this->registerTemp());
+
+        $storage->atomic(static function (EntryStorageInterface $buffer) use ($entries): void {
+            foreach ($entries as $entry) {
+                $buffer->store($entry);
+            }
+        });
+
+        return $storage;
     }
 
     /**

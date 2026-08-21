@@ -57,6 +57,16 @@ interface EntryStorageInterface
     ): void;
 
     /**
+     * Re-key the entry at $from and every descendant under $to, leaving attributes and secondary-index rows untouched.
+     *
+     * $to must be free, its parent must exist, and $to may not sit at or under $from.
+     */
+    public function renameSubtree(
+        Dn $from,
+        Dn $to,
+    ): void;
+
+    /**
      * Remove the entry for the given normalised DN. A no-op if the entry does not exist.
      */
     public function remove(Dn $dn): void;

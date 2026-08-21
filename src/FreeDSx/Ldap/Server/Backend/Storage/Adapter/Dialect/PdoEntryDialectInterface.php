@@ -113,6 +113,22 @@ interface PdoEntryDialectInterface
     public function queryUpsert(): string;
 
     /**
+     * Re-key one entry in place.
+     *
+     * Parameters: [dn, lc_dn, lc_parent_dn, current lc_dn]
+     */
+    public function queryRenameEntry(): string;
+
+    /**
+     * Re-key every entry beneath a DN, keeping each stored DN's own leading RDNs where it carries the source's stored
+     * form. Lengths are counted in characters.
+     *
+     * Parameters: [from dn length, from dn, from dn length, to dn, from lc_dn length, to lc_dn, from lc_dn length,
+     * to lc_dn, from lc_dn length, to lc_dn, from lc_dn]
+     */
+    public function queryRenameDescendants(): string;
+
+    /**
      * `DELETE FROM entries WHERE lc_dn = ?`. Parameters: [lc_dn]
      */
     public function queryDelete(): string;
@@ -133,7 +149,7 @@ interface PdoEntryDialectInterface
     public function querySidecarDeleteNames(int $count): string;
 
     /**
-     * INSERT prefix for the sidecar; caller appends `(?, ?, ?, ?)` tuples for (entry_lc_dn, attr_name_lower, value_lower, value_original).
+     * INSERT prefix for the sidecar; caller appends `(?, ?, ?, ?)` tuples for (owner_entry_id, attr_name_lower, value_lower, value_original).
      */
     public function querySidecarInsertPrefix(): string;
 
