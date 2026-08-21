@@ -23,3 +23,13 @@ dn: cn=carol,dc=foo,dc=bar
 changetype: modrdn
 newrdn: cn=carolyn
 deleteoldrdn: 1
+
+# Spells two descriptions with differing case. RFC 4512 2.5 makes them one attribute, and the entry is
+# refused as a duplicate if they are grouped separately.
+dn: cn=dave,dc=foo,dc=bar
+changetype: add
+objectclass: inetOrgPerson
+cn: dave
+sn: Davis
+description: first
+DESCRIPTION: second

@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Server\Config\Storage\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
+use FreeDSx\Ldap\Server\Backend\Storage\SeedOptions;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Schema\LdifSchemaSource;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
@@ -444,7 +445,7 @@ final class LdapBackendStorageCommand extends Command
         $seed = function () use ($server, $entries, $container, $seedLdif, $validateSeed): void {
             $server->seed(
                 new FileLdifLoader($seedLdif),
-                ignoreValidation: !$validateSeed,
+                new SeedOptions(ignoreValidation: !$validateSeed),
             );
 
             // The generated entries stay a raw import, since they exist to widen the return path rather than to

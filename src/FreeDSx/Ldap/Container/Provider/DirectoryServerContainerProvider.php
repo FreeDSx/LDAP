@@ -70,6 +70,7 @@ use FreeDSx\Ldap\Server\Process\Signals\PcntlShutdownSignals;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
+use FreeDSx\Ldap\Ldif\LdifParser;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Sync\Consumer\LdapReplica;
 use FreeDSx\Ldap\Sync\Consumer\PrimaryConnectionFactory;
@@ -96,6 +97,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             OperationalAttributeGenerator::class => $this->makeOperationalAttributeGenerator(...),
             SearchStreamBuilder::class => $this->makeSearchStreamBuilder(...),
             LdapImporter::class => $this->makeLdapImporter(...),
+            LdifParser::class => static fn(): LdifParser => new LdifParser(),
             WritableStorageBackend::class => $this->makeBackend(...),
             WriteRequestReplayer::class => $this->makeWriteRequestReplayer(...),
             ServerProtocolFactory::class => $this->makeServerProtocolFactory(...),

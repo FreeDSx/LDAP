@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Ldif\Parser;
 
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Exception\LdifParseException;
 use FreeDSx\Ldap\Ldif\LdifChanges;
@@ -34,7 +35,7 @@ final class LdifChangeRecordParserTest extends TestCase
             1,
             $result,
         );
-        $request = $result->toArray()[0];
+        $request = $result->requests()[0];
         self::assertInstanceOf(
             AddRequest::class,
             $request,
@@ -57,7 +58,7 @@ final class LdifChangeRecordParserTest extends TestCase
             1,
             $result,
         );
-        $request = $result->toArray()[0];
+        $request = $result->requests()[0];
         self::assertInstanceOf(
             DeleteRequest::class,
             $request,
@@ -82,7 +83,7 @@ final class LdifChangeRecordParserTest extends TestCase
             "dn: cn=alice,dc=x\nchangetype: modify\nreplace: sn\nsn: Anderson\n-\n",
         );
 
-        $request = $result->toArray()[0];
+        $request = $result->requests()[0];
         self::assertInstanceOf(
             ModifyRequest::class,
             $request,
@@ -115,7 +116,7 @@ final class LdifChangeRecordParserTest extends TestCase
             . "replace: sn\nsn: Anderson\n-\n",
         );
 
-        $request = $result->toArray()[0];
+        $request = $result->requests()[0];
         self::assertInstanceOf(
             ModifyRequest::class,
             $request,
@@ -157,7 +158,7 @@ final class LdifChangeRecordParserTest extends TestCase
             "dn: cn=alice,dc=x\nchangetype: modify\ndelete: telephoneNumber\ntelephoneNumber: 555-0100\n-\n",
         );
 
-        $request = $result->toArray()[0];
+        $request = $result->requests()[0];
         self::assertInstanceOf(
             ModifyRequest::class,
             $request,
@@ -207,7 +208,7 @@ final class LdifChangeRecordParserTest extends TestCase
             "dn: cn=alice,dc=x\nchangetype: modrdn\nnewrdn: cn=alicia\ndeleteoldrdn: 1\n",
         );
 
-        $request = $result->toArray()[0];
+        $request = $result->requests()[0];
         self::assertInstanceOf(
             ModifyDnRequest::class,
             $request,
@@ -230,7 +231,7 @@ final class LdifChangeRecordParserTest extends TestCase
             "dn: cn=alice,ou=old,dc=x\nchangetype: modrdn\nnewrdn: cn=alicia\ndeleteoldrdn: 0\nnewsuperior: ou=new,dc=x\n",
         );
 
-        $request = $result->toArray()[0];
+        $request = $result->requests()[0];
         self::assertInstanceOf(
             ModifyDnRequest::class,
             $request,
@@ -246,7 +247,7 @@ final class LdifChangeRecordParserTest extends TestCase
     {
         $ldif = "dn: cn=foo,dc=x\nchangetype: modrdn\nnewrdn:: " . base64_encode('cn=Bär') . "\ndeleteoldrdn: 1\n";
 
-        $request = LdifChanges::fromString($ldif)->toArray()[0];
+        $request = LdifChanges::fromString($ldif)->requests()[0];
         self::assertInstanceOf(
             ModifyDnRequest::class,
             $request,
@@ -289,5 +290,109 @@ final class LdifChangeRecordParserTest extends TestCase
         $this->expectExceptionMessage('Unsupported changetype "bogus"');
 
         LdifChanges::fromString("dn: cn=alice,dc=x\nchangetype: bogus\n");
+    }
+
+    public function test_it_reads_a_control_that_precedes_the_changetype(): void
+    {
+        $record = LdifChanges::fromString(
+            "dn: ou=Product Development,dc=airius,dc=com\n"
+            . "control: 1.2.840.113556.1.4.805 true\n"
+            . "changetype: delete\n",
+        )->toArray()[0];
+
+        self::assertInstanceOf(
+            DeleteRequest::class,
+            $record->request,
+        );
+        self::assertCount(
+            1,
+            $record->controls,
+        );
+        self::assertSame(
+            '1.2.840.113556.1.4.805',
+            $record->controls[0]->getTypeOid(),
+        );
+        self::assertTrue($record->controls[0]->getCriticality());
+    }
+
+    public function test_a_control_defaults_to_not_critical_and_carries_no_value(): void
+    {
+        $record = LdifChanges::fromString(
+            "dn: cn=alice,dc=x\ncontrol: 1.2.3.4\nchangetype: delete\n",
+        )->toArray()[0];
+
+        self::assertFalse($record->controls[0]->getCriticality());
+        self::assertNull($record->controls[0]->getValue());
+    }
+
+    /**
+     * RFC 5234 2.3 makes the ABNF's quoted "true" and "false" case insensitive.
+     */
+    public function test_a_control_criticality_is_read_without_regard_to_case(): void
+    {
+        $record = LdifChanges::fromString(
+            "dn: cn=alice,dc=x\ncontrol: 1.2.3.4 TRUE\nchangetype: delete\n",
+        )->toArray()[0];
+
+        self::assertTrue($record->controls[0]->getCriticality());
+    }
+
+    public function test_it_reads_every_control_a_record_carries_in_order(): void
+    {
+        $record = LdifChanges::fromString(
+            "dn: cn=alice,dc=x\ncontrol: 1.2.3.4\ncontrol: 5.6.7.8 true\nchangetype: delete\n",
+        )->toArray()[0];
+
+        self::assertSame(
+            ['1.2.3.4', '5.6.7.8'],
+            array_map(
+                static fn(Control $control): string => $control->getTypeOid(),
+                $record->controls,
+            ),
+        );
+    }
+
+    public function test_it_reads_a_plain_control_value(): void
+    {
+        $record = LdifChanges::fromString(
+            "dn: cn=alice,dc=x\ncontrol: 1.2.3.4 true: hello\nchangetype: delete\n",
+        )->toArray()[0];
+
+        self::assertSame(
+            'hello',
+            $record->controls[0]->getValue(),
+        );
+    }
+
+    public function test_it_decodes_a_base64_control_value(): void
+    {
+        $record = LdifChanges::fromString(
+            "dn: cn=alice,dc=x\ncontrol: 1.2.3.4 true:: aGVsbG8=\nchangetype: delete\n",
+        )->toArray()[0];
+
+        self::assertSame(
+            'hello',
+            $record->controls[0]->getValue(),
+        );
+    }
+
+    public function test_it_rejects_a_control_criticality_that_is_not_a_boolean(): void
+    {
+        $this->expectException(LdifParseException::class);
+        $this->expectExceptionMessage('must be "true" or "false"');
+
+        LdifChanges::fromString(
+            "dn: cn=alice,dc=x\ncontrol: 1.2.3.4 maybe\nchangetype: delete\n",
+        );
+    }
+
+    public function test_it_rejects_a_control_with_no_oid(): void
+    {
+        $this->expectException(LdifParseException::class);
+        $this->expectExceptionMessage('needs a control OID');
+
+        LdifChanges::fromString(
+            "dn: cn=alice,dc=x\ncontrol: \nchangetype: delete\n",
+        );
     }
 }

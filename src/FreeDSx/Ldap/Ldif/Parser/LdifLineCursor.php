@@ -14,7 +14,10 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Ldif\Parser;
 
 use FreeDSx\Ldap\Exception\LdifParseException;
+use FreeDSx\Ldap\Exception\LdifUrlException;
 use FreeDSx\Ldap\Ldif\Loader\LdifLoaderInterface;
+use FreeDSx\Ldap\Ldif\Url\LdifUrlResolverInterface;
+use FreeDSx\Ldap\Ldif\Url\RefusingUrlResolver;
 use Generator;
 
 use function base64_decode;
@@ -46,8 +49,10 @@ final class LdifLineCursor
     /**
      * @param Generator<int, string> $source
      */
-    private function __construct(private readonly Generator $source)
-    {
+    private function __construct(
+        private readonly Generator $source,
+        private readonly LdifUrlResolverInterface $urlResolver = new RefusingUrlResolver(),
+    ) {
         $this->source->rewind();
         $this->advance();
     }
@@ -55,21 +60,36 @@ final class LdifLineCursor
     /**
      * @param iterable<string> $lines
      */
-    public static function forIterable(iterable $lines): self
-    {
-        return new self(self::toGenerator($lines));
+    public static function forIterable(
+        iterable $lines,
+        LdifUrlResolverInterface $urlResolver = new RefusingUrlResolver(),
+    ): self {
+        return new self(
+            self::toGenerator($lines),
+            $urlResolver,
+        );
     }
 
-    public static function forInput(string $ldif): self
-    {
+    public static function forInput(
+        string $ldif,
+        LdifUrlResolverInterface $urlResolver = new RefusingUrlResolver(),
+    ): self {
         $lines = preg_split("/\r\n|\r|\n/", $ldif);
 
-        return self::forIterable($lines === false ? [] : $lines);
+        return self::forIterable(
+            $lines === false ? [] : $lines,
+            $urlResolver,
+        );
     }
 
-    public static function forLoader(LdifLoaderInterface $loader): self
-    {
-        return self::forIterable($loader->load());
+    public static function forLoader(
+        LdifLoaderInterface $loader,
+        LdifUrlResolverInterface $urlResolver = new RefusingUrlResolver(),
+    ): self {
+        return self::forIterable(
+            $loader->load(),
+            $urlResolver,
+        );
     }
 
     public function atEnd(): bool
@@ -134,10 +154,13 @@ final class LdifLineCursor
                 $startSource,
             );
         } elseif ($marker === self::URL_MARKER) {
-            $this->errorAt(
+            $value = $this->resolveUrl(
+                $this->readFolded(ltrim(
+                    substr($line, $colon + 2),
+                    ' ',
+                )),
                 $startLine,
                 $startSource,
-                'URL-referenced values ("name:< url") are not yet supported',
             );
         } else {
             $value = $this->readFolded(ltrim(
@@ -189,6 +212,32 @@ final class LdifLineCursor
         return !$this->atEnd()
             && $this->current() !== ''
             && $this->current()[0] === ' ';
+    }
+
+    /**
+     * Decodes a value-spec embedded in a directive's value, which carries its own base64 or URL marker.
+     *
+     * @throws LdifParseException
+     */
+    public function decodeEmbeddedValue(
+        string $spec,
+        LdifDirective $directive,
+    ): string {
+        $payload = ltrim(substr($spec, 1), ' ');
+
+        return match ($spec[0] ?? '') {
+            self::SEPARATOR => $this->decodeBase64(
+                $payload,
+                $directive->position,
+                $directive->sourceLine,
+            ),
+            self::URL_MARKER => $this->resolveUrl(
+                $payload,
+                $directive->position,
+                $directive->sourceLine,
+            ),
+            default => ltrim($spec, ' '),
+        };
     }
 
     public function keyOf(string $line): string
@@ -271,5 +320,24 @@ final class LdifLineCursor
         }
 
         return $decoded;
+    }
+
+    /**
+     * The resolver decides what a URL may name, so its refusal is reported at the line that asked.
+     */
+    private function resolveUrl(
+        string $url,
+        int $line,
+        ?string $sourceLine,
+    ): string {
+        try {
+            return $this->urlResolver->resolve($url);
+        } catch (LdifUrlException $e) {
+            $this->errorAt(
+                $line,
+                $sourceLine,
+                $e->getMessage(),
+            );
+        }
     }
 }

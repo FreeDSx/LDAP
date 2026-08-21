@@ -15,8 +15,10 @@ namespace Tests\Unit\FreeDSx\Ldap\Ldif;
 
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Ldif\LdifChangeRecord;
 use FreeDSx\Ldap\Ldif\LdifChanges;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operations;
 use PHPUnit\Framework\TestCase;
 
@@ -28,8 +30,8 @@ final class LdifChangesTest extends TestCase
         $del = Operations::delete('cn=b,dc=x');
 
         $changes = new LdifChanges(
-            $add,
-            $del,
+            new LdifChangeRecord($add),
+            new LdifChangeRecord($del),
         );
 
         self::assertCount(
@@ -38,11 +40,14 @@ final class LdifChangesTest extends TestCase
         );
         self::assertSame(
             [$add, $del],
-            $changes->toArray(),
+            $changes->requests(),
         );
         self::assertSame(
             [$add, $del],
-            iterator_to_array($changes->getIterator()),
+            array_map(
+                static fn(LdifChangeRecord $record): RequestInterface => $record->request,
+                iterator_to_array($changes->getIterator()),
+            ),
         );
     }
 
@@ -61,10 +66,10 @@ final class LdifChangesTest extends TestCase
         );
 
         $changes = new LdifChanges(
-            $add,
-            $modify,
-            $delete,
-            $modDn,
+            new LdifChangeRecord($add),
+            new LdifChangeRecord($modify),
+            new LdifChangeRecord($delete),
+            new LdifChangeRecord($modDn),
         );
 
         self::assertSame(
@@ -88,8 +93,8 @@ final class LdifChangesTest extends TestCase
     public function test_isAddOnly_is_true_when_every_request_is_an_add(): void
     {
         $changes = new LdifChanges(
-            Operations::add(Entry::create('cn=a,dc=x', ['cn' => 'a'])),
-            Operations::add(Entry::create('cn=b,dc=x', ['cn' => 'b'])),
+            new LdifChangeRecord(Operations::add(Entry::create('cn=a,dc=x', ['cn' => 'a']))),
+            new LdifChangeRecord(Operations::add(Entry::create('cn=b,dc=x', ['cn' => 'b']))),
         );
 
         self::assertTrue($changes->isAddOnly());
@@ -98,8 +103,8 @@ final class LdifChangesTest extends TestCase
     public function test_isAddOnly_is_false_when_any_request_is_not_an_add(): void
     {
         $changes = new LdifChanges(
-            Operations::add(Entry::create('cn=a,dc=x', ['cn' => 'a'])),
-            Operations::delete('cn=b,dc=x'),
+            new LdifChangeRecord(Operations::add(Entry::create('cn=a,dc=x', ['cn' => 'a']))),
+            new LdifChangeRecord(Operations::delete('cn=b,dc=x')),
         );
 
         self::assertFalse($changes->isAddOnly());
@@ -116,9 +121,9 @@ final class LdifChangesTest extends TestCase
         $bar = Entry::create('cn=bar,dc=x', ['cn' => 'bar']);
 
         $changes = new LdifChanges(
-            Operations::add($foo),
-            Operations::delete('cn=zap,dc=x'),
-            Operations::add($bar),
+            new LdifChangeRecord(Operations::add($foo)),
+            new LdifChangeRecord(Operations::delete('cn=zap,dc=x')),
+            new LdifChangeRecord(Operations::add($bar)),
         );
 
         self::assertSame(

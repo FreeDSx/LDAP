@@ -15,12 +15,17 @@ namespace Tests\Integration\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
+use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\PasswordModifyResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use Tests\Support\FreeDSx\Ldap\LdapBackendStorageCommand;
+use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
 final class LdapPasswordModifyServerTest extends ServerTestCase
 {
+    use RawClientQueueTrait;
+
     private const USER_DN = 'cn=user,dc=foo,dc=bar';
 
     private const USER_PASSWORD = '12345';
@@ -141,6 +146,28 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
         $this->ldapClient()->sendAndReceive(
             new PasswordModifyRequest(null, 'wrongpassword', 'newpass'),
         );
+    }
+
+    public function testAFailedPasswordModifyNamesNoResponseOid(): void
+    {
+        $queue = $this->rawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            1,
+            new PasswordModifyRequest(null, null, 'newpass'),
+        ));
+
+        $response = $queue->getMessage(1)->getResponse();
+        $queue->close();
+
+        self::assertInstanceOf(
+            ExtendedResponse::class,
+            $response,
+        );
+        self::assertSame(
+            ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+            $response->getResultCode(),
+        );
+        self::assertNull($response->getName());
     }
 
     private function assertStoredPasswordIsHashed(): void

@@ -13,18 +13,23 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Ldif\Parser;
 
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\LdifParseException;
+use FreeDSx\Ldap\Ldif\LdifChangeRecord;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
-use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operations;
 
+use function preg_split;
 use function sprintf;
+use function strpos;
 use function strtolower;
+use function substr;
+use function trim;
 
 /**
  * Parses one RFC 2849 LDIF change record into a write request, given a cursor positioned after the dn directive.
@@ -33,7 +38,11 @@ use function strtolower;
  */
 final class LdifChangeRecordParser
 {
+    use AttributeGroupingTrait;
+
     private const DN = 'dn';
+
+    private const CONTROL = 'control';
 
     private const CHANGETYPE = 'changetype';
 
@@ -45,11 +54,12 @@ final class LdifChangeRecordParser
     public function parseRecord(
         LdifLineCursor $cursor,
         string $dn,
-    ): RequestInterface {
+    ): LdifChangeRecord {
+        $controls = $this->readControls($cursor);
         $changetype = $this->readChangetype($cursor);
         $type = ChangeType::tryFrom(strtolower($changetype));
 
-        return match ($type) {
+        $request = match ($type) {
             ChangeType::Add => $this->parseAddRecord($cursor, $dn),
             ChangeType::Delete => $this->parseDeleteRecord($cursor, $dn),
             ChangeType::Modify => $this->parseModifyRecord($cursor, $dn),
@@ -58,6 +68,96 @@ final class LdifChangeRecordParser
                 'Unsupported changetype "%s"',
                 $changetype,
             )),
+        };
+
+        return new LdifChangeRecord(
+            $request,
+            ...$controls,
+        );
+    }
+
+    /**
+     * RFC 2849 places any controls between the DN and the changetype.
+     *
+     * @return list<Control>
+     * @throws LdifParseException
+     */
+    private function readControls(LdifLineCursor $cursor): array
+    {
+        $controls = [];
+
+        while (!$cursor->atEnd()) {
+            if ($cursor->isComment($cursor->current())) {
+                $cursor->skipComment();
+
+                continue;
+            }
+            if ($cursor->keyOf($cursor->current()) !== self::CONTROL) {
+                break;
+            }
+
+            $controls[] = $this->parseControl(
+                $cursor,
+                $cursor->readDirective(),
+            );
+        }
+
+        return $controls;
+    }
+
+    /**
+     * The body is "oid [criticality] [value-spec]", the value-spec keeping its own base64 or URL marker.
+     *
+     * @throws LdifParseException
+     */
+    private function parseControl(
+        LdifLineCursor $cursor,
+        LdifDirective $directive,
+    ): Control {
+        $separator = strpos($directive->value, ':');
+        $head = $separator === false
+            ? $directive->value
+            : substr($directive->value, 0, $separator);
+        $value = $separator === false
+            ? null
+            : $cursor->decodeEmbeddedValue(
+                substr($directive->value, $separator + 1),
+                $directive,
+            );
+
+        $parts = preg_split('/\s+/', trim($head), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $oid = $parts[0] ?? '';
+
+        if ($oid === '') {
+            $cursor->errorFor(
+                $directive,
+                'A "control:" directive needs a control OID',
+            );
+        }
+
+        return new Control(
+            $oid,
+            $this->readCriticality($cursor, $directive, $parts[1] ?? null),
+            $value,
+        );
+    }
+
+    /**
+     * @throws LdifParseException
+     */
+    private function readCriticality(
+        LdifLineCursor $cursor,
+        LdifDirective $directive,
+        ?string $token,
+    ): bool {
+        // RFC 5234 2.3 makes the quoted literals the grammar spells "true" and "false" case insensitive.
+        return match ($token === null ? 'false' : strtolower($token)) {
+            'false' => false,
+            'true' => true,
+            default => $cursor->errorFor(
+                $directive,
+                sprintf('A control criticality must be "true" or "false", got "%s"', $token),
+            ),
         };
     }
 
@@ -327,13 +427,13 @@ final class LdifChangeRecordParser
      */
     private function readAttrvalBody(LdifLineCursor $cursor): array
     {
-        $attributes = [];
+        $directives = [];
 
         while (($directive = $this->advanceToNextDirective($cursor)) !== null) {
-            $attributes[$directive->name][] = $directive->value;
+            $directives[] = $directive;
         }
 
-        return $attributes;
+        return $this->groupAttributeValues($directives);
     }
 
     /**

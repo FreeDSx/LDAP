@@ -17,10 +17,13 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\LdifParseException;
 use FreeDSx\Ldap\Ldif\Loader\LdifLoaderInterface;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
+use FreeDSx\Ldap\Ldif\Parser\AttributeGroupingTrait;
 use FreeDSx\Ldap\Ldif\Parser\LdifChangeRecordParser;
+use FreeDSx\Ldap\Ldif\Parser\LdifDirective;
 use FreeDSx\Ldap\Ldif\Parser\LdifLineCursor;
+use FreeDSx\Ldap\Ldif\Url\LdifUrlResolverInterface;
+use FreeDSx\Ldap\Ldif\Url\RefusingUrlResolver;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
-use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operations;
 use Generator;
 
@@ -35,25 +38,34 @@ use function sprintf;
  */
 final class LdifParser
 {
+    use AttributeGroupingTrait;
+
     private const DN = 'dn';
 
     private const VERSION = 'version';
 
     private const CHANGETYPE = 'changetype';
 
+    private const CONTROL = 'control';
+
     public function __construct(
         private readonly LdifChangeRecordParser $changeParser = new LdifChangeRecordParser(),
     ) {}
 
     /**
-     * Streams parsed write requests from an LDIF source.
+     * Streams parsed records from an LDIF source.
      *
-     * @return Generator<RequestInterface>
+     * @return Generator<LdifChangeRecord>
      * @throws LdifParseException
      */
-    public function parse(LdifLoaderInterface $loader): Generator
-    {
-        $cursor = LdifLineCursor::forLoader($loader);
+    public function parse(
+        LdifLoaderInterface $loader,
+        LdifUrlResolverInterface $urlResolver = new RefusingUrlResolver(),
+    ): Generator {
+        $cursor = LdifLineCursor::forLoader(
+            $loader,
+            $urlResolver,
+        );
         $recordsSeen = 0;
 
         while (!$cursor->atEnd()) {
@@ -85,7 +97,7 @@ final class LdifParser
     /**
      * Convenience for parsing an in-memory LDIF string.
      *
-     * @return Generator<RequestInterface>
+     * @return Generator<LdifChangeRecord>
      * @throws LdifParseException
      */
     public static function parseString(string $ldif): Generator
@@ -97,13 +109,13 @@ final class LdifParser
     /**
      * @throws LdifParseException
      */
-    private function parseRecord(LdifLineCursor $cursor): RequestInterface
+    private function parseRecord(LdifLineCursor $cursor): LdifChangeRecord
     {
         $dn = $cursor->readDirective()->value;
 
-        return $this->isAtChangetype($cursor)
+        return $this->isAtChangeRecord($cursor)
             ? $this->changeParser->parseRecord($cursor, $dn)
-            : $this->parseContentRecord($cursor, $dn);
+            : new LdifChangeRecord($this->parseContentRecord($cursor, $dn));
     }
 
     /**
@@ -113,8 +125,8 @@ final class LdifParser
         LdifLineCursor $cursor,
         string $dn,
     ): AddRequest {
-        /** @var array<string, string[]> $attributes */
-        $attributes = [];
+        /** @var list<LdifDirective> $directives */
+        $directives = [];
 
         while (!$cursor->atEnd()) {
             $line = $cursor->current();
@@ -139,19 +151,19 @@ final class LdifParser
                 );
             }
 
-            $attributes[$directive->name][] = $directive->value;
+            $directives[] = $directive;
         }
 
         return Operations::add(Entry::create(
             $dn,
-            $attributes,
+            $this->groupAttributeValues($directives),
         ));
     }
 
     /**
-     * Peeks (after skipping comments) whether the next directive is "changetype:".
+     * Peeks (after skipping comments) whether a change record follows, which any controls begin.
      */
-    private function isAtChangetype(LdifLineCursor $cursor): bool
+    private function isAtChangeRecord(LdifLineCursor $cursor): bool
     {
         while (!$cursor->atEnd() && $cursor->isComment($cursor->current())) {
             $cursor->skipComment();
@@ -160,8 +172,10 @@ final class LdifParser
         if ($cursor->atEnd() || $cursor->current() === '') {
             return false;
         }
+        $key = $cursor->keyOf($cursor->current());
 
-        return $cursor->keyOf($cursor->current()) === self::CHANGETYPE;
+        return $key === self::CHANGETYPE
+            || $key === self::CONTROL;
     }
 
     /**
