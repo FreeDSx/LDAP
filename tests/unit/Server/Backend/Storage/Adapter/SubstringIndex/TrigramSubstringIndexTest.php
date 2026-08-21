@@ -24,6 +24,8 @@ final class TrigramSubstringIndexTest extends TestCase
 {
     private const DN = 'cn=smith,dc=example,dc=com';
 
+    private const ENTRY_ID = 42;
+
     /**
      * @var list<array{0: string, 1: array<array-key, mixed>}>
      */
@@ -37,7 +39,7 @@ final class TrigramSubstringIndexTest extends TestCase
     public function test_maintain_deletes_then_inserts_the_trigram_rows(): void
     {
         (new TrigramSubstringIndex(['cn']))->maintain(
-            self::DN,
+            self::ENTRY_ID,
             new Entry(
                 new Dn(self::DN),
                 new Attribute('cn', 'smith'),
@@ -50,7 +52,7 @@ final class TrigramSubstringIndexTest extends TestCase
             $this->executed[0][0],
         );
         self::assertSame(
-            [self::DN],
+            [self::ENTRY_ID],
             $this->executed[0][1],
         );
         self::assertStringContainsString(
@@ -59,9 +61,9 @@ final class TrigramSubstringIndexTest extends TestCase
         );
         self::assertSame(
             [
-                self::DN, 'cn', 'smi',
-                self::DN, 'cn', 'mit',
-                self::DN, 'cn', 'ith',
+                self::ENTRY_ID, 'cn','smi',
+                self::ENTRY_ID, 'cn','mit',
+                self::ENTRY_ID, 'cn','ith',
             ],
             $this->executed[1][1],
         );
@@ -70,7 +72,7 @@ final class TrigramSubstringIndexTest extends TestCase
     public function test_maintain_only_deletes_when_no_indexed_values_exist(): void
     {
         (new TrigramSubstringIndex(['cn']))->maintain(
-            self::DN,
+            self::ENTRY_ID,
             new Entry(
                 new Dn(self::DN),
                 new Attribute('uid', 'smith'),
@@ -91,7 +93,7 @@ final class TrigramSubstringIndexTest extends TestCase
     public function test_maintain_indexes_only_configured_attributes(): void
     {
         (new TrigramSubstringIndex(['cn']))->maintain(
-            self::DN,
+            self::ENTRY_ID,
             new Entry(
                 new Dn(self::DN),
                 new Attribute('cn', 'abc'),
@@ -101,7 +103,7 @@ final class TrigramSubstringIndexTest extends TestCase
         );
 
         self::assertSame(
-            [self::DN, 'cn', 'abc'],
+            [self::ENTRY_ID, 'cn', 'abc'],
             $this->executed[1][1],
         );
     }
@@ -109,7 +111,7 @@ final class TrigramSubstringIndexTest extends TestCase
     public function test_maintain_pools_distinct_trigrams_across_values(): void
     {
         (new TrigramSubstringIndex(['cn']))->maintain(
-            self::DN,
+            self::ENTRY_ID,
             new Entry(
                 new Dn(self::DN),
                 new Attribute('cn', 'smith', 'smithy'),
@@ -119,10 +121,10 @@ final class TrigramSubstringIndexTest extends TestCase
 
         self::assertSame(
             [
-                self::DN, 'cn', 'smi',
-                self::DN, 'cn', 'mit',
-                self::DN, 'cn', 'ith',
-                self::DN, 'cn', 'thy',
+                self::ENTRY_ID, 'cn','smi',
+                self::ENTRY_ID, 'cn','mit',
+                self::ENTRY_ID, 'cn','ith',
+                self::ENTRY_ID, 'cn','thy',
             ],
             $this->executed[1][1],
         );
@@ -174,6 +176,9 @@ final class TrigramSubstringIndexTest extends TestCase
 
     /**
      * @return callable(string, list<string>): void
+     */
+    /**
+     * @return callable(string, list<string|int>): void
      */
     private function recorder(): callable
     {

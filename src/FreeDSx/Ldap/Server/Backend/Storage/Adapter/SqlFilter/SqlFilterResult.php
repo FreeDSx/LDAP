@@ -46,7 +46,7 @@ final class SqlFilterResult
     }
 
     /**
-     * Wraps a sidecar WHERE body as an `EXISTS` correlated to the outer entries row via the unqualified `lc_dn`.
+     * Wraps a sidecar WHERE body as an `EXISTS` correlated to the outer entries row via the unqualified `entry_id`.
      */
     public static function correlatedLeaf(string $sidecarCondition): string
     {
@@ -54,7 +54,7 @@ final class SqlFilterResult
             EXISTS (
                 SELECT 1
                 FROM entry_attribute_values s
-                WHERE s.entry_lc_dn = lc_dn
+                WHERE s.owner_entry_id = entry_id
                   AND $sidecarCondition)
             SQL;
     }

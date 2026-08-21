@@ -51,15 +51,16 @@ final class MysqlDialect implements PdoDialectInterface
     public function lockRowForWrite(
         PDO $pdo,
         string $table,
-        string $lcDn,
+        string $keyColumn,
+        string|int $key,
     ): void {
         $statement = $pdo->prepare(<<<SQL
-            SELECT lc_dn
+            SELECT $keyColumn
             FROM $table
-            WHERE lc_dn = ?
+            WHERE $keyColumn = ?
             FOR UPDATE
             SQL);
-        $statement->execute([$lcDn]);
+        $statement->execute([$key]);
     }
 
     /**

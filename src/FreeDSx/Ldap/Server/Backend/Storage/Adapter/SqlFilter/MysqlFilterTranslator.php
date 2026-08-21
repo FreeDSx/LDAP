@@ -39,7 +39,7 @@ final class MysqlFilterTranslator implements FilterTranslatorInterface
     private function buildPresenceCheck(string $attribute): string
     {
         return <<<SQL
-            lc_dn IN (SELECT s.entry_lc_dn FROM entry_attribute_values s
+            entry_id IN (SELECT s.owner_entry_id FROM entry_attribute_values s
                 WHERE s.attr_name_lower = '$attribute')
             SQL;
     }
@@ -49,7 +49,7 @@ final class MysqlFilterTranslator implements FilterTranslatorInterface
         string $innerCondition,
     ): string {
         return <<<SQL
-            lc_dn IN (SELECT s.entry_lc_dn FROM entry_attribute_values s
+            entry_id IN (SELECT s.owner_entry_id FROM entry_attribute_values s
                 WHERE s.attr_name_lower = '$attribute' AND $innerCondition)
             SQL;
     }

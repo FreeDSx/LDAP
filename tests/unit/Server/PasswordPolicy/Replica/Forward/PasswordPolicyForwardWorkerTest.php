@@ -13,8 +13,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ForwardStateException;
 use FreeDSx\Ldap\Operation\Request\ForwardPasswordPolicyStateRequest;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
@@ -23,13 +25,18 @@ use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\ForwardStateSenderInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\PasswordPolicyForwardWorker;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
-use Tests\Support\FreeDSx\Ldap\Server\PasswordPolicy\Replica\SqliteReplicaPasswordStateStoreFactory;
+use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class PasswordPolicyForwardWorkerTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private const DN = 'cn=foo,dc=example,dc=com';
 
     private ReplicaPasswordStateStoreInterface $store;
@@ -50,7 +57,17 @@ final class PasswordPolicyForwardWorkerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->store = SqliteReplicaPasswordStateStoreFactory::inMemory();
+        // Both resolve from the memoised container, so the state store shares the storage holding the subjects.
+        $storage = $this->fromContainer(EntryStorageInterface::class);
+        foreach ([self::DN, 'cn=a,dc=example,dc=com', 'cn=b,dc=example,dc=com'] as $subject) {
+            $dn = new Dn($subject);
+            $storage->store(new Entry(
+                $dn,
+                new Attribute('cn', $dn->getRdn()->getValue()),
+            ));
+        }
+
+        $this->store = $this->fromContainer(ReplicaPasswordStateStoreInterface::class);
         $this->sent = [];
         $this->slept = [];
         $this->sender = $this->createMock(ForwardStateSenderInterface::class);
@@ -175,6 +192,11 @@ final class PasswordPolicyForwardWorkerTest extends TestCase
             1,
             $this->store->listUnforwarded(),
         );
+    }
+
+    protected function makeServerOptions(): ServerOptions
+    {
+        return TestServerOptions::sqlite();
     }
 
     private function recordSends(): void

@@ -69,8 +69,8 @@ final class Fts5SubstringIndex implements SubstringIndexInterface
         SQL;
 
     private const MATCH_SQL = <<<SQL
-        lc_dn IN (
-            SELECT s.entry_lc_dn FROM entry_attribute_values s
+        entry_id IN (
+            SELECT s.owner_entry_id FROM entry_attribute_values s
             WHERE s.attr_name_lower = ?
               AND s.rowid IN (SELECT rowid FROM entry_attribute_fts WHERE entry_attribute_fts MATCH ?)
         )
@@ -146,7 +146,7 @@ final class Fts5SubstringIndex implements SubstringIndexInterface
     }
 
     public function maintain(
-        string $lcDn,
+        int $entryId,
         Entry $entry,
         callable $execute,
     ): void {

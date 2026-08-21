@@ -630,6 +630,54 @@ trait QueryTestsTrait
         );
     }
 
+    /**
+     * @return iterable<string, array{string, FilterInterface, int}>
+     */
+    public static function singleLevelFilterProvider(): iterable
+    {
+        // cn=alice carries sn=Smith but sits under ou=people, so no direct child of the root matches.
+        yield 'a value held only by a grandchild matches nothing' => [
+            'dc=foo,dc=bar',
+            Filters::equal('sn', 'Smith'),
+            0,
+        ];
+        yield 'direct children matching are returned' => [
+            'dc=foo,dc=bar',
+            Filters::equal('sn', 'Admin'),
+            2,
+        ];
+        yield 'the grandchild matches under its own parent' => [
+            'ou=people,dc=foo,dc=bar',
+            Filters::equal('sn', 'Smith'),
+            1,
+        ];
+        yield 'a presence filter narrows to children carrying it' => [
+            'dc=foo,dc=bar',
+            Filters::present('sn'),
+            2,
+        ];
+    }
+
+    #[DataProvider('singleLevelFilterProvider')]
+    public function test_single_level_filter_evaluation(
+        string $base,
+        FilterInterface $filter,
+        int $expected,
+    ): void {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search($filter)
+                ->base($base)
+                ->useSingleLevelScope(),
+        );
+
+        self::assertCount(
+            $expected,
+            $entries,
+        );
+    }
+
     public function testRequestingABaseTypeReturnsItsTaggedVariants(): void
     {
         $this->authenticateUser();
