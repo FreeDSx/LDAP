@@ -13,21 +13,25 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap;
 
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\LdifParseException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Ldif\LdifChangeRecord;
 use FreeDSx\Ldap\Ldif\LdifParser;
+use FreeDSx\Ldap\Ldif\Url\LdifUrlResolverInterface;
+use FreeDSx\Ldap\Ldif\Url\RefusingUrlResolver;
 use FreeDSx\Ldap\Ldif\Loader\LdifLoaderInterface;
 use FreeDSx\Ldap\Ldif\Output\LdifOutputInterface;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\EntryIndexReindexer;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
+use FreeDSx\Ldap\Server\Backend\Storage\SeedOptions;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestReplayer;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Socket\Exception\ConnectionException;
@@ -76,8 +80,6 @@ class LdapServer
      *
      * Use {@see applyChanges()} instead to replay a changelog (modify/delete/rename) through the live write path.
      *
-     * @param Dn $creatorDn DN recorded as creatorsName/modifiersName on imported entries; defaults to the anonymous (empty) DN.
-     * @param bool $ignoreValidation Loads content the current schema does not cover, e.g. a migration that predates it.
      * @throws LdifParseException when the LDIF cannot be parsed
      * @throws RuntimeException when the LDIF contains a non-add change record
      * @throws InvalidArgumentException when the creator DN is malformed or an entry's parent is missing
@@ -85,13 +87,12 @@ class LdapServer
      */
     public function seed(
         LdifLoaderInterface $loader,
-        Dn $creatorDn = new Dn(''),
-        bool $ignoreValidation = false,
+        SeedOptions $options = new SeedOptions(),
     ): self {
         $this->container->get(LdapImporter::class)->importEntries(
-            $this->streamSeedEntries($loader),
-            $creatorDn,
-            $ignoreValidation,
+            $this->streamSeedEntries($loader, $options->getUrlResolver()),
+            $options->getCreatorDn(),
+            $options->isIgnoreValidation(),
         );
 
         return $this;
@@ -105,10 +106,12 @@ class LdapServer
      * @throws LdifParseException when the LDIF cannot be parsed
      * @throws OperationException when a write fails (no such entry, schema violation, etc.)
      */
-    public function applyChanges(LdifLoaderInterface $loader): self
-    {
+    public function applyChanges(
+        LdifLoaderInterface $loader,
+        LdifUrlResolverInterface $urlResolver = new RefusingUrlResolver(),
+    ): self {
         $this->container->get(WriteRequestReplayer::class)
-            ->apply((new LdifParser())->parse($loader));
+            ->apply($this->streamChangeRequests($loader, $urlResolver));
 
         return $this;
     }
@@ -148,16 +151,46 @@ class LdapServer
      * @throws RuntimeException when the LDIF contains a non-add change record
      * @throws LdifParseException
      */
-    private function streamSeedEntries(LdifLoaderInterface $loader): Generator
-    {
-        foreach ((new LdifParser())->parse($loader) as $request) {
-            if (!$request instanceof AddRequest) {
+    private function streamSeedEntries(
+        LdifLoaderInterface $loader,
+        LdifUrlResolverInterface $urlResolver,
+    ): Generator {
+        foreach ($this->parseLdif($loader, $urlResolver) as $record) {
+            if (!$record->request instanceof AddRequest) {
                 throw new RuntimeException(
                     'seed() only accepts content records (adds). Use applyChanges() for modify/delete/rename.',
                 );
             }
 
-            yield $request->getEntry();
+            yield $record->request->getEntry();
         }
+    }
+
+    /**
+     * @return Generator<RequestInterface>
+     * @throws LdifParseException
+     */
+    private function streamChangeRequests(
+        LdifLoaderInterface $loader,
+        LdifUrlResolverInterface $urlResolver,
+    ): Generator {
+        foreach ($this->parseLdif($loader, $urlResolver) as $record) {
+            yield $record->request;
+        }
+    }
+
+    /**
+     * @return Generator<LdifChangeRecord>
+     * @throws LdifParseException
+     */
+    private function parseLdif(
+        LdifLoaderInterface $loader,
+        LdifUrlResolverInterface $urlResolver,
+    ): Generator {
+        return $this->container->get(LdifParser::class)
+            ->parse(
+                $loader,
+                $urlResolver,
+            );
     }
 }

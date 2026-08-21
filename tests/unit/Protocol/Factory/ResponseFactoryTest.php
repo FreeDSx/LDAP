@@ -147,15 +147,12 @@ final class ResponseFactoryTest extends TestCase
         );
     }
 
-    public function test_it_should_get_an_extended_response_echoing_the_request_name(): void
+    public function test_it_should_get_an_extended_response_that_names_no_oid(): void
     {
         self::assertEquals(
             new LdapMessageResponse(
                 1,
-                new ExtendedResponse(
-                    new LdapResult(0, '', 'foo'),
-                    '1.2.3.4',
-                ),
+                new ExtendedResponse(new LdapResult(0, '', 'foo')),
             ),
             $this->subject->getStandardResponse(
                 new LdapMessageRequest(

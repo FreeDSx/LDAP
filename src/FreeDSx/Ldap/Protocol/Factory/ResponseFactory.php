@@ -97,13 +97,13 @@ class ResponseFactory
                 $dn,
                 $diagnostic,
             ),
+            // RFC 4511 4.12 makes the name optional, and the operations built on it require it absent on error.
             $request instanceof ExtendedRequest => new ExtendedResponse(
                 new LdapResult(
                     $resultCode,
                     $dn,
                     $diagnostic,
                 ),
-                $request->getName(),
             ),
             default => null,
         };

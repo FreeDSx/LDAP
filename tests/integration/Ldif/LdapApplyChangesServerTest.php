@@ -104,4 +104,15 @@ final class LdapApplyChangesServerTest extends ServerTestCase
             $carolyn->get('sn')?->firstValue(),
         );
     }
+
+    public function test_an_added_entry_groups_descriptions_that_differ_only_in_case(): void
+    {
+        $dave = $this->ldapClient()->read('cn=dave,dc=foo,dc=bar');
+
+        $this->assertNotNull($dave);
+        $this->assertSame(
+            ['first', 'second'],
+            $dave->get('description')?->getValues(),
+        );
+    }
 }

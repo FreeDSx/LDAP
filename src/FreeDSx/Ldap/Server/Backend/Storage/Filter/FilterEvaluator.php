@@ -493,7 +493,7 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     }
 
     /**
-     * Returns null when the attribute is unknown, so the caller falls back to the digit heuristic.
+     * Implementations disagree on whether a missing rule is undefined, so the permissive reading is taken.
      */
     private function resolveOrderingComparator(string $attrName): MatchingRuleComparatorInterface
     {

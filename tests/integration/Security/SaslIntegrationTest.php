@@ -21,20 +21,18 @@ use FreeDSx\Ldap\Operation\Response\ResponseInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
-use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Options\CramMD5Options;
 use FreeDSx\Sasl\Options\PlainOptions;
 use FreeDSx\Sasl\Options\ScramOptions;
 use FreeDSx\Sasl\Sasl;
-use FreeDSx\Socket\SocketOptions;
-use FreeDSx\Socket\SocketPool;
-use FreeDSx\Socket\SocketPoolOptions;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
-use Tests\Support\FreeDSx\Ldap\TestWorker;
+use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
 final class SaslIntegrationTest extends ServerTestCase
 {
+    use RawClientQueueTrait;
+
     /**
      * The stored hash for cn=hashed in the harness seed, as an attacker reading the directory would obtain it.
      */
@@ -375,16 +373,5 @@ final class SaslIntegrationTest extends ServerTestCase
         );
 
         return $response->getResultCode();
-    }
-
-    private function rawQueue(): ClientQueue
-    {
-        return new ClientQueue(new SocketPool(
-            (new SocketPoolOptions(
-                (new SocketOptions())
-                    ->setPort(TestWorker::port())
-                    ->setTimeoutConnect(1),
-            ))->setServers(['127.0.0.1']),
-        ));
     }
 }

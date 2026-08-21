@@ -18,6 +18,8 @@ use Countable;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Ldif\Loader\LdifLoaderInterface;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
+use FreeDSx\Ldap\Ldif\Url\LdifUrlResolverInterface;
+use FreeDSx\Ldap\Ldif\Url\RefusingUrlResolver;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
@@ -32,24 +34,24 @@ use function array_values;
 use function count;
 
 /**
- * The full outcome of an LDIF parse: write requests in original record order.
+ * The full outcome of an LDIF parse: records in original order, each a request with any controls it carried.
  *
  * @api
  *
- * @implements IteratorAggregate<RequestInterface>
+ * @implements IteratorAggregate<LdifChangeRecord>
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final readonly class LdifChanges implements Countable, IteratorAggregate
 {
     /**
-     * @var array<RequestInterface>
+     * @var list<LdifChangeRecord>
      */
-    private array $requests;
+    private array $records;
 
-    public function __construct(RequestInterface ...$requests)
+    public function __construct(LdifChangeRecord ...$records)
     {
-        $this->requests = $requests;
+        $this->records = array_values($records);
     }
 
     /**
@@ -58,8 +60,12 @@ final readonly class LdifChanges implements Countable, IteratorAggregate
     public static function fromLoader(
         LdifLoaderInterface $loader,
         LdifParser $parser = new LdifParser(),
+        LdifUrlResolverInterface $urlResolver = new RefusingUrlResolver(),
     ): self {
-        return new self(...$parser->parse($loader));
+        return new self(...$parser->parse(
+            $loader,
+            $urlResolver,
+        ));
     }
 
     /**
@@ -68,32 +74,47 @@ final readonly class LdifChanges implements Countable, IteratorAggregate
     public static function fromString(
         string $ldif,
         LdifParser $parser = new LdifParser(),
+        LdifUrlResolverInterface $urlResolver = new RefusingUrlResolver(),
     ): self {
         return self::fromLoader(
             new StringLdifLoader($ldif),
             $parser,
+            $urlResolver,
         );
     }
 
     /**
-     * @return RequestInterface[]
+     * @return list<LdifChangeRecord>
      */
     public function toArray(): array
     {
-        return $this->requests;
+        return $this->records;
     }
 
     public function count(): int
     {
-        return count($this->requests);
+        return count($this->records);
     }
 
     /**
-     * @return Traversable<RequestInterface>
+     * @return Traversable<LdifChangeRecord>
      */
     public function getIterator(): Traversable
     {
-        return new ArrayIterator($this->requests);
+        return new ArrayIterator($this->records);
+    }
+
+    /**
+     * The requests alone, for callers with no interest in the controls a record may carry.
+     *
+     * @return list<RequestInterface>
+     */
+    public function requests(): array
+    {
+        return array_map(
+            static fn(LdifChangeRecord $record): RequestInterface => $record->request,
+            $this->records,
+        );
     }
 
     /**
@@ -101,10 +122,7 @@ final readonly class LdifChanges implements Countable, IteratorAggregate
      */
     public function adds(): array
     {
-        return array_values(array_filter(
-            $this->requests,
-            fn(RequestInterface $r): bool => $r instanceof AddRequest,
-        ));
+        return $this->requestsOfType(AddRequest::class);
     }
 
     /**
@@ -112,10 +130,7 @@ final readonly class LdifChanges implements Countable, IteratorAggregate
      */
     public function modifies(): array
     {
-        return array_values(array_filter(
-            $this->requests,
-            fn(RequestInterface $r): bool => $r instanceof ModifyRequest,
-        ));
+        return $this->requestsOfType(ModifyRequest::class);
     }
 
     /**
@@ -123,10 +138,7 @@ final readonly class LdifChanges implements Countable, IteratorAggregate
      */
     public function deletes(): array
     {
-        return array_values(array_filter(
-            $this->requests,
-            fn(RequestInterface $r): bool => $r instanceof DeleteRequest,
-        ));
+        return $this->requestsOfType(DeleteRequest::class);
     }
 
     /**
@@ -134,16 +146,13 @@ final readonly class LdifChanges implements Countable, IteratorAggregate
      */
     public function modifyDns(): array
     {
-        return array_values(array_filter(
-            $this->requests,
-            fn(RequestInterface $r): bool => $r instanceof ModifyDnRequest,
-        ));
+        return $this->requestsOfType(ModifyDnRequest::class);
     }
 
     public function isAddOnly(): bool
     {
-        foreach ($this->requests as $request) {
-            if (!($request instanceof AddRequest)) {
+        foreach ($this->records as $record) {
+            if (!($record->request instanceof AddRequest)) {
                 return false;
             }
         }
@@ -162,5 +171,18 @@ final readonly class LdifChanges implements Countable, IteratorAggregate
             fn(AddRequest $r): Entry => $r->getEntry(),
             $this->adds(),
         );
+    }
+
+    /**
+     * @template T of RequestInterface
+     * @param class-string<T> $type
+     * @return list<T>
+     */
+    private function requestsOfType(string $type): array
+    {
+        return array_values(array_filter(
+            $this->requests(),
+            static fn(RequestInterface $request): bool => $request instanceof $type,
+        ));
     }
 }

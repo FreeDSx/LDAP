@@ -30,7 +30,7 @@ final readonly class EqualityComparatorResolver
     ) {}
 
     /**
-     * Falls back to the default when the type is undefined or declares a rule nothing implements.
+     * Falls back to the default when the type is undefined or has no rule anything implements.
      */
     public function for(string $attributeName): MatchingRuleComparatorInterface
     {
@@ -40,6 +40,7 @@ final readonly class EqualityComparatorResolver
             ? $this->schema->getComparator($equalityOid)
             : null;
 
+        // Implementations disagree on whether a missing rule is undefined, so the permissive reading is taken.
         return $comparator ?? $this->default;
     }
 }

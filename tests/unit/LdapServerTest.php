@@ -17,8 +17,10 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Exception\LdifParseException;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
 use FreeDSx\Ldap\Ldif\Output\StringLdifOutput;
+use FreeDSx\Ldap\Ldif\Url\FileUrlResolver;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\JsonStorageConfig;
@@ -26,6 +28,7 @@ use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
+use FreeDSx\Ldap\Server\Backend\Storage\SeedOptions;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\ClientOptions;
@@ -37,9 +40,12 @@ use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\TempFileUrlTrait;
 
 class LdapServerTest extends TestCase
 {
+    use TempFileUrlTrait;
+
     private const SEED_LDIF = <<<'LDIF'
         dn: dc=example,dc=com
         objectClass: top
@@ -199,13 +205,42 @@ class LdapServerTest extends TestCase
     {
         $this->subject->seed(
             new StringLdifLoader(self::SEED_LDIF),
-            new Dn('cn=Importer,dc=example,dc=com'),
+            new SeedOptions(creatorDn: new Dn('cn=Importer,dc=example,dc=com')),
         );
 
         self::assertSame(
             'cn=Importer,dc=example,dc=com',
             $this->storage()->find(new Dn('cn=foo,dc=example,dc=com'))?->get('creatorsName')?->getValues()[0],
         );
+    }
+
+    public function test_it_should_seed_a_url_referenced_value_when_options_carry_a_resolver(): void
+    {
+        $url = $this->tempFileUrl('Bar');
+
+        $this->subject->seed(
+            new StringLdifLoader(
+                "dn: dc=example,dc=com\nobjectClass: top\nobjectClass: domain\ndc: example\n"
+                . "\n"
+                . "dn: cn=foo,dc=example,dc=com\nobjectClass: top\nobjectClass: person\ncn: foo\nsn:< $url\n",
+            ),
+            new SeedOptions(urlResolver: new FileUrlResolver()),
+        );
+
+        self::assertSame(
+            ['Bar'],
+            $this->storage()->find(new Dn('cn=foo,dc=example,dc=com'))?->get('sn')?->getValues(),
+        );
+    }
+
+    public function test_it_should_refuse_a_url_referenced_value_when_seeding_without_a_resolver(): void
+    {
+        $this->expectException(LdifParseException::class);
+        $this->expectExceptionMessage('URL-referenced');
+
+        $this->subject->seed(new StringLdifLoader(
+            "dn: cn=foo,dc=example,dc=com\nobjectClass: person\ncn: foo\nsn:< file:///tmp/x\n",
+        ));
     }
 
     public function test_it_should_reject_seeding_when_the_ldif_contains_change_records(): void

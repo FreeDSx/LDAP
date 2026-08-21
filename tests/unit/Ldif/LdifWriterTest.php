@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Ldif;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Ldif\LdifChangeRecord;
 use FreeDSx\Ldap\Ldif\LdifChanges;
 use FreeDSx\Ldap\Ldif\LdifOutputOptions;
 use FreeDSx\Ldap\Ldif\LdifWriter;
@@ -327,32 +328,32 @@ final class LdifWriterTest extends TestCase
             ->setEmitChangetypeForAdds(true);
 
         $changes = new LdifChanges(
-            Operations::add(Entry::create('cn=a,dc=x', [
+            new LdifChangeRecord(Operations::add(Entry::create('cn=a,dc=x', [
                 'objectClass' => ['top', 'person'],
                 'cn' => 'a',
                 'sn' => ['Bär', ' spaced '],
-            ])),
-            Operations::delete('cn=b,dc=x'),
-            Operations::modify(
+            ]))),
+            new LdifChangeRecord(Operations::delete('cn=b,dc=x')),
+            new LdifChangeRecord(Operations::modify(
                 'cn=c,dc=x',
                 Change::add('telephoneNumber', '555-0100'),
                 Change::delete('description'),
                 Change::replace('sn', 'C'),
-            ),
-            new ModifyDnRequest(
+            )),
+            new LdifChangeRecord(new ModifyDnRequest(
                 'cn=d,ou=old,dc=x',
                 'cn=dd',
                 true,
                 'ou=new,dc=x',
-            ),
+            )),
         );
 
-        $ldif = (new LdifWriter($options))->write($changes);
+        $ldif = (new LdifWriter($options))->write($changes->requests());
         $parsed = LdifChanges::fromString($ldif);
 
         self::assertSame(
-            $this->normalize($changes),
-            $this->normalize($parsed),
+            $this->normalize($changes->requests()),
+            $this->normalize($parsed->requests()),
         );
     }
 

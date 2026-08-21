@@ -76,9 +76,9 @@ final readonly class SubschemaLoader
      */
     public function fromLdif(LdifLoaderInterface $ldif): Schema
     {
-        foreach ((new LdifParser())->parse($ldif) as $request) {
-            if ($request instanceof AddRequest) {
-                return $this->fromEntry($request->getEntry());
+        foreach ((new LdifParser())->parse($ldif) as $record) {
+            if ($record->request instanceof AddRequest) {
+                return $this->fromEntry($record->request->getEntry());
             }
         }
 
