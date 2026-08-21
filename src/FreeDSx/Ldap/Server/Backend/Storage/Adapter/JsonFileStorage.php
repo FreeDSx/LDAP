@@ -121,6 +121,21 @@ final class JsonFileStorage implements EntryStorageInterface, ChangeJournalingIn
     }
 
     /**
+     * Re-keys under the same lock the buffer already takes, so a partially renamed subtree is never published.
+     */
+    public function renameSubtree(
+        Dn $from,
+        Dn $to,
+    ): void {
+        $this->atomic(static function (EntryStorageInterface $storage) use ($from, $to): void {
+            $storage->renameSubtree(
+                $from,
+                $to,
+            );
+        });
+    }
+
+    /**
      * One mutation for the whole set, rather than rewriting the file once per DN.
      */
     public function removeAll(array $dns): void

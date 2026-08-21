@@ -153,6 +153,46 @@ trait PdoDialectTrait
         SQL;
     }
 
+    public function queryRenameEntry(): string
+    {
+        return <<<SQL
+            UPDATE entries
+            SET dn = ?,
+                lc_dn = ?,
+                lc_parent_dn = ?
+            WHERE lc_dn = ?
+        SQL;
+    }
+
+    /**
+     * One pass, since the walk reaches a deep entry only through parent links this statement rewrites.
+     *
+     * The stored DN is assigned first, because MySQL evaluates each assignment against the preceding ones.
+     */
+    public function queryRenameDescendants(): string
+    {
+        $carriesSuffix = $this->binaryCompare(
+            'SUBSTR(dn, ' . $this->charLength('dn') . ' - ? + 1)',
+            '?',
+        );
+        $stored = $this->replaceDnSuffix('dn');
+        $canonical = $this->replaceDnSuffix('lc_dn');
+        $parent = $this->replaceDnSuffix('lc_parent_dn');
+        $scope = $this->scopedSubtreeIds();
+
+        return <<<SQL
+            UPDATE entries
+            SET dn = CASE
+                    WHEN $carriesSuffix
+                    THEN $stored
+                    ELSE $canonical
+                END,
+                lc_dn = $canonical,
+                lc_parent_dn = $parent
+            WHERE entry_id IN ($scope)
+        SQL;
+    }
+
     public function queryDelete(): string
     {
         return <<<SQL
@@ -249,5 +289,69 @@ trait PdoDialectTrait
     protected function listColumns(): string
     {
         return 'entry_id, lc_dn, dn, attributes';
+    }
+
+    /**
+     * Replaces the trailing characters of $column, the first marker naming how many and the second what replaces them.
+     */
+    protected function replaceDnSuffix(string $column): string
+    {
+        return $this->concat(
+            "SUBSTR($column, 1, {$this->charLength($column)} - ?)",
+            '?',
+        );
+    }
+
+    /**
+     * Character count, which the DN arithmetic needs: SQLite counts characters for TEXT, MySQL's LENGTH() counts bytes.
+     */
+    protected function charLength(string $column): string
+    {
+        return "LENGTH($column)";
+    }
+
+    protected function concat(
+        string $left,
+        string $right,
+    ): string {
+        return "$left || $right";
+    }
+
+    /**
+     * Byte-exact comparison, which SQLite already applies to text; a collated one would let a dialect keep a spelling
+     * the other adapters discard.
+     */
+    protected function binaryCompare(
+        string $left,
+        string $right,
+    ): string {
+        return "$left = $right";
+    }
+
+    /**
+     * Entry keys under a DN, which the rename scopes on. Parameters: [lc_dn]
+     */
+    protected function scopedSubtreeIds(): string
+    {
+        return $this->subtreeWalk();
+    }
+
+    /**
+     * Descends lc_parent_dn, so a rename costs its subtree rather than the whole table a DN suffix match would scan.
+     */
+    protected function subtreeWalk(): string
+    {
+        return <<<SQL
+            WITH RECURSIVE subtree AS (
+                SELECT entry_id, lc_dn
+                FROM entries
+                WHERE lc_parent_dn = ?
+                UNION ALL
+                SELECT e.entry_id, e.lc_dn
+                FROM entries e
+                INNER JOIN subtree s ON e.lc_parent_dn = s.lc_dn
+            )
+            SELECT entry_id FROM subtree
+        SQL;
     }
 }

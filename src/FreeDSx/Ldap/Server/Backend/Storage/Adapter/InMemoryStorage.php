@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\ArrayEntryStorageTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SubtreeRename;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
@@ -80,6 +81,30 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
         bool $rebuildIndexes = false,
     ): void {
         $this->entries[$entry->getDn()->normalize()->toString()] = $entry;
+    }
+
+    public function renameSubtree(
+        Dn $from,
+        Dn $to,
+    ): void {
+        $base = $this->find($from);
+        if ($base === null) {
+            return;
+        }
+
+        $rename = new SubtreeRename(
+            $from,
+            $to,
+            $base->getDn()->toString(),
+        );
+
+        $this->entries = $rename->applyTo(
+            $this->entries,
+            static fn(Entry $entry): Entry => Entry::raw(
+                $rename->storedFor($entry->getDn()),
+                $entry->getAttributes(),
+            ),
+        );
     }
 
     public function remove(Dn $dn): void

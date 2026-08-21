@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\SqlQuery;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SidecarLeaf;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SubtreeRename;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingTrait;
@@ -244,7 +245,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             // stored; a second writer then repairs whatever the first left behind instead of drifting from it.
             $current = $rebuildIndexes
                 ? null
-                : $this->currentForDiff($normDn);
+                : $this->lockedEntry($normDn);
 
             $this->statements->execute($this->dialect->queryUpsert(), [
                 $lcDn,
@@ -267,6 +268,43 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
                 $entry,
                 $current,
             );
+        });
+    }
+
+    /**
+     * Re-keys the subtree without touching a single sidecar row, since those hang off entry_id rather than the DN.
+     */
+    public function renameSubtree(
+        Dn $from,
+        Dn $to,
+    ): void {
+        $this->assertDnFits($to->toString());
+
+        $this->atomic(function () use ($from, $to): void {
+            // Locked before the walk reads it, so a concurrent rename of the same base cannot interleave with this one.
+            $base = $this->lockedEntry($from->normalize());
+
+            if ($base === null) {
+                return;
+            }
+
+            $rename = new SubtreeRename(
+                $from,
+                $to,
+                $base->getDn()->toString(),
+            );
+
+            $this->statements->execute(
+                $this->dialect->queryRenameDescendants(),
+                $this->renameDescendantParams($rename),
+            );
+
+            $this->statements->execute($this->dialect->queryRenameEntry(), [
+                $rename->toDisplay,
+                $rename->lcTo,
+                $to->normalize()->getParent()?->toString() ?? '',
+                $rename->lcFrom,
+            ]);
         });
     }
 
@@ -468,9 +506,9 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     }
 
     /**
-     * The stored entry, locked for the rest of this transaction, or null when there is nothing to diff against.
+     * The stored entry, locked for the rest of this transaction, or null when there is none.
      */
-    private function currentForDiff(Dn $normDn): ?Entry
+    private function lockedEntry(Dn $normDn): ?Entry
     {
         $this->dialect->lockRowForWrite(
             $this->transactor->pdo(),
@@ -480,6 +518,31 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         );
 
         return $this->find($normDn);
+    }
+
+    /**
+     * The DN lengths are counted in characters, matching what the dialect's SUBSTR and length functions slice on.
+     *
+     * @return list<string|int>
+     */
+    private function renameDescendantParams(SubtreeRename $rename): array
+    {
+        $storedLength = mb_strlen($rename->fromDisplay, 'UTF-8');
+        $canonicalLength = mb_strlen($rename->lcFrom, 'UTF-8');
+
+        return [
+            $storedLength,
+            $rename->fromDisplay,
+            $storedLength,
+            $rename->toDisplay,
+            $canonicalLength,
+            $rename->lcTo,
+            $canonicalLength,
+            $rename->lcTo,
+            $canonicalLength,
+            $rename->lcTo,
+            $rename->lcFrom,
+        ];
     }
 
     /**

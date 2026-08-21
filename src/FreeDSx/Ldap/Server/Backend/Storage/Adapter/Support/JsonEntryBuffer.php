@@ -59,7 +59,7 @@ final class JsonEntryBuffer implements EntryStorageInterface, ChangeAppenderInte
 
     public function find(Dn $dn): ?Entry
     {
-        $key = $dn->toString();
+        $key = $dn->normalize()->toString();
         if (!isset($this->data[$key])) {
             return null;
         }
@@ -69,7 +69,7 @@ final class JsonEntryBuffer implements EntryStorageInterface, ChangeAppenderInte
 
     public function exists(Dn $dn): bool
     {
-        return isset($this->data[$dn->toString()]);
+        return isset($this->data[$dn->normalize()->toString()]);
     }
 
     public function list(StorageListOptions $options): EntryStream
@@ -84,9 +84,30 @@ final class JsonEntryBuffer implements EntryStorageInterface, ChangeAppenderInte
         $this->data[$entry->getDn()->normalize()->toString()] = ($this->fromEntry)($entry);
     }
 
+    public function renameSubtree(
+        Dn $from,
+        Dn $to,
+    ): void {
+        $base = $this->find($from);
+        if ($base === null) {
+            return;
+        }
+
+        $rename = new SubtreeRename(
+            $from,
+            $to,
+            $base->getDn()->toString(),
+        );
+
+        $this->data = $rename->applyTo(
+            $this->data,
+            fn(mixed $row): array => ($this->fromEntry)($this->renamed($rename, $row)),
+        );
+    }
+
     public function remove(Dn $dn): void
     {
-        unset($this->data[$dn->toString()]);
+        unset($this->data[$dn->normalize()->toString()]);
     }
 
     public function removeAll(array $dns): void
@@ -136,6 +157,18 @@ final class JsonEntryBuffer implements EntryStorageInterface, ChangeAppenderInte
     public function getData(): array
     {
         return $this->data;
+    }
+
+    private function renamed(
+        SubtreeRename $rename,
+        mixed $row,
+    ): Entry {
+        $entry = ($this->toEntry)($row);
+
+        return Entry::raw(
+            $rename->storedFor($entry->getDn()),
+            $entry->getAttributes(),
+        );
     }
 
     /**

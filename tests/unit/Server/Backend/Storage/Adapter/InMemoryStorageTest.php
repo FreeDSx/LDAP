@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
@@ -24,10 +25,13 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
+use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 
 final class InMemoryStorageTest extends TestCase
 {
     use JournalingStorageContractTests;
+
+    use SubtreeRenameStorageContractTests;
 
     private InMemoryStorage $subject;
 
@@ -333,5 +337,10 @@ final class InMemoryStorageTest extends TestCase
             [],
             $journal,
         );
+    }
+
+    protected function makeRenameStorage(Entry ...$entries): EntryStorageInterface
+    {
+        return new InMemoryStorage($entries);
     }
 }

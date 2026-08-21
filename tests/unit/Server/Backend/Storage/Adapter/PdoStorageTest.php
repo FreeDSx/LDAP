@@ -45,6 +45,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
@@ -64,12 +65,15 @@ use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
+use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 
 final class PdoStorageTest extends TestCase
 {
     use ServerContainerTrait;
 
     use JournalingStorageContractTests;
+
+    use SubtreeRenameStorageContractTests;
 
     private WritableStorageBackend $subject;
 
@@ -1506,6 +1510,17 @@ final class PdoStorageTest extends TestCase
             $statements,
             journal: $journal,
         );
+    }
+
+    protected function makeRenameStorage(Entry ...$entries): EntryStorageInterface
+    {
+        $storage = $this->pdoStorage(TestServerOptions::sqlite());
+
+        foreach ($entries as $entry) {
+            $storage->store($entry);
+        }
+
+        return $storage;
     }
 
     /**

@@ -170,6 +170,30 @@ final class WriteSerializingStorageTest extends TestCase
         );
     }
 
+    public function test_rename_subtree_routes_through_queue_to_writes(): void
+    {
+        $from = new Dn('ou=people,dc=example,dc=com');
+        $to = new Dn('ou=staff,dc=example,dc=com');
+
+        $this->writes
+            ->expects(self::once())
+            ->method('renameSubtree')
+            ->with($from, $to);
+        $this->reads
+            ->expects(self::never())
+            ->method('renameSubtree');
+
+        $this->subject->renameSubtree(
+            $from,
+            $to,
+        );
+
+        self::assertSame(
+            1,
+            $this->queue->ranCount,
+        );
+    }
+
     public function test_atomic_routes_through_queue_to_writes(): void
     {
         $callable = static function (EntryStorageInterface $s): void {
