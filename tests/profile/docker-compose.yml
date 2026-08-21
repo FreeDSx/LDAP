@@ -98,6 +98,40 @@ services:
     tmpfs:
       - /var/lib/ldap
 
+  389ds:
+    image: quay.io/389ds/dirsrv:latest
+    container_name: freedsx-profile-389ds
+    cpus: ${PROFILE_CPUS:-4}
+    # Pinned to the same cores as freedsx-server so a comparison measures the server, not core contention.
+    cpuset: ${SERVER_CPUSET:-}
+    ports:
+      - "10392:3389"
+    environment:
+      DS_DM_PASSWORD: "P@ssword12345"
+      DS_SUFFIX_NAME: "dc=example,dc=com"
+    healthcheck:
+      test: ["CMD-SHELL", "dsctl localhost status 2>/dev/null | grep -qi running"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+
+  # The image creates the instance but not the suffix, so the backend is added once the instance answers.
+  389ds-init:
+    image: quay.io/389ds/dirsrv:latest
+    container_name: freedsx-profile-389ds-init
+    depends_on:
+      389ds:
+        condition: service_healthy
+    restart: on-failure
+    entrypoint:
+      - bash
+      - -lc
+      - >
+        dsconf -D "cn=Directory Manager" -w "P@ssword12345" ldap://389ds:3389 backend suffix list 2>/dev/null | grep -q "dc=example,dc=com"
+        || dsconf -D "cn=Directory Manager" -w "P@ssword12345" ldap://389ds:3389 backend create
+        --suffix "dc=example,dc=com" --be-name userRoot --create-suffix
+
   opendj:
     image: openidentityplatform/opendj:latest
     container_name: freedsx-profile-opendj

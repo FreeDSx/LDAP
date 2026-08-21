@@ -26,6 +26,8 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
@@ -71,6 +73,19 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
         Dn $dn,
     ): void {
         if (!$this->isAllowed($operation, $token, $dn)) {
+            $this->deny();
+        }
+    }
+
+    /**
+     * @throws OperationException
+     */
+    public function authorizeRelocation(
+        TokenInterface $token,
+        Dn $container,
+        RelocationAccess $direction,
+    ): void {
+        if (!$this->isRelocationAllowed($token, $container, $direction)) {
             $this->deny();
         }
     }
@@ -263,6 +278,28 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
             || in_array($operation, $rule->operations, true);
     }
 
+    private function isRelocationAllowed(
+        TokenInterface $token,
+        Dn $container,
+        RelocationAccess $direction,
+    ): bool {
+        return $this->resolveEffect(
+            $this->rules->relocations,
+            $this->relocationMatches(...),
+            $direction,
+            $token,
+            $container,
+            Effect::Deny,
+        ) === Effect::Allow;
+    }
+
+    private function relocationMatches(
+        RelocationRule $rule,
+        RelocationAccess $direction,
+    ): bool {
+        return $rule->access->includes($direction);
+    }
+
     private function isControlAllowed(
         string $controlOid,
         TokenInterface $token,
@@ -366,7 +403,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
     /**
      * Returns the effect of the first rule whose selector, target, and subject all match; otherwise $default.
      *
-     * @template TRule of OperationRule|ControlRule
+     * @template TRule of OperationRule|ControlRule|RelocationRule
      * @template TValue
      * @param TRule[] $rules
      * @param callable(TRule, TValue): bool $selectorMatches

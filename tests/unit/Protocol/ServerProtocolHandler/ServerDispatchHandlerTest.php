@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
+use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
@@ -181,6 +182,24 @@ final class ServerDispatchHandlerTest extends TestCase
             ->with(self::isInstanceOf(WriteRequestInterface::class));
 
         $this->subject->handleRequest($delete, $this->mockToken);
+    }
+
+    public function test_it_sends_modify_dn_through_the_write_handler(): void
+    {
+        $modifyDn = new LdapMessageRequest(
+            1,
+            new ModifyDnRequest('cn=foo,dc=bar', 'cn=baz', true),
+        );
+
+        $this->mockWriteHandler
+            ->expects(self::once())
+            ->method('handle')
+            ->with(self::isInstanceOf(WriteRequestInterface::class));
+
+        $this->subject->handleRequest(
+            $modifyDn,
+            $this->mockToken,
+        );
     }
 
     public function test_non_critical_unsupported_control_does_not_cause_an_error(): void

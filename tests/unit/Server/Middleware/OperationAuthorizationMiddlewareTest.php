@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Protocol\Factory\HandlerRouteResolverInterface;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\Middleware\OperationAuthorizationMiddleware;
@@ -259,6 +260,89 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
                 'ou=other,dc=bar',
             ],
             $this->authorizedModifyDnTargets(),
+        );
+    }
+
+    public function test_dispatch_route_authorizes_relocation_of_both_containers_when_the_parent_changes(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $relocations = [];
+        $this->accessControl
+            ->method('authorizeRelocation')
+            ->willReturnCallback(static function (
+                TokenInterface $token,
+                Dn $container,
+                RelocationAccess $direction,
+            ) use (&$relocations): void {
+                $relocations[] = $direction->name . ':' . $container->toString();
+            });
+
+        $this->subject->process(
+            $this->contextFor(new ModifyDnRequest('cn=foo,ou=here,dc=bar', 'cn=baz', true, 'ou=there,dc=bar')),
+            $this->next,
+        );
+
+        self::assertSame(
+            [
+                'Out:ou=here,dc=bar',
+                'In:ou=there,dc=bar',
+            ],
+            $relocations,
+        );
+    }
+
+    public function test_dispatch_route_skips_relocation_for_a_rename_in_place(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $this->accessControl
+            ->expects(self::never())
+            ->method('authorizeRelocation');
+
+        $this->subject->process(
+            $this->contextFor(new ModifyDnRequest('cn=foo,ou=here,dc=bar', 'cn=baz', true)),
+            $this->next,
+        );
+    }
+
+    public function test_dispatch_route_skips_relocation_when_the_new_superior_is_the_current_parent(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $this->accessControl
+            ->expects(self::never())
+            ->method('authorizeRelocation');
+
+        $this->subject->process(
+            $this->contextFor(new ModifyDnRequest('cn=foo,ou=here,dc=bar', 'cn=baz', true, 'OU=Here,DC=Bar')),
+            $this->next,
+        );
+    }
+
+    public function test_dispatch_route_skips_relocation_for_a_single_rdn_source(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $this->accessControl
+            ->expects(self::never())
+            ->method('authorizeRelocation');
+
+        $this->subject->process(
+            $this->contextFor(new ModifyDnRequest('dc=bar', 'dc=baz', true, 'ou=there,dc=bar')),
+            $this->next,
+        );
+    }
+
+    public function test_dispatch_route_relocation_denial_blocks_dispatch(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $this->accessControl
+            ->method('authorizeRelocation')
+            ->willThrowException($this->denied());
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->subject->process(
+            $this->contextFor(new ModifyDnRequest('cn=foo,ou=here,dc=bar', 'cn=baz', true, 'ou=there,dc=bar')),
+            $this->next,
         );
     }
 

@@ -390,30 +390,36 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
     }
 
     /**
+     * Moves whatever is under the entry along with it.
+     *
+     * The containers an entry leaves and arrives in are gated by the relocation rules the middleware consults.
+     *
      * @throws OperationException
      */
     public function move(
         MoveCommand $command,
         WriteContext $context,
     ): void {
-        $this->writeAtomic(function (EntryStorageInterface $storage) use ($command, $context): void {
-            $normOld = $command->dn->normalize();
+        $normOld = $command->dn->normalize();
+        $this->findOrFail(
+            $this->storage,
+            $normOld,
+        );
+        $this->assertNotNamingContext(
+            $this->storage,
+            $command->dn,
+        );
+        $this->assertNewSuperiorExists(
+            $this->storage,
+            $command,
+        );
+        $this->assertNotIntoOwnSubtree(
+            $command,
+            $normOld,
+        );
+
+        $this->writeAtomic(function (EntryStorageInterface $storage) use ($command, $context, $normOld): void {
             $entry = $this->findOrFail($storage, $normOld);
-
-            if ($storage->hasChildren($normOld)) {
-                throw new OperationException(
-                    sprintf('Entry "%s" has subordinate entries and cannot be moved.', $command->dn->toString()),
-                    ResultCode::NOT_ALLOWED_ON_NON_LEAF,
-                );
-            }
-
-            $this->assertNotNamingContext(
-                $storage,
-                $command->dn,
-            );
-
-            $this->assertNewSuperiorExists($storage, $command);
-
             $newEntry = $this->entryHandler->apply($entry, $command);
             $this->validateForMove(
                 $command,
@@ -425,8 +431,12 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             // Respelling the RDN resolves to the entry being renamed, which is not a collision with another one.
             $isRespelling = $normNew->toString() === $normOld->toString();
 
-            if (!$isRespelling && $storage->exists($normNew)) {
-                $this->throwEntryAlreadyExists($newEntry->getDn());
+            if (!$isRespelling) {
+                $this->assertMoveTargetIsFree(
+                    $storage,
+                    $normNew,
+                    $newEntry->getDn(),
+                );
             }
 
             $this->subentryGuard->assertPlacement(
@@ -440,16 +450,23 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 $newEntry,
                 $context,
             );
-            $storage->remove($normOld);
-            $storage->store(
-                $newEntry,
-                rebuildIndexes: true,
-            );
-            $this->changeRecorder?->recordModRdn(
+
+            // Re-keyed before the base is stored, so the upsert lands on the moved row rather than inserting a second.
+            if (!$isRespelling) {
+                $storage->renameSubtree(
+                    $normOld,
+                    $newEntry->getDn(),
+                );
+            }
+
+            $storage->store($newEntry);
+            $this->recordSubtreeMove(
                 $storage,
+                $context,
                 $newEntry,
                 $command->dn,
-                $context,
+                $normOld,
+                $normNew,
             );
         });
     }
@@ -476,6 +493,130 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         return $this->searchStream->buildForBaseObject(
             $entry,
             $request,
+        );
+    }
+
+    /**
+     * The target must hold no entry, and nothing may already sit beneath it.
+     *
+     * @throws OperationException
+     */
+    private function assertMoveTargetIsFree(
+        EntryStorageInterface $storage,
+        Dn $normNew,
+        Dn $newDn,
+    ): void {
+        // A system write may create an entry whose parent is absent, so the target can hold subordinates yet not exist.
+        if (!$storage->exists($normNew) && !$storage->hasChildren($normNew)) {
+            return;
+        }
+
+        $this->throwEntryAlreadyExists($newDn);
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function assertNotIntoOwnSubtree(
+        MoveCommand $command,
+        Dn $normOld,
+    ): void {
+        // Also what keeps the storage suffix rewrite well defined, so this is more than a sanity check.
+        if ($command->newParent === null || !$command->newParent->normalize()->isDescendantOf($normOld)) {
+            return;
+        }
+
+        throw new OperationException(
+            sprintf(
+                'Entry "%s" cannot be moved beneath itself.',
+                $command->dn->toString(),
+            ),
+            ResultCode::UNWILLING_TO_PERFORM,
+        );
+    }
+
+    /**
+     * One record per moved entry, since a consumer re-fetches by the DN each record carries and would otherwise never
+     * hear about a descendant.
+     */
+    private function recordSubtreeMove(
+        EntryStorageInterface $storage,
+        WriteContext $context,
+        Entry $newEntry,
+        Dn $previousDn,
+        Dn $normOld,
+        Dn $normNew,
+    ): void {
+        if ($this->changeRecorder === null) {
+            return;
+        }
+
+        $this->changeRecorder->recordModRdn(
+            $storage,
+            $newEntry,
+            $previousDn,
+            $context,
+        );
+
+        // Respelling the base leaves every DN beneath it exactly where it was.
+        if ($normNew->toString() === $normOld->toString()) {
+            return;
+        }
+
+        foreach ($this->movedDescendants($storage, $normNew) as $entry) {
+            $this->changeRecorder->recordModRdn(
+                $storage,
+                $entry,
+                $this->previousDnOf(
+                    $entry->getDn(),
+                    $normOld,
+                    $normNew,
+                ),
+                $context,
+            );
+        }
+    }
+
+    /**
+     * Read in full rather than streamed, so the journal writes below do not run against an open result set.
+     *
+     * @return list<Entry>
+     */
+    private function movedDescendants(
+        EntryStorageInterface $storage,
+        Dn $normNew,
+    ): array {
+        $descendants = [];
+        $options = StorageListOptions::matchAll(
+            $normNew,
+            subtree: true,
+        );
+
+        foreach ($storage->list($options)->entries as $entry) {
+            if ($entry->getDn()->normalize()->toString() !== $normNew->toString()) {
+                $descendants[] = $entry;
+            }
+        }
+
+        return $descendants;
+    }
+
+    /**
+     * Where a moved entry sat before, by swapping back the canonical suffix the move replaced.
+     */
+    private function previousDnOf(
+        Dn $movedDn,
+        Dn $normOld,
+        Dn $normNew,
+    ): Dn {
+        $lcDn = $movedDn->normalize()->toString();
+
+        return Dn::fromCanonical(
+            substr(
+                $lcDn,
+                0,
+                -strlen($normNew->toString()),
+            ) . $normOld->toString(),
         );
     }
 
@@ -571,13 +712,13 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
      */
     private function collectSubtreeDnsDeepestFirst(Dn $base): array
     {
-        $dns = [];
         $options = StorageListOptions::matchAll(
             $base,
             subtree: true,
             attributes: [],
         );
 
+        $dns = [];
         foreach ($this->storage->list($options)->entries as $entry) {
             $dns[] = $entry->getDn()->normalize();
         }
@@ -784,6 +925,8 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
     }
 
     /**
+     * A single-RDN superior is held to this too, so a move cannot strand the entry under a DN that holds nothing.
+     *
      * @throws OperationException
      */
     private function assertNewSuperiorExists(EntryStorageInterface $storage, MoveCommand $command): void
@@ -792,9 +935,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             return;
         }
 
-        $normNewParent = $command->newParent->normalize();
-
-        if ($normNewParent->getParent() !== null && !$storage->exists($normNewParent)) {
+        if (!$storage->exists($command->newParent->normalize())) {
             $this->throwNoSuchObject(
                 $storage,
                 $command->newParent,

@@ -25,6 +25,8 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationRule;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
 use FreeDSx\Ldap\Server\AccessControl\Subject\AnySubjectMatcher;
@@ -932,5 +934,95 @@ final class RuleBasedAccessControlTest extends TestCase
             new AnonToken(),
             'userPassword',
         ));
+    }
+
+    public function test_relocation_is_denied_when_no_rule_matches(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty());
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $subject->authorizeRelocation(
+            $this->bindToken,
+            $this->dn,
+            RelocationAccess::Out,
+        );
+    }
+
+    public function test_relocation_is_allowed_by_a_matching_rule(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            relocations: [RelocationRule::allow(new AnySubjectMatcher())],
+        ));
+
+        $subject->authorizeRelocation(
+            $this->bindToken,
+            $this->dn,
+            RelocationAccess::Out,
+        );
+    }
+
+    public function test_relocation_rules_apply_only_to_their_own_direction(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            relocations: [
+                RelocationRule::allow(
+                    new AnySubjectMatcher(),
+                    new AnyTargetMatcher(),
+                    RelocationAccess::In,
+                ),
+            ],
+        ));
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $subject->authorizeRelocation(
+            $this->bindToken,
+            $this->dn,
+            RelocationAccess::Out,
+        );
+    }
+
+    public function test_a_relocation_rule_for_both_directions_answers_either(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            relocations: [RelocationRule::allow(new AnySubjectMatcher())],
+        ));
+
+        $subject->authorizeRelocation(
+            $this->bindToken,
+            $this->dn,
+            RelocationAccess::Out,
+        );
+        $subject->authorizeRelocation(
+            $this->bindToken,
+            $this->dn,
+            RelocationAccess::In,
+        );
+    }
+
+    public function test_the_first_matching_relocation_rule_wins(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            relocations: [
+                RelocationRule::deny(new AnySubjectMatcher()),
+                RelocationRule::allow(new AnySubjectMatcher()),
+            ],
+        ));
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $subject->authorizeRelocation(
+            $this->bindToken,
+            $this->dn,
+            RelocationAccess::Out,
+        );
     }
 }

@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
@@ -48,6 +49,21 @@ interface AccessControlInterface
         Dn $dn,
         string $attribute,
         AttributeAccess $access,
+    ): void;
+
+    /**
+     * Assert that $token may move an entry out of, or into, the given container.
+     *
+     * Only consulted when a Modify DN changes the parent, so renaming an entry in place never reaches this.
+     *
+     * @param Dn $container The old parent for Out, the new parent for In.
+     *
+     * @throws OperationException with ResultCode::INSUFFICIENT_ACCESS_RIGHTS on denial
+     */
+    public function authorizeRelocation(
+        TokenInterface $token,
+        Dn $container,
+        RelocationAccess $direction,
     ): void;
 
     /**

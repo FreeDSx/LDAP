@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\ManagerToken;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -56,6 +57,9 @@ final class PrivilegedBypassAccessControlTest extends TestCase
         $this->inner
             ->expects(self::never())
             ->method('authorizeExtendedOperation');
+        $this->inner
+            ->expects(self::never())
+            ->method('authorizeRelocation');
 
         $dn = new Dn('cn=other,dc=foo,dc=bar');
         $this->subject->authorizeOperation(
@@ -77,6 +81,11 @@ final class PrivilegedBypassAccessControlTest extends TestCase
         $this->subject->authorizeExtendedOperation(
             $this->manager,
             '1.2.3.4',
+        );
+        $this->subject->authorizeRelocation(
+            $this->manager,
+            $dn,
+            RelocationAccess::Out,
         );
 
         $this->addToAssertionCount(1);
