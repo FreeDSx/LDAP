@@ -617,19 +617,66 @@ final class WritableStorageBackendTest extends TestCase
         );
     }
 
-    public function test_move_throws_not_allowed_on_non_leaf_when_entry_has_children(): void
+    public function test_move_relocates_an_entry_that_has_children(): void
     {
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::NOT_ALLOWED_ON_NON_LEAF);
+        $this->addPeopleOu();
 
-        // dc=example,dc=com has cn=Alice as a direct child — cannot be moved
+        $this->subject->move(
+            $this->renamePeopleToStaff(),
+            $this->context(),
+        );
+
+        self::assertNotNull($this->subject->get(new Dn('ou=staff,dc=example,dc=com')));
+        self::assertNull($this->subject->get(new Dn('ou=people,dc=example,dc=com')));
+    }
+
+    public function test_move_takes_the_descendants_of_the_entry_with_it(): void
+    {
+        $this->addPeopleOu();
+
+        $this->subject->move(
+            $this->renamePeopleToStaff(),
+            $this->context(),
+        );
+
+        self::assertNotNull($this->subject->get(new Dn('cn=bob,ou=staff,dc=example,dc=com')));
+        self::assertNull($this->subject->get(new Dn('cn=bob,ou=people,dc=example,dc=com')));
+    }
+
+    public function test_move_refuses_relocating_an_entry_beneath_itself(): void
+    {
+        $this->addPeopleOu();
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
+
         $this->subject->move(
             new MoveCommand(
-                new Dn('dc=example,dc=com'),
-                Rdn::create('dc=example'),
-                false,
-                null,
+                new Dn('ou=People,dc=example,dc=com'),
+                Rdn::create('ou=Staff'),
+                true,
+                new Dn('cn=Bob,ou=People,dc=example,dc=com'),
             ),
+            $this->context(),
+        );
+    }
+
+    public function test_move_refuses_a_target_that_already_holds_subordinates(): void
+    {
+        $this->addPeopleOu();
+        $this->subject->add(
+            new AddCommand(new Entry(
+                new Dn('cn=Orphan,ou=Staff,dc=example,dc=com'),
+                new Attribute('cn', 'Orphan'),
+            )),
+            $this->systemContext(),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::ENTRY_ALREADY_EXISTS);
+
+        $this->subject->move(
+            $this->renamePeopleToStaff(),
             $this->context(),
         );
     }
@@ -969,6 +1016,13 @@ final class WritableStorageBackendTest extends TestCase
     {
         /** @var EntryStorageInterface&MockObject $storage */
         $storage = $this->createMock(EntryStorageInterface::class);
+        // The entry and its parent are read before the write opens, so both must resolve to reach atomic().
+        $storage->method('find')
+            ->willReturn($this->alice);
+        $storage->method('exists')
+            ->willReturn(true);
+        $storage->method('list')
+            ->willReturn(new EntryStream($this->makeGenerator($this->alice)));
         $storage->method('atomic')
             ->willThrowException(new StorageIoException('Unable to publish the storage update.'));
 
@@ -2053,6 +2107,30 @@ final class WritableStorageBackendTest extends TestCase
         return WriteContext::system(
             new AnonToken(),
             new ControlBag(),
+        );
+    }
+
+    /**
+     * The shared fixture puts cn=Bob under this, but leaves the OU itself out.
+     */
+    private function addPeopleOu(): void
+    {
+        $this->subject->add(
+            new AddCommand(new Entry(
+                new Dn('ou=People,dc=example,dc=com'),
+                new Attribute('ou', 'People'),
+            )),
+            $this->context(),
+        );
+    }
+
+    private function renamePeopleToStaff(): MoveCommand
+    {
+        return new MoveCommand(
+            new Dn('ou=People,dc=example,dc=com'),
+            Rdn::create('ou=Staff'),
+            true,
+            null,
         );
     }
 

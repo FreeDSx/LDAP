@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
@@ -71,6 +72,18 @@ final readonly class ConfidentialAttributeAccessControl implements AccessControl
             $operation,
             $token,
             $dn,
+        );
+    }
+
+    public function authorizeRelocation(
+        TokenInterface $token,
+        Dn $container,
+        RelocationAccess $direction,
+    ): void {
+        $this->inner->authorizeRelocation(
+            $token,
+            $container,
+            $direction,
         );
     }
 

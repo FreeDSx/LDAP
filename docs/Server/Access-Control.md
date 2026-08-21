@@ -217,6 +217,7 @@ The defaults are fixed rather than configurable:
 - Attribute writes that match no rule are denied.
 - Attribute reads that match no rule are allowed, so a search still returns attributes you wrote no rule for.
 - Controls and extended operations that match no rule are denied, so privileged controls are off unless granted.
+- Relocations that match no rule are denied. Moving an entry between containers needs a grant.
 
 Because writes are denied by default, granting an operation is not enough on its own. A rule that allows `Add` or
 `Modify` still needs a matching attribute rule for the attributes being written, otherwise the operation is
@@ -245,7 +246,7 @@ replacing them, so they compose on `secureDefault()` or on a policy built from `
 
 | Method                                                    | Grants                                                                            |
 |-----------------------------------------------------------|-----------------------------------------------------------------------------------|
-| `withFullAccess($subject, $target = new AnyTargetMatcher())`   | Every operation and every attribute write over the target                         |
+| `withFullAccess($subject, $target = new AnyTargetMatcher())`   | Every operation, every attribute write, and relocation over the target            |
 | `withSelfServiceWrites($attributes = AclRules::SELF_WRITABLE_ATTRIBUTES)` | Modify on an identity's own entry, limited to the given attributes |
 | `withCredentialProtection($administrators = null)`        | The `userPassword` and Password Modify rules, plus privileged controls and extended operations for the administrator |
 | `withReplicaGrants($replica, $target = new AnyTargetMatcher())` | The content-sync control, the ppolicy-forward extended operation, and the policy-state writes that forward needs |
@@ -253,8 +254,9 @@ replacing them, so they compose on `secureDefault()` or on a policy built from `
 `AclRules::secureDefault()` is built from the first three. `withFullAccess()` is what it applies to the configured
 [administrator](#administrators), so reaching for it directly is how you grant a second identity the same rights.
 
-It covers operations and attribute writes only. Controls, extended operations, and confidential attributes are gated
-separately, which is why an administrator gets those from `withCredentialProtection()` rather than from this method.
+It covers operations, attribute writes, and [relocation](#relocation-rules) only. Controls, extended operations, and
+confidential attributes are gated separately, which is why an administrator gets those from
+`withCredentialProtection()` rather than from this method.
 
 ```php
 // A provisioning account with full rights over one subtree.
@@ -496,6 +498,41 @@ AclRules::fromEmpty()->replaceControlRules(
 ```
 
 A client attaches the control with `Controls::relaxRules()`, e.g. `$client->create($entry, Controls::relaxRules())`.
+
+## Relocation Rules
+
+`RelocationRule`s gate whether entries may leave or arrive in a container. This is a separate question from whether an
+entry may be renamed, which the `ModifyDn` operation controls.
+
+Two things make these rules different:
+
+- The target matches the container, not the entry being moved. For `RelocationAccess::Out` it is tested against the
+  entry's current parent, for `RelocationAccess::In` against the new parent. A rule with no direction covers both.
+- They are only consulted when a move changes the parent. Renaming an entry in place never reaches them. You can
+  pin a container shut without preventing renames inside it.
+
+They are denied by default, so an identity granted `ModifyDn` also needs a relocation grant before it can move entries
+between containers. `withFullAccess()` includes one.
+
+```php
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationRule;
+
+AclRules::secureDefault()->appendRelocationRules(
+    // Nothing may be moved out of ou=protected, though entries there may still be renamed in place.
+    RelocationRule::deny(
+        Subject::authenticated(),
+        Target::subtree('ou=protected,dc=example,dc=com'),
+        RelocationAccess::Out,
+    ),
+    // Everything else stays movable for this identity.
+    RelocationRule::allow(
+        Subject::group('cn=admins,dc=example,dc=com'),
+    ),
+);
+```
+
+Order matters: the deny is listed first so it matches before the grant.
 
 ## Extended Operation Rules
 

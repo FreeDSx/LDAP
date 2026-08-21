@@ -35,6 +35,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerMonitorHandler;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
 use FreeDSx\Ldap\Server\AccessControl\OperationTargetDn;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
@@ -372,6 +373,42 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
             OperationType::ModifyDn,
             $token,
             $newParentDn,
+        );
+
+        $this->authorizeRelocation(
+            $request,
+            $token,
+            $newParentDn,
+        );
+    }
+
+    /**
+     * Gates the containers an entry leaves and arrives in.
+     *
+     * @throws OperationException
+     */
+    private function authorizeRelocation(
+        ModifyDnRequest $request,
+        TokenInterface $token,
+        Dn $newParentDn,
+    ): void {
+        $oldParentDn = $request->getDn()->getParent();
+        if ($oldParentDn === null) {
+            return;
+        }
+        if ($oldParentDn->normalize()->toString() === $newParentDn->normalize()->toString()) {
+            return;
+        }
+
+        $this->accessControl->authorizeRelocation(
+            $token,
+            $oldParentDn,
+            RelocationAccess::Out,
+        );
+        $this->accessControl->authorizeRelocation(
+            $token,
+            $newParentDn,
+            RelocationAccess::In,
         );
     }
 

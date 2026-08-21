@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\AccessControl\Target\AnyTargetMatcher;
@@ -61,6 +62,7 @@ final readonly class AclRules
      * @param ControlRule[] $controls Evaluated per control in order; first match wins.
      * @param ExtendedOperationRule[] $extendedOps Evaluated per extended operation in order; first match wins.
      * @param ConfidentialAccessRule[] $confidential Evaluated per confidential attribute in order; first match wins.
+     * @param RelocationRule[] $relocations Evaluated per container and direction in order; first match wins.
      */
     private function __construct(
         public array $operations = [],
@@ -68,6 +70,7 @@ final readonly class AclRules
         public array $controls = [],
         public array $extendedOps = [],
         public array $confidential = [],
+        public array $relocations = [],
     ) {}
 
     /**
@@ -80,6 +83,7 @@ final readonly class AclRules
      * @param ControlRule[] $controls
      * @param ExtendedOperationRule[] $extendedOps
      * @param ConfidentialAccessRule[] $confidential
+     * @param RelocationRule[] $relocations
      */
     public static function fromEmpty(
         array $operations = [],
@@ -87,6 +91,7 @@ final readonly class AclRules
         array $controls = [],
         array $extendedOps = [],
         array $confidential = [],
+        array $relocations = [],
     ): self {
         return new self(
             $operations,
@@ -94,6 +99,7 @@ final readonly class AclRules
             $controls,
             $extendedOps,
             $confidential,
+            $relocations,
         );
     }
 
@@ -108,6 +114,7 @@ final readonly class AclRules
             $this->controls,
             $this->extendedOps,
             $this->confidential,
+            $this->relocations,
         );
     }
 
@@ -122,6 +129,7 @@ final readonly class AclRules
             $this->controls,
             $this->extendedOps,
             $this->confidential,
+            $this->relocations,
         );
     }
 
@@ -136,6 +144,7 @@ final readonly class AclRules
             $controls,
             $this->extendedOps,
             $this->confidential,
+            $this->relocations,
         );
     }
 
@@ -150,6 +159,7 @@ final readonly class AclRules
             $this->controls,
             $extendedOps,
             $this->confidential,
+            $this->relocations,
         );
     }
 
@@ -166,6 +176,24 @@ final readonly class AclRules
             $this->controls,
             $this->extendedOps,
             $confidential,
+            $this->relocations,
+        );
+    }
+
+    /**
+     * Rules gating whether entries may leave or arrive in a container, consulted only when a move changes the parent.
+     *
+     * Discards every relocation rule already present.
+     */
+    public function replaceRelocationRules(RelocationRule ...$relocations): self
+    {
+        return new self(
+            $this->operations,
+            $this->attributes,
+            $this->controls,
+            $this->extendedOps,
+            $this->confidential,
+            $relocations,
         );
     }
 
@@ -221,6 +249,17 @@ final readonly class AclRules
         return $this->replaceConfidentialAccess(
             ...$this->confidential,
             ...$confidential,
+        );
+    }
+
+    /**
+     * Append relocation rules, so anything already present matches first.
+     */
+    public function appendRelocationRules(RelocationRule ...$relocations): self
+    {
+        return $this->replaceRelocationRules(
+            ...$this->relocations,
+            ...$relocations,
         );
     }
 
@@ -372,7 +411,11 @@ final readonly class AclRules
             ->appendAttributeRules(AttributeRule::allow(
                 $subject,
                 $target,
-            )->forWrite());
+            )->forWrite())
+            ->appendRelocationRules(RelocationRule::allow(
+                $subject,
+                $target,
+            ));
     }
 
     /**

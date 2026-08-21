@@ -11,8 +11,12 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
@@ -48,6 +52,25 @@ final class LdapBackendStorageCommand extends Command
     public const MANAGER_DN = 'cn=manager';
 
     public const MANAGER_PASSWORD = 'manager-pass';
+
+    public const ROOT_DN = 'dc=foo,dc=bar';
+
+    /**
+     * Holds ModifyDn without administrator rights, so a rename it performs is held to the per-entry rules.
+     */
+    public const MOVER_DN = 'cn=mover,dc=foo,dc=bar';
+
+    public const MOVER_PASSWORD = '12345';
+
+    /**
+     * Entries may be renamed inside this container but never moved out of it.
+     */
+    public const PINNED_CONTAINER_DN = 'ou=pinned,dc=foo,dc=bar';
+
+    /**
+     * Nothing may be moved into this container.
+     */
+    public const SEALED_CONTAINER_DN = 'ou=sealed,dc=foo,dc=bar';
 
     /**
      * Tests assert on replicated state, so they should not wait a production poll for it.
@@ -379,6 +402,8 @@ final class LdapBackendStorageCommand extends Command
             );
         }
 
+        $this->grantSubtreeMoves($serverOptions);
+
         if ($input->getOption('manager')) {
             $serverOptions->setManager(new ManagerIdentity(
                 new Dn(self::MANAGER_DN),
@@ -464,6 +489,50 @@ final class LdapBackendStorageCommand extends Command
         $server->run();
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Lets cn=mover rename entries without administrator rights, while pinning one container shut.
+     */
+    private function grantSubtreeMoves(ServerOptions $serverOptions): void
+    {
+        $mover = Subject::dn(self::MOVER_DN);
+
+        $serverOptions->setAclRules(
+            $serverOptions->getAclRules()
+                ->appendOperationRules(
+                    OperationRule::allow(
+                        $mover,
+                        Target::subtree(self::ROOT_DN),
+                        OperationType::ModifyDn,
+                    ),
+                )
+                ->appendAttributeRules(
+                    AttributeRule::allow(
+                        $mover,
+                        Target::subtree(self::ROOT_DN),
+                        'cn',
+                        'ou',
+                    )->forWrite(),
+                )
+                // Denies first, since the first match wins.
+                ->appendRelocationRules(
+                    RelocationRule::deny(
+                        $mover,
+                        Target::subtree(self::PINNED_CONTAINER_DN),
+                        RelocationAccess::Out,
+                    ),
+                    RelocationRule::deny(
+                        $mover,
+                        Target::subtree(self::SEALED_CONTAINER_DN),
+                        RelocationAccess::In,
+                    ),
+                    RelocationRule::allow(
+                        $mover,
+                        Target::subtree(self::ROOT_DN),
+                    ),
+                ),
+        );
     }
 
     /**

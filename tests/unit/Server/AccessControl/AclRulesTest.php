@@ -29,6 +29,8 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
+use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationRule;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
@@ -604,6 +606,54 @@ final class AclRulesTest extends TestCase
             $this->user(),
             Control::OID_PROXY_AUTHORIZATION,
         ));
+    }
+
+    public function test_relocation_is_denied_under_the_secure_default(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::secureDefault());
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $subject->authorizeRelocation(
+            $this->user(),
+            new Dn('ou=people,dc=foo,dc=bar'),
+            RelocationAccess::Out,
+        );
+    }
+
+    public function test_full_access_grants_relocation(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $rules = AclRules::secureDefault()
+            ->withFullAccess(Subject::dn(self::ADMIN_DN));
+
+        (new RuleBasedAccessControl($rules))->authorizeRelocation(
+            $this->admin(),
+            new Dn('ou=people,dc=foo,dc=bar'),
+            RelocationAccess::Out,
+        );
+    }
+
+    public function test_appended_relocation_rules_keep_the_ones_already_present(): void
+    {
+        $rules = AclRules::fromEmpty()
+            ->appendRelocationRules(RelocationRule::deny(Subject::anyone()))
+            ->appendRelocationRules(RelocationRule::allow(Subject::anyone()));
+
+        self::assertCount(
+            2,
+            $rules->relocations,
+        );
+
+        // The deny was appended first, so it matches first.
+        self::expectException(OperationException::class);
+        (new RuleBasedAccessControl($rules))->authorizeRelocation(
+            $this->user(),
+            new Dn('ou=people,dc=foo,dc=bar'),
+            RelocationAccess::Out,
+        );
     }
 
     private function user(): TokenInterface
