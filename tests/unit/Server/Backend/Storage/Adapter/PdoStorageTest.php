@@ -387,6 +387,7 @@ final class PdoStorageTest extends TestCase
                 'ldap_change_journal',
                 'ldap_change_journal_seq',
                 'ldap_replica_pwpolicy_state',
+                'ldap_schema_version',
             ],
             $this->tableNames($pdo),
         );

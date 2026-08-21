@@ -44,19 +44,19 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
 
     private const DELETE_SQL = <<<SQL
         DELETE FROM entry_attribute_trigrams
-        WHERE entry_lc_dn = ?
+        WHERE owner_entry_id = ?
         SQL;
 
     private const INSERT_SQL = <<<SQL
-        INSERT INTO entry_attribute_trigrams (entry_lc_dn, attr_name_lower, trigram)
+        INSERT INTO entry_attribute_trigrams (owner_entry_id, attr_name_lower, trigram)
         VALUES %s
         SQL;
 
     private const PREDICATE_SQL = <<<SQL
-        lc_dn IN (
-            SELECT entry_lc_dn FROM entry_attribute_trigrams
+        entry_id IN (
+            SELECT owner_entry_id FROM entry_attribute_trigrams
             WHERE attr_name_lower = ? AND trigram IN (%s)
-            GROUP BY entry_lc_dn
+            GROUP BY owner_entry_id
             HAVING COUNT(DISTINCT trigram) = %d
         )
         SQL;
@@ -91,16 +91,16 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
     }
 
     public function maintain(
-        string $lcDn,
+        int $entryId,
         Entry $entry,
         callable $execute,
     ): void {
         $execute(
             self::DELETE_SQL,
-            [$lcDn],
+            [$entryId],
         );
 
-        $rows = $this->rowsFor($lcDn, $entry);
+        $rows = $this->rowsFor($entryId, $entry);
         if ($rows === []) {
             return;
         }
@@ -148,10 +148,10 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
     }
 
     /**
-     * @return list<array{0: string, 1: string, 2: string}>
+     * @return list<array{0: int, 1: string, 2: string}>
      */
     private function rowsFor(
-        string $lcDn,
+        int $entryId,
         Entry $entry,
     ): array {
         $rows = [];
@@ -170,7 +170,7 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
             }
 
             foreach (array_unique($trigrams) as $trigram) {
-                $rows[] = [$lcDn, $attrLower, $trigram];
+                $rows[] = [$entryId, $attrLower, $trigram];
             }
         }
 
@@ -186,9 +186,9 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
     }
 
     /**
-     * @param list<array{0: string, 1: string, 2: string}> $rows
+     * @param list<array{0: int, 1: string, 2: string}> $rows
      *
-     * @return list<string>
+     * @return list<string|int>
      */
     private function flatten(array $rows): array
     {

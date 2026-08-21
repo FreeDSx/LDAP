@@ -34,14 +34,16 @@ interface PdoEntryDialectInterface
     public function commit(PDO $pdo): void;
 
     /**
-     * Take an exclusive lock on the lc_dn row of $table within the current transaction so concurrent writers serialize.
+     * Take an exclusive lock on a row of $table within the current transaction so concurrent writers serialize.
      *
      * @param string $table A fixed internal table identifier, never client input, so implementations may interpolate it.
+     * @param string $keyColumn A fixed internal column identifier, interpolated for the same reason as $table.
      */
     public function lockRowForWrite(
         PDO $pdo,
         string $table,
-        string $lcDn,
+        string $keyColumn,
+        string|int $key,
     ): void;
 
     /**
@@ -66,6 +68,11 @@ interface PdoEntryDialectInterface
      * `SELECT dn, attributes FROM entries WHERE lc_dn = ?`. Parameters: [lc_dn]
      */
     public function queryFetchEntry(): string;
+
+    /**
+     * `SELECT entry_id FROM entries WHERE lc_dn = ?`. Parameters: [lc_dn]
+     */
+    public function queryEntryId(): string;
 
     /**
      * SELECT dn, attributes with no WHERE clause (returns all entries).
@@ -116,12 +123,12 @@ interface PdoEntryDialectInterface
     public function queryDeleteIn(int $count): string;
 
     /**
-     * `DELETE FROM entry_attribute_values WHERE entry_lc_dn = ?`. Parameters: [entry_lc_dn]
+     * `DELETE FROM entry_attribute_values WHERE owner_entry_id = ?`. Parameters: [owner_entry_id]
      */
     public function querySidecarDelete(): string;
 
     /**
-     * The same restricted to $count attribute names. Parameters: [entry_lc_dn, attr_name_lower, ...]
+     * The same restricted to $count attribute names. Parameters: [owner_entry_id, attr_name_lower, ...]
      */
     public function querySidecarDeleteNames(int $count): string;
 

@@ -58,7 +58,7 @@ final readonly class PdoListQueryBuilder
 
         $subentryCondition = $this->subentryCondition(
             $subentries,
-            'lc_dn',
+            'entry_id',
         );
         $query = match (true) {
             !$subtree => $this->buildChildQuery(
@@ -114,7 +114,7 @@ final readonly class PdoListQueryBuilder
         // Applied inside the candidate select, since the limit below it would otherwise be spent on excluded rows.
         $subentryCondition = $this->subentryCondition(
             $subentries,
-            's.entry_lc_dn',
+            's.owner_entry_id',
         );
         $subentryClause = $subentryCondition !== null
             ? "AND $subentryCondition"
@@ -122,16 +122,19 @@ final readonly class PdoListQueryBuilder
 
         if ($base === '') {
             $inner = <<<SQL
-                SELECT DISTINCT s.entry_lc_dn AS d FROM entry_attribute_values s
+                SELECT DISTINCT s.owner_entry_id AS d FROM entry_attribute_values s
                     WHERE $sidecarCondition
                     $subentryClause
                     LIMIT ?
                 SQL;
         } else {
+            // Scope reads off entries, since the sidecar holds the key rather than the DN. The join is on the
+            // entry key, so the limit still bounds the candidate scan.
             $inner = <<<SQL
-                SELECT DISTINCT s.entry_lc_dn AS d FROM entry_attribute_values s
+                SELECT DISTINCT s.owner_entry_id AS d FROM entry_attribute_values s
+                    INNER JOIN entries scope ON scope.entry_id = s.owner_entry_id
                     WHERE $sidecarCondition
-                      AND (s.entry_lc_dn = ? OR s.entry_lc_dn LIKE ? ESCAPE '!')
+                      AND (scope.lc_dn = ? OR scope.lc_dn LIKE ? ESCAPE '!')
                     $subentryClause
                     LIMIT ?
                 SQL;
@@ -142,7 +145,7 @@ final readonly class PdoListQueryBuilder
         $params[] = $sqlLimit;
 
         return new SqlQuery(
-            "$fetchAll WHERE lc_dn IN (SELECT t.d FROM ($inner) t)",
+            "$fetchAll WHERE entry_id IN (SELECT t.d FROM ($inner) t)",
             $params,
         );
     }

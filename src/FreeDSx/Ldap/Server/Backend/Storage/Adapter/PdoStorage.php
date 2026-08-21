@@ -141,6 +141,8 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         foreach ($statements as $statement) {
             $pdo->exec($statement);
         }
+
+        self::stampSchemaVersion($pdo);
     }
 
     /**
@@ -251,14 +253,17 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
                 $this->encodeAttributes($entry),
             ]);
 
+            // Neither dialect reports the key from an upsert, so it is read back before the index rows are written.
+            $entryId = $this->entryIdFor($normDn);
+
             if ($current === null) {
-                $this->indexes->rewrite($lcDn, $entry);
+                $this->indexes->rewrite($entryId, $entry);
 
                 return;
             }
 
             $this->indexes->update(
-                $lcDn,
+                $entryId,
                 $entry,
                 $current,
             );
@@ -324,8 +329,22 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         $this->dialect->lockRowForWrite(
             $this->transactor->pdo(),
             'entries',
+            'lc_dn',
             $dn->normalize()->toString(),
         );
+    }
+
+    /**
+     * Records the schema the tables were created from, so a database states which revision it holds.
+     */
+    private static function stampSchemaVersion(PDO $pdo): void
+    {
+        $statement = $pdo->prepare(<<<SQL
+            INSERT INTO ldap_schema_version (id, version)
+            SELECT 1, ?
+            WHERE NOT EXISTS (SELECT 1 FROM ldap_schema_version WHERE id = 1)
+            SQL);
+        $statement->execute([self::SCHEMA_VERSION]);
     }
 
     /**
@@ -456,10 +475,33 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         $this->dialect->lockRowForWrite(
             $this->transactor->pdo(),
             'entries',
+            'lc_dn',
             $normDn->toString(),
         );
 
         return $this->find($normDn);
+    }
+
+    /**
+     * @throws RuntimeException when the row was written in this transaction but cannot be read back
+     */
+    private function entryIdFor(Dn $normDn): int
+    {
+        $row = $this->statements
+            ->execute(
+                $this->dialect->queryEntryId(),
+                [$normDn->toString()],
+            )
+            ->fetch();
+
+        if (!is_array($row) || !is_numeric($row['entry_id'] ?? null)) {
+            throw new RuntimeException(sprintf(
+                'The entry "%s" has no storage key.',
+                $normDn->toString(),
+            ));
+        }
+
+        return (int) $row['entry_id'];
     }
 
     /**

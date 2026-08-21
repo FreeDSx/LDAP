@@ -176,11 +176,11 @@ final class PdoListQueryBuilderTest extends TestCase
         );
 
         self::assertStringContainsString(
-            'SELECT DISTINCT s.entry_lc_dn AS d',
+            'SELECT DISTINCT s.owner_entry_id AS d',
             $query->sql,
         );
         self::assertStringContainsString(
-            "AND (s.entry_lc_dn = ? OR s.entry_lc_dn LIKE ? ESCAPE '!')",
+            "AND (scope.lc_dn = ? OR scope.lc_dn LIKE ? ESCAPE '!')",
             $query->sql,
         );
         self::assertStringContainsString(
@@ -216,7 +216,7 @@ final class PdoListQueryBuilderTest extends TestCase
             $query->sql,
         );
         self::assertStringNotContainsString(
-            's.entry_lc_dn = ?',
+            'scope.lc_dn = ?',
             $query->sql,
         );
         self::assertSame(
@@ -236,7 +236,7 @@ final class PdoListQueryBuilderTest extends TestCase
         );
 
         self::assertStringContainsString(
-            'SELECT DISTINCT s.entry_lc_dn AS d',
+            'SELECT DISTINCT s.owner_entry_id AS d',
             $query->sql,
         );
         self::assertStringContainsString(
@@ -339,12 +339,13 @@ final class PdoListQueryBuilderTest extends TestCase
             'EXISTS (',
             $query->sql,
         );
+        // The sidecar column is named apart from the outer one so this cannot bind to the inner scope.
         self::assertStringContainsString(
-            's.entry_lc_dn = lc_dn',
+            's.owner_entry_id = entry_id',
             $query->sql,
         );
         self::assertStringNotContainsString(
-            'lc_dn IN (',
+            'entry_id IN (',
             $query->sql,
         );
     }
@@ -355,7 +356,7 @@ final class PdoListQueryBuilderTest extends TestCase
             'ou=people,dc=foo,dc=bar',
             false,
             new SqlFilterResult(
-                "lc_dn IN (SELECT s.entry_lc_dn FROM entry_attribute_values s WHERE s.attr_name_lower = 'cn')",
+                "entry_id IN (SELECT s.owner_entry_id FROM entry_attribute_values s WHERE s.attr_name_lower = 'cn')",
                 [],
             ),
             5001,
@@ -363,7 +364,7 @@ final class PdoListQueryBuilderTest extends TestCase
         );
 
         self::assertStringContainsString(
-            'lc_dn IN (',
+            'entry_id IN (',
             $query->sql,
         );
         self::assertStringNotContainsString(
@@ -375,7 +376,7 @@ final class PdoListQueryBuilderTest extends TestCase
     private function sidecarLeaf(): SqlFilterResult
     {
         return new SqlFilterResult(
-            "lc_dn IN (SELECT s.entry_lc_dn FROM entry_attribute_values s WHERE s.attr_name_lower = 'cn' AND s.value_lower = ?)",
+            "entry_id IN (SELECT s.owner_entry_id FROM entry_attribute_values s WHERE s.attr_name_lower = 'cn' AND s.value_lower = ?)",
             ['smith'],
             sidecarCondition: "s.attr_name_lower = 'cn' AND s.value_lower = ?",
         );

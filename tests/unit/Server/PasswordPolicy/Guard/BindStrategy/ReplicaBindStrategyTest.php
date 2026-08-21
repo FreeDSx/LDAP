@@ -17,6 +17,8 @@ use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -28,7 +30,8 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyBindGuard;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
-use Tests\Support\FreeDSx\Ldap\Server\PasswordPolicy\Replica\SqliteReplicaPasswordStateStoreFactory;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
@@ -41,6 +44,8 @@ use Tests\Support\FreeDSx\Ldap\Server\Clock\RecordingSleeper;
 
 final class ReplicaBindStrategyTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private const NOW = '2026-05-20T12:00:00Z';
 
     private const DN = 'cn=foo,dc=example,dc=com';
@@ -57,7 +62,13 @@ final class ReplicaBindStrategyTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->store = SqliteReplicaPasswordStateStoreFactory::inMemory();
+        // Both resolve from the memoised container, so the state store shares the storage holding the subject.
+        $this->fromContainer(EntryStorageInterface::class)
+            ->store(new Entry(
+                new Dn(self::DN),
+                new Attribute('cn', 'foo'),
+            ));
+        $this->store = $this->fromContainer(ReplicaPasswordStateStoreInterface::class);
         $this->backend = $this->createMock(LdapBackendInterface::class);
         $this->context = new PasswordPolicyContext();
         $this->sleeper = new RecordingSleeper();
@@ -181,6 +192,11 @@ final class ReplicaBindStrategyTest extends TestCase
 
         self::assertFalse($this->localState()->isLocked());
         self::assertNull($this->context->getOutcome());
+    }
+
+    protected function makeServerOptions(): ServerOptions
+    {
+        return TestServerOptions::sqlite();
     }
 
     private function localState(): UserPasswordState

@@ -124,12 +124,13 @@ final class SqliteFilterTranslatorTest extends TestCase
             'EXISTS (',
             $result->correlatedSql,
         );
+        // The sidecar column is named apart from the outer one so this cannot bind to the inner scope.
         self::assertStringContainsString(
-            's.entry_lc_dn = lc_dn',
+            's.owner_entry_id = entry_id',
             $result->correlatedSql,
         );
         self::assertStringNotContainsString(
-            'lc_dn IN (',
+            'entry_id IN (',
             $result->correlatedSql,
         );
     }
@@ -876,7 +877,7 @@ final class SqliteFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringStartsWith(
-            'NOT (lc_dn IN (',
+            'NOT (entry_id IN (',
             $result->sql,
         );
         self::assertTrue($result->isExact);

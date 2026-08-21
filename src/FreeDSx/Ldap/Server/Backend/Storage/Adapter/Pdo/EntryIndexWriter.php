@@ -38,22 +38,22 @@ final readonly class EntryIndexWriter
      * Replace every index row for the entry, for a new entry or an explicit rebuild.
      */
     public function rewrite(
-        string $lcDn,
+        int $entryId,
         Entry $entry,
     ): void {
         $this->statements->execute(
             $this->dialect->querySidecarDelete(),
-            [$lcDn],
+            [$entryId],
         );
-        $this->insertRows($lcDn, $entry);
-        $this->maintainSubstringIndex($lcDn, $entry);
+        $this->insertRows($entryId, $entry);
+        $this->maintainSubstringIndex($entryId, $entry);
     }
 
     /**
      * Touch only the index rows of attributes whose values differ from those of the currently stored entry.
      */
     public function update(
-        string $lcDn,
+        int $entryId,
         Entry $entry,
         Entry $current,
     ): void {
@@ -64,10 +64,10 @@ final readonly class EntryIndexWriter
 
         $this->statements->execute(
             $this->dialect->querySidecarDeleteNames(count($changed)),
-            [$lcDn, ...$changed],
+            [$entryId, ...$changed],
         );
         $this->insertRows(
-            $lcDn,
+            $entryId,
             $entry,
             array_fill_keys($changed, true),
         );
@@ -77,7 +77,7 @@ final readonly class EntryIndexWriter
             return;
         }
 
-        $this->maintainSubstringIndex($lcDn, $entry);
+        $this->maintainSubstringIndex($entryId, $entry);
     }
 
     /**
@@ -145,11 +145,11 @@ final readonly class EntryIndexWriter
     }
 
     private function maintainSubstringIndex(
-        string $lcDn,
+        int $entryId,
         Entry $entry,
     ): void {
         $this->substringIndex?->maintain(
-            $lcDn,
+            $entryId,
             $entry,
             function (string $sql, array $params): void {
                 $this->statements->execute(
@@ -164,11 +164,11 @@ final readonly class EntryIndexWriter
      * @param array<string, true>|null $only Lowercased attribute names to write, or null for every attribute.
      */
     private function insertRows(
-        string $lcDn,
+        int $entryId,
         Entry $entry,
         ?array $only = null,
     ): void {
-        $rows = $this->buildRows($lcDn, $entry, $only);
+        $rows = $this->buildRows($entryId, $entry, $only);
         if ($rows === []) {
             return;
         }
@@ -194,10 +194,10 @@ final readonly class EntryIndexWriter
     /**
      * @param array<string, true>|null $only
      *
-     * @return list<array{string, string, string, string}> (entry_lc_dn, attr_name_lower, value_lower, value_original)
+     * @return list<array{int, string, string, string}> (owner_entry_id, attr_name_lower, value_lower, value_original)
      */
     private function buildRows(
-        string $lcDn,
+        int $entryId,
         Entry $entry,
         ?array $only,
     ): array {
@@ -211,7 +211,7 @@ final readonly class EntryIndexWriter
 
             foreach ($attribute->getValues() as $value) {
                 $rows[] = [
-                    $lcDn,
+                    $entryId,
                     $attrNameLower,
                     $this->valueLower($attrNameLower, $value),
                     $value,

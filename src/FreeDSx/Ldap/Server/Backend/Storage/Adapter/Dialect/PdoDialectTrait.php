@@ -48,7 +48,8 @@ trait PdoDialectTrait
     public function lockRowForWrite(
         PDO $pdo,
         string $table,
-        string $lcDn,
+        string $keyColumn,
+        string|int $key,
     ): void {}
 
     public function queryExists(): string
@@ -65,6 +66,15 @@ trait PdoDialectTrait
     {
         return <<<SQL
             SELECT dn, attributes
+            FROM entries
+            WHERE lc_dn = ?
+        SQL;
+    }
+
+    public function queryEntryId(): string
+    {
+        return <<<SQL
+            SELECT entry_id
             FROM entries
             WHERE lc_dn = ?
         SQL;
@@ -91,11 +101,11 @@ trait PdoDialectTrait
     {
         return <<<SQL
             WITH RECURSIVE subtree AS (
-                SELECT lc_dn, dn, attributes
+                SELECT entry_id, lc_dn, dn, attributes
                 FROM entries
                 WHERE lc_dn = ?
                 UNION ALL
-                SELECT e.lc_dn, e.dn, e.attributes
+                SELECT e.entry_id, e.lc_dn, e.dn, e.attributes
                 FROM entries e
                 INNER JOIN subtree s ON e.lc_parent_dn = s.lc_dn
             )
@@ -125,7 +135,7 @@ trait PdoDialectTrait
 
         return <<<SQL
             $dnColumn $operator (
-                SELECT sub.entry_lc_dn
+                SELECT sub.owner_entry_id
                 FROM entry_attribute_values sub
                 WHERE sub.attr_name_lower = '$objectClass'
                   AND sub.value_lower = '$subentry'
@@ -165,7 +175,7 @@ trait PdoDialectTrait
     {
         return <<<SQL
             DELETE FROM entry_attribute_values
-            WHERE entry_lc_dn = ?
+            WHERE owner_entry_id = ?
         SQL;
     }
 
@@ -175,14 +185,14 @@ trait PdoDialectTrait
 
         return <<<SQL
             DELETE FROM entry_attribute_values
-            WHERE entry_lc_dn = ?
+            WHERE owner_entry_id = ?
               AND attr_name_lower IN ($markers)
         SQL;
     }
 
     public function querySidecarInsertPrefix(): string
     {
-        return 'INSERT INTO entry_attribute_values (entry_lc_dn, attr_name_lower, value_lower, value_original) VALUES ';
+        return 'INSERT INTO entry_attribute_values (owner_entry_id, attr_name_lower, value_lower, value_original) VALUES ';
     }
 
     public function sortedQuery(
@@ -204,7 +214,7 @@ trait PdoDialectTrait
             $projections[] = <<<SQL
                 (SELECT MIN({$value})
                  FROM entry_attribute_values eav
-                 WHERE eav.entry_lc_dn = __base.lc_dn
+                 WHERE eav.owner_entry_id = __base.entry_id
                    AND eav.attr_name_lower = ?) AS {$alias}
                 SQL;
             $orderTerms[] = "{$alias} IS NULL {$sortKey->direction}, {$alias} {$sortKey->direction}";
@@ -234,10 +244,10 @@ trait PdoDialectTrait
     }
 
     /**
-     * Columns every list query selects; the portable sort projects lc_dn so it can correlate on the canonical DN.
+     * Columns every list query selects; the portable sort projects entry_id so it can correlate on the entry key.
      */
     protected function listColumns(): string
     {
-        return 'lc_dn, dn, attributes';
+        return 'entry_id, lc_dn, dn, attributes';
     }
 }

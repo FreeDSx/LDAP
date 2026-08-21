@@ -39,10 +39,10 @@ interface SubstringIndexInterface
     /**
      * Re-index one entry, running each write through the executor inside the caller's transaction.
      *
-     * @param callable(string $sql, list<string> $params): void $execute
+     * @param callable(string $sql, list<string|int> $params): void $execute
      */
     public function maintain(
-        string $lcDn,
+        int $entryId,
         Entry $entry,
         callable $execute,
     ): void;

@@ -74,7 +74,7 @@ final class MysqlFilterTranslatorTest extends TestCase
             $result->sql,
         );
         self::assertStringStartsWith(
-            'lc_dn IN (SELECT s.entry_lc_dn',
+            'entry_id IN (SELECT s.owner_entry_id',
             $result->sql,
         );
         self::assertSame(
@@ -641,7 +641,7 @@ final class MysqlFilterTranslatorTest extends TestCase
 
         self::assertNotNull($result);
         self::assertStringStartsWith(
-            'NOT (lc_dn IN (',
+            'NOT (entry_id IN (',
             $result->sql,
         );
         self::assertStringContainsString(
