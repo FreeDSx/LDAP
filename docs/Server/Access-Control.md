@@ -142,7 +142,7 @@ default). `AclRules` is immutable; every setter is variadic and returns a new in
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
-use FreeDSx\Ldap\Server\AccessControl\OperationType;
+use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
@@ -150,7 +150,7 @@ use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 
 $server = new LdapServer(
-    (new ServerOptions())
+    (new ServerOptions(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')))
         ->setAclRules(
             AclRules::fromEmpty()
                 ->replaceOperationRules(
@@ -189,7 +189,6 @@ $server = new LdapServer(
                     ),
                 ),
         )
-        ->setStorageConfig(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite'))
 );
 ```
 

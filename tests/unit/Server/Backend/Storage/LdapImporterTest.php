@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
-use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\TestCase;
 
 final class LdapImporterTest extends TestCase
@@ -170,7 +170,7 @@ final class LdapImporterTest extends TestCase
     public function test_importEntries_rejects_a_schema_violation_in_strict_mode(): void
     {
         $validator = new SchemaValidator(
-            (new ServerOptions())->getSchema(),
+            (TestServerOptions::defaults())->getSchema(),
             SchemaValidationMode::Strict,
         );
 
@@ -192,7 +192,7 @@ final class LdapImporterTest extends TestCase
     {
         $storage = new InMemoryStorage();
         $validator = new SchemaValidator(
-            (new ServerOptions())->getSchema(),
+            (TestServerOptions::defaults())->getSchema(),
             SchemaValidationMode::Lenient,
         );
 
@@ -214,7 +214,7 @@ final class LdapImporterTest extends TestCase
     {
         $storage = new InMemoryStorage();
         $validator = new SchemaValidator(
-            (new ServerOptions())->getSchema(),
+            (TestServerOptions::defaults())->getSchema(),
             SchemaValidationMode::Strict,
         );
 

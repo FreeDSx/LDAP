@@ -77,7 +77,7 @@ connections, which means the recorded changes must be visible to whichever proce
 
 | Runner | Concurrency model | What to use |
 | --- | --- | --- |
-| PCNTL (default) | One forked child process per connection | A storage that is shared across processes, such as SQLite, MySQL, or JSON file. In-memory storage is private to each child and will not serve writes made on other connections. |
+| PCNTL (default) | One forked child process per connection | A storage that is shared across processes, such as SQLite or MySQL. In-memory storage is private to each child, so the server refuses this pairing at startup. |
 | Swoole | One process, one coroutine per connection | Any storage, including in-memory, since everything shares one process. |
 
 In short, the persistent listen mode is available when either the Swoole runner is in use or the storage is shared

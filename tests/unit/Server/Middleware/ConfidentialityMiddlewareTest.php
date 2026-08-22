@@ -31,6 +31,7 @@ use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Middleware\ConfidentialityMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -217,7 +218,10 @@ final class ConfidentialityMiddlewareTest extends TestCase
         ConfidentialityRequirement $requirement,
         ?NetworkConfig $networkConfig = null,
     ): ConfidentialityMiddleware {
-        $options = new ServerOptions(networkConfig: $networkConfig ?? new NetworkConfig());
+        $options = new ServerOptions(
+            TestServerOptions::transientStorage(),
+            networkConfig: $networkConfig ?? new NetworkConfig(),
+        );
         $options->setRequireConfidentiality($requirement);
 
         return new ConfidentialityMiddleware(

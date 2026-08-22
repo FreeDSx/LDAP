@@ -19,9 +19,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\CoroutineLock;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\FileLock;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackend;
@@ -36,7 +33,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringI
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\FileChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContext;
@@ -45,13 +41,10 @@ use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptionsFactory;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
-use FreeDSx\Ldap\Server\Config\Storage\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoDriver;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
-use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\ServerOptions;
-use Psr\Log\NullLogger;
 
 /**
  * Builds the storage adapter selected by the StorageConfigInterface, plus the PDO primitives it is assembled from.
@@ -60,10 +53,6 @@ use Psr\Log\NullLogger;
  */
 final class StorageContainerProvider implements ContainerProviderInterface
 {
-    private const JOURNAL_SUFFIX = '.journal.jsonl';
-
-    private const SEQ_SUFFIX = '.journal.seq';
-
     public function factories(): array
     {
         return [
@@ -130,11 +119,6 @@ final class StorageContainerProvider implements ContainerProviderInterface
 
         return match (true) {
             $config instanceof PdoConfig => $container->get(PdoBackend::class)->storage,
-            $config instanceof JsonStorageConfig => $this->makeJsonStorage(
-                $container,
-                $config,
-                $journalConfig,
-            ),
             $config instanceof InMemoryStorageConfig => new InMemoryStorage(
                 $config->entries(),
                 $journalConfig === null ? null : AuditingChangeJournal::wrap(
@@ -148,36 +132,6 @@ final class StorageContainerProvider implements ContainerProviderInterface
                 $config::class,
             )),
         };
-    }
-
-    /**
-     * The journal and storage share one lock, so a journal append re-enters the write it belongs to.
-     */
-    private function makeJsonStorage(
-        Container $container,
-        JsonStorageConfig $config,
-        ?ChangeJournalConfig $journalConfig,
-    ): JsonFileStorage {
-        // Coroutines need a lock that yields rather than blocking the whole worker.
-        $lock = $container->get(ServerOptions::class)->isRunnerMode(RunnerMode::Swoole)
-            ? new CoroutineLock($config->path())
-            : new FileLock($config->path());
-
-        return new JsonFileStorage(
-            $config->path(),
-            $lock,
-            $journalConfig === null ? null : AuditingChangeJournal::wrap(
-                new FileChangeJournal(
-                    $lock,
-                    $config->path() . self::JOURNAL_SUFFIX,
-                    $config->path() . self::SEQ_SUFFIX,
-                    $this->journalOrigin($container),
-                ),
-                $journalConfig,
-            ),
-            $config->logger() ?? new NullLogger(),
-            $container->get(SortKeyComparator::class),
-        );
     }
 
     /**

@@ -16,7 +16,6 @@ namespace Tests\Unit\FreeDSx\Ldap;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
-use FreeDSx\Ldap\Server\Config\Storage\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Container;
@@ -30,7 +29,6 @@ use FreeDSx\Ldap\Protocol\Queue\Response\MetricsResponseInterceptor;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\JsonFileStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
@@ -70,6 +68,7 @@ use FreeDSx\Ldap\Server\ServerRunner\Swoole\PooledServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use FreeDSx\Socket\SocketPool;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -82,7 +81,7 @@ class ContainerTest extends TestCase
     {
         parent::setUp();
 
-        $this->subject = Container::forServer(new ServerOptions());
+        $this->subject = Container::forServer(TestServerOptions::defaults());
     }
 
     public function test_it_builds_in_memory_storage_from_an_in_memory_config(): void
@@ -93,18 +92,6 @@ class ContainerTest extends TestCase
 
         self::assertInstanceOf(
             InMemoryStorage::class,
-            $container->get(EntryStorageInterface::class),
-        );
-    }
-
-    public function test_it_builds_a_json_backend_from_a_json_config(): void
-    {
-        $container = Container::forServer(
-            new ServerOptions(JsonStorageConfig::forFile(sys_get_temp_dir() . '/freedsx_container_test.json')),
-        );
-
-        self::assertInstanceOf(
-            JsonFileStorage::class,
             $container->get(EntryStorageInterface::class),
         );
     }
@@ -264,9 +251,12 @@ class ContainerTest extends TestCase
             self::markTestSkipped('Cannot construct the default PCNTL runner on Windows.');
         }
 
+        // Shared storage, since the forking runner refuses anything a fork would not carry.
+        $container = $this->containerFor(TestServerOptions::forStorage($this->sharedStorage()));
+
         self::assertInstanceOf(
             ServerRunnerInterface::class,
-            $this->subject->get(ServerRunnerInterface::class),
+            $container->get(ServerRunnerInterface::class),
         );
     }
 
@@ -280,7 +270,7 @@ class ContainerTest extends TestCase
 
     public function test_the_metrics_recorder_is_in_memory_when_monitor_is_enabled(): void
     {
-        $container = $this->containerFor((new ServerOptions())->setMonitorEnabled(true));
+        $container = $this->containerFor((TestServerOptions::defaults())->setMonitorEnabled(true));
 
         self::assertInstanceOf(
             InMemoryMetricsRecorder::class,
@@ -291,7 +281,7 @@ class ContainerTest extends TestCase
     public function test_the_metrics_recorder_chains_a_user_recorder_when_one_is_set(): void
     {
         $container = $this->containerFor(
-            (new ServerOptions())
+            (TestServerOptions::defaults())
                 ->setMonitorEnabled(true)
                 ->setMetricsRecorder(new InMemoryMetricsRecorder()),
         );
@@ -309,7 +299,7 @@ class ContainerTest extends TestCase
         }
 
         $container = $this->containerFor(
-            (new ServerOptions())
+            (TestServerOptions::defaults())
                 ->setMonitorEnabled(true)
                 ->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
         );
@@ -322,7 +312,7 @@ class ContainerTest extends TestCase
 
     public function test_the_snapshot_provider_is_file_based_under_pcntl(): void
     {
-        $container = $this->containerFor((new ServerOptions())->setMonitorEnabled(true));
+        $container = $this->containerFor((TestServerOptions::defaults())->setMonitorEnabled(true));
 
         self::assertInstanceOf(
             FileSnapshotProvider::class,
@@ -367,7 +357,7 @@ class ContainerTest extends TestCase
         }
 
         $container = $this->containerFor(
-            (new ServerOptions())->setRunnerConfig(new RunnerConfig(
+            (TestServerOptions::defaults())->setRunnerConfig(new RunnerConfig(
                 RunnerMode::Swoole,
                 1,
             )),
@@ -379,7 +369,10 @@ class ContainerTest extends TestCase
         );
     }
 
-    public function test_several_workers_build_the_pooled_runner_when_storage_can_be_shared(): void
+    /**
+     * Each worker would open its own database, so the backend is shared in name only.
+     */
+    public function test_several_workers_are_clamped_to_one_process_for_an_in_memory_database(): void
     {
         if (!extension_loaded('swoole')) {
             self::markTestSkipped('The swoole extension is required.');
@@ -393,20 +386,20 @@ class ContainerTest extends TestCase
                 )),
         );
 
-        self::assertInstanceOf(
+        self::assertNotInstanceOf(
             PooledServerRunner::class,
             $container->get(ServerRunnerInterface::class),
         );
     }
 
-    public function test_several_workers_build_the_pooled_runner_for_file_storage(): void
+    public function test_several_workers_build_the_pooled_runner_for_shared_storage(): void
     {
         if (!extension_loaded('swoole')) {
             self::markTestSkipped('The swoole extension is required.');
         }
 
         $container = $this->containerFor(
-            (new ServerOptions(JsonStorageConfig::forFile(sys_get_temp_dir() . '/freedsx_container_test.json')))
+            (new ServerOptions(PdoConfig::forSqlite(sys_get_temp_dir() . '/freedsx_container_test.sqlite')))
                 ->setRunnerConfig(new RunnerConfig(
                     RunnerMode::Swoole,
                     4,
@@ -426,7 +419,7 @@ class ContainerTest extends TestCase
         }
 
         $container = $this->containerFor(
-            (new ServerOptions())->setRunnerConfig(new RunnerConfig(
+            (TestServerOptions::defaults())->setRunnerConfig(new RunnerConfig(
                 RunnerMode::Swoole,
                 4,
             )),
@@ -448,9 +441,17 @@ class ContainerTest extends TestCase
         );
     }
 
+    /**
+     * A path rather than ':memory:', since a forking runner refuses storage a fork would not carry.
+     */
+    private function sharedStorage(): PdoConfig
+    {
+        return PdoConfig::forSqlite(sys_get_temp_dir() . '/freedsx_container_test.sqlite');
+    }
+
     private function journalingOptions(): ServerOptions
     {
-        return (new ServerOptions())
+        return TestServerOptions::forStorage($this->sharedStorage())
             ->setReplicationConfig(ReplicationConfig::forProvider())
             ->setChangeJournalConfig(new ChangeJournalConfig(
                 retention: new RetentionPolicy(maxRecords: 100),

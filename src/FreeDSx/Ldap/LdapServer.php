@@ -49,7 +49,7 @@ class LdapServer
     private Container $container;
 
     public function __construct(
-        private readonly ServerOptions $options = new ServerOptions(),
+        private readonly ServerOptions $options,
         ?Container $container = null,
     ) {
         $this->container = $container ?? Container::forServer($this->options);

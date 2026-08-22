@@ -26,7 +26,6 @@ use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRule;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRules;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
-use FreeDSx\Ldap\Server\Config\Storage\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -75,7 +74,7 @@ final class LdapServerCommand extends Command
 
     private const EXTERNAL_CA_CERT = __DIR__ . '/../resources/cert/test-cases/ext-ca.crt';
 
-    private const VALID_STORAGE = ['memory', 'json', 'sqlite', 'mysql'];
+    private const VALID_STORAGE = ['memory', 'sqlite', 'mysql'];
 
     protected function configure(): void
     {
@@ -108,7 +107,7 @@ final class LdapServerCommand extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Storage adapter (' . implode(', ', self::VALID_STORAGE) . ')',
-                'memory',
+                'sqlite',
             )
             ->addOption(
                 'entries',
@@ -447,16 +446,6 @@ final class LdapServerCommand extends Command
 
     private function createStorageConfig(string $storageType): StorageConfigInterface
     {
-        if ($storageType === 'json') {
-            $filePath = TestWorker::path('server.json');
-
-            if (file_exists($filePath)) {
-                unlink($filePath);
-            }
-
-            return JsonStorageConfig::forFile($filePath);
-        }
-
         if ($storageType === 'sqlite') {
             $dbPath = TestWorker::path('server.sqlite');
 

@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -32,7 +33,7 @@ final class ServerAuthorizationTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new ServerAuthorization(new ServerOptions());
+        $this->subject = new ServerAuthorization(TestServerOptions::defaults());
     }
 
     public function test_it_should_have_an_anonymous_token_by_default(): void
@@ -107,7 +108,7 @@ final class ServerAuthorizationTest extends TestCase
     public function test_it_should_not_require_authentication_if_it_has_been_explicitly_disabled(RequestInterface $request): void
     {
         $this->subject = new ServerAuthorization(
-            (new ServerOptions())
+            (TestServerOptions::defaults())
                 ->setAllowAnonymous(false)
                 ->setRequireAuthentication(false),
             new AnonToken(),
@@ -124,7 +125,7 @@ final class ServerAuthorizationTest extends TestCase
     public function test_it_should_respect_the_option_for_whether_anon_binds_are_allowed(): void
     {
         $this->subject = new ServerAuthorization(
-            (new ServerOptions())
+            (TestServerOptions::defaults())
                 ->setAllowAnonymous(true),
             new AnonToken(),
         );
@@ -149,7 +150,7 @@ final class ServerAuthorizationTest extends TestCase
     public function test_it_should_allow_sasl_bind_when_the_mechanism_is_configured(): void
     {
         $this->subject = new ServerAuthorization(
-            (new ServerOptions())
+            (TestServerOptions::defaults())
                 ->setSaslMechanisms(ServerOptions::SASL_PLAIN),
         );
 
@@ -161,7 +162,7 @@ final class ServerAuthorizationTest extends TestCase
     public function test_it_should_not_allow_sasl_bind_for_a_mechanism_that_is_not_configured(): void
     {
         $this->subject = new ServerAuthorization(
-            (new ServerOptions())
+            (TestServerOptions::defaults())
                 ->setSaslMechanisms(ServerOptions::SASL_PLAIN),
         );
 

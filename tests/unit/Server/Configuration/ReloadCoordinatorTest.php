@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
@@ -38,7 +39,10 @@ final class ReloadCoordinatorTest extends TestCase
 
     public function test_reload_returns_the_new_options_and_a_factory_rebuilt_from_them(): void
     {
-        $newOptions = new ServerOptions(networkConfig: (new NetworkConfig())->setMaxConnections(123));
+        $newOptions = new ServerOptions(
+            TestServerOptions::transientStorage(),
+            networkConfig: (new NetworkConfig())->setMaxConnections(123),
+        );
         $reloader = $this->createMock(ConfigReloaderInterface::class);
         $reloader
             ->expects(self::once())
@@ -47,7 +51,7 @@ final class ReloadCoordinatorTest extends TestCase
 
         $rebuiltFrom = null;
         $result = $this->subject->reload(
-            (new ServerOptions())->setConfigReloader($reloader),
+            (TestServerOptions::defaults())->setConfigReloader($reloader),
             function (ServerListenerOptionsInterface $options) use (&$rebuiltFrom): ServerProtocolFactoryInterface {
                 $rebuiltFrom = $options;
 
@@ -83,7 +87,7 @@ final class ReloadCoordinatorTest extends TestCase
             );
 
         $result = $this->subject->reload(
-            (new ServerOptions())->setLogger($logger),
+            (TestServerOptions::defaults())->setLogger($logger),
             fn(ServerListenerOptionsInterface $options) => $this->reloadedFactory,
         );
 
@@ -108,7 +112,7 @@ final class ReloadCoordinatorTest extends TestCase
             ->willThrowException(new RuntimeException('Bad configuration.'));
 
         $result = $this->subject->reload(
-            (new ServerOptions())
+            (TestServerOptions::defaults())
                 ->setLogger($logger)
                 ->setConfigReloader($reloader),
             fn(ServerListenerOptionsInterface $options) => $this->reloadedFactory,

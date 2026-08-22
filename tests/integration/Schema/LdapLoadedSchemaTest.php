@@ -49,11 +49,26 @@ final class LdapLoadedSchemaTest extends ServerTestCase
         static::tearDownSharedServer();
     }
 
+    /**
+     * The directory outlives each test, so records a previous one left behind are cleared before this one runs.
+     *
+     * Done up front rather than after, so a test that fails part way through still leaves a clean directory.
+     */
     public function setUp(): void
     {
         $this->setServerMode('ldap-backend-storage');
 
         parent::setUp();
+
+        $this->authenticateAdmin();
+
+        foreach ($this->ldapClient()->search(
+            Operations::search(Filters::equal('objectClass', 'projectRecord'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        ) as $entry) {
+            $this->ldapClient()->delete($entry->getDn()->toString());
+        }
     }
 
     public function test_an_entry_using_a_loaded_object_class_is_accepted(): void

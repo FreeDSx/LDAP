@@ -24,9 +24,12 @@ Configuring backend storage automatically enables schema validation using the bu
 
 ```php
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 
-$server = new LdapServer(new ServerOptions());
+$server = new LdapServer(new ServerOptions(
+    PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite'),
+));
 ```
 
 ## What Gets Validated
@@ -158,13 +161,16 @@ use FreeDSx\Ldap\ServerOptions;
 $schemaConfig = (new SchemaConfig())
     ->addSource(new LdifSchemaSource('/path/to/schema.ldif'));
 
-$options = new ServerOptions(schemaConfig: $schemaConfig);
+$options = new ServerOptions(
+    $storageConfig,
+    schemaConfig: $schemaConfig,
+);
 ```
 
 `ServerOptions::getSchemaConfig()` returns the config in use, so the same can be done without constructing one:
 
 ```php
-$options = new ServerOptions();
+$options = new ServerOptions($storageConfig);
 
 $options->getSchemaConfig()
     ->addSource(new LdifSchemaSource('/path/to/schema.ldif'));

@@ -35,7 +35,7 @@ use FreeDSx\Ldap\Server\Metrics\Observation\TrafficObservation;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -55,7 +55,7 @@ final class ServerMonitorHandlerTest extends TestCase
         $this->metrics = new InMemoryMetricsRecorder();
 
         $this->subject = new ServerMonitorHandler(
-            options: new ServerOptions(),
+            options: TestServerOptions::defaults(),
             snapshots: $this->metrics,
             responder: $this->responder(),
         );
@@ -313,7 +313,7 @@ final class ServerMonitorHandlerTest extends TestCase
         $this->metrics->operationStarted(OperationType::Search);
 
         $subject = new ServerMonitorHandler(
-            options: (new ServerOptions())->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
+            options: (TestServerOptions::defaults())->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
             snapshots: $this->metrics,
             responder: $this->responder(),
         );

@@ -28,7 +28,7 @@ use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
-use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -45,7 +45,7 @@ final class BindMiddlewareTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->authorization = new ServerAuthorization(new ServerOptions());
+        $this->authorization = new ServerAuthorization(TestServerOptions::defaults());
         $this->authenticator = $this->createMock(Authenticator::class);
         $this->next = new RecordingMiddlewareHandler(new CallLog());
     }

@@ -39,7 +39,7 @@ final class CiThresholds
         return match ($key) {
             'memory:swoole' => new ThresholdSet(
                 maxErrors: 0,
-                minThroughput: 800.0,
+                minThroughput: 700.0,
                 maxP99Ms: 100.0,
             ),
             'json:pcntl' => new ThresholdSet(

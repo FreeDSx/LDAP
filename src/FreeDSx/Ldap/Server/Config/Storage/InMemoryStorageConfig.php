@@ -49,4 +49,9 @@ final readonly class InMemoryStorageConfig implements StorageConfigInterface
     {
         return StorageType::InMemory;
     }
+
+    public function isMultiProcessSafe(): bool
+    {
+        return StorageType::InMemory->isMultiProcessSafe();
+    }
 }

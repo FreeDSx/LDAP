@@ -18,7 +18,10 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
-use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
+use FreeDSx\Ldap\Container;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\SchemaConfig;
 use FreeDSx\Ldap\ServerOptions;
@@ -154,13 +157,21 @@ class LdapAclCommand extends Command
             ->setTransport($transport)
             ->setSocketAcceptTimeout(0.1);
 
-        $server = new LdapServer(
-            (new ServerOptions(
-                networkConfig: $network,
-                schemaConfig: (new SchemaConfig())->addSource(
-                    new LdifSchemaSource(self::SECRET_CODE_SCHEMA),
-                ),
-            ))
+        $dbPath = TestWorker::path('acl.sqlite');
+
+        foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $path) {
+            if (file_exists($path)) {
+                unlink($path);
+            }
+        }
+
+        $serverOptions = (new ServerOptions(
+            PdoConfig::forSqlite($dbPath),
+            networkConfig: $network,
+            schemaConfig: (new SchemaConfig())->addSource(
+                new LdifSchemaSource(self::SECRET_CODE_SCHEMA),
+            ),
+        ))
                 ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL))
                 ->setAclRules(
                     (AclRules::fromEmpty())
@@ -254,10 +265,15 @@ class LdapAclCommand extends Command
                                 'userPassword',
                             ),
                         ),
-                ),
+                );
+
+        $container = Container::forServer($serverOptions);
+        $server = new LdapServer(
+            $serverOptions,
+            $container,
         );
 
-        $server->getOptions()->setStorageConfig(InMemoryStorageConfig::withEntries($entries));
+        (new LdapImporter($container->get(EntryStorageInterface::class)))->importEntries($entries);
         $server->run();
 
         return Command::SUCCESS;

@@ -16,7 +16,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Ldif;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use FreeDSx\Ldap\Ldif\LdifChanges;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
@@ -111,7 +111,7 @@ final class LdapDumpServerTest extends ServerTestCase
 
     public function test_a_fresh_server_seeded_from_the_dump_reconstructs_the_directory(): void
     {
-        $options = new ServerOptions();
+        $options = TestServerOptions::defaults();
         $container = Container::forServer($options);
         (new LdapServer(
             $options,

@@ -26,8 +26,10 @@ use Tests\Integration\FreeDSx\Ldap\Storage\Concern\WriteTestsTrait;
  *
  * Subclasses override storageExtraArgs() to route the shared server at a different backend, so the same cases run
  * against each one. Cases live in the Concern traits grouped by the behavior they cover.
+ *
+ * Abstract because only a subclass can pair an adapter with a runner it is sound on.
  */
-class LdapBackendStorageTest extends ServerTestCase
+abstract class LdapBackendStorageTestCase extends ServerTestCase
 {
     use BindTestsTrait;
     use QueryTestsTrait;
@@ -72,5 +74,17 @@ class LdapBackendStorageTest extends ServerTestCase
     protected static function storageExtraArgs(): array
     {
         return [];
+    }
+
+    /**
+     * Whether this variant runs on a database, which answers filters itself rather than handing over candidates.
+     */
+    protected static function usesPdoStorage(): bool
+    {
+        return !in_array(
+            '--storage=memory',
+            static::storageExtraArgs(),
+            true,
+        );
     }
 }

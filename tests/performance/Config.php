@@ -25,7 +25,6 @@ final class Config
      */
     public const BACKENDS = [
         'memory',
-        'json',
         'sqlite',
         'mysql',
     ];

@@ -8,6 +8,7 @@ use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordChangeRules;
 use FreeDSx\Ldap\ServerOptions;
@@ -73,7 +74,18 @@ final class LdapPasswordPolicyCommand extends Command
             ->setSslCertKey(self::SSL_KEY)
             ->setSocketAcceptTimeout(0.1);
 
-        $options = (new ServerOptions(networkConfig: $network))
+        $dbPath = TestWorker::path('password_policy.sqlite');
+
+        foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $path) {
+            if (file_exists($path)) {
+                unlink($path);
+            }
+        }
+
+        $options = (new ServerOptions(
+            PdoConfig::forSqlite($dbPath),
+            networkConfig: $network,
+        ))
             ->setSaslMechanisms(ServerOptions::SASL_PLAIN)
             ->setAdministrators(Subject::dn(self::ADMIN_DN))
             ->setOnServerReady(fn() => fwrite(STDOUT, 'server starting...' . PHP_EOL));

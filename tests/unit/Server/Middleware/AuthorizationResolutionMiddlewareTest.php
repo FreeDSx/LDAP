@@ -24,7 +24,7 @@ use FreeDSx\Ldap\Server\Middleware\AuthorizationResolutionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\Token\BindToken;
-use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Middleware\CallLog;
 use Tests\Support\FreeDSx\Ldap\Middleware\RecordingMiddlewareHandler;
@@ -39,7 +39,7 @@ final class AuthorizationResolutionMiddlewareTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->authorization = new ServerAuthorization(new ServerOptions());
+        $this->authorization = new ServerAuthorization(TestServerOptions::defaults());
         $this->passwordPolicyContext = new PasswordPolicyContext();
         $this->next = new RecordingMiddlewareHandler(new CallLog());
     }

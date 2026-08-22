@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\Factory\HandlerId;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
-use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -33,7 +33,7 @@ final class ServerProtocolHandlerFactoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new ServerProtocolHandlerFactory(new ServerOptions());
+        $this->subject = new ServerProtocolHandlerFactory(TestServerOptions::defaults());
     }
 
     #[DataProvider('routes')]
@@ -54,7 +54,7 @@ final class ServerProtocolHandlerFactoryTest extends TestCase
     public function test_a_base_scope_monitor_search_routes_to_monitor_when_enabled(): void
     {
         $factory = new ServerProtocolHandlerFactory(
-            (new ServerOptions())->setMonitorEnabled(true),
+            (TestServerOptions::defaults())->setMonitorEnabled(true),
         );
 
         self::assertSame(

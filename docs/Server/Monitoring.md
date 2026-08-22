@@ -21,7 +21,7 @@ use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\ServerOptions;
 
 $server = new LdapServer(
-    (new ServerOptions())
+    (new ServerOptions($storageConfig))
         ->setMonitorEnabled(true),
 );
 ```

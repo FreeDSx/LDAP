@@ -35,7 +35,6 @@ use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\Config\SchemaConfig;
-use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Configuration\ConfigReloaderInterface;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRules;
@@ -155,21 +154,21 @@ final class ServerOptions implements ServerListenerOptionsInterface
     private array $saslMechanisms = [];
 
     /**
-     * @param ?StorageConfigInterface $storageConfig Storage backend; a transient in-memory directory when omitted.
+     * @param StorageConfigInterface $storageConfig Where the directory lives.
      * @param NetworkConfig $networkConfig Listener and TLS settings; defaults to a plaintext listener on 0.0.0.0:389.
      * @param SchemaConfig $schemaConfig Schema sources and validation; defaults to the schemas this package ships.
      * @param ReplicationConfig $replicationConfig Replication role; defaults to playing none.
      * @param PasswordConfig $passwordConfig How passwords are governed and stored; defaults to enforcing no policy.
      */
     public function __construct(
-        ?StorageConfigInterface $storageConfig = null,
+        StorageConfigInterface $storageConfig,
         private NetworkConfig $networkConfig = new NetworkConfig(),
         private RunnerConfig $runnerConfig = new RunnerConfig(),
         private SchemaConfig $schemaConfig = new SchemaConfig(),
         private ReplicationConfig $replicationConfig = new ReplicationConfig(),
         private PasswordConfig $passwordConfig = new PasswordConfig(),
     ) {
-        $this->storageConfig = $storageConfig ?? InMemoryStorageConfig::withEntries();
+        $this->storageConfig = $storageConfig;
     }
 
     public function getDseAltServer(): ?string

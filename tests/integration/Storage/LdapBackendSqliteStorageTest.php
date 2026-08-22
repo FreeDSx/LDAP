@@ -19,7 +19,7 @@ use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filters;
 
 /**
- * Runs the full LdapBackendStorageTest suite against the SQLite-backed PdoStorage,
+ * Runs the full LdapBackendStorageTestCase suite against the SQLite-backed PdoStorage,
  * and adds a test that verifies writes persist across separate client connections.
  *
  * Uses the same ldap-backend-storage.php bootstrap script with the 'sqlite' handler,
@@ -28,7 +28,7 @@ use FreeDSx\Ldap\Search\Filters;
  * Each mutating test restarts the server so the database is recreated cleanly,
  * preventing cross-test pollution.
  */
-final class LdapBackendSqliteStorageTest extends LdapBackendStorageTest
+final class LdapBackendSqliteStorageTest extends LdapBackendStorageTestCase
 {
     /**
      * Tests that mutate the database and would pollute subsequent tests.
@@ -43,7 +43,7 @@ final class LdapBackendSqliteStorageTest extends LdapBackendStorageTest
 
     public static function setUpBeforeClass(): void
     {
-        // Intentionally skip LdapBackendStorageTest::setUpBeforeClass() to
+        // Intentionally skip LdapBackendStorageTestCase::setUpBeforeClass() to
         // avoid starting the InMemory server. Start the SQLite-storage server.
         if (!extension_loaded('pcntl')) {
             return;
@@ -52,7 +52,7 @@ final class LdapBackendSqliteStorageTest extends LdapBackendStorageTest
         static::initSharedServer(
             'ldap-backend-storage',
             'tcp',
-            ['--storage=sqlite'],
+            static::storageExtraArgs(),
         );
     }
 
@@ -69,7 +69,7 @@ final class LdapBackendSqliteStorageTest extends LdapBackendStorageTest
             $this->stopServer();
             $this->createServerProcess(
                 'tcp',
-                ['--storage=sqlite'],
+                static::storageExtraArgs(),
             );
         }
     }
@@ -158,5 +158,13 @@ final class LdapBackendSqliteStorageTest extends LdapBackendStorageTest
             'cn=alice,ou=people,dc=foo,dc=bar',
             $entries->first()?->getDn()->toString(),
         );
+    }
+
+    /**
+     * Declared so a test that restarts the server gets this backend rather than the command's default.
+     */
+    protected static function storageExtraArgs(): array
+    {
+        return ['--storage=sqlite'];
     }
 }

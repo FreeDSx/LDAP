@@ -317,7 +317,7 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
     {
         $handler = $this->handler(
             policy: new PasswordPolicy(quality: new PasswordQualityRules(inHistory: 3)),
-            options: new ServerOptions(),
+            options: TestServerOptions::defaults(),
         );
         $dn = new Dn('cn=new,dc=foo,dc=bar');
 

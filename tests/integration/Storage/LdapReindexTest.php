@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
-use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\TestWorker;
@@ -56,7 +56,7 @@ final class LdapReindexTest extends TestCase
         $this->removeDatabase();
 
         // Pinned rather than auto-resolved, so the substring index under test is the same on every build.
-        $options = (new ServerOptions())
+        $options = (TestServerOptions::defaults())
             ->setStorageConfig(
                 PdoConfig::forSqlite($this->path)
                     ->setSubstringIndexMode(SubstringIndexMode::Trigram),
