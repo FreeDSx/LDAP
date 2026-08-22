@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -49,7 +50,7 @@ final class ServerRootDseHandlerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->options = new ServerOptions();
+        $this->options = TestServerOptions::defaults();
         $this->mockToken = $this->createMock(TokenInterface::class);
         $this->withStorageNamingContexts([]);
     }

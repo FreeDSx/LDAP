@@ -2,8 +2,8 @@ General LDAP Server Usage
 ===================
 
 * [Quick Start Scenarios](#quick-start-scenarios)
-  * [In-Memory Server](#in-memory-server)
-  * [File-Backed Server with Custom Bind Names](#file-backed-server-with-custom-bind-names)
+  * [Seeded SQLite Server](#seeded-sqlite-server)
+  * [Custom Bind Names](#custom-bind-names)
   * [Challenge SASL with a Custom Authenticator](#challenge-sasl-with-a-custom-authenticator)
 * [Running the Server](#running-the-server)
 * [Reloading Configuration on SIGHUP](#reloading-configuration-on-sighup)
@@ -11,7 +11,6 @@ General LDAP Server Usage
 * [Providing a Backend](#providing-a-backend)
   * [Built-In Storage Implementations](#built-in-storage-implementations)
     * [InMemoryStorage](#inmemorystorage)
-    * [JsonFileStorage](#jsonfilestorage)
     * [SQLite](#sqlite)
     * [MySQL](#mysql)
 * [LDIF Data](#ldif-data)
@@ -47,56 +46,61 @@ and [Authentication](#authentication) for details.
 
 ## Quick Start Scenarios
 
-### In-Memory Server
+### Seeded SQLite Server
 
-The simplest useful setup: an in-memory directory pre-seeded with entries. Ideal for testing or applications that
-reconstruct the directory on each start.
+The simplest useful setup. A SQLite file holds the directory, so it survives restarts and works under the default
+forking runner. Seeding is an upsert, so running this again is safe.
 
 The built-in `PasswordAuthenticator` handles bind authentication automatically — it reads the `userPassword` attribute
 from entries and verifies credentials against it. Supported hash schemes: `{SHA}`, `{SSHA}`, `{MD5}`, `{SMD5}`, and
 plaintext.
 
 ```php
-use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
+use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 $passwordHash = '{SHA}' . base64_encode(sha1('secret', true));
 
-$options = new ServerOptions(InMemoryStorageConfig::withEntries([
-    new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
-    new Entry(
-        new Dn('cn=admin,dc=example,dc=com'),
-        new Attribute('cn', 'admin'),
-        new Attribute('userPassword', $passwordHash),
-    ),
-]));
+$server = new LdapServer(new ServerOptions(
+    PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite'),
+));
 
-$server = new LdapServer($options);
+$server->seed(new StringLdifLoader(<<<LDIF
+    dn: dc=example,dc=com
+    objectClass: domain
+    dc: example
+
+    dn: cn=admin,dc=example,dc=com
+    objectClass: person
+    cn: admin
+    sn: admin
+    userPassword: {$passwordHash}
+    LDIF));
+
 $server->run();
 ```
 
 Clients bind as `cn=admin,dc=example,dc=com` with password `secret`. No further configuration needed.
 
+For a transient server that should leave nothing behind, swap in `InMemoryStorageConfig::withEntries()` and the Swoole
+runner. See [InMemoryStorage](#inmemorystorage).
+
 ---
 
-### File-Backed Server with Custom Bind Names
+### Custom Bind Names
 
-A persistent directory stored in a JSON file. Clients bind with a bare username (`alice`) instead of a full DN.
-The built-in identity resolver already handles this; if the bind name is not a valid DN, it falls back to
-searching for an entry where the `uid` attribute matches.
+Clients bind with a bare username (`alice`) instead of a full DN. The built-in identity resolver already handles this.
+If the bind name is not a valid DN, it falls back to searching for an entry where the `uid` attribute matches.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Config\Storage\JsonStorageConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 
-$options = (new ServerOptions())
-    ->setSaslMechanisms(ServerOptions::SASL_PLAIN)
-    ->setStorageConfig(JsonStorageConfig::forFile('/var/lib/myapp/ldap.json'));
+$options = (new ServerOptions(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')))
+    ->setSaslMechanisms(ServerOptions::SASL_PLAIN);
 
 $server = new LdapServer($options);
 $server->run();
@@ -119,7 +123,7 @@ For full control over credential storage, such as delegating to an external user
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
-use FreeDSx\Ldap\Server\Config\Storage\JsonStorageConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Sasl\Mechanism\MechanismName;
@@ -150,12 +154,11 @@ class MyAuthenticator implements PasswordAuthenticatableInterface
     }
 }
 
-$options = (new ServerOptions())
+$options = (new ServerOptions(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')))
     ->setSaslMechanisms(
         ServerOptions::SASL_PLAIN,
         ServerOptions::SASL_SCRAM_SHA_256,
     )
-    ->setStorageConfig(JsonStorageConfig::forFile('/var/lib/myapp/ldap.json'))
     ->setPasswordAuthenticator(new MyAuthenticator());
 
 $server = new LdapServer($options);
@@ -169,15 +172,17 @@ about the other.
 
 ## Running The Server
 
-In its simplest form you construct the server and call `run()`. `ServerOptions` defaults to a transient in-memory
-backend when no storage config is given. This default is for testing only. In production supply a persistent
-backend config such as `PdoConfig::forSqlite()`.
+In its simplest form you construct the server with a storage config and call `run()`. The config is required, as no
+default suits every runner.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 
-$server = new LdapServer(new ServerOptions());
+$server = new LdapServer(new ServerOptions(
+    PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite'),
+));
 $server->run();
 ```
 
@@ -217,8 +222,7 @@ final class FileConfigReloader implements ConfigReloaderInterface
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\ServerOptions;
 
-$options = (new ServerOptions())
-    ->setStorageConfig($storageConfig)
+$options = (new ServerOptions($storageConfig))
     ->setConfigReloader(new FileConfigReloader('/etc/myapp/ldap.json'));
 
 $server = new LdapServer($options);
@@ -296,20 +300,22 @@ single configured upstream.
 ## Providing a Backend
 
 Configure backend storage via `setStorageConfig()` or pass a config to the `ServerOptions` constructor
-(`new ServerOptions(StorageConfigInterface $config)`). Pick the config that matches your persistence needs: in-memory,
-JSON file, PDO-SQLite, or PDO-MySQL. When no config is given the server uses a transient in-memory backend, which is
-for testing only.
+(`new ServerOptions(StorageConfigInterface $config)`). Pick the config that matches your persistence needs: PDO-SQLite,
+PDO-MySQL, or in-memory. A config is required, as no default suits every runner.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
+use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 
-$server = new LdapServer(new ServerOptions(InMemoryStorageConfig::withEntries($entries)));
+$server = new LdapServer(new ServerOptions(
+    PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite'),
+));
 $server->run();
 ```
 
 Each config is a value object. The container builds the runner-appropriate storage for the runner set on
-`ServerOptions`, so the same config works under both the PCNTL and Swoole runners.
+`ServerOptions`. A forking runner needs storage that every process can see, so pairing it with in-memory storage is
+refused at startup.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
@@ -326,80 +332,43 @@ Authentication is a separate concern handled by `PasswordAuthenticatableInterfac
 
 ### Built-In Storage Implementations
 
-Four storage backends are included, each selected via a config object passed to `setStorageConfig()`:
+Three storage backends are included, each selected via a config object passed to `setStorageConfig()`:
 
 - **SQLite** (`PdoConfig::forSqlite()`): recommended for most deployments. It is the most optimized backend and gives durable persistence with concurrent access.
 - **MySQL** (`PdoConfig::forMysql()`): durable persistence backed by a shared MySQL/MariaDB server.
-- **JsonFileStorage** (`JsonStorageConfig::forFile()`): a single JSON file, useful for small directories.
-- **InMemoryStorage** (`InMemoryStorageConfig::withEntries()`): non-persistent, ideal for testing or read-only PCNTL data seeded before `run()`.
+- **InMemoryStorage** (`InMemoryStorageConfig::withEntries()`): non-persistent, for transient servers under the Swoole runner.
 
 #### InMemoryStorage
 
-An in-memory, array-backed storage implementation. Suitable for:
+An in-memory, array-backed storage implementation. Entries live in the process that holds them, so it requires the
+Swoole runner, where all connections share one process and every client sees the same reads and writes.
 
-- **Swoole**: all connections share the same process memory, so reads and writes are visible to every client.
-- **PCNTL** with pre-seeded, read-only data: data seeded before `run()` is inherited by all forked child processes.
-
-> **⚠️ PCNTL write caveat**
->
-> Under the PCNTL runner, `InMemoryStorage` is **not safe for multi-client write workloads**. Each forked child receives
-> its own copy of the store at fork time. Written data is not propagated.
->
-> Use `JsonStorageConfig` or a SQLite/MySQL `PdoConfig` if you need write behavior under the PCNTL runner.
+The forking runner gives each connection its own copy of the store at fork time, so writes made on one connection would
+be invisible to the rest and lost when it closes. That pairing is refused at startup. Use a SQLite or MySQL `PdoConfig`
+under the forking runner.
 
 ```php
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\ServerOptions;
 
 $passwordHash = '{SHA}' . base64_encode(sha1('secret', true));
 
-$options = new ServerOptions(InMemoryStorageConfig::withEntries([
+$options = (new ServerOptions(InMemoryStorageConfig::withEntries([
     new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
     new Entry(
         new Dn('cn=admin,dc=example,dc=com'),
         new Attribute('cn', 'admin'),
         new Attribute('userPassword', $passwordHash),
     ),
-]));
+])))->setRunnerConfig(RunnerConfig::forSwoole());
 
 $server = new LdapServer($options);
 $server->run();
-```
-
-#### JsonFileStorage
-
-A file-backed storage implementation that persists the directory as a JSON file. Safe for PCNTL (write operations are
-serialised with `flock(LOCK_EX)` and the in-memory read cache is invalidated via `filemtime` checks).
-
-Pass a `JsonStorageConfig::forFile()` to the `ServerOptions` constructor. The container selects the PCNTL
-implementation (`flock()` serialised writes) or the Swoole implementation (coroutine Channel mutex, non-blocking file
-I/O) to match the configured runner:
-
-```php
-use FreeDSx\Ldap\LdapServer;
-use FreeDSx\Ldap\Server\Config\Storage\JsonStorageConfig;
-use FreeDSx\Ldap\ServerOptions;
-
-$server = new LdapServer(new ServerOptions(JsonStorageConfig::forFile('/var/lib/myapp/ldap.json')));
-$server->run();
-```
-
-JSON format:
-
-```json
-{
-  "cn=admin,dc=example,dc=com": {
-    "dn": "cn=admin,dc=example,dc=com",
-    "attributes": {
-      "cn": ["admin"],
-      "userPassword": ["{SHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g="]
-    }
-  }
-}
 ```
 
 #### SQLite
@@ -518,6 +487,7 @@ stamping (`createTimestamp`, `entryUUID`, etc.) applied. Use it to populate a pe
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
+use FreeDSx\Ldap\Server\Backend\Storage\SeedOptions;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -526,14 +496,15 @@ $server = new LdapServer(
 );
 $server->seed(
     new FileLdifLoader('/etc/myapp/initial-data.ldif'),
-    new Dn('cn=admin,dc=example,dc=com'),
+    new SeedOptions(new Dn('cn=admin,dc=example,dc=com')),
 );
 
 $server->run();
 ```
 
-The optional second argument is the creator DN, stamped as `creatorsName`/`modifiersName` on each imported entry.
-It defaults to the empty (anonymous) DN.
+The optional second argument is a `SeedOptions`. Its `creatorDn` is stamped as `creatorsName`/`modifiersName` on each
+imported entry, defaulting to the empty (anonymous) DN. It also carries `setIgnoreValidation()` for content the current
+schema does not cover, and `setUrlResolver()` to enable RFC 2849 URL values.
 
 `seed()` accepts only content records (entries without `changetype:`) and requires depth-first input (parents first,
 then children entries). LDIF produced by `dump()` is already in this order. The operation itself is an upsert that overwrites.
@@ -741,7 +712,9 @@ class MyAuthenticator implements PasswordAuthenticatableInterface
     }
 }
 
-$server = new LdapServer((new ServerOptions())->setPasswordAuthenticator(new MyAuthenticator()));
+$server = new LdapServer(
+    (new ServerOptions($storageConfig))->setPasswordAuthenticator(new MyAuthenticator()),
+);
 ```
 
 ## Handling the RootDSE
@@ -847,7 +820,7 @@ Adding the generated certs and keys on construction:
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\LdapServer;
 
-$options = new ServerOptions();
+$options = new ServerOptions($storageConfig);
 $options->getNetworkConfig()
     # The key can also be bundled in this cert
     ->setSslCert('/path/to/cert.pem')

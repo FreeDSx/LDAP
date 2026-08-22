@@ -25,7 +25,7 @@ use PDOException;
  * parent's destructive tests rely on pcntl fork isolation for reset, which does not apply to a
  * persistent backend.
  */
-final class MysqlLdapBackendStorageTest extends LdapBackendStorageTest
+final class MysqlLdapBackendStorageTest extends LdapBackendStorageTestCase
 {
     public static function setUpBeforeClass(): void
     {
@@ -36,7 +36,7 @@ final class MysqlLdapBackendStorageTest extends LdapBackendStorageTest
         static::initSharedServer(
             'ldap-backend-storage',
             'tcp',
-            ['--storage=mysql'],
+            static::storageExtraArgs(),
         );
     }
 
@@ -59,6 +59,14 @@ final class MysqlLdapBackendStorageTest extends LdapBackendStorageTest
         $this->stopServer();
 
         parent::tearDown();
+    }
+
+    /**
+     * Declared so a test that restarts the server gets this backend rather than the command's default.
+     */
+    protected static function storageExtraArgs(): array
+    {
+        return ['--storage=mysql'];
     }
 
     private static function isMysqlAvailable(): bool

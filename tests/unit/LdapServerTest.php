@@ -23,7 +23,6 @@ use FreeDSx\Ldap\Ldif\Output\StringLdifOutput;
 use FreeDSx\Ldap\Ldif\Url\FileUrlResolver;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
-use FreeDSx\Ldap\Server\Config\Storage\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -37,6 +36,7 @@ use FreeDSx\Ldap\Server\Config\ReplicationConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -71,8 +71,10 @@ class LdapServerTest extends TestCase
     {
         $this->mockServerRunner = $this->createMock(ServerRunnerInterface::class);
 
-        $this->options = (new ServerOptions(networkConfig: NetworkConfig::withPort(33389)))
-            ->setServerRunner($this->mockServerRunner);
+        $this->options = (new ServerOptions(
+            TestServerOptions::transientStorage(),
+            networkConfig: NetworkConfig::withPort(33389),
+        ))->setServerRunner($this->mockServerRunner);
 
         $this->container = Container::forServer($this->options);
         $this->subject = new LdapServer(
@@ -102,9 +104,11 @@ class LdapServerTest extends TestCase
             self::markTestSkipped('The swoole extension is required to construct the Swoole runner.');
         }
 
-        $options = (new ServerOptions(networkConfig: NetworkConfig::withPort(33389)))
+        $options = (new ServerOptions(
+            $storageConfig,
+            networkConfig: NetworkConfig::withPort(33389),
+        ))
             ->setReplicationConfig(ReplicationConfig::forReplica(new ConsumerConfig(new ClientOptions())))
-            ->setStorageConfig($storageConfig)
             ->setRunnerConfig(new RunnerConfig($runner));
 
         $this->expectException(RuntimeException::class);
@@ -125,14 +129,14 @@ class LdapServerTest extends TestCase
         $this->subject->run();
     }
 
-    #[DataProvider('nonPdoReplicaStorageDataProvider')]
-    public function test_run_does_not_throw_for_a_non_replica_on_non_pdo_storage(
-        StorageConfigInterface $storageConfig,
-        RunnerMode $runner,
-    ): void {
+    /**
+     * Swoole shares one process, so storage that a fork would not carry is sound there.
+     */
+    public function test_run_does_not_throw_for_a_non_replica_on_unshared_storage_under_swoole(): void
+    {
         $this->options
-            ->setStorageConfig($storageConfig)
-            ->setRunnerConfig(new RunnerConfig($runner));
+            ->setStorageConfig(InMemoryStorageConfig::withEntries())
+            ->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole));
 
         $this->mockServerRunner
             ->expects(self::once())
@@ -142,17 +146,42 @@ class LdapServerTest extends TestCase
     }
 
     /**
+     * A forking runner gives each connection its own copy, so a write would answer success and then be lost.
+     */
+    #[DataProvider('unsharedStorageDataProvider')]
+    public function test_building_the_runner_throws_for_unshared_storage_under_a_forking_runner(
+        StorageConfigInterface $storageConfig,
+    ): void {
+        $options = (new ServerOptions(
+            $storageConfig,
+            networkConfig: NetworkConfig::withPort(33389),
+        ))->setRunnerConfig(new RunnerConfig(RunnerMode::Pcntl));
+
+        $this->expectException(RuntimeException::class);
+
+        Container::forServer($options)->get(ServerRunnerInterface::class);
+    }
+
+    /**
      * @return array<string, array{StorageConfigInterface, RunnerMode}>
      */
     public static function nonPdoReplicaStorageDataProvider(): array
     {
-        $jsonPath = sys_get_temp_dir() . '/ldap_server_test_replica.json';
-
         return [
             'in-memory under pcntl' => [InMemoryStorageConfig::withEntries(), RunnerMode::Pcntl],
             'in-memory under swoole' => [InMemoryStorageConfig::withEntries(), RunnerMode::Swoole],
-            'json under pcntl' => [JsonStorageConfig::forFile($jsonPath), RunnerMode::Pcntl],
-            'json under swoole' => [JsonStorageConfig::forFile($jsonPath), RunnerMode::Swoole],
+        ];
+    }
+
+    /**
+     * @return array<string, array{StorageConfigInterface}>
+     */
+    public static function unsharedStorageDataProvider(): array
+    {
+        return [
+            'in-memory' => [InMemoryStorageConfig::withEntries()],
+            // Keyed on the config rather than the backend: an in-memory database belongs to one connection.
+            'sqlite in-memory' => [PdoConfig::forSqlite(':memory:')],
         ];
     }
 
@@ -318,7 +347,7 @@ class LdapServerTest extends TestCase
             (new DumpOptions())->setBaseDn(new Dn('dc=example,dc=com')),
         );
 
-        $restoreOptions = new ServerOptions();
+        $restoreOptions = TestServerOptions::defaults();
         $restoreContainer = Container::forServer($restoreOptions);
         (new LdapServer(
             $restoreOptions,

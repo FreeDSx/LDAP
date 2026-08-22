@@ -22,17 +22,17 @@ enum StorageType
 {
     case Pdo;
 
-    case Json;
-
     case InMemory;
 
     /**
-     * Whether a directory can be served by several processes at once.
+     * Whether a directory can be served by several processes at once; the config refines it.
+     *
+     * @see StorageConfigInterface::isMultiProcessSafe()
      */
     public function isMultiProcessSafe(): bool
     {
         return match ($this) {
-            self::Pdo, self::Json => true,
+            self::Pdo => true,
             self::InMemory => false,
         };
     }

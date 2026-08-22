@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Protocol\Queue\ConnectionControl;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerStartTlsHandler;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -40,7 +41,7 @@ final class ServerStartTlsHandlerTest extends TestCase
     {
         $this->mockToken = $this->createMock(TokenInterface::class);
         $this->mockConnection = $this->createMock(ConnectionControl::class);
-        $this->options = new ServerOptions();
+        $this->options = TestServerOptions::defaults();
 
         $this->subject = new ServerStartTlsHandler(
             $this->options,

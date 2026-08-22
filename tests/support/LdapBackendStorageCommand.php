@@ -21,8 +21,8 @@ use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
-use FreeDSx\Ldap\Server\Config\Storage\JsonStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
 use FreeDSx\Ldap\Server\Backend\Storage\SeedOptions;
@@ -113,8 +113,8 @@ final class LdapBackendStorageCommand extends Command
                 'storage',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Storage adapter (memory, json, sqlite, mysql)',
-                'memory',
+                'Storage adapter (memory, sqlite, mysql)',
+                'sqlite',
             )
             ->addOption(
                 'runner',
@@ -267,8 +267,8 @@ final class LdapBackendStorageCommand extends Command
         $seedEntries = (int) $this->getStringOption($input, 'seed-entries');
         $seedAttributes = (int) $this->getStringOption($input, 'seed-attributes');
 
-        if (!in_array($storage, ['memory', 'json', 'sqlite', 'mysql'], true)) {
-            $io->error("Invalid --storage value: {$storage}. Expected one of: memory, json, sqlite, mysql.");
+        if (!in_array($storage, ['memory', 'sqlite', 'mysql'], true)) {
+            $io->error("Invalid --storage value: {$storage}. Expected one of: memory, sqlite, mysql.");
 
             return Command::FAILURE;
         }
@@ -333,6 +333,7 @@ final class LdapBackendStorageCommand extends Command
             ->setSocketAcceptTimeout(0.1);
 
         $serverOptions = (new ServerOptions(
+            $this->createStorageConfig($storage),
             networkConfig: $network,
             schemaConfig: $this->buildSchemaConfig(
                 $validationMode,
@@ -411,48 +412,7 @@ final class LdapBackendStorageCommand extends Command
             ));
         }
 
-        if ($storage === 'memory') {
-            $config = InMemoryStorageConfig::withEntries();
-        } elseif ($storage === 'json') {
-            $filePath = TestWorker::path('backend_storage.json');
-
-            if (file_exists($filePath)) {
-                unlink($filePath);
-            }
-
-            $config = JsonStorageConfig::forFile($filePath);
-        } elseif ($storage === 'sqlite') {
-            $dbPath = TestWorker::path('backend_storage.sqlite');
-
-            foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $path) {
-                if (file_exists($path)) {
-                    unlink($path);
-                }
-            }
-
-            $config = PdoConfig::forSqlite($dbPath);
-        } else {
-            $dsn = getenv('MYSQL_DSN') ?: 'mysql:host=127.0.0.1;port=3306;dbname=freedsx';
-            $user = getenv('MYSQL_USER') ?: 'root';
-            $password = getenv('MYSQL_PASSWORD') ?: 'root';
-
-            $cleanup = new PDO(
-                $dsn,
-                $user,
-                $password,
-                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
-            );
-            $cleanup->exec('DROP TABLE IF EXISTS ldap_replica_pwpolicy_state');
-            $cleanup->exec('DROP TABLE IF EXISTS entry_attribute_trigrams');
-            $cleanup->exec('DROP TABLE IF EXISTS entry_attribute_values');
-            $cleanup->exec('DROP TABLE IF EXISTS entries');
-            unset($cleanup);
-
-            $config = PdoConfig::forMysql($dsn, $user, $password);
-        }
-
         $serverOptions
-            ->setStorageConfig($config)
             ->setRunnerConfig(new RunnerConfig(
                 $runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl,
                 (int) $this->getStringOption($input, 'swoole-workers'),
@@ -489,6 +449,46 @@ final class LdapBackendStorageCommand extends Command
         $server->run();
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Wipes whatever the previous run left behind, so each server starts from the seed alone.
+     */
+    private function createStorageConfig(string $storage): StorageConfigInterface
+    {
+        if ($storage === 'memory') {
+            return InMemoryStorageConfig::withEntries();
+        }
+
+        if ($storage === 'sqlite') {
+            $dbPath = TestWorker::path('backend_storage.sqlite');
+
+            foreach ([$dbPath, $dbPath . '-wal', $dbPath . '-shm'] as $path) {
+                if (file_exists($path)) {
+                    unlink($path);
+                }
+            }
+
+            return PdoConfig::forSqlite($dbPath);
+        }
+
+        $dsn = getenv('MYSQL_DSN') ?: 'mysql:host=127.0.0.1;port=3306;dbname=freedsx';
+        $user = getenv('MYSQL_USER') ?: 'root';
+        $password = getenv('MYSQL_PASSWORD') ?: 'root';
+
+        $cleanup = new PDO(
+            $dsn,
+            $user,
+            $password,
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+        );
+        $cleanup->exec('DROP TABLE IF EXISTS ldap_replica_pwpolicy_state');
+        $cleanup->exec('DROP TABLE IF EXISTS entry_attribute_trigrams');
+        $cleanup->exec('DROP TABLE IF EXISTS entry_attribute_values');
+        $cleanup->exec('DROP TABLE IF EXISTS entries');
+        unset($cleanup);
+
+        return PdoConfig::forMysql($dsn, $user, $password);
     }
 
     /**

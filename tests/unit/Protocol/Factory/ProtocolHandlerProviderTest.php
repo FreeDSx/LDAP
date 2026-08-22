@@ -40,7 +40,7 @@ use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\RequestHistory;
-use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -50,7 +50,7 @@ final class ProtocolHandlerProviderTest extends TestCase
 
     protected function setUp(): void
     {
-        $container = Container::forServer(new ServerOptions());
+        $container = Container::forServer(TestServerOptions::defaults());
 
         $this->subject = new ProtocolHandlerProvider(
             routeResolver: $container->get(ServerProtocolHandlerFactory::class),
@@ -200,7 +200,7 @@ final class ProtocolHandlerProviderTest extends TestCase
     #[DataProvider('handlerIdProvider')]
     public function test_every_route_has_a_registered_factory(HandlerId $handlerId): void
     {
-        $container = Container::forServer(new ServerOptions());
+        $container = Container::forServer(TestServerOptions::defaults());
 
         self::assertInstanceOf(
             ServerProtocolHandlerInterface::class,

@@ -43,6 +43,7 @@ use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRules;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -52,7 +53,7 @@ final class ServerOptionsTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new ServerOptions();
+        $this->subject = TestServerOptions::defaults();
     }
 
     public function test_a_default_server_plays_no_replication_role(): void

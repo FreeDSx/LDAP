@@ -20,7 +20,7 @@ use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\WorkerFactory;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
-use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\TestCase;
 
 final class ServerRunnerTest extends TestCase
@@ -33,7 +33,7 @@ final class ServerRunnerTest extends TestCase
 
         $this->workers = new WorkerFactory(
             serverProtocolFactory: $factory,
-            options: new ServerOptions(),
+            options: TestServerOptions::defaults(),
             socketServerFactory: $this->createMock(SocketServerFactory::class),
             protocolFactoryProvider: static fn(ServerListenerOptionsInterface $options) => $factory,
         );

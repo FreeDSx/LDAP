@@ -26,7 +26,7 @@ use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\ServerOptions;
 use Psr\Log\LoggerInterface;
 
-$server = new LdapServer((new ServerOptions())->setLogger($logger));
+$server = new LdapServer((new ServerOptions($storageConfig))->setLogger($logger));
 ```
 
 ## Event Catalog
@@ -110,7 +110,7 @@ Enable the per-operation success events as a group:
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 
-$options = (new ServerOptions())
+$options = (new ServerOptions($storageConfig))
     ->setEventLogPolicy(EventLogPolicy::default()->withAuditTrail());
 ```
 
@@ -134,7 +134,7 @@ By default, `session.disconnect_notice` events triggered by an unexpected `Throw
 Enough to identify what threw and where. To include the full stack trace:
 
 ```php
-$options = (new ServerOptions())
+$options = (new ServerOptions($storageConfig))
     ->setEventLogPolicy(EventLogPolicy::default()->withExceptionTraces());
 ```
 

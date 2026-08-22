@@ -16,8 +16,10 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\Sync\SyncDoneControl;
 use FreeDSx\Ldap\Control\Sync\SyncRequestControl;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshDelete;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshPresent;
@@ -233,6 +235,23 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
      *
      * @return Generator<LdapMessageResponse>
      */
+    /**
+     * The entryUUID rides in the syncStateValue control, so RFC 4533 requires it whatever the client selected.
+     */
+    private function withSyncUuid(SearchRequest $request): SearchRequest
+    {
+        if ($request->getAttributes() === []) {
+            return $request;
+        }
+
+        $widened = clone $request;
+
+        return $widened->setAttributes(
+            ...$request->getAttributes(),
+            ...[new Attribute(AttributeTypeOid::NAME_ENTRY_UUID)],
+        );
+    }
+
     private function fullRefreshEntries(
         LdapMessageRequest $message,
         SearchRequest $request,
@@ -240,7 +259,7 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
         SearchResultState $state,
     ): Generator {
         $result = $this->backend->search(
-            $request,
+            $this->withSyncUuid($request),
             SubentryVisibility::All, // we need all entries in a sync
             $this->controlsForBackend($message),
             $this->limits,

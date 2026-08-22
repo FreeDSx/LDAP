@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Schema\SchemaSourceInterface;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\Config\SchemaConfig;
+use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 use FreeDSx\Ldap\ServerOptions;
@@ -43,6 +44,7 @@ final class TestServerOptions
     public static function validatedCore(SchemaValidationMode $mode): ServerOptions
     {
         return new ServerOptions(
+            self::transientStorage(),
             schemaConfig: (new SchemaConfig())
                 ->setSources(SchemaResource::Core)
                 ->setValidationMode($mode),
@@ -55,6 +57,7 @@ final class TestServerOptions
     public static function unvalidated(SchemaSourceInterface ...$sources): ServerOptions
     {
         return new ServerOptions(
+            self::transientStorage(),
             schemaConfig: self::unvalidatedCoreSchema()
                 ->setSources(...$sources),
         );
@@ -66,6 +69,22 @@ final class TestServerOptions
     public static function sqlite(): ServerOptions
     {
         return self::forStorage(PdoConfig::forSqlite(':memory:'));
+    }
+
+    /**
+     * Stock options on transient storage, for a test that cares about neither.
+     */
+    public static function defaults(): ServerOptions
+    {
+        return new ServerOptions(self::transientStorage());
+    }
+
+    /**
+     * What a test wants when it asserts on something other than storage; nothing outlives the test.
+     */
+    public static function transientStorage(): StorageConfigInterface
+    {
+        return InMemoryStorageConfig::withEntries();
     }
 
     /**
@@ -85,6 +104,7 @@ final class TestServerOptions
     public static function cheaplyHashed(): ServerOptions
     {
         return new ServerOptions(
+            self::transientStorage(),
             schemaConfig: self::unvalidatedCoreSchema(),
             passwordConfig: (new PasswordConfig())->setHashCost(self::TEST_HASH_COST),
         );

@@ -197,4 +197,19 @@ final class PdoConfig implements StorageConfigInterface
     {
         return StorageType::Pdo;
     }
+
+    /**
+     * A SQLite in-memory database belongs to the connection that opened it, so each process would get its own.
+     */
+    public function isMultiProcessSafe(): bool
+    {
+        if ($this->driver !== PdoDriver::Sqlite) {
+            return StorageType::Pdo->isMultiProcessSafe();
+        }
+
+        $dsn = strtolower($this->dsn);
+
+        return !str_contains($dsn, ':memory:')
+            && !str_contains($dsn, 'mode=memory');
+    }
 }

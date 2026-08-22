@@ -39,7 +39,7 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
         $this->createServerProcess(
             'tcp',
             [
-                '--storage=json',
+                '--storage=sqlite',
                 '--manager',
             ],
         );

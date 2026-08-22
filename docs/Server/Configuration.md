@@ -111,7 +111,7 @@ on `session.disconnect_notice` events are also opt-in via `withExceptionTraces()
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 
-$options = (new ServerOptions())
+$options = (new ServerOptions($storageConfig))
     ->setEventLogPolicy(EventLogPolicy::default()->withAuditTrail());
 ```
 
@@ -201,7 +201,6 @@ process. Anything else is clamped back to a single worker with a logged warning.
 | Storage | Multiple workers | Why |
 | --- | --- | --- |
 | PDO (`PdoConfig`) | Yes | The database is the shared state |
-| JSON (`JsonStorageConfig`) | Yes | Writes serialize on a file lock, so throughput is far below PDO |
 | In-memory (`InMemoryStorageConfig`) | No | Entries never leave the process that holds them |
 
 A proxy has no local directory, so it can always use multiple workers.
@@ -423,7 +422,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 
 $server = new LdapServer(
-    (new ServerOptions())
+    (new ServerOptions($storageConfig))
         ->setAclRules(
             AclRules::fromEmpty()->replaceOperationRules(
                 OperationRule::allow(Subject::authenticated()),
@@ -455,9 +454,8 @@ storage built from the configured backend config.
 #### setStorageConfig
 
 Storage is configured on `ServerOptions` via `setStorageConfig()` or by passing a config to the `ServerOptions`
-constructor. Choose one of the built-in backend configs: `InMemoryStorageConfig`, `JsonStorageConfig`, or `PdoConfig`
-(SQLite or MySQL). All directory operations (search, authenticate, and optionally write) are dispatched to the
-resulting storage.
+constructor. Choose one of the built-in backend configs: `PdoConfig` (SQLite or MySQL) or `InMemoryStorageConfig`. All
+directory operations (search, authenticate, and optionally write) are dispatched to the resulting storage.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
@@ -467,8 +465,9 @@ use FreeDSx\Ldap\ServerOptions;
 $server = new LdapServer(new ServerOptions(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')));
 ```
 
-When no config is given the server uses a transient in-memory backend. That default is for testing only. Supply a
-persistent config such as `PdoConfig::forSqlite()` in production.
+A config is required, as no default suits every runner. `InMemoryStorageConfig` keeps entries in the process that holds
+them, so the forking runner refuses it at startup. Use it with the Swoole runner or for testing. Use
+`PdoConfig::forSqlite()` otherwise.
 
 The bundled SQLite and MySQL backends create their tables automatically on first connect. For managing that schema
 yourself, see [Database Schema](Database-Schema.md).
@@ -600,7 +599,7 @@ $options = new ServerOptions(schemaConfig: $schemaConfig);
 `getSchemaConfig()` returns the config in use, so the defaults can be adjusted without constructing one:
 
 ```php
-$options = new ServerOptions();
+$options = new ServerOptions($storageConfig);
 
 $options->getSchemaConfig()
     ->addSource(new LdifSchemaSource('/path/to/schema.ldif'));
@@ -705,9 +704,10 @@ scans many entries to return few. Raise it above the largest legitimate subtree 
 
 **Default**: `5000`
 
-> It applies only to filters evaluated in PHP (array/JSON backends, and SQL backends when the filter cannot be pushed to the
-> index); indexed equality and prefix filters are bounded by the database and are not counted. Paged searches are subject to
-> the lookthrough limit cumulatively across all pages (see `setMaxSearchPagedLookthrough` to set a separate cap for paging).
+> It applies only to filters evaluated in PHP. That means the in-memory backend, and SQL backends when the filter cannot
+> be pushed to the index. Indexed equality and prefix filters are bounded by the database and are not counted. Paged
+> searches are subject to the lookthrough limit cumulatively across all pages (see `setMaxSearchPagedLookthrough` to set
+> a separate cap for paging).
 
 ------------------
 #### setMaxSearchPagedLookthrough

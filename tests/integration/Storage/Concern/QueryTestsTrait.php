@@ -1447,6 +1447,13 @@ trait QueryTestsTrait
 
     public function testInexactSearchTripsLookthroughLimit(): void
     {
+        if (static::usesPdoStorage()) {
+            self::markTestSkipped(
+                'The filter is answered from an index, so no candidates are examined and the limit cannot trip. '
+                    . 'Revisit with the keyset paging work, which is what bounds transfer on that path.',
+            );
+        }
+
         $this->stopServer();
         $this->createServerProcess(
             'tcp',

@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Storage;
 
 /**
- * Runs the full LdapBackendStorageTest suite against the SwooleServerRunner.
+ * Runs the full LdapBackendStorageTestCase suite against the SwooleServerRunner.
  *
  * Read-only tests share a single Swoole server process started in
  * setUpBeforeClass(). Write tests that mutate the InMemoryStorageAdapter
@@ -25,7 +25,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage;
  *
  * Skipped automatically when the swoole extension is not loaded.
  */
-final class LdapBackendStorageSwooleTest extends LdapBackendStorageTest
+final class LdapBackendStorageSwooleTest extends LdapBackendStorageTestCase
 {
     /**
      * Tests that write to the InMemoryStorageAdapter and would pollute the
@@ -40,12 +40,12 @@ final class LdapBackendStorageSwooleTest extends LdapBackendStorageTest
 
     /**
      * Start a single shared Swoole server instead of the PCNTL server that
-     * LdapBackendStorageTest::setUpBeforeClass() would launch.
+     * LdapBackendStorageTestCase::setUpBeforeClass() would launch.
      */
     public static function setUpBeforeClass(): void
     {
         // Intentionally skip parent::setUpBeforeClass() to avoid starting the
-        // shared PCNTL server that LdapBackendStorageTest would launch.
+        // shared PCNTL server that LdapBackendStorageTestCase would launch.
         if (!extension_loaded('swoole')) {
             return;
         }
@@ -53,7 +53,7 @@ final class LdapBackendStorageSwooleTest extends LdapBackendStorageTest
         static::initSharedServer(
             'ldap-backend-storage',
             'tcp',
-            ['--runner=swoole'],
+            static::storageExtraArgs(),
         );
     }
 
@@ -76,7 +76,16 @@ final class LdapBackendStorageSwooleTest extends LdapBackendStorageTest
             // connection yet), so stopServer() will find no active Swoole
             // connections and the drain coroutine exits immediately.
             $this->stopServer();
-            $this->createServerProcess('tcp', ['--runner=swoole']);
+            $this->createServerProcess('tcp', static::storageExtraArgs());
         }
+    }
+
+    /**
+     * In-memory storage is stated rather than inherited: Swoole shares one process, which is the only runner it is
+     * sound on, and this is the suite's only coverage of that adapter over the wire.
+     */
+    protected static function storageExtraArgs(): array
+    {
+        return ['--storage=memory', '--runner=swoole'];
     }
 }

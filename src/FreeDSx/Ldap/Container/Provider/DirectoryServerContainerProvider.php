@@ -329,10 +329,32 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     {
         $options = $container->get(ServerOptions::class);
         $this->requirePdoStorageForReplica($options);
+        $this->requireSharedStorageWhenForking($options);
 
         return $options->isRunnerMode(RunnerMode::Swoole)
             ? $this->makeSwooleBackgroundTasks($container)
             : $this->makePcntlBackgroundTasks($container);
+    }
+
+    /**
+     * The PCNTL runner forks per connection, so storage only that process can see makes a write vanish with the
+     * connection that made it while still answering success. Swoole is exempt, since its workers share memory.
+     *
+     * @throws RuntimeException when a forking runner is paired with storage it cannot share
+     */
+    private function requireSharedStorageWhenForking(ServerOptions $options): void
+    {
+        $storageConfig = $options->getStorageConfig();
+
+        if ($options->isRunnerMode(RunnerMode::Swoole) || $storageConfig->isMultiProcessSafe()) {
+            return;
+        }
+
+        throw new RuntimeException(sprintf(
+            'The %s runner forks per connection, so "%s" is not safe to use. See the docs for more details.',
+            RunnerMode::Pcntl->name,
+            $storageConfig::class,
+        ));
     }
 
     /**
@@ -372,7 +394,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return new DirectoryListenerContributor(
             $backend,
             $instances,
-            $container->get(ServerOptions::class)->getStorageConfig()->type(),
+            $container->get(ServerOptions::class)->getStorageConfig(),
         );
     }
 

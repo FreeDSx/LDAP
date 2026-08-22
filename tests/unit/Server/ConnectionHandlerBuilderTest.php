@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Server\ConnectionHandlerBuilderInterface;
 use FreeDSx\Ldap\Server\Config\PasswordConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use FreeDSx\Socket\Socket;
 use PHPUnit\Framework\TestCase;
 
@@ -25,7 +26,7 @@ final class ConnectionHandlerBuilderTest extends TestCase
 {
     public function test_it_builds_a_distinct_handler_per_connection(): void
     {
-        $builder = $this->builderFor(new ServerOptions());
+        $builder = $this->builderFor(TestServerOptions::defaults());
 
         self::assertNotSame(
             $builder->build($this->createMock(Socket::class)),
@@ -38,6 +39,7 @@ final class ConnectionHandlerBuilderTest extends TestCase
         $this->expectNotToPerformAssertions();
 
         $options = new ServerOptions(
+            storageConfig: TestServerOptions::transientStorage(),
             passwordConfig: (new PasswordConfig())->setPolicy(new PasswordPolicy()),
         );
         $this->builderFor($options)->build($this->createMock(Socket::class));
@@ -47,7 +49,7 @@ final class ConnectionHandlerBuilderTest extends TestCase
     {
         $this->expectNotToPerformAssertions();
 
-        $options = (new ServerOptions())->setSaslMechanisms(ServerOptions::SASL_PLAIN);
+        $options = (TestServerOptions::defaults())->setSaslMechanisms(ServerOptions::SASL_PLAIN);
         $this->builderFor($options)->build($this->createMock(Socket::class));
     }
 

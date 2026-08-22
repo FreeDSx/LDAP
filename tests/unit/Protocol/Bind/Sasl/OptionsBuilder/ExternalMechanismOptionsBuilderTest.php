@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Sasl\External\ExternalCredentialMapperInterface;
 use FreeDSx\Ldap\ServerOptions;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Options\ExternalOptions;
 use FreeDSx\Socket\Tls\Certificate;
@@ -161,7 +162,10 @@ final class ExternalMechanismOptionsBuilderTest extends TestCase
 
         return new ExternalMechanismOptionsBuilder(
             $queue,
-            new ServerOptions(networkConfig: (new NetworkConfig())->setSslValidateCert($validateCert)),
+            new ServerOptions(
+                TestServerOptions::transientStorage(),
+                networkConfig: (new NetworkConfig())->setSslValidateCert($validateCert),
+            ),
             $mapper,
             $this->authzIdResolver,
         );

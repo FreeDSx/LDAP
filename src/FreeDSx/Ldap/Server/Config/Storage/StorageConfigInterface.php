@@ -26,4 +26,11 @@ interface StorageConfigInterface
      * The storage backend this config selects.
      */
     public function type(): StorageType;
+
+    /**
+     * Whether every process sees the same data, which a forking runner requires.
+     *
+     * @see StorageType::isMultiProcessSafe()
+     */
+    public function isMultiProcessSafe(): bool;
 }

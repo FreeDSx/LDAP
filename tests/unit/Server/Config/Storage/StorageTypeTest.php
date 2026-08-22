@@ -23,11 +23,6 @@ final class StorageTypeTest extends TestCase
         self::assertTrue(StorageType::Pdo->isMultiProcessSafe());
     }
 
-    public function test_file_backed_storage_can_be_shared_between_processes(): void
-    {
-        self::assertTrue(StorageType::Json->isMultiProcessSafe());
-    }
-
     public function test_heap_backed_storage_cannot_be_shared_between_processes(): void
     {
         self::assertFalse(StorageType::InMemory->isMultiProcessSafe());
