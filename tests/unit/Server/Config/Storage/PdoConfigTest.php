@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Server\Config\Storage\PdoDriver;
 use FreeDSx\Ldap\Server\Config\Storage\StorageType;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
 use PDO;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class PdoConfigTest extends TestCase
@@ -143,5 +144,38 @@ final class PdoConfigTest extends TestCase
             SubstringIndexMode::None,
             $config->getSubstringIndexMode(),
         );
+    }
+
+    public function test_a_file_backed_sqlite_database_is_multi_process_safe(): void
+    {
+        self::assertTrue(PdoConfig::forSqlite('/var/lib/ldap.sqlite')->isMultiProcessSafe());
+    }
+
+    public function test_mysql_is_multi_process_safe(): void
+    {
+        self::assertTrue(
+            PdoConfig::forMysql(
+                'mysql:host=localhost;dbname=ldap',
+                'user',
+                'secret',
+            )->isMultiProcessSafe(),
+        );
+    }
+
+    #[DataProvider('inMemorySqliteDsnProvider')]
+    public function test_an_in_memory_sqlite_database_is_not_multi_process_safe(string $path): void
+    {
+        self::assertFalse(PdoConfig::forSqlite($path)->isMultiProcessSafe());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function inMemorySqliteDsnProvider(): iterable
+    {
+        yield 'the bare in-memory path' => [':memory:'];
+        yield 'mixed case, since a DSN is not case sensitive here' => [':MEMORY:'];
+        yield 'a shared cache URI' => ['file:ldap?mode=memory&cache=shared'];
+        yield 'mixed case on the URI parameter' => ['file:ldap?mode=MEMORY'];
     }
 }
