@@ -74,6 +74,24 @@ final class SwooleWriterQueue implements WriterQueueInterface
     }
 
     /**
+     * Closing the channel wakes the writer out of its idle wait, so it exits now rather than a timeout later.
+     *
+     * Every accepted job has already been replied to by the time run() returns, so there is never one in flight here.
+     */
+    public function drain(): void
+    {
+        $jobs = $this->jobs;
+        if ($jobs === null) {
+            return;
+        }
+
+        $this->jobs = null;
+        $this->started = false;
+
+        $jobs->close();
+    }
+
+    /**
      * Executes a batch under a single outer transaction, isolating per-job failures via savepoints.
      *
      * @internal
@@ -138,7 +156,14 @@ final class SwooleWriterQueue implements WriterQueueInterface
     {
         $batchWrapper = $this->batchWrapper;
         $executeBatch = self::executeBatch(...);
-        $onExit = function (): void {
+
+        // Only the writer still holding the current channel may clear the state
+        $onExit = function () use ($jobs): void {
+            if ($this->jobs !== $jobs) {
+                return;
+            }
+
+            $this->jobs = null;
             $this->started = false;
         };
 

@@ -719,9 +719,10 @@ search, so this raises the cap for paging without loosening `setMaxSearchLookthr
 ------------------
 #### setMaxPagingSessions
 
-Cap how many paged searches one connection may leave unfinished, since each holds its result state until the connection
-closes. Starting one past the cap discards the least recently started session, logged as `paging.session_evicted`. A
-client resuming a discarded session is refused with an invalid cookie. A value of `0` removes the cap.
+Cap how many paged searches one connection may leave unfinished, since each holds its place in the result until the
+connection closes. Starting one past the cap discards the least recently started session, logged as
+`paging.session_evicted`. A client resuming a discarded session is refused with an invalid cookie. A value of `0`
+removes the cap.
 
 **Default**: `25`
 

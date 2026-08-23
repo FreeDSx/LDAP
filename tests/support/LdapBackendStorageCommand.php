@@ -23,8 +23,6 @@ use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
 use FreeDSx\Ldap\Server\Backend\Storage\SeedOptions;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Schema\LdifSchemaSource;
@@ -427,16 +425,19 @@ final class LdapBackendStorageCommand extends Command
         $seedLdif = $this->getStringOption($input, 'seed-ldif');
         $validateSeed = !$input->getOption('no-seed-validation');
 
-        $seed = function () use ($server, $entries, $container, $seedLdif, $validateSeed): void {
+        $seed = function () use ($server, $entries, $seedLdif, $validateSeed): void {
             $server->seed(
                 new FileLdifLoader($seedLdif),
                 new SeedOptions(ignoreValidation: !$validateSeed),
             );
 
-            // The generated entries stay a raw import, since they exist to widen the return path rather than to
-            // be valid directory content.
+            // The generated entries skip validation, since they exist to widen the return path rather than to be
+            // valid directory content.
             if ($entries !== []) {
-                (new LdapImporter($container->get(EntryStorageInterface::class)))->importEntries($entries);
+                $server->seedEntries(
+                    $entries,
+                    new SeedOptions(ignoreValidation: true),
+                );
             }
         };
 

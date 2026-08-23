@@ -143,7 +143,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
          *     assume the paged result set is closed and no longer resumable.
          *
          * If a search result is anything other than success, or the paging is complete,
-         * remove the paging request and discard the generator.
+         * remove the paging request and discard the cursor.
          */
         if (($response && $response->isComplete()) || $searchResult->getState()->resultCode !== ResultCode::SUCCESS) {
             $this->requestHistory->pagingRequest()->remove($pagingRequest);

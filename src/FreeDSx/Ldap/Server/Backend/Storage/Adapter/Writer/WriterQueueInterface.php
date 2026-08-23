@@ -27,4 +27,9 @@ interface WriterQueueInterface
      * @throws Throwable
      */
     public function run(Closure $job): void;
+
+    /**
+     * Release the writer now that no further job is coming, rather than leaving it to time out.
+     */
+    public function drain(): void;
 }

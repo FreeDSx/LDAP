@@ -28,4 +28,9 @@ final class TestSynchronousWriterQueue implements WriterQueueInterface
         $this->ranCount++;
         $job();
     }
+
+    /**
+     * Nothing is kept between jobs here, so there is nothing to release.
+     */
+    public function drain(): void {}
 }

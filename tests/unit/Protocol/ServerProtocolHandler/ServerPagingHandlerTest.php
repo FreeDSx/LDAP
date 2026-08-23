@@ -117,6 +117,47 @@ class ServerPagingHandlerTest extends TestCase
         );
     }
 
+    public function test_a_page_is_filled_past_entries_access_control_hides(): void
+    {
+        $hidden = Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']);
+        $visible = Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']);
+
+        $mockAccessControl = $this->createMock(AccessControlInterface::class);
+        $mockAccessControl
+            ->method('filterEntry')
+            ->willReturnCallback(
+                static fn(TokenInterface $token, Entry $entry): ?Entry => $entry === $hidden
+                    ? null
+                    : $entry,
+            );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback($this->sliceAware(
+                $hidden,
+                $visible,
+            ));
+
+        $subject = new ServerPagingHandler(
+            backend: $this->mockBackend,
+            filterEvaluator: $this->mockFilterEvaluator,
+            accessControl: $mockAccessControl,
+            requestHistory: $this->requestHistory,
+            schema: $this->schema,
+        );
+
+        // A page of one, whose first candidate is hidden, so filling it means reading on rather than answering short.
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(size: 1),
+        );
+
+        self::assertEquals(
+            [new LdapMessageResponse(2, new SearchResultEntry($visible))],
+            $this->entryMessages(),
+        );
+    }
+
     public function test_it_should_call_the_backend_search_on_paging_start_and_return_entries(): void
     {
         $message = $this->makeSearchMessage(size: 10);
