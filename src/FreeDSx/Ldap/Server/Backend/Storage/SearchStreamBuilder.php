@@ -86,8 +86,8 @@ final readonly class SearchStreamBuilder
     }
 
     /**
-     * @param Generator<Entry> $generator
-     * @return Generator<Entry>
+     * @param Generator<int, Entry, mixed, ?FetchedBatch> $generator
+     * @return Generator<int, Entry, mixed, ?FetchedBatch>
      */
     private function wrapWithDerived(
         Generator $generator,
@@ -170,8 +170,8 @@ final readonly class SearchStreamBuilder
     }
 
     /**
-     * @param Generator<Entry> $generator
-     * @return Generator<Entry>
+     * @param Generator<int, Entry, mixed, ?FetchedBatch> $generator
+     * @return Generator<int, Entry, mixed, ?FetchedBatch>
      * @throws OperationException
      */
     private function wrapWithFilterEvaluation(
@@ -188,8 +188,8 @@ final readonly class SearchStreamBuilder
     }
 
     /**
-     * @param Generator<Entry> $generator
-     * @return Generator<Entry>
+     * @param Generator<int, Entry, mixed, ?FetchedBatch> $generator
+     * @return Generator<int, Entry, mixed, ?FetchedBatch>
      * @throws OperationException
      */
     private function wrapWithLookthrough(
@@ -214,8 +214,8 @@ final readonly class SearchStreamBuilder
     }
 
     /**
-     * @param Generator<Entry> $generator
-     * @return Generator<Entry>
+     * @param Generator<int, Entry, mixed, ?FetchedBatch> $generator
+     * @return Generator<int, Entry, mixed, ?FetchedBatch>
      * @throws OperationException
      */
     private function wrapWithTimeLimitHandling(Generator $generator): Generator
@@ -235,10 +235,13 @@ final readonly class SearchStreamBuilder
     }
 
     /**
-     * @return Generator<Entry>
+     * @return Generator<int, Entry, mixed, ?FetchedBatch>
      */
     private function yieldSingle(Entry $entry): Generator
     {
         yield $entry;
+
+        // A base-object read is one entry, so there is never anywhere to resume from.
+        return null;
     }
 }

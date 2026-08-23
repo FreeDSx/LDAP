@@ -44,6 +44,7 @@ final readonly class StorageListOptionsFactory
 
     /**
      * @param ?SearchLimits $effectiveLimits Per-request limits, or null for the ones this factory was configured with.
+     * @param ?PageSlice $slice Reads one bounded piece of the result rather than the whole of it.
      */
     public function make(
         SearchRequest $request,
@@ -51,6 +52,7 @@ final readonly class StorageListOptionsFactory
         ControlBag $controls,
         SubentryVisibility $subentries,
         ?SearchLimits $effectiveLimits = null,
+        ?PageSlice $slice = null,
     ): StorageListOptions {
         $limits = $effectiveLimits ?? $this->limits;
         $sortingControl = $controls->get(Control::OID_SORTING);
@@ -67,6 +69,8 @@ final readonly class StorageListOptionsFactory
             lookthroughLimit: $limits->maxSearchLookthrough,
             attributes: $this->materializedAttributes($request),
             subentries: $subentries,
+            after: $slice?->after,
+            maxCandidates: $slice?->limit,
         );
     }
 

@@ -17,9 +17,10 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
+use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
+use FreeDSx\Ldap\Server\Backend\Storage\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Subentry\SubentryDetector;
-use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use Generator;
 
 /**
@@ -35,52 +36,119 @@ trait ArrayEntryStorageTrait
 
     /**
      * @param array<string, Entry> $entries Entries keyed by normalised DN string
+     * @param array<string, int> $keys Entry key per normalised DN string
      */
     private function listFromArray(
         StorageListOptions $options,
         array $entries,
+        array $keys = [],
     ): EntryStream {
+        $scoped = $this->yieldByScope($options, $entries);
+
         if ($options->sortKeys === []) {
-            return new EntryStream(
-                $this->yieldByScope(
-                    $entries,
-                    $options->baseDn,
-                    $options->subtree,
-                    $options->timeLimit,
-                    $options->subentries,
-                ),
-            );
+            return new EntryStream($this->pageByKey(
+                $scoped,
+                $keys,
+                $options,
+            ));
         }
 
-        return new EntryStream($this->sortedStreamFromArray(
+        /** @var list<Entry> $collected */
+        $collected = iterator_to_array($scoped, false);
+
+        return new EntryStream($this->pageByCount(
+            $this->sortKeyComparator->sort($collected, $options->sortKeys),
             $options,
-            $entries,
         ));
     }
 
     /**
-     * @param array<string, Entry> $entries Entries keyed by normalised DN string
-     * @return Generator<Entry>
+     * Hands over the window $options asks for, resuming past the key it names.
+     *
+     * @param iterable<Entry> $entries
+     * @param array<string, int> $keys Entry key per normalised DN string
+     * @return Generator<int, Entry, mixed, FetchedBatch>
      */
-    private function sortedStreamFromArray(
+    private function pageByKey(
+        iterable $entries,
+        array $keys,
         StorageListOptions $options,
-        array $entries,
     ): Generator {
-        /** @var list<Entry> $collected */
-        $collected = iterator_to_array(
-            $this->yieldByScope(
-                $entries,
-                $options->baseDn,
-                $options->subtree,
-                $options->timeLimit,
-                $options->subentries,
-            ),
-            false,
-        );
+        $after = $options->after?->position;
+        $cursor = $options->after;
+        $taken = 0;
+        $hasMore = false;
 
-        yield from $this->sortKeyComparator->sort(
-            $collected,
-            $options->sortKeys,
+        foreach ($entries as $entry) {
+            $key = $keys[$entry->getDn()->normalize()->toString()] ?? null;
+
+            if ($after !== null && $key !== null && $key <= $after) {
+                continue;
+            }
+
+            // Seen but not handed over: its only job is to prove the result did not end here.
+            if ($options->maxCandidates !== null && $taken >= $options->maxCandidates) {
+                $hasMore = true;
+
+                break;
+            }
+
+            $taken++;
+
+            if ($key !== null) {
+                $cursor = PageCursor::afterEntry($key);
+            }
+
+            yield $entry;
+        }
+
+        return new FetchedBatch(
+            $taken,
+            $cursor,
+            $hasMore,
+        );
+    }
+
+    /**
+     * Hands over the window $options asks for, resuming by how much was already delivered.
+     *
+     * A sort defines its own order that the key says nothing about, so the count is the only position that means
+     * anything. The sort is recomputed identically for every page.
+     *
+     * @param iterable<Entry> $entries
+     * @return Generator<int, Entry, mixed, FetchedBatch>
+     */
+    private function pageByCount(
+        iterable $entries,
+        StorageListOptions $options,
+    ): Generator {
+        $delivered = $options->after->position ?? 0;
+        $skipped = 0;
+        $taken = 0;
+        $hasMore = false;
+
+        foreach ($entries as $entry) {
+            if ($skipped < $delivered) {
+                $skipped++;
+
+                continue;
+            }
+
+            if ($options->maxCandidates !== null && $taken >= $options->maxCandidates) {
+                $hasMore = true;
+
+                break;
+            }
+
+            $taken++;
+
+            yield $entry;
+        }
+
+        return new FetchedBatch(
+            $taken,
+            PageCursor::afterSorted($delivered + $taken),
+            $hasMore,
         );
     }
 
@@ -103,18 +171,18 @@ trait ArrayEntryStorageTrait
     }
 
     /**
+     * Entries in scope, in insertion order, which is ascending key order since keys are handed out on insert and a
+     * rename re-keys the array in place.
+     *
      * @param array<string, Entry> $entries Entries keyed by normalised DN string
-     * @return Generator<Entry>
+     * @return Generator<int, Entry>
      */
     private function yieldByScope(
+        StorageListOptions $options,
         array $entries,
-        Dn $baseDn,
-        bool $subtree,
-        int $timeLimit = 0,
-        SubentryVisibility $subentries = SubentryVisibility::All,
     ): Generator {
-        $deadline = $timeLimit > 0
-            ? microtime(true) + $timeLimit
+        $deadline = $options->timeLimit > 0
+            ? microtime(true) + $options->timeLimit
             : null;
 
         foreach ($entries as $normDn => $entry) {
@@ -124,11 +192,11 @@ trait ArrayEntryStorageTrait
 
             $entryDn = Dn::fromCanonical((string) $normDn);
 
-            $inScope = $subtree
-                ? $entryDn->isDescendantOf($baseDn)
-                : $entryDn->isChildOf($baseDn);
+            $inScope = $options->subtree
+                ? $entryDn->isDescendantOf($options->baseDn)
+                : $entryDn->isChildOf($options->baseDn);
 
-            if ($inScope && SubentryDetector::isVisibleUnder($entry, $subentries)) {
+            if ($inScope && SubentryDetector::isVisibleUnder($entry, $options->subentries)) {
                 yield $entry;
             }
         }

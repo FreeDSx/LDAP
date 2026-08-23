@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\PageSlice;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 
@@ -33,12 +34,14 @@ interface LdapBackendInterface
     /**
      * @param SubentryVisibility $subentries Which entry population is in scope; callers state it, as no default is safe for all.
      * @param ?SearchLimits $effectiveLimits Per-request effective limits (time/lookthrough); null uses backend defaults.
+     * @param ?PageSlice $slice Read one bounded piece, so the stream reports where it stopped; null reads the result.
      */
     public function search(
         SearchRequest $request,
         SubentryVisibility $subentries,
         ControlBag $controls = new ControlBag(),
         ?SearchLimits $effectiveLimits = null,
+        ?PageSlice $slice = null,
     ): EntryStream;
 
     /**

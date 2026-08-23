@@ -13,21 +13,21 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage;
 
-use FreeDSx\Ldap\Entry\Entry;
-use Generator;
-
 /**
- * Lazy entry generator returned by storage list() / backend search(); $isPreFiltered marks an exact native filter match.
+ * A bounded piece of a result, for a caller that reads one page at a time.
+ *
+ * Bounded so the caller can read it to the end, which is the only point a stream will say where it stopped.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class EntryStream
+final readonly class PageSlice
 {
     /**
-     * @param Generator<int, Entry, mixed, ?FetchedBatch> $entries Returns what it read, once read to its end.
+     * @param int $limit Candidates this slice may examine.
+     * @param ?PageCursor $after Where to resume, or null to start from the beginning.
      */
     public function __construct(
-        public Generator $entries,
-        public bool $isPreFiltered = false,
+        public int $limit,
+        public ?PageCursor $after = null,
     ) {}
 }

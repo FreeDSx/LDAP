@@ -14,21 +14,33 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage;
 
 /**
- * Where a list resumes from, as a key the storage assigns rather than anything derived from the entry.
- *
- * A key survives a rename, so a walk is not disturbed by one landing between pages.
+ * Where a list resumes from: an assigned key, which a rename cannot disturb, or a count when a sort defines the order.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final readonly class PageCursor
 {
     /**
-     * @param int $entryKey Identifies the last entry delivered.
+     * @param int $position The key of the last entry delivered, or the count already delivered when sorted.
      */
-    private function __construct(public int $entryKey) {}
+    private function __construct(
+        public int $position,
+        public bool $isOrdinal = false,
+    ) {}
 
     public static function afterEntry(int $entryKey): self
     {
         return new self($entryKey);
+    }
+
+    /**
+     * @param int $delivered Entries the sorted order has already handed over.
+     */
+    public static function afterSorted(int $delivered): self
+    {
+        return new self(
+            $delivered,
+            true,
+        );
     }
 }

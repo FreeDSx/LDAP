@@ -52,6 +52,38 @@ trait ControlTestsTrait
         );
     }
 
+    public function testSortedPagingReturnsEveryEntryOnceInOrder(): void
+    {
+        $this->authenticateUser();
+
+        $search = Operations::search(Filters::present('objectClass'))
+            ->base('dc=foo,dc=bar')
+            ->useSubtreeScope();
+
+        $paging = $this->ldapClient()
+            ->paging($search, 3)
+            ->useControls(new SortingControl(SortKey::ascending('cn')));
+
+        $dns = [];
+
+        while ($paging->hasEntries()) {
+            foreach ($paging->getEntries() as $entry) {
+                $dns[] = $entry->getDn()->toString();
+            }
+        }
+
+        self::assertSame(
+            array_values(array_unique($dns)),
+            $dns,
+            'A sorted walk must not repeat an entry it already delivered.',
+        );
+        self::assertCount(
+            8,
+            $dns,
+            'A sorted walk must hand over every entry.',
+        );
+    }
+
     public function testPagingCanBeAbandoned(): void
     {
         $this->authenticateUser();

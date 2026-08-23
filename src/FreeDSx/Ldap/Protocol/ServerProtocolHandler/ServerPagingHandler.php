@@ -24,8 +24,12 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\PageCursor;
+use FreeDSx\Ldap\Server\Backend\Storage\PageSlice;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\Paging\PagingRequestComparator;
 use FreeDSx\Ldap\Server\Paging\PagingResponse;
@@ -37,7 +41,6 @@ use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use Generator;
 use Throwable;
 
 /**
@@ -144,7 +147,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
          */
         if (($response && $response->isComplete()) || $searchResult->getState()->resultCode !== ResultCode::SUCCESS) {
             $this->requestHistory->pagingRequest()->remove($pagingRequest);
-            $this->requestHistory->removePagingGenerator($pagingRequest->getNextCookie());
+            $this->requestHistory->removePagingCursor($pagingRequest->getNextCookie());
         }
 
         $outcome = $failure !== null
@@ -198,32 +201,15 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         PagingRequest $pagingRequest,
         TokenInterface $token,
     ): PagingResponse {
-        $searchRequest = $pagingRequest->getSearchRequest();
-
-        // Paged searches use the paged lookthrough limit (falls back to the regular one when unset).
-        $result = $this->backend->search(
-            $searchRequest,
-            $this->subentryVisibility($pagingRequest->controls()),
-            $pagingRequest->controls(),
-            new SearchLimits(
-                maxSearchTimeLimit: $this->limits->maxSearchTimeLimit,
-                maxSearchLookthrough: $this->limits->effectivePagedLookthrough(),
-            ),
-        );
-        $generator = $result->entries;
-
-        $collected = $this->collectFromGenerator(
-            $generator,
-            $pagingRequest->getSize(),
-            $searchRequest,
+        $collected = $this->collectPage(
+            $pagingRequest,
             $token,
-            $this->projectionFor($searchRequest),
+            null,
         );
 
         return $this->buildPagingResponse(
             $collected,
             $pagingRequest,
-            $generator,
         );
     }
 
@@ -251,29 +237,26 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         }
 
         $currentCookie = $pagingRequest->getNextCookie();
-        $generator = $this->requestHistory->getPagingGenerator($currentCookie);
+        $resumeFrom = $this->requestHistory->getPagingCursor($currentCookie);
 
-        if ($generator === null) {
+        if ($resumeFrom === null) {
             throw new OperationException(
                 'The paging session could not be resumed.',
                 ResultCode::UNWILLING_TO_PERFORM,
             );
         }
 
-        $this->requestHistory->removePagingGenerator($currentCookie);
+        $this->requestHistory->removePagingCursor($currentCookie);
 
-        $collected = $this->collectFromGenerator(
-            $generator,
-            $pagingRequest->getSize(),
-            $pagingRequest->getSearchRequest(),
+        $collected = $this->collectPage(
+            $pagingRequest,
             $token,
-            $this->projectionFor($pagingRequest->getSearchRequest()),
+            $resumeFrom,
         );
 
         return $this->buildPagingResponse(
             $collected,
             $pagingRequest,
-            $generator,
         );
     }
 
@@ -283,7 +266,6 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
     private function buildPagingResponse(
         CollectedPage $collected,
         PagingRequest $pagingRequest,
-        Generator $generator,
     ): PagingResponse {
         if ($collected->isSizeLimitExceeded) {
             return PagingResponse::makeSizeLimitExceeded(new Entries(...$collected->entries));
@@ -292,13 +274,14 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $nextCookie = $this->generateCookie();
         $pagingRequest->updateNextCookie($nextCookie);
 
-        if ($collected->isGeneratorExhausted) {
+        // Without a position there is nothing to resume from, so the result has to be treated as finished.
+        if ($collected->isResultExhausted || $collected->cursor === null) {
             return PagingResponse::makeFinal(new Entries(...$collected->entries));
         }
 
-        $this->requestHistory->storePagingGenerator(
+        $this->requestHistory->storePagingCursor(
             $nextCookie,
-            $generator,
+            $collected->cursor,
         );
 
         return PagingResponse::make(
@@ -307,73 +290,118 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
     }
 
     /**
-     * Advances the generator, collecting up to $pageSize entries that pass the filter.
+     * Fills one page from $resumeFrom, reading bounded slices to their end so each says where it stopped.
      *
-     * Also enforces the client's sizeLimit from the SearchRequest. When the sizeLimit is
-     * reached before the generator is exhausted, $isSizeLimitExceeded is true in the return.
+     * @throws OperationException
      */
-    private function collectFromGenerator(
-        Generator $generator,
-        int $pageSize,
-        SearchRequest $request,
+    private function collectPage(
+        PagingRequest $pagingRequest,
         TokenInterface $token,
-        AttributeProjection $projection,
+        ?PageCursor $resumeFrom,
     ): CollectedPage {
-        $page = [];
+        $request = $pagingRequest->getSearchRequest();
+        $projection = $this->projectionFor($request);
+        $filter = $request->getFilter();
         $effectivePageSize = $this->effectiveSizeLimit(
-            $pageSize,
+            $pagingRequest->getSize(),
             $this->limits->maxSearchPageSize,
         );
-        $pageLimit = $effectivePageSize > 0
-            ? $effectivePageSize
-            : null;
         $sizeLimit = $this->effectiveSizeLimit(
             $request->getSizeLimit(),
             $this->limits->maxSearchSize,
         );
-        $filter = $request->getFilter();
 
-        while ($generator->valid() && $this->pageHasCapacity($page, $pageLimit)) {
-            $entry = $generator->current();
+        // Deliberate: the size limit bounds each page rather than the whole paged operation.
+        $collectCap = $this->effectiveSizeLimit(
+            $effectivePageSize,
+            $sizeLimit,
+        );
+        $pageLimit = $collectCap > 0
+            ? $collectCap
+            : null;
 
-            if ($entry instanceof Entry) {
-                $filtered = $this->accessControl->filterEntry(
-                    $token,
+        $page = [];
+        $cursor = $resumeFrom;
+        $exhausted = false;
+        $sliceSize = $pageLimit ?? $this->limits->maxSearchPageSize;
+
+        while (!$exhausted && $this->pageHasCapacity($page, $pageLimit)) {
+            $stream = $this->readSlice(
+                $pagingRequest,
+                new PageSlice(
+                    max($sliceSize, 1),
+                    $cursor,
+                ),
+            );
+            foreach ($stream->entries as $entry) {
+                $kept = $this->keepForPage(
                     $entry,
+                    $token,
+                    $filter,
                 );
 
-                if ($filtered === null) {
-                    $generator->next();
-                    continue;
-                }
-
-                if ($filtered !== $entry && !$this->filterEvaluator->evaluate($filtered, $filter)) {
-                    $generator->next();
-                    continue;
-                }
-
-                $page[] = $projection->project($filtered);
-
-                // Deliberate: the limit bounds each page rather than the whole paged operation.
-                if ($sizeLimit > 0 && count($page) >= $sizeLimit) {
-                    $generator->next();
-                    break;
+                if ($kept !== null) {
+                    $page[] = $projection->project($kept);
                 }
             }
 
-            $generator->next();
+            // A stream that reports nothing cannot be resumed, so the result has to be taken as finished.
+            $read = $stream->entries->getReturn();
+            $exhausted = $read === null || !$read->hasMore || $read->cursor === null;
+            $cursor = $read->cursor ?? $cursor;
         }
-
-        $generatorExhausted = !$generator->valid();
-        $sizeLimitExceeded = !$generatorExhausted
-            && $sizeLimit > 0
-            && count($page) >= $sizeLimit;
 
         return new CollectedPage(
             $page,
-            $generatorExhausted,
-            $sizeLimitExceeded,
+            $exhausted,
+            !$exhausted && $sizeLimit > 0 && count($page) >= $sizeLimit,
+            $cursor,
         );
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function readSlice(
+        PagingRequest $pagingRequest,
+        PageSlice $slice,
+    ): EntryStream {
+        // Paged searches use the paged lookthrough limit (falls back to the regular one when unset), applied per page.
+        return $this->backend->search(
+            $pagingRequest->getSearchRequest(),
+            $this->subentryVisibility($pagingRequest->controls()),
+            $pagingRequest->controls(),
+            new SearchLimits(
+                maxSearchTimeLimit: $this->limits->maxSearchTimeLimit,
+                maxSearchLookthrough: $this->limits->effectivePagedLookthrough(),
+            ),
+            $slice,
+        );
+    }
+
+    /**
+     * The entry as this identity may see it, or null when it may not see it at all.
+     *
+     * @throws OperationException
+     */
+    private function keepForPage(
+        Entry $entry,
+        TokenInterface $token,
+        FilterInterface $filter,
+    ): ?Entry {
+        $filtered = $this->accessControl->filterEntry(
+            $token,
+            $entry,
+        );
+
+        if ($filtered === null) {
+            return null;
+        }
+
+        // Stripping an attribute can cost the entry its match, so a changed entry is judged against the filter again.
+        return $filtered !== $entry && !$this->filterEvaluator->evaluate($filtered, $filter)
+            ? null
+            : $filtered;
     }
 
     private function projectionFor(SearchRequest $request): AttributeProjection
@@ -423,7 +451,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         }
 
         $requests->remove($oldest);
-        $this->requestHistory->removePagingGenerator($oldest->getNextCookie());
+        $this->requestHistory->removePagingCursor($oldest->getNextCookie());
         $this->eventLogger?->record(
             ServerEvent::PagingSessionEvicted,
             [EventContext::LIMIT => $limit],

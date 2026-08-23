@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
+use Generator;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
@@ -127,9 +128,11 @@ final class DirectoryDumperTest extends TestCase
         );
         $storage = $this->createMock(EntryStorageInterface::class);
         $storage->method('list')->willReturn(new EntryStream(
-            entries: (function () use ($alice, $bob): iterable {
+            entries: (function () use ($alice, $bob): Generator {
                 yield $alice;
                 yield $bob;
+
+                return null;
             })(),
             isPreFiltered: false,
         ));
@@ -165,8 +168,10 @@ final class DirectoryDumperTest extends TestCase
         $alice = Entry::create('cn=alice,dc=foo,dc=bar', ['cn' => 'alice']);
         $storage = $this->createMock(EntryStorageInterface::class);
         $storage->method('list')->willReturn(new EntryStream(
-            entries: (function () use ($alice): iterable {
+            entries: (function () use ($alice): Generator {
                 yield $alice;
+
+                return null;
             })(),
             isPreFiltered: true,
         ));
@@ -195,8 +200,10 @@ final class DirectoryDumperTest extends TestCase
                     => $opts->subtree === true && $opts->baseDn->toString() === 'dc=foo,dc=bar',
             ))
             ->willReturn(new EntryStream(
-                entries: (function (): iterable {
+                entries: (function (): Generator {
                     yield from [];
+
+                    return null;
                 })(),
             ));
 

@@ -295,6 +295,8 @@ final class PasswordPolicyResolverTest extends TestCase
         $backend->method('search')
             ->willReturn(new EntryStream((static function () use ($subentry): Generator {
                 yield $subentry;
+
+                return null;
             })()));
 
         return new GoverningSubentryResolver(

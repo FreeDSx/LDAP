@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
+use Generator;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -107,8 +108,10 @@ final class WriteSerializingStorageTest extends TestCase
             subtree: true,
         );
         $stream = new EntryStream(
-            (function () {
+            (function (): Generator {
                 yield from [];
+
+                return null;
             })(),
         );
 

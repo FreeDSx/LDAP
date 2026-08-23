@@ -117,6 +117,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         SubentryVisibility $subentries,
         ControlBag $controls = new ControlBag(),
         ?SearchLimits $effectiveLimits = null,
+        ?PageSlice $slice = null,
     ): EntryStream {
         $baseDn = $request->getBaseDn() ?? new Dn('');
         $normBase = $baseDn->normalize();
@@ -141,6 +142,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             $controls,
             $subentries,
             $effectiveLimits,
+            $slice,
         );
 
         try {
@@ -149,6 +151,8 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             # RFC 4511 §4.5.1.7: unrecognized attribute descriptions evaluate to Undefined; yield zero entries.
             return new EntryStream((static function (): Generator {
                 yield from [];
+
+                return null;
             })());
         }
 

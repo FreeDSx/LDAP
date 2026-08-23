@@ -43,6 +43,15 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
     private array $entries = [];
 
     /**
+     * Assigned rather than derived from the DN, so a resumed walk is not disturbed by a rename.
+     *
+     * @var array<string, int> entry key, keyed by normalised DN string
+     */
+    private array $keys = [];
+
+    private int $nextKey = 1;
+
+    /**
      * @param Entry[] $entries pre-populated into the store
      */
     public function __construct(
@@ -54,7 +63,7 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
         $this->journal = $journal;
 
         foreach ($entries as $entry) {
-            $this->entries[$entry->getDn()->normalize()->toString()] = $entry;
+            $this->store($entry);
         }
     }
 
@@ -73,6 +82,7 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
         return $this->listFromArray(
             $options,
             $this->entries,
+            $this->keys,
         );
     }
 
@@ -80,7 +90,11 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
         Entry $entry,
         bool $rebuildIndexes = false,
     ): void {
-        $this->entries[$entry->getDn()->normalize()->toString()] = $entry;
+        $lcDn = $entry->getDn()->normalize()->toString();
+
+        // Overwriting an entry keeps its key, matching the upsert the database adapters do.
+        $this->keys[$lcDn] ??= $this->nextKey++;
+        $this->entries[$lcDn] = $entry;
     }
 
     public function renameSubtree(
@@ -105,11 +119,19 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
                 $entry->getAttributes(),
             ),
         );
+
+        // Re-keyed the same way and in the same order, so a walk in progress keeps both its position and its ordering.
+        $this->keys = $rename->applyTo(
+            $this->keys,
+            static fn(int $key): int => $key,
+        );
     }
 
     public function remove(Dn $dn): void
     {
-        unset($this->entries[$dn->normalize()->toString()]);
+        $lcDn = $dn->normalize()->toString();
+
+        unset($this->entries[$lcDn], $this->keys[$lcDn]);
     }
 
     public function removeAll(array $dns): void

@@ -37,6 +37,9 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
+use FreeDSx\Ldap\Server\Backend\Storage\PageCursor;
+use FreeDSx\Ldap\Server\Backend\Storage\PageSlice;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
@@ -125,7 +128,7 @@ class ServerPagingHandlerTest extends TestCase
             ->expects(self::once())
             ->method('search')
             ->with(self::isInstanceOf(SearchRequest::class))
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
+            ->willReturnCallback($this->sliceAware($entry1, $entry2));
 
         $result = $this->drive(
             $this->subject,
@@ -159,7 +162,7 @@ class ServerPagingHandlerTest extends TestCase
         $this->mockBackend
             ->expects(self::once())
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
+            ->willReturnCallback($this->sliceAware($entry1, $entry2));
 
         $this->drive(
             $this->subject,
@@ -174,7 +177,7 @@ class ServerPagingHandlerTest extends TestCase
         self::assertNotSame('', $this->donePagingControl()->getCookie());
     }
 
-    public function test_it_should_continue_from_the_stored_generator_on_subsequent_pages(): void
+    public function test_it_should_continue_from_the_stored_cursor_on_subsequent_pages(): void
     {
         // First page: size=1 with 2 entries in the backend.
         $firstMessage = $this->makeSearchMessage(size: 1);
@@ -182,10 +185,11 @@ class ServerPagingHandlerTest extends TestCase
         $entry1 = Entry::create('dc=foo,dc=bar', ['cn' => 'foo']);
         $entry2 = Entry::create('dc=bar,dc=foo', ['cn' => 'bar']);
 
+        // One search per page, since a page resumes from a position rather than from a result left open.
         $this->mockBackend
-            ->expects(self::once())
+            ->expects(self::exactly(2))
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
+            ->willReturnCallback($this->sliceAware($entry1, $entry2));
 
         $this->drive($this->subject, $firstMessage);
 
@@ -346,7 +350,7 @@ class ServerPagingHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2, $entry3)));
+            ->willReturnCallback($this->sliceAware($entry1, $entry2, $entry3));
 
         $subject = new ServerPagingHandler(
             backend: $this->mockBackend,
@@ -402,7 +406,7 @@ class ServerPagingHandlerTest extends TestCase
         $this->mockBackend
             ->expects(self::once())
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
+            ->willReturnCallback($this->sliceAware($entry1, $entry2));
 
         $this->drive($this->subject, $message);
 
@@ -429,11 +433,11 @@ class ServerPagingHandlerTest extends TestCase
         $entry4 = Entry::create('cn=4,dc=foo,dc=bar', ['cn' => '4']);
 
         $this->mockBackend
-            ->expects(self::once())
+            ->expects(self::exactly(2))
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2, $entry3, $entry4)));
+            ->willReturnCallback($this->sliceAware($entry1, $entry2, $entry3, $entry4));
 
-        // First page: pageSize=1, sizeLimit=2 — gets entry1, stores generator
+        // First page: pageSize=1, sizeLimit=2 — gets entry1, stores the cursor
         $this->drive(
             $this->subject,
             $this->makeSearchMessage(size: 1, searchRequest: $searchRequest),
@@ -442,7 +446,7 @@ class ServerPagingHandlerTest extends TestCase
         $capturedCookie = $this->donePagingControl()->getCookie();
         self::assertNotSame('', $capturedCookie, 'Expected a non-empty cookie after the first page.');
 
-        // Second page: pageSize=10, sizeLimit=2 — gets entry2+entry3 (hits limit), entry4 still in generator → SIZE_LIMIT_EXCEEDED
+        // Second page: pageSize=10, sizeLimit=2 — gets entry2+entry3 (hits limit), entry4 unread → SIZE_LIMIT_EXCEEDED
         $pagingReq = $this->requestHistory->pagingRequest()->findByNextCookie($capturedCookie);
         $this->drive(
             $this->subject,
@@ -474,7 +478,7 @@ class ServerPagingHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
+            ->willReturnCallback($this->sliceAware($entry1, $entry2));
 
         $subject = new ServerPagingHandler(
             backend: $this->mockBackend,
@@ -500,10 +504,10 @@ class ServerPagingHandlerTest extends TestCase
     {
         $this->mockBackend
             ->method('search')
-            ->willReturnCallback(fn(): EntryStream => new EntryStream($this->makeGenerator(
+            ->willReturnCallback($this->sliceAware(
                 Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']),
                 Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']),
-            )));
+            ));
 
         $subject = new ServerPagingHandler(
             backend: $this->mockBackend,
@@ -525,8 +529,8 @@ class ServerPagingHandlerTest extends TestCase
             $this->requestHistory->pagingRequest()->count(),
         );
         self::assertNull(
-            $this->requestHistory->getPagingGenerator($firstCookie),
-            'The evicted session must not keep its generator alive.',
+            $this->requestHistory->getPagingCursor($firstCookie),
+            'The evicted session must not keep a resume point.',
         );
         self::assertFalse(
             $this->requestHistory->pagingRequest()->has($firstCookie),
@@ -538,9 +542,9 @@ class ServerPagingHandlerTest extends TestCase
     {
         $this->mockBackend
             ->method('search')
-            ->willReturnCallback(fn(): EntryStream => new EntryStream($this->makeGenerator(
+            ->willReturnCallback($this->sliceAware(
                 Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']),
-            )));
+            ));
 
         $subject = new ServerPagingHandler(
             backend: $this->mockBackend,
@@ -567,10 +571,10 @@ class ServerPagingHandlerTest extends TestCase
     {
         $this->mockBackend
             ->method('search')
-            ->willReturnCallback(fn(): EntryStream => new EntryStream($this->makeGenerator(
+            ->willReturnCallback($this->sliceAware(
                 Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']),
                 Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']),
-            )));
+            ));
 
         $subject = new ServerPagingHandler(
             backend: $this->mockBackend,
@@ -591,17 +595,17 @@ class ServerPagingHandlerTest extends TestCase
             0,
             $this->requestHistory->pagingRequest()->count(),
         );
-        self::assertNull($this->requestHistory->getPagingGenerator($cookie));
+        self::assertNull($this->requestHistory->getPagingCursor($cookie));
     }
 
     public function test_sessions_are_not_evicted_when_no_limit_is_set(): void
     {
         $this->mockBackend
             ->method('search')
-            ->willReturnCallback(fn(): EntryStream => new EntryStream($this->makeGenerator(
+            ->willReturnCallback($this->sliceAware(
                 Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']),
                 Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']),
-            )));
+            ));
 
         $subject = new ServerPagingHandler(
             backend: $this->mockBackend,
@@ -631,7 +635,7 @@ class ServerPagingHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
+            ->willReturnCallback($this->sliceAware($entry1, $entry2));
 
         $subject = new ServerPagingHandler(
             backend: $this->mockBackend,
@@ -663,7 +667,7 @@ class ServerPagingHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2, $entry3)));
+            ->willReturnCallback($this->sliceAware($entry1, $entry2, $entry3));
 
         $subject = new ServerPagingHandler(
             backend: $this->mockBackend,
@@ -690,7 +694,7 @@ class ServerPagingHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
+            ->willReturnCallback($this->sliceAware($entry1, $entry2));
 
         $subject = new ServerPagingHandler(
             backend: $this->mockBackend,
@@ -731,10 +735,10 @@ class ServerPagingHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator(
+            ->willReturnCallback($this->sliceAware(
                 $entry1,
                 $entry2,
-            )));
+            ));
 
         $subject = new ServerPagingHandler(
             backend: $this->mockBackend,
@@ -775,7 +779,7 @@ class ServerPagingHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry)));
+            ->willReturnCallback($this->sliceAware($entry));
 
         $subject = new ServerPagingHandler(
             backend: $this->mockBackend,
@@ -800,7 +804,7 @@ class ServerPagingHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator()));
+            ->willReturnCallback($this->sliceAware());
 
         $this->drive(
             $this->subject,
@@ -829,7 +833,7 @@ class ServerPagingHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator()));
+            ->willReturnCallback($this->sliceAware());
 
         $this->drive(
             $this->subject,
@@ -931,9 +935,9 @@ class ServerPagingHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator(
+            ->willReturnCallback($this->sliceAware(
                 Entry::create('dc=foo,dc=bar', ['cn' => 'foo']),
-            )));
+            ));
 
         $this->drive(
             $this->subject,
@@ -961,7 +965,7 @@ class ServerPagingHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator()));
+            ->willReturnCallback($this->sliceAware());
 
         $this->drive(
             $this->subject,
@@ -1073,9 +1077,59 @@ class ServerPagingHandlerTest extends TestCase
         );
     }
 
-    private function makeGenerator(Entry ...$entries): Generator
+    /**
+     * A search that honours the slice the way real storage does, keying entries by their position.
+     *
+     * @return callable(mixed...): EntryStream
+     */
+    private function sliceAware(Entry ...$entries): callable
     {
-        yield from $entries;
+        return fn(mixed ...$args): EntryStream => new EntryStream($this->sliceOf(
+            array_values($entries),
+            array_values(array_filter(
+                $args,
+                static fn(mixed $arg): bool => $arg instanceof PageSlice,
+            ))[0] ?? null,
+        ));
+    }
+
+    /**
+     * @param list<Entry> $entries
+     * @return Generator<int, Entry, mixed, FetchedBatch>
+     */
+    private function sliceOf(
+        array $entries,
+        ?PageSlice $slice,
+    ): Generator {
+        $after = $slice?->after->position ?? 0;
+        $cursor = $slice?->after;
+        $taken = 0;
+        $hasMore = false;
+
+        foreach ($entries as $index => $entry) {
+            $key = $index + 1;
+
+            if ($key <= $after) {
+                continue;
+            }
+
+            if ($slice !== null && $taken >= $slice->limit) {
+                $hasMore = true;
+
+                break;
+            }
+
+            $taken++;
+            $cursor = PageCursor::afterEntry($key);
+
+            yield $entry;
+        }
+
+        return new FetchedBatch(
+            $taken,
+            $cursor,
+            $hasMore,
+        );
     }
 
     /**
@@ -1125,7 +1179,7 @@ class ServerPagingHandlerTest extends TestCase
 
         $pagingReq->markProcessed();
         $this->requestHistory->pagingRequest()->add($pagingReq);
-        $this->requestHistory->storePagingGenerator($nextCookie, $this->makeGenerator());
+        $this->requestHistory->storePagingCursor($nextCookie, PageCursor::afterEntry(0));
 
         return $pagingReq;
     }

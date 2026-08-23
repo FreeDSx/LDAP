@@ -30,6 +30,7 @@ final readonly class StorageListOptions
      * @param SortKey[] $sortKeys
      * @param list<string>|null $attributes Lowercase base attribute names to materialize, or null for all.
      * @param ?PageCursor $after Resume after this entry rather than starting from the beginning.
+     * @param ?int $maxCandidates Stop after examining this many, so the caller can read the result to its end.
      */
     public function __construct(
         public Dn $baseDn,
@@ -42,6 +43,7 @@ final readonly class StorageListOptions
         public ?array $attributes = null,
         public SubentryVisibility $subentries = SubentryVisibility::All,
         public ?PageCursor $after = null,
+        public ?int $maxCandidates = null,
     ) {}
 
     /**
