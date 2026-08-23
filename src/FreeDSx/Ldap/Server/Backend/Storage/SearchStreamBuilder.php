@@ -96,6 +96,8 @@ final readonly class SearchStreamBuilder
         foreach ($generator as $entry) {
             yield $this->injectDerived($entry, $request);
         }
+
+        return $generator->getReturn();
     }
 
     /**
@@ -181,6 +183,8 @@ final readonly class SearchStreamBuilder
                 yield $entry;
             }
         }
+
+        return $generator->getReturn();
     }
 
     /**
@@ -205,6 +209,8 @@ final readonly class SearchStreamBuilder
 
             yield $entry;
         }
+
+        return $generator->getReturn();
     }
 
     /**
@@ -224,6 +230,8 @@ final readonly class SearchStreamBuilder
                 ResultCode::TIME_LIMIT_EXCEEDED,
             );
         }
+
+        return $generator->getReturn();
     }
 
     /**

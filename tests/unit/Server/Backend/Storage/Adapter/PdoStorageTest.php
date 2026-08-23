@@ -986,7 +986,7 @@ final class PdoStorageTest extends TestCase
         );
     }
 
-    public function test_search_exact_filter_bounds_transfer_at_lookthrough(): void
+    public function test_search_exact_filter_returns_every_match_past_the_transfer_bound(): void
     {
         $storage = $this->pdoStorage(TestServerOptions::sqlite());
         $backend = $this->backendFor(
@@ -1013,8 +1013,9 @@ final class PdoStorageTest extends TestCase
             ->base('dc=example,dc=com')
             ->useSubtreeScope();
 
+        // The bound is on how much one statement transfers, not on the answer, so the walk continues past it.
         self::assertCount(
-            3,
+            5,
             iterator_to_array($backend->search(
                 $request,
                 SubentryVisibility::All,

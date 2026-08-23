@@ -705,16 +705,14 @@ scans many entries to return few. Raise it above the largest legitimate subtree 
 **Default**: `5000`
 
 > It applies only to filters evaluated in PHP. That means the in-memory backend, and SQL backends when the filter cannot
-> be pushed to the index. Indexed equality and prefix filters are bounded by the database and are not counted. Paged
-> searches are subject to the lookthrough limit cumulatively across all pages (see `setMaxSearchPagedLookthrough` to set
-> a separate cap for paging).
+> be pushed to the index. Indexed equality and prefix filters are bounded by the database and are not counted. Each page
+> of a paged search is counted on its own (see `setMaxSearchPagedLookthrough`).
 
 ------------------
 #### setMaxSearchPagedLookthrough
 
-Set a lookthrough cap applied to paged searches, counted cumulatively across all pages. Paging is the standard way to retrieve
-large result sets, so this lets you allow large paged enumerations without loosening the regular `setMaxSearchLookthrough`
-for ordinary searches. A value of `0` falls back to the regular lookthrough limit.
+A separate lookthrough cap for paged searches, counted per page. Filling a page examines more candidates than an ordinary
+search, so this raises the cap for paging without loosening `setMaxSearchLookthrough`.
 
 **Default**: `0` (use the regular lookthrough limit)
 
