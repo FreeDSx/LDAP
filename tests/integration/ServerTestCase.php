@@ -68,9 +68,7 @@ class ServerTestCase extends LdapTestCase
     {
         parent::setUp();
 
-        if (!extension_loaded('pcntl')) {
-            $this->markTestSkipped('The PCNTL extension is required to run the built-in LDAP server.');
-        }
+        $this->requirePcntl();
 
         if (self::$sharedProcess !== null) {
             // Clear any leftover output from the previous test before creating

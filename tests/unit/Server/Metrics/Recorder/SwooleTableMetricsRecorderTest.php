@@ -19,16 +19,17 @@ use FreeDSx\Ldap\Server\Metrics\Observation\OperationObservation;
 use FreeDSx\Ldap\Server\Metrics\Observation\TrafficObservation;
 use FreeDSx\Ldap\Server\Metrics\Recorder\SwooleTableMetricsRecorder;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 
 final class SwooleTableMetricsRecorderTest extends TestCase
 {
+    use RequiresExtensionsTrait;
+
     private SwooleTableMetricsRecorder $subject;
 
     protected function setUp(): void
     {
-        if (!extension_loaded('swoole')) {
-            self::markTestSkipped('The swoole extension is required.');
-        }
+        $this->requireSwoole();
 
         $this->subject = new SwooleTableMetricsRecorder(SwooleTableMetricsRecorder::createTable(1024));
     }

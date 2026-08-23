@@ -16,10 +16,13 @@ namespace Tests\Integration\FreeDSx\Ldap;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapClient;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 use Throwable;
 
 class LdapTestCase extends TestCase
 {
+    use RequiresExtensionsTrait;
+
     protected static ?bool $isActiveDirectory = null;
 
     /**

@@ -896,9 +896,7 @@ final class LdapServerTest extends ServerTestCase
 
     public function testSighupDoesNotShutdownTheServer(): void
     {
-        if (!extension_loaded('posix')) {
-            $this->markTestSkipped('The posix extension is required to send signals.');
-        }
+        $this->requirePosix();
 
         $this->authenticateUser();
         $this->assertSame(

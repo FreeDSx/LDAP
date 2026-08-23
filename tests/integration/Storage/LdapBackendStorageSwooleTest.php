@@ -64,9 +64,7 @@ final class LdapBackendStorageSwooleTest extends LdapBackendStorageTestCase
 
     public function setUp(): void
     {
-        if (!extension_loaded('swoole')) {
-            $this->markTestSkipped('The swoole extension is required to run SwooleServerRunner tests.');
-        }
+        $this->requireSwoole();
 
         parent::setUp();
 

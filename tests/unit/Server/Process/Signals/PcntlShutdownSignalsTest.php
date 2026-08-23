@@ -16,17 +16,19 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Process\Signals;
 use FreeDSx\Ldap\Server\Process\Signals\PcntlShutdownSignals;
 use FreeDSx\Ldap\Server\Process\Signals\ShutdownSignalsInterface;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 
 final class PcntlShutdownSignalsTest extends TestCase
 {
+    use RequiresExtensionsTrait;
+
     private ShutdownSignalsInterface $subject;
 
     protected function setUp(): void
     {
         // pcntl_* is ext-pcntl; posix_kill/posix_getpid (used to raise the signal) is ext-posix.
-        if (!extension_loaded('pcntl') || !extension_loaded('posix')) {
-            $this->markTestSkipped('The pcntl and posix extensions are required for this test.');
-        }
+        $this->requirePcntl();
+        $this->requirePosix();
 
         $this->subject = new PcntlShutdownSignals();
     }

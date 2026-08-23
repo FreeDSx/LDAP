@@ -17,14 +17,16 @@ use FreeDSx\Ldap\Server\Process\Signals\SwooleShutdownSignals;
 use PHPUnit\Framework\TestCase;
 use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
+use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 
 final class SwooleShutdownSignalsTest extends TestCase
 {
+    use RequiresExtensionsTrait;
+
     protected function setUp(): void
     {
-        if (!extension_loaded('swoole') || !extension_loaded('posix')) {
-            $this->markTestSkipped('The swoole and posix extensions are required for this test.');
-        }
+        $this->requireSwoole();
+        $this->requirePosix();
     }
 
     public function test_the_handler_runs_on_a_termination_signal(): void
