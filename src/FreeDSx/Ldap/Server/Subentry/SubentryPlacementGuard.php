@@ -25,17 +25,16 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 /**
  * Keeps subentries directly below an administrative point. RFC 3672.
  *
- * Storage is passed per call rather than injected, so each check runs on the caller's transaction.
- *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final readonly class SubentryPlacementGuard
 {
+    public function __construct(private EntryStorageInterface $storage) {}
+
     /**
      * @throws OperationException
      */
     public function assertPlacement(
-        EntryStorageInterface $storage,
         Entry $entry,
         Dn $dn,
         WriteContext $context,
@@ -54,7 +53,7 @@ final readonly class SubentryPlacementGuard
             );
         }
 
-        $parentEntry = $storage->find($parent);
+        $parentEntry = $this->storage->find($parent);
 
         // A missing parent is reported by the parent-exists check, which resolves the matched DN.
         if ($parentEntry === null || $this->isAdministrativePoint($parentEntry)) {
@@ -73,7 +72,6 @@ final readonly class SubentryPlacementGuard
      * @throws OperationException
      */
     public function assertAdministrativeRoleRetained(
-        EntryStorageInterface $storage,
         Entry $updated,
         Dn $dn,
         WriteContext $context,
@@ -82,7 +80,7 @@ final readonly class SubentryPlacementGuard
             return;
         }
 
-        if (!$this->hasSubentryChildren($storage, $dn)) {
+        if (!$this->hasSubentryChildren($dn)) {
             return;
         }
 
@@ -97,11 +95,9 @@ final readonly class SubentryPlacementGuard
         return ($entry->get(AttributeTypeOid::NAME_ADMINISTRATIVE_ROLE)?->getValues() ?? []) !== [];
     }
 
-    private function hasSubentryChildren(
-        EntryStorageInterface $storage,
-        Dn $dn,
-    ): bool {
-        $stream = $storage->list(StorageListOptions::firstChild(
+    private function hasSubentryChildren(Dn $dn): bool
+    {
+        $stream = $this->storage->list(StorageListOptions::firstChild(
             $dn,
             SubentryVisibility::Only,
         ));

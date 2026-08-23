@@ -31,16 +31,15 @@ use Psr\Log\NullLogger;
 final readonly class ChangeRecorder
 {
     public function __construct(
+        private EntryStorageInterface $storage,
         private LoggerInterface $logger = new NullLogger(),
     ) {}
 
     public function recordAdd(
-        EntryStorageInterface $storage,
         Entry $entry,
         WriteContext $context,
     ): void {
         $this->record(
-            $storage,
             ChangeType::Add,
             $entry,
             $context,
@@ -48,12 +47,10 @@ final readonly class ChangeRecorder
     }
 
     public function recordModify(
-        EntryStorageInterface $storage,
         Entry $entry,
         WriteContext $context,
     ): void {
         $this->record(
-            $storage,
             ChangeType::Modify,
             $entry,
             $context,
@@ -61,13 +58,11 @@ final readonly class ChangeRecorder
     }
 
     public function recordModRdn(
-        EntryStorageInterface $storage,
         Entry $entry,
         Dn $previousDn,
         WriteContext $context,
     ): void {
         $this->record(
-            $storage,
             ChangeType::ModRdn,
             $entry,
             $context,
@@ -76,12 +71,10 @@ final readonly class ChangeRecorder
     }
 
     public function recordDelete(
-        EntryStorageInterface $storage,
         Entry $entry,
         WriteContext $context,
     ): void {
         $this->record(
-            $storage,
             ChangeType::Delete,
             $entry,
             $context,
@@ -90,14 +83,13 @@ final readonly class ChangeRecorder
     }
 
     private function record(
-        EntryStorageInterface $storage,
         ChangeType $type,
         Entry $entry,
         WriteContext $context,
         ?Dn $previousDn = null,
         ?Entry $preImage = null,
     ): void {
-        if (!$storage instanceof ChangeAppenderInterface) {
+        if (!$this->storage instanceof ChangeAppenderInterface) {
             return;
         }
 
@@ -118,7 +110,7 @@ final readonly class ChangeRecorder
             return;
         }
 
-        $storage->appendChange(new PendingChange(
+        $this->storage->appendChange(new PendingChange(
             changeType: $type,
             dn: $entry->getDn(),
             entryUuid: $uuid,

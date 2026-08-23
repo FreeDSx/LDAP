@@ -35,6 +35,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
+use FreeDSx\Ldap\Server\Subentry\SubentryPlacementGuard;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionSweeper;
@@ -266,6 +267,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             entryHandler: new WriteEntryOperationHandler(
                 $container->get(EqualityComparatorResolver::class),
             ),
+            subentryGuard: new SubentryPlacementGuard($storage),
             operationalAttrs: $container->get(OperationalAttributeGenerator::class),
             changeRecorder: $this->changeRecorderFor($container, $storage),
         );
@@ -339,7 +341,10 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             return null;
         }
 
-        return new ChangeRecorder($options->getLogger() ?? new NullLogger());
+        return new ChangeRecorder(
+            $storage,
+            $options->getLogger() ?? new NullLogger(),
+        );
     }
 
     private function makeServerProtocolFactory(Container $container): ServerProtocolFactory
