@@ -13,12 +13,14 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query;
 
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 
+use function array_merge;
 use function implode;
 
 /**
@@ -32,63 +34,57 @@ final readonly class PdoListQueryBuilder
         private PdoDialectInterface $dialect,
     ) {}
 
-    /**
-     * @param list<SortKeySpec> $sortKeys
-     */
-    public function build(
-        string $base,
-        bool $subtree,
-        ?SqlFilterResult $filterResult,
-        ?int $sqlLimit,
-        array $sortKeys,
-        SubentryVisibility $subentries = SubentryVisibility::All,
-    ): SqlQuery {
-        $streamed = $this->tryBuildStreamingQuery(
-            $base,
-            $subtree,
-            $filterResult,
-            $sqlLimit,
-            $sortKeys,
-            $subentries,
-        );
+    public function build(ListQuerySpec $spec): SqlQuery
+    {
+        $streamed = $this->tryBuildStreamingQuery($spec);
 
         if ($streamed !== null) {
             return $streamed;
         }
 
         $subentryCondition = $this->subentryCondition(
-            $subentries,
+            $spec->subentries,
             'entry_id',
         );
+        // Resuming an unsorted list seeks on the key directly; a sorted one seeks on the projected key, which only
+        // exists once the sort has wrapped the query.
+        $seek = $spec->after !== null && $spec->sortKeys === []
+            ? new SqlQuery(
+                'entry_id > ?',
+                [$spec->after->entryKey],
+            )
+            : null;
+
         $query = match (true) {
-            !$subtree => $this->buildChildQuery(
-                $base,
-                $filterResult,
+            !$spec->subtree => $this->buildChildQuery(
+                $spec->base,
+                $spec->filter,
                 $subentryCondition,
+                $seek,
             ),
-            $base === '' => $this->buildRootQuery(
-                $filterResult,
+            $spec->base === '' => $this->buildRootQuery(
+                $spec->filter,
                 $subentryCondition,
+                $seek,
             ),
             default => $this->buildSubtreeQuery(
-                $base,
-                $filterResult,
+                $spec->base,
+                $spec->filter,
                 $subentryCondition,
+                $seek,
             ),
         };
 
-        if ($sortKeys !== []) {
-            $query = $this->applySort(
-                $query,
-                $sortKeys,
-            );
-        }
+        // A resumable walk needs one deterministic order, so an unsorted list gets the key order it seeks in.
+        $query = $spec->sortKeys !== []
+            ? $this->applySort($query, $spec->sortKeys)
+            : $query->appending(' ORDER BY entry_id');
 
         // Bound rather than inlined: an inlined limit makes every distinct client size limit its own prepared statement.
-        if ($sqlLimit !== null) {
+        if ($spec->limit !== null) {
             $query = $query->appending(
                 ' LIMIT ?',
-                [$sqlLimit],
+                [$spec->limit],
             );
         }
 
@@ -96,28 +92,38 @@ final readonly class PdoListQueryBuilder
     }
 
     /**
-     * Bounds work to $sqlLimit by pushing DISTINCT + subtree scope + LIMIT into the sidecar sub-select, wrapped in a
-     * derived table (portable: MySQL/MariaDB reject LIMIT directly inside IN, and it still streams on SQLite).
+     * Bounds work to the spec's limit by pushing DISTINCT + subtree scope + LIMIT into the sidecar sub-select, wrapped
+     * in a derived table (portable: MySQL/MariaDB reject LIMIT directly inside IN, and it still streams on SQLite).
      *
      * @param list<string> $filterParams
      */
     public function buildStreamingQuery(
         string $sidecarCondition,
         array $filterParams,
-        string $base,
-        int $sqlLimit,
-        SubentryVisibility $subentries = SubentryVisibility::All,
+        ListQuerySpec $spec,
     ): SqlQuery {
         $fetchAll = $this->dialect->queryFetchAll();
         $params = $filterParams;
+        $base = $spec->base;
+        $after = $spec->after;
+
+        // This shape exists to bound the candidate scan, so it is only ever built with a bound to spend.
+        $limit = $spec->limit ?? throw new RuntimeException(
+            'A streaming list query requires a row bound.',
+        );
 
         // Applied inside the candidate select, since the limit below it would otherwise be spent on excluded rows.
         $subentryCondition = $this->subentryCondition(
-            $subentries,
+            $spec->subentries,
             's.owner_entry_id',
         );
         $subentryClause = $subentryCondition !== null
             ? "AND $subentryCondition"
+            : '';
+
+        // Seeks and orders inside the candidate select as well, so the limit is spent on rows the caller has not seen.
+        $seekClause = $after !== null
+            ? 'AND s.owner_entry_id > ?'
             : '';
 
         if ($base === '') {
@@ -125,6 +131,8 @@ final readonly class PdoListQueryBuilder
                 SELECT DISTINCT s.owner_entry_id AS d FROM entry_attribute_values s
                     WHERE $sidecarCondition
                     $subentryClause
+                    $seekClause
+                    ORDER BY s.owner_entry_id
                     LIMIT ?
                 SQL;
         } else {
@@ -136,16 +144,22 @@ final readonly class PdoListQueryBuilder
                     WHERE $sidecarCondition
                       AND (scope.lc_dn = ? OR scope.lc_dn LIKE ? ESCAPE '!')
                     $subentryClause
+                    $seekClause
+                    ORDER BY s.owner_entry_id
                     LIMIT ?
                 SQL;
             $params[] = $base;
             $params[] = '%,' . SqlFilterUtility::escape($base);
         }
 
-        $params[] = $sqlLimit;
+        if ($after !== null) {
+            $params[] = $after->entryKey;
+        }
+
+        $params[] = $limit;
 
         return new SqlQuery(
-            "$fetchAll WHERE entry_id IN (SELECT t.d FROM ($inner) t)",
+            "$fetchAll WHERE entry_id IN (SELECT t.d FROM ($inner) t) ORDER BY entry_id",
             $params,
         );
     }
@@ -155,31 +169,21 @@ final readonly class PdoListQueryBuilder
      *
      * A single drivable sidecar leaf under a bounded, unsorted subtree/root search drives off the sidecar index so the
      * limit short-circuits candidate scanning.
-     *
-     * @param list<SortKeySpec> $sortKeys
      */
-    private function tryBuildStreamingQuery(
-        string $base,
-        bool $subtree,
-        ?SqlFilterResult $filterResult,
-        ?int $sqlLimit,
-        array $sortKeys,
-        SubentryVisibility $subentries = SubentryVisibility::All,
-    ): ?SqlQuery {
-        if (!$subtree || $sqlLimit === null || $sortKeys !== []) {
+    private function tryBuildStreamingQuery(ListQuerySpec $spec): ?SqlQuery
+    {
+        if (!$spec->subtree || $spec->limit === null || $spec->sortKeys !== []) {
             return null;
         }
 
-        if ($filterResult === null || $filterResult->sidecarCondition === null) {
+        if ($spec->filter === null || $spec->filter->sidecarCondition === null) {
             return null;
         }
 
         return $this->buildStreamingQuery(
-            $filterResult->sidecarCondition,
-            $filterResult->params,
-            $base,
-            $sqlLimit,
-            $subentries,
+            $spec->filter->sidecarCondition,
+            $spec->filter->params,
+            $spec,
         );
     }
 
@@ -187,6 +191,7 @@ final readonly class PdoListQueryBuilder
         string $base,
         ?SqlFilterResult $filterResult,
         ?string $subentryCondition,
+        ?SqlQuery $seek,
     ): SqlQuery {
         $query = new SqlQuery(
             $this->dialect->queryFetchChildren(),
@@ -202,14 +207,21 @@ final readonly class PdoListQueryBuilder
             );
         }
 
-        return $subentryCondition !== null
-            ? $query->appending(' AND ' . $subentryCondition)
-            : $query;
+        if ($subentryCondition !== null) {
+            $query = $query->appending(' AND ' . $subentryCondition);
+        }
+
+        return $this->appendSeek(
+            $query,
+            $seek,
+            true,
+        );
     }
 
     private function buildRootQuery(
         ?SqlFilterResult $filterResult,
         ?string $subentryCondition,
+        ?SqlQuery $seek,
     ): SqlQuery {
         $conditions = [];
         $params = [];
@@ -221,6 +233,14 @@ final readonly class PdoListQueryBuilder
 
         if ($subentryCondition !== null) {
             $conditions[] = $subentryCondition;
+        }
+
+        if ($seek !== null) {
+            $conditions[] = $seek->sql;
+            $params = array_merge(
+                $params,
+                $seek->params,
+            );
         }
 
         if ($conditions === []) {
@@ -237,22 +257,31 @@ final readonly class PdoListQueryBuilder
         string $base,
         ?SqlFilterResult $filterResult,
         ?string $subentryCondition,
+        ?SqlQuery $seek,
     ): SqlQuery {
         if ($filterResult === null) {
             $query = new SqlQuery(
                 $this->dialect->querySubtree(),
                 [$base],
             );
+            $hasWhere = $subentryCondition !== null;
 
-            return $subentryCondition !== null
-                ? $query->appending(' WHERE ' . $subentryCondition)
-                : $query;
+            if ($subentryCondition !== null) {
+                $query = $query->appending(' WHERE ' . $subentryCondition);
+            }
+
+            return $this->appendSeek(
+                $query,
+                $seek,
+                $hasWhere,
+            );
         }
 
         return $this->buildFilteredSubtreeQuery(
             $base,
             $filterResult,
             $subentryCondition,
+            $seek,
         );
     }
 
@@ -263,6 +292,7 @@ final readonly class PdoListQueryBuilder
         string $base,
         SqlFilterResult $filterResult,
         ?string $subentryCondition,
+        ?SqlQuery $seek,
     ): SqlQuery {
         $fetchAll = $this->dialect->queryFetchAll();
         $filterSql = $filterResult->sql;
@@ -279,9 +309,31 @@ final readonly class PdoListQueryBuilder
         $params[] = $base;
         $params[] = '%,' . SqlFilterUtility::escape($base);
 
-        return new SqlQuery(
-            $sql,
-            $params,
+        return $this->appendSeek(
+            new SqlQuery(
+                $sql,
+                $params,
+            ),
+            $seek,
+            true,
+        );
+    }
+
+    /**
+     * Appended last so its bindings follow every condition already in the query.
+     */
+    private function appendSeek(
+        SqlQuery $query,
+        ?SqlQuery $seek,
+        bool $hasWhere,
+    ): SqlQuery {
+        if ($seek === null) {
+            return $query;
+        }
+
+        return $query->appending(
+            ($hasWhere ? ' AND ' : ' WHERE ') . $seek->sql,
+            $seek->params,
         );
     }
 

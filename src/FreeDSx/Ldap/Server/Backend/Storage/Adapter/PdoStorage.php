@@ -22,11 +22,12 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\FetchedBatch;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\ListQuerySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\PdoListQueryBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\SqlQuery;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SidecarLeaf;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SubtreeRename;
@@ -43,6 +44,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
+use FreeDSx\Ldap\Server\Backend\Storage\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use Generator;
@@ -75,6 +77,11 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
      * DNs per batched delete, well inside the placeholder limits of every supported driver.
      */
     private const DELETE_BATCH_SIZE = 500;
+
+    /**
+     * Rows a single list statement may transfer before the walk seeks on and issues the next one.
+     */
+    private const FETCH_BATCH_SIZE = 1000;
 
     private readonly PdoListQueryBuilder $queryBuilder;
 
@@ -189,41 +196,36 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         $composed = $this->tryComposedStreamingQuery($filterResult, $options);
         if ($composed !== null) {
             return new EntryStream(
-                $this->generateRows(
-                    $this->statements->execute(
-                        $composed->sql,
-                        $composed->params,
-                    ),
+                $this->generateBatches(
+                    $composed,
                     $deadline,
-                    $options->attributes,
+                    $options,
+                    self::COMPOSED_DRIVER_PROBE_LIMIT,
                 ),
                 false,
             );
         }
 
         $isPreFiltered = $filterResult !== null && $filterResult->isExact;
-
-        // Exact is bound by the client sizeLimit; otherwise cap candidate transfer at lookthrough+1.
-        $sqlLimit = match (true) {
-            $isPreFiltered && $options->sizeLimit > 0 => $options->sizeLimit,
-            $options->lookthroughLimit > 0 => $options->lookthroughLimit + 1,
-            default => null,
-        };
-
-        $query = $this->queryBuilder->build(
-            $options->baseDn->normalize()->toString(),
-            $options->subtree,
+        $maxRows = $this->maxRowsFor($options, $isPreFiltered);
+        $batchSize = $maxRows === null
+            ? self::FETCH_BATCH_SIZE
+            : min($maxRows, self::FETCH_BATCH_SIZE);
+        $spec = ListQuerySpec::fromOptions(
+            $options,
             $filterResult,
-            $sqlLimit,
+            $batchSize,
             $this->sortSpecs($options),
-            $options->subentries,
         );
 
         return new EntryStream(
-            $this->generateRows(
-                $this->statements->execute($query->sql, $query->params),
+            $this->generateBatches(
+                $this->queryBuilder->build($spec),
                 $deadline,
-                $options->attributes,
+                $options,
+                $batchSize,
+                $spec,
+                $maxRows,
             ),
             $isPreFiltered,
         );
@@ -373,6 +375,26 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     }
 
     /**
+     * Rows worth reading at all, or null to walk the whole result.
+     *
+     * An exact filter makes the client size limit a real ceiling on the answer.
+     */
+    private function maxRowsFor(
+        StorageListOptions $options,
+        bool $isPreFiltered,
+    ): ?int {
+        if ($isPreFiltered) {
+            return $options->sizeLimit > 0
+                ? $options->sizeLimit
+                : null;
+        }
+
+        return $options->lookthroughLimit > 0
+            ? $options->lookthroughLimit + 1
+            : null;
+    }
+
+    /**
      * Records the schema the tables were created from, so a database states which revision it holds.
      */
     private static function stampSchemaVersion(PDO $pdo): void
@@ -406,12 +428,16 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             return null;
         }
 
+        // The leaf was chosen for matching fewer rows than the probe cap, so this bound cannot truncate it.
         return $this->queryBuilder->buildStreamingQuery(
             $driver->condition,
             $driver->params,
-            $options->baseDn->normalize()->toString(),
-            self::COMPOSED_DRIVER_PROBE_LIMIT,
-            $options->subentries,
+            ListQuerySpec::fromOptions(
+                $options,
+                $filterResult,
+                self::COMPOSED_DRIVER_PROBE_LIMIT,
+                [],
+            ),
         );
     }
 
@@ -479,30 +505,101 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     }
 
     /**
-     * @param list<string>|null $attributes
+     * Walks the result in bounded batches, seeking past the last row read rather than holding one cursor open.
+     *
+     * @return Generator<Entry> Returns the cursor for the last row read, for a caller resuming later.
      */
-    private function generateRows(
-        PooledStatement $stmt,
+    private function generateBatches(
+        SqlQuery $query,
         ?float $deadline,
-        ?array $attributes = null,
+        StorageListOptions $options,
+        int $batchSize,
+        ?ListQuerySpec $spec = null,
+        ?int $maxRows = null,
     ): Generator {
-        $allowed = $attributes === null
+        $allowed = $options->attributes === null
             ? null
-            : array_fill_keys($attributes, true);
+            : array_fill_keys($options->attributes, true);
+        $cursor = $options->after;
+        $read = 0;
+
+        while (true) {
+            $batch = yield from $this->generateBatch(
+                $query,
+                $deadline,
+                $allowed,
+            );
+            $cursor = $batch->cursor ?? $cursor;
+            $read += $batch->rows;
+
+            $isLast = $spec === null
+                || $cursor === null
+                || $batch->rows < $batchSize
+                || ($maxRows !== null && $read >= $maxRows);
+
+            if ($isLast) {
+                return $cursor;
+            }
+
+            $query = $this->queryBuilder->build($spec->resumingAfter($cursor));
+        }
+    }
+
+    /**
+     * One statement's worth of rows, released as this returns so only one is ever open.
+     *
+     * @param array<string, true>|null $allowed
+     * @return Generator<int, Entry, mixed, FetchedBatch>
+     */
+    private function generateBatch(
+        SqlQuery $query,
+        ?float $deadline,
+        ?array $allowed,
+    ): Generator {
+        $stmt = $this->statements->execute(
+            $query->sql,
+            $query->params,
+        );
+        $rows = 0;
+        $cursor = null;
 
         while (($row = $stmt->fetch()) !== false) {
             if ($deadline !== null && microtime(true) >= $deadline) {
                 throw new TimeLimitExceededException();
             }
 
+            $rows++;
+            $cursor = $this->cursorForRow($row) ?? $cursor;
             $entry = $this->rowToEntry(
                 $row,
                 $allowed,
             );
+
             if ($entry !== null) {
                 yield $entry;
             }
         }
+
+        return new FetchedBatch(
+            $rows,
+            $cursor,
+        );
+    }
+
+    /**
+     * The resume point a row represents, or null when the query did not project the key.
+     */
+    private function cursorForRow(mixed $row): ?PageCursor
+    {
+        if (!is_array($row)) {
+            return null;
+        }
+
+        $key = $row['entry_id'] ?? null;
+
+        return is_int($key) || is_string($key)
+            ? PageCursor::afterEntry((int) $key)
+            : null;
     }
 
     /**

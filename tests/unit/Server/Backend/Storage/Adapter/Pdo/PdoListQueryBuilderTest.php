@@ -17,20 +17,22 @@ use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\ListQuerySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\PdoListQueryBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use PHPUnit\Framework\TestCase;
 
 final class PdoListQueryBuilderTest extends TestCase
 {
-    public function test_no_sort_keys_appends_no_order_by(): void
+    public function test_no_sort_keys_orders_by_the_entry_key(): void
     {
         [$sql, $params] = $this->rootQuery(
             new PdoListQueryBuilder(new SqliteDialect()),
             null,
         );
 
-        self::assertStringNotContainsString('ORDER BY', $sql);
+        // A walk resumes by seeking on this key, so the order it seeks in has to be the order it reads in.
+        self::assertStringEndsWith('ORDER BY entry_id', $sql);
         self::assertSame([], $params);
     }
 
@@ -49,13 +51,9 @@ final class PdoListQueryBuilderTest extends TestCase
 
     public function test_sqlite_orders_a_numeric_key_as_a_number(): void
     {
-        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(
-            '',
-            true,
-            null,
-            null,
-            [self::spec(SortKey::ascending('uidNumber'), numeric: true)],
-        );
+        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(self::querySpec(
+            sortKeys: [self::spec(SortKey::ascending('uidNumber'), numeric: true)],
+        ));
 
         self::assertStringContainsString(
             'MIN(CAST(eav.value_lower AS INTEGER))',
@@ -65,13 +63,9 @@ final class PdoListQueryBuilderTest extends TestCase
 
     public function test_mysql_orders_a_numeric_key_as_a_number(): void
     {
-        $query = (new PdoListQueryBuilder(new MysqlDialect()))->build(
-            '',
-            true,
-            null,
-            null,
-            [self::spec(SortKey::ascending('uidNumber'), numeric: true)],
-        );
+        $query = (new PdoListQueryBuilder(new MysqlDialect()))->build(self::querySpec(
+            sortKeys: [self::spec(SortKey::ascending('uidNumber'), numeric: true)],
+        ));
 
         self::assertStringContainsString(
             'MIN(CAST(eav.value_lower AS SIGNED))',
@@ -167,13 +161,11 @@ final class PdoListQueryBuilderTest extends TestCase
 
     public function test_streaming_subtree_pushes_limit_and_scope_into_the_sidecar_subquery(): void
     {
-        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(
-            'ou=people,dc=foo,dc=bar',
-            true,
-            $this->sidecarLeaf(),
-            500,
-            [],
-        );
+        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(self::querySpec(
+            base: 'ou=people,dc=foo,dc=bar',
+            filter: $this->sidecarLeaf(),
+            limit: 500,
+        ));
 
         self::assertStringContainsString(
             'SELECT DISTINCT s.owner_entry_id AS d',
@@ -191,8 +183,9 @@ final class PdoListQueryBuilderTest extends TestCase
             'LIMIT ?',
             $query->sql,
         );
-        self::assertStringNotContainsString(
-            'ORDER BY',
+        // Ordered inside the candidate select too, so the limit there is spent in the same order the walk resumes in.
+        self::assertStringContainsString(
+            'ORDER BY s.owner_entry_id',
             $query->sql,
         );
         self::assertSame(
@@ -203,13 +196,10 @@ final class PdoListQueryBuilderTest extends TestCase
 
     public function test_streaming_root_query_omits_the_subtree_scope(): void
     {
-        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(
-            '',
-            true,
-            $this->sidecarLeaf(),
-            500,
-            [],
-        );
+        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(self::querySpec(
+            filter: $this->sidecarLeaf(),
+            limit: 500,
+        ));
 
         self::assertStringContainsString(
             'IN (SELECT t.d FROM (',
@@ -227,13 +217,11 @@ final class PdoListQueryBuilderTest extends TestCase
 
     public function test_mysql_produces_the_same_streaming_shape(): void
     {
-        $query = (new PdoListQueryBuilder(new MysqlDialect()))->build(
-            'ou=people,dc=foo,dc=bar',
-            true,
-            $this->sidecarLeaf(),
-            500,
-            [],
-        );
+        $query = (new PdoListQueryBuilder(new MysqlDialect()))->build(self::querySpec(
+            base: 'ou=people,dc=foo,dc=bar',
+            filter: $this->sidecarLeaf(),
+            limit: 500,
+        ));
 
         self::assertStringContainsString(
             'SELECT DISTINCT s.owner_entry_id AS d',
@@ -247,13 +235,12 @@ final class PdoListQueryBuilderTest extends TestCase
 
     public function test_sort_keys_disable_the_streaming_fast_path(): void
     {
-        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(
-            'ou=people,dc=foo,dc=bar',
-            true,
-            $this->sidecarLeaf(),
-            500,
-            [self::spec(SortKey::ascending('cn'))],
-        );
+        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(self::querySpec(
+            base: 'ou=people,dc=foo,dc=bar',
+            filter: $this->sidecarLeaf(),
+            limit: 500,
+            sortKeys: [self::spec(SortKey::ascending('cn'))],
+        ));
 
         self::assertStringNotContainsString(
             'SELECT t.d FROM (',
@@ -267,13 +254,10 @@ final class PdoListQueryBuilderTest extends TestCase
 
     public function test_null_limit_disables_the_streaming_fast_path(): void
     {
-        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(
-            'ou=people,dc=foo,dc=bar',
-            true,
-            $this->sidecarLeaf(),
-            null,
-            [],
-        );
+        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(self::querySpec(
+            base: 'ou=people,dc=foo,dc=bar',
+            filter: $this->sidecarLeaf(),
+        ));
 
         self::assertStringNotContainsString(
             'SELECT t.d FROM (',
@@ -283,13 +267,11 @@ final class PdoListQueryBuilderTest extends TestCase
 
     public function test_absent_sidecar_condition_disables_the_streaming_fast_path(): void
     {
-        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(
-            'ou=people,dc=foo,dc=bar',
-            true,
-            new SqlFilterResult('(a) AND (b)', ['x', 'y']),
-            500,
-            [],
-        );
+        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(self::querySpec(
+            base: 'ou=people,dc=foo,dc=bar',
+            filter: new SqlFilterResult('(a) AND (b)', ['x', 'y']),
+            limit: 500,
+        ));
 
         self::assertStringNotContainsString(
             'SELECT t.d FROM (',
@@ -307,13 +289,12 @@ final class PdoListQueryBuilderTest extends TestCase
 
     public function test_child_scope_disables_the_streaming_fast_path(): void
     {
-        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(
-            'ou=people,dc=foo,dc=bar',
-            false,
-            $this->sidecarLeaf(),
-            500,
-            [],
-        );
+        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(self::querySpec(
+            base: 'ou=people,dc=foo,dc=bar',
+            subtree: false,
+            filter: $this->sidecarLeaf(),
+            limit: 500,
+        ));
 
         self::assertStringNotContainsString(
             'SELECT t.d FROM (',
@@ -323,13 +304,12 @@ final class PdoListQueryBuilderTest extends TestCase
 
     public function test_child_scope_uses_the_correlated_exists_form(): void
     {
-        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(
-            'ou=people,dc=foo,dc=bar',
-            false,
-            $this->sidecarLeaf(),
-            5001,
-            [],
-        );
+        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(self::querySpec(
+            base: 'ou=people,dc=foo,dc=bar',
+            subtree: false,
+            filter: $this->sidecarLeaf(),
+            limit: 5001,
+        ));
 
         self::assertStringContainsString(
             'lc_parent_dn = ?',
@@ -352,16 +332,15 @@ final class PdoListQueryBuilderTest extends TestCase
 
     public function test_child_scope_falls_back_to_the_in_form_without_a_correlated_form(): void
     {
-        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(
-            'ou=people,dc=foo,dc=bar',
-            false,
-            new SqlFilterResult(
+        $query = (new PdoListQueryBuilder(new SqliteDialect()))->build(self::querySpec(
+            base: 'ou=people,dc=foo,dc=bar',
+            subtree: false,
+            filter: new SqlFilterResult(
                 "entry_id IN (SELECT s.owner_entry_id FROM entry_attribute_values s WHERE s.attr_name_lower = 'cn')",
                 [],
             ),
-            5001,
-            [],
-        );
+            limit: 5001,
+        ));
 
         self::assertStringContainsString(
             'entry_id IN (',
@@ -390,18 +369,34 @@ final class PdoListQueryBuilderTest extends TestCase
         ?SqlFilterResult $filter,
         SortKey ...$sortKeys,
     ): array {
-        $query = $builder->build(
-            '',
-            true,
-            $filter,
-            null,
-            array_values(array_map(
+        $query = $builder->build(self::querySpec(
+            filter: $filter,
+            sortKeys: array_values(array_map(
                 self::spec(...),
                 $sortKeys,
             )),
-        );
+        ));
 
         return [$query->sql, $query->params];
+    }
+
+    /**
+     * @param list<SortKeySpec> $sortKeys
+     */
+    private static function querySpec(
+        string $base = '',
+        bool $subtree = true,
+        ?SqlFilterResult $filter = null,
+        ?int $limit = null,
+        array $sortKeys = [],
+    ): ListQuerySpec {
+        return new ListQuerySpec(
+            base: $base,
+            subtree: $subtree,
+            filter: $filter,
+            limit: $limit,
+            sortKeys: $sortKeys,
+        );
     }
 
     private static function spec(
