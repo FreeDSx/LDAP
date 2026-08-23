@@ -37,6 +37,7 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
@@ -606,11 +607,15 @@ final class ServerSyncHandlerTest extends TestCase
     }
 
     /**
-     * @return Generator<Entry>
+     * @return Generator<int, Entry, mixed, ?FetchedBatch>
      */
     private function stream(Entry ...$entries): Generator
     {
-        yield from $entries;
+        foreach ($entries as $entry) {
+            yield $entry;
+        }
+
+        return null;
     }
 
     /**

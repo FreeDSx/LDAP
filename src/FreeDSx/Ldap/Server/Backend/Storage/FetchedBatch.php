@@ -11,23 +11,23 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query;
-
-use FreeDSx\Ldap\Server\Backend\Storage\PageCursor;
+namespace FreeDSx\Ldap\Server\Backend\Storage;
 
 /**
- * What one statement's worth of rows amounted to.
+ * What one bounded read amounted to, returned by the stream that performed it.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final readonly class FetchedBatch
 {
     /**
-     * @param int $rows Rows read, which tells a caller whether the batch filled and so whether more may follow.
-     * @param ?PageCursor $cursor Where the rows ended, or null when none were read.
+     * @param int $rows Candidates read, which tells a caller whether its bound was reached.
+     * @param ?PageCursor $cursor The last one read, or null when there were none.
+     * @param bool $hasMore Whether a further candidate was seen beyond the bound, so a caller need not read to find out.
      */
     public function __construct(
         public int $rows,
         public ?PageCursor $cursor = null,
+        public bool $hasMore = false,
     ) {}
 }

@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
@@ -2135,11 +2136,12 @@ final class WritableStorageBackendTest extends TestCase
     }
 
     /**
-     * @return Generator<Entry>
+     * @return Generator<int, Entry, mixed, ?FetchedBatch>
      */
     private function makeTimeLimitStream(): Generator
     {
         yield new Entry(new Dn('dc=example,dc=com'));
+
         throw new TimeLimitExceededException();
     }
 
@@ -2154,11 +2156,15 @@ final class WritableStorageBackendTest extends TestCase
     }
 
     /**
-     * @return Generator<Entry>
+     * @return Generator<int, Entry, mixed, ?FetchedBatch>
      */
     private function makeGenerator(Entry ...$entries): Generator
     {
-        yield from $entries;
+        foreach ($entries as $entry) {
+            yield $entry;
+        }
+
+        return null;
     }
 
     /**

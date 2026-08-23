@@ -51,7 +51,7 @@ final readonly class PdoListQueryBuilder
         $seek = $spec->after !== null && $spec->sortKeys === []
             ? new SqlQuery(
                 'entry_id > ?',
-                [$spec->after->entryKey],
+                [$spec->after->position],
             )
             : null;
 
@@ -85,6 +85,14 @@ final readonly class PdoListQueryBuilder
             $query = $query->appending(
                 ' LIMIT ?',
                 [$spec->limit],
+            );
+        }
+
+        // A sort orders by something the key says nothing about, so resuming it skips what was already handed over.
+        if ($spec->after?->isOrdinal === true && $spec->limit !== null) {
+            $query = $query->appending(
+                ' OFFSET ?',
+                [$spec->after->position],
             );
         }
 
@@ -153,7 +161,7 @@ final readonly class PdoListQueryBuilder
         }
 
         if ($after !== null) {
-            $params[] = $after->entryKey;
+            $params[] = $after->position;
         }
 
         $params[] = $limit;

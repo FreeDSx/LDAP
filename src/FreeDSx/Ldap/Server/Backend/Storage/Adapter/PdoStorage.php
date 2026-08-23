@@ -22,7 +22,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\ListQuerySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\PdoListQueryBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
@@ -44,6 +43,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
+use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
@@ -383,15 +383,24 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         StorageListOptions $options,
         bool $isPreFiltered,
     ): ?int {
-        if ($isPreFiltered) {
-            return $options->sizeLimit > 0
+        $ceiling = match (true) {
+            $isPreFiltered => $options->sizeLimit > 0
                 ? $options->sizeLimit
-                : null;
+                : null,
+            $options->lookthroughLimit > 0 => $options->lookthroughLimit + 1,
+            default => null,
+        };
+
+        if ($options->maxCandidates === null) {
+            return $ceiling;
         }
 
-        return $options->lookthroughLimit > 0
-            ? $options->lookthroughLimit + 1
-            : null;
+        // One past what a slice will hand over, so it can say whether more remain without the caller reading on.
+        $sliceRead = $options->maxCandidates + 1;
+
+        return $ceiling === null
+            ? $sliceRead
+            : min($ceiling, $sliceRead);
     }
 
     /**
@@ -507,7 +516,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     /**
      * Walks the result in bounded batches, seeking past the last row read rather than holding one cursor open.
      *
-     * @return Generator<Entry> Returns the cursor for the last row read, for a caller resuming later.
+     * @return Generator<int, Entry, mixed, FetchedBatch>
      */
     private function generateBatches(
         SqlQuery $query,
@@ -523,22 +532,40 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         $cursor = $options->after;
         $read = 0;
 
+        // A sort orders by something the key says nothing about, so its walk resumes by count rather than by key.
+        $isSorted = $options->sortKeys !== [];
+        $delivered = $isSorted
+            ? $options->after->position ?? 0
+            : 0;
+
         while (true) {
+            $remaining = $options->maxCandidates === null
+                ? null
+                : $options->maxCandidates - $read;
             $batch = yield from $this->generateBatch(
                 $query,
                 $deadline,
                 $allowed,
+                $remaining,
             );
-            $cursor = $batch->cursor ?? $cursor;
             $read += $batch->rows;
+            $delivered += $batch->rows;
+            $cursor = $isSorted
+                ? PageCursor::afterSorted($delivered)
+                : $batch->cursor ?? $cursor;
 
             $isLast = $spec === null
                 || $cursor === null
+                || $batch->hasMore
                 || $batch->rows < $batchSize
                 || ($maxRows !== null && $read >= $maxRows);
 
             if ($isLast) {
-                return $cursor;
+                return new FetchedBatch(
+                    $read,
+                    $cursor,
+                    $batch->hasMore,
+                );
             }
 
             $query = $this->queryBuilder->build($spec->resumingAfter($cursor));
@@ -555,6 +582,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         SqlQuery $query,
         ?float $deadline,
         ?array $allowed,
+        ?int $yieldCap = null,
     ): Generator {
         $stmt = $this->statements->execute(
             $query->sql,
@@ -562,10 +590,18 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         );
         $rows = 0;
         $cursor = null;
+        $hasMore = false;
 
         while (($row = $stmt->fetch()) !== false) {
             if ($deadline !== null && microtime(true) >= $deadline) {
                 throw new TimeLimitExceededException();
+            }
+
+            // Read but not handed over: its only job is to prove the result did not end here.
+            if ($yieldCap !== null && $rows >= $yieldCap) {
+                $hasMore = true;
+
+                break;
             }
 
             $rows++;
@@ -583,6 +619,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         return new FetchedBatch(
             $rows,
             $cursor,
+            $hasMore,
         );
     }
 

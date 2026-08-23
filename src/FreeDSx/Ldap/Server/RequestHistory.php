@@ -13,8 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server;
 
+use FreeDSx\Ldap\Server\Backend\Storage\PageCursor;
 use FreeDSx\Ldap\Server\Paging\PagingRequests;
-use Generator;
 
 /**
  * Used to retain history regarding certain client request details.
@@ -26,12 +26,13 @@ final class RequestHistory
     private PagingRequests $pagingRequests;
 
     /**
-     * Per-connection generator store for active paging sessions.
-     * Keyed by the cookie that the client will send on the next request.
+     * Where each active paging session left off, keyed by the cookie the client returns on its next request.
      *
-     * @var array<string, Generator>
+     * A position rather than an open result, so nothing is held between requests but the place to resume from.
+     *
+     * @var array<string, PageCursor>
      */
-    private array $pagingGenerators = [];
+    private array $pagingCursors = [];
 
     public function __construct(?PagingRequests $pagingRequests = null)
     {
@@ -46,31 +47,20 @@ final class RequestHistory
         return $this->pagingRequests;
     }
 
-    /**
-     * Store a generator for the given paging cookie (the cookie that will be
-     * sent to the client and returned on the next page request).
-     */
-    public function storePagingGenerator(
+    public function storePagingCursor(
         string $cookie,
-        Generator $generator,
+        PageCursor $cursor,
     ): void {
-        $this->pagingGenerators[$cookie] = $generator;
+        $this->pagingCursors[$cookie] = $cursor;
     }
 
-    /**
-     * Retrieve the generator associated with the given cookie, or null if
-     * the cookie is not found.
-     */
-    public function getPagingGenerator(string $cookie): ?Generator
+    public function getPagingCursor(string $cookie): ?PageCursor
     {
-        return $this->pagingGenerators[$cookie] ?? null;
+        return $this->pagingCursors[$cookie] ?? null;
     }
 
-    /**
-     * Remove and discard the generator associated with the given cookie.
-     */
-    public function removePagingGenerator(string $cookie): void
+    public function removePagingCursor(string $cookie): void
     {
-        unset($this->pagingGenerators[$cookie]);
+        unset($this->pagingCursors[$cookie]);
     }
 }

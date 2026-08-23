@@ -14,22 +14,26 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Server\Backend\Storage\PageCursor;
 
 /**
- * Holds the result of a single generator collection pass in a paging operation.
+ * One page of a paging operation, and where the result was left.
  *
  * @internal
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class CollectedPage
+final readonly class CollectedPage
 {
     /**
      * @param Entry[] $entries
+     * @param bool $isResultExhausted Whether the result ran out, so no further page can exist.
+     * @param ?PageCursor $cursor Where to resume, or null when nothing was read.
      */
     public function __construct(
-        public readonly array $entries,
-        public readonly bool $isGeneratorExhausted,
-        public readonly bool $isSizeLimitExceeded,
+        public array $entries,
+        public bool $isResultExhausted,
+        public bool $isSizeLimitExceeded,
+        public ?PageCursor $cursor = null,
     ) {}
 }
