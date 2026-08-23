@@ -1028,8 +1028,8 @@ final class PdoStorageTest extends TestCase
         $threw = false;
 
         try {
-            $this->storage->atomic(function ($storage): void {
-                $storage->store(new Entry(
+            $this->storage->atomic(function (): void {
+                $this->storage->store(new Entry(
                     new Dn('cn=Rollback,dc=example,dc=com'),
                     new Attribute('cn', 'Rollback'),
                 ));
@@ -1045,8 +1045,8 @@ final class PdoStorageTest extends TestCase
 
     public function test_atomic_commits_on_success(): void
     {
-        $this->storage->atomic(function ($storage): void {
-            $storage->store(new Entry(
+        $this->storage->atomic(function (): void {
+            $this->storage->store(new Entry(
                 new Dn('cn=Committed,dc=example,dc=com'),
                 new Attribute('cn', 'Committed'),
             ));
@@ -1111,7 +1111,7 @@ final class PdoStorageTest extends TestCase
         $storage = $this->storageOver($mockPdo);
 
         try {
-            $storage->atomic(function ($storage): void {
+            $storage->atomic(function () use ($storage): void {
                 $storage->atomic(fn() => null);
             });
             self::fail('Expected RuntimeException was not thrown.');
@@ -1150,7 +1150,7 @@ final class PdoStorageTest extends TestCase
 
         $storage = $this->storageOver($mockPdo);
 
-        $storage->atomic(function ($storage): void {
+        $storage->atomic(function () use ($storage): void {
             try {
                 $storage->atomic(fn() => null);
             } catch (RuntimeException) {
@@ -1185,7 +1185,7 @@ final class PdoStorageTest extends TestCase
 
         $storage = $this->storageOver($mockPdo);
 
-        $storage->atomic(function ($storage): void {
+        $storage->atomic(function () use ($storage): void {
             try {
                 $storage->atomic(fn() => null);
             } catch (RuntimeException) {
@@ -1387,15 +1387,15 @@ final class PdoStorageTest extends TestCase
     {
         $threw = false;
 
-        $this->storage->atomic(function ($storage) use (&$threw): void {
-            $storage->store(new Entry(
+        $this->storage->atomic(function () use (&$threw): void {
+            $this->storage->store(new Entry(
                 new Dn('cn=Outer,dc=example,dc=com'),
                 new Attribute('cn', 'Outer'),
             ));
 
             try {
-                $storage->atomic(function ($storage): void {
-                    $storage->store(new Entry(
+                $this->storage->atomic(function (): void {
+                    $this->storage->store(new Entry(
                         new Dn('cn=Inner,dc=example,dc=com'),
                         new Attribute('cn', 'Inner'),
                     ));

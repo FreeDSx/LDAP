@@ -96,10 +96,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         $entry = $this->get($dn);
 
         if ($entry === null) {
-            $this->throwNoSuchObject(
-                $this->storage,
-                $dn,
-            );
+            $this->throwNoSuchObject($dn);
         }
 
         // A comparison is an equality assertion, so it answers through the same evaluation a filter would get.
@@ -218,21 +215,20 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             $context,
         );
 
-        $this->writeAtomic(function (EntryStorageInterface $storage) use ($command, $context): void {
+        $this->writeAtomic(function () use ($command, $context): void {
             $dn = $command->entry->getDn()->normalize();
             $this->assertParentExists(
-                $storage,
                 $dn,
                 $context,
             );
             $this->subentryGuard->assertPlacement(
-                $storage,
+                $this->storage,
                 $command->entry,
                 $dn,
                 $context,
             );
 
-            if ($storage->exists($dn)) {
+            if ($this->storage->exists($dn)) {
                 $this->throwEntryAlreadyExists($command->entry->getDn());
             }
 
@@ -244,12 +240,12 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 $command->entry,
                 $command->systemChanges,
             );
-            $storage->store(
+            $this->storage->store(
                 $command->entry,
                 rebuildIndexes: true,
             );
             $this->changeRecorder?->recordAdd(
-                $storage,
+                $this->storage,
                 $command->entry,
                 $context,
             );
@@ -263,14 +259,11 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         DeleteCommand $command,
         WriteContext $context,
     ): void {
-        $this->writeAtomic(function (EntryStorageInterface $storage) use ($command, $context): void {
+        $this->writeAtomic(function () use ($command, $context): void {
             $dn = $command->dn->normalize();
-            $entry = $this->findOrFail(
-                $storage,
-                $dn,
-            );
+            $entry = $this->findOrFail($dn);
 
-            if ($storage->hasChildren($dn)) {
+            if ($this->storage->hasChildren($dn)) {
                 throw new OperationException(
                     sprintf(
                         'Entry "%s" has subordinate entries and cannot be deleted.',
@@ -280,14 +273,11 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 );
             }
 
-            $this->assertNotNamingContext(
-                $storage,
-                $command->dn,
-            );
+            $this->assertNotNamingContext($command->dn);
 
-            $storage->remove($dn);
+            $this->storage->remove($dn);
             $this->changeRecorder?->recordDelete(
-                $storage,
+                $this->storage,
                 $entry,
                 $context,
             );
@@ -305,14 +295,8 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         callable $authorize,
     ): void {
         $base = $command->dn->normalize();
-        $this->findOrFail(
-            $this->storage,
-            $base,
-        );
-        $this->assertNotNamingContext(
-            $this->storage,
-            $command->dn,
-        );
+        $this->findOrFail($base);
+        $this->assertNotNamingContext($command->dn);
 
         $dns = $this->collectSubtreeDnsDeepestFirst($base);
 
@@ -322,13 +306,13 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         }
 
         foreach (array_chunk($dns, self::SUBTREE_DELETE_BATCH_SIZE) as $batch) {
-            $this->writeAtomic(function (EntryStorageInterface $storage) use ($batch, $context): void {
-                $preImages = $this->preImagesFor($storage, $batch);
-                $storage->removeAll($batch);
+            $this->writeAtomic(function () use ($batch, $context): void {
+                $preImages = $this->preImagesFor($batch);
+                $this->storage->removeAll($batch);
 
                 foreach ($preImages as $entry) {
                     $this->changeRecorder?->recordDelete(
-                        $storage,
+                        $this->storage,
                         $entry,
                         $context,
                     );
@@ -344,9 +328,8 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         UpdateCommand $command,
         WriteContext $context,
     ): void {
-        $this->writeAtomic(function (EntryStorageInterface $storage) use ($command, $context): void {
+        $this->writeAtomic(function () use ($command, $context): void {
             $this->applyUpdate(
-                $storage,
                 $command,
                 $context,
             );
@@ -364,13 +347,13 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         WriteContext $context,
         callable $compute,
     ): void {
-        $this->writeAtomic(function (EntryStorageInterface $storage) use ($dn, $context, $compute): void {
+        $this->writeAtomic(function () use ($dn, $context, $compute): void {
             $normalized = $dn->normalize();
-            if ($storage instanceof RowLockableInterface) {
-                $storage->lockForWrite($normalized);
+            if ($this->storage instanceof RowLockableInterface) {
+                $this->storage->lockForWrite($normalized);
             }
 
-            $entry = $storage->find($normalized);
+            $entry = $this->storage->find($normalized);
             if ($entry === null) {
                 return;
             }
@@ -380,10 +363,8 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 return;
             }
 
-            // Apply on the already-open storage rather than re-entering writeAtomic, which would re-enter the
-            // serialized writer under Swoole and deadlock.
+            // Applied inline rather than through update(), which would open a second transaction around this one.
             $this->applyUpdate(
-                $storage,
                 new UpdateCommand(
                     $dn,
                     $changes,
@@ -405,25 +386,16 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         WriteContext $context,
     ): void {
         $normOld = $command->dn->normalize();
-        $this->findOrFail(
-            $this->storage,
-            $normOld,
-        );
-        $this->assertNotNamingContext(
-            $this->storage,
-            $command->dn,
-        );
-        $this->assertNewSuperiorExists(
-            $this->storage,
-            $command,
-        );
+        $this->findOrFail($normOld);
+        $this->assertNotNamingContext($command->dn);
+        $this->assertNewSuperiorExists($command);
         $this->assertNotIntoOwnSubtree(
             $command,
             $normOld,
         );
 
-        $this->writeAtomic(function (EntryStorageInterface $storage) use ($command, $context, $normOld): void {
-            $entry = $this->findOrFail($storage, $normOld);
+        $this->writeAtomic(function () use ($command, $context, $normOld): void {
+            $entry = $this->findOrFail($normOld);
             $newEntry = $this->entryHandler->apply($entry, $command);
             $this->validateForMove(
                 $command,
@@ -437,14 +409,13 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
 
             if (!$isRespelling) {
                 $this->assertMoveTargetIsFree(
-                    $storage,
                     $normNew,
                     $newEntry->getDn(),
                 );
             }
 
             $this->subentryGuard->assertPlacement(
-                $storage,
+                $this->storage,
                 $newEntry,
                 $normNew,
                 $context,
@@ -457,15 +428,14 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
 
             // Re-keyed before the base is stored, so the upsert lands on the moved row rather than inserting a second.
             if (!$isRespelling) {
-                $storage->renameSubtree(
+                $this->storage->renameSubtree(
                     $normOld,
                     $newEntry->getDn(),
                 );
             }
 
-            $storage->store($newEntry);
+            $this->storage->store($newEntry);
             $this->recordSubtreeMove(
-                $storage,
                 $context,
                 $newEntry,
                 $command->dn,
@@ -488,10 +458,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         $entry = $this->storage->find($normBase);
 
         if ($entry === null) {
-            $this->throwNoSuchObject(
-                $this->storage,
-                $baseDn,
-            );
+            $this->throwNoSuchObject($baseDn);
         }
 
         return $this->searchStream->buildForBaseObject(
@@ -506,12 +473,11 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
      * @throws OperationException
      */
     private function assertMoveTargetIsFree(
-        EntryStorageInterface $storage,
         Dn $normNew,
         Dn $newDn,
     ): void {
         // A system write may create an entry whose parent is absent, so the target can hold subordinates yet not exist.
-        if (!$storage->exists($normNew) && !$storage->hasChildren($normNew)) {
+        if (!$this->storage->exists($normNew) && !$this->storage->hasChildren($normNew)) {
             return;
         }
 
@@ -544,7 +510,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
      * hear about a descendant.
      */
     private function recordSubtreeMove(
-        EntryStorageInterface $storage,
         WriteContext $context,
         Entry $newEntry,
         Dn $previousDn,
@@ -556,7 +521,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         }
 
         $this->changeRecorder->recordModRdn(
-            $storage,
+            $this->storage,
             $newEntry,
             $previousDn,
             $context,
@@ -567,9 +532,9 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             return;
         }
 
-        foreach ($this->movedDescendants($storage, $normNew) as $entry) {
+        foreach ($this->movedDescendants($normNew) as $entry) {
             $this->changeRecorder->recordModRdn(
-                $storage,
+                $this->storage,
                 $entry,
                 $this->previousDnOf(
                     $entry->getDn(),
@@ -586,17 +551,15 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
      *
      * @return list<Entry>
      */
-    private function movedDescendants(
-        EntryStorageInterface $storage,
-        Dn $normNew,
-    ): array {
+    private function movedDescendants(Dn $normNew): array
+    {
         $descendants = [];
         $options = StorageListOptions::matchAll(
             $normNew,
             subtree: true,
         );
 
-        foreach ($storage->list($options)->entries as $entry) {
+        foreach ($this->storage->list($options)->entries as $entry) {
             if ($entry->getDn()->normalize()->toString() !== $normNew->toString()) {
                 $descendants[] = $entry;
             }
@@ -631,17 +594,15 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
      *
      * @return list<Entry>
      */
-    private function preImagesFor(
-        EntryStorageInterface $storage,
-        array $batch,
-    ): array {
+    private function preImagesFor(array $batch): array
+    {
         if ($this->changeRecorder === null) {
             return [];
         }
 
         $entries = [];
         foreach ($batch as $dn) {
-            $entry = $storage->find($dn);
+            $entry = $this->storage->find($dn);
             if ($entry !== null) {
                 $entries[] = $entry;
             }
@@ -656,12 +617,11 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
      * @throws OperationException
      */
     private function applyUpdate(
-        EntryStorageInterface $storage,
         UpdateCommand $command,
         WriteContext $context,
     ): void {
         $dn = $command->dn->normalize();
-        $entry = $this->findOrFail($storage, $dn);
+        $entry = $this->findOrFail($dn);
         $updated = $this->entryHandler->apply($entry, $command);
         $this->validateForModify(
             $command,
@@ -669,7 +629,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             $context,
         );
         $this->subentryGuard->assertAdministrativeRoleRetained(
-            $storage,
+            $this->storage,
             $updated,
             $dn,
             $context,
@@ -678,9 +638,9 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             $updated,
             $context,
         );
-        $storage->store($updated);
+        $this->storage->store($updated);
         $this->changeRecorder?->recordModify(
-            $storage,
+            $this->storage,
             $updated,
             $context,
         );
@@ -704,10 +664,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         }
 
         if (!$this->storage->exists($normBase)) {
-            $this->throwNoSuchObject(
-                $this->storage,
-                $baseDn,
-            );
+            $this->throwNoSuchObject($baseDn);
         }
     }
 
@@ -864,7 +821,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
     /**
      * Runs the operation under storage->atomic() and maps storage-layer exceptions to LDAP result codes.
      *
-     * @param callable(EntryStorageInterface): void $operation
+     * @param callable(): void $operation
      * @throws OperationException
      */
     private function writeAtomic(callable $operation): void
@@ -889,15 +846,12 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
     /**
      * @throws OperationException
      */
-    private function findOrFail(EntryStorageInterface $storage, Dn $dn): Entry
+    private function findOrFail(Dn $dn): Entry
     {
-        $entry = $storage->find($dn);
+        $entry = $this->storage->find($dn);
 
         if ($entry === null) {
-            $this->throwNoSuchObject(
-                $storage,
-                $dn,
-            );
+            $this->throwNoSuchObject($dn);
         }
 
         return $entry;
@@ -907,13 +861,12 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
      * @throws OperationException
      */
     private function assertParentExists(
-        EntryStorageInterface $storage,
         Dn $dn,
         WriteContext $context,
     ): void {
         $parent = $dn->getParent();
 
-        if ($parent !== null && $storage->exists($parent)) {
+        if ($parent !== null && $this->storage->exists($parent)) {
             return;
         }
 
@@ -922,10 +875,7 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             return;
         }
 
-        $this->throwNoSuchObject(
-            $storage,
-            $parent ?? $dn,
-        );
+        $this->throwNoSuchObject($parent ?? $dn);
     }
 
     /**
@@ -933,30 +883,25 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
      *
      * @throws OperationException
      */
-    private function assertNewSuperiorExists(EntryStorageInterface $storage, MoveCommand $command): void
+    private function assertNewSuperiorExists(MoveCommand $command): void
     {
         if ($command->newParent === null) {
             return;
         }
 
-        if (!$storage->exists($command->newParent->normalize())) {
-            $this->throwNoSuchObject(
-                $storage,
-                $command->newParent,
-            );
+        if (!$this->storage->exists($command->newParent->normalize())) {
+            $this->throwNoSuchObject($command->newParent);
         }
     }
 
     /**
      * @throws OperationException
      */
-    private function assertNotNamingContext(
-        EntryStorageInterface $storage,
-        Dn $dn,
-    ): void {
+    private function assertNotNamingContext(Dn $dn): void
+    {
         $parent = $dn->normalize()->getParent();
 
-        if ($parent !== null && $parent->toString() !== '' && $storage->exists($parent)) {
+        if ($parent !== null && $parent->toString() !== '' && $this->storage->exists($parent)) {
             return;
         }
 
@@ -972,33 +917,26 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
     /**
      * @throws OperationException
      */
-    private function throwNoSuchObject(
-        EntryStorageInterface $storage,
-        Dn $dn,
-    ): never {
+    private function throwNoSuchObject(Dn $dn): never
+    {
         throw new OperationException(
             sprintf('No such object: %s', $dn->toString()),
             ResultCode::NO_SUCH_OBJECT,
             null,
-            $this->findMatchedDn(
-                $storage,
-                $dn,
-            ),
+            $this->findMatchedDn($dn),
         );
     }
 
     /**
      * Walks up the parent chain to find the deepest ancestor that exists in the DIT (RFC 4511 §4.1.9).
      */
-    private function findMatchedDn(
-        EntryStorageInterface $storage,
-        Dn $dn,
-    ): ?Dn {
+    private function findMatchedDn(Dn $dn): ?Dn
+    {
         try {
             $current = $dn->getParent();
 
             while ($current !== null) {
-                if ($storage->exists($current->normalize())) {
+                if ($this->storage->exists($current->normalize())) {
                     return $current;
                 }
 

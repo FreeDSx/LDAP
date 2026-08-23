@@ -361,7 +361,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function atomic(callable $operation): void
     {
-        $this->transactor->atomic(fn() => $operation($this));
+        $this->transactor->atomic($operation);
     }
 
     public function lockForWrite(Dn $dn): void

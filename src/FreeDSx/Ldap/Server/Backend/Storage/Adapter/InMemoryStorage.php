@@ -143,7 +143,7 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
 
     public function atomic(callable $operation): void
     {
-        $operation($this);
+        $operation();
     }
 
     public function namingContexts(): array
