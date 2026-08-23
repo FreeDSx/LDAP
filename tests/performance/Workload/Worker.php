@@ -256,7 +256,7 @@ final class Worker
     {
         return $this->config->seedEntries > 0
             ? Filters::startsWith('cn', $this->config->searchValue)
-            : Filters::startsWith('cn', '');
+            : Filters::present('cn');
     }
 
     private function doSearchSubstr(LdapClient $client): void

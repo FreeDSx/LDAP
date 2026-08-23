@@ -450,7 +450,8 @@ final class BenchCompareCommand extends Command
             serverMode: 'external',
             rngSeed: $params['rngSeed'],
             output: 'text',
-            seedEntries: 0,
+            // External mode never seeds, so this only tells the workload how many fixtures its filters may target.
+            seedEntries: $params['seedEntries'],
             bindDn: $side->bindDn,
             bindPassword: $side->bindPassword,
             baseDn: $bench->benchBaseDn,
