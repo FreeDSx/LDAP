@@ -29,16 +29,9 @@ use Throwable;
 final class LdapServerTest extends ServerTestCase
 {
     /**
-     * Lookthrough limits count candidates examined before filter evaluation, and the filter these assert on is
-     * answered from an index on the database this harness now runs, so nothing is examined and the limit cannot
-     * trip. Revisit with the keyset paging work.
-     *
-     * @var list<string>
+     * The supertype arm is one the index cannot answer, so every candidate reaches the evaluator the limit counts.
      */
-    private const INDEX_ANSWERED_LOOKTHROUGH_TESTS = [
-        'testPagedSearchFallsBackToRegularLookthroughWhenPagedUnset',
-        'testPerIdentityRuleAppliesAuthenticatedLookthrough',
-    ];
+    private const PHP_EVALUATED_FILTER = '(&(employeeNumber=*)(name=*))';
 
     public static function setUpBeforeClass(): void
     {
@@ -59,10 +52,6 @@ final class LdapServerTest extends ServerTestCase
 
     public function setUp(): void
     {
-        if (in_array($this->name(), self::INDEX_ANSWERED_LOOKTHROUGH_TESTS, true)) {
-            self::markTestSkipped('The filter is index-answered here, so the lookthrough limit cannot trip.');
-        }
-
         $this->setServerMode('ldap-server');
 
         parent::setUp();
@@ -444,7 +433,7 @@ final class LdapServerTest extends ServerTestCase
         ]);
         $this->authenticateUser();
 
-        $search = Operations::search(Filters::raw('(employeeNumber=*)'))->base('dc=foo,dc=bar');
+        $search = Operations::search(Filters::raw(self::PHP_EVALUATED_FILTER))->base('dc=foo,dc=bar');
         $paging = $this->ldapClient()->paging($search);
 
         $count = 0;
@@ -471,7 +460,7 @@ final class LdapServerTest extends ServerTestCase
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
 
-        $search = Operations::search(Filters::raw('(employeeNumber=*)'))->base('dc=foo,dc=bar');
+        $search = Operations::search(Filters::raw(self::PHP_EVALUATED_FILTER))->base('dc=foo,dc=bar');
         $paging = $this->ldapClient()->paging($search);
         while ($paging->hasEntries()) {
             $paging->getEntries(500);
@@ -492,7 +481,7 @@ final class LdapServerTest extends ServerTestCase
         $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
 
         $this->ldapClient()->search(
-            Operations::search(Filters::raw('(employeeNumber=*)'))->base('dc=foo,dc=bar')->useSubtreeScope(),
+            Operations::search(Filters::raw(self::PHP_EVALUATED_FILTER))->base('dc=foo,dc=bar')->useSubtreeScope(),
         );
     }
 

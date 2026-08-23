@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Ldif\Output\LdifOutputInterface;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\EntryIndexReindexer;
+use FreeDSx\Ldap\Server\Backend\Storage\DrainableWritesInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
@@ -89,11 +90,31 @@ class LdapServer
         LdifLoaderInterface $loader,
         SeedOptions $options = new SeedOptions(),
     ): self {
-        $this->container->get(LdapImporter::class)->importEntries(
+        return $this->seedEntries(
             $this->streamSeedEntries($loader, $options->getUrlResolver()),
+            $options,
+        );
+    }
+
+    /**
+     * Bulk-imports entries already in hand, for a caller building them rather than reading LDIF.
+     *
+     * @param iterable<Entry> $entries Depth-first, since a parent has to exist before the entries beneath it.
+     *
+     * @throws InvalidArgumentException when the creator DN is malformed or an entry's parent is missing
+     * @throws OperationException when an entry violates the schema and validation mode is strict
+     */
+    public function seedEntries(
+        iterable $entries,
+        SeedOptions $options = new SeedOptions(),
+    ): self {
+        $this->container->get(LdapImporter::class)->importEntries(
+            $entries,
             $options->getCreatorDn(),
             $options->isIgnoreValidation(),
         );
+
+        $this->drainWrites();
 
         return $this;
     }
@@ -140,10 +161,23 @@ class LdapServer
      */
     public function reindex(): self
     {
-        (new EntryIndexReindexer($this->container->get(EntryStorageInterface::class)))
-            ->reindex();
+        $this->container->get(EntryIndexReindexer::class)->reindex();
 
         return $this;
+    }
+
+    /**
+     * Releases whatever the write path keeps between writes, since seeding is a burst followed by silence.
+     *
+     * Under Swoole that helper is a coroutine, and one still waiting for work holds open the scope it was spawned in.
+     */
+    private function drainWrites(): void
+    {
+        $storage = $this->container->get(EntryStorageInterface::class);
+
+        if ($storage instanceof DrainableWritesInterface) {
+            $storage->drainWrites();
+        }
     }
 
     /**

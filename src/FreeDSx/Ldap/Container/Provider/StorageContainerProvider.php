@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Container\Provider;
 
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\EntryIndexReindexer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
@@ -61,10 +62,16 @@ final class StorageContainerProvider implements ContainerProviderInterface
             SortKeyComparator::class => $this->makeSortKeyComparator(...),
             StorageListOptionsFactory::class => $this->makeStorageListOptionsFactory(...),
             EntryStorageInterface::class => $this->makeStorage(...),
+            EntryIndexReindexer::class => $this->makeEntryIndexReindexer(...),
             PdoDialectInterface::class => $this->makePdoDialect(...),
             PdoStorageFactory::class => $this->makePdoStorageFactory(...),
             PdoBackend::class => $this->makePdoBackend(...),
         ];
+    }
+
+    private function makeEntryIndexReindexer(Container $container): EntryIndexReindexer
+    {
+        return new EntryIndexReindexer($container->get(EntryStorageInterface::class));
     }
 
     /**

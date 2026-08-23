@@ -1445,15 +1445,11 @@ trait QueryTestsTrait
         self::assertCount(0, $entries);
     }
 
-    public function testInexactSearchTripsLookthroughLimit(): void
+    /**
+     * A supertype the index cannot answer, so every candidate reaches the evaluator the limit counts.
+     */
+    public function testAFilterEvaluatedInPhpTripsTheLookthroughLimit(): void
     {
-        if (static::usesPdoStorage()) {
-            self::markTestSkipped(
-                'The filter is answered from an index, so no candidates are examined and the limit cannot trip. '
-                    . 'Revisit with the keyset paging work, which is what bounds transfer on that path.',
-            );
-        }
-
         $this->stopServer();
         $this->createServerProcess(
             'tcp',
@@ -1469,7 +1465,7 @@ trait QueryTestsTrait
         $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
 
         $this->ldapClient()->search(
-            Operations::search(Filters::endsWith('cn', 'zzz'))
+            Operations::search(Filters::equal('name', 'no-entry-has-this'))
                 ->base('dc=foo,dc=bar')
                 ->useSubtreeScope(),
         );

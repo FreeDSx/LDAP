@@ -75,16 +75,4 @@ abstract class LdapBackendStorageTestCase extends ServerTestCase
     {
         return [];
     }
-
-    /**
-     * Whether this variant runs on a database, which answers filters itself rather than handing over candidates.
-     */
-    protected static function usesPdoStorage(): bool
-    {
-        return !in_array(
-            '--storage=memory',
-            static::storageExtraArgs(),
-            true,
-        );
-    }
 }

@@ -84,6 +84,51 @@ trait ControlTestsTrait
         );
     }
 
+    /**
+     * RFC 2696 §3 promises no snapshot, so the walk need only stay coherent: end, and repeat nothing.
+     */
+    public function testPagingSurvivesWritesLandingBetweenPages(): void
+    {
+        $this->authenticateAdmin();
+
+        $search = Operations::search(Filters::present('objectClass'))
+            ->base('dc=foo,dc=bar')
+            ->useSubtreeScope();
+
+        $paging = $this->ldapClient()->paging($search, 2);
+        $dns = [];
+        $wrote = false;
+
+        while ($paging->hasEntries()) {
+            foreach ($paging->getEntries() as $entry) {
+                $dns[] = $entry->getDn()->toString();
+            }
+
+            if (!$wrote) {
+                $wrote = true;
+                $this->ldapClient()->create(Entry::fromArray('cn=mid-walk,dc=foo,dc=bar', [
+                    'objectClass' => ['top', 'inetOrgPerson'],
+                    'cn' => 'mid-walk',
+                    'sn' => 'Added',
+                ]));
+            }
+        }
+
+        // Dropped before asserting, so a sibling counting the fixture does not inherit it.
+        $this->ldapClient()->delete('cn=mid-walk,dc=foo,dc=bar');
+
+        self::assertSame(
+            array_values(array_unique($dns)),
+            $dns,
+            'A walk must not hand over an entry it already delivered.',
+        );
+        self::assertGreaterThanOrEqual(
+            8,
+            count($dns),
+            'Entries present before the write must still be delivered.',
+        );
+    }
+
     public function testPagingCanBeAbandoned(): void
     {
         $this->authenticateUser();

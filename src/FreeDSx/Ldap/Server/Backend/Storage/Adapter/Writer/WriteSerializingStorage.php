@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\DrainableWritesInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
@@ -29,13 +30,22 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class WriteSerializingStorage implements EntryStorageInterface, ResettableInterface, ChangeJournalingInterface
+final readonly class WriteSerializingStorage implements
+    EntryStorageInterface,
+    ResettableInterface,
+    ChangeJournalingInterface,
+    DrainableWritesInterface
 {
     public function __construct(
         private EntryStorageInterface $reads,
         private EntryStorageInterface $writes,
         private WriterQueueInterface $queue,
     ) {}
+
+    public function drainWrites(): void
+    {
+        $this->queue->drain();
+    }
 
     public function find(Dn $dn): ?Entry
     {
