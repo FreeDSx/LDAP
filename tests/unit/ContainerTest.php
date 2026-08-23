@@ -72,9 +72,12 @@ use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use FreeDSx\Socket\SocketPool;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 
 class ContainerTest extends TestCase
 {
+    use RequiresExtensionsTrait;
+
     private Container $subject;
 
     protected function setUp(): void
@@ -294,9 +297,7 @@ class ContainerTest extends TestCase
 
     public function test_the_snapshot_provider_is_the_live_recorder_under_swoole(): void
     {
-        if (!extension_loaded('swoole')) {
-            self::markTestSkipped('The swoole extension is required to construct the shared metrics table.');
-        }
+        $this->requireSwoole();
 
         $container = $this->containerFor(
             (TestServerOptions::defaults())
@@ -336,9 +337,7 @@ class ContainerTest extends TestCase
 
     public function test_the_swoole_runner_builds_with_a_retention_sweeper(): void
     {
-        if (!extension_loaded('swoole')) {
-            self::markTestSkipped('The swoole extension is required to construct the Swoole runner.');
-        }
+        $this->requireSwoole();
 
         $container = $this->containerFor(
             $this->journalingOptions()->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
@@ -352,9 +351,7 @@ class ContainerTest extends TestCase
 
     public function test_a_single_worker_builds_the_one_process_coroutine_runner(): void
     {
-        if (!extension_loaded('swoole')) {
-            self::markTestSkipped('The swoole extension is required.');
-        }
+        $this->requireSwoole();
 
         $container = $this->containerFor(
             (TestServerOptions::defaults())->setRunnerConfig(new RunnerConfig(
@@ -374,9 +371,7 @@ class ContainerTest extends TestCase
      */
     public function test_several_workers_are_clamped_to_one_process_for_an_in_memory_database(): void
     {
-        if (!extension_loaded('swoole')) {
-            self::markTestSkipped('The swoole extension is required.');
-        }
+        $this->requireSwoole();
 
         $container = $this->containerFor(
             (new ServerOptions(PdoConfig::forSqlite(':memory:')))
@@ -394,9 +389,7 @@ class ContainerTest extends TestCase
 
     public function test_several_workers_build_the_pooled_runner_for_shared_storage(): void
     {
-        if (!extension_loaded('swoole')) {
-            self::markTestSkipped('The swoole extension is required.');
-        }
+        $this->requireSwoole();
 
         $container = $this->containerFor(
             (new ServerOptions(PdoConfig::forSqlite(sys_get_temp_dir() . '/freedsx_container_test.sqlite')))
@@ -414,9 +407,7 @@ class ContainerTest extends TestCase
 
     public function test_several_workers_are_clamped_to_one_process_for_in_memory_storage(): void
     {
-        if (!extension_loaded('swoole')) {
-            self::markTestSkipped('The swoole extension is required.');
-        }
+        $this->requireSwoole();
 
         $container = $this->containerFor(
             (TestServerOptions::defaults())->setRunnerConfig(new RunnerConfig(

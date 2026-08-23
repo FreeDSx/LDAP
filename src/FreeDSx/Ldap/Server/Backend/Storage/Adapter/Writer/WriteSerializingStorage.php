@@ -13,10 +13,12 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer;
 
+use Closure;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\DrainableWritesInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
@@ -28,18 +30,22 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 /**
  * Routes reads to a per-coroutine read storage and serializes writes through a single writer coroutine.
  *
+ * Callers already running inside the writer bypass both, since its transaction is open on the write storage.
+ *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final readonly class WriteSerializingStorage implements
     EntryStorageInterface,
     ResettableInterface,
     ChangeJournalingInterface,
-    DrainableWritesInterface
+    DrainableWritesInterface,
+    RowLockableInterface
 {
     public function __construct(
         private EntryStorageInterface $reads,
         private EntryStorageInterface $writes,
         private WriterQueueInterface $queue,
+        private WriteScope $scope = new WriteScope(),
     ) {}
 
     public function drainWrites(): void
@@ -49,29 +55,29 @@ final readonly class WriteSerializingStorage implements
 
     public function find(Dn $dn): ?Entry
     {
-        return $this->reads->find($dn);
+        return $this->readStorage()->find($dn);
     }
 
     public function exists(Dn $dn): bool
     {
-        return $this->reads->exists($dn);
+        return $this->readStorage()->exists($dn);
     }
 
     public function hasChildren(Dn $dn): bool
     {
-        return $this->reads->hasChildren($dn);
+        return $this->readStorage()->hasChildren($dn);
     }
 
     public function list(StorageListOptions $options): EntryStream
     {
-        return $this->reads->list($options);
+        return $this->readStorage()->list($options);
     }
 
     public function store(
         Entry $entry,
         bool $rebuildIndexes = false,
     ): void {
-        $this->queue->run(fn() => $this->writes->store(
+        $this->submit(fn() => $this->writes->store(
             $entry,
             $rebuildIndexes,
         ));
@@ -81,7 +87,7 @@ final readonly class WriteSerializingStorage implements
         Dn $from,
         Dn $to,
     ): void {
-        $this->queue->run(fn() => $this->writes->renameSubtree(
+        $this->submit(fn() => $this->writes->renameSubtree(
             $from,
             $to,
         ));
@@ -89,22 +95,45 @@ final readonly class WriteSerializingStorage implements
 
     public function remove(Dn $dn): void
     {
-        $this->queue->run(fn() => $this->writes->remove($dn));
+        $this->submit(fn() => $this->writes->remove($dn));
     }
 
     public function removeAll(array $dns): void
     {
-        $this->queue->run(fn() => $this->writes->removeAll($dns));
+        $this->submit(fn() => $this->writes->removeAll($dns));
     }
 
     public function atomic(callable $operation): void
     {
-        $this->queue->run(fn() => $this->writes->atomic($operation));
+        // Nests on the transaction already open, rather than queueing a job the blocked writer could never run.
+        if ($this->scope->isActive()) {
+            $this->writes->atomic($operation);
+
+            return;
+        }
+
+        $this->queue->run(function () use ($operation): void {
+            $this->scope->enter();
+
+            try {
+                $this->writes->atomic($operation);
+            } finally {
+                $this->scope->leave();
+            }
+        });
+    }
+
+    /**
+     * Only meaningful inside an atomic block, where the transaction holding the lock is open on the write storage.
+     */
+    public function lockForWrite(Dn $dn): void
+    {
+        $this->rowLockable($this->writes)->lockForWrite($dn);
     }
 
     public function namingContexts(): array
     {
-        return $this->reads->namingContexts();
+        return $this->readStorage()->namingContexts();
     }
 
     public function reset(): void
@@ -134,6 +163,41 @@ final readonly class WriteSerializingStorage implements
     public function changeJournal(): ?ChangeJournalInterface
     {
         return $this->journaling($this->reads)->changeJournal();
+    }
+
+    /**
+     * The write storage while its transaction is open, since the read storage cannot see uncommitted changes.
+     */
+    private function readStorage(): EntryStorageInterface
+    {
+        return $this->scope->isActive()
+            ? $this->writes
+            : $this->reads;
+    }
+
+    /**
+     * Runs the write directly when the writer is already executing it, since queueing would block on itself.
+     *
+     * @param Closure(): void $write
+     */
+    private function submit(Closure $write): void
+    {
+        if ($this->scope->isActive()) {
+            $write();
+
+            return;
+        }
+
+        $this->queue->run($write);
+    }
+
+    private function rowLockable(EntryStorageInterface $storage): RowLockableInterface
+    {
+        if (!$storage instanceof RowLockableInterface) {
+            throw new InvalidArgumentException('The underlying storage does not support row locking.');
+        }
+
+        return $storage;
     }
 
     private function journaling(EntryStorageInterface $storage): ChangeJournalingInterface

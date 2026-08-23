@@ -25,6 +25,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\TestResettableEntryStorage;
+use Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\TestRowLockableEntryStorage;
 use Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\TestSynchronousWriterQueue;
 
 final class WriteSerializingStorageTest extends TestCase
@@ -214,6 +215,140 @@ final class WriteSerializingStorageTest extends TestCase
         $this->subject->atomic($callable);
     }
 
+    public function test_reads_route_to_the_write_storage_inside_an_atomic_block(): void
+    {
+        $dn = new Dn('cn=alice,dc=example,dc=com');
+        $entry = new Entry($dn, new Attribute('cn', 'Alice'));
+
+        $this->passAtomicThrough();
+        $this->writes
+            ->expects(self::once())
+            ->method('find')
+            ->with($dn)
+            ->willReturn($entry);
+        $this->reads
+            ->expects(self::never())
+            ->method('find');
+
+        $found = null;
+        $this->subject->atomic(function () use (&$found, $dn): void {
+            $found = $this->subject->find($dn);
+        });
+
+        self::assertSame(
+            $entry,
+            $found,
+        );
+    }
+
+    public function test_writes_bypass_the_queue_inside_an_atomic_block(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=carol,dc=example,dc=com'),
+            new Attribute('cn', 'Carol'),
+        );
+
+        $this->passAtomicThrough();
+        $this->writes
+            ->expects(self::once())
+            ->method('store')
+            ->with($entry);
+
+        $this->subject->atomic(function () use ($entry): void {
+            $this->subject->store($entry);
+        });
+
+        // Only the block itself was queued; queueing the store would block the writer on its own reply.
+        self::assertSame(
+            1,
+            $this->queue->ranCount,
+        );
+    }
+
+    public function test_a_nested_atomic_block_does_not_queue_again(): void
+    {
+        $opened = 0;
+        $this->writes
+            ->method('atomic')
+            ->willReturnCallback(function (callable $operation) use (&$opened): void {
+                $opened++;
+                $operation($this->writes);
+            });
+
+        $this->subject->atomic(function (): void {
+            $this->subject->atomic(static function (): void {});
+        });
+
+        self::assertSame(
+            2,
+            $opened,
+        );
+        self::assertSame(
+            1,
+            $this->queue->ranCount,
+        );
+    }
+
+    public function test_reads_return_to_the_read_storage_after_the_block(): void
+    {
+        $dn = new Dn('cn=alice,dc=example,dc=com');
+
+        $this->passAtomicThrough();
+        $this->reads
+            ->expects(self::once())
+            ->method('find')
+            ->with($dn);
+
+        $this->subject->atomic(static function (): void {});
+        $this->subject->find($dn);
+    }
+
+    public function test_the_scope_is_released_when_the_operation_throws(): void
+    {
+        $dn = new Dn('cn=alice,dc=example,dc=com');
+
+        $this->passAtomicThrough();
+        $this->reads
+            ->expects(self::once())
+            ->method('find')
+            ->with($dn);
+
+        $caught = null;
+        try {
+            $this->subject->atomic(static function (): void {
+                throw new RuntimeException('boom');
+            });
+        } catch (RuntimeException $e) {
+            $caught = $e;
+        }
+
+        $this->subject->find($dn);
+
+        self::assertSame(
+            'boom',
+            $caught?->getMessage(),
+        );
+    }
+
+    public function test_lock_for_write_routes_to_writes(): void
+    {
+        $dn = new Dn('cn=alice,dc=example,dc=com');
+        $writes = $this->createMock(TestRowLockableEntryStorage::class);
+
+        $writes
+            ->expects(self::once())
+            ->method('lockForWrite')
+            ->with($dn);
+
+        $subject = new WriteSerializingStorage(
+            reads: $this->reads,
+            writes: $writes,
+            queue: $this->queue,
+        );
+
+        $subject->lockForWrite($dn);
+    }
+
     public function test_write_exceptions_propagate(): void
     {
         $entry = new Entry(
@@ -254,5 +389,17 @@ final class WriteSerializingStorageTest extends TestCase
         $this->writes->expects(self::never())->method(self::anything());
 
         $this->subject->reset();
+    }
+
+    /**
+     * Stands in for a real transaction, which invokes the operation rather than merely accepting it.
+     */
+    private function passAtomicThrough(): void
+    {
+        $this->writes
+            ->method('atomic')
+            ->willReturnCallback(function (callable $operation): void {
+                $operation($this->writes);
+            });
     }
 }

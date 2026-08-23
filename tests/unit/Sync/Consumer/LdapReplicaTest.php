@@ -30,9 +30,12 @@ use FreeDSx\Ldap\Sync\SyncRepl;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 
 final class LdapReplicaTest extends TestCase
 {
+    use RequiresExtensionsTrait;
+
     private ChangeApplierInterface&MockObject $applier;
 
     private InMemoryReplicationCheckpoint $checkpoint;
@@ -228,9 +231,7 @@ final class LdapReplicaTest extends TestCase
 
     public function test_for_pcntl_builds_a_replica(): void
     {
-        if (!extension_loaded('pcntl')) {
-            $this->markTestSkipped('The pcntl extension is required for this test.');
-        }
+        $this->requirePcntl();
 
         $this->expectNotToPerformAssertions();
 
@@ -242,9 +243,7 @@ final class LdapReplicaTest extends TestCase
 
     public function test_for_swoole_builds_a_replica(): void
     {
-        if (!extension_loaded('swoole')) {
-            $this->markTestSkipped('The swoole extension is required for this test.');
-        }
+        $this->requireSwoole();
 
         $this->expectNotToPerformAssertions();
 

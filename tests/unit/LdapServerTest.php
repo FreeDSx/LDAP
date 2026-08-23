@@ -42,10 +42,13 @@ use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 use Tests\Support\FreeDSx\Ldap\TempFileUrlTrait;
 
 class LdapServerTest extends TestCase
 {
+    use RequiresExtensionsTrait;
+
     use TempFileUrlTrait;
 
     private const SEED_LDIF = <<<'LDIF'
@@ -115,8 +118,8 @@ class LdapServerTest extends TestCase
         StorageConfigInterface $storageConfig,
         RunnerMode $runner,
     ): void {
-        if ($runner === RunnerMode::Swoole && !extension_loaded('swoole')) {
-            self::markTestSkipped('The swoole extension is required to construct the Swoole runner.');
+        if ($runner === RunnerMode::Swoole) {
+            $this->requireSwoole();
         }
 
         $options = (new ServerOptions(

@@ -22,9 +22,12 @@ use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 
 final class ServerRunnerTest extends TestCase
 {
+    use RequiresExtensionsTrait;
+
     private WorkerFactory $workers;
 
     protected function setUp(): void
@@ -53,9 +56,7 @@ final class ServerRunnerTest extends TestCase
 
     public function test_a_pool_refuses_to_run_a_single_worker(): void
     {
-        if (!extension_loaded('swoole')) {
-            $this->markTestSkipped('The swoole extension is required.');
-        }
+        $this->requireSwoole();
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessageMatches('/more than one worker/');

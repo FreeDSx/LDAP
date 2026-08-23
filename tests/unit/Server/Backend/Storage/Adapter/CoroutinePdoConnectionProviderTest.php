@@ -20,14 +20,15 @@ use PDO;
 use PHPUnit\Framework\TestCase;
 use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
+use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 
 final class CoroutinePdoConnectionProviderTest extends TestCase
 {
+    use RequiresExtensionsTrait;
+
     protected function setUp(): void
     {
-        if (!extension_loaded('swoole')) {
-            $this->markTestSkipped('The swoole extension is required for this test.');
-        }
+        $this->requireSwoole();
     }
 
     public function test_throws_when_called_outside_a_coroutine(): void
