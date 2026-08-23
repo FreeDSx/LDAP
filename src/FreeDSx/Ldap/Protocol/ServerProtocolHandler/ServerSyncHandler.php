@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
+use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshDelete;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshPresent;
 use FreeDSx\Ldap\Operation\Response\SyncInfoMessage;
@@ -40,6 +41,7 @@ use FreeDSx\Ldap\Sync\Provider\Exception\MalformedSyncCookieException;
 use FreeDSx\Ldap\Sync\Provider\SyncCookie;
 use FreeDSx\Ldap\Sync\Provider\SyncPersistStreamer;
 use FreeDSx\Ldap\Sync\Provider\SyncResult;
+use FreeDSx\Ldap\Sync\Provider\SyncResultBatcher;
 use FreeDSx\Ldap\Sync\Provider\SyncResultProjector;
 use Generator;
 
@@ -67,6 +69,7 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
         private readonly ?ChangeStream $changeStream = null,
         private readonly ?SyncPersistStreamer $persistStreamer = null,
         private readonly bool $persistSupported = false,
+        private readonly SyncResultBatcher $batcher = new SyncResultBatcher(),
     ) {}
 
     /**
@@ -293,9 +296,20 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
         int $sinceSeq,
         SearchResultState $state,
     ): Generator {
-        foreach ($streamer->projectSince($sinceSeq, $request, $token) as $result) {
+        $results = $streamer->projectSince(
+            $sinceSeq,
+            $request,
+            $token,
+        );
+
+        $responses = $this->batcher->batch(
+            $results,
+            $message->getMessageId(),
+        );
+
+        foreach ($responses as $response) {
             yield from $this->emit(
-                $this->toResponse($message->getMessageId(), $result),
+                $response,
                 $state,
             );
         }
@@ -327,7 +341,10 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
             return;
         }
 
-        $state->entriesReturned++;
+        // A coalesced delete set is an intermediate response, so it is not one of the entries the result reports.
+        if ($response->getResponse() instanceof SearchResultEntry) {
+            $state->entriesReturned++;
+        }
 
         yield $response;
     }

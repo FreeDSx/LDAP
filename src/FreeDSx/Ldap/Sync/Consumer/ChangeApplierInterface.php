@@ -13,7 +13,9 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Sync\Consumer;
 
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
+use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Session;
 
 /**
@@ -38,6 +40,16 @@ interface ChangeApplierInterface
         SyncEntryResult $result,
         Session $session,
     ): void;
+
+    /**
+     * Apply one bulk UUID set: a delete set removes each entry, a present set marks them seen for reconciliation.
+     *
+     * @return list<Dn> the DNs the set removed, which only a UUID lookup against storage can resolve
+     */
+    public function applyIdSet(
+        SyncIdSetResult $result,
+        Session $session,
+    ): array;
 
     /**
      * Delete local entries not seen during a present-phase refresh (reconcile by absence).

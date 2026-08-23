@@ -51,6 +51,7 @@ final readonly class SyncPersistStreamer
         private ChangeStream $stream,
         private SleeperInterface $sleeper,
         private float $pollInterval = self::DEFAULT_POLL_INTERVAL,
+        private SyncResultBatcher $batcher = new SyncResultBatcher(),
     ) {}
 
     /**
@@ -164,13 +165,14 @@ final readonly class SyncPersistStreamer
         TokenInterface $token,
         int $messageId,
     ): Generator {
-        foreach ($this->projectSince($sinceSeq, $request, $token) as $result) {
-            yield new LdapMessageResponse(
-                $messageId,
-                $result->entry,
-                $result->control,
-            );
-        }
+        yield from $this->batcher->batch(
+            $this->projectSince(
+                $sinceSeq,
+                $request,
+                $token,
+            ),
+            $messageId,
+        );
     }
 
     /**

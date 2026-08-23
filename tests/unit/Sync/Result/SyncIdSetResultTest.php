@@ -41,6 +41,27 @@ final class SyncIdSetResultTest extends TestCase
         );
     }
 
+    public function test_it_should_decode_the_entry_uuids_from_their_wire_form(): void
+    {
+        $subject = new SyncIdSetResult(
+            new LdapMessageResponse(
+                1,
+                new SyncIdSet([
+                    pack('H*', '0f8fad5bd9cb469fa16570867728950e'),
+                    pack('H*', '7d4448409dc011d1b2455ffdce74fad2'),
+                ]),
+            ),
+        );
+
+        self::assertSame(
+            [
+                '0f8fad5b-d9cb-469f-a165-70867728950e',
+                '7d444840-9dc0-11d1-b245-5ffdce74fad2',
+            ],
+            $subject->getDecodedEntryUuids(),
+        );
+    }
+
     public function test_it_should_get_the_count_of_the_set(): void
     {
         self::assertCount(

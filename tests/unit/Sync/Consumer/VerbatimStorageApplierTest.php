@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
+use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\Result\EntryResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
@@ -25,6 +26,7 @@ use FreeDSx\Ldap\Server\Utility\Uuid;
 use FreeDSx\Ldap\Sync\Consumer\ChangeApplierInterface;
 use FreeDSx\Ldap\Sync\Consumer\VerbatimStorageApplier;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
+use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Session;
 use PHPUnit\Framework\TestCase;
 
@@ -233,6 +235,103 @@ final class VerbatimStorageApplierTest extends TestCase
         self::assertTrue($this->exists('cn=new,dc=example,dc=com'));
     }
 
+    public function test_a_delete_set_removes_every_entry_it_names_by_uuid(): void
+    {
+        $this->storage->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
+        $this->storage->store($this->entry('cn=b,dc=example,dc=com', self::UUID_B));
+        $this->storage->store($this->entry('cn=c,dc=example,dc=com', self::UUID_C));
+
+        $removed = $this->subject->applyIdSet(
+            $this->idSet(
+                [self::UUID_A, self::UUID_C],
+                deleted: true,
+            ),
+            $this->persistSession(),
+        );
+
+        self::assertFalse($this->exists('cn=a,dc=example,dc=com'));
+        self::assertTrue($this->exists('cn=b,dc=example,dc=com'));
+        self::assertFalse($this->exists('cn=c,dc=example,dc=com'));
+        self::assertSame(
+            [
+                'cn=a,dc=example,dc=com',
+                'cn=c,dc=example,dc=com',
+            ],
+            array_map(
+                static fn(Dn $dn): string => $dn->toString(),
+                $removed,
+            ),
+        );
+    }
+
+    public function test_a_delete_set_naming_an_unheld_uuid_is_a_no_op(): void
+    {
+        $this->storage->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
+
+        $removed = $this->subject->applyIdSet(
+            $this->idSet(
+                [self::UUID_B],
+                deleted: true,
+            ),
+            $this->persistSession(),
+        );
+
+        self::assertTrue($this->exists('cn=a,dc=example,dc=com'));
+        self::assertSame(
+            [],
+            $removed,
+        );
+    }
+
+    /**
+     * The dangerous branch: a present set the consumer ignores leaves live entries for the sweep to delete.
+     */
+    public function test_entries_named_by_a_present_set_survive_reconciliation(): void
+    {
+        $this->storage->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
+        $this->storage->store($this->entry('cn=b,dc=example,dc=com', self::UUID_B));
+
+        $this->subject->beginRefresh();
+        $this->subject->applyIdSet(
+            $this->idSet([self::UUID_A]),
+            $this->refreshSession(),
+        );
+        $this->subject->reconcile();
+
+        self::assertTrue($this->exists('cn=a,dc=example,dc=com'));
+        self::assertFalse($this->exists('cn=b,dc=example,dc=com'));
+    }
+
+    public function test_a_present_set_is_matched_regardless_of_uuid_case(): void
+    {
+        $this->storage->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
+
+        $this->subject->beginRefresh();
+        $this->subject->applyIdSet(
+            $this->idSet([strtoupper(self::UUID_A)]),
+            $this->refreshSession(),
+        );
+        $this->subject->reconcile();
+
+        self::assertTrue($this->exists('cn=a,dc=example,dc=com'));
+    }
+
+    public function test_begin_refresh_clears_a_previous_present_set_of_uuids(): void
+    {
+        $this->storage->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
+
+        $this->subject->beginRefresh();
+        $this->subject->applyIdSet(
+            $this->idSet([self::UUID_A]),
+            $this->refreshSession(),
+        );
+
+        $this->subject->beginRefresh();
+        $this->subject->reconcile();
+
+        self::assertFalse($this->exists('cn=a,dc=example,dc=com'));
+    }
+
     public function test_begin_refresh_clears_the_previous_present_set(): void
     {
         $session = $this->refreshSession();
@@ -281,6 +380,25 @@ final class VerbatimStorageApplierTest extends TestCase
         );
 
         return new SyncEntryResult(new EntryResult($message));
+    }
+
+    /**
+     * @param list<string> $uuids
+     */
+    private function idSet(
+        array $uuids,
+        bool $deleted = false,
+    ): SyncIdSetResult {
+        return new SyncIdSetResult(new LdapMessageResponse(
+            1,
+            new SyncIdSet(
+                array_map(
+                    Uuid::toBinary(...),
+                    $uuids,
+                ),
+                $deleted,
+            ),
+        ));
     }
 
     private function refreshSession(): Session

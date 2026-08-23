@@ -18,9 +18,11 @@ use Countable;
 use FreeDSx\Ldap\Exception\UnexpectedValueException;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
+use FreeDSx\Ldap\Server\Utility\Uuid;
 use IteratorAggregate;
 use Traversable;
 
+use function array_map;
 use function count;
 
 /**
@@ -66,6 +68,19 @@ class SyncIdSetResult implements Countable, IteratorAggregate
     {
         return $this->getSyncIdSet()
             ->getEntryUuids();
+    }
+
+    /**
+     * The same UUIDs in the dashed form entries carry them in, rather than the 16 bytes the wire does.
+     *
+     * @return string[]
+     */
+    public function getDecodedEntryUuids(): array
+    {
+        return array_map(
+            Uuid::fromBinary(...),
+            $this->getEntryUuids(),
+        );
     }
 
     /**
