@@ -224,6 +224,10 @@ Any client write to a replica (add, modify, delete, rename, password modify) is 
 referral to the provider. Call `ConsumerConfig::setReferWrites(false)` to reject it with `unwillingToPerform` instead.
 Reads, binds, compares, and StartTLS are served normally.
 
+In-process writes are refused for the same reason. `seed()` and `applyChanges()` both fail on a replica, since the
+provider owns the content and the next refresh would sweep away anything written locally. Apply changes to the provider
+and let them replicate.
+
 ### Storage Requirement
 
 A replica requires PDO storage (SQLite or MySQL) on either runner. Any other storage fails at startup. The reasons:

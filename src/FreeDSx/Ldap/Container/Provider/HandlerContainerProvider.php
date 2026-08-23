@@ -43,6 +43,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
+use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyService;
@@ -217,19 +218,16 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         HandlerContext $context,
     ): ServerDispatchHandler {
         $backend = $container->get(WritableStorageBackend::class);
-        $policyWriteHandler = $container->get(PasswordPolicyComponentFactory::class)->makeWriteHandler(
-            $context->eventLogger,
-            $context->passwordPolicyContext,
-        );
 
         return new ServerDispatchHandler(
             backend: $backend,
-            writeDispatcher: $policyWriteHandler !== null
-                ? new WriteOperationDispatcher(
-                    $policyWriteHandler,
-                    $backend,
-                )
-                : $container->get(WriteOperationDispatcher::class),
+            router: new WriteRequestRouter(
+                $backend,
+                $container->get(PasswordPolicyComponentFactory::class)->makeWriteDispatcher(
+                    $context->eventLogger,
+                    $context->passwordPolicyContext,
+                ),
+            ),
             accessControl: $container->get(AccessControlInterface::class),
             schema: $container->get(ServerOptions::class)->getSchema(),
         );

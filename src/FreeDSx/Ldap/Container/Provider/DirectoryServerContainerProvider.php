@@ -57,7 +57,18 @@ use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
+use FreeDSx\Ldap\Server\Backend\Write\ReplayWriteHandler;
+use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
+use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
+use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Logging\OperationAuditor;
+use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
+use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
+use FreeDSx\Ldap\Server\Middleware\OperationAuditMiddleware;
+use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareChain;
+use FreeDSx\Ldap\Server\Middleware\ReadOnlyMiddleware;
+use FreeDSx\Ldap\Server\Middleware\RequestValidationMiddleware;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\LdapClientForwardStateSender;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\PasswordPolicyForwardWorker;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
@@ -189,9 +200,33 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         );
     }
 
+    /**
+     * Replay runs the pipeline stages that need no connection, so it cannot drift from the wire path.
+     */
     private function makeWriteRequestReplayer(Container $container): WriteRequestReplayer
     {
-        return new WriteRequestReplayer($container->get(WritableStorageBackend::class));
+        $options = $container->get(ServerOptions::class);
+        $consumerConfig = $options->getConsumerConfig();
+
+        return new WriteRequestReplayer(new MiddlewareChain(
+            [
+                new RequestValidationMiddleware(),
+                new OperationAuditMiddleware(new OperationAuditor(new EventLogger(
+                    $options->getLogger(),
+                    $options->getEventLogPolicy(),
+                    (new ConnectionContext())->toLogContext(),
+                ))),
+                ...($consumerConfig !== null
+                    ? [new ReadOnlyMiddleware($consumerConfig)]
+                    : []),
+                $container->get(CriticalControlMiddleware::class),
+                $container->get(AssertionMiddleware::class),
+            ],
+            new ReplayWriteHandler(new WriteRequestRouter(
+                $container->get(WritableStorageBackend::class),
+                $container->get(WriteOperationDispatcher::class),
+            )),
+        ));
     }
 
     private function makeDirectoryDumper(Container $container): DirectoryDumper
@@ -255,6 +290,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
      */
     private function makeLdapImporter(Container $container): LdapImporter
     {
+        $this->refuseBulkImportOnReplica($container->get(ServerOptions::class));
+
         return new LdapImporter(
             $container->get(EntryStorageInterface::class),
             $container->get(OperationalAttributeGenerator::class),
@@ -375,6 +412,19 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             'A read-only replica requires PDO storage, but "%s" is configured.',
             $storageConfig::class,
         ));
+    }
+
+    /**
+     * @throws RuntimeException when a replica would be seeded locally
+     */
+    private function refuseBulkImportOnReplica(ServerOptions $options): void
+    {
+        if (!$options->isReadOnly()) {
+            return;
+        }
+
+        // The provider owns a replica's content, so the next refresh would sweep away whatever was imported here.
+        throw new RuntimeException('A read-only replica cannot be seeded locally; seed the provider instead.');
     }
 
     private function makeListenerContributor(Container $container): ListenerContributorInterface

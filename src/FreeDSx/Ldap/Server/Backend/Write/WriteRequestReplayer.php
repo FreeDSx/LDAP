@@ -13,43 +13,62 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write;
 
-use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Operation\Request\RequestInterface;
+use FreeDSx\Ldap\Ldif\LdifChangeRecord;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
+use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
+use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
+use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Token\SystemToken;
 
 /**
- * Replays a sequence of client write requests against a backend as system-initiated operations.
+ * Replays parsed change records through the server's request pipeline as system-initiated operations.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class WriteRequestReplayer
+final readonly class WriteRequestReplayer
 {
-    private readonly WriteOperationDispatcher $dispatcher;
+    public function __construct(private MiddlewareHandlerInterface $pipeline) {}
 
-    public function __construct(
-        WriteHandlerInterface $backend,
-        private readonly WriteCommandFactory $commandFactory = new WriteCommandFactory(),
-    ) {
-        $this->dispatcher = new WriteOperationDispatcher($backend);
+    /**
+     * @param iterable<LdifChangeRecord> $records
+     * @throws OperationException
+     */
+    public function apply(iterable $records): void
+    {
+        $messageId = 0;
+
+        foreach ($records as $record) {
+            ++$messageId;
+
+            $this->assertApplied($this->pipeline->handle(new ServerRequestContext(
+                new LdapMessageRequest(
+                    $messageId,
+                    $record->request,
+                    ...$record->controls,
+                ),
+                new SystemToken(),
+            )));
+        }
     }
 
     /**
-     * @param iterable<RequestInterface> $requests
+     * A refusal answered as a response rather than thrown has no client to read it here, so it is raised instead.
+     *
      * @throws OperationException
      */
-    public function apply(iterable $requests): void
+    private function assertApplied(ResponseStream $stream): void
     {
-        $context = WriteContext::system(
-            new SystemToken(),
-            new ControlBag(),
-        );
+        $result = $stream->outcome();
 
-        foreach ($requests as $request) {
-            $this->dispatcher->dispatch(
-                $this->commandFactory->fromRequest($request),
-                $context,
-            );
+        if ($result->outcome() === OperationOutcome::Succeeded) {
+            return;
         }
+
+        throw new OperationException(
+            'The change record was refused by the server.',
+            $result->resultCode(),
+        );
     }
 }

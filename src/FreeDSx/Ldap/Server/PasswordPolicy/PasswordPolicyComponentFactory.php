@@ -59,6 +59,27 @@ final readonly class PasswordPolicyComponentFactory
         );
     }
 
+    /**
+     * The write dispatcher for a connection, with policy enforcement ahead of the backend where policy is active.
+     */
+    public function makeWriteDispatcher(
+        EventLogger $eventLogger,
+        ?PasswordPolicyContext $passwordPolicyContext,
+    ): WriteOperationDispatcher {
+        $writeHandler = $this->makeWriteHandler(
+            $eventLogger,
+            $passwordPolicyContext,
+        );
+        if ($writeHandler === null) {
+            return $this->writeDispatcher;
+        }
+
+        return new WriteOperationDispatcher(
+            $writeHandler,
+            $this->backend,
+        );
+    }
+
     public function makeChangeGuard(
         EventLogger $eventLogger,
         ?PasswordPolicyContext $passwordPolicyContext,
