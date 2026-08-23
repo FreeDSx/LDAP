@@ -84,6 +84,109 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
         self::assertNull($this->waitForReplicaGone('cn=eve,ou=people,dc=foo,dc=bar'));
     }
 
+    /**
+     * RFC 4533 §3.6 keys entries by entryUUID, so a move must relocate the replica's copy rather than add a second.
+     */
+    public function test_a_rename_on_the_provider_relocates_rather_than_duplicating(): void
+    {
+        $this->writeToProvider(static function (LdapClient $provider): void {
+            $provider->create(Entry::fromArray(
+                'cn=frank,ou=people,dc=foo,dc=bar',
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'frank',
+                    'sn' => 'Franklin',
+                ],
+            ));
+        });
+        self::assertNotNull($this->waitForReplica('cn=frank,ou=people,dc=foo,dc=bar'));
+
+        $this->writeToProvider(static function (LdapClient $provider): void {
+            $provider->rename(
+                'cn=frank,ou=people,dc=foo,dc=bar',
+                'cn=franklin',
+            );
+        });
+
+        self::assertNotNull($this->waitForReplica('cn=franklin,ou=people,dc=foo,dc=bar'));
+        self::assertNull(
+            $this->waitForReplicaGone('cn=frank,ou=people,dc=foo,dc=bar'),
+            'The replica must not keep the entry at the DN it moved from.',
+        );
+    }
+
+    /**
+     * A subtree move journals one record per relocated entry, so every descendant has to relocate too.
+     */
+    public function test_a_subtree_move_on_the_provider_relocates_every_descendant(): void
+    {
+        $this->writeToProvider(static function (LdapClient $provider): void {
+            $provider->create(Entry::fromArray(
+                'ou=staff,dc=foo,dc=bar',
+                [
+                    'objectClass' => 'organizationalUnit',
+                    'ou' => 'staff',
+                ],
+            ));
+            $provider->create(Entry::fromArray(
+                'cn=grace,ou=staff,dc=foo,dc=bar',
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'grace',
+                    'sn' => 'Hopper',
+                ],
+            ));
+        });
+        self::assertNotNull($this->waitForReplica('cn=grace,ou=staff,dc=foo,dc=bar'));
+
+        $this->writeToProvider(static function (LdapClient $provider): void {
+            $provider->rename(
+                'ou=staff,dc=foo,dc=bar',
+                'ou=crew',
+            );
+        });
+
+        self::assertNotNull($this->waitForReplica('cn=grace,ou=crew,dc=foo,dc=bar'));
+        self::assertNull(
+            $this->waitForReplicaGone('cn=grace,ou=staff,dc=foo,dc=bar'),
+            'A descendant must not be left behind beneath the old base.',
+        );
+        self::assertNull(
+            $this->waitForReplicaGone('ou=staff,dc=foo,dc=bar'),
+            'The moved base must not be left behind either.',
+        );
+    }
+
+    /**
+     * RFC 4533 §4.1 wants a delete when a move takes an entry out of the content the consumer asked for.
+     */
+    public function test_a_move_out_of_the_replicated_scope_deletes_from_the_replica(): void
+    {
+        $this->writeToProvider(static function (LdapClient $provider): void {
+            $provider->create(Entry::fromArray(
+                'cn=heidi,ou=people,dc=foo,dc=bar',
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'heidi',
+                    'sn' => 'Lamarr',
+                ],
+            ));
+        });
+        self::assertNotNull($this->waitForReplica('cn=heidi,ou=people,dc=foo,dc=bar'));
+
+        $this->writeToProvider(static function (LdapClient $provider): void {
+            $provider->move(
+                'cn=heidi,ou=people,dc=foo,dc=bar',
+                'dc=other,dc=test',
+            );
+        });
+
+        self::assertNull(
+            $this->waitForReplicaGone('cn=heidi,ou=people,dc=foo,dc=bar'),
+            'An entry that left the replicated content must not linger on the replica.',
+        );
+    }
+
     public function test_a_client_write_to_the_replica_is_referred_to_the_provider(): void
     {
         self::assertNotNull($this->waitForReplica('cn=alice,ou=people,dc=foo,dc=bar'));

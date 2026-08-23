@@ -120,6 +120,17 @@ trait SyncResultTrait
             ->getEntryUuid();
     }
 
+    /**
+     * The same UUID in the dashed form entries carry it in, rather than the 16 bytes the control does.
+     *
+     * @api
+     */
+    public function getDecodedEntryUuid(): string
+    {
+        return $this->getSyncStateControl()
+            ->decodedUuid();
+    }
+
     private function getSyncStateControl(): SyncStateControl
     {
         if ($this->syncState !== null) {
