@@ -81,7 +81,7 @@ interface EntryStorageInterface
     /**
      * Execute $operation as an atomic read-modify-write cycle; implementations must hold an exclusive lock or transaction.
      *
-     * @param callable(EntryStorageInterface): void $operation
+     * @param callable(): void $operation Calls back onto this instance, which routes itself into the open transaction.
      */
     public function atomic(callable $operation): void;
 

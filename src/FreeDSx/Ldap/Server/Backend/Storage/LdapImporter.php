@@ -52,13 +52,10 @@ final readonly class LdapImporter
     ): void {
         $this->assertValidCreatorDn($creatorDn);
 
-        $this->storage->atomic(function (EntryStorageInterface $storage) use ($entries, $creatorDn, $ignoreValidation): void {
+        $this->storage->atomic(function () use ($entries, $creatorDn, $ignoreValidation): void {
             foreach ($entries as $entry) {
                 if (!$ignoreValidation) {
-                    $this->assertParentExists(
-                        $storage,
-                        $entry->getDn(),
-                    );
+                    $this->assertParentExists($entry->getDn());
                 }
 
                 $this->validateForImport(
@@ -69,7 +66,7 @@ final readonly class LdapImporter
                     $entry,
                     $creatorDn->toString(),
                 );
-                $storage->store(
+                $this->storage->store(
                     $entry,
                     rebuildIndexes: true,
                 );
@@ -80,17 +77,15 @@ final readonly class LdapImporter
     /**
      * @throws InvalidArgumentException
      */
-    private function assertParentExists(
-        EntryStorageInterface $storage,
-        Dn $dn,
-    ): void {
+    private function assertParentExists(Dn $dn): void
+    {
         $parent = $dn->normalize()->getParent();
 
         if ($parent === null || $parent->getParent() === null) {
             return;
         }
 
-        if ($storage->exists($parent)) {
+        if ($this->storage->exists($parent)) {
             return;
         }
 

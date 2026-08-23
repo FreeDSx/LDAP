@@ -200,8 +200,8 @@ final class WriteSerializingStorageTest extends TestCase
 
     public function test_atomic_routes_through_queue_to_writes(): void
     {
-        $callable = static function (EntryStorageInterface $s): void {
-            $s->remove(new Dn('cn=foo,dc=example,dc=com'));
+        $callable = function (): void {
+            $this->subject->remove(new Dn('cn=foo,dc=example,dc=com'));
         };
 
         $this->writes
@@ -270,9 +270,9 @@ final class WriteSerializingStorageTest extends TestCase
         $opened = 0;
         $this->writes
             ->method('atomic')
-            ->willReturnCallback(function (callable $operation) use (&$opened): void {
+            ->willReturnCallback(static function (callable $operation) use (&$opened): void {
                 $opened++;
-                $operation($this->writes);
+                $operation();
             });
 
         $this->subject->atomic(function (): void {
@@ -398,8 +398,8 @@ final class WriteSerializingStorageTest extends TestCase
     {
         $this->writes
             ->method('atomic')
-            ->willReturnCallback(function (callable $operation): void {
-                $operation($this->writes);
+            ->willReturnCallback(static function (callable $operation): void {
+                $operation();
             });
     }
 }
