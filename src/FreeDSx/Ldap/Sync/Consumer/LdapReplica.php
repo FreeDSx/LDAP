@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Server\Process\Signals\ShutdownSignalsInterface;
 use FreeDSx\Ldap\Server\Process\Signals\SwooleShutdownSignals;
 use FreeDSx\Ldap\Sync\Consumer\Checkpoint\ReplicationCheckpointInterface;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
+use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Session;
 use FreeDSx\Ldap\Sync\SyncRepl;
 use Psr\Log\LoggerInterface;
@@ -172,6 +173,7 @@ final class LdapReplica
         $syncRepl
             ->useCookie($this->checkpoint->read())
             ->useCookieHandler($this->persistCookie(...))
+            ->useIdSetHandler($this->applyIdSet(...))
             ->useRefreshDoneHandler($this->reconcileRefresh(...));
 
         $this->activeSync = $syncRepl;
@@ -193,6 +195,20 @@ final class LdapReplica
         }
 
         $this->applier->apply(
+            $result,
+            $session,
+        );
+    }
+
+    private function applyIdSet(
+        SyncIdSetResult $result,
+        Session $session,
+    ): void {
+        if ($this->stopping) {
+            throw new CancelRequestException();
+        }
+
+        $this->applier->applyIdSet(
             $result,
             $session,
         );

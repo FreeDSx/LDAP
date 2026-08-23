@@ -19,11 +19,13 @@ use function bin2hex;
 use function chr;
 use function ctype_xdigit;
 use function hex2bin;
+use function implode;
 use function ord;
 use function random_bytes;
 use function str_replace;
 use function str_split;
 use function strlen;
+use function substr;
 use function vsprintf;
 
 /**
@@ -53,6 +55,22 @@ final class Uuid
                 4,
             ),
         );
+    }
+
+    /**
+     * The dashed string form of a binary UUID, as RFC 4533 sync messages carry it on the wire.
+     */
+    public static function fromBinary(string $bytes): string
+    {
+        $hex = bin2hex($bytes);
+
+        return implode('-', [
+            substr($hex, 0, 8),
+            substr($hex, 8, 4),
+            substr($hex, 12, 4),
+            substr($hex, 16, 4),
+            substr($hex, 20),
+        ]);
     }
 
     /**

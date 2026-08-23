@@ -85,6 +85,48 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
     }
 
     /**
+     * Coalesced deletes name only UUIDs, so the replica has to resolve each one rather than read a DN off the message.
+     */
+    public function test_multiple_deletes_on_the_provider_propagate_as_a_uuid_set(): void
+    {
+        $dns = [
+            'cn=ivan,ou=people,dc=foo,dc=bar',
+            'cn=judy,ou=people,dc=foo,dc=bar',
+            'cn=karl,ou=people,dc=foo,dc=bar',
+        ];
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($dns): void {
+            foreach ($dns as $dn) {
+                $provider->create(Entry::fromArray(
+                    $dn,
+                    [
+                        'objectClass' => 'inetOrgPerson',
+                        'cn' => explode('=', explode(',', $dn)[0])[1],
+                        'sn' => 'Doomed',
+                    ],
+                ));
+            }
+        });
+
+        foreach ($dns as $dn) {
+            self::assertNotNull($this->waitForReplica($dn));
+        }
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($dns): void {
+            foreach ($dns as $dn) {
+                $provider->delete($dn);
+            }
+        });
+
+        foreach ($dns as $dn) {
+            self::assertNull(
+                $this->waitForReplicaGone($dn),
+                'Every entry named by the delete set must be removed from the replica.',
+            );
+        }
+    }
+
+    /**
      * RFC 4533 §3.6 keys entries by entryUUID, so a move must relocate the replica's copy rather than add a second.
      */
     public function test_a_rename_on_the_provider_relocates_rather_than_duplicating(): void

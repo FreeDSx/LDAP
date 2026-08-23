@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 use FreeDSx\Ldap\Sync\Consumer\ChangeApplierInterface;
 use FreeDSx\Ldap\Sync\Consumer\ReconcilingChangeApplier;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
+use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Session;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -157,6 +158,51 @@ final class ReconcilingChangeApplierTest extends TestCase
                 SyncStateControl::STATE_DELETE,
                 $this->entry(),
             ),
+            $this->session(),
+        );
+    }
+
+    public function test_an_id_set_discards_the_local_state_of_every_dn_it_removed(): void
+    {
+        $removed = [
+            new Dn(self::DN),
+            new Dn('cn=bob,dc=example,dc=com'),
+        ];
+        $idSet = $this->createMock(SyncIdSetResult::class);
+        $session = $this->session();
+
+        $this->baseApplier
+            ->expects(self::once())
+            ->method('applyIdSet')
+            ->with(
+                $idSet,
+                $session,
+            )
+            ->willReturn($removed);
+        $this->passwordStateStore
+            ->expects(self::exactly(2))
+            ->method('discard');
+
+        self::assertSame(
+            $removed,
+            $this->subject->applyIdSet(
+                $idSet,
+                $session,
+            ),
+        );
+    }
+
+    public function test_an_id_set_that_removed_nothing_discards_no_local_state(): void
+    {
+        $this->baseApplier
+            ->method('applyIdSet')
+            ->willReturn([]);
+        $this->passwordStateStore
+            ->expects(self::never())
+            ->method('discard');
+
+        $this->subject->applyIdSet(
+            $this->createMock(SyncIdSetResult::class),
             $this->session(),
         );
     }

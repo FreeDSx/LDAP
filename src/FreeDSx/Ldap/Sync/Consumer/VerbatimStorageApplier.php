@@ -20,7 +20,10 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
+use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Session;
+
+use function strtolower;
 
 /**
  * Applies sync results verbatim to a local replica's raw storage, reconciling deletes by absence.
@@ -37,11 +40,17 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
      */
     private array $presentDns = [];
 
+    /**
+     * @var array<string, true> Lower-cased UUIDs announced present in bulk during the current refresh phase.
+     */
+    private array $presentUuids = [];
+
     public function __construct(private readonly EntryStorageInterface $storage) {}
 
     public function beginRefresh(): void
     {
         $this->presentDns = [];
+        $this->presentUuids = [];
     }
 
     public function apply(
@@ -78,6 +87,28 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         $this->storage->store($this->identified($entry, $uuid));
     }
 
+    public function applyIdSet(
+        SyncIdSetResult $result,
+        Session $session,
+    ): array {
+        $uuids = $result->getDecodedEntryUuids();
+
+        if ($result->isDeleted()) {
+            return $this->removeByUuids($uuids);
+        }
+
+        // A present set only feeds the sweep, so it is worthless once the refresh that would run it is over.
+        if ($session->isRefreshComplete()) {
+            return [];
+        }
+
+        foreach ($uuids as $uuid) {
+            $this->presentUuids[strtolower($uuid)] = true;
+        }
+
+        return [];
+    }
+
     public function reconcile(): void
     {
         $options = StorageListOptions::matchAll(
@@ -90,7 +121,7 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
             $dn = $entry->getDn()
                 ->normalize();
 
-            if (!isset($this->presentDns[$dn->toString()])) {
+            if (!$this->wasAnnouncedPresent($entry, $dn)) {
                 $stale[] = $dn;
             }
         }
@@ -100,6 +131,49 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         }
 
         $this->presentDns = [];
+        $this->presentUuids = [];
+    }
+
+    /**
+     * @param string[] $uuids
+     * @return list<Dn>
+     */
+    private function removeByUuids(array $uuids): array
+    {
+        $removed = [];
+
+        // Every DN is resolved before any is deleted, so the whole set goes out as one bulk delete.
+        foreach ($uuids as $uuid) {
+            $dn = $this->dnHolding($uuid);
+
+            // The replica never held it, so there is nothing to delete.
+            if ($dn === null) {
+                continue;
+            }
+
+            $removed[] = $dn;
+        }
+
+        $this->storage->removeAll($removed);
+
+        return $removed;
+    }
+
+    /**
+     * Whether the upstream announced this entry as still present, individually by DN or in bulk by UUID.
+     */
+    private function wasAnnouncedPresent(
+        Entry $entry,
+        Dn $dn,
+    ): bool {
+        if (isset($this->presentDns[$dn->toString()])) {
+            return true;
+        }
+
+        $uuid = $entry->get(AttributeTypeOid::NAME_ENTRY_UUID)
+            ?->firstValue();
+
+        return $uuid !== null && isset($this->presentUuids[strtolower($uuid)]);
     }
 
     /**
@@ -116,9 +190,14 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
             ),
         );
 
+        $wanted = strtolower($uuid);
+
         // Storage answers the filter only where it can, so each candidate is checked rather than trusted.
         foreach ($this->storage->list($options)->entries as $entry) {
-            if ($entry->get(AttributeTypeOid::NAME_ENTRY_UUID)?->firstValue() !== $uuid) {
+            $candidate = $entry->get(AttributeTypeOid::NAME_ENTRY_UUID)
+                ?->firstValue();
+
+            if ($candidate === null || strtolower($candidate) !== $wanted) {
                 continue;
             }
 

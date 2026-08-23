@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Sync\Consumer;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
+use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Session;
 
 /**
@@ -67,6 +68,22 @@ readonly class ReconcilingChangeApplier implements ChangeApplierInterface
             $dn,
             UserPasswordState::fromEntry($result->getEntry()),
         );
+    }
+
+    public function applyIdSet(
+        SyncIdSetResult $result,
+        Session $session,
+    ): array {
+        $removed = $this->baseApplier->applyIdSet(
+            $result,
+            $session,
+        );
+
+        foreach ($removed as $dn) {
+            $this->passwordStateStore->discard($dn);
+        }
+
+        return $removed;
     }
 
     public function reconcile(): void

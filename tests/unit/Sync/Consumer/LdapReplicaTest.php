@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Sync\Consumer\Checkpoint\InMemoryReplicationCheckpoint;
 use FreeDSx\Ldap\Sync\Consumer\LdapReplica;
 use FreeDSx\Ldap\Sync\Consumer\PrimaryConnectionFactory;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
+use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Session;
 use FreeDSx\Ldap\Sync\SyncRepl;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -50,6 +51,8 @@ final class LdapReplicaTest extends TestCase
 
     private Closure $cookieHandler;
 
+    private Closure $idSetHandler;
+
     private ?string $usedCookie = null;
 
     protected function setUp(): void
@@ -58,6 +61,7 @@ final class LdapReplicaTest extends TestCase
         $this->shutdown = $noop;
         $this->refreshDoneHandler = $noop;
         $this->cookieHandler = $noop;
+        $this->idSetHandler = $noop;
 
         $this->applier = $this->createMock(ChangeApplierInterface::class);
         $this->checkpoint = new InMemoryReplicationCheckpoint();
@@ -78,6 +82,12 @@ final class LdapReplicaTest extends TestCase
         $this->syncRepl->method('useCookieHandler')
             ->willReturnCallback(function (Closure $handler): SyncRepl {
                 $this->cookieHandler = $handler;
+
+                return $this->syncRepl;
+            });
+        $this->syncRepl->method('useIdSetHandler')
+            ->willReturnCallback(function (Closure $handler): SyncRepl {
+                $this->idSetHandler = $handler;
 
                 return $this->syncRepl;
             });
@@ -134,6 +144,31 @@ final class LdapReplicaTest extends TestCase
             'cookie-after',
             $this->checkpoint->read(),
         );
+    }
+
+    public function test_a_received_id_set_is_routed_to_the_applier(): void
+    {
+        $idSet = $this->createMock(SyncIdSetResult::class);
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        );
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function () use ($idSet, $session): void {
+                ($this->idSetHandler)($idSet, $session);
+                ($this->shutdown)();
+            });
+
+        $this->applier->expects(self::once())
+            ->method('applyIdSet')
+            ->with(
+                $idSet,
+                $session,
+            )
+            ->willReturn([]);
+
+        $this->subject->run();
     }
 
     public function test_an_incremental_refresh_applies_without_reconciling(): void

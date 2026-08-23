@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\CancelRequestException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
+use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Session;
 use FreeDSx\Ldap\Sync\SyncRepl;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
@@ -153,6 +154,57 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
         );
     }
 
+    /**
+     * RFC 4533 §3.4.2 asks for multiple delete entries to be coalesced into a syncIdSet.
+     */
+    public function testPersistCoalescesMultipleDeletionsIntoAnIdSet(): void
+    {
+        $dns = [
+            'cn=idset-one,dc=foo,dc=bar',
+            'cn=idset-two,dc=foo,dc=bar',
+            'cn=idset-three,dc=foo,dc=bar',
+        ];
+        $idSet = null;
+
+        $syncRepl = $this->boundSync();
+        $syncRepl->useIdSetHandler(function (SyncIdSetResult $result) use (&$idSet): void {
+            $idSet = $result;
+
+            throw new CancelRequestException();
+        });
+
+        $this->listenAfterWriting(
+            $syncRepl,
+            static function (LdapClient $w) use ($dns): void {
+                foreach ($dns as $dn) {
+                    $w->create(Entry::fromArray(
+                        $dn,
+                        [
+                            'cn' => explode(',', $dn)[0],
+                            'sn' => 'Doomed',
+                            'objectClass' => 'inetOrgPerson',
+                        ],
+                    ));
+                }
+
+                foreach ($dns as $dn) {
+                    $w->delete($dn);
+                }
+            },
+        );
+
+        self::assertInstanceOf(
+            SyncIdSetResult::class,
+            $idSet,
+            'Several deletions in one journal window are delivered as a single syncIdSet.',
+        );
+        self::assertTrue($idSet->isDeleted());
+        self::assertCount(
+            3,
+            $idSet,
+        );
+    }
+
     public function testListenResumesFromACookieWithAnIncrementalRefresh(): void
     {
         $dn = 'cn=persist-resume,dc=foo,dc=bar';
@@ -215,6 +267,35 @@ abstract class SyncReplPersistTestCase extends ServerTestCase
         );
 
         return $cookie;
+    }
+
+    /**
+     * Applies $write on another connection once the refresh phase begins, then persists until the result cap.
+     */
+    private function listenAfterWriting(
+        SyncRepl $syncRepl,
+        Closure $write,
+    ): void {
+        $wrote = false;
+        $seen = 0;
+
+        $syncRepl->listen(function (SyncEntryResult $entry, Session $session) use (&$wrote, &$seen, $write): void {
+            $refreshing = !$session->isRefreshComplete();
+            if ($refreshing && !$wrote) {
+                $wrote = true;
+                $this->onAnotherConnection($write);
+
+                return;
+            }
+            if ($refreshing) {
+                return;
+            }
+            $seen++;
+
+            if ($seen >= self::MAX_PERSIST_RESULTS) {
+                throw new CancelRequestException();
+            }
+        });
     }
 
     private function onAnotherConnection(Closure $do): void

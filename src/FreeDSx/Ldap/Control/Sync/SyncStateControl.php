@@ -20,11 +20,9 @@ use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\ProtocolException;
+use FreeDSx\Ldap\Server\Utility\Uuid;
 
-use function bin2hex;
 use function count;
-use function implode;
-use function substr;
 
 /**
  * Represents a syncStateValue control. RFC 4533.
@@ -86,19 +84,7 @@ class SyncStateControl extends Control
      */
     public function decodedUuid(): string
     {
-        if ($this->decodedUuid === null) {
-            $hex = bin2hex($this->entryUuid);
-
-            $this->decodedUuid = implode('-', [
-                substr($hex, 0, 8),
-                substr($hex, 8, 4),
-                substr($hex, 12, 4),
-                substr($hex, 16, 4),
-                substr($hex, 20),
-            ]);
-        }
-
-        return $this->decodedUuid;
+        return $this->decodedUuid ??= Uuid::fromBinary($this->entryUuid);
     }
 
     /**
