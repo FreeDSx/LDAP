@@ -69,9 +69,9 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         private readonly StorageListOptionsFactory $listOptions,
         private readonly FilterEvaluatorInterface $filterEvaluator,
         private readonly WriteEntryOperationHandler $entryHandler,
+        private readonly SubentryPlacementGuard $subentryGuard,
         private readonly OperationalAttributeGenerator $operationalAttrs = new OperationalAttributeGenerator(),
         private readonly ?ChangeRecorder $changeRecorder = null,
-        private readonly SubentryPlacementGuard $subentryGuard = new SubentryPlacementGuard(),
     ) {}
 
     public function reset(): void
@@ -222,7 +222,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 $context,
             );
             $this->subentryGuard->assertPlacement(
-                $this->storage,
                 $command->entry,
                 $dn,
                 $context,
@@ -245,7 +244,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
                 rebuildIndexes: true,
             );
             $this->changeRecorder?->recordAdd(
-                $this->storage,
                 $command->entry,
                 $context,
             );
@@ -277,7 +275,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
 
             $this->storage->remove($dn);
             $this->changeRecorder?->recordDelete(
-                $this->storage,
                 $entry,
                 $context,
             );
@@ -312,7 +309,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
 
                 foreach ($preImages as $entry) {
                     $this->changeRecorder?->recordDelete(
-                        $this->storage,
                         $entry,
                         $context,
                     );
@@ -415,7 +411,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             }
 
             $this->subentryGuard->assertPlacement(
-                $this->storage,
                 $newEntry,
                 $normNew,
                 $context,
@@ -521,7 +516,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         }
 
         $this->changeRecorder->recordModRdn(
-            $this->storage,
             $newEntry,
             $previousDn,
             $context,
@@ -534,7 +528,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
 
         foreach ($this->movedDescendants($normNew) as $entry) {
             $this->changeRecorder->recordModRdn(
-                $this->storage,
                 $entry,
                 $this->previousDnOf(
                     $entry->getDn(),
@@ -629,7 +622,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
             $context,
         );
         $this->subentryGuard->assertAdministrativeRoleRetained(
-            $this->storage,
             $updated,
             $dn,
             $context,
@@ -640,7 +632,6 @@ final class WritableStorageBackend implements WritableLdapBackendInterface, Rese
         );
         $this->storage->store($updated);
         $this->changeRecorder?->recordModify(
-            $this->storage,
             $updated,
             $context,
         );

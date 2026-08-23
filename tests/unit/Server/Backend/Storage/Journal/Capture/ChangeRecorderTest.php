@@ -41,12 +41,12 @@ final class ChangeRecorderTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new ChangeRecorder();
         $this->journal = new InMemoryChangeJournal();
         $this->storage = new InMemoryStorage(
             [],
             $this->journal,
         );
+        $this->subject = new ChangeRecorder($this->storage);
         $this->context = new WriteContext(
             BindToken::fromDn('cn=admin,dc=example,dc=com'),
             new ControlBag(),
@@ -56,7 +56,6 @@ final class ChangeRecorderTest extends TestCase
     public function test_record_add_journals_an_add_with_the_acting_identity(): void
     {
         $this->subject->recordAdd(
-            $this->storage,
             $this->entry('cn=a,dc=example,dc=com'),
             $this->context,
         );
@@ -79,7 +78,6 @@ final class ChangeRecorderTest extends TestCase
     public function test_record_modify_journals_a_modify(): void
     {
         $this->subject->recordModify(
-            $this->storage,
             $this->entry('cn=a,dc=example,dc=com'),
             $this->context,
         );
@@ -93,7 +91,6 @@ final class ChangeRecorderTest extends TestCase
     public function test_record_modrdn_journals_the_previous_dn(): void
     {
         $this->subject->recordModRdn(
-            $this->storage,
             $this->entry('cn=new,dc=example,dc=com'),
             new Dn('cn=old,dc=example,dc=com'),
             $this->context,
@@ -115,7 +112,6 @@ final class ChangeRecorderTest extends TestCase
         $entry = $this->entry('cn=a,dc=example,dc=com');
 
         $this->subject->recordDelete(
-            $this->storage,
             $entry,
             $this->context,
         );
@@ -137,10 +133,12 @@ final class ChangeRecorderTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::once())
             ->method('warning');
-        $recorder = new ChangeRecorder($logger);
+        $recorder = new ChangeRecorder(
+            $this->storage,
+            $logger,
+        );
 
         $recorder->recordAdd(
-            $this->storage,
             new Entry(
                 new Dn('cn=a,dc=example,dc=com'),
                 new Attribute('cn', 'a'),
@@ -156,10 +154,9 @@ final class ChangeRecorderTest extends TestCase
 
     public function test_it_is_a_no_op_for_non_journaling_storage(): void
     {
-        $storage = $this->createMock(EntryStorageInterface::class);
+        $recorder = new ChangeRecorder($this->createMock(EntryStorageInterface::class));
 
-        $this->subject->recordAdd(
-            $storage,
+        $recorder->recordAdd(
             $this->entry('cn=a,dc=example,dc=com'),
             $this->context,
         );
