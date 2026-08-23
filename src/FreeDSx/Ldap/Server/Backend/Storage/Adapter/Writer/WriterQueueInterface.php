@@ -29,6 +29,11 @@ interface WriterQueueInterface
     public function run(Closure $job): void;
 
     /**
+     * True while the caller is executing one of this queue's jobs, so it must not submit another and block on itself.
+     */
+    public function isWriter(): bool;
+
+    /**
      * Release the writer now that no further job is coming, rather than leaving it to time out.
      */
     public function drain(): void;

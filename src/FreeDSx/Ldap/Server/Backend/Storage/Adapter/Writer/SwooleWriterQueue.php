@@ -38,13 +38,17 @@ final class SwooleWriterQueue implements WriterQueueInterface
 
     private bool $started = false;
 
+    private readonly WriteScope $scope;
+
     /**
      * @param Closure(Closure(): void): void|null $batchWrapper Wraps a batch of jobs in an outer transaction.
      */
     public function __construct(
         private readonly int $capacity = 1024,
         private readonly ?Closure $batchWrapper = null,
-    ) {}
+    ) {
+        $this->scope = new WriteScope();
+    }
 
     public function __destruct()
     {
@@ -71,6 +75,11 @@ final class SwooleWriterQueue implements WriterQueueInterface
         if ($result instanceof Throwable) {
             throw $result;
         }
+    }
+
+    public function isWriter(): bool
+    {
+        return $this->scope->isActive();
     }
 
     /**
@@ -168,6 +177,9 @@ final class SwooleWriterQueue implements WriterQueueInterface
         };
 
         Coroutine::create(function () use ($jobs, $batchWrapper, $executeBatch, $onExit): void {
+            // Held for the writer's whole life, so anything a job runs can tell it is already on the writer.
+            $this->scope->enter();
+
             try {
                 while (true) {
                     $first = $jobs->pop(self::IDLE_TIMEOUT_SECONDS);
@@ -201,6 +213,7 @@ final class SwooleWriterQueue implements WriterQueueInterface
                     }
                 }
             } finally {
+                $this->scope->leave();
                 $onExit();
             }
         });
