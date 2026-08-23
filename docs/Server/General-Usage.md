@@ -517,6 +517,18 @@ When using the Swoole runner (`setRunnerConfig(RunnerConfig::forSwoole())`), cal
 `LdapServer::applyChanges()` replays an LDIF changelog through the live write path. Use it for applying diffs, migrations,
 or administrative changes after the initial directory is populated.
 
+Each record runs through the same request validation, auditing and control handling a client request gets, so a replayed
+record and the same operation sent by a client behave alike. A record may carry the controls RFC 2849 allows:
+
+```ldif
+dn: ou=staff,dc=example,dc=com
+control: 1.2.840.113556.1.4.805 true
+changetype: delete
+```
+
+Replay applies the subtree delete, relax rules, and assertion controls. Anything else is ignored when it is not critical
+and refused when it is, since there is no client connection to answer with a response control.
+
 ```ldif
 version: 1
 

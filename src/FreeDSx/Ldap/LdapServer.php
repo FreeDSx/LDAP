@@ -25,7 +25,6 @@ use FreeDSx\Ldap\Ldif\Url\RefusingUrlResolver;
 use FreeDSx\Ldap\Ldif\Loader\LdifLoaderInterface;
 use FreeDSx\Ldap\Ldif\Output\LdifOutputInterface;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
-use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\EntryIndexReindexer;
 use FreeDSx\Ldap\Server\Backend\Storage\DrainableWritesInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -132,7 +131,7 @@ class LdapServer
         LdifUrlResolverInterface $urlResolver = new RefusingUrlResolver(),
     ): self {
         $this->container->get(WriteRequestReplayer::class)
-            ->apply($this->streamChangeRequests($loader, $urlResolver));
+            ->apply($this->parseLdif($loader, $urlResolver));
 
         return $this;
     }
@@ -197,19 +196,6 @@ class LdapServer
             }
 
             yield $record->request->getEntry();
-        }
-    }
-
-    /**
-     * @return Generator<RequestInterface>
-     * @throws LdifParseException
-     */
-    private function streamChangeRequests(
-        LdifLoaderInterface $loader,
-        LdifUrlResolverInterface $urlResolver,
-    ): Generator {
-        foreach ($this->parseLdif($loader, $urlResolver) as $record) {
-            yield $record->request;
         }
     }
 

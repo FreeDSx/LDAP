@@ -33,3 +33,19 @@ cn: dave
 sn: Davis
 description: first
 DESCRIPTION: second
+
+# A subtree the record below removes whole, which only works if the control is honored on replay.
+dn: ou=team,dc=foo,dc=bar
+changetype: add
+objectClass: organizationalUnit
+ou: team
+
+dn: cn=erin,ou=team,dc=foo,dc=bar
+changetype: add
+objectClass: inetOrgPerson
+cn: erin
+sn: Engels
+
+dn: ou=team,dc=foo,dc=bar
+control: 1.2.840.113556.1.4.805 true
+changetype: delete

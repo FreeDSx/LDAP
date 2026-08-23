@@ -15,7 +15,9 @@ namespace Tests\Unit\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Exception\LdifParseException;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
@@ -57,6 +59,19 @@ class LdapServerTest extends TestCase
         objectClass: person
         cn: foo
         sn: Bar
+        LDIF;
+
+    private const SUBTREE_LDIF = <<<'LDIF'
+        dn: ou=people,dc=example,dc=com
+        objectClass: top
+        objectClass: organizationalUnit
+        ou: people
+
+        dn: cn=child,ou=people,dc=example,dc=com
+        objectClass: top
+        objectClass: person
+        cn: child
+        sn: Child
         LDIF;
 
     private LdapServer $subject;
@@ -303,6 +318,57 @@ class LdapServerTest extends TestCase
         ));
 
         self::assertNull($this->storage()->find(new Dn('cn=foo,dc=example,dc=com')));
+    }
+
+    /**
+     * RFC 2849 lets a change record carry controls, and the wire path routes this one to a subtree delete.
+     */
+    public function test_it_should_apply_a_delete_carrying_the_subtree_control_to_the_whole_subtree(): void
+    {
+        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF . "\n\n" . self::SUBTREE_LDIF));
+
+        $this->subject->applyChanges(new StringLdifLoader(
+            "dn: ou=people,dc=example,dc=com\ncontrol: 1.2.840.113556.1.4.805 true\nchangetype: delete\n",
+        ));
+
+        self::assertNull($this->storage()->find(new Dn('cn=child,ou=people,dc=example,dc=com')));
+        self::assertNull($this->storage()->find(new Dn('ou=people,dc=example,dc=com')));
+    }
+
+    public function test_it_should_refuse_a_change_record_carrying_a_critical_control_it_cannot_honor(): void
+    {
+        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNAVAILABLE_CRITICAL_EXTENSION);
+
+        $this->subject->applyChanges(new StringLdifLoader(
+            "dn: cn=foo,dc=example,dc=com\ncontrol: 1.3.6.1.1.13.1 true\nchangetype: delete\n",
+        ));
+    }
+
+    public function test_it_should_apply_a_change_record_carrying_a_non_critical_control_it_cannot_honor(): void
+    {
+        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
+
+        $this->subject->applyChanges(new StringLdifLoader(
+            "dn: cn=foo,dc=example,dc=com\ncontrol: 1.3.6.1.1.13.1 false\nchangetype: delete\n",
+        ));
+
+        self::assertNull($this->storage()->find(new Dn('cn=foo,dc=example,dc=com')));
+    }
+
+    public function test_it_should_refuse_to_seed_a_read_only_replica(): void
+    {
+        $options = (new ServerOptions(
+            PdoConfig::forSqlite(':memory:'),
+            networkConfig: NetworkConfig::withPort(33389),
+        ))->setReplicationConfig(ReplicationConfig::forReplica(new ConsumerConfig(new ClientOptions())));
+
+        $this->expectException(RuntimeException::class);
+
+        (new LdapServer($options, Container::forServer($options)))
+            ->seed(new StringLdifLoader(self::SEED_LDIF));
     }
 
     public function test_it_should_dump_seeded_entries_to_the_given_output(): void

@@ -26,12 +26,10 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Operation\OperationType;
-use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
-use FreeDSx\Ldap\Server\Backend\Write\WriteCommandFactory;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
-use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
+use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
 use FreeDSx\Ldap\Server\Operation\WriteOperationResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -47,10 +45,9 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
 
     public function __construct(
         private WritableLdapBackendInterface $backend,
-        private WriteOperationDispatcher $writeDispatcher,
+        private WriteRequestRouter $router,
         private AccessControlInterface $accessControl,
         Schema $schema,
-        private WriteCommandFactory $commandFactory = new WriteCommandFactory(),
         private ResponseFactory $responseFactory = new ResponseFactory(),
     ) {
         $this->readEntryControlHandler = new ReadEntryControlHandler(
@@ -171,44 +168,15 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
         SchemaViolations $schemaViolations,
     ): void {
-        if ($request instanceof Request\DeleteRequest && $controls->has(Control::OID_SUBTREE_DELETE)) {
-            $this->handleSubtreeDelete(
-                $request,
-                $controls,
-                $token,
-                $schemaViolations,
-            );
-
-            return;
-        }
-
-        $this->writeDispatcher->dispatch(
-            $this->commandFactory->fromRequest($request),
+        $this->router->route(
+            $request,
             new WriteContext(
                 $token,
                 $controls,
                 schemaViolations: $schemaViolations,
             ),
-        );
-    }
-
-    /**
-     * @throws OperationException
-     */
-    private function handleSubtreeDelete(
-        Request\DeleteRequest $request,
-        ControlBag $controls,
-        TokenInterface $token,
-        SchemaViolations $schemaViolations,
-    ): void {
-        // Permissive by default; lock down by denying the Delete operation on the subtree (per-entry authorization below).
-        $this->backend->deleteSubtree(
-            new DeleteCommand($request->getDn()),
-            new WriteContext(
-                $token,
-                $controls,
-                schemaViolations: $schemaViolations,
-            ),
+            // Permissive by default.
+            // lock down by denying the delete operation on the subtree.
             function (Dn $dn) use ($token): void {
                 $this->accessControl->authorizeOperation(
                     OperationType::Delete,

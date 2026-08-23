@@ -36,6 +36,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
 use FreeDSx\Ldap\Server\Backend\Write\PasswordPolicyWriteHandler;
 use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriter;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
+use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyChangeGuard;
@@ -419,9 +420,12 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
 
         return new ServerDispatchHandler(
             backend: $this->backend,
-            writeDispatcher: new WriteOperationDispatcher(
-                $policyWriteHandler,
+            router: new WriteRequestRouter(
                 $this->backend,
+                new WriteOperationDispatcher(
+                    $policyWriteHandler,
+                    $this->backend,
+                ),
             ),
             accessControl: $this->createMock(AccessControlInterface::class),
             schema: new Schema(),

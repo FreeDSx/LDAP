@@ -105,6 +105,17 @@ final class LdapApplyChangesServerTest extends ServerTestCase
         );
     }
 
+    /**
+     * The changelog adds ou=team with a child, then deletes it carrying "control: 1.2.840.113556.1.4.805 true".
+     *
+     * Replay runs at test startup, so this asserts the state it left.
+     */
+    public function test_a_delete_change_carrying_the_subtree_control_removes_the_whole_subtree(): void
+    {
+        $this->assertNull($this->ldapClient()->read('cn=erin,ou=team,dc=foo,dc=bar'));
+        $this->assertNull($this->ldapClient()->read('ou=team,dc=foo,dc=bar'));
+    }
+
     public function test_an_added_entry_groups_descriptions_that_differ_only_in_case(): void
     {
         $dave = $this->ldapClient()->read('cn=dave,dc=foo,dc=bar');

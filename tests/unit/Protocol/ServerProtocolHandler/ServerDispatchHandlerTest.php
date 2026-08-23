@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
+use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
@@ -65,7 +66,10 @@ final class ServerDispatchHandlerTest extends TestCase
 
         $this->subject = new ServerDispatchHandler(
             backend: $this->mockBackend,
-            writeDispatcher: new WriteOperationDispatcher($this->mockWriteHandler),
+            router: new WriteRequestRouter(
+                $this->mockBackend,
+                new WriteOperationDispatcher($this->mockWriteHandler),
+            ),
             accessControl: $this->mockAccessControl,
             schema: new Schema(),
         );
@@ -150,7 +154,10 @@ final class ServerDispatchHandlerTest extends TestCase
     {
         $subject = new ServerDispatchHandler(
             backend: $this->mockBackend,
-            writeDispatcher: new WriteOperationDispatcher(),
+            router: new WriteRequestRouter(
+                $this->mockBackend,
+                new WriteOperationDispatcher(),
+            ),
             accessControl: $this->mockAccessControl,
             schema: new Schema(),
         );
