@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support;
 
 use Closure;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriterQueueInterface;
 
 /**
@@ -24,28 +23,27 @@ final class TestSynchronousWriterQueue implements WriterQueueInterface
 {
     public int $ranCount = 0;
 
-    private WriteScope $scope;
-
-    public function __construct()
-    {
-        $this->scope = new WriteScope();
-    }
+    /**
+     * Jobs run on the caller here, so being inside one is all there is to being the writer.
+     */
+    private bool $running = false;
 
     public function run(Closure $job): void
     {
         $this->ranCount++;
-        $this->scope->enter();
+        $wasRunning = $this->running;
+        $this->running = true;
 
         try {
             $job();
         } finally {
-            $this->scope->leave();
+            $this->running = $wasRunning;
         }
     }
 
     public function isWriter(): bool
     {
-        return $this->scope->isActive();
+        return $this->running;
     }
 
     /**
