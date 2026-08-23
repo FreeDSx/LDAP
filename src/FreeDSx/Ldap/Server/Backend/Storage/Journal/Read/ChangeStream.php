@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Journal\Read;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 
@@ -40,7 +41,7 @@ final readonly class ChangeStream
         ?ChangeScope $scope = null,
     ): iterable {
         foreach ($this->journal->read($afterSeq) as $record) {
-            if ($scope === null || $scope->contains($record->change->dn)) {
+            if ($scope === null || $this->touchesScope($record->change, $scope)) {
                 yield $record;
             }
         }
@@ -75,5 +76,16 @@ final readonly class ChangeStream
     public function origin(): ReplicaId
     {
         return $this->journal->origin();
+    }
+
+    /**
+     * A move is judged at both ends, since one leaving the scope is only tellable from where it used to be.
+     */
+    private function touchesScope(
+        PendingChange $change,
+        ChangeScope $scope,
+    ): bool {
+        return $scope->contains($change->dn)
+            || ($change->previousDn !== null && $scope->contains($change->previousDn));
     }
 }

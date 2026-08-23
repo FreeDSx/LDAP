@@ -132,6 +132,25 @@ final readonly class SyncResultProjector
         );
     }
 
+    /**
+     * A move out of the consumer's content, announced as a delete at the DN it left (RFC 4533 §4.1).
+     */
+    public function projectMovedOut(
+        Entry $entry,
+        PendingChange $change,
+        TokenInterface $token,
+    ): ?SyncResult {
+        // Still live, so visibility is judged from where it went rather than a pre-image a move never carries.
+        if ($change->previousDn === null || !$this->accessControl->isEntryVisible($token, $entry)) {
+            return null;
+        }
+
+        return $this->deleteResult(
+            $change->previousDn,
+            $change->entryUuid,
+        );
+    }
+
     private function deleteResult(
         Dn $dn,
         string $entryUuid,

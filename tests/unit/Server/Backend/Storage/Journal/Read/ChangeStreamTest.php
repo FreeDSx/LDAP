@@ -107,6 +107,41 @@ final class ChangeStreamTest extends TestCase
         self::assertTrue($this->subject->retainsSince(0));
     }
 
+    /**
+     * A move out of scope is only visible as a delete if the record survives scope filtering to be interpreted.
+     */
+    public function test_since_yields_a_move_whose_previous_dn_was_in_scope(): void
+    {
+        $this->appendMove(
+            'cn=a,dc=other,dc=com',
+            'cn=a,dc=example,dc=com',
+        );
+
+        self::assertCount(
+            1,
+            iterator_to_array($this->subject->since(
+                0,
+                ChangeScope::wholeSubtree(new Dn('dc=example,dc=com')),
+            )),
+        );
+    }
+
+    public function test_since_skips_a_move_that_touched_the_scope_at_neither_end(): void
+    {
+        $this->appendMove(
+            'cn=a,dc=other,dc=com',
+            'cn=a,dc=elsewhere,dc=com',
+        );
+
+        self::assertCount(
+            0,
+            iterator_to_array($this->subject->since(
+                0,
+                ChangeScope::wholeSubtree(new Dn('dc=example,dc=com')),
+            )),
+        );
+    }
+
     private function append(string $dn): void
     {
         $this->journal->append(new PendingChange(
@@ -114,6 +149,19 @@ final class ChangeStreamTest extends TestCase
             dn: new Dn($dn),
             entryUuid: '11111111-1111-4111-8111-111111111111',
             authzId: AuthzId::anonymous(),
+        ));
+    }
+
+    private function appendMove(
+        string $dn,
+        string $previousDn,
+    ): void {
+        $this->journal->append(new PendingChange(
+            changeType: ChangeType::ModRdn,
+            dn: new Dn($dn),
+            entryUuid: '11111111-1111-4111-8111-111111111111',
+            authzId: AuthzId::anonymous(),
+            previousDn: new Dn($previousDn),
         ));
     }
 }

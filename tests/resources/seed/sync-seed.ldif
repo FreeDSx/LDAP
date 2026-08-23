@@ -55,3 +55,10 @@ dn: cn=sync-policy,ou=people,dc=foo,dc=bar
 objectClass: subentry
 cn: sync-policy
 subtreeSpecification: { base "ou=people" }
+
+# Somewhere outside what the replica syncs, so an entry moved here has left the replicated content.
+# Revisit if moving between naming contexts is ever refused; RFC 4511 4.9 leaves that to the server.
+dn: dc=other,dc=test
+objectClass: top
+objectClass: domain
+dc: other

@@ -71,9 +71,23 @@ final readonly class SyncPersistStreamer
         }
 
         foreach ($netByUuid as $change) {
-            $result = $change->changeType === ChangeType::Delete
-                ? $this->projector->projectDeleted($change, $request, $token)
-                : $this->fetchAndProject($change, $request, $token);
+            $result = match (true) {
+                $change->changeType === ChangeType::Delete => $this->projector->projectDeleted(
+                    $change,
+                    $request,
+                    $token,
+                ),
+                // Left the content, so RFC 4533 §4.1 wants it deleted rather than sent from where it went.
+                !$scope->contains($change->dn) => $this->fetchAndProjectMovedOut(
+                    $change,
+                    $token,
+                ),
+                default => $this->fetchAndProject(
+                    $change,
+                    $request,
+                    $token,
+                ),
+            };
 
             if ($result !== null) {
                 yield $result;
@@ -157,6 +171,25 @@ final readonly class SyncPersistStreamer
                 $result->control,
             );
         }
+    }
+
+    /**
+     * The entry is read where it went, since that is the only place it still exists to judge visibility from.
+     */
+    private function fetchAndProjectMovedOut(
+        PendingChange $change,
+        TokenInterface $token,
+    ): ?SyncResult {
+        $entry = $this->backend->get($change->dn);
+        if ($entry === null) {
+            return null;
+        }
+
+        return $this->projector->projectMovedOut(
+            $entry,
+            $change,
+            $token,
+        );
     }
 
     private function fetchAndProject(
