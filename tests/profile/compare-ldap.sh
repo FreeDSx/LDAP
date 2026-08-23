@@ -5,18 +5,22 @@
 #
 # Usage (from the repo root):
 #
-#   composer compare-ldap -- [--source=freedsx|openldap|opendj] [--target=freedsx|openldap|opendj]
+#   composer compare-ldap -- [--source=freedsx|openldap|opendj|389ds] [--target=freedsx|openldap|opendj|389ds]
 #       [--seed-entries=2000] [--cpus=4] [--storage=sqlite] [--runner=pcntl] [--mix=default]
 #       [--search-value=seed-1] [--duration=15] [--warmup=3] [--clients=8] [--driver-processes=1] [--keep-up]
-#       [--swoole-workers=0] [--server-cpuset=0-3] [--driver-cpuset=4-7]
+#       [--swoole-workers=0] [--server-cpuset=0-3] [--driver-cpuset=4-7] [--jit=function]
 #
-# --storage/--runner apply only to a freedsx side.
+# --storage/--runner/--jit apply only to a freedsx side.
+# --jit (function, tracing, or off) is the same for every runner, so a runner comparison is not also a JIT one.
 # --search-value is the cn prefix the subtree searches filter on (--search-value=seed- matches all).
 #
 # Examples:
 #
 #   # FreeDSx (sqlite) vs OpenDJ at 25k, with search-sub kept selective on OpenDJ's substring index
 #   composer compare-ldap -- --target=opendj --seed-entries=25000 --search-value=seed-12
+#
+#   # FreeDSx vs 389DS
+#   composer compare-ldap -- --target=389ds --seed-entries=25000 --search-value=seed-12
 #
 #   # Any-vs-any: neither side is FreeDSx (both seeded over LDAP)
 #   composer compare-ldap -- --source=openldap --target=opendj
@@ -42,6 +46,7 @@ KEEP_UP=0
 WORKERS=0
 SERVER_CPUSET=0-3
 DRIVER_CPUSET=4-7
+JIT=function
 
 for arg in "$@"; do
     case "$arg" in
@@ -60,11 +65,18 @@ for arg in "$@"; do
         --swoole-workers=*)   WORKERS="${arg#*=}" ;;
         --server-cpuset=*)    SERVER_CPUSET="${arg#*=}" ;;
         --driver-cpuset=*)    DRIVER_CPUSET="${arg#*=}" ;;
+        --jit=*)              JIT="${arg#*=}" ;;
         --keep-up)            KEEP_UP=1 ;;
-        -h|--help)            sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help)            sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *)                    echo "unknown arg: $arg" >&2; exit 2 ;;
     esac
 done
+
+# A bad value would otherwise reach php as an opcache setting and only surface as a server that will not start.
+case "$JIT" in
+    off|function|tracing) ;;
+    *) echo "unknown --jit value: $JIT (expected off, function, or tracing)" >&2; exit 2 ;;
+esac
 
 # Resolve a service key to its compose service, container, internal LDAP port, admin bind, base DN, display
 # label, and per-service setup hook. Sets ${prefix}_SVC / _CONT / _PORT / _BIND / _PW / _BASE / _LABEL / _SETUP.
@@ -84,7 +96,11 @@ resolve_svc() {
             declare -g "${p}_SVC=opendj" "${p}_CONT=freedsx-profile-opendj" "${p}_PORT=1389" \
                 "${p}_BIND=cn=Directory Manager" "${p}_PW=P@ssword12345" "${p}_BASE=dc=example,dc=com" \
                 "${p}_LABEL=OpenDJ" "${p}_SETUP=opendj" ;;
-        *) echo "unknown service: $key (expected freedsx, openldap, or opendj)" >&2; exit 2 ;;
+        389ds)
+            declare -g "${p}_SVC=389ds" "${p}_CONT=freedsx-profile-389ds" "${p}_PORT=3389" \
+                "${p}_BIND=cn=Directory Manager" "${p}_PW=P@ssword12345" "${p}_BASE=dc=example,dc=com" \
+                "${p}_LABEL=389DS" "${p}_SETUP=389ds" ;;
+        *) echo "unknown service: $key (expected freedsx, openldap, opendj, or 389ds)" >&2; exit 2 ;;
     esac
 }
 
@@ -130,14 +146,41 @@ setup_opendj() {
     || echo "   (index-limit tweak skipped)"
 }
 
+# The image creates the instance but not the suffix, so create the backend, silence the per-op access log, and raise
+# the scan limits past the 4000 default so search-list stays indexed.
+setup_389ds() {
+    local bind="$1" pw="$2" base="$3" uri="ldap://localhost:3389"
+    if ! docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" backend suffix list 2>/dev/null \
+        | grep -qi "$base"; then
+        echo "==> creating 389ds backend for $base"
+        docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" backend create \
+            --suffix "$base" --be-name userRoot --create-suffix
+    fi
+
+    echo "==> tuning 389ds (disable access log; raise ID list + lookthrough limits)"
+    docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" \
+        config replace nsslapd-accesslog-logging-enabled=off >/dev/null 2>&1 \
+    || echo "   (access-log tweak skipped)"
+    docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" backend config set \
+        --idlistscanlimit 200000 --lookthroughlimit 200000 >/dev/null 2>&1 \
+    || echo "   (scan-limit tweak skipped)"
+}
+
+run_setup() {
+    case "$1" in
+        opendj) setup_opendj "${@:2}" ;;
+        389ds)  setup_389ds "${@:2}" ;;
+    esac
+}
+
 echo "==> up $SRC_LABEL ($SRC_SVC) + $TGT_LABEL ($TGT_SVC) (cpuset=$SERVER_CPUSET each, driver on $DRIVER_CPUSET, seed=$SEED)"
 # Sharing cores with the driver can reverse which server looks faster, so each side is pinned to its own.
 PROFILE_CPUS="$CPUS" FREEDSX_STORAGE="$STORAGE" FREEDSX_RUNNER="$RUNNER" SEED_ENTRIES=0 \
-SERVER_CPUSET="$SERVER_CPUSET" SWOOLE_WORKERS="$WORKERS" FREEDSX_JIT="$([[ "$RUNNER" == pcntl ]] && echo off || echo function)" \
+SERVER_CPUSET="$SERVER_CPUSET" SWOOLE_WORKERS="$WORKERS" FREEDSX_JIT="$JIT" \
     docker compose -f "$COMPOSE" up -d --wait "$SRC_SVC" "$TGT_SVC"
 
-[[ "$SRC_SETUP" == opendj ]] && setup_opendj "$SRC_BIND" "$SRC_PW" "$SRC_BASE"
-[[ "$TGT_SETUP" == opendj ]] && setup_opendj "$TGT_BIND" "$TGT_PW" "$TGT_BASE"
+run_setup "$SRC_SETUP" "$SRC_BIND" "$SRC_PW" "$SRC_BASE"
+run_setup "$TGT_SETUP" "$TGT_BIND" "$TGT_PW" "$TGT_BASE"
 
 NET=$(docker inspect -f '{{range $k,$_ := .NetworkSettings.Networks}}{{$k}}{{end}}' "$SRC_CONT")
 

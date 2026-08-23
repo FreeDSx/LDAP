@@ -109,8 +109,9 @@ services:
     environment:
       DS_DM_PASSWORD: "P@ssword12345"
       DS_SUFFIX_NAME: "dc=example,dc=com"
+    # The instance answers before the entrypoint applies DS_DM_PASSWORD, so readiness is a successful manager bind.
     healthcheck:
-      test: ["CMD-SHELL", "dsctl localhost status 2>/dev/null | grep -qi running"]
+      test: ["CMD-SHELL", "dsconf -D 'cn=Directory Manager' -w \"$$DS_DM_PASSWORD\" ldap://localhost:3389 backend suffix list >/dev/null 2>&1"]
       interval: 5s
       timeout: 5s
       retries: 60
