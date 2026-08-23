@@ -54,6 +54,43 @@ final class SwooleWriterQueueTest extends TestCase
         self::assertTrue($executed);
     }
 
+    public function test_is_writer_is_false_before_any_job_runs(): void
+    {
+        $queue = new SwooleWriterQueue();
+
+        self::assertFalse($queue->isWriter());
+    }
+
+    public function test_is_writer_is_true_inside_a_job(): void
+    {
+        $observed = null;
+
+        Coroutine\run(function () use (&$observed): void {
+            $queue = new SwooleWriterQueue();
+            $queue->run(static function () use ($queue, &$observed): void {
+                $observed = $queue->isWriter();
+            });
+        });
+
+        self::assertTrue($observed);
+    }
+
+    /**
+     * The submitter is blocked on the reply while its job runs, so treating it as the writer would route it wrongly.
+     */
+    public function test_is_writer_is_false_on_the_coroutine_that_submitted_the_job(): void
+    {
+        $observed = null;
+
+        Coroutine\run(function () use (&$observed): void {
+            $queue = new SwooleWriterQueue();
+            $queue->run(static fn() => null);
+            $observed = $queue->isWriter();
+        });
+
+        self::assertFalse($observed);
+    }
+
     public function test_run_rethrows_job_exception_to_caller(): void
     {
         $thrown = null;

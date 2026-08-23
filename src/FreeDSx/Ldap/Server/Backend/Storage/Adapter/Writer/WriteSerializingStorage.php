@@ -45,7 +45,6 @@ final readonly class WriteSerializingStorage implements
         private EntryStorageInterface $reads,
         private EntryStorageInterface $writes,
         private WriterQueueInterface $queue,
-        private WriteScope $scope = new WriteScope(),
     ) {}
 
     public function drainWrites(): void
@@ -105,22 +104,7 @@ final readonly class WriteSerializingStorage implements
 
     public function atomic(callable $operation): void
     {
-        // Nests on the transaction already open, rather than queueing a job the blocked writer could never run.
-        if ($this->scope->isActive()) {
-            $this->writes->atomic($operation);
-
-            return;
-        }
-
-        $this->queue->run(function () use ($operation): void {
-            $this->scope->enter();
-
-            try {
-                $this->writes->atomic($operation);
-            } finally {
-                $this->scope->leave();
-            }
-        });
+        $this->submit(fn() => $this->writes->atomic($operation));
     }
 
     /**
@@ -170,19 +154,19 @@ final readonly class WriteSerializingStorage implements
      */
     private function readStorage(): EntryStorageInterface
     {
-        return $this->scope->isActive()
+        return $this->queue->isWriter()
             ? $this->writes
             : $this->reads;
     }
 
     /**
-     * Runs the write directly when the writer is already executing it, since queueing would block on itself.
+     * Runs directly when the writer is already executing, since submitting there would block the writer on itself.
      *
      * @param Closure(): void $write
      */
     private function submit(Closure $write): void
     {
-        if ($this->scope->isActive()) {
+        if ($this->queue->isWriter()) {
             $write();
 
             return;

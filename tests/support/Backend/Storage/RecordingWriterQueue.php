@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Support\FreeDSx\Ldap\Backend\Storage;
 
 use Closure;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriterQueueInterface;
 
 /**
@@ -23,10 +24,28 @@ final class RecordingWriterQueue implements WriterQueueInterface
 {
     public int $runs = 0;
 
+    private WriteScope $scope;
+
+    public function __construct()
+    {
+        $this->scope = new WriteScope();
+    }
+
     public function run(Closure $job): void
     {
         $this->runs++;
-        $job();
+        $this->scope->enter();
+
+        try {
+            $job();
+        } finally {
+            $this->scope->leave();
+        }
+    }
+
+    public function isWriter(): bool
+    {
+        return $this->scope->isActive();
     }
 
     /**
