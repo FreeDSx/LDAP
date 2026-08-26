@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\Storage\PageCursor;
+use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 
 /**
  * One page of a paging operation, and where the result was left.

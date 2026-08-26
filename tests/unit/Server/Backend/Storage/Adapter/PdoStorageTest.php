@@ -49,7 +49,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
-use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
+use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\AddEntryHandler;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;

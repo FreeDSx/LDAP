@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
-use FreeDSx\Ldap\Sync\Provider\Exception\MalformedSyncCookieException;
+use FreeDSx\Ldap\Exception\MalformedSyncCookieException;
 use FreeDSx\Ldap\Sync\Provider\SyncCookie;
 use PHPUnit\Framework\TestCase;
 

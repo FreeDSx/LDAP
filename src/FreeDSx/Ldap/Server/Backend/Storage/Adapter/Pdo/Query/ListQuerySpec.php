@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
-use FreeDSx\Ldap\Server\Backend\Storage\PageCursor;
+use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 

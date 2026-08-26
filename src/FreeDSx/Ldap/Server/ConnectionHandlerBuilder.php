@@ -75,7 +75,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordResetGate;
-use FreeDSx\Ldap\Server\Sasl\External\SubjectDnCredentialMapper;
+use FreeDSx\Ldap\Server\Backend\Auth\SubjectDnCredentialMapper;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Options\SaslOptions;

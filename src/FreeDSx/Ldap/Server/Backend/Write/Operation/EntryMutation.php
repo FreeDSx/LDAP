@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\WriteEntryOperationHandler;
-use FreeDSx\Ldap\Server\Backend\Storage\OperationalAttributeGenerator;
+use FreeDSx\Ldap\Server\Backend\Write\OperationalAttributeGenerator;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolationGate;

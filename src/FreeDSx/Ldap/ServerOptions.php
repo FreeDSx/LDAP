@@ -20,7 +20,7 @@ use FreeDSx\Ldap\Exception\SchemaParseException;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
-use FreeDSx\Ldap\Server\Sasl\External\ExternalCredentialMapperInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\ExternalCredentialMapperInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;

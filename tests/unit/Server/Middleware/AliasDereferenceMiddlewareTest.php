@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\AliasResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\Directory\AliasResolver;
 use FreeDSx\Ldap\Server\Middleware\AliasDereferenceMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Token\TokenInterface;

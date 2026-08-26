@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\SeedOptions;
+use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedOptions;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Schema\LdifSchemaSource;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;

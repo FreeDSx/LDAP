@@ -37,7 +37,7 @@ use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
-use FreeDSx\Ldap\Sync\Provider\Exception\MalformedSyncCookieException;
+use FreeDSx\Ldap\Exception\MalformedSyncCookieException;
 use FreeDSx\Ldap\Sync\Provider\SyncCookie;
 use FreeDSx\Ldap\Sync\Provider\SyncPersistStreamer;
 use FreeDSx\Ldap\Sync\Provider\SyncResult;

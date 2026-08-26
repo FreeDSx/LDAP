@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\AliasResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\Directory\AliasResolver;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;

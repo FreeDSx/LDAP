@@ -43,7 +43,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
-use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
+use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyService;
