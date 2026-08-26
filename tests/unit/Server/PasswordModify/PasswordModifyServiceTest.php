@@ -25,7 +25,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyService;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyTargetResolver;
@@ -38,7 +38,7 @@ final class PasswordModifyServiceTest extends TestCase
 {
     private const USER_DN = 'cn=user,dc=foo,dc=bar';
 
-    private LdapBackendInterface&MockObject $backend;
+    private ReadBackendInterface&MockObject $backend;
 
     private BindNameResolverInterface&MockObject $resolver;
 
@@ -54,7 +54,7 @@ final class PasswordModifyServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->backend = $this->createMock(LdapBackendInterface::class);
+        $this->backend = $this->createMock(ReadBackendInterface::class);
         $this->resolver = $this->createMock(BindNameResolverInterface::class);
         $this->accessControl = $this->createMock(AccessControlInterface::class);
         $writeHandler = $this->createMock(WriteHandlerInterface::class);

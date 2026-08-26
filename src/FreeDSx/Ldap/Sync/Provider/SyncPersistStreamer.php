@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncNewCookie;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
@@ -46,7 +46,7 @@ final readonly class SyncPersistStreamer
     public const DEFAULT_POLL_INTERVAL = 1.0;
 
     public function __construct(
-        private LdapBackendInterface $backend,
+        private ReadBackendInterface $backend,
         private SyncResultProjector $projector,
         private ChangeStream $stream,
         private SleeperInterface $sleeper,

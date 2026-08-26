@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordBindAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyBindGuard;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
@@ -32,7 +32,7 @@ final readonly class SaslBindPolicyEnforcer
 {
     public function __construct(
         private BindNameResolverInterface $nameResolver,
-        private LdapBackendInterface $backend,
+        private ReadBackendInterface $backend,
         private PasswordPolicyResolver $resolver,
         private PasswordPolicyBindGuard $guard,
         private PasswordPolicyContext $context,

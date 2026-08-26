@@ -25,7 +25,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordPolicyAwareAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
@@ -61,7 +61,7 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
 
     private FrozenClock $clock;
 
-    private WritableStorageBackend $backend;
+    private StorageReadBackend $backend;
 
     private PasswordPolicyContext $context;
 
@@ -615,7 +615,7 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
             ),
             $user,
         ]));
-        $this->backend = $container->get(WritableStorageBackend::class);
+        $this->backend = $container->get(StorageReadBackend::class);
 
         $nameResolver = new DnBindNameResolver();
         $engine = new PasswordPolicyEngine(

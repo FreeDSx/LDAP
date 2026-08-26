@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Container\Contributor;
 
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 
 /**
@@ -28,7 +28,7 @@ final readonly class DirectoryListenerContributor implements ListenerContributor
      * @param array<class-string, object> $reloadInstances
      */
     public function __construct(
-        private WritableStorageBackend $backend,
+        private StorageReadBackend $backend,
         private array $reloadInstances,
         private StorageConfigInterface $storageConfig,
     ) {}

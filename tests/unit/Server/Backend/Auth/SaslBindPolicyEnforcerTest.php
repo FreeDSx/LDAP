@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslBindPolicyEnforcer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
@@ -51,7 +51,7 @@ final class SaslBindPolicyEnforcerTest extends TestCase
 
     private FrozenClock $clock;
 
-    private WritableStorageBackend $backend;
+    private StorageReadBackend $backend;
 
     private PasswordPolicyContext $context;
 
@@ -190,7 +190,7 @@ final class SaslBindPolicyEnforcerTest extends TestCase
                 ] + $userAttrs,
             ),
         ]));
-        $this->backend = $container->get(WritableStorageBackend::class);
+        $this->backend = $container->get(StorageReadBackend::class);
 
         $engine = new PasswordPolicyEngine(
             clock: $this->clock,

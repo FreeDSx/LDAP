@@ -31,7 +31,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
 use FreeDSx\Ldap\Protocol\Queue\Response\QueueWriterConfig;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
 use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
 use FreeDSx\Ldap\Server\SearchLimits;
@@ -63,7 +63,7 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
     ];
 
     public function __construct(
-        private readonly LdapBackendInterface $backend,
+        private readonly ReadBackendInterface $backend,
         private readonly SyncResultProjector $projector,
         private readonly SearchLimits $limits = new SearchLimits(),
         private readonly ?ChangeStream $changeStream = null,

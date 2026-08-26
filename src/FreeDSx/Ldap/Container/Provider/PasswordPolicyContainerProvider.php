@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackend;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
@@ -101,7 +101,7 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
     private function makePasswordModifyTargetResolver(Container $container): PasswordModifyTargetResolver
     {
         return new PasswordModifyTargetResolver(
-            $container->get(WritableStorageBackend::class),
+            $container->get(ReadBackendInterface::class),
             $container->get(BindNameResolverInterface::class),
         );
     }
@@ -119,7 +119,7 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
     private function makePasswordPolicyResolver(Container $container): PasswordPolicyResolver
     {
         $options = $container->get(ServerOptions::class);
-        $backend = $container->get(WritableStorageBackend::class);
+        $backend = $container->get(ReadBackendInterface::class);
 
         return new PasswordPolicyResolver(
             $backend,
@@ -135,7 +135,7 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
     private function makePasswordPolicyComponentFactory(Container $container): PasswordPolicyComponentFactory
     {
         return new PasswordPolicyComponentFactory(
-            backend: $container->get(WritableStorageBackend::class),
+            backend: $container->get(ReadBackendInterface::class),
             options: $container->get(ServerOptions::class),
             writeDispatcher: $container->get(WriteOperationDispatcher::class),
             passwordPolicyEngine: $container->get(PasswordPolicyEngine::class),

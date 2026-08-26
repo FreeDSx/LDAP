@@ -13,11 +13,11 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\PasswordPolicy;
 
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\PasswordPolicyWriteHandler;
 use FreeDSx\Ldap\Server\Backend\Write\SystemChange\NullSystemChangeWriter;
 use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriter;
 use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriterInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyChangeGuard;
@@ -32,7 +32,7 @@ use FreeDSx\Ldap\ServerOptions;
 final readonly class PasswordPolicyComponentFactory
 {
     public function __construct(
-        private LdapBackendInterface $backend,
+        private ReadBackendInterface $backend,
         private ServerOptions $options,
         private WriteHandlerInterface $writeDispatcher,
         private PasswordPolicyEngine $passwordPolicyEngine,

@@ -25,7 +25,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPasswordPolicyForwardHandler;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Command\ComputeUpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
@@ -47,7 +47,7 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
 
     private const DN = 'cn=user,dc=foo,dc=bar';
 
-    private LdapBackendInterface&MockObject $backend;
+    private ReadBackendInterface&MockObject $backend;
 
     private WriteHandlerInterface&MockObject $writes;
 
@@ -59,7 +59,7 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->backend = $this->createMock(LdapBackendInterface::class);
+        $this->backend = $this->createMock(ReadBackendInterface::class);
         $this->writes = $this->createMock(WriteHandlerInterface::class);
         $this->accessControl = $this->createMock(AccessControlInterface::class);
         $this->subject = new ServerPasswordPolicyForwardHandler(

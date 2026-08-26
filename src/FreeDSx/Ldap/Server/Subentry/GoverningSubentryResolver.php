@@ -22,7 +22,7 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 
 use function iterator_to_array;
 use function sprintf;
@@ -35,7 +35,7 @@ use function sprintf;
 final readonly class GoverningSubentryResolver
 {
     public function __construct(
-        private LdapBackendInterface $backend,
+        private ReadBackendInterface $backend,
         private SubtreeSpecificationEvaluator $evaluator,
         private SubtreeSpecificationParser $parser = new SubtreeSpecificationParser(),
     ) {}

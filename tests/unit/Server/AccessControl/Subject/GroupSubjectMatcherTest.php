@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\SubjectEvaluationException;
 use FreeDSx\Ldap\Server\AccessControl\Subject\GroupSubjectMatcher;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -27,13 +27,13 @@ use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
 
 final class GroupSubjectMatcherTest extends TestCase
 {
-    private LdapBackendInterface&MockObject $mockBackend;
+    private ReadBackendInterface&MockObject $mockBackend;
 
     private Dn $targetDn;
 
     protected function setUp(): void
     {
-        $this->mockBackend = $this->createMock(LdapBackendInterface::class);
+        $this->mockBackend = $this->createMock(ReadBackendInterface::class);
         $this->targetDn = new Dn('dc=foo,dc=bar');
     }
 

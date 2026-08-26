@@ -41,7 +41,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
@@ -141,7 +141,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
     private function makeForwardHandler(Container $container): ServerProtocolHandlerInterface
     {
         return new ServerPasswordPolicyForwardHandler(
-            backend: $container->get(WritableStorageBackend::class),
+            backend: $container->get(ReadBackendInterface::class),
             writes: $container->get(WriteOperationDispatcher::class),
             policyResolver: $container->get(PasswordPolicyResolver::class),
             engine: $container->get(PasswordPolicyEngine::class),
@@ -174,7 +174,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         ?SearchLimits $searchLimits,
     ): ServerSyncHandler {
         $options = $container->get(ServerOptions::class);
-        $backend = $container->get(WritableStorageBackend::class);
+        $backend = $container->get(ReadBackendInterface::class);
         $journal = $this->syncJournalFor($container);
         $projector = new SyncResultProjector(
             accessControl: $container->get(AccessControlInterface::class),
@@ -218,7 +218,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         Container $container,
         HandlerContext $context,
     ): ServerDispatchHandler {
-        $backend = $container->get(WritableStorageBackend::class);
+        $backend = $container->get(ReadBackendInterface::class);
 
         return new ServerDispatchHandler(
             backend: $backend,
@@ -240,7 +240,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         $options = $container->get(ServerOptions::class);
 
         return new ServerSearchHandler(
-            backend: $container->get(WritableStorageBackend::class),
+            backend: $container->get(ReadBackendInterface::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
             accessControl: $container->get(AccessControlInterface::class),
             schema: $options->getSchema(),
@@ -256,7 +256,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         $options = $container->get(ServerOptions::class);
 
         return new ServerPagingHandler(
-            backend: $container->get(WritableStorageBackend::class),
+            backend: $container->get(ReadBackendInterface::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
             accessControl: $container->get(AccessControlInterface::class),
             requestHistory: $context->requestHistory,

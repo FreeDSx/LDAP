@@ -20,7 +20,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordModifyAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyChangeGuard;
@@ -237,7 +237,7 @@ final class PasswordPolicyChangeGuardTest extends TestCase
                 [ClockInterface::class => $this->clock],
             ),
             new PasswordPolicyResolver(
-                $this->createMock(LdapBackendInterface::class),
+                $this->createMock(ReadBackendInterface::class),
                 null,
                 $policy,
             ),

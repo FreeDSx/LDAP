@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\MatchedDnAccessFilterTrait;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
@@ -41,7 +41,7 @@ final readonly class ResponseWriterMiddleware implements MiddlewareInterface
 
     public function __construct(
         private ResponseWriter $writer,
-        private LdapBackendInterface $backend,
+        private ReadBackendInterface $backend,
         private AccessControlInterface $accessControl,
         private ResponseFactory $responseFactory = new ResponseFactory(),
     ) {}

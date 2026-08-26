@@ -17,13 +17,13 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverChain;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class BindNameResolverChainTest extends TestCase
 {
-    private LdapBackendInterface&MockObject $mockBackend;
+    private ReadBackendInterface&MockObject $mockBackend;
 
     private BindNameResolverInterface&MockObject $mockResolverA;
 
@@ -31,7 +31,7 @@ final class BindNameResolverChainTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockBackend = $this->createMock(LdapBackendInterface::class);
+        $this->mockBackend = $this->createMock(ReadBackendInterface::class);
         $this->mockResolverA = $this->createMock(BindNameResolverInterface::class);
         $this->mockResolverB = $this->createMock(BindNameResolverInterface::class);
     }

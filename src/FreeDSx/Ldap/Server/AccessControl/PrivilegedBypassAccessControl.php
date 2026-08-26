@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Token\PrivilegedTokenInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
@@ -31,7 +31,7 @@ final readonly class PrivilegedBypassAccessControl implements AccessControlInter
 {
     public function __construct(private AccessControlInterface $inner) {}
 
-    public function setBackend(LdapBackendInterface $backend): void
+    public function setBackend(ReadBackendInterface $backend): void
     {
         if ($this->inner instanceof BackendAwareInterface) {
             $this->inner->setBackend($backend);

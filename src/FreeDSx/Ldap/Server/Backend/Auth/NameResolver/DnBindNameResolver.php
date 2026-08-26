@@ -15,10 +15,10 @@ namespace FreeDSx\Ldap\Server\Backend\Auth\NameResolver;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 
 /**
- * Default resolver: treats the bind name as a DN and delegates to LdapBackendInterface::get().
+ * Default resolver: treats the bind name as a DN and delegates to ReadBackendInterface::get().
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -26,7 +26,7 @@ final class DnBindNameResolver implements BindNameResolverInterface
 {
     public function resolve(
         string $name,
-        LdapBackendInterface $backend,
+        ReadBackendInterface $backend,
     ): ?Entry {
         return $backend->get(new Dn($name));
     }
