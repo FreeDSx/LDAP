@@ -49,11 +49,12 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
+use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\AddEntryHandler;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
-use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use PDO;
@@ -77,6 +78,8 @@ final class PdoStorageTest extends TestCase
 
     private WritableStorageBackend $subject;
 
+    private LdapImporter $importer;
+
     private PdoStorage $storage;
 
     private Entry $alice;
@@ -90,16 +93,12 @@ final class PdoStorageTest extends TestCase
         );
 
         $this->storage = $this->pdoStorage(TestServerOptions::sqlite());
-        $this->subject = $this->backendFor($this->storage);
-        $this->subject->add(
-            new AddCommand(
-                new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
-            ),
-            $this->systemContext(),
-        );
-        $this->subject->add(
-            new AddCommand($this->alice),
-            $this->context(),
+        $container = $this->containerFor($this->storage);
+        $this->subject = $container->get(WritableStorageBackend::class);
+        $this->importer = $container->get(LdapImporter::class);
+        $this->seed(
+            new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
+            $this->alice,
         );
     }
 
@@ -479,23 +478,19 @@ final class PdoStorageTest extends TestCase
 
     public function test_composed_and_streams_off_a_leaf_and_php_verifies_the_rest(): void
     {
-        $this->subject->add(
-            new AddCommand(new Entry(
+        $this->seed(
+            new Entry(
                 new Dn('cn=bob,dc=example,dc=com'),
                 new Attribute('cn', 'bob'),
                 new Attribute('sn', 'common'),
                 new Attribute('objectClass', 'person'),
-            )),
-            $this->context(),
-        );
-        $this->subject->add(
-            new AddCommand(new Entry(
+            ),
+            new Entry(
                 new Dn('cn=carol,dc=example,dc=com'),
                 new Attribute('cn', 'carol'),
                 new Attribute('sn', 'common'),
                 new Attribute('objectClass', 'device'),
-            )),
-            $this->context(),
+            ),
         );
 
         // sn=common matches both; the AND drives off a leaf and PHP verifies the rest, so carol (objectClass=device) fails
@@ -522,21 +517,17 @@ final class PdoStorageTest extends TestCase
 
     public function test_infix_search_finds_matches_and_rejects_trigram_over_selection(): void
     {
-        $this->subject->add(
-            new AddCommand(new Entry(
+        $this->seed(
+            new Entry(
                 new Dn('uid=match,dc=example,dc=com'),
                 new Attribute('uid', 'match'),
                 new Attribute('cn', 'blacksmith'),
-            )),
-            $this->context(),
-        );
-        $this->subject->add(
-            new AddCommand(new Entry(
+            ),
+            new Entry(
                 new Dn('uid=scatter,dc=example,dc=com'),
                 new Attribute('uid', 'scatter'),
                 new Attribute('cn', 'smi mit ith'),
-            )),
-            $this->context(),
+            ),
         );
 
         self::assertSame(
@@ -609,34 +600,27 @@ final class PdoStorageTest extends TestCase
         self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
     }
 
-    public function test_add_persists_entry(): void
+    public function test_store_persists_entry(): void
     {
-        $entry = new Entry(new Dn('cn=Persistent,dc=example,dc=com'), new Attribute('cn', 'Persistent'));
-        $this->subject->add(
-            new AddCommand($entry),
-            $this->context(),
-        );
+        $this->storage->store(new Entry(
+            new Dn('cn=Persistent,dc=example,dc=com'),
+            new Attribute('cn', 'Persistent'),
+        ));
 
-        self::assertNotNull($this->subject->get(new Dn('cn=Persistent,dc=example,dc=com')));
+        self::assertNotNull($this->storage->find(new Dn('cn=persistent,dc=example,dc=com')));
     }
 
-    public function test_delete_removes_entry(): void
+    public function test_remove_deletes_entry(): void
     {
-        $this->subject->delete(
-            new DeleteCommand(new Dn('cn=Alice,dc=example,dc=com')),
-            $this->context(),
-        );
+        $this->storage->remove(new Dn('cn=alice,dc=example,dc=com'));
 
-        self::assertNull($this->subject->get(new Dn('cn=Alice,dc=example,dc=com')));
+        self::assertNull($this->storage->find(new Dn('cn=alice,dc=example,dc=com')));
     }
 
     public function test_list_single_level_returns_direct_children_only(): void
     {
         $grandchild = new Entry(new Dn('cn=Sub,cn=Alice,dc=example,dc=com'), new Attribute('cn', 'Sub'));
-        $this->subject->add(
-            new AddCommand($grandchild),
-            $this->context(),
-        );
+        $this->seed($grandchild);
 
         $request = (new SearchRequest(new AndFilter()))
             ->base('dc=example,dc=com')
@@ -656,10 +640,7 @@ final class PdoStorageTest extends TestCase
     public function test_list_recursive_includes_base_and_descendants(): void
     {
         $grandchild = new Entry(new Dn('cn=Sub,cn=Alice,dc=example,dc=com'), new Attribute('cn', 'Sub'));
-        $this->subject->add(
-            new AddCommand($grandchild),
-            $this->context(),
-        );
+        $this->seed($grandchild);
 
         $request = (new SearchRequest(new AndFilter()))
             ->base('dc=example,dc=com')
@@ -762,17 +743,9 @@ final class PdoStorageTest extends TestCase
 
     public function test_interleaved_lists_do_not_share_cursor_state(): void
     {
-        $this->subject->add(
-            new AddCommand(
-                new Entry(new Dn('cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Bob')),
-            ),
-            $this->context(),
-        );
-        $this->subject->add(
-            new AddCommand(
-                new Entry(new Dn('cn=Carol,dc=example,dc=com'), new Attribute('cn', 'Carol')),
-            ),
-            $this->context(),
+        $this->seed(
+            new Entry(new Dn('cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Bob')),
+            new Entry(new Dn('cn=Carol,dc=example,dc=com'), new Attribute('cn', 'Carol')),
         );
 
         $outerIterator = $this->storage->list(StorageListOptions::matchAll(
@@ -821,17 +794,14 @@ final class PdoStorageTest extends TestCase
     public function test_attribute_options_round_trip_through_storage(): void
     {
         $dn = new Dn('uid=tagged,dc=example,dc=com');
-        $this->subject->add(
-            new AddCommand(
-                new Entry(
-                    $dn,
-                    new Attribute('uid', 'tagged'),
-                    new Attribute('cn', 'Common'),
-                    new Attribute('cn;lang-en', 'English'),
-                    new Attribute('userCertificate;binary', 'CERTDATA'),
-                ),
+        $this->seed(
+            new Entry(
+                $dn,
+                new Attribute('uid', 'tagged'),
+                new Attribute('cn', 'Common'),
+                new Attribute('cn;lang-en', 'English'),
+                new Attribute('userCertificate;binary', 'CERTDATA'),
             ),
-            $this->context(),
         );
 
         $entry = $this->subject->get($dn);
@@ -853,25 +823,17 @@ final class PdoStorageTest extends TestCase
 
     public function test_option_bearing_equality_filter_matches_only_the_subtype(): void
     {
-        $this->subject->add(
-            new AddCommand(
-                new Entry(
-                    new Dn('uid=tagged,dc=example,dc=com'),
-                    new Attribute('uid', 'tagged'),
-                    new Attribute('cn;lang-en', 'shared'),
-                ),
+        $this->seed(
+            new Entry(
+                new Dn('uid=tagged,dc=example,dc=com'),
+                new Attribute('uid', 'tagged'),
+                new Attribute('cn;lang-en', 'shared'),
             ),
-            $this->context(),
-        );
-        $this->subject->add(
-            new AddCommand(
-                new Entry(
-                    new Dn('uid=plain,dc=example,dc=com'),
-                    new Attribute('uid', 'plain'),
-                    new Attribute('cn', 'shared'),
-                ),
+            new Entry(
+                new Dn('uid=plain,dc=example,dc=com'),
+                new Attribute('uid', 'plain'),
+                new Attribute('cn', 'shared'),
             ),
-            $this->context(),
         );
 
         self::assertSame(
@@ -925,22 +887,11 @@ final class PdoStorageTest extends TestCase
 
     public function test_search_inexact_filter_trips_lookthrough_limit(): void
     {
-        $storage = $this->pdoStorage(TestServerOptions::sqlite());
-        $backend = $this->backendFor(
-            $storage,
+        $backend = $this->seededBackend(
             TestServerOptions::unvalidatedCore()
                 ->setMaxSearchLookthrough(2),
+            ...$this->namedEntries(['Ann', 'Bob', 'Cyd']),
         );
-        $backend->add(
-            new AddCommand(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
-            $this->systemContext(),
-        );
-        foreach (['Ann', 'Bob', 'Cyd'] as $cn) {
-            $backend->add(
-                new AddCommand(new Entry(new Dn("cn={$cn},dc=example,dc=com"), new Attribute('cn', $cn))),
-                $this->context(),
-            );
-        }
 
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
@@ -956,22 +907,11 @@ final class PdoStorageTest extends TestCase
 
     public function test_search_exact_filter_is_not_subject_to_lookthrough(): void
     {
-        $storage = $this->pdoStorage(TestServerOptions::sqlite());
-        $backend = $this->backendFor(
-            $storage,
+        $backend = $this->seededBackend(
             TestServerOptions::unvalidatedCore()
                 ->setMaxSearchLookthrough(1),
+            ...$this->namedEntries(['Ann', 'Bob', 'Cyd']),
         );
-        $backend->add(
-            new AddCommand(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
-            $this->systemContext(),
-        );
-        foreach (['Ann', 'Bob', 'Cyd'] as $cn) {
-            $backend->add(
-                new AddCommand(new Entry(new Dn("cn={$cn},dc=example,dc=com"), new Attribute('cn', $cn))),
-                $this->context(),
-            );
-        }
 
         $request = (new SearchRequest(Filters::equal('cn', 'Ann')))
             ->base('dc=example,dc=com')
@@ -988,26 +928,14 @@ final class PdoStorageTest extends TestCase
 
     public function test_search_exact_filter_returns_every_match_past_the_transfer_bound(): void
     {
-        $storage = $this->pdoStorage(TestServerOptions::sqlite());
-        $backend = $this->backendFor(
-            $storage,
+        $backend = $this->seededBackend(
             TestServerOptions::unvalidatedCore()
                 ->setMaxSearchLookthrough(2),
+            ...$this->namedEntries(
+                ['Ann', 'Bob', 'Cyd', 'Dan', 'Eve'],
+                new Attribute('st', 'dup'),
+            ),
         );
-        $backend->add(
-            new AddCommand(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
-            $this->systemContext(),
-        );
-        foreach (['Ann', 'Bob', 'Cyd', 'Dan', 'Eve'] as $cn) {
-            $backend->add(
-                new AddCommand(new Entry(
-                    new Dn("cn={$cn},dc=example,dc=com"),
-                    new Attribute('cn', $cn),
-                    new Attribute('st', 'dup'),
-                )),
-                $this->context(),
-            );
-        }
 
         $request = (new SearchRequest(Filters::equal('st', 'dup')))
             ->base('dc=example,dc=com')
@@ -1275,19 +1203,16 @@ final class PdoStorageTest extends TestCase
         }
     }
 
-    public function test_add_translates_dn_too_long_to_admin_limit_exceeded(): void
+    public function test_a_write_translates_dn_too_long_to_admin_limit_exceeded(): void
     {
-        $storage = $this->createPdoStorageWithMaxDnLength(5);
-        $backend = $this->backendFor($storage);
-
-        $entry = new Entry(
-            new Dn('cn=TooLong,dc=example'),
-            new Attribute('cn', 'TooLong'),
-        );
+        $container = $this->containerFor($this->createPdoStorageWithMaxDnLength(5));
 
         try {
-            $backend->add(
-                new AddCommand($entry),
+            $container->get(AddEntryHandler::class)->handle(
+                new AddCommand(new Entry(
+                    new Dn('cn=TooLong,dc=example'),
+                    new Attribute('cn', 'TooLong'),
+                )),
                 $this->systemContext(),
             );
             self::fail('Expected OperationException was not thrown.');
@@ -1305,24 +1230,16 @@ final class PdoStorageTest extends TestCase
 
     public function test_subtree_does_not_match_escaped_comma_suffix_collision(): void
     {
-        $storage = $this->pdoStorage(TestServerOptions::sqlite());
-        $backend = $this->backendFor($storage);
-
-        $base = new Entry(
-            new Dn('dc=example,dc=com'),
-            new Attribute('dc', 'example'),
-        );
-        $escaped = new Entry(
-            new Dn('cn=Doe\,John,dc=example,dc=com'),
-            new Attribute('cn', 'Doe,John'),
-        );
-        $backend->add(
-            new AddCommand($base),
-            $this->systemContext(),
-        );
-        $backend->add(
-            new AddCommand($escaped),
-            $this->context(),
+        $backend = $this->seededBackend(
+            TestServerOptions::unvalidatedCore(),
+            new Entry(
+                new Dn('dc=example,dc=com'),
+                new Attribute('dc', 'example'),
+            ),
+            new Entry(
+                new Dn('cn=Doe\,John,dc=example,dc=com'),
+                new Attribute('cn', 'Doe,John'),
+            ),
         );
 
         $request = (new SearchRequest(new AndFilter()))
@@ -1340,24 +1257,16 @@ final class PdoStorageTest extends TestCase
 
     public function test_subtree_includes_entries_with_escaped_comma_under_correct_parent(): void
     {
-        $storage = $this->pdoStorage(TestServerOptions::sqlite());
-        $backend = $this->backendFor($storage);
-
-        $base = new Entry(
-            new Dn('dc=example,dc=com'),
-            new Attribute('dc', 'example'),
-        );
-        $escaped = new Entry(
-            new Dn('cn=Doe\,John,dc=example,dc=com'),
-            new Attribute('cn', 'Doe,John'),
-        );
-        $backend->add(
-            new AddCommand($base),
-            $this->systemContext(),
-        );
-        $backend->add(
-            new AddCommand($escaped),
-            $this->context(),
+        $backend = $this->seededBackend(
+            TestServerOptions::unvalidatedCore(),
+            new Entry(
+                new Dn('dc=example,dc=com'),
+                new Attribute('dc', 'example'),
+            ),
+            new Entry(
+                new Dn('cn=Doe\,John,dc=example,dc=com'),
+                new Attribute('cn', 'Doe,John'),
+            ),
         );
 
         $request = (new SearchRequest(new AndFilter()))
@@ -1628,20 +1537,57 @@ final class PdoStorageTest extends TestCase
         return $dns;
     }
 
-    private function context(): WriteContext
-    {
-        return new WriteContext(
-            new AnonToken(),
-            new ControlBag(),
-        );
-    }
-
     private function systemContext(): WriteContext
     {
         return WriteContext::system(
             new AnonToken(),
             new ControlBag(),
         );
+    }
+
+    /**
+     * Bulk load, so the fixture carries its operational attributes without the write pipeline being involved.
+     */
+    private function seed(Entry ...$entries): void
+    {
+        $this->importer->importEntries($entries);
+    }
+
+    /**
+     * A backend over a fresh store, seeded with the given entries, for tests needing options the shared fixture lacks.
+     */
+    private function seededBackend(
+        ServerOptions $options,
+        Entry ...$entries,
+    ): WritableStorageBackend {
+        $container = $this->containerFor(
+            $this->pdoStorage(TestServerOptions::sqlite()),
+            $options,
+        );
+        $container->get(LdapImporter::class)->importEntries($entries);
+
+        return $container->get(WritableStorageBackend::class);
+    }
+
+    /**
+     * @param list<string> $names
+     *
+     * @return list<Entry> a naming context and one entry per name beneath it
+     */
+    private function namedEntries(
+        array $names,
+        Attribute ...$shared,
+    ): array {
+        $entries = [new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))];
+        foreach ($names as $cn) {
+            $entries[] = new Entry(
+                new Dn("cn={$cn},dc=example,dc=com"),
+                new Attribute('cn', $cn),
+                ...$shared,
+            );
+        }
+
+        return $entries;
     }
 
     private function createPdoStorageWithMaxDnLength(int $max): PdoStorage

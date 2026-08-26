@@ -348,7 +348,7 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
         PasswordPolicy $policy,
         array $extra = [],
     ): ServerPasswordModifyHandler {
-        $this->backend = $this->backendFor(new InMemoryStorage([
+        $container = $this->containerFor(new InMemoryStorage([
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [
@@ -366,6 +366,7 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
                 ] + $extra,
             ),
         ]));
+        $this->backend = $container->get(WritableStorageBackend::class);
 
         return new ServerPasswordModifyHandler(
             service: new PasswordModifyService(
@@ -374,7 +375,7 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
                     new DnBindNameResolver(),
                 ),
                 accessControl: $this->createMock(AccessControlInterface::class),
-                writeDispatcher: new WriteOperationDispatcher($this->backend),
+                writeDispatcher: $container->get(WriteOperationDispatcher::class),
                 changeGuard: new PasswordPolicyChangeGuard(
                     $this->engine(),
                     new PasswordPolicyResolver(

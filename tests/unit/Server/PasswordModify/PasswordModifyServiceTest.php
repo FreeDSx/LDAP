@@ -27,7 +27,6 @@ use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
-use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyService;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyTargetResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
@@ -59,7 +58,6 @@ final class PasswordModifyServiceTest extends TestCase
         $this->resolver = $this->createMock(BindNameResolverInterface::class);
         $this->accessControl = $this->createMock(AccessControlInterface::class);
         $writeHandler = $this->createMock(WriteHandlerInterface::class);
-        $writeHandler->method('supports')->willReturn(true);
         $this->context = new PasswordPolicyContext();
 
         $this->userEntry = new Entry(
@@ -76,7 +74,7 @@ final class PasswordModifyServiceTest extends TestCase
                 $this->resolver,
             ),
             accessControl: $this->accessControl,
-            writeDispatcher: new WriteOperationDispatcher($writeHandler),
+            writeDispatcher: $writeHandler,
             hashService: new PasswordHashService(hashCost: 4),
             passwordPolicyContext: $this->context,
         );

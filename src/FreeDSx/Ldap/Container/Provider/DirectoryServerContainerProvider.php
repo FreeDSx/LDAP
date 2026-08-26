@@ -34,7 +34,26 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteRequestReplayer;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\AtomicWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
+use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\SubtreeMoveRecorder;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\AddEntryHandler;
+use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\ComputeUpdateCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteSubtreeCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\ComputeUpdateHandler;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\DeleteEntryHandler;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\DeleteSubtreeHandler;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\EntryMutation;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\EntryPlacementGuard;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\MoveEntryHandler;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\UpdateEntryHandler;
+use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolationGate;
 use FreeDSx\Ldap\Server\Subentry\SubentryPlacementGuard;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
@@ -110,6 +129,48 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             SearchStreamBuilder::class => $this->makeSearchStreamBuilder(...),
             LdapImporter::class => $this->makeLdapImporter(...),
             LdifParser::class => static fn(): LdifParser => new LdifParser(),
+            EntryLocator::class => static fn(Container $c): EntryLocator => new EntryLocator(
+                $c->get(EntryStorageInterface::class),
+            ),
+            SubtreeEnumerator::class => static fn(Container $c): SubtreeEnumerator => new SubtreeEnumerator(
+                $c->get(EntryStorageInterface::class),
+            ),
+            AtomicWriter::class => static fn(Container $c): AtomicWriter => new AtomicWriter(
+                $c->get(EntryStorageInterface::class),
+            ),
+            SubentryPlacementGuard::class => static fn(Container $c): SubentryPlacementGuard => new SubentryPlacementGuard(
+                $c->get(EntryStorageInterface::class),
+            ),
+            SchemaViolationGate::class => static fn(Container $c): SchemaViolationGate => new SchemaViolationGate(
+                $c->get(SchemaValidator::class),
+            ),
+            WriteEntryOperationHandler::class => static fn(Container $c): WriteEntryOperationHandler => new WriteEntryOperationHandler(
+                $c->get(EqualityComparatorResolver::class),
+            ),
+            EntryPlacementGuard::class => static fn(Container $c): EntryPlacementGuard => new EntryPlacementGuard(
+                $c->get(EntryStorageInterface::class),
+                $c->get(EntryLocator::class),
+                $c->get(SubentryPlacementGuard::class),
+            ),
+            EntryMutation::class => static fn(Container $c): EntryMutation => new EntryMutation(
+                $c->get(WriteEntryOperationHandler::class),
+                $c->get(SchemaViolationGate::class),
+                $c->get(OperationalAttributeGenerator::class),
+            ),
+            AddEntryHandler::class => $this->makeAddEntryHandler(...),
+            DeleteEntryHandler::class => $this->makeDeleteEntryHandler(...),
+            DeleteSubtreeHandler::class => $this->makeDeleteSubtreeHandler(...),
+            UpdateEntryHandler::class => $this->makeUpdateEntryHandler(...),
+            ComputeUpdateHandler::class => $this->makeComputeUpdateHandler(...),
+            MoveEntryHandler::class => $this->makeMoveEntryHandler(...),
+            WriteOperationDispatcher::class => static fn(Container $c): WriteOperationDispatcher => new WriteOperationDispatcher([
+                AddCommand::class => $c->get(AddEntryHandler::class)->handle(...),
+                DeleteCommand::class => $c->get(DeleteEntryHandler::class)->handle(...),
+                DeleteSubtreeCommand::class => $c->get(DeleteSubtreeHandler::class)->handle(...),
+                UpdateCommand::class => $c->get(UpdateEntryHandler::class)->handle(...),
+                ComputeUpdateCommand::class => $c->get(ComputeUpdateHandler::class)->handle(...),
+                MoveCommand::class => $c->get(MoveEntryHandler::class)->handle(...),
+            ]),
             WritableStorageBackend::class => $this->makeBackend(...),
             WriteRequestReplayer::class => $this->makeWriteRequestReplayer(...),
             ServerProtocolFactory::class => $this->makeServerProtocolFactory(...),
@@ -224,7 +285,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                 $container->get(AssertionMiddleware::class),
             ],
             new ReplayWriteHandler(new WriteRequestRouter(
-                $container->get(WritableStorageBackend::class),
                 $container->get(WriteOperationDispatcher::class),
             )),
         ));
@@ -255,21 +315,91 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeBackend(Container $container): WritableStorageBackend
     {
-        $options = $container->get(ServerOptions::class);
-        $storage = $container->get(EntryStorageInterface::class);
-
         return new WritableStorageBackend(
-            storage: $storage,
+            storage: $container->get(EntryStorageInterface::class),
             searchStream: $container->get(SearchStreamBuilder::class),
-            validator: $container->get(SchemaValidator::class),
             listOptions: $container->get(StorageListOptionsFactory::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
-            entryHandler: new WriteEntryOperationHandler(
-                $container->get(EqualityComparatorResolver::class),
-            ),
-            subentryGuard: new SubentryPlacementGuard($storage),
+            locator: $container->get(EntryLocator::class),
+        );
+    }
+
+    private function makeAddEntryHandler(Container $container): AddEntryHandler
+    {
+        return new AddEntryHandler(
+            storage: $container->get(EntryStorageInterface::class),
+            writer: $container->get(AtomicWriter::class),
+            placement: $container->get(EntryPlacementGuard::class),
+            schemaGate: $container->get(SchemaViolationGate::class),
             operationalAttrs: $container->get(OperationalAttributeGenerator::class),
-            changeRecorder: $this->changeRecorderFor($container, $storage),
+            changeRecorder: $this->changeRecorderFor($container),
+        );
+    }
+
+    private function makeDeleteEntryHandler(Container $container): DeleteEntryHandler
+    {
+        return new DeleteEntryHandler(
+            storage: $container->get(EntryStorageInterface::class),
+            writer: $container->get(AtomicWriter::class),
+            locator: $container->get(EntryLocator::class),
+            placement: $container->get(EntryPlacementGuard::class),
+            changeRecorder: $this->changeRecorderFor($container),
+        );
+    }
+
+    private function makeDeleteSubtreeHandler(Container $container): DeleteSubtreeHandler
+    {
+        return new DeleteSubtreeHandler(
+            storage: $container->get(EntryStorageInterface::class),
+            writer: $container->get(AtomicWriter::class),
+            locator: $container->get(EntryLocator::class),
+            placement: $container->get(EntryPlacementGuard::class),
+            subtree: $container->get(SubtreeEnumerator::class),
+            accessControl: $container->get(AccessControlInterface::class),
+            changeRecorder: $this->changeRecorderFor($container),
+        );
+    }
+
+    private function makeUpdateEntryHandler(Container $container): UpdateEntryHandler
+    {
+        return new UpdateEntryHandler(
+            storage: $container->get(EntryStorageInterface::class),
+            writer: $container->get(AtomicWriter::class),
+            locator: $container->get(EntryLocator::class),
+            mutation: $container->get(EntryMutation::class),
+            placement: $container->get(EntryPlacementGuard::class),
+            changeRecorder: $this->changeRecorderFor($container),
+        );
+    }
+
+    private function makeComputeUpdateHandler(Container $container): ComputeUpdateHandler
+    {
+        return new ComputeUpdateHandler(
+            storage: $container->get(EntryStorageInterface::class),
+            writer: $container->get(AtomicWriter::class),
+            locator: $container->get(EntryLocator::class),
+            mutation: $container->get(EntryMutation::class),
+            placement: $container->get(EntryPlacementGuard::class),
+            changeRecorder: $this->changeRecorderFor($container),
+        );
+    }
+
+    private function makeMoveEntryHandler(Container $container): MoveEntryHandler
+    {
+        $recorder = $this->changeRecorderFor($container);
+
+        return new MoveEntryHandler(
+            storage: $container->get(EntryStorageInterface::class),
+            writer: $container->get(AtomicWriter::class),
+            locator: $container->get(EntryLocator::class),
+            mutation: $container->get(EntryMutation::class),
+            placement: $container->get(EntryPlacementGuard::class),
+            moveRecorder: $recorder === null
+                ? null
+                : new SubtreeMoveRecorder(
+                    $recorder,
+                    $container->get(SubtreeEnumerator::class),
+                ),
         );
     }
 
@@ -331,11 +461,10 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     /**
      * A recorder when sync is enabled and the storage was built with a journal to append to.
      */
-    private function changeRecorderFor(
-        Container $container,
-        EntryStorageInterface $storage,
-    ): ?ChangeRecorder {
+    private function changeRecorderFor(Container $container): ?ChangeRecorder
+    {
         $options = $container->get(ServerOptions::class);
+        $storage = $container->get(EntryStorageInterface::class);
 
         if ($options->getChangeJournalConfig() === null || !$storage instanceof ChangeJournalingInterface) {
             return null;

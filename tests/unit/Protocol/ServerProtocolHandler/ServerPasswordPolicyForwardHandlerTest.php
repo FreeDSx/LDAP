@@ -25,7 +25,9 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPasswordPolicyForwardHandler;
-use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Write\Command\ComputeUpdateCommand;
+use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
@@ -45,7 +47,9 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
 
     private const DN = 'cn=user,dc=foo,dc=bar';
 
-    private WritableLdapBackendInterface&MockObject $backend;
+    private LdapBackendInterface&MockObject $backend;
+
+    private WriteHandlerInterface&MockObject $writes;
 
     private ServerPasswordPolicyForwardHandler $subject;
 
@@ -55,10 +59,12 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->backend = $this->createMock(WritableLdapBackendInterface::class);
+        $this->backend = $this->createMock(LdapBackendInterface::class);
+        $this->writes = $this->createMock(WriteHandlerInterface::class);
         $this->accessControl = $this->createMock(AccessControlInterface::class);
         $this->subject = new ServerPasswordPolicyForwardHandler(
             $this->backend,
+            $this->writes,
             new PasswordPolicyResolver(
                 $this->backend,
                 null,
@@ -131,13 +137,14 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
         $this->backend
             ->method('get')
             ->willReturn(Entry::fromArray(self::DN, ['cn' => ['user']]));
-        $this->backend
+        $this->writes
             ->expects(self::never())
-            ->method('atomicUpdate');
+            ->method('handle');
 
         // A resolver with no source at all, so nothing governs the target.
         $subject = new ServerPasswordPolicyForwardHandler(
             $this->backend,
+            $this->writes,
             new PasswordPolicyResolver(
                 $this->backend,
                 null,
@@ -168,9 +175,9 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
         $this->backend
             ->method('get')
             ->willReturn(null);
-        $this->backend
+        $this->writes
             ->expects(self::never())
-            ->method('atomicUpdate');
+            ->method('handle');
 
         $stream = $this->subject->handleRequest(
             $this->messageFor(new ForwardPasswordPolicyStateRequest(self::DN, 'uuid', [
@@ -230,17 +237,13 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
         $this->backend
             ->method('get')
             ->willReturn(Entry::fromArray(self::DN, ['cn' => ['user']]));
-        $this->backend
-            ->method('atomicUpdate')
-            ->with(
-                self::anything(),
-                self::anything(),
-                self::callback(function (callable $fn) use (&$compute): bool {
-                    $compute = $fn;
+        $this->writes
+            ->method('handle')
+            ->with(self::callback(function (ComputeUpdateCommand $command) use (&$compute): bool {
+                $compute = $command->compute;
 
-                    return true;
-                }),
-            );
+                return true;
+            }));
 
         $this->subject->handleRequest(
             $this->messageFor(new ForwardPasswordPolicyStateRequest(
@@ -260,9 +263,9 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
 
     public function test_it_rejects_a_request_of_the_wrong_type(): void
     {
-        $this->backend
+        $this->writes
             ->expects(self::never())
-            ->method('atomicUpdate');
+            ->method('handle');
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::PROTOCOL_ERROR);
 
@@ -288,23 +291,22 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
             ->method('get')
             ->willReturn($entry);
 
-        $this->backend
+        $this->writes
             ->expects(self::once())
-            ->method('atomicUpdate')
+            ->method('handle')
             ->with(
-                self::callback(fn(Dn $dn): bool => $dn->toString() === self::DN),
-                self::isInstanceOf(WriteContext::class),
-                self::callback(function (callable $compute) use (&$captured, $entry): bool {
-                    $result = $compute($entry);
+                self::callback(function (ComputeUpdateCommand $command) use (&$captured, $entry): bool {
+                    if ($command->dn->toString() !== self::DN) {
+                        return false;
+                    }
 
-                    foreach (is_array($result) ? $result : [] as $change) {
-                        if ($change instanceof Change) {
-                            $captured[] = $change;
-                        }
+                    foreach (($command->compute)($entry) as $change) {
+                        $captured[] = $change;
                     }
 
                     return true;
                 }),
+                self::isInstanceOf(WriteContext::class),
             );
 
         $this->lastStream = $this->subject->handleRequest(

@@ -68,31 +68,37 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
         $this->context = new PasswordPolicyContext();
     }
 
-    public function test_supports_a_user_password_replace(): void
+    public function test_a_modification_not_touching_user_password_passes_straight_through(): void
     {
         $handler = $this->handler(new PasswordPolicy());
 
-        self::assertTrue($handler->supports(new UpdateCommand(
-            new Dn(self::USER_DN),
-            [Change::replace('userPassword', 'newpass')],
-        )));
+        $handler->handle(
+            new UpdateCommand(
+                new Dn(self::USER_DN),
+                [Change::replace('description', 'hello')],
+            ),
+            $this->writeContext(),
+        );
+
+        $entry = $this->backend->get(new Dn(self::USER_DN));
+        self::assertNotNull($entry);
+        self::assertSame(
+            'hello',
+            $entry->get('description')?->firstValue(),
+        );
+        self::assertNull($entry->get(PasswordPolicyOid::NAME_PWD_CHANGED_TIME));
     }
 
-    public function test_ignores_modifications_that_do_not_touch_user_password(): void
+    public function test_a_command_that_sets_no_password_passes_straight_through(): void
     {
         $handler = $this->handler(new PasswordPolicy());
 
-        self::assertFalse($handler->supports(new UpdateCommand(
-            new Dn(self::USER_DN),
-            [Change::replace('description', 'hello')],
-        )));
-    }
+        $handler->handle(
+            new DeleteCommand(new Dn(self::USER_DN)),
+            $this->writeContext(),
+        );
 
-    public function test_ignores_non_update_commands(): void
-    {
-        $handler = $this->handler(new PasswordPolicy());
-
-        self::assertFalse($handler->supports(new DeleteCommand(new Dn(self::USER_DN))));
+        self::assertNull($this->backend->get(new Dn(self::USER_DN)));
     }
 
     public function test_allowed_change_writes_password_and_bookkeeping(): void
@@ -348,7 +354,7 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
         ?ServerOptions $options = null,
     ): PasswordPolicyWriteHandler {
         $options ??= TestServerOptions::cheaplyHashed();
-        $this->backend = $this->backendFor(new InMemoryStorage([
+        $container = $this->containerFor(new InMemoryStorage([
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [
@@ -366,6 +372,8 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
                 ] + $userAttrs,
             ),
         ]), $options);
+        $this->backend = $container->get(WritableStorageBackend::class);
+        $writes = $container->get(WriteOperationDispatcher::class);
 
         $guard = new PasswordPolicyChangeGuard(
             $this->fromContainer(
@@ -384,8 +392,9 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
 
         return new PasswordPolicyWriteHandler(
             $this->backend,
+            $writes,
             $guard,
-            new SystemChangeWriter(new WriteOperationDispatcher($this->backend)),
+            new SystemChangeWriter($writes),
         );
     }
 

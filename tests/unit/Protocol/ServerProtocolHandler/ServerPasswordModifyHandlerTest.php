@@ -28,7 +28,6 @@ use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
-use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Operation\PasswordModifyOperationResult;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyService;
@@ -57,8 +56,6 @@ final class ServerPasswordModifyHandlerTest extends TestCase
         $this->mockBackend = $this->createMock(LdapBackendInterface::class);
         $mockWriteHandler = $this->createMock(WriteHandlerInterface::class);
 
-        $mockWriteHandler->method('supports')->willReturn(true);
-
         $this->userEntry = new Entry(
             new Dn('cn=user,dc=foo,dc=bar'),
             new Attribute('userPassword', '12345'),
@@ -74,7 +71,7 @@ final class ServerPasswordModifyHandlerTest extends TestCase
                     $this->createMock(BindNameResolverInterface::class),
                 ),
                 accessControl: $this->createMock(AccessControlInterface::class),
-                writeDispatcher: new WriteOperationDispatcher($mockWriteHandler),
+                writeDispatcher: $mockWriteHandler,
                 hashService: new PasswordHashService(hashCost: 4),
             ),
         );

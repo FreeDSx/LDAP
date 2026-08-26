@@ -13,15 +13,11 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write;
 
-use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
-use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 
 /**
- * Decides which write a request means.
+ * Turns a protocol request into the write it describes, and hands it to whatever performs it.
  *
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
@@ -29,44 +25,23 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 final readonly class WriteRequestRouter
 {
     public function __construct(
-        private WritableLdapBackendInterface $backend,
-        private WriteOperationDispatcher $dispatcher,
+        private WriteHandlerInterface $writes,
         private WriteCommandFactory $commandFactory = new WriteCommandFactory(),
     ) {}
 
     /**
-     * @param callable(Dn): void $authorize Throws OperationException to deny removal of a subtree entry.
      * @throws OperationException
      */
     public function route(
         RequestInterface $request,
         WriteContext $context,
-        callable $authorize,
     ): void {
-        if ($this->isSubtreeDelete($request, $context)) {
-            $this->backend->deleteSubtree(
-                new DeleteCommand($request->getDn()),
+        $this->writes->handle(
+            $this->commandFactory->fromRequest(
+                $request,
                 $context,
-                $authorize,
-            );
-
-            return;
-        }
-
-        $this->dispatcher->dispatch(
-            $this->commandFactory->fromRequest($request),
+            ),
             $context,
         );
-    }
-
-    /**
-     * @phpstan-assert-if-true DeleteRequest $request
-     */
-    private function isSubtreeDelete(
-        RequestInterface $request,
-        WriteContext $context,
-    ): bool {
-        return $request instanceof DeleteRequest
-            && $context->getControls()->has(Control::OID_SUBTREE_DELETE);
     }
 }

@@ -22,13 +22,13 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class AddCommand implements WriteRequestInterface
+final readonly class AddCommand implements WriteRequestInterface
 {
     /**
      * @param list<Change> $systemChanges Stamped by the server, so they are applied after the caller's entry is validated.
      */
     public function __construct(
-        public readonly Entry $entry,
-        public readonly array $systemChanges = [],
+        public Entry $entry,
+        public array $systemChanges = [],
     ) {}
 }

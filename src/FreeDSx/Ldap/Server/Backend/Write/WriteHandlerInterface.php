@@ -13,15 +13,18 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write;
 
+use FreeDSx\Ldap\Exception\OperationException;
+
 /**
- * Handles one or more LDAP write operations; the framework only calls handle() after supports() returns true.
+ * Applies whichever LDAP write a command describes, or refuses one it has no operation for.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 interface WriteHandlerInterface
 {
-    public function supports(WriteRequestInterface $request): bool;
-
+    /**
+     * @throws OperationException
+     */
     public function handle(
         WriteRequestInterface $request,
         WriteContext $context,

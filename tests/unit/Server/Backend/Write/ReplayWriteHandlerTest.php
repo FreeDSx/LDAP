@@ -20,10 +20,8 @@ use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Server\Backend\Write\ReplayWriteHandler;
-use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
-use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
@@ -43,14 +41,8 @@ final class ReplayWriteHandlerTest extends TestCase
     protected function setUp(): void
     {
         $this->writeHandler = $this->createMock(WriteHandlerInterface::class);
-        $this->writeHandler
-            ->method('supports')
-            ->willReturn(true);
 
-        $this->subject = new ReplayWriteHandler(new WriteRequestRouter(
-            $this->createMock(WritableLdapBackendInterface::class),
-            new WriteOperationDispatcher($this->writeHandler),
-        ));
+        $this->subject = new ReplayWriteHandler(new WriteRequestRouter($this->writeHandler));
     }
 
     public function test_it_applies_the_write_and_reports_success(): void

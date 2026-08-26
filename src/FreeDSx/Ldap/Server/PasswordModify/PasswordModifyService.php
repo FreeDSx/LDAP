@@ -27,7 +27,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
-use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
+use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordModifyAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\PasswordPolicyOutcome;
@@ -45,7 +45,7 @@ final readonly class PasswordModifyService
     public function __construct(
         private PasswordModifyTargetResolver $targetResolver,
         private AccessControlInterface $accessControl,
-        private WriteOperationDispatcher $writeDispatcher,
+        private WriteHandlerInterface $writeDispatcher,
         private PasswordHashService $hashService = new PasswordHashService(),
         private ?PasswordPolicyChangeGuard $changeGuard = null,
         private ?PasswordPolicyContext $passwordPolicyContext = null,
@@ -236,7 +236,7 @@ final readonly class PasswordModifyService
                 $controls,
             );
 
-        $this->writeDispatcher->dispatch(
+        $this->writeDispatcher->handle(
             new UpdateCommand(
                 $targetDn,
                 $changes,

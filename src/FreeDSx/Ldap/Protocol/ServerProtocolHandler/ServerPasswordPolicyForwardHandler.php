@@ -26,7 +26,9 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
-use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Write\Command\ComputeUpdateCommand;
+use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
@@ -44,7 +46,8 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandlerInterface
 {
     public function __construct(
-        private WritableLdapBackendInterface $backend,
+        private LdapBackendInterface $backend,
+        private WriteHandlerInterface $writes,
         private PasswordPolicyResolver $policyResolver,
         private PasswordPolicyEngine $engine,
         private AccessControlInterface $accessControl,
@@ -101,28 +104,30 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
             return;
         }
 
-        $this->backend->atomicUpdate(
-            $request->getDn(),
+        $this->writes->handle(
+            new ComputeUpdateCommand(
+                $request->getDn(),
+                function (Entry $entry) use ($request, $token, $policy): array {
+                    $changes = $this->engine->recordForwardedState(
+                        UserPasswordState::fromEntry($entry),
+                        $policy,
+                        $request->getFailureTimes(),
+                        $request->getLastSuccess(),
+                    )->changes;
+
+                    $this->authorizeChanges(
+                        $token,
+                        $entry->getDn(),
+                        $changes,
+                    );
+
+                    return $changes;
+                },
+            ),
             WriteContext::system(
                 new SystemToken(),
                 new ControlBag(),
             ),
-            function (Entry $entry) use ($request, $token, $policy): array {
-                $changes = $this->engine->recordForwardedState(
-                    UserPasswordState::fromEntry($entry),
-                    $policy,
-                    $request->getFailureTimes(),
-                    $request->getLastSuccess(),
-                )->changes;
-
-                $this->authorizeChanges(
-                    $token,
-                    $entry->getDn(),
-                    $changes,
-                );
-
-                return $changes;
-            },
         );
     }
 

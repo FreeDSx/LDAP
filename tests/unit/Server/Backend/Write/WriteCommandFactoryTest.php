@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Write;
 
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -24,9 +26,12 @@ use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteSubtreeCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteCommandFactory;
+use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
+use FreeDSx\Ldap\Server\Token\AnonToken;
 use PHPUnit\Framework\TestCase;
 
 final class WriteCommandFactoryTest extends TestCase
@@ -41,7 +46,10 @@ final class WriteCommandFactoryTest extends TestCase
     public function test_it_creates_add_command_from_add_request(): void
     {
         $entry = Entry::create('cn=foo,dc=bar');
-        $command = $this->subject->fromRequest(new AddRequest($entry));
+        $command = $this->subject->fromRequest(
+            new AddRequest($entry),
+            $this->context(),
+        );
 
         self::assertInstanceOf(AddCommand::class, $command);
         self::assertSame($entry, $command->entry);
@@ -49,16 +57,43 @@ final class WriteCommandFactoryTest extends TestCase
 
     public function test_it_creates_delete_command_from_delete_request(): void
     {
-        $command = $this->subject->fromRequest(new DeleteRequest('cn=foo,dc=bar'));
+        $command = $this->subject->fromRequest(
+            new DeleteRequest('cn=foo,dc=bar'),
+            $this->context(),
+        );
 
         self::assertInstanceOf(DeleteCommand::class, $command);
         self::assertSame('cn=foo,dc=bar', $command->dn->toString());
     }
 
+    public function test_the_subtree_control_makes_a_delete_a_subtree_delete(): void
+    {
+        $command = $this->subject->fromRequest(
+            new DeleteRequest('cn=foo,dc=bar'),
+            $this->context(new Control(Control::OID_SUBTREE_DELETE)),
+        );
+
+        self::assertInstanceOf(DeleteSubtreeCommand::class, $command);
+        self::assertSame('cn=foo,dc=bar', $command->dn->toString());
+    }
+
+    public function test_the_subtree_control_on_another_operation_changes_nothing(): void
+    {
+        $command = $this->subject->fromRequest(
+            new AddRequest(Entry::create('cn=foo,dc=bar')),
+            $this->context(new Control(Control::OID_SUBTREE_DELETE)),
+        );
+
+        self::assertInstanceOf(AddCommand::class, $command);
+    }
+
     public function test_it_creates_update_command_from_modify_request(): void
     {
         $changes = [Change::add('mail', 'foo@bar.com')];
-        $command = $this->subject->fromRequest(new ModifyRequest('cn=foo,dc=bar', ...$changes));
+        $command = $this->subject->fromRequest(
+            new ModifyRequest('cn=foo,dc=bar', ...$changes),
+            $this->context(),
+        );
 
         self::assertInstanceOf(UpdateCommand::class, $command);
         self::assertSame('cn=foo,dc=bar', $command->dn->toString());
@@ -69,6 +104,7 @@ final class WriteCommandFactoryTest extends TestCase
     {
         $command = $this->subject->fromRequest(
             new ModifyDnRequest('cn=foo,dc=bar', 'cn=bar', true, 'ou=people,dc=bar'),
+            $this->context(),
         );
 
         self::assertInstanceOf(MoveCommand::class, $command);
@@ -83,11 +119,14 @@ final class WriteCommandFactoryTest extends TestCase
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::INVALID_DN_SYNTAX);
 
-        $this->subject->fromRequest(new ModifyDnRequest(
-            'cn=foo,dc=bar',
-            "cn=\xFF\xFE",
-            true,
-        ));
+        $this->subject->fromRequest(
+            new ModifyDnRequest(
+                'cn=foo,dc=bar',
+                "cn=\xFF\xFE",
+                true,
+            ),
+            $this->context(),
+        );
     }
 
     public function test_it_throws_for_unsupported_request(): void
@@ -95,6 +134,17 @@ final class WriteCommandFactoryTest extends TestCase
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::NO_SUCH_OPERATION);
 
-        $this->subject->fromRequest(new AbandonRequest(1));
+        $this->subject->fromRequest(
+            new AbandonRequest(1),
+            $this->context(),
+        );
+    }
+
+    private function context(Control ...$controls): WriteContext
+    {
+        return new WriteContext(
+            new AnonToken(),
+            new ControlBag(...$controls),
+        );
     }
 }

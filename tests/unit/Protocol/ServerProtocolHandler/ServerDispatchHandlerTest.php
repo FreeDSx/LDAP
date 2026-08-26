@@ -28,10 +28,9 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
@@ -45,7 +44,7 @@ final class ServerDispatchHandlerTest extends TestCase
 {
     private ServerDispatchHandler $subject;
 
-    private WritableLdapBackendInterface&MockObject $mockBackend;
+    private LdapBackendInterface&MockObject $mockBackend;
 
     private WriteHandlerInterface&MockObject $mockWriteHandler;
 
@@ -56,20 +55,13 @@ final class ServerDispatchHandlerTest extends TestCase
     protected function setUp(): void
     {
         $this->mockToken = $this->createMock(TokenInterface::class);
-        $this->mockBackend = $this->createMock(WritableLdapBackendInterface::class);
+        $this->mockBackend = $this->createMock(LdapBackendInterface::class);
         $this->mockWriteHandler = $this->createMock(WriteHandlerInterface::class);
         $this->mockAccessControl = $this->createMock(AccessControlInterface::class);
 
-        $this->mockWriteHandler
-            ->method('supports')
-            ->willReturn(true);
-
         $this->subject = new ServerDispatchHandler(
             backend: $this->mockBackend,
-            router: new WriteRequestRouter(
-                $this->mockBackend,
-                new WriteOperationDispatcher($this->mockWriteHandler),
-            ),
+            router: new WriteRequestRouter($this->mockWriteHandler),
             accessControl: $this->mockAccessControl,
             schema: new Schema(),
         );
@@ -150,24 +142,21 @@ final class ServerDispatchHandlerTest extends TestCase
         $this->subject->handleRequest($compare, $this->mockToken);
     }
 
-    public function test_it_throws_when_no_write_handler_supports_the_operation(): void
+    public function test_a_write_the_handler_refuses_surfaces_its_result_code(): void
     {
-        $subject = new ServerDispatchHandler(
-            backend: $this->mockBackend,
-            router: new WriteRequestRouter(
-                $this->mockBackend,
-                new WriteOperationDispatcher(),
-            ),
-            accessControl: $this->mockAccessControl,
-            schema: new Schema(),
-        );
+        $this->mockWriteHandler
+            ->method('handle')
+            ->willThrowException(new OperationException(
+                'This operation is not supported.',
+                ResultCode::UNWILLING_TO_PERFORM,
+            ));
 
         $add = new LdapMessageRequest(1, new AddRequest(Entry::create('cn=foo,dc=bar')));
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
 
-        $subject->handleRequest($add, $this->mockToken);
+        $this->subject->handleRequest($add, $this->mockToken);
     }
 
     public function test_it_throws_for_unsupported_requests(): void

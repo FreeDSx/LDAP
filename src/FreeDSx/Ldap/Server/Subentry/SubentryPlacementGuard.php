@@ -20,7 +20,6 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
-use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
 /**
  * Keeps subentries directly below an administrative point. RFC 3672.
@@ -37,10 +36,10 @@ final readonly class SubentryPlacementGuard
     public function assertPlacement(
         Entry $entry,
         Dn $dn,
-        WriteContext $context,
+        bool $isSystem,
     ): void {
         // Server-initiated writes replay a placement the provider already accepted.
-        if ($context->isSystem() || !SubentryDetector::isSubentry($entry)) {
+        if ($isSystem || !SubentryDetector::isSubentry($entry)) {
             return;
         }
 
@@ -74,9 +73,9 @@ final readonly class SubentryPlacementGuard
     public function assertAdministrativeRoleRetained(
         Entry $updated,
         Dn $dn,
-        WriteContext $context,
+        bool $isSystem,
     ): void {
-        if ($context->isSystem() || $this->isAdministrativePoint($updated)) {
+        if ($isSystem || $this->isAdministrativePoint($updated)) {
             return;
         }
 
