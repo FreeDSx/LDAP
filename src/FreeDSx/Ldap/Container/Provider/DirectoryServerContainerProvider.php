@@ -63,7 +63,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\WriteEntryOperationHan
 use FreeDSx\Ldap\Server\Backend\Storage\OperationalAttributeGenerator;
 use FreeDSx\Ldap\Server\Backend\Storage\SearchStreamBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptionsFactory;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
+use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\CoroutineSleeper;
@@ -171,7 +172,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                 ComputeUpdateCommand::class => $c->get(ComputeUpdateHandler::class)->handle(...),
                 MoveCommand::class => $c->get(MoveEntryHandler::class)->handle(...),
             ]),
-            WritableStorageBackend::class => $this->makeBackend(...),
+            StorageReadBackend::class => $this->makeBackend(...),
+            ReadBackendInterface::class => static fn(Container $c): ReadBackendInterface => $c->get(StorageReadBackend::class),
             WriteRequestReplayer::class => $this->makeWriteRequestReplayer(...),
             ServerProtocolFactory::class => $this->makeServerProtocolFactory(...),
             ServerProtocolFactoryInterface::class => static fn(Container $c): ServerProtocolFactoryInterface => $c->get(ServerProtocolFactory::class),
@@ -200,7 +202,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         ));
 
         // Both wrappers pass this inward, so the configured policy is the one that actually receives it.
-        $acl->setBackend($container->get(WritableStorageBackend::class));
+        $acl->setBackend($container->get(ReadBackendInterface::class));
 
         return $acl;
     }
@@ -226,7 +228,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return $container->get(ServerOptions::class)->getPasswordAuthenticator()
             ?? new PasswordAuthenticator(
                 $container->get(BindNameResolverInterface::class),
-                $container->get(WritableStorageBackend::class),
+                $container->get(ReadBackendInterface::class),
             );
     }
 
@@ -313,9 +315,9 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             : null;
     }
 
-    private function makeBackend(Container $container): WritableStorageBackend
+    private function makeBackend(Container $container): StorageReadBackend
     {
-        return new WritableStorageBackend(
+        return new StorageReadBackend(
             storage: $container->get(EntryStorageInterface::class),
             searchStream: $container->get(SearchStreamBuilder::class),
             listOptions: $container->get(StorageListOptionsFactory::class),
@@ -563,10 +565,11 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeListenerContributor(Container $container): ListenerContributorInterface
     {
-        $backend = $container->get(WritableStorageBackend::class);
+        // The concrete key, since the reloaded generation resolves its interface alias through this instance.
+        $backend = $container->get(StorageReadBackend::class);
 
         $instances = [
-            WritableStorageBackend::class => $backend,
+            StorageReadBackend::class => $backend,
             EntryStorageInterface::class => $container->get(EntryStorageInterface::class),
         ];
 

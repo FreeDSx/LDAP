@@ -20,7 +20,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\AliasResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
@@ -83,7 +83,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
             return new ReplicaBindStrategy(
                 $engine,
                 $container->get(ReplicaPasswordStateStoreInterface::class),
-                $container->get(WritableStorageBackend::class),
+                $container->get(ReadBackendInterface::class),
             );
         }
 
@@ -100,7 +100,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
             $options->getSearchLimitRules(),
             $options->makeSearchLimits(),
         );
-        $resolver->setBackend($container->get(WritableStorageBackend::class));
+        $resolver->setBackend($container->get(ReadBackendInterface::class));
 
         return $resolver;
     }
@@ -109,7 +109,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
     {
         return new AssertionEvaluator(
             $container->get(FilterEvaluatorInterface::class),
-            $container->get(WritableStorageBackend::class),
+            $container->get(ReadBackendInterface::class),
             $container->get(AccessControlInterface::class),
         );
     }

@@ -29,7 +29,7 @@ use FreeDSx\Ldap\Protocol\Authorization\AuthzIdResolver;
 use FreeDSx\Ldap\Protocol\Authorization\ProxiedAuthorizationResolver;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
@@ -49,7 +49,7 @@ final class ProxiedAuthorizationResolverTest extends TestCase
 
     private AccessControlInterface&MockObject $accessControl;
 
-    private LdapBackendInterface&MockObject $backend;
+    private ReadBackendInterface&MockObject $backend;
 
     private BindNameResolverInterface&MockObject $identityResolver;
 
@@ -62,7 +62,7 @@ final class ProxiedAuthorizationResolverTest extends TestCase
     protected function setUp(): void
     {
         $this->accessControl = $this->createMock(AccessControlInterface::class);
-        $this->backend = $this->createMock(LdapBackendInterface::class);
+        $this->backend = $this->createMock(ReadBackendInterface::class);
         $this->identityResolver = $this->createMock(BindNameResolverInterface::class);
         $this->recordingLogger = new RecordingLogger();
         $this->subject = new ProxiedAuthorizationResolver(

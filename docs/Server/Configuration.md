@@ -28,8 +28,9 @@ LDAP Server Configuration
 * [Access Control](#access-control)
     * [ServerOptions:setAclRules](#setaclrules)
     * [ServerOptions:setAccessControl](#setaccesscontrol)
-* [Backend](#backend)
+* [Storage](#storage)
     * [ServerOptions:setStorageConfig](#setstorageconfig)
+* [Authentication](#authentication)
     * [ServerOptions:setPasswordAuthenticator](#setpasswordauthenticator)
     * [ServerOptions:setIdentityResolver](#setidentityresolver)
 * [Schema](#schema)
@@ -445,17 +446,13 @@ rule engine. Prefer `setAclRules()` unless the built-in rules are insufficient.
 
 **Default**: `RuleBasedAccessControl` over the rules from `setAclRules()`.
 
-## Backend
-
-The LDAP server handles directory data through `WritableStorageBackend`, which applies LDAP semantics over the
-storage built from the configured backend config.
+## Storage
 
 ------------------
 #### setStorageConfig
 
-Storage is configured on `ServerOptions` via `setStorageConfig()` or by passing a config to the `ServerOptions`
-constructor. Choose one of the built-in backend configs: `PdoConfig` (SQLite or MySQL) or `InMemoryStorageConfig`. All
-directory operations (search, authenticate, and optionally write) are dispatched to the resulting storage.
+Where directory data lives, set with `setStorageConfig()` or by passing the config to the `ServerOptions` constructor.
+All directory operations are dispatched to the resulting storage.
 
 ```php
 use FreeDSx\Ldap\LdapServer;
@@ -465,12 +462,13 @@ use FreeDSx\Ldap\ServerOptions;
 $server = new LdapServer(new ServerOptions(PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')));
 ```
 
-A config is required, as no default suits every runner. `InMemoryStorageConfig` keeps entries in the process that holds
-them, so the forking runner refuses it at startup. Use it with the Swoole runner or for testing. Use
-`PdoConfig::forSqlite()` otherwise.
+A config is required, as no default suits every runner. For the available configs see
+[Built-In Storage Implementations](General-Usage.md#built-in-storage-implementations), and for the options each one
+carries see [Tuning a PDO config](General-Usage.md#tuning-a-pdo-config).
 
-The bundled SQLite and MySQL backends create their tables automatically on first connect. For managing that schema
-yourself, see [Database Schema](Database-Schema.md).
+**Default**: none, a config must be provided.
+
+## Authentication
 
 ------------------
 #### setPasswordAuthenticator

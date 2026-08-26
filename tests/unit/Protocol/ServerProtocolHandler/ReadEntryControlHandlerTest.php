@@ -20,7 +20,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -28,7 +28,7 @@ use PHPUnit\Framework\TestCase;
 
 final class ReadEntryControlHandlerTest extends TestCase
 {
-    private LdapBackendInterface&MockObject $backend;
+    private ReadBackendInterface&MockObject $backend;
 
     private ReadEntryControlHandler $subject;
 
@@ -38,7 +38,7 @@ final class ReadEntryControlHandlerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->backend = $this->createMock(LdapBackendInterface::class);
+        $this->backend = $this->createMock(ReadBackendInterface::class);
         $this->dn = new Dn('cn=foo,dc=ex,dc=com');
         $this->token = BindToken::fromDn('cn=foo,dc=ex,dc=com');
         $this->subject = new ReadEntryControlHandler(

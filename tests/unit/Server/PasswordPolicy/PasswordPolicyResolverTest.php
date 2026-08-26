@@ -15,7 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\PasswordPolicy;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordQualityRules;
@@ -284,7 +284,7 @@ final class PasswordPolicyResolverTest extends TestCase
             ] + $extra,
         );
 
-        $backend = $this->createMock(LdapBackendInterface::class);
+        $backend = $this->createMock(ReadBackendInterface::class);
         $backend->method('get')
             ->willReturnCallback(static fn(Dn $dn): ?Entry => $dn->toString() === 'dc=example,dc=com'
                 ? Entry::fromArray(
@@ -312,9 +312,9 @@ final class PasswordPolicyResolverTest extends TestCase
      *
      * @param array<string, Entry> $entries DN string → entry
      */
-    private function backend(array $entries = []): LdapBackendInterface&MockObject
+    private function backend(array $entries = []): ReadBackendInterface&MockObject
     {
-        $backend = $this->createMock(LdapBackendInterface::class);
+        $backend = $this->createMock(ReadBackendInterface::class);
         $backend->method('get')
             ->willReturnCallback(function (Dn $dn) use ($entries): ?Entry {
                 $key = $dn->toString();

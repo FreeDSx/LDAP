@@ -32,7 +32,7 @@ use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\PasswordPolicyWriteHandler;
 use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriter;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
@@ -68,7 +68,7 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
 
     private FrozenClock $clock;
 
-    private WritableStorageBackend $backend;
+    private StorageReadBackend $backend;
 
     private PasswordPolicyContext $context;
 
@@ -398,7 +398,7 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
                 ] + $userAttrs,
             ),
         ]));
-        $this->backend = $container->get(WritableStorageBackend::class);
+        $this->backend = $container->get(StorageReadBackend::class);
 
         $guard = new PasswordPolicyChangeGuard(
             $this->fromContainer(

@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\SubjectEvaluationException;
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\Clock\SystemClock;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
@@ -38,7 +38,7 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
 {
     private readonly Dn $groupDn;
 
-    private ?LdapBackendInterface $backend = null;
+    private ?ReadBackendInterface $backend = null;
 
     private ?Entry $cached = null;
 
@@ -56,7 +56,7 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
         $this->groupDn = new Dn($groupDn);
     }
 
-    public function setBackend(LdapBackendInterface $backend): void
+    public function setBackend(ReadBackendInterface $backend): void
     {
         $this->backend = $backend;
     }
@@ -122,7 +122,7 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
             || ($now->getTimestamp() - $this->cachedAt->getTimestamp()) >= $this->cacheTtl;
     }
 
-    private function backend(): LdapBackendInterface
+    private function backend(): ReadBackendInterface
     {
         if ($this->backend === null) {
             throw new LogicException('No backend set on GroupSubjectMatcher; call setBackend() before use.');

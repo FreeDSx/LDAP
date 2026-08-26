@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Storage;
+namespace FreeDSx\Ldap\Server\Backend;
 
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
@@ -19,11 +19,14 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\PageSlice;
+use FreeDSx\Ldap\Server\Backend\Storage\SearchStreamBuilder;
+use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptionsFactory;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use Generator;
@@ -33,14 +36,14 @@ use Generator;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class WritableStorageBackend implements LdapBackendInterface, ResettableInterface
+final readonly class StorageReadBackend implements ReadBackendInterface, ResettableInterface
 {
     public function __construct(
-        private readonly EntryStorageInterface $storage,
-        private readonly SearchStreamBuilder $searchStream,
-        private readonly StorageListOptionsFactory $listOptions,
-        private readonly FilterEvaluatorInterface $filterEvaluator,
-        private readonly EntryLocator $locator,
+        private EntryStorageInterface $storage,
+        private SearchStreamBuilder $searchStream,
+        private StorageListOptionsFactory $listOptions,
+        private FilterEvaluatorInterface $filterEvaluator,
+        private EntryLocator $locator,
     ) {}
 
     public function reset(): void

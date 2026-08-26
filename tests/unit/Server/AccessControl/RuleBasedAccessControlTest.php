@@ -34,7 +34,7 @@ use FreeDSx\Ldap\Server\AccessControl\Subject\CallbackSubjectMatcher;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SelfSubjectMatcher;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\AccessControl\Target\AnyTargetMatcher;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -724,7 +724,7 @@ final class RuleBasedAccessControlTest extends TestCase
 
     public function test_set_backend_propagates_to_backend_aware_subjects(): void
     {
-        $mockBackend = $this->createMock(LdapBackendInterface::class);
+        $mockBackend = $this->createMock(ReadBackendInterface::class);
 
         /** @var SubjectMatcherInterface&BackendAwareInterface&MockObject $mockBackendAwareSubject */
         $mockBackendAwareSubject = $this->createMockForIntersectionOfInterfaces([
@@ -749,7 +749,7 @@ final class RuleBasedAccessControlTest extends TestCase
      */
     public function test_set_backend_propagates_to_confidential_rule_subjects(): void
     {
-        $mockBackend = $this->createMock(LdapBackendInterface::class);
+        $mockBackend = $this->createMock(ReadBackendInterface::class);
 
         /** @var SubjectMatcherInterface&BackendAwareInterface&MockObject $mockBackendAwareSubject */
         $mockBackendAwareSubject = $this->createMockForIntersectionOfInterfaces([

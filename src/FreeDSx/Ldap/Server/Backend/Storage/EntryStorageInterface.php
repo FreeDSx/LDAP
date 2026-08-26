@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\DefaultHasChildrenTrait;
 
 /**
- * Raw persistence contract; LDAP semantics live in WritableStorageBackend. Dn parameters are always normalised (lowercased).
+ * Raw persistence contract; LDAP semantics live in the read backend and write handlers above it. Dn parameters are always normalised (lowercased).
  *
  * @internal
  *

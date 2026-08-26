@@ -34,7 +34,7 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\ServerOptions;
@@ -162,7 +162,7 @@ final class SaslBindTest extends TestCase
 
         $accessControl = $this->createMock(AccessControlInterface::class);
         $accessControl->method('mayUseControl')->willReturn(true);
-        $backend = $this->createMock(LdapBackendInterface::class);
+        $backend = $this->createMock(ReadBackendInterface::class);
         $backend->method('get')->willReturn(new Entry(new Dn('cn=alice,dc=foo,dc=bar')));
 
         $this->mockQueue
@@ -213,7 +213,7 @@ final class SaslBindTest extends TestCase
 
         $this->subjectWith($this->resolverWith(
             $accessControl,
-            $this->createMock(LdapBackendInterface::class),
+            $this->createMock(ReadBackendInterface::class),
         ))->bind(new LdapMessageRequest(
             1,
             new SaslBindRequest('PLAIN', $credentials),
@@ -370,13 +370,13 @@ final class SaslBindTest extends TestCase
     {
         return $this->resolverWith(
             $this->createMock(AccessControlInterface::class),
-            $this->createMock(LdapBackendInterface::class),
+            $this->createMock(ReadBackendInterface::class),
         );
     }
 
     private function resolverWith(
         AccessControlInterface $accessControl,
-        LdapBackendInterface $backend,
+        ReadBackendInterface $backend,
     ): AuthzIdResolver {
         return new AuthzIdResolver(
             $accessControl,

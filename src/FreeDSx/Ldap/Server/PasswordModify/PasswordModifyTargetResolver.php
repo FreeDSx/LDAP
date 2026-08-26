@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Server\PasswordModify;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 
 /**
@@ -25,7 +25,7 @@ use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 final readonly class PasswordModifyTargetResolver
 {
     public function __construct(
-        private LdapBackendInterface $backend,
+        private ReadBackendInterface $backend,
         private BindNameResolverInterface $identityResolver,
     ) {}
 

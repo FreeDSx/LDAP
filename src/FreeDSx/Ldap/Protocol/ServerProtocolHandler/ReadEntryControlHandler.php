@@ -25,7 +25,7 @@ use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\OperationTargetDn;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
@@ -44,7 +44,7 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 final readonly class ReadEntryControlHandler
 {
     public function __construct(
-        private LdapBackendInterface $backend,
+        private ReadBackendInterface $backend,
         private Schema $schema,
         private AccessControlInterface $accessControl,
     ) {}

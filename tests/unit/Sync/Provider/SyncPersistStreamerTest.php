@@ -36,7 +36,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
@@ -62,7 +62,7 @@ final class SyncPersistStreamerTest extends TestCase
 
     private ServerQueue&MockObject $queue;
 
-    private LdapBackendInterface&MockObject $backend;
+    private ReadBackendInterface&MockObject $backend;
 
     private TokenInterface&MockObject $token;
 
@@ -111,7 +111,7 @@ final class SyncPersistStreamerTest extends TestCase
             ->method('peekForCancelSignal')
             ->willReturnCallback(fn(): ?LdapMessageRequest => array_shift($this->cancelSignals));
 
-        $this->backend = $this->createMock(LdapBackendInterface::class);
+        $this->backend = $this->createMock(ReadBackendInterface::class);
         $this->backend
             ->method('get')
             ->willReturnCallback(fn(Dn $dn): ?Entry => $this->liveEntries[$dn->toString()] ?? null);

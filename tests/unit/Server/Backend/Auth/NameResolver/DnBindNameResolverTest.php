@@ -17,17 +17,17 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class DnBindNameResolverTest extends TestCase
 {
-    private LdapBackendInterface&MockObject $mockBackend;
+    private ReadBackendInterface&MockObject $mockBackend;
 
     protected function setUp(): void
     {
-        $this->mockBackend = $this->createMock(LdapBackendInterface::class);
+        $this->mockBackend = $this->createMock(ReadBackendInterface::class);
     }
 
     public function test_resolve_calls_backend_get_with_dn(): void

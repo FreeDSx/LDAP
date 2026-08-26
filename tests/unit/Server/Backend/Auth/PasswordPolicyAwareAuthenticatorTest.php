@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordPolicyAwareAuthenticator;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
@@ -203,7 +203,7 @@ final class PasswordPolicyAwareAuthenticatorTest extends TestCase
 
     private function authenticator(?PasswordPolicy $policy): PasswordPolicyAwareAuthenticator
     {
-        $backend = $this->createMock(LdapBackendInterface::class);
+        $backend = $this->createMock(ReadBackendInterface::class);
         $updates = $this->createMock(WriteHandlerInterface::class);
         $updates->method('handle')->willReturnCallback(
             function (WriteRequestInterface $request, WriteContext $context): void {

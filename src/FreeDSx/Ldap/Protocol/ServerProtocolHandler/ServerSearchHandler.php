@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
 use FreeDSx\Ldap\Protocol\Queue\Response\QueueWriterConfig;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
@@ -42,7 +42,7 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
     private const CANCEL_CHECK_INTERVAL = 50;
 
     public function __construct(
-        private readonly LdapBackendInterface $backend,
+        private readonly ReadBackendInterface $backend,
         private readonly FilterEvaluatorInterface $filterEvaluator,
         private readonly AccessControlInterface $accessControl,
         private readonly Schema $schema,

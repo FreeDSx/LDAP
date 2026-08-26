@@ -15,7 +15,7 @@ namespace Tests\Support\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\ServerOptions;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 
@@ -96,9 +96,9 @@ trait ServerContainerTrait
     private function backendFor(
         EntryStorageInterface $storage,
         ?ServerOptions $options = null,
-    ): WritableStorageBackend {
+    ): StorageReadBackend {
         return $this->fromContainer(
-            WritableStorageBackend::class,
+            StorageReadBackend::class,
             [EntryStorageInterface::class => $storage],
             $options,
         );

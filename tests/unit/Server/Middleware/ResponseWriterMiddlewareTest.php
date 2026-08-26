@@ -30,7 +30,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Middleware\ResponseWriterMiddleware;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
@@ -48,7 +48,7 @@ final class ResponseWriterMiddlewareTest extends TestCase
 {
     private ServerQueue&MockObject $mockQueue;
 
-    private LdapBackendInterface&MockObject $mockBackend;
+    private ReadBackendInterface&MockObject $mockBackend;
 
     private AccessControlInterface&MockObject $mockAccessControl;
 
@@ -64,7 +64,7 @@ final class ResponseWriterMiddlewareTest extends TestCase
     protected function setUp(): void
     {
         $this->mockQueue = $this->createMock(ServerQueue::class);
-        $this->mockBackend = $this->createMock(LdapBackendInterface::class);
+        $this->mockBackend = $this->createMock(ReadBackendInterface::class);
         $this->mockAccessControl = $this->createMock(AccessControlInterface::class);
         $this->mockToken = $this->createMock(TokenInterface::class);
 

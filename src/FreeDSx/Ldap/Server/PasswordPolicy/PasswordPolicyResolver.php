@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Subentry\GoverningSubentryResolver;
 
 /**
@@ -32,7 +32,7 @@ final readonly class PasswordPolicyResolver
      * @param ?GoverningSubentryResolver $subentries Null when subentry-based policy is not enabled.
      */
     public function __construct(
-        private LdapBackendInterface $backend,
+        private ReadBackendInterface $backend,
         private ?Dn $defaultPolicyDn,
         private ?PasswordPolicy $inMemoryFallback,
         private ?GoverningSubentryResolver $subentries = null,

@@ -35,7 +35,7 @@ use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\PageCursor;
@@ -58,7 +58,7 @@ class ServerPagingHandlerTest extends TestCase
 
     private ServerQueue&MockObject $mockQueue;
 
-    private LdapBackendInterface&MockObject $mockBackend;
+    private ReadBackendInterface&MockObject $mockBackend;
 
     private FilterEvaluatorInterface&MockObject $mockFilterEvaluator;
 
@@ -79,7 +79,7 @@ class ServerPagingHandlerTest extends TestCase
     {
         $this->mockToken = $this->createMock(TokenInterface::class);
         $this->mockQueue = $this->createMock(ServerQueue::class);
-        $this->mockBackend = $this->createMock(LdapBackendInterface::class);
+        $this->mockBackend = $this->createMock(ReadBackendInterface::class);
         $this->mockFilterEvaluator = $this->createMock(FilterEvaluatorInterface::class);
         $this->mockAccessControl = $this->createMock(AccessControlInterface::class);
         $this->requestHistory = new RequestHistory();

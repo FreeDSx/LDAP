@@ -19,7 +19,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 
 /**
@@ -44,7 +44,7 @@ final class AttributeSearchBindNameResolver implements BindNameResolverInterface
      */
     public function resolve(
         string $name,
-        LdapBackendInterface $backend,
+        ReadBackendInterface $backend,
     ): ?Entry {
         $request = (new SearchRequest(Filters::equal(
             $this->attribute,

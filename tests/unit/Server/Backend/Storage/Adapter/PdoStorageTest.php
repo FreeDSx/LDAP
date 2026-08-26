@@ -50,7 +50,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\AddEntryHandler;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use FreeDSx\Ldap\Control\ControlBag;
@@ -76,7 +76,7 @@ final class PdoStorageTest extends TestCase
 
     use SubtreeRenameStorageContractTests;
 
-    private WritableStorageBackend $subject;
+    private StorageReadBackend $subject;
 
     private LdapImporter $importer;
 
@@ -94,7 +94,7 @@ final class PdoStorageTest extends TestCase
 
         $this->storage = $this->pdoStorage(TestServerOptions::sqlite());
         $container = $this->containerFor($this->storage);
-        $this->subject = $container->get(WritableStorageBackend::class);
+        $this->subject = $container->get(StorageReadBackend::class);
         $this->importer = $container->get(LdapImporter::class);
         $this->seed(
             new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
@@ -676,7 +676,7 @@ final class PdoStorageTest extends TestCase
     public function test_list_from_root_returns_all_entries(): void
     {
         // Test the storage interface directly with an empty base DN (root listing).
-        // WritableStorageBackend requires the base DN to exist, so bypass it here.
+        // StorageReadBackend requires the base DN to exist, so bypass it here.
         $results = iterator_to_array($this->storage->list(StorageListOptions::matchAll(new Dn(''), true))->entries);
 
         self::assertCount(2, $results);
@@ -1559,14 +1559,14 @@ final class PdoStorageTest extends TestCase
     private function seededBackend(
         ServerOptions $options,
         Entry ...$entries,
-    ): WritableStorageBackend {
+    ): StorageReadBackend {
         $container = $this->containerFor(
             $this->pdoStorage(TestServerOptions::sqlite()),
             $options,
         );
         $container->get(LdapImporter::class)->importEntries($entries);
 
-        return $container->get(WritableStorageBackend::class);
+        return $container->get(StorageReadBackend::class);
     }
 
     /**

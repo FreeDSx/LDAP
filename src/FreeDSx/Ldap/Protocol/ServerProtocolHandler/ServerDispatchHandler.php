@@ -25,7 +25,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
@@ -42,7 +42,7 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
     private ReadEntryControlHandler $readEntryControlHandler;
 
     public function __construct(
-        private LdapBackendInterface $backend,
+        private ReadBackendInterface $backend,
         private WriteRequestRouter $router,
         private AccessControlInterface $accessControl,
         Schema $schema,

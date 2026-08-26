@@ -35,7 +35,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSyncHandler;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
@@ -67,7 +67,7 @@ final class ServerSyncHandlerTest extends TestCase
 
     private ServerQueue&MockObject $queue;
 
-    private LdapBackendInterface&MockObject $backend;
+    private ReadBackendInterface&MockObject $backend;
 
     private FilterEvaluatorInterface&MockObject $filterEvaluator;
 
@@ -115,7 +115,7 @@ final class ServerSyncHandlerTest extends TestCase
     protected function setUp(): void
     {
         $this->queue = $this->createMock(ServerQueue::class);
-        $this->backend = $this->createMock(LdapBackendInterface::class);
+        $this->backend = $this->createMock(ReadBackendInterface::class);
         $this->filterEvaluator = $this->createMock(FilterEvaluatorInterface::class);
         $this->accessControl = $this->createMock(AccessControlInterface::class);
         $this->token = $this->createMock(TokenInterface::class);

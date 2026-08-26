@@ -29,7 +29,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
@@ -47,7 +47,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
         $this->rules = $rules ?? AclRules::secureDefault();
     }
 
-    public function setBackend(LdapBackendInterface $backend): void
+    public function setBackend(ReadBackendInterface $backend): void
     {
         $allRules = [
             ...$this->rules->operations,
