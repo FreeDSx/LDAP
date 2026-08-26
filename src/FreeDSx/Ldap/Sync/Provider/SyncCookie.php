@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
-use FreeDSx\Ldap\Sync\Provider\Exception\MalformedSyncCookieException;
+use FreeDSx\Ldap\Exception\MalformedSyncCookieException;
 use JsonException;
 
 /**

@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzIdResolver;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
-use FreeDSx\Ldap\Server\Sasl\External\ExternalCredentialMapperInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\ExternalCredentialMapperInterface;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Sasl\Mechanism\MechanismName;
 use FreeDSx\Sasl\Options\ChallengeOptionsInterface;

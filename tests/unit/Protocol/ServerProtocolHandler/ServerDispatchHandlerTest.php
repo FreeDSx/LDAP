@@ -31,7 +31,7 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
+use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;

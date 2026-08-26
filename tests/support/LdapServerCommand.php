@@ -29,7 +29,7 @@ use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\LdapImporter;
+use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
 use FreeDSx\Ldap\Server\Config\ConfidentialityRequirement;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\Replication\ProviderConfig;

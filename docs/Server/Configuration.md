@@ -939,7 +939,7 @@ Use the constants defined on `ServerOptions` to specify mechanisms:
 | `ServerOptions::SASL_SCRAM_SHA3_512_PLUS` | `SCRAM-SHA3-512-PLUS` |
 
 All mechanisms call `getSaslIdentity()` on `PasswordAuthenticatableInterface`. PLAIN accepts any hash scheme
-supported by `PasswordHashVerifier`; challenge mechanisms (CRAM-MD5, DIGEST-MD5, SCRAM-*) require a plaintext or
+supported by `PasswordHashService`. Challenge mechanisms (CRAM-MD5, DIGEST-MD5, SCRAM-*) require a plaintext or
 recoverable password since the digest is computed server-side.
 
 All mechanisms are handled through `PasswordAuthenticatableInterface` — no separate handler interface is required.
@@ -983,7 +983,7 @@ and resolves it as a DN. Provide a custom mapper to instead map a SAN/UPN, rewri
 
 ```php
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
-use FreeDSx\Ldap\Server\Sasl\External\ExternalCredentialMapperInterface;
+use FreeDSx\Ldap\Server\Backend\Auth\ExternalCredentialMapperInterface;
 use FreeDSx\Socket\Tls\Certificate;
 
 $mapper = new class implements ExternalCredentialMapperInterface {

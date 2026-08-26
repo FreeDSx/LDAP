@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support;
 
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\RowLockableInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 
 /**

@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\AtomicWriter;
+use FreeDSx\Ldap\Server\Backend\Write\AtomicWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;

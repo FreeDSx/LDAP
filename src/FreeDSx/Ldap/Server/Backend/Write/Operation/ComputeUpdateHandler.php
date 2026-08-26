@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Lock\RowLockableInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\AtomicWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
+use FreeDSx\Ldap\Server\Backend\Write\AtomicWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;

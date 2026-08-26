@@ -27,7 +27,7 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
-use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
+use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
 use FreeDSx\Ldap\Server\Operation\WriteOperationResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;

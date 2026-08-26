@@ -29,7 +29,7 @@ use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
-use FreeDSx\Ldap\Server\Backend\Storage\SeedOptions;
+use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedOptions;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\ClientOptions;

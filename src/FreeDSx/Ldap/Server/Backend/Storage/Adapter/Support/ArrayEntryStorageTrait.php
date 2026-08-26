@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
-use FreeDSx\Ldap\Server\Backend\Storage\PageCursor;
+use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Subentry\SubentryDetector;
 use Generator;

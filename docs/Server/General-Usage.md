@@ -549,7 +549,7 @@ stamping (`createTimestamp`, `entryUUID`, etc.) applied. Use it to populate a pe
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
-use FreeDSx\Ldap\Server\Backend\Storage\SeedOptions;
+use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedOptions;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -827,7 +827,7 @@ modification is needed.
 
 The `PLAIN` mechanism extracts the username and password from the SASL credentials and calls
 `PasswordAuthenticatableInterface::getSaslIdentity()`. The built-in `PasswordAuthenticator` then verifies the
-supplied password against the stored `userPassword` using `PasswordHashVerifier`, which supports `{SHA}`, `{SSHA}`,
+supplied password against the stored `userPassword` using `PasswordHashService`, which supports `{SHA}`, `{SSHA}`,
 `{MD5}`, `{SMD5}`, and plaintext. No additional configuration is needed beyond enabling the mechanism.
 
 **Note**: PLAIN transmits credentials in cleartext. Only enable it when the connection is protected by TLS (StartTLS

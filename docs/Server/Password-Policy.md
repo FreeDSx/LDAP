@@ -61,8 +61,8 @@ $passwordConfig = (new PasswordConfig())
 $ldap = new LdapServer(new ServerOptions(passwordConfig: $passwordConfig));
 ```
 
-Password policy is active when either `setPolicy()` or `setDefaultPolicyDn()` has been called
-(`ServerOptions::isPasswordPolicyEnabled()`). When active, the policy schema (the `pwdPolicy` auxiliary class and the
+Password policy is active when either `setPolicy()` or `setDefaultPolicyDn()` has been set on the `PasswordConfig`.
+When active, the policy schema (the `pwdPolicy` auxiliary class and the
 `pwd*` attribute types) is merged into the server schema automatically.
 
 ## Defining a Policy

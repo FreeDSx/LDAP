@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
+
 /**
  * What one bounded read amounted to, returned by the stream that performed it.
  *

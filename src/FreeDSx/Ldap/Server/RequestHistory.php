@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server;
 
-use FreeDSx\Ldap\Server\Backend\Storage\PageCursor;
+use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Paging\PagingRequests;
 
 /**

@@ -39,7 +39,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
-use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptionsFactory;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\StorageListOptionsFactory;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;

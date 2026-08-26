@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\MetricsResponseInterceptor;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
-use FreeDSx\Ldap\Server\Backend\Storage\AliasResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\Directory\AliasResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
