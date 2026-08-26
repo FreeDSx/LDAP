@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write;
 
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
@@ -23,6 +24,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Text;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteSubtreeCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 
@@ -36,11 +38,13 @@ final class WriteCommandFactory
     /**
      * @throws OperationException
      */
-    public function fromRequest(RequestInterface $request): WriteRequestInterface
-    {
+    public function fromRequest(
+        RequestInterface $request,
+        WriteContext $context,
+    ): WriteRequestInterface {
         return match (true) {
             $request instanceof AddRequest => new AddCommand($request->getEntry()),
-            $request instanceof DeleteRequest => new DeleteCommand($request->getDn()),
+            $request instanceof DeleteRequest => $this->deleteCommand($request, $context),
             $request instanceof ModifyRequest => new UpdateCommand(
                 $request->getDn(),
                 $request->getChanges(),
@@ -51,6 +55,18 @@ final class WriteCommandFactory
                 ResultCode::NO_SUCH_OPERATION,
             ),
         };
+    }
+
+    /**
+     * A control decides whether the delete stops at the entry or takes everything beneath it.
+     */
+    private function deleteCommand(
+        DeleteRequest $request,
+        WriteContext $context,
+    ): WriteRequestInterface {
+        return $context->getControls()->has(Control::OID_SUBTREE_DELETE)
+            ? new DeleteSubtreeCommand($request->getDn())
+            : new DeleteCommand($request->getDn());
     }
 
     /**

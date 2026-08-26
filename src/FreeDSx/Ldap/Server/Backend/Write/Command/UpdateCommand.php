@@ -22,13 +22,13 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class UpdateCommand implements WriteRequestInterface
+final readonly class UpdateCommand implements WriteRequestInterface
 {
     /**
      * @param Change[] $changes
      */
     public function __construct(
-        public readonly Dn $dn,
-        public readonly array $changes,
+        public Dn $dn,
+        public array $changes,
     ) {}
 }

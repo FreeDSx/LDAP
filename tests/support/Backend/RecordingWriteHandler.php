@@ -27,11 +27,6 @@ final class RecordingWriteHandler implements WriteHandlerInterface
      */
     public array $dispatched = [];
 
-    public function supports(WriteRequestInterface $request): bool
-    {
-        return true;
-    }
-
     public function handle(
         WriteRequestInterface $request,
         WriteContext $context,

@@ -105,6 +105,22 @@ trait ServerContainerTrait
     }
 
     /**
+     * A container over the given storage, for pulling several collaborators that must share one graph.
+     *
+     * @param array<class-string, object> $sharedInstances
+     */
+    private function containerFor(
+        EntryStorageInterface $storage,
+        ?ServerOptions $options = null,
+        array $sharedInstances = [],
+    ): Container {
+        return Container::forServer(
+            $options ?? $this->serverOptions(),
+            [EntryStorageInterface::class => $storage] + $sharedInstances,
+        );
+    }
+
+    /**
      * This test's container, for pulling several services that must come from the same graph.
      */
     private function container(): Container

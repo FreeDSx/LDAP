@@ -142,6 +142,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
     {
         return new ServerPasswordPolicyForwardHandler(
             backend: $container->get(WritableStorageBackend::class),
+            writes: $container->get(WriteOperationDispatcher::class),
             policyResolver: $container->get(PasswordPolicyResolver::class),
             engine: $container->get(PasswordPolicyEngine::class),
             accessControl: $container->get(AccessControlInterface::class),
@@ -222,7 +223,6 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         return new ServerDispatchHandler(
             backend: $backend,
             router: new WriteRequestRouter(
-                $backend,
                 $container->get(PasswordPolicyComponentFactory::class)->makeWriteDispatcher(
                     $context->eventLogger,
                     $context->passwordPolicyContext,

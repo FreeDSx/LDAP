@@ -22,12 +22,12 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class MoveCommand implements WriteRequestInterface
+final readonly class MoveCommand implements WriteRequestInterface
 {
     public function __construct(
-        public readonly Dn $dn,
-        public readonly Rdn $newRdn,
-        public readonly bool $deleteOldRdn,
-        public readonly ?Dn $newParent,
+        public Dn $dn,
+        public Rdn $newRdn,
+        public bool $deleteOldRdn,
+        public ?Dn $newParent,
     ) {}
 }

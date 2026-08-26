@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -25,9 +24,8 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
-use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
@@ -44,7 +42,7 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
     private ReadEntryControlHandler $readEntryControlHandler;
 
     public function __construct(
-        private WritableLdapBackendInterface $backend,
+        private LdapBackendInterface $backend,
         private WriteRequestRouter $router,
         private AccessControlInterface $accessControl,
         Schema $schema,
@@ -175,15 +173,6 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
                 $controls,
                 schemaViolations: $schemaViolations,
             ),
-            // Permissive by default.
-            // lock down by denying the delete operation on the subtree.
-            function (Dn $dn) use ($token): void {
-                $this->accessControl->authorizeOperation(
-                    OperationType::Delete,
-                    $token,
-                    $dn,
-                );
-            },
         );
     }
 

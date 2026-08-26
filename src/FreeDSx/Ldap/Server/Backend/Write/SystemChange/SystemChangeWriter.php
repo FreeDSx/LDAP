@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
-use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
+use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\Token\SystemToken;
 
@@ -27,7 +27,7 @@ use FreeDSx\Ldap\Server\Token\SystemToken;
  */
 final readonly class SystemChangeWriter implements SystemChangeWriterInterface
 {
-    public function __construct(private WriteOperationDispatcher $writeDispatcher) {}
+    public function __construct(private WriteHandlerInterface $writeDispatcher) {}
 
     /**
      * @throws OperationException
@@ -40,7 +40,7 @@ final readonly class SystemChangeWriter implements SystemChangeWriterInterface
             return;
         }
 
-        $this->writeDispatcher->dispatch(
+        $this->writeDispatcher->handle(
             new UpdateCommand(
                 $dn,
                 $changes->changes,

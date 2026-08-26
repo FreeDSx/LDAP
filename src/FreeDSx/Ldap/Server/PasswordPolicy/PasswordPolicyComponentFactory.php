@@ -17,8 +17,8 @@ use FreeDSx\Ldap\Server\Backend\Write\PasswordPolicyWriteHandler;
 use FreeDSx\Ldap\Server\Backend\Write\SystemChange\NullSystemChangeWriter;
 use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriter;
 use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriterInterface;
-use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
-use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyChangeGuard;
 use FreeDSx\Ldap\ServerOptions;
@@ -32,9 +32,9 @@ use FreeDSx\Ldap\ServerOptions;
 final readonly class PasswordPolicyComponentFactory
 {
     public function __construct(
-        private WritableLdapBackendInterface $backend,
+        private LdapBackendInterface $backend,
         private ServerOptions $options,
-        private WriteOperationDispatcher $writeDispatcher,
+        private WriteHandlerInterface $writeDispatcher,
         private PasswordPolicyEngine $passwordPolicyEngine,
         private PasswordPolicyResolver $policyResolver,
     ) {}
@@ -54,30 +54,23 @@ final readonly class PasswordPolicyComponentFactory
 
         return new PasswordPolicyWriteHandler(
             $this->backend,
+            $this->writeDispatcher,
             $guard,
             $this->makeSystemChangeWriter(),
         );
     }
 
     /**
-     * The write dispatcher for a connection, with policy enforcement ahead of the backend where policy is active.
+     * The write entry point for a connection, wrapped in policy enforcement where policy is active.
      */
     public function makeWriteDispatcher(
         EventLogger $eventLogger,
         ?PasswordPolicyContext $passwordPolicyContext,
-    ): WriteOperationDispatcher {
-        $writeHandler = $this->makeWriteHandler(
+    ): WriteHandlerInterface {
+        return $this->makeWriteHandler(
             $eventLogger,
             $passwordPolicyContext,
-        );
-        if ($writeHandler === null) {
-            return $this->writeDispatcher;
-        }
-
-        return new WriteOperationDispatcher(
-            $writeHandler,
-            $this->backend,
-        );
+        ) ?? $this->writeDispatcher;
     }
 
     public function makeChangeGuard(

@@ -15,7 +15,8 @@ namespace FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy;
 
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Write\Command\ComputeUpdateCommand;
+use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordBindAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
@@ -34,7 +35,7 @@ final readonly class EntryBindStrategy implements PasswordPolicyBindStrategyInte
 {
     public function __construct(
         private PasswordPolicyEngine $engine,
-        private WritableLdapBackendInterface $backend,
+        private WriteHandlerInterface $writes,
     ) {}
 
     public function preBindOutcome(PasswordBindAttempt $attempt): PasswordPolicyOutcome
@@ -51,17 +52,19 @@ final readonly class EntryBindStrategy implements PasswordPolicyBindStrategyInte
     ): RecordedOutcome {
         $recorded = null;
 
-        $this->backend->atomicUpdate(
-            $attempt->dn,
+        $this->writes->handle(
+            new ComputeUpdateCommand(
+                $attempt->dn,
+                function (Entry $entry) use ($decide, &$recorded): array {
+                    $recorded = $decide(UserPasswordState::fromEntry($entry));
+
+                    return $recorded->changes->changes;
+                },
+            ),
             WriteContext::system(
                 new SystemToken(),
                 new ControlBag(),
             ),
-            function (Entry $entry) use ($decide, &$recorded): array {
-                $recorded = $decide(UserPasswordState::fromEntry($entry));
-
-                return $recorded->changes->changes;
-            },
         );
 
         return $recorded ?? new RecordedOutcome(

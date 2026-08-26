@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslBindPolicyEnforcer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\PasswordChangeConstraintChain;
@@ -171,7 +172,7 @@ final class SaslBindPolicyEnforcerTest extends TestCase
         ?PasswordPolicy $policy,
         array $userAttrs = [],
     ): SaslBindPolicyEnforcer {
-        $this->backend = $this->backendFor(new InMemoryStorage([
+        $container = $this->containerFor(new InMemoryStorage([
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [
@@ -189,6 +190,7 @@ final class SaslBindPolicyEnforcerTest extends TestCase
                 ] + $userAttrs,
             ),
         ]));
+        $this->backend = $container->get(WritableStorageBackend::class);
 
         $engine = new PasswordPolicyEngine(
             clock: $this->clock,
@@ -198,7 +200,7 @@ final class SaslBindPolicyEnforcerTest extends TestCase
             $engine,
             new EntryBindStrategy(
                 $engine,
-                $this->backend,
+                $container->get(WriteOperationDispatcher::class),
             ),
             $this->context,
             new EventLogger(null, EventLogPolicy::all()),

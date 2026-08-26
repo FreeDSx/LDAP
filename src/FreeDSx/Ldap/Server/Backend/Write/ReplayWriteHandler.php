@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Server\Backend\Write;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
@@ -39,7 +38,7 @@ final readonly class ReplayWriteHandler implements MiddlewareHandlerInterface
      * Controls a replayed record can be given effect; a critical control outside this set has to be refused.
      */
     private const HONORED_CONTROLS = [
-        // Routed by the write router.
+        // Names which delete the command factory builds.
         Control::OID_SUBTREE_DELETE,
         // Read off the write context by the storage backend.
         Control::OID_RELAX_RULES,
@@ -65,8 +64,6 @@ final readonly class ReplayWriteHandler implements MiddlewareHandlerInterface
                 $context->tokenOrFail(),
                 $controls,
             ),
-            // Replay is privileged by construction, so a subtree delete authorizes no descendant separately.
-            static function (Dn $dn): void {},
         );
 
         return ResponseStream::of(

@@ -13,47 +13,37 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write;
 
+use Closure;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 
 /**
- * Routes a write command to the first registered handler that supports it; explicit handlers precede the fallback backend.
+ * Hands a write command to the operation that performs it.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class WriteOperationDispatcher
+readonly class WriteOperationDispatcher implements WriteHandlerInterface
 {
     /**
-     * @var WriteHandlerInterface[]
+     * @param array<class-string<WriteRequestInterface>, Closure> $operations Keyed by the command each performs.
      */
-    private array $handlers;
-
-    public function __construct(WriteHandlerInterface ...$handlers)
-    {
-        $this->handlers = $handlers;
-    }
+    public function __construct(private array $operations) {}
 
     /**
      * @throws OperationException
      */
-    public function dispatch(
+    public function handle(
         WriteRequestInterface $request,
         WriteContext $context,
     ): void {
-        foreach ($this->handlers as $handler) {
-            if ($handler->supports($request)) {
-                $handler->handle(
-                    $request,
-                    $context,
-                );
-
-                return;
-            }
-        }
-
-        throw new OperationException(
+        $operation = $this->operations[$request::class] ?? throw new OperationException(
             'This operation is not supported.',
             ResultCode::UNWILLING_TO_PERFORM,
+        );
+
+        $operation(
+            $request,
+            $context,
         );
     }
 }

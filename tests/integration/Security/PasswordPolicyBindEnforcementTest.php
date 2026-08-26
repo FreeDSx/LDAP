@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordPolicyAwareAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
@@ -604,7 +605,7 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
         Entry $user,
         PasswordPolicy $policy,
     ): PasswordPolicyAwareAuthenticator {
-        $this->backend = $this->backendFor(new InMemoryStorage([
+        $container = $this->containerFor(new InMemoryStorage([
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [
@@ -614,6 +615,7 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
             ),
             $user,
         ]));
+        $this->backend = $container->get(WritableStorageBackend::class);
 
         $nameResolver = new DnBindNameResolver();
         $engine = new PasswordPolicyEngine(
@@ -624,7 +626,7 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
             $engine,
             new EntryBindStrategy(
                 $engine,
-                $this->backend,
+                $container->get(WriteOperationDispatcher::class),
             ),
             $this->context,
             new EventLogger(

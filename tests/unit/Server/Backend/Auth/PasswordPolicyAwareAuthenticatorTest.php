@@ -21,7 +21,9 @@ use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordPolicyAwareAuthenticator;
-use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
+use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\PasswordPolicy\Constraint\PasswordChangeConstraintChain;
@@ -201,9 +203,10 @@ final class PasswordPolicyAwareAuthenticatorTest extends TestCase
 
     private function authenticator(?PasswordPolicy $policy): PasswordPolicyAwareAuthenticator
     {
-        $backend = $this->createMock(WritableLdapBackendInterface::class);
-        $backend->method('atomicUpdate')->willReturnCallback(
-            function (Dn $dn, WriteContext $context, callable $compute): void {
+        $backend = $this->createMock(LdapBackendInterface::class);
+        $updates = $this->createMock(WriteHandlerInterface::class);
+        $updates->method('handle')->willReturnCallback(
+            function (WriteRequestInterface $request, WriteContext $context): void {
                 $this->writes[] = true;
             },
         );
@@ -213,7 +216,7 @@ final class PasswordPolicyAwareAuthenticatorTest extends TestCase
         );
         $guard = new PasswordPolicyBindGuard(
             $engine,
-            new EntryBindStrategy($engine, $backend),
+            new EntryBindStrategy($engine, $updates),
             $this->context,
             new EventLogger(null),
             new BlockingSleeper(),

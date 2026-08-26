@@ -380,7 +380,7 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
         PasswordPolicy $policy,
         array $userAttrs = [],
     ): ServerDispatchHandler {
-        $this->backend = $this->backendFor(new InMemoryStorage([
+        $container = $this->containerFor(new InMemoryStorage([
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [
@@ -398,6 +398,7 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
                 ] + $userAttrs,
             ),
         ]));
+        $this->backend = $container->get(WritableStorageBackend::class);
 
         $guard = new PasswordPolicyChangeGuard(
             $this->fromContainer(
@@ -412,21 +413,17 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
             $this->context,
             new EventLogger(null),
         );
+        $writes = $container->get(WriteOperationDispatcher::class);
         $policyWriteHandler = new PasswordPolicyWriteHandler(
             $this->backend,
+            $writes,
             $guard,
-            new SystemChangeWriter(new WriteOperationDispatcher($this->backend)),
+            new SystemChangeWriter($writes),
         );
 
         return new ServerDispatchHandler(
             backend: $this->backend,
-            router: new WriteRequestRouter(
-                $this->backend,
-                new WriteOperationDispatcher(
-                    $policyWriteHandler,
-                    $this->backend,
-                ),
-            ),
+            router: new WriteRequestRouter($policyWriteHandler),
             accessControl: $this->createMock(AccessControlInterface::class),
             schema: new Schema(),
         );

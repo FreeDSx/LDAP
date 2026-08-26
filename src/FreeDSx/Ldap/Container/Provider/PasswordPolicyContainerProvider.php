@@ -54,7 +54,6 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
             PasswordModifyTargetResolver::class => $this->makePasswordModifyTargetResolver(...),
             PasswordHashService::class => $this->makePasswordHashService(...),
             PasswordPolicyResolver::class => $this->makePasswordPolicyResolver(...),
-            WriteOperationDispatcher::class => $this->makeWriteOperationDispatcher(...),
             PasswordPolicyComponentFactory::class => $this->makePasswordPolicyComponentFactory(...),
         ];
     }
@@ -131,11 +130,6 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
                 new SubtreeSpecificationEvaluator($container->get(FilterEvaluatorInterface::class)),
             ),
         );
-    }
-
-    private function makeWriteOperationDispatcher(Container $container): WriteOperationDispatcher
-    {
-        return new WriteOperationDispatcher($container->get(WritableStorageBackend::class));
     }
 
     private function makePasswordPolicyComponentFactory(Container $container): PasswordPolicyComponentFactory

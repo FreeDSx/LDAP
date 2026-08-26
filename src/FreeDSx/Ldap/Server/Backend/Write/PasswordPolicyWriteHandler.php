@@ -41,28 +41,32 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
     ];
 
     public function __construct(
-        private LdapBackendInterface&WriteHandlerInterface $backend,
+        private LdapBackendInterface $backend,
+        private WriteHandlerInterface $writes,
         private PasswordPolicyChangeGuard $changeGuard,
         private SystemChangeWriterInterface $systemChangeWriter,
         private PasswordHashService $hashService = new PasswordHashService(),
     ) {}
 
-    public function supports(WriteRequestInterface $request): bool
-    {
-        return $this->newPasswordsFor($request) !== [];
-    }
-
     /**
+     * Anything not setting a password is nothing this has an opinion about.
+     *
      * @throws OperationException
      */
     public function handle(
         WriteRequestInterface $request,
         WriteContext $context,
     ): void {
+        if ($this->newPasswordsFor($request) === []) {
+            $this->writes->handle($request, $context);
+
+            return;
+        }
+
         match (true) {
             $request instanceof AddCommand => $this->handleAdd($request, $context),
             $request instanceof UpdateCommand => $this->handleUpdate($request, $context),
-            default => $this->backend->handle($request, $context),
+            default => $this->writes->handle($request, $context),
         };
     }
 
@@ -78,7 +82,7 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
     ): void {
         $newPasswords = $this->entryPasswordValues($request->entry);
         if ($newPasswords === []) {
-            $this->backend->handle(
+            $this->writes->handle(
                 $request,
                 $context,
             );
@@ -96,7 +100,7 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
 
         // Carried on the command rather than written after, so the entry is never stored without the state governing
         // it, and rather than folded into the entry, so validation still judges only what the requester supplied.
-        $this->backend->handle(
+        $this->writes->handle(
             new AddCommand(
                 $request->entry,
                 $deltas->changes,
@@ -115,7 +119,7 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
         $newPasswords = $this->userPasswordValues($request, self::SET_TYPES);
         $entry = $this->backend->get($request->dn);
         if ($newPasswords === [] || $entry === null) {
-            $this->backend->handle(
+            $this->writes->handle(
                 $request,
                 $context,
             );
@@ -134,7 +138,7 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
             $isSelf,
         ));
 
-        $this->backend->handle(
+        $this->writes->handle(
             $request,
             $context,
         );

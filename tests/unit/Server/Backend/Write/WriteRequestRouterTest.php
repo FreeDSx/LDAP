@@ -15,14 +15,14 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Write;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
-use FreeDSx\Ldap\Server\Backend\Write\WritableLdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteSubtreeCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
-use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Token\SystemToken;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -32,96 +32,55 @@ final class WriteRequestRouterTest extends TestCase
 {
     private const DN = 'cn=foo,dc=example,dc=com';
 
-    private WritableLdapBackendInterface&MockObject $backend;
-
-    private WriteHandlerInterface&MockObject $writeHandler;
+    private WriteHandlerInterface&MockObject $writes;
 
     private WriteRequestRouter $subject;
 
     protected function setUp(): void
     {
-        $this->backend = $this->createMock(WritableLdapBackendInterface::class);
-        $this->writeHandler = $this->createMock(WriteHandlerInterface::class);
-        $this->writeHandler
-            ->method('supports')
-            ->willReturn(true);
-
-        $this->subject = new WriteRequestRouter(
-            $this->backend,
-            new WriteOperationDispatcher($this->writeHandler),
-        );
+        $this->writes = $this->createMock(WriteHandlerInterface::class);
+        $this->subject = new WriteRequestRouter($this->writes);
     }
 
-    public function test_a_delete_carrying_the_subtree_control_removes_the_whole_subtree(): void
+    public function test_a_delete_carrying_the_subtree_control_becomes_a_subtree_delete(): void
     {
-        $this->backend
-            ->expects(self::once())
-            ->method('deleteSubtree');
-        $this->writeHandler
-            ->expects(self::never())
-            ->method('handle');
+        $this->expectCommand(DeleteSubtreeCommand::class);
 
         $this->subject->route(
             new DeleteRequest(self::DN),
             $this->contextWith(new Control(Control::OID_SUBTREE_DELETE)),
-            static function (Dn $dn): void {},
         );
     }
 
-    public function test_a_delete_without_the_subtree_control_goes_to_the_write_handler(): void
+    public function test_a_delete_without_the_subtree_control_stays_a_delete(): void
     {
-        $this->backend
-            ->expects(self::never())
-            ->method('deleteSubtree');
-        $this->writeHandler
-            ->expects(self::once())
-            ->method('handle');
+        $this->expectCommand(DeleteCommand::class);
 
         $this->subject->route(
             new DeleteRequest(self::DN),
             $this->contextWith(),
-            static function (Dn $dn): void {},
         );
     }
 
-    public function test_the_subtree_control_on_another_operation_is_not_routed_as_a_subtree_delete(): void
+    public function test_the_subtree_control_on_another_operation_changes_nothing(): void
     {
-        $this->backend
-            ->expects(self::never())
-            ->method('deleteSubtree');
-        $this->writeHandler
-            ->expects(self::once())
-            ->method('handle');
+        $this->expectCommand(AddCommand::class);
 
         $this->subject->route(
             new AddRequest(Entry::create(self::DN)),
             $this->contextWith(new Control(Control::OID_SUBTREE_DELETE)),
-            static function (Dn $dn): void {},
         );
     }
 
-    public function test_the_subtree_delete_is_given_the_callers_authorization_check(): void
+    /**
+     * @param class-string $command
+     */
+    private function expectCommand(string $command): void
     {
-        $authorized = false;
-        $this->backend
-            ->method('deleteSubtree')
-            ->willReturnCallback(static function (
-                object $command,
-                WriteContext $context,
-                callable $authorize,
-            ): void {
-                $authorize(new Dn(self::DN));
-            });
-
-        $this->subject->route(
-            new DeleteRequest(self::DN),
-            $this->contextWith(new Control(Control::OID_SUBTREE_DELETE)),
-            static function (Dn $dn) use (&$authorized): void {
-                $authorized = true;
-            },
-        );
-
-        self::assertTrue($authorized);
+        $this->writes
+            ->expects(self::once())
+            ->method('handle')
+            ->with(self::isInstanceOf($command));
     }
 
     private function contextWith(Control ...$controls): WriteContext
