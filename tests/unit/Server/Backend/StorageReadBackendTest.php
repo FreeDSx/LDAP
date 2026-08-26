@@ -28,7 +28,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use FreeDSx\Ldap\ServerOptions;
 use Generator;
@@ -38,11 +38,11 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
-final class WritableStorageBackendTest extends TestCase
+final class StorageReadBackendTest extends TestCase
 {
     use ServerContainerTrait;
 
-    private WritableStorageBackend $subject;
+    private StorageReadBackend $subject;
 
     private Entry $alice;
 
@@ -593,7 +593,7 @@ final class WritableStorageBackendTest extends TestCase
         return TestServerOptions::unvalidatedCore();
     }
 
-    private function aliasBackend(): WritableStorageBackend
+    private function aliasBackend(): StorageReadBackend
     {
         return $this->backendFor(new InMemoryStorage([
             $this->base,

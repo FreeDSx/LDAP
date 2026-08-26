@@ -28,7 +28,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestRouter;
@@ -44,7 +44,7 @@ final class ServerDispatchHandlerTest extends TestCase
 {
     private ServerDispatchHandler $subject;
 
-    private LdapBackendInterface&MockObject $mockBackend;
+    private ReadBackendInterface&MockObject $mockBackend;
 
     private WriteHandlerInterface&MockObject $mockWriteHandler;
 
@@ -55,7 +55,7 @@ final class ServerDispatchHandlerTest extends TestCase
     protected function setUp(): void
     {
         $this->mockToken = $this->createMock(TokenInterface::class);
-        $this->mockBackend = $this->createMock(LdapBackendInterface::class);
+        $this->mockBackend = $this->createMock(ReadBackendInterface::class);
         $this->mockWriteHandler = $this->createMock(WriteHandlerInterface::class);
         $this->mockAccessControl = $this->createMock(AccessControlInterface::class);
 

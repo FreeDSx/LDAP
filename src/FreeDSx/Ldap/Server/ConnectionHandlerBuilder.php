@@ -44,8 +44,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordPolicyAwareAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslBindPolicyEnforcer;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\WritableStorageBackend;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -107,7 +106,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         $metricsRecorder = $this->container->get(MetricsRecorderInterface::class);
 
         $eventLogger = $this->makeEventLogger($context);
-        $backend = $this->container->get(WritableStorageBackend::class);
+        $backend = $this->container->get(ReadBackendInterface::class);
         $passwordAuthenticator = $this->container->get(PasswordAuthenticatableInterface::class);
 
         // Always composed: policy may come from a DIT entry that appears after the server starts.
@@ -212,7 +211,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
 
     private function decoratePasswordAuthenticator(
         PasswordAuthenticatableInterface $inner,
-        LdapBackendInterface $backend,
+        ReadBackendInterface $backend,
         PasswordPolicyContext $policyContext,
         EventLogger $eventLogger,
     ): PasswordPolicyAwareAuthenticator {
@@ -236,7 +235,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         EventLogger $eventLogger,
         PasswordAuthenticatableInterface $authenticator,
         AuthzIdResolver $authzIdResolver,
-        LdapBackendInterface $backend,
+        ReadBackendInterface $backend,
         ?PasswordPolicyContext $policyContext,
         array $saslMechanisms,
     ): SaslBind {
@@ -272,7 +271,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
     }
 
     private function makeSaslPolicyEnforcer(
-        LdapBackendInterface $backend,
+        ReadBackendInterface $backend,
         PasswordPolicyContext $policyContext,
         EventLogger $eventLogger,
     ): SaslBindPolicyEnforcer {
@@ -374,7 +373,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         array $authenticators,
         DispatchAuthorizer $dispatchAuthorizer,
         ?PasswordPolicyContext $policyContext,
-        LdapBackendInterface $backend,
+        ReadBackendInterface $backend,
         ProtocolHandlerProviderInterface $handlerProvider,
     ): MiddlewareChain {
         $options = $this->serverOptions();

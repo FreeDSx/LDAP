@@ -13,6 +13,15 @@ General LDAP Server Usage
     * [InMemoryStorage](#inmemorystorage)
     * [SQLite](#sqlite)
     * [MySQL](#mysql)
+  * [Tuning a PDO config](#tuning-a-pdo-config)
+    * [PdoConfig:setDsn](#setdsn)
+    * [PdoConfig:setUsername](#setusername)
+    * [PdoConfig:setPassword](#setpassword)
+    * [PdoConfig:setPdoOptions](#setpdooptions)
+    * [PdoConfig:setSessionStatements](#setsessionstatements)
+    * [PdoConfig:setSerializeSwooleWrites](#setserializeswoolewrites)
+    * [PdoConfig:setInitializeSchema](#setinitializeschema)
+    * [PdoConfig:setSubstringIndexMode](#setsubstringindexmode)
 * [LDIF Data](#ldif-data)
   * [Seeding Initial Entries](#seeding-initial-entries)
   * [Replaying LDIF Changelogs](#replaying-ldif-changelogs)
@@ -40,9 +49,9 @@ using a forking method (PCNTL) for handling client connections, which is only av
 > than a FreeDSx issue. If you hit it, try running with `opcache.jit=off`. The single-process Swoole runner has not shown
 > this.
 
-The server has no built-in entry persistence. You provide a backend that implements the storage logic for your use
-case. Authentication is a separate, independently configurable concern. See [Providing a Backend](#providing-a-backend)
-and [Authentication](#authentication) for details.
+Entries are persisted by a storage config you pass to `ServerOptions`, chosen from the built-in SQLite, MySQL, and
+in-memory implementations. Authentication is a separate, independently configurable concern. See
+[Providing a Backend](#providing-a-backend) and [Authentication](#authentication) for details.
 
 ## Quick Start Scenarios
 
@@ -422,11 +431,11 @@ $server->run();
 The DSN follows the standard PDO MySQL format. The character set is automatically configured to `utf8mb4`
 and the time zone to UTC on each connection.
 
-##### Tuning a PDO config
+#### Tuning a PDO config
 
-`forSqlite()` and `forMysql()` pick the database engine, and everything that follows from it. The PDO options,
-per-connection session statements, and whether writes are serialized under Swoole all come from the driver.
-Override any of them with the setters:
+`forSqlite()` and `forMysql()` pick the database engine and everything that follows from it. The PDO options, the
+per-connection session statements, and whether writes are serialized under Swoole all come from the driver. Override
+any of them with the setters below. Each returns the config, so calls chain:
 
 ```php
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
@@ -445,16 +454,67 @@ $config = PdoConfig::forMysql(
 ```
 
 `PdoConfig` implements `StorageConfigInterface`, so pass `$config` to `setStorageConfig()` or the `ServerOptions`
-constructor like any other backend config.
+constructor like any other storage config.
 
-##### Substring index
+##### setDsn
 
-Substring filters such as `(cn=*smith*)` are narrowed by an index the storage maintains alongside the entries.
-Choose it with `setSubstringIndexMode()`:
+The PDO connection string. `forSqlite()` builds it as `sqlite:` followed by the path you give it, and `forMysql()`
+takes it verbatim. Set it to repoint an existing config at a different database.
+
+**Default**: derived from the factory method used.
+
+##### setUsername
+
+The connection user. SQLite has no authentication, so `forSqlite()` leaves it unset.
+
+**Default**: `null` for SQLite, the `forMysql()` argument for MySQL.
+
+##### setPassword
+
+The connection password, unset for SQLite for the same reason as the username.
+
+**Default**: `null` for SQLite, the `forMysql()` argument for MySQL.
+
+##### setPdoOptions
+
+The options array handed to the PDO constructor, keyed by the `PDO::ATTR_*` constants. It replaces the driver defaults
+outright rather than merging, so carry over any you still want.
+
+**Default**: `[PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]` for SQLite. MySQL adds
+`PDO::ATTR_EMULATE_PREPARES => false`.
+
+##### setSessionStatements
+
+Statements replayed on every new connection, used to put each one into the state the storage expects. This also
+replaces the defaults outright, so include the ones you want to keep.
+
+**Default**: for SQLite, `PRAGMA busy_timeout = 5000`, `PRAGMA synchronous = NORMAL`, `PRAGMA journal_mode = WAL`, and
+`PRAGMA foreign_keys = ON`. For MySQL, `SET NAMES utf8mb4` and `SET time_zone = '+00:00'`.
+
+##### setSerializeSwooleWrites
+
+Whether concurrent writes funnel through a single connection while reads stay on their own. Honoured only under the
+Swoole runner, as the forking runner already writes on one inherited connection.
+
+SQLite allows one writer at a time, so serializing turns lock contention between coroutines into an ordered queue.
+MySQL handles concurrent writers itself, so serializing it only costs throughput.
+
+**Default**: `true` for SQLite, `false` for MySQL.
+
+##### setInitializeSchema
+
+Whether the storage issues its DDL on first connect. Turn it off to manage the tables yourself, covered in
+[Database Schema](Database-Schema.md).
+
+**Default**: `true`.
+
+##### setSubstringIndexMode
+
+Which index narrows substring filters such as `(cn=*smith*)`, maintained by the storage alongside the entries.
 
 | Mode | Behavior |
 | --- | --- |
-| `SubstringIndexMode::Auto` | The default. FTS5 on SQLite where the build provides it, trigram everywhere else. |
+| `SubstringIndexMode::Auto` | FTS5 on SQLite where the build provides it, trigram everywhere else. |
 | `SubstringIndexMode::Trigram` | The portable trigram table, supported by every driver. |
 | `SubstringIndexMode::None` | No index. Substring filters scan instead. |
 
@@ -468,6 +528,8 @@ $config = PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')
 
 The index adds write cost and disk, so turn it off for a directory that never runs substring filters. Changing
 the mode on a directory that already holds entries needs the index rebuilt before those filters match again.
+
+**Default**: `SubstringIndexMode::Auto`.
 
 ## LDIF Data
 

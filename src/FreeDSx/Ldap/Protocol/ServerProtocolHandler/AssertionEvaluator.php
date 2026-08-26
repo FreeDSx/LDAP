@@ -20,7 +20,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
@@ -41,7 +41,7 @@ final readonly class AssertionEvaluator
 {
     public function __construct(
         private FilterEvaluatorInterface $filterEvaluator,
-        private LdapBackendInterface $backend,
+        private ReadBackendInterface $backend,
         private AccessControlInterface $accessControl,
     ) {}
 

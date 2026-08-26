@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
@@ -30,7 +30,7 @@ trait MatchedDnAccessFilterTrait
     private function filterMatchedDn(
         ?Dn $matchedDn,
         TokenInterface $token,
-        LdapBackendInterface $backend,
+        ReadBackendInterface $backend,
         AccessControlInterface $accessControl,
     ): ?Dn {
         if ($matchedDn === null) {

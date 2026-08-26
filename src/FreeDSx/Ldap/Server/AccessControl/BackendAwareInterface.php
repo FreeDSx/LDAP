@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\AccessControl;
 
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 
 /**
  * Implemented by access control classes or matchers that need a backend injected at startup.
@@ -22,5 +22,5 @@ use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
  */
 interface BackendAwareInterface
 {
-    public function setBackend(LdapBackendInterface $backend): void;
+    public function setBackend(ReadBackendInterface $backend): void;
 }

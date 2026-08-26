@@ -26,7 +26,6 @@ jobs:
         include:
           - { id: memory-swoole,      backend: memory, runner: swoole, profile: 'memory:swoole',      workers: 1 }
           - { id: sqlite-pcntl,       backend: sqlite, runner: pcntl,  profile: 'sqlite:pcntl',       workers: 1 }
-          - { id: sqlite-swoole,      backend: sqlite, runner: swoole, profile: 'sqlite:swoole',      workers: 1 }
           # Worker count left to auto-detect, so the pool is exercised on whatever cores the runner has.
           - { id: sqlite-swoole-pool, backend: sqlite, runner: swoole, profile: 'sqlite:swoole-pool', workers: 0 }
     steps:

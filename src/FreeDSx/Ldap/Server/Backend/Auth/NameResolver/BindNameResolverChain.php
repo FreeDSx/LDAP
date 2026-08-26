@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Auth\NameResolver;
 
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 
 /**
  * Tries each resolver in order, returning the first non-null result.
@@ -30,7 +30,7 @@ final readonly class BindNameResolverChain implements BindNameResolverInterface
 
     public function resolve(
         string $name,
-        LdapBackendInterface $backend,
+        ReadBackendInterface $backend,
     ): ?Entry {
         foreach ($this->resolvers as $resolver) {
             $entry = $resolver->resolve(

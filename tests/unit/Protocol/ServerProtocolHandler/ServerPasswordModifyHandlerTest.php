@@ -26,7 +26,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPasswordModifyHandler;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Operation\PasswordModifyOperationResult;
@@ -43,7 +43,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class ServerPasswordModifyHandlerTest extends TestCase
 {
-    private LdapBackendInterface&MockObject $mockBackend;
+    private ReadBackendInterface&MockObject $mockBackend;
 
     private ServerPasswordModifyHandler $subject;
 
@@ -53,7 +53,7 @@ final class ServerPasswordModifyHandlerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mockBackend = $this->createMock(LdapBackendInterface::class);
+        $this->mockBackend = $this->createMock(ReadBackendInterface::class);
         $mockWriteHandler = $this->createMock(WriteHandlerInterface::class);
 
         $this->userEntry = new Entry(

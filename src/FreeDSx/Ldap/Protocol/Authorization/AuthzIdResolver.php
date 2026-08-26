@@ -22,7 +22,7 @@ use FreeDSx\Ldap\Exception\UnexpectedValueException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
@@ -40,7 +40,7 @@ final readonly class AuthzIdResolver
 {
     public function __construct(
         private AccessControlInterface $accessControl,
-        private LdapBackendInterface $backend,
+        private ReadBackendInterface $backend,
         private BindNameResolverInterface $identityResolver,
         private EventLogger $eventLogger,
     ) {}

@@ -28,7 +28,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordResetGate;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
@@ -44,7 +44,7 @@ final class DispatchAuthorizerTest extends TestCase
 
     private ServerAuthorization&MockObject $authorizer;
 
-    private LdapBackendInterface&MockObject $backend;
+    private ReadBackendInterface&MockObject $backend;
 
     private AccessControlInterface&MockObject $accessControl;
 
@@ -53,7 +53,7 @@ final class DispatchAuthorizerTest extends TestCase
     protected function setUp(): void
     {
         $this->authorizer = $this->createMock(ServerAuthorization::class);
-        $this->backend = $this->createMock(LdapBackendInterface::class);
+        $this->backend = $this->createMock(ReadBackendInterface::class);
         $this->accessControl = $this->createMock(AccessControlInterface::class);
         $this->accessControl
             ->method('mayUseControl')

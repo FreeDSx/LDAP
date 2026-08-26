@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Sasl\Mechanism\MechanismName;
@@ -33,7 +33,7 @@ final class PasswordAuthenticator implements PasswordAuthenticatableInterface
 {
     public function __construct(
         private readonly BindNameResolverInterface $resolver,
-        private readonly LdapBackendInterface $backend,
+        private readonly ReadBackendInterface $backend,
         private readonly PasswordHashService $hashService = new PasswordHashService(),
     ) {}
 

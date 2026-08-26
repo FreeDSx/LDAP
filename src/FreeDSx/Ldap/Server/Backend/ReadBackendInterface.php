@@ -29,7 +29,7 @@ use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-interface LdapBackendInterface
+interface ReadBackendInterface
 {
     /**
      * @param SubentryVisibility $subentries Which entry population is in scope; callers state it, as no default is safe for all.

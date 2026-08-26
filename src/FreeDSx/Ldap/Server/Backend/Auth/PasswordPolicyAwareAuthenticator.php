@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Auth;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordBindAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyBindGuard;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
@@ -33,7 +33,7 @@ final readonly class PasswordPolicyAwareAuthenticator implements PasswordAuthent
     public function __construct(
         private PasswordAuthenticatableInterface $decoratedAuthenticator,
         private BindNameResolverInterface $nameResolver,
-        private LdapBackendInterface $backend,
+        private ReadBackendInterface $backend,
         private PasswordPolicyResolver $policyResolver,
         private PasswordPolicyBindGuard $guard,
     ) {}

@@ -27,7 +27,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
@@ -42,7 +42,7 @@ final class AssertionMiddlewareTest extends TestCase
 {
     use ServerContainerTrait;
 
-    private LdapBackendInterface&MockObject $backend;
+    private ReadBackendInterface&MockObject $backend;
 
     private AssertionMiddleware $subject;
 
@@ -50,7 +50,7 @@ final class AssertionMiddlewareTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->backend = $this->createMock(LdapBackendInterface::class);
+        $this->backend = $this->createMock(ReadBackendInterface::class);
         $this->backend
             ->method('get')
             ->willReturn(Entry::fromArray(

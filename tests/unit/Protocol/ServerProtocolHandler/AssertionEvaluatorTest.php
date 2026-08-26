@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\Token\BindToken;
@@ -29,7 +29,7 @@ final class AssertionEvaluatorTest extends TestCase
 {
     use ServerContainerTrait;
 
-    private LdapBackendInterface&MockObject $backend;
+    private ReadBackendInterface&MockObject $backend;
 
     private AssertionEvaluator $subject;
 
@@ -39,7 +39,7 @@ final class AssertionEvaluatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->backend = $this->createMock(LdapBackendInterface::class);
+        $this->backend = $this->createMock(ReadBackendInterface::class);
         $this->targetDn = new Dn('cn=foo,dc=ex,dc=com');
         $this->token = BindToken::fromDn('cn=foo,dc=ex,dc=com');
         $this->subject = new AssertionEvaluator(

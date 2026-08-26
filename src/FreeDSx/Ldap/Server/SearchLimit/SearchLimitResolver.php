@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\SearchLimit;
 
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
@@ -28,7 +28,7 @@ final class SearchLimitResolver implements SearchLimitResolverInterface, Backend
         private readonly SearchLimits $default,
     ) {}
 
-    public function setBackend(LdapBackendInterface $backend): void
+    public function setBackend(ReadBackendInterface $backend): void
     {
         foreach ($this->rules->rules as $rule) {
             if ($rule->subject instanceof BackendAwareInterface) {

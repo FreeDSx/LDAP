@@ -35,7 +35,7 @@ use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
@@ -52,7 +52,7 @@ final class ReplicaBindStrategyTest extends TestCase
 
     private ReplicaPasswordStateStoreInterface $store;
 
-    private LdapBackendInterface&MockObject $backend;
+    private ReadBackendInterface&MockObject $backend;
 
     private PasswordPolicyContext $context;
 
@@ -69,7 +69,7 @@ final class ReplicaBindStrategyTest extends TestCase
                 new Attribute('cn', 'foo'),
             ));
         $this->store = $this->fromContainer(ReplicaPasswordStateStoreInterface::class);
-        $this->backend = $this->createMock(LdapBackendInterface::class);
+        $this->backend = $this->createMock(ReadBackendInterface::class);
         $this->context = new PasswordPolicyContext();
         $this->sleeper = new RecordingSleeper();
 

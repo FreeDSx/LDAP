@@ -31,7 +31,7 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Sasl\Challenge\ChallengeInterface;
 use FreeDSx\Sasl\Mechanism\CramMD5Mechanism;
@@ -68,7 +68,7 @@ final class SaslExchangeTest extends TestCase
             optionsBuilderFactory: new MechanismOptionsBuilderFactory($mockAuthenticator),
             authzIdResolver: new AuthzIdResolver(
                 $this->createMock(AccessControlInterface::class),
-                $this->createMock(LdapBackendInterface::class),
+                $this->createMock(ReadBackendInterface::class),
                 $this->createMock(BindNameResolverInterface::class),
                 new EventLogger(null),
             ),
@@ -365,7 +365,7 @@ final class SaslExchangeTest extends TestCase
             optionsBuilderFactory: new MechanismOptionsBuilderFactory($authenticator),
             authzIdResolver: new AuthzIdResolver(
                 $this->createMock(AccessControlInterface::class),
-                $this->createMock(LdapBackendInterface::class),
+                $this->createMock(ReadBackendInterface::class),
                 $this->createMock(BindNameResolverInterface::class),
                 new EventLogger(null),
             ),

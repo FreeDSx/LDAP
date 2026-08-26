@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\PasswordPolicy\Guard\BindStrategy;
 
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordBindAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\PasswordPolicyOutcome;
@@ -35,7 +35,7 @@ final readonly class ReplicaBindStrategy implements PasswordPolicyBindStrategyIn
     public function __construct(
         private PasswordPolicyEngine $engine,
         private ReplicaPasswordStateStoreInterface $store,
-        private LdapBackendInterface $backend,
+        private ReadBackendInterface $backend,
     ) {}
 
     /**

@@ -24,7 +24,7 @@ use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\ExternalMechanismOptionsBuild
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
@@ -47,14 +47,14 @@ final class ExternalMechanismOptionsBuilderTest extends TestCase
 
     private AccessControlInterface&MockObject $accessControl;
 
-    private LdapBackendInterface&MockObject $backend;
+    private ReadBackendInterface&MockObject $backend;
 
     private AuthzIdResolver $authzIdResolver;
 
     protected function setUp(): void
     {
         $this->accessControl = $this->createMock(AccessControlInterface::class);
-        $this->backend = $this->createMock(LdapBackendInterface::class);
+        $this->backend = $this->createMock(ReadBackendInterface::class);
         $this->authzIdResolver = new AuthzIdResolver(
             $this->accessControl,
             $this->backend,

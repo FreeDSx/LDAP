@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Auth\NameResolver;
 
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\LdapBackendInterface;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 
 /**
  * Translates a raw LDAP bind name into an Entry.
@@ -28,6 +28,6 @@ interface BindNameResolverInterface
      */
     public function resolve(
         string $name,
-        LdapBackendInterface $backend,
+        ReadBackendInterface $backend,
     ): ?Entry;
 }
