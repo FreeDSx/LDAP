@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\UndefinedCause;
 use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -1279,6 +1280,53 @@ final class FilterEvaluatorTest extends TestCase
             ),
             false,
         ];
+    }
+
+    /**
+     * @return iterable<string, array{FilterInterface, ?UndefinedCause}>
+     */
+    public static function undefinedCauseProvider(): iterable
+    {
+        yield 'unrecognized type' => [
+            Filters::equal('shoeSize', '9'),
+            UndefinedCause::UnrecognizedAttributeType,
+        ];
+        yield 'unrecognized type under a present filter' => [
+            Filters::present('shoeSize'),
+            UndefinedCause::UnrecognizedAttributeType,
+        ];
+        yield 'assertion value the syntax rejects' => [
+            Filters::equal('uidNumber', 'abc'),
+            UndefinedCause::InvalidAssertionValue,
+        ];
+        yield 'matching value' => [
+            Filters::equal('cn', 'Alice'),
+            null,
+        ];
+        yield 'differing value' => [
+            Filters::equal('cn', 'Nobody'),
+            null,
+        ];
+        // A defined type the entry happens to lack is False, which only an entry can decide.
+        yield 'defined type the entry lacks' => [
+            Filters::equal('description', 'anything'),
+            null,
+        ];
+        yield 'composite' => [
+            Filters::and(Filters::equal('cn', 'Alice')),
+            null,
+        ];
+    }
+
+    #[DataProvider('undefinedCauseProvider')]
+    public function test_the_undefined_cause_is_reported_without_an_entry(
+        FilterInterface $filter,
+        ?UndefinedCause $expected,
+    ): void {
+        self::assertSame(
+            $expected,
+            $this->subject->undefinedCause($filter),
+        );
     }
 
     private function uidNumberEntry(): Entry

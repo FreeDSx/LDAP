@@ -133,6 +133,23 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         return $this->evaluateFilter($entry, $filter) === FilterResult::True;
     }
 
+    /**
+     * The same preconditions evaluation applies, asked without an entry so a caller can answer each cause its own way.
+     */
+    public function undefinedCause(FilterInterface $filter): ?UndefinedCause
+    {
+        if ($filter instanceof FilterAttributeInterface && !$this->attributeIsRecognized($filter)) {
+            return UndefinedCause::UnrecognizedAttributeType;
+        }
+        if (!$filter instanceof AttributeValueAssertionInterface) {
+            return null;
+        }
+
+        return $this->assertionSyntaxIsValid($filter) && $this->assertionDescriptorIsRecognized($filter)
+            ? null
+            : UndefinedCause::InvalidAssertionValue;
+    }
+
     private function evaluateFilter(
         Entry $entry,
         FilterInterface $filter,

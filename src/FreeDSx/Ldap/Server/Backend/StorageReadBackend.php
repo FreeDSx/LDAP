@@ -18,12 +18,14 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\UndefinedCause;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\SearchStreamBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\StorageListOptionsFactory;
@@ -70,6 +72,8 @@ final readonly class StorageReadBackend implements ReadBackendInterface, Resetta
         if ($entry === null) {
             $this->locator->throwNoSuchObject($dn);
         }
+        // RFC 4511 4.10: only compareTrue and compareFalse may report a match, so Undefined needs its own code.
+        $this->assertComparable($filter);
 
         // A comparison is an equality assertion, so it answers through the same evaluation a filter would get.
         return $this->filterEvaluator->evaluate(
@@ -129,6 +133,28 @@ final readonly class StorageReadBackend implements ReadBackendInterface, Resetta
             $request,
             $effectiveLimits,
         );
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function assertComparable(EqualityFilter $filter): void
+    {
+        $cause = $this->filterEvaluator->undefinedCause($filter);
+        if ($cause === null) {
+            return;
+        }
+
+        throw match ($cause) {
+            UndefinedCause::UnrecognizedAttributeType => new OperationException(
+                sprintf('Undefined attribute type: "%s".', $filter->getAttribute()),
+                ResultCode::UNDEFINED_ATTRIBUTE_TYPE,
+            ),
+            UndefinedCause::InvalidAssertionValue => new OperationException(
+                sprintf('The assertion value is not valid for attribute "%s".', $filter->getAttribute()),
+                ResultCode::INVALID_ATTRIBUTE_SYNTAX,
+            ),
+        };
     }
 
     /**
