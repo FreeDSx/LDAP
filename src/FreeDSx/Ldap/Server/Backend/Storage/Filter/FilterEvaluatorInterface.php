@@ -30,4 +30,9 @@ interface FilterEvaluatorInterface
         Entry $entry,
         FilterInterface $filter,
     ): bool;
+
+    /**
+     * Why the assertion is Undefined for every entry (RFC 4511 4.5.1.7), or null when an entry decides it.
+     */
+    public function undefinedCause(FilterInterface $filter): ?UndefinedCause;
 }

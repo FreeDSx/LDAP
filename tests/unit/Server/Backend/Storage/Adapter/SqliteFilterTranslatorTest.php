@@ -290,18 +290,14 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
-    public function test_negating_an_attribute_the_schema_does_not_define_can_never_match(): void
+    public function test_negating_an_attribute_the_schema_does_not_define_is_untranslatable(): void
     {
         $result = $this->translateWith(
             new NotFilter(new EqualityFilter('shoeSize', '12')),
             $this->attributeContext(support: AttributeFilterSupport::NeverMatches),
         );
 
-        self::assertNotNull($result);
-        self::assertStringContainsString(
-            '1 = 0',
-            $result->sql,
-        );
+        self::assertNull($result);
     }
 
     public function test_an_assertion_value_the_syntax_rejects_selects_nothing_and_stays_inexact(): void
@@ -319,15 +315,14 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertFalse($result->isExact);
     }
 
-    public function test_a_negated_assertion_the_syntax_rejects_stays_inexact_so_the_evaluator_decides(): void
+    public function test_a_negated_assertion_the_syntax_rejects_is_untranslatable(): void
     {
         $result = $this->translateWith(
             new NotFilter(new EqualityFilter('uidNumber', 'abc')),
             $this->attributeContext(assertionConforms: false),
         );
 
-        self::assertNotNull($result);
-        self::assertFalse($result->isExact);
+        self::assertNull($result);
     }
 
     public function test_a_substring_filter_is_not_subject_to_the_assertion_syntax_check(): void
@@ -908,7 +903,7 @@ final class SqliteFilterTranslatorTest extends TestCase
         self::assertTrue($result->isExact);
     }
 
-    public function test_not_equality_with_non_ascii_value_is_inexact(): void
+    public function test_not_equality_with_non_ascii_value_is_untranslatable(): void
     {
         $result = $this->subject->translate(
             new NotFilter(new EqualityFilter(
@@ -917,11 +912,10 @@ final class SqliteFilterTranslatorTest extends TestCase
             )),
         );
 
-        self::assertNotNull($result);
-        self::assertFalse($result->isExact);
+        self::assertNull($result);
     }
 
-    public function test_not_composite_inner_is_inexact(): void
+    public function test_not_composite_inner_is_untranslatable_when_a_leaf_is_inexact(): void
     {
         $result = $this->subject->translate(
             new NotFilter(new AndFilter(
@@ -934,8 +928,7 @@ final class SqliteFilterTranslatorTest extends TestCase
             )),
         );
 
-        self::assertNotNull($result);
-        self::assertFalse($result->isExact);
+        self::assertNull($result);
     }
 
     public function test_not_with_untranslatable_child_returns_null(): void
@@ -949,6 +942,28 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
 
         self::assertNull($result);
+    }
+
+    /**
+     * @return iterable<string, array{FilterInterface}>
+     */
+    public static function inexactFilterProvider(): iterable
+    {
+        yield 'option-bearing equality' => [new EqualityFilter('cn;lang-en', 'alice')];
+        yield 'non-ascii equality' => [new EqualityFilter('cn', 'Café')];
+        yield 'oid spellings' => [new EqualityFilter('objectClass', 'top')];
+        yield 'option-bearing presence' => [new PresentFilter('cn;lang-en')];
+        yield 'contains with no substring index' => [(new SubstringFilter('cn'))->setContains('zzz')];
+    }
+
+    /**
+     * A superset stands in for the item, and its complement is a subset no later evaluation can widen back.
+     */
+    #[DataProvider('inexactFilterProvider')]
+    public function test_a_negated_inexact_item_is_untranslatable(FilterInterface $filter): void
+    {
+        self::assertFalse($this->subject->translate($filter)?->isExact);
+        self::assertNull($this->subject->translate(new NotFilter($filter)));
     }
 
     public function test_matching_rule_filter_always_returns_null(): void

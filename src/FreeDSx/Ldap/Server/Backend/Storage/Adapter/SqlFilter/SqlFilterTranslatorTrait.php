@@ -93,8 +93,7 @@ trait SqlFilterTranslatorTrait
             return null;
         }
 
-        // Undefined for every entry, so on its own it selects nothing. It stays inexact because Undefined only
-        // behaves like false until a negation is layered over it, and SQL has no third value to carry that.
+        // Undefined for every entry, so it selects nothing and stays inexact for the evaluator to settle.
         if ($support === AttributeFilterSupport::NeverMatches) {
             return new SqlFilterResult(
                 '1 = 0',
@@ -684,20 +683,18 @@ trait SqlFilterTranslatorTrait
 
     private function translateNot(NotFilter $filter): ?SqlFilterResult
     {
-        $inner = $filter->get();
-        $result = $this->dispatch($inner);
+        $result = $this->dispatch($filter->get());
 
-        if ($result === null) {
+        // A non-exact item stands for a superset, whose complement is a subset the evaluator cannot widen back.
+        if ($result === null || !$result->isExact) {
             return null;
         }
 
         // An assertion the schema defines is false when the entry lacks the attribute, so negating it legitimately
-        // matches those rows and plain `NOT (...)` is precise. Types the schema does not define never reach here;
-        // dispatch() has already answered them.
+        // matches those rows and plain `NOT (...)` is precise.
         return new SqlFilterResult(
             'NOT (' . $result->sql . ')',
             $result->params,
-            isExact: $result->isExact,
             correlatedSql: $result->correlatedSql !== null
                 ? 'NOT (' . $result->correlatedSql . ')'
                 : null,

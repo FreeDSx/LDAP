@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filter\GreaterThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\LessThanOrEqualFilter;
 use FreeDSx\Ldap\Search\Filter\MatchingRuleFilter;
@@ -675,7 +676,7 @@ final class MysqlFilterTranslatorTest extends TestCase
         self::assertTrue($result->isExact);
     }
 
-    public function test_not_equality_with_non_ascii_value_is_inexact(): void
+    public function test_not_equality_with_non_ascii_value_is_untranslatable(): void
     {
         $result = $this->subject->translate(
             new NotFilter(new EqualityFilter(
@@ -684,8 +685,7 @@ final class MysqlFilterTranslatorTest extends TestCase
             )),
         );
 
-        self::assertNotNull($result);
-        self::assertFalse($result->isExact);
+        self::assertNull($result);
     }
 
     public function test_not_composite_inner_stays_exact_when_every_leaf_is(): void
@@ -722,6 +722,28 @@ final class MysqlFilterTranslatorTest extends TestCase
         );
 
         self::assertNull($result);
+    }
+
+    /**
+     * @return iterable<string, array{FilterInterface}>
+     */
+    public static function inexactFilterProvider(): iterable
+    {
+        yield 'option-bearing equality' => [new EqualityFilter('cn;lang-en', 'alice')];
+        yield 'non-ascii equality' => [new EqualityFilter('cn', 'Café')];
+        yield 'oid spellings' => [new EqualityFilter('objectClass', 'top')];
+        yield 'option-bearing presence' => [new PresentFilter('cn;lang-en')];
+        yield 'contains with no substring index' => [(new SubstringFilter('cn'))->setContains('zzz')];
+    }
+
+    /**
+     * A superset stands in for the item, and its complement is a subset no later evaluation can widen back.
+     */
+    #[DataProvider('inexactFilterProvider')]
+    public function test_a_negated_inexact_item_is_untranslatable(FilterInterface $filter): void
+    {
+        self::assertFalse($this->subject->translate($filter)?->isExact);
+        self::assertNull($this->subject->translate(new NotFilter($filter)));
     }
 
     public function test_matching_rule_filter_always_returns_null(): void

@@ -130,6 +130,22 @@ trait QueryTestsTrait
             7,
         ];
 
+        // A SQL predicate narrower than the item it stands for cannot be complemented: the sidecar keys on the
+        // bare type, so negating it would drop the entries the option excludes rather than return them.
+        yield 'negating a tagged assertion the bare type would match' => [
+            Filters::not(Filters::equal('mail;lang-en', 'alice@foo.bar')),
+            8,
+        ];
+        yield 'negating an absent tagged description' => [
+            Filters::not(Filters::present('mail;lang-de')),
+            8,
+        ];
+        // No substring index covers employeeNumber, so the item stands for a bare presence check.
+        yield 'negating a contains on an unindexed type' => [
+            Filters::not(Filters::contains('employeeNumber', 'zzz')),
+            8,
+        ];
+
         // RFC 4512 2.5.2: an assertion on the base type covers its tagged variants and its subtypes.
         yield 'the base type matches a value held under an option' => [
             Filters::equal('mail', 'alice-en@foo.bar'),
@@ -1220,6 +1236,51 @@ trait QueryTestsTrait
         self::assertTrue($result);
     }
 
+    /**
+     * RFC 4511 4.10: compareFalse means the values did not match, so an Undefined assertion needs its own code.
+     */
+    public function testCompareRefusesAnUnrecognizedAttributeType(): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNDEFINED_ATTRIBUTE_TYPE);
+
+        $this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'shoeSize',
+            '9',
+        );
+    }
+
+    public function testCompareRefusesAnAssertionValueTheSyntaxRejects(): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
+
+        $this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'uidNumber',
+            'abc',
+        );
+    }
+
+    /**
+     * A defined type the entry lacks is False rather than Undefined, so it keeps answering compareFalse.
+     */
+    public function testCompareAnswersFalseWhenTheEntryLacksTheAttribute(): void
+    {
+        $this->authenticateUser();
+
+        self::assertFalse($this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'title',
+            'anything',
+        ));
+    }
+
     public function testCompareAppliesTheSchemaDeclaredMatchingRule(): void
     {
         $this->authenticateUser();
@@ -1267,18 +1328,6 @@ trait QueryTestsTrait
             'cn=alice,ou=people,dc=foo,dc=bar',
             'telephoneNumber',
             '555',
-        ));
-    }
-
-    public function testCompareIsFalseForAnUnrecognizedAttributeType(): void
-    {
-        $this->authenticateUser();
-
-        // The assertion is Undefined rather than false, but neither is a match.
-        self::assertFalse($this->ldapClient()->compare(
-            'cn=alice,ou=people,dc=foo,dc=bar',
-            'shoeSize',
-            '12',
         ));
     }
 

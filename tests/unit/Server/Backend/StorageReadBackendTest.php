@@ -553,6 +553,72 @@ final class StorageReadBackendTest extends TestCase
         }
     }
 
+    public function test_compare_answers_true_for_a_matching_value(): void
+    {
+        self::assertTrue($this->subject->compare(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new EqualityFilter('cn', 'Alice'),
+        ));
+    }
+
+    public function test_compare_answers_false_for_a_differing_value(): void
+    {
+        self::assertFalse($this->subject->compare(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new EqualityFilter('cn', 'Nobody'),
+        ));
+    }
+
+    /**
+     * A defined type the entry lacks is False rather than Undefined, so it keeps answering compareFalse.
+     */
+    public function test_compare_answers_false_when_the_entry_lacks_the_attribute(): void
+    {
+        self::assertFalse($this->subject->compare(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new EqualityFilter('description', 'anything'),
+        ));
+    }
+
+    public function test_compare_refuses_an_unrecognized_attribute_type(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNDEFINED_ATTRIBUTE_TYPE);
+
+        $this->subject->compare(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new EqualityFilter('shoeSize', '9'),
+        );
+    }
+
+    /**
+     * The Country String syntax admits exactly two printable characters, so a longer value cannot be asserted.
+     */
+    public function test_compare_refuses_an_assertion_value_the_syntax_rejects(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
+
+        $this->subject->compare(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new EqualityFilter('c', 'UnitedStates'),
+        );
+    }
+
+    /**
+     * The entry is located first, so a missing entry outranks anything the assertion itself is wrong about.
+     */
+    public function test_compare_reports_a_missing_entry_before_an_undefined_assertion(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
+
+        $this->subject->compare(
+            new Dn('cn=Nobody,dc=example,dc=com'),
+            new EqualityFilter('shoeSize', '9'),
+        );
+    }
+
     public function test_no_such_object_on_compare_carries_matched_dn(): void
     {
         try {
