@@ -8,6 +8,7 @@ LDAP Server Configuration
     * [transport](#transport)
     * [logger](#logger)
     * [idle_timeout](#idle_timeout)
+    * [max_clients](#max_clients)
     * [require_authentication](#require_authentication)
     * [allow_anonymous](#allow_anonymous)
 * [LDAP Protocol Handlers](#ldap-protocol-handlers)
@@ -102,6 +103,13 @@ Consider an idle client to timeout after this period of time (in seconds) and di
 -1, the client can idle indefinitely and not timeout the connection to the server.
 
 **Default**: `600`
+
+------------------
+#### max_clients
+
+The maximum number of clients served at once. Connections past the limit are closed. Set to `0` for no limit.
+
+**Default**: `1024`
 
 ------------------
 #### require_authentication

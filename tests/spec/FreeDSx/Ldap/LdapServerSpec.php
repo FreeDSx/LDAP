@@ -76,6 +76,7 @@ class LdapServerSpec extends ObjectBehavior
             'unix_socket' => "/var/run/ldap.socket",
             'transport' => "tcp",
             'idle_timeout' => 600,
+            'max_clients' => 1024,
             'require_authentication' => true,
             'allow_anonymous' => false,
             'request_handler' => null,

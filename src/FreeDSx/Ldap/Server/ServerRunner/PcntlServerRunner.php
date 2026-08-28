@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Server\RequestHandler\HandlerFactory;
 use FreeDSx\Ldap\Server\RequestHandler\RequestHandlerInterface;
 use FreeDSx\Socket\Socket;
 use FreeDSx\Socket\SocketServer;
+use Throwable;
 
 /**
  * Uses PNCTL to fork incoming requests and send them to the server protocol handler.
@@ -69,16 +70,6 @@ class PcntlServerRunner implements ServerRunnerInterface
     /**
      * @var bool
      */
-    protected $isPosixExtLoaded;
-
-    /**
-     * @var bool
-     */
-    protected $isServerSignalsInstalled = false;
-
-    /**
-     * @var bool
-     */
     protected $isShuttingDown = false;
 
     /**
@@ -93,13 +84,13 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     public function __construct(array $options = [])
     {
-        if (!extension_loaded('pcntl')) {
-            throw new RuntimeException('The PCNTL extension is needed to fork incoming requests, which is only available on Linux.');
+        if (!extension_loaded('pcntl') || !extension_loaded('posix')) {
+            throw new RuntimeException(
+                'The PCNTL and POSIX extensions are needed to fork and manage child processes, which is only available on Linux.'
+            );
         }
         $this->options = $options;
 
-        // posix_kill needs this...we cannot clean up child processes without it on shutdown...
-        $this->isPosixExtLoaded = extension_loaded('posix');
         // We need to be able to handle signals as they come in, regardless of what is going on...
         pcntl_async_signals(true);
 
@@ -123,6 +114,19 @@ class PcntlServerRunner implements ServerRunnerInterface
 
         try {
             $this->acceptClients();
+        } catch (Throwable $e) {
+            $this->logError(
+                'The server stopped accepting clients due to an error.',
+                array_merge(
+                    $this->defaultContext,
+                    [
+                        'error' => $e->getMessage(),
+                        'error_class' => get_class($e),
+                    ]
+                )
+            );
+
+            throw $e;
         } finally {
             if ($this->isMainProcess) {
                 $this->handleServerShutdown();
@@ -167,6 +171,7 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     private function acceptClients(): void
     {
+        $this->installServerSignalHandlers();
         $this->logInfo(
             'The server process has started and is now accepting clients.',
             $this->defaultContext
@@ -194,6 +199,15 @@ class PcntlServerRunner implements ServerRunnerInterface
                 continue;
             }
 
+            if ($this->isClientLimitReached()) {
+                $this->cleanUpChildProcesses();
+            }
+            if ($this->isClientLimitReached()) {
+                $this->rejectClient($socket);
+
+                continue;
+            }
+
             $pid = pcntl_fork();
             if ($pid == -1) {
                 // In parent process, but could not fork...
@@ -214,7 +228,40 @@ class PcntlServerRunner implements ServerRunnerInterface
                     $socket
                 );
             }
-        } while ($this->server->isConnected());
+        } while (!$this->isShuttingDown);
+    }
+
+    private function releaseInheritedConnections(Socket $keep): void
+    {
+        // Dropping the reference to free the descriptors
+        foreach ($this->server->getClients() as $client) {
+            if ($client !== $keep) {
+                $this->server->removeClient($client);
+            }
+        }
+        $this->childProcesses = [];
+    }
+
+    private function isClientLimitReached(): bool
+    {
+        $maxClients = isset($this->options['max_clients'])
+            ? (int) $this->options['max_clients']
+            : 0;
+
+        return $maxClients > 0 && count($this->childProcesses) >= $maxClients;
+    }
+
+    private function rejectClient(Socket $socket): void
+    {
+        $this->logInfo(
+            'The maximum number of clients has been reached. Closing the connection.',
+            array_merge(
+                $this->defaultContext,
+                ['max_clients' => (int) $this->options['max_clients']]
+            )
+        );
+        $this->server->removeClient($socket);
+        $socket->close();
     }
 
     /**
@@ -241,7 +288,20 @@ class PcntlServerRunner implements ServerRunnerInterface
                         'The child process has received a signal to stop.',
                         $context
                     );
-                    $protocolHandler->shutdown($context);
+                    try {
+                        $protocolHandler->shutdown($context);
+                    } catch (Throwable $e) {
+                        $this->logError(
+                            'Unable to notify the client of the shutdown.',
+                            array_merge(
+                                $context,
+                                [
+                                    'error' => $e->getMessage(),
+                                    'error_class' => get_class($e),
+                                ]
+                            )
+                        );
+                    }
                 }
             );
         }
@@ -253,7 +313,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     private function installServerSignalHandlers(): void
     {
         foreach ($this->handledSignals as $signal) {
-            $this->isServerSignalsInstalled = pcntl_signal(
+            pcntl_signal(
                 $signal,
                 function () {
                     $this->handleServerShutdown();
@@ -284,12 +344,6 @@ class PcntlServerRunner implements ServerRunnerInterface
             $this->defaultContext
         );
 
-        // We can't do anything else without the posix ext ... :(
-        if (!$this->isPosixExtLoaded) {
-            $this->cleanUpChildProcesses();
-
-            return;
-        }
         // Ask nicely first...
         $this->endChildProcesses(SIGTERM);
 
@@ -360,6 +414,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     ): void {
         $context = ['pid' => $pid];
         $this->isMainProcess = false;
+        $this->releaseInheritedConnections($socket);
         $serverProtocolHandler = new ServerProtocolHandler(
             new ServerQueue($socket),
             new HandlerFactory($this->options),
@@ -387,17 +442,13 @@ class PcntlServerRunner implements ServerRunnerInterface
     /**
      * When a new Socket is received, we do the following:
      *
-     *     1. If the server has not installed its signal handlers, do that first.
-     *     2. Add the ChildProcess to the list of running child processes.
-     *     3. Clean-up any currently running child processes.
+     *     1. Add the ChildProcess to the list of running child processes.
+     *     2. Clean-up any currently running child processes.
      */
     private function runAfterChildStarted(
         int $pid,
         Socket $socket
     ): void {
-        if (!$this->isServerSignalsInstalled) {
-            $this->installServerSignalHandlers();
-        }
         $this->childProcesses[] = new ChildProcess(
             $pid,
             $socket
