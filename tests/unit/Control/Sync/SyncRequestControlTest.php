@@ -63,7 +63,29 @@ class SyncRequestControlTest extends TestCase
                 Asn1::octetString($encoder->encode(Asn1::sequence(
                     Asn1::enumerated(1),
                     Asn1::octetString('omnomnom'),
-                    Asn1::boolean(false),
+                ))),
+            ),
+            $this->subject->toAsn1(),
+        );
+    }
+
+    public function test_it_should_encode_the_reload_hint_only_when_it_is_true(): void
+    {
+        $encoder = new LdapEncoder();
+        $this->subject = new SyncRequestControl(
+            mode: 1,
+            cookie: 'omnomnom',
+            reloadHint: true,
+        );
+
+        self::assertEquals(
+            Asn1::sequence(
+                Asn1::octetString(Control::OID_SYNC_REQUEST),
+                Asn1::boolean(true),
+                Asn1::octetString($encoder->encode(Asn1::sequence(
+                    Asn1::enumerated(1),
+                    Asn1::octetString('omnomnom'),
+                    Asn1::boolean(true),
                 ))),
             ),
             $this->subject->toAsn1(),

@@ -88,7 +88,6 @@ class SortingControlTest extends TestCase
         self::assertEquals(
             Asn1::sequence(
                 Asn1::octetString(Control::OID_SORTING),
-                Asn1::boolean(false),
                 Asn1::octetString($encoder->encode(Asn1::sequenceOf(
                     Asn1::sequence(Asn1::octetString('foo')),
                     Asn1::sequence(Asn1::octetString('bar')),

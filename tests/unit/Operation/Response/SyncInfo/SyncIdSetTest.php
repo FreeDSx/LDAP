@@ -119,7 +119,28 @@ final class SyncIdSetTest extends TestCase
                 Asn1::context(0, Asn1::octetString(IntermediateResponse::OID_SYNC_INFO)),
                 Asn1::context(1, Asn1::octetString($encoder->encode(Asn1::context(3, Asn1::sequence(
                     Asn1::octetString('omnomnom'),
-                    Asn1::boolean(false),
+                    Asn1::setOf(Asn1::octetString('foo'), Asn1::octetString('bar')),
+                ))))),
+            )),
+            $this->subject->toAsn1(),
+        );
+    }
+
+    public function test_it_should_encode_refresh_deletes_only_when_it_is_true(): void
+    {
+        $encoder = new LdapEncoder();
+        $this->subject = new SyncIdSet(
+            ['foo', 'bar'],
+            true,
+            'omnomnom',
+        );
+
+        self::assertEquals(
+            Asn1::application(25, Asn1::sequence(
+                Asn1::context(0, Asn1::octetString(IntermediateResponse::OID_SYNC_INFO)),
+                Asn1::context(1, Asn1::octetString($encoder->encode(Asn1::context(3, Asn1::sequence(
+                    Asn1::octetString('omnomnom'),
+                    Asn1::boolean(true),
                     Asn1::setOf(Asn1::octetString('foo'), Asn1::octetString('bar')),
                 ))))),
             )),

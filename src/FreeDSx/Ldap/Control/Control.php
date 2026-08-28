@@ -151,8 +151,11 @@ class Control implements ProtocolElementInterface, Stringable
     {
         $asn1 = Asn1::sequence(
             Asn1::octetString($this->controlType),
-            Asn1::boolean($this->criticality),
         );
+        // RFC 4511 5.1: a field holding its default value is absent from the encoding.
+        if ($this->criticality) {
+            $asn1->addChild(Asn1::boolean(true));
+        }
 
         if ($this->controlValue !== null) {
             $encoder = new LdapEncoder();

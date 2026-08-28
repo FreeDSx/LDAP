@@ -43,10 +43,12 @@ final readonly class CriticalControlMiddleware implements MiddlewareInterface
         MiddlewareHandlerInterface $next,
     ): ResponseStream {
         $controls = $context->message->controls();
+        $request = $context->message->getRequest();
 
-        $this->validator->assertSupportedForRoute(
+        $this->validator->assertSupportedForRequest(
+            $request,
             $this->routeResolver->routeIdFor(
-                $context->message->getRequest(),
+                $request,
                 $controls,
             ),
             $controls,

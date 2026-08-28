@@ -47,7 +47,6 @@ class ExtendedDnControlTest extends TestCase
         self::assertEquals(
             Asn1::sequence(
                 Asn1::octetString(Control::OID_EXTENDED_DN),
-                Asn1::boolean(false),
                 Asn1::octetString($encoder->encode(Asn1::sequence(
                     Asn1::integer(1),
                 ))),

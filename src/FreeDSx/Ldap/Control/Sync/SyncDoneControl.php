@@ -66,9 +66,10 @@ class SyncDoneControl extends Control
                 $this->cookie,
             ));
         }
-        $this->controlValue->addChild(Asn1::boolean(
-            $this->refreshDeletes,
-        ));
+        // RFC 4511 5.1: a field holding its default value is absent from the encoding.
+        if ($this->refreshDeletes) {
+            $this->controlValue->addChild(Asn1::boolean(true));
+        }
 
         return parent::toAsn1();
     }

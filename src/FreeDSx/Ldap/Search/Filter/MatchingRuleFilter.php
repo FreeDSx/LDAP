@@ -151,10 +151,13 @@ class MatchingRuleFilter implements FilterInterface, FilterAttributeInterface, S
             tagNumber: 3,
             type: Asn1::octetString($this->value),
         ));
-        $matchingRule->addChild(Asn1::context(
-            tagNumber: 4,
-            type: Asn1::boolean($this->useDnAttributes),
-        ));
+        // RFC 4511 5.1: a field holding its default value is absent from the encoding.
+        if ($this->useDnAttributes) {
+            $matchingRule->addChild(Asn1::context(
+                tagNumber: 4,
+                type: Asn1::boolean(true),
+            ));
+        }
 
         return $matchingRule;
     }

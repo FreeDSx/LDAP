@@ -68,7 +68,19 @@ class ControlTest extends TestCase
         self::assertEquals(
             Asn1::sequence(
                 Asn1::octetString('foo'),
-                Asn1::boolean(false),
+            ),
+            $this->subject->toAsn1(),
+        );
+    }
+
+    public function test_it_should_encode_the_criticality_only_when_it_is_true(): void
+    {
+        $this->subject->setCriticality(true);
+
+        self::assertEquals(
+            Asn1::sequence(
+                Asn1::octetString('foo'),
+                Asn1::boolean(true),
             ),
             $this->subject->toAsn1(),
         );

@@ -78,7 +78,6 @@ class VlvControlTest extends TestCase
         self::assertEquals(
             Asn1::sequence(
                 Asn1::octetString(Control::OID_VLV),
-                Asn1::boolean(false),
                 Asn1::octetString($encoder->encode(Asn1::sequence(
                     Asn1::integer(10),
                     Asn1::integer(9),

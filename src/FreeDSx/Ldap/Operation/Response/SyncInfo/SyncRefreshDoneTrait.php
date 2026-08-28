@@ -57,9 +57,10 @@ trait SyncRefreshDoneTrait
             ));
         }
 
-        $asn1->addChild(Asn1::boolean(
-            $this->refreshDone,
-        ));
+        // RFC 4511 5.1: a field holding its default value is absent, and this one defaults to TRUE.
+        if (!$this->refreshDone) {
+            $asn1->addChild(Asn1::boolean(false));
+        }
 
         $this->setResponseValueToEncode($asn1);
 

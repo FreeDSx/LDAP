@@ -89,7 +89,6 @@ final class MatchingRuleFilterTest extends TestCase
                 Asn1::context(1, Asn1::octetString('foo')),
                 Asn1::context(2, Asn1::octetString('bar')),
                 Asn1::context(3, Asn1::octetString('foobar')),
-                Asn1::context(4, Asn1::boolean(false)),
             )),
             $this->subject->toAsn1(),
         );

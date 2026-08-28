@@ -92,10 +92,12 @@ class SyncIdSet extends SyncInfoMessage
         foreach ($this->entryUuids as $uuid) {
             $uuids[] = Asn1::octetString($uuid);
         }
-        $asn1->addChild(
-            Asn1::boolean($this->refreshDeletes),
-            Asn1::setOf(...$uuids),
-        );
+        // RFC 4511 5.1: a field holding its default value is absent from the encoding.
+        if ($this->refreshDeletes) {
+            $asn1->addChild(Asn1::boolean(true));
+        }
+
+        $asn1->addChild(Asn1::setOf(...$uuids));
 
         $this->setResponseValueToEncode($asn1);
 
