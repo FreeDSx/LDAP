@@ -14,14 +14,19 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
+use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Search controls the backend participates in: paged results and server side sorting.
@@ -191,6 +196,61 @@ trait ControlTestsTrait
                 (new SortingControl(SortKey::ascending('bogusAttr')))->setCriticality(true),
             );
             self::fail('The critical sort should have failed the search.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+                $e->getCode(),
+            );
+        }
+    }
+
+    /**
+     * @return iterable<string, array{RequestInterface, Control}>
+     */
+    public static function inappropriateCriticalControls(): iterable
+    {
+        // RFC 4527 §3.1 leaves pre-read to the operations with a before image, which an add has not.
+        yield 'pre-read on an add' => [
+            Operations::add(Entry::create(
+                'cn=ctl,dc=foo,dc=bar',
+                ['objectClass' => 'inetOrgPerson', 'cn' => 'ctl', 'sn' => 'Ctl'],
+            )),
+            new PreReadControl('cn'),
+        ];
+        // RFC 4527 §3.2: a deleted entry has no after image, so post-read does not suit a delete.
+        yield 'post-read on a delete' => [
+            Operations::delete('cn=ctl,dc=foo,dc=bar'),
+            new PostReadControl('cn'),
+        ];
+        yield 'pre-read on a compare' => [
+            Operations::compare('cn=alice,ou=people,dc=foo,dc=bar', 'sn', 'Smith'),
+            new PreReadControl('cn'),
+        ];
+        yield 'subtree delete on a modify' => [
+            Operations::modify(
+                'cn=alice,ou=people,dc=foo,dc=bar',
+                Change::replace('description', 'ctl'),
+            ),
+            new Control(Control::OID_SUBTREE_DELETE),
+        ];
+    }
+
+    /**
+     * RFC 4511 §4.1.11: a control the operation does not take must fail it rather than be dropped.
+     */
+    #[DataProvider('inappropriateCriticalControls')]
+    public function testACriticalControlTheOperationDoesNotTakeIsRefused(
+        RequestInterface $request,
+        Control $control,
+    ): void {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->sendAndReceive(
+                $request,
+                $control->setCriticality(true),
+            );
+            self::fail('The critical control should have failed the operation.');
         } catch (OperationException $e) {
             self::assertSame(
                 ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,

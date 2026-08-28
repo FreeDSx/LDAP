@@ -55,7 +55,29 @@ class SyncDoneControlTest extends TestCase
                 Asn1::octetString(
                     $encoder->encode(Asn1::sequence(
                         Asn1::octetString('omnomnom'),
-                        Asn1::boolean(false),
+                    )),
+                ),
+            ),
+            $this->subject->toAsn1(),
+        );
+    }
+
+    public function test_it_should_encode_refresh_deletes_only_when_it_is_true(): void
+    {
+        $encoder = new LdapEncoder();
+        $this->subject = new SyncDoneControl(
+            cookie: 'omnomnom',
+            refreshDeletes: true,
+        );
+
+        self::assertEquals(
+            Asn1::sequence(
+                Asn1::octetString(Control::OID_SYNC_DONE),
+                Asn1::boolean(true),
+                Asn1::octetString(
+                    $encoder->encode(Asn1::sequence(
+                        Asn1::octetString('omnomnom'),
+                        Asn1::boolean(true),
                     )),
                 ),
             ),

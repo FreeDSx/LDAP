@@ -83,4 +83,23 @@ final class SyncRefreshPresentTest extends TestCase
             $this->subject->toAsn1(),
         );
     }
+
+    public function test_it_should_omit_refresh_done_from_asn1_when_it_holds_its_default_of_true(): void
+    {
+        $encoder = new LdapEncoder();
+        $this->subject = new SyncRefreshPresent(
+            true,
+            'omnomnom',
+        );
+
+        self::assertEquals(
+            Asn1::application(25, Asn1::sequence(
+                Asn1::context(0, Asn1::octetString(IntermediateResponse::OID_SYNC_INFO)),
+                Asn1::context(1, Asn1::octetString($encoder->encode(Asn1::context(2, Asn1::sequence(
+                    Asn1::octetString('omnomnom'),
+                ))))),
+            )),
+            $this->subject->toAsn1(),
+        );
+    }
 }

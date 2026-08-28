@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Middleware;
 
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\HandlerId;
 
@@ -34,7 +35,8 @@ final readonly class CriticalControlValidator
     /**
      * @throws OperationException
      */
-    public function assertSupportedForRoute(
+    public function assertSupportedForRequest(
+        RequestInterface $request,
         HandlerId $routeId,
         ControlBag $controls,
     ): void {
@@ -44,7 +46,10 @@ final readonly class CriticalControlValidator
 
         $this->assertNoCriticalUnsupportedControls(
             $controls,
-            $this->controlRegistry->supportedControlsFor($routeId),
+            $this->controlRegistry->supportedControlsFor(
+                $routeId,
+                $request,
+            ),
         );
     }
 

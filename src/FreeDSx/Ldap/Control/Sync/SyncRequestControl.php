@@ -102,7 +102,11 @@ class SyncRequestControl extends Control
         if ($this->cookie !== null) {
             $this->controlValue->addChild(Asn1::octetString($this->cookie));
         }
-        $this->controlValue->addChild(Asn1::boolean($this->reloadHint));
+
+        // RFC 4511 5.1: a field holding its default value is absent from the encoding.
+        if ($this->reloadHint) {
+            $this->controlValue->addChild(Asn1::boolean(true));
+        }
 
         return parent::toAsn1();
     }

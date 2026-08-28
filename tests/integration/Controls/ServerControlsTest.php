@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Controls;
 
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Operation\Response\CompareResponse;
+use FreeDSx\Ldap\Operation\Response\ModifyResponse;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
 use FreeDSx\Ldap\Control\ReadEntry\PreReadResponseControl;
 use FreeDSx\Ldap\Controls;
@@ -349,16 +349,15 @@ final class ServerControlsTest extends ServerTestCase
         );
     }
 
-    public function test_a_privileged_control_on_a_compare_is_denied_to_a_non_administrator(): void
+    public function test_a_privileged_control_on_a_modify_is_denied_to_a_non_administrator(): void
     {
         $this->authenticateUser();
 
         try {
             $this->ldapClient()->send(
-                Operations::compare(
+                Operations::modify(
                     'cn=user,dc=foo,dc=bar',
-                    'cn',
-                    'user',
+                    Change::replace('description', 'relaxed'),
                 ),
                 Controls::relaxRules(),
             );
@@ -413,26 +412,26 @@ final class ServerControlsTest extends ServerTestCase
         }
     }
 
-    public function test_an_administrator_may_use_a_privileged_control_on_a_compare(): void
+    public function test_an_administrator_may_use_a_privileged_control_on_a_modify(): void
     {
         $this->authenticateAdmin();
 
         $response = $this->ldapClient()->send(
-            Operations::compare(
+            Operations::modify(
                 'cn=user,dc=foo,dc=bar',
-                'cn',
-                'user',
+                Change::replace('description', 'relaxed'),
             ),
             Controls::relaxRules(),
         );
 
+        $modify = $response?->getResponse();
         self::assertInstanceOf(
-            CompareResponse::class,
-            $response?->getResponse(),
+            ModifyResponse::class,
+            $modify,
         );
         self::assertSame(
-            ResultCode::COMPARE_TRUE,
-            $response->getResponse()->getResultCode(),
+            ResultCode::SUCCESS,
+            $modify->getResultCode(),
         );
     }
 

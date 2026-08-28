@@ -71,7 +71,6 @@ class DirSyncResponseControlTest extends TestCase
         self::assertEquals(
             Asn1::sequence(
                 Asn1::octetString(Control::OID_DIR_SYNC),
-                Asn1::boolean(false),
                 Asn1::octetString($encoder->encode(Asn1::sequence(
                     Asn1::integer(0),
                     Asn1::integer(0),

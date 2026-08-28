@@ -103,7 +103,6 @@ class SyncStateControlTest extends TestCase
         self::assertEquals(
             Asn1::sequence(
                 Asn1::octetString(Control::OID_SYNC_STATE),
-                Asn1::boolean(false),
                 Asn1::octetString($encoder->encode(Asn1::sequence(
                     Asn1::enumerated(0),
                     Asn1::octetString('foo'),
