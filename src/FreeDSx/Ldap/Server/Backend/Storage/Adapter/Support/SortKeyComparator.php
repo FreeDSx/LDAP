@@ -79,16 +79,19 @@ final class SortKeyComparator
         Entry $b,
         SortKey $sortKey,
     ): int {
+        $ordering = $this->orderingFor($sortKey);
         $cmp = $this->rawCompare(
             $this->minValue(
                 $a,
                 $sortKey->getAttribute(),
+                $ordering,
             ),
             $this->minValue(
                 $b,
                 $sortKey->getAttribute(),
+                $ordering,
             ),
-            $this->orderingFor($sortKey),
+            $ordering,
         );
 
         return $sortKey->getUseReverseOrder() ? -$cmp : $cmp;
@@ -157,12 +160,14 @@ final class SortKeyComparator
     }
 
     /**
-     * Returns the case-insensitive minimum value, consistent with the SQL backend's MIN(value_lower).
+     * RFC 2891 §2.2: a multi-valued key sorts on its least value under the ordering rule, not its least spelling.
+     *
      * Null when the attribute is absent or empty.
      */
     private function minValue(
         Entry $entry,
         string $attribute,
+        ?MatchingRuleComparatorInterface $ordering,
     ): ?string {
         $attr = $entry->get($attribute);
 
@@ -170,24 +175,13 @@ final class SortKeyComparator
             return null;
         }
 
-        $values = $attr->getValues();
-
-        if ($values === []) {
-            return null;
+        $min = null;
+        foreach ($attr->getValues() as $value) {
+            if ($min === null || $this->rawCompare($value, $min, $ordering) < 0) {
+                $min = $value;
+            }
         }
 
-        return array_reduce(
-            $values,
-            self::caseInsensitiveMin(...),
-        );
-    }
-
-    private static function caseInsensitiveMin(
-        ?string $min,
-        string $value,
-    ): string {
-        return $min === null || strcasecmp($value, $min) < 0
-            ? $value
-            : $min;
+        return $min;
     }
 }

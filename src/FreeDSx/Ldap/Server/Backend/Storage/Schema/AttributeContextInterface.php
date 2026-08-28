@@ -33,6 +33,14 @@ interface AttributeContextInterface
     public function isCaseInsensitive(string $attribute): ?bool;
 
     /**
+     * Whether a sort on this key orders numerically: by the rule it names, or by the attribute's own ordering.
+     */
+    public function sortsNumerically(
+        string $attribute,
+        ?string $orderingRule,
+    ): bool;
+
+    /**
      * How faithfully SQL alone can answer an assertion on the attribute.
      */
     public function filterSupport(string $attribute): AttributeFilterSupport;

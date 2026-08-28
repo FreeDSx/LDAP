@@ -388,6 +388,64 @@ trait ControlTestsTrait
         );
     }
 
+    /**
+     * RFC 2891 §1.1: the rule the key names decides the order, not the one the attribute declares.
+     */
+    public function testSortControlHonorsTheRequestedOrderingRule(): void
+    {
+        $this->authenticateUser();
+
+        self::assertSame(
+            ['9', '10'],
+            $this->sortedDescriptions(SortKey::ascending(
+                'description',
+                'integerOrderingMatch',
+            )),
+        );
+    }
+
+    /**
+     * A type declaring no ORDERING rule still has the server's own order, so it is sortable.
+     */
+    public function testSortControlOrdersATypeWithNoOrderingRule(): void
+    {
+        $this->authenticateUser();
+
+        // Ordered as numbers, '9' would come first.
+        self::assertSame(
+            ['10', '9'],
+            $this->sortedDescriptions(SortKey::ascending('description')),
+        );
+    }
+
+    /**
+     * RFC 2891 §2: success promises the requested order, so a rule the stored order cannot provide is refused.
+     */
+    public function testSortControlRefusesARuleTheStoredOrderCannotProvide(): void
+    {
+        $this->authenticateUser();
+
+        $response = $this->ldapClient()->send(
+            Operations::search(Filters::present('uidNumber'), 'uidNumber')
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+            new SortingControl(SortKey::ascending(
+                'uidNumber',
+                'caseIgnoreOrderingMatch',
+            )),
+        );
+
+        $sortResponse = $response?->controls()->get(Control::OID_SORTING_RESPONSE);
+        self::assertInstanceOf(
+            SortingResponseControl::class,
+            $sortResponse,
+        );
+        self::assertSame(
+            ResultCode::INAPPROPRIATE_MATCHING,
+            $sortResponse->getResult(),
+        );
+    }
+
     public function testSortControlPlacesMissingAttributeLastWhenAscending(): void
     {
         $this->authenticateUser();
@@ -418,5 +476,25 @@ trait ControlTestsTrait
         // More than one seed entry lacks 'sn', so assert the ordering rather than which of them sorts first.
         self::assertNull($entries[0]->get('sn'));
         self::assertNotNull($entries[count($entries) - 1]->get('sn'));
+    }
+
+    /**
+     * The description values the seed carries, in the order the sort key put them.
+     *
+     * @return list<string>
+     */
+    private function sortedDescriptions(SortKey $sortKey): array
+    {
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present('description'), 'description')
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+            new SortingControl($sortKey),
+        );
+
+        return array_values(array_map(
+            static fn(Entry $entry): string => $entry->get('description')?->firstValue() ?? '',
+            $entries->toArray(),
+        ));
     }
 }

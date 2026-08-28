@@ -507,7 +507,10 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             fn(SortKey $sortKey): SortKeySpec => new SortKeySpec(
                 strtolower($sortKey->getAttribute()),
                 $sortKey->getUseReverseOrder() ? 'DESC' : 'ASC',
-                $this->attributeContext->isIntegerOrdered($sortKey->getAttribute()) === true,
+                $this->attributeContext->sortsNumerically(
+                    $sortKey->getAttribute(),
+                    $sortKey->getOrderingRule(),
+                ),
             ),
             $options->sortKeys,
         ));

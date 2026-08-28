@@ -761,7 +761,10 @@ final class ServerSearchHandlerTest extends TestCase
         );
     }
 
-    public function test_sort_by_attribute_without_ordering_rule_reports_inappropriate_matching(): void
+    /**
+     * Naming no rule asks only for the server's own order on that attribute, which it always has.
+     */
+    public function test_sort_by_attribute_without_ordering_rule_reports_success(): void
     {
         $search = new LdapMessageRequest(
             2,
@@ -778,16 +781,84 @@ final class ServerSearchHandlerTest extends TestCase
             $search,
         );
 
-        $done = end($this->sentMessages);
-        self::assertInstanceOf(LdapMessageResponse::class, $done);
-        $sortControl = $done->controls()->get(Control::OID_SORTING_RESPONSE);
-        self::assertInstanceOf(
-            SortingResponseControl::class,
-            $sortControl,
+        self::assertSame(
+            ResultCode::SUCCESS,
+            $this->sortResultOf(),
         );
+    }
+
+    /**
+     * RFC 2891 §2: success promises the requested order, so a rule the stored order cannot provide is refused.
+     */
+    public function test_sort_by_a_rule_the_stored_order_cannot_provide_reports_inappropriate_matching(): void
+    {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar'),
+            new SortingControl(SortKey::ascending('cn', '2.5.13.6')),
+        );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturn(new EntryStream($this->makeGenerator()));
+
+        $this->drive(
+            $this->subject,
+            $search,
+        );
+
         self::assertSame(
             ResultCode::INAPPROPRIATE_MATCHING,
-            $sortControl->getResult(),
+            $this->sortResultOf(),
+        );
+    }
+
+    public function test_sort_by_a_rule_the_stored_order_provides_reports_success(): void
+    {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar'),
+            new SortingControl(SortKey::ascending('cn', 'caseIgnoreOrderingMatch')),
+        );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturn(new EntryStream($this->makeGenerator()));
+
+        $this->drive(
+            $this->subject,
+            $search,
+        );
+
+        self::assertSame(
+            ResultCode::SUCCESS,
+            $this->sortResultOf(),
+        );
+    }
+
+    /**
+     * Numeric ordering is available whatever form the stored key holds, since values compare as numbers.
+     */
+    public function test_sort_by_integer_ordering_on_a_text_attribute_reports_success(): void
+    {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar'),
+            new SortingControl(SortKey::ascending('employeeNumber', '2.5.13.15')),
+        );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturn(new EntryStream($this->makeGenerator()));
+
+        $this->drive(
+            $this->subject,
+            $search,
+        );
+
+        self::assertSame(
+            ResultCode::SUCCESS,
+            $this->sortResultOf(),
         );
     }
 
@@ -953,6 +1024,23 @@ final class ServerSearchHandlerTest extends TestCase
     private function makeGenerator(Entry ...$entries): Generator
     {
         yield from $entries;
+    }
+
+    /**
+     * The sortResult the done message carried, failing when no sorting response control was returned.
+     */
+    private function sortResultOf(): int
+    {
+        $done = end($this->sentMessages);
+        self::assertInstanceOf(LdapMessageResponse::class, $done);
+
+        $sortControl = $done->controls()->get(Control::OID_SORTING_RESPONSE);
+        self::assertInstanceOf(
+            SortingResponseControl::class,
+            $sortControl,
+        );
+
+        return $sortControl->getResult();
     }
 
     /**

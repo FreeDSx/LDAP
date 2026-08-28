@@ -34,6 +34,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
+use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use Generator;
@@ -380,14 +381,10 @@ trait ServerSearchTrait
                 );
             }
 
+            // A rule the stored order cannot provide must not be reported as success (RFC 2891 §2). Naming no rule
+            // asks only for the server's own order on that attribute, which it always has.
             $orderingRule = $sortKey->getOrderingRule();
-            $unknownRule = $orderingRule !== null
-                && $schema->getMatchingRule($orderingRule) === null;
-
-            $noOrdering = $orderingRule === null
-                && $schema->getOrderingRuleOid($attribute) === null;
-
-            if ($unknownRule || $noOrdering) {
+            if ($orderingRule !== null && !$this->ordersByRule($schema, $attribute, $orderingRule)) {
                 return new SortingResponseControl(
                     ResultCode::INAPPROPRIATE_MATCHING,
                     $attribute,
@@ -396,5 +393,32 @@ trait ServerSearchTrait
         }
 
         return new SortingResponseControl(ResultCode::SUCCESS);
+    }
+
+    /**
+     * Whether the order the store keeps for the attribute is the one this rule names.
+     */
+    private function ordersByRule(
+        Schema $schema,
+        string $attribute,
+        string $orderingRule,
+    ): bool {
+        $rule = $schema->getMatchingRule($orderingRule);
+        if ($rule === null) {
+            return false;
+        }
+
+        // Values compare as numbers whatever form the key holds
+        if ($rule->oid === MatchingRuleOid::OID_INTEGER_ORDERING_MATCH) {
+            return true;
+        }
+
+        $equalityOid = $schema->getEqualityRuleOid($attribute);
+        if ($equalityOid !== null && $schema->getComparator($rule->oid) === $schema->getComparator($equalityOid)) {
+            return true;
+        }
+
+        return $rule->oid === MatchingRuleOid::OID_CASE_IGNORE_ORDERING_MATCH
+            && $schema->isCaseInsensitiveMatched($attribute) === true;
     }
 }
