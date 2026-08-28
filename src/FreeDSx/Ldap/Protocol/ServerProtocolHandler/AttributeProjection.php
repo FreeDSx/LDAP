@@ -148,20 +148,17 @@ final class AttributeProjection
     }
 
     /**
-     * Whether a requested name asks for this attribute: its own type, or one it descends from.
+     * Whether a requested name asks for this attribute: its own description, or one it is a subtype of.
      *
      * A type may be named by any of its names or its OID, and naming it asks for the values held under its options
-     * and its subtypes too (RFC 4511 4.5.1.8, RFC 4512 2.5.2).
+     * and its subtypes too (RFC 4511 4.5.1.8, RFC 4512 2.5.2.1).
      */
     private function isNamedType(Attribute $attribute): bool
     {
-        $type = Attribute::normalizeName($attribute->getDescription());
+        $description = $attribute->getDescription();
 
         foreach ($this->names as $name) {
-            if ($name === $type) {
-                return true;
-            }
-            if ($this->schema->isTypeOrSubtypeOf($type, $name)) {
+            if ($this->schema->isDescriptionSubtypeOf($description, $name)) {
                 return true;
             }
         }

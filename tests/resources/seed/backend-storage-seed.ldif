@@ -46,6 +46,8 @@ sn: Smith
 mail: alice@foo.bar
 # Only reachable through its base type, so it shows whether attribute options are honored.
 mail;lang-en: alice-en@foo.bar
+# RFC 4512 2.5.2.1 makes this a subtype of mail;lang-de and mail;lang-en alike, not just of mail.
+mail;lang-de;lang-en: alice-de-en@foo.bar
 uidNumber: 99
 employeeNumber: A1b2C3
 # Matched case-exactly by the schema, so searches on it prove the configured schema is in play.
