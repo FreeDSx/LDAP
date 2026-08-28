@@ -1,6 +1,15 @@
 CHANGELOG
 =========
 
+0.9.0 (2026-08-28)
+------------------
+* Fix the LDAP server shut down when connections arrive while others are still queued.
+* Fix each forked child process holding open the connections of every client that came before it.
+* Fix the server signal handlers only being installed once the first client connected.
+* Require the POSIX extension in the LdapServer.
+* Log errors that stop the server from accepting clients / notifying of shutdown.
+* Add a "max_clients" option to limit how many clients the LDAP server will handle. Defaults to 1024.
+
 0.8.1 (2026-04-25)
 ------------------
 * Lock FreeDSx dependencies to prepare for a 1.0 release. This will be the final 0.x release.
