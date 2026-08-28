@@ -133,16 +133,22 @@ trait QueryTestsTrait
         // A SQL predicate narrower than the item it stands for cannot be complemented: the sidecar keys on the
         // bare type, so negating it would drop the entries the option excludes rather than return them.
         yield 'negating a tagged assertion the bare type would match' => [
-            Filters::not(Filters::equal('mail;lang-en', 'alice@foo.bar')),
+            Filters::not(Filters::equal(
+                'mail;lang-en',
+                'alice@foo.bar',
+            )),
             8,
         ];
         yield 'negating an absent tagged description' => [
-            Filters::not(Filters::present('mail;lang-de')),
+            Filters::not(Filters::present('mail;lang-fr')),
             8,
         ];
         // No substring index covers employeeNumber, so the item stands for a bare presence check.
         yield 'negating a contains on an unindexed type' => [
-            Filters::not(Filters::contains('employeeNumber', 'zzz')),
+            Filters::not(Filters::contains(
+                'employeeNumber',
+                'zzz',
+            )),
             8,
         ];
 
@@ -150,6 +156,60 @@ trait QueryTestsTrait
         yield 'the base type matches a value held under an option' => [
             Filters::equal('mail', 'alice-en@foo.bar'),
             1,
+        ];
+
+        // RFC 4512 2.5.2.1: a description is a subtype of the same type carrying any subset of its options.
+        yield 'an option subset reaches a description carrying more' => [
+            Filters::equal(
+                'mail;lang-de',
+                'alice-de-en@foo.bar',
+            ),
+            1,
+        ];
+        yield 'either option alone reaches it' => [
+            Filters::equal(
+                'mail;lang-en',
+                'alice-de-en@foo.bar',
+            ),
+            1,
+        ];
+        yield 'the bare type reaches it too' => [
+            Filters::equal(
+                'mail',
+                'alice-de-en@foo.bar',
+            ),
+            1,
+        ];
+        yield 'the full option set reaches it' => [
+            Filters::equal(
+                'mail;lang-de;lang-en',
+                'alice-de-en@foo.bar',
+            ),
+            1,
+        ];
+        // The option order is irrelevant, since a description is its type plus a set.
+        yield 'the option set is unordered' => [
+            Filters::equal(
+                'mail;lang-en;lang-de',
+                'alice-de-en@foo.bar',
+            ),
+            1,
+        ];
+        // An option the stored description does not carry makes the assertion a subtype of nothing held.
+        yield 'an option the description lacks matches nothing' => [
+            Filters::equal(
+                'mail;lang-de;lang-fr',
+                'alice-de-en@foo.bar',
+            ),
+            0,
+        ];
+        // A supertype description must not answer an assertion on its own subtype.
+        yield 'a tagged assertion does not reach the untagged value' => [
+            Filters::equal(
+                'mail;lang-de',
+                'alice@foo.bar',
+            ),
+            0,
         ];
         yield 'a supertype matches a value held by its subtype' => [
             Filters::equal('name', 'alice'),
@@ -1009,8 +1069,62 @@ trait QueryTestsTrait
         );
         sort($descriptions);
         self::assertSame(
-            ['mail', 'mail;lang-en'],
+            ['mail', 'mail;lang-de;lang-en', 'mail;lang-en'],
             $descriptions,
+        );
+    }
+
+    /**
+     * RFC 4512 2.5.2.1: naming a subset of the options selects the descriptions carrying at least those.
+     */
+    public function testRequestingAnOptionSubsetReturnsTheDescriptionsCarryingMore(): void
+    {
+        $this->authenticateUser();
+
+        $alice = $this->searchSelecting(
+            'alice',
+            'mail;lang-de',
+        );
+        self::assertNotNull($alice);
+
+        self::assertSame(
+            ['mail;lang-de;lang-en'],
+            $this->descriptionsOf($alice),
+        );
+    }
+
+    public function testRequestingAnOptionTheDescriptionLacksReturnsNothing(): void
+    {
+        $this->authenticateUser();
+
+        $alice = $this->searchSelecting(
+            'alice',
+            'mail;lang-fr',
+        );
+        self::assertNotNull($alice);
+
+        self::assertSame(
+            [],
+            $this->descriptionsOf($alice),
+        );
+    }
+
+    /**
+     * A supertype description must not be returned for a request naming one of its subtypes.
+     */
+    public function testRequestingATaggedDescriptionDoesNotReturnTheUntaggedOne(): void
+    {
+        $this->authenticateUser();
+
+        $alice = $this->searchSelecting(
+            'alice',
+            'mail;lang-en',
+        );
+        self::assertNotNull($alice);
+
+        self::assertSame(
+            ['mail;lang-de;lang-en', 'mail;lang-en'],
+            $this->descriptionsOf($alice),
         );
     }
 
@@ -1759,5 +1873,33 @@ trait QueryTestsTrait
     {
         return Operations::search(Filters::present('objectClass'))
             ->base('dc=foo,dc=bar');
+    }
+
+    private function searchSelecting(
+        string $cn,
+        string $selector,
+    ): ?Entry {
+        return $this->ldapClient()->search(
+            Operations::search(
+                Filters::equal('cn', $cn),
+                $selector,
+            )
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        )->first();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function descriptionsOf(Entry $entry): array
+    {
+        $descriptions = array_map(
+            static fn(Attribute $attribute): string => $attribute->getDescription(),
+            $entry->getAttributes(),
+        );
+        sort($descriptions);
+
+        return $descriptions;
     }
 }

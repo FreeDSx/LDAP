@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\LdapSyntax;
 use FreeDSx\Ldap\Schema\Definition\MatchingRule;
@@ -208,6 +209,26 @@ final class Schema
     }
 
     /**
+     * Whether one attribute description is the other, or a subtype of it (RFC 4512 2.5.2.1, 2.5.3).
+     */
+    public function isDescriptionSubtypeOf(
+        string $description,
+        string $ofDescription,
+    ): bool {
+        $type = Attribute::normalizeName($description);
+        $ofType = Attribute::normalizeName($ofDescription);
+
+        if ($type !== $ofType && !$this->isTypeOrSubtypeOf($type, $ofType)) {
+            return false;
+        }
+
+        return self::optionsCover(
+            $description,
+            $ofDescription,
+        );
+    }
+
+    /**
      * Whether any other attribute type names this one as its SUP, so an assertion on it must also cover theirs.
      */
     public function hasSubtypes(string $nameOrOid): bool
@@ -372,6 +393,28 @@ final class Schema
         }
 
         return $merged;
+    }
+
+    /**
+     * Whether every option the wanted description carries is also carried by the one being tested.
+     */
+    private static function optionsCover(
+        string $description,
+        string $ofDescription,
+    ): bool {
+        $wanted = (new Attribute($ofDescription))->getOptions();
+        if ($wanted->count() === 0) {
+            return true;
+        }
+
+        $held = (new Attribute($description))->getOptions();
+        foreach ($wanted as $option) {
+            if (!$held->has($option)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

@@ -234,11 +234,6 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
     }
 
     /**
-     * Empty/unknown cookie: every in-scope live entry as an add.
-     *
-     * @return Generator<LdapMessageResponse>
-     */
-    /**
      * The entryUUID rides in the syncStateValue control, so RFC 4533 requires it whatever the client selected.
      */
     private function withSyncUuid(SearchRequest $request): SearchRequest
@@ -255,6 +250,11 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
         );
     }
 
+    /**
+     * Empty/unknown cookie: every in-scope live entry as an add.
+     *
+     * @return Generator<LdapMessageResponse>
+     */
     private function fullRefreshEntries(
         LdapMessageRequest $message,
         SearchRequest $request,

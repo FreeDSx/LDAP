@@ -72,13 +72,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     private ?array $cachedDnRdns = null;
 
     /**
-     * Lowercased base name => first matching attribute; scoped to one evaluate() call.
-     *
-     * @var array<string, Attribute>|null
-     */
-    private ?array $attributeIndex = null;
-
-    /**
      * @var WeakMap<object, SubstringAssertion>
      */
     private WeakMap $substringCache;
@@ -128,7 +121,6 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         FilterInterface $filter,
     ): bool {
         $this->cachedDnRdns = null;
-        $this->attributeIndex = null;
 
         return $this->evaluateFilter($entry, $filter) === FilterResult::True;
     }
@@ -417,9 +409,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
         $values = [];
 
         if ($filterAttributeName !== null) {
-            $values = $this->derivedValues($entry, $filterAttributeName)
-                ?? $this->lookupAttribute($entry, $filterAttributeName)?->getValues()
-                ?? [];
+            $values = $this->valuesForAssertion(
+                $entry,
+                $filterAttributeName,
+            );
         } else {
             foreach ($entry->getAttributes() as $attribute) {
                 array_push(
@@ -544,40 +537,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
     }
 
     /**
-     * Whether a description carries options, without paying for an Attribute to ask Attribute::hasOptions().
-     */
-    private static function descriptionHasOptions(string $attributeDescription): bool
-    {
-        return str_contains($attributeDescription, ';');
-    }
-
-    /**
-     * Defers to Entry::get() when the filter attribute has options to preserve Attribute::equals() options-matching.
-     */
-    private function lookupAttribute(
-        Entry $entry,
-        string $filterAttributeName,
-    ): ?Attribute {
-        if (self::descriptionHasOptions($filterAttributeName)) {
-            return $entry->get($filterAttributeName);
-        }
-
-        if ($this->attributeIndex === null) {
-            $index = [];
-            foreach ($entry->getAttributes() as $attr) {
-                $lc = strtolower($attr->getName());
-                $index[$lc] ??= $attr;
-            }
-            $this->attributeIndex = $index;
-        }
-
-        return $this->attributeIndex[strtolower($filterAttributeName)] ?? null;
-    }
-
-    /**
      * Every value an assertion on this description must be tested against.
      *
-     * RFC 4512 2.5.2 makes an assertion on an attribute type cover its tagged variants and its subtypes.
+     * RFC 4512 2.5.2.1 makes an assertion cover every description whose type descends from the asserted one and
+     * whose options include the asserted ones.
      *
      * @return array<string>
      */
@@ -592,37 +555,15 @@ final class FilterEvaluator implements FilterEvaluatorInterface
             return $derived;
         }
 
-        if (self::descriptionHasOptions($filterAttributeName)) {
-            return $entry->get($filterAttributeName)?->getValues() ?? [];
-        }
-
-        $wanted = strtolower($filterAttributeName);
         $values = [];
 
         foreach ($entry->getAttributes() as $attribute) {
-            if ($this->describesSameType($attribute->getName(), $wanted)) {
+            if ($this->schema->isDescriptionSubtypeOf($attribute->getDescription(), $filterAttributeName)) {
                 array_push($values, ...$attribute->getValues());
             }
         }
 
         return $values;
-    }
-
-    /**
-     * Whether an entry attribute is the wanted type, or a subtype of it through the SUP chain.
-     */
-    private function describesSameType(
-        string $entryAttributeName,
-        string $wantedLowerName,
-    ): bool {
-        if (strtolower($entryAttributeName) === $wantedLowerName) {
-            return true;
-        }
-
-        return $this->schema->isTypeOrSubtypeOf(
-            $entryAttributeName,
-            $wantedLowerName,
-        );
     }
 
     /**

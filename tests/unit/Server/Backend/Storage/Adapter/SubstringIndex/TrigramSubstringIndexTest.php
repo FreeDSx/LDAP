@@ -175,9 +175,6 @@ final class TrigramSubstringIndexTest extends TestCase
     }
 
     /**
-     * @return callable(string, list<string>): void
-     */
-    /**
      * @return callable(string, list<string|int>): void
      */
     private function recorder(): callable

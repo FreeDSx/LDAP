@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
 use FreeDSx\Ldap\Schema\Schema;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class SchemaTest extends TestCase
@@ -502,6 +503,143 @@ final class SchemaTest extends TestCase
         $this->seedSupertypeChain();
 
         self::assertFalse($this->subject->isCaseInsensitiveMatched('subordinate'));
+    }
+
+    /**
+     * @return iterable<string, array{string, string, bool}>
+     */
+    public static function descriptionSubtypeProvider(): iterable
+    {
+        yield 'the same description' => [
+            'cn',
+            'cn',
+            true,
+        ];
+        yield 'an alternate name of the same type' => [
+            'cn',
+            'commonName',
+            true,
+        ];
+        yield 'the type by its oid' => [
+            'cn',
+            '2.5.4.3',
+            true,
+        ];
+        yield 'a subtype of the wanted type' => [
+            'cn',
+            'name',
+            true,
+        ];
+        yield 'a supertype of the wanted type' => [
+            'name',
+            'cn',
+            false,
+        ];
+        yield 'an unrelated type' => [
+            'sn',
+            'cn',
+            false,
+        ];
+
+        // RFC 4512 2.5.2.1: options are a set, and a subtype carries every option its supertype does.
+        yield 'the same option set' => [
+            'cn;lang-de',
+            'cn;lang-de',
+            true,
+        ];
+        yield 'an option set spelled in another order' => [
+            'cn;lang-de;lang-en',
+            'cn;lang-en;lang-de',
+            true,
+        ];
+        yield 'options differing only by case' => [
+            'cn;LANG-DE',
+            'cn;lang-de',
+            true,
+        ];
+        yield 'a superset of the wanted options' => [
+            'cn;lang-de;lang-en',
+            'cn;lang-de',
+            true,
+        ];
+        yield 'every option dropped' => [
+            'cn;lang-de;lang-en',
+            'cn',
+            true,
+        ];
+        yield 'a subset of the wanted options' => [
+            'cn;lang-de',
+            'cn;lang-de;lang-en',
+            false,
+        ];
+        yield 'an untagged description against a tagged one' => [
+            'cn',
+            'cn;lang-de',
+            false,
+        ];
+        yield 'a disjoint option' => [
+            'cn;lang-de',
+            'cn;lang-fr',
+            false,
+        ];
+
+        // The type and the options must both hold, so a supertype request reaches a tagged subtype.
+        yield 'a tagged subtype against its bare supertype' => [
+            'cn;lang-de',
+            'name',
+            true,
+        ];
+        yield 'a tagged subtype against its tagged supertype' => [
+            'cn;lang-de',
+            'name;lang-de',
+            true,
+        ];
+        yield 'a tagged subtype missing the supertype option' => [
+            'cn;lang-de',
+            'name;lang-fr',
+            false,
+        ];
+
+        yield 'a type the schema does not define' => [
+            'shoeSize',
+            'cn',
+            false,
+        ];
+        yield 'against a type the schema does not define' => [
+            'cn',
+            'shoeSize',
+            false,
+        ];
+    }
+
+    #[DataProvider('descriptionSubtypeProvider')]
+    public function test_description_subtyping(
+        string $description,
+        string $ofDescription,
+        bool $expected,
+    ): void {
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.41',
+            names: ['name'],
+        ));
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.3',
+            names: ['cn', 'commonName'],
+            superTypeOid: '2.5.4.41',
+        ));
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '2.5.4.4',
+            names: ['sn'],
+            superTypeOid: '2.5.4.41',
+        ));
+
+        self::assertSame(
+            $expected,
+            $this->subject->isDescriptionSubtypeOf(
+                $description,
+                $ofDescription,
+            ),
+        );
     }
 
     /**
