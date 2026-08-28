@@ -84,6 +84,17 @@ final readonly class AttributeContext implements AttributeContextInterface
         return $this->schema->isCaseInsensitiveMatched($attribute);
     }
 
+    public function sortsNumerically(
+        string $attribute,
+        ?string $orderingRule,
+    ): bool {
+        if ($orderingRule === null) {
+            return $this->schema->isIntegerOrdered($attribute) === true;
+        }
+
+        return $this->schema->getMatchingRule($orderingRule)?->oid === MatchingRuleOid::OID_INTEGER_ORDERING_MATCH;
+    }
+
     public function oidSpellings(
         string $attribute,
         string $value,
