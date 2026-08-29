@@ -29,7 +29,7 @@ use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
+use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedOptions;
 use FreeDSx\Ldap\Server\Config\ConfidentialityRequirement;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\Replication\ProviderConfig;
@@ -416,12 +416,15 @@ final class LdapServerCommand extends Command
             ? self::SASL_SEED_LDIF
             : self::SEED_LDIF;
 
-        $loadData = function () use ($server, $storage, $seedFile, $fixedSeed, $entries, $changesFile, $dumpFile): void {
+        $loadData = function () use ($server, $seedFile, $fixedSeed, $entries, $changesFile, $dumpFile): void {
             $server->seed(new FileLdifLoader($seedFile !== '' ? $seedFile : $fixedSeed));
 
-            // The generated and cert-mapped entries stay a raw import, since they carry synthetic attributes.
+            // Validation is skipped, since these carry synthetic attributes the configured schema does not cover.
             if ($entries !== []) {
-                (new LdapImporter($storage))->importEntries($entries);
+                $server->seedEntries(
+                    $entries,
+                    (new SeedOptions())->setIgnoreValidation(true),
+                );
             }
 
             if ($changesFile !== '') {

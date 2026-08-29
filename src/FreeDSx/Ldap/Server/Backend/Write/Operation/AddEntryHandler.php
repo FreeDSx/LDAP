@@ -53,6 +53,8 @@ readonly class AddEntryHandler
             // Merged before validation, so the values naming the entry count toward what its object classes require.
             $entry->mergeRdnAttributes();
 
+            $bulkLoad = $context->bulkLoadOptions();
+
             $this->schemaGate->assertAddAllowed(
                 $entry,
                 $context,
@@ -61,12 +63,22 @@ readonly class AddEntryHandler
                 $entry,
                 $entry->getDn()->normalize(),
                 $context->isSystem(),
+                $bulkLoad !== null && $bulkLoad->replaceExisting,
             );
 
-            $this->operationalAttrs->applyForAdd(
-                $entry,
-                $context,
-            );
+            // A bulk load keeps the operational attributes its source supplied.
+            if ($bulkLoad !== null) {
+                $this->operationalAttrs->applyForBulkLoad(
+                    $entry,
+                    $bulkLoad->actorDn->toString(),
+                );
+            } else {
+                $this->operationalAttrs->applyForAdd(
+                    $entry,
+                    $context,
+                );
+            }
+
             $this->applySystemChanges(
                 $entry,
                 $command->systemChanges,

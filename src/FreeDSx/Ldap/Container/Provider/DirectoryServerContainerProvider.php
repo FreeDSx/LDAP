@@ -417,16 +417,20 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     }
 
     /**
-     * Bulk loading writes straight to storage, so it stamps and validates with the same components the write path uses.
+     * Bulk loading reuses the write path's add operation, so it cannot drift from the wire path.
      */
     private function makeLdapImporter(Container $container): LdapImporter
     {
-        $this->refuseBulkImportOnReplica($container->get(ServerOptions::class));
+        $options = $container->get(ServerOptions::class);
+        $this->refuseBulkImportOnReplica($options);
 
         return new LdapImporter(
             $container->get(EntryStorageInterface::class),
-            $container->get(OperationalAttributeGenerator::class),
-            $container->get(SchemaValidator::class),
+            new WriteRequestRouter($container->get(WriteOperationDispatcher::class)),
+            new EventLogger(
+                $options->getLogger(),
+                $options->getEventLogPolicy(),
+            ),
         );
     }
 

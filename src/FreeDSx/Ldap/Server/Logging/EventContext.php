@@ -80,6 +80,10 @@ final class EventContext
 
     public const DURATION_SECONDS = 'duration_seconds';
 
+    public const ENTRIES_ADDED = 'entries_added';
+
+    public const ENTRIES_REPLACED = 'entries_replaced';
+
     public const NEW_RDN = 'new_rdn';
 
     public const NEW_SUPERIOR_DN = 'new_superior_dn';

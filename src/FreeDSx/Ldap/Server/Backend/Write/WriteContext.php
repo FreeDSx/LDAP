@@ -32,6 +32,7 @@ final readonly class WriteContext
         private ControlBag $controls,
         private bool $isSystem = false,
         private SchemaViolations $schemaViolations = new SchemaViolations(),
+        private ?BulkLoadOptions $bulkLoad = null,
     ) {}
 
     /**
@@ -45,6 +46,22 @@ final readonly class WriteContext
             $token,
             $controls,
             isSystem: true,
+        );
+    }
+
+    /**
+     * Build a context for loading an entry as supplied, rather than composing one for a client.
+     */
+    public static function bulkLoad(
+        TokenInterface $token,
+        ControlBag $controls,
+        BulkLoadOptions $bulkLoad,
+    ): self {
+        return new self(
+            $token,
+            $controls,
+            isSystem: true,
+            bulkLoad: $bulkLoad,
         );
     }
 
@@ -82,5 +99,13 @@ final readonly class WriteContext
     public function schemaViolations(): SchemaViolations
     {
         return $this->schemaViolations;
+    }
+
+    /**
+     * Present when the entry is loaded as supplied, so attributes the source provided are kept rather than restamped.
+     */
+    public function bulkLoadOptions(): ?BulkLoadOptions
+    {
+        return $this->bulkLoad;
     }
 }
