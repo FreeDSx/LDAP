@@ -58,7 +58,8 @@ in-memory implementations. Authentication is a separate, independently configura
 ### Seeded SQLite Server
 
 The simplest useful setup. A SQLite file holds the directory, so it survives restarts and works under the default
-forking runner. Seeding is an upsert, so running this again is safe.
+forking runner. Seeding refuses an entry that already exists, so running this again fails unless you set
+`setReplaceExisting(true)`.
 
 The built-in `PasswordAuthenticator` handles bind authentication automatically — it reads the `userPassword` attribute
 from entries and verifies credentials against it. Supported hash schemes: `{SHA}`, `{SSHA}`, `{MD5}`, `{SMD5}`, and
@@ -541,9 +542,9 @@ other source (database, remote URL, gzip stream, etc.). LDIF output uses the par
 ### Seeding Initial Entries
 
 `LdapServer::seed()` bulk-imports RFC 2849 LDIF content records into the storage configured via
-`ServerOptions::setStorageConfig()` in one atomic transaction, with schema validation and operational-attribute
-stamping (`createTimestamp`, `entryUUID`, etc.) applied. Use it to populate a persistent storage backend before
-`$server->run()`.
+`ServerOptions::setStorageConfig()` in one atomic transaction. Each entry runs through the same add operation a
+client write uses, minus the ACL, message controls and event auditing that need a connection. Use it to populate
+a persistent storage backend before `$server->run()`.
 
 ```php
 use FreeDSx\Ldap\Entry\Dn;
@@ -564,12 +565,20 @@ $server->seed(
 $server->run();
 ```
 
-The optional second argument is a `SeedOptions`. Its `creatorDn` is stamped as `creatorsName`/`modifiersName` on each
-imported entry, defaulting to the empty (anonymous) DN. It also carries `setIgnoreValidation()` for content the current
-schema does not cover, and `setUrlResolver()` to enable RFC 2849 URL values.
+The optional second argument is a `SeedOptions`:
+
+| Setter | Effect |
+|---|---|
+| `setCreatorDn()` | Stamped as `creatorsName`/`modifiersName` on entries carrying neither. Defaults to the empty DN. |
+| `setIgnoreValidation()` | Relaxes the structural, naming and duplicate-value rules. Still refuses a value its attribute syntax rejects. |
+| `setReplaceExisting()` | Overwrites a DN already present, which is otherwise refused with `entryAlreadyExists`. |
+| `setUrlResolver()` | Enables RFC 2849 URL values. |
+
+Supply `entryUUID` for every entry `setReplaceExisting()` replaces: an omitted one is generated fresh, which reads as a
+delete and an add to anything keyed on it. Each replacement is logged, with a record of the counts once the import commits.
 
 `seed()` accepts only content records (entries without `changetype:`) and requires depth-first input (parents first,
-then children entries). LDIF produced by `dump()` is already in this order. The operation itself is an upsert that overwrites.
+then children entries). LDIF produced by `dump()` is already in this order.
 
 When using the Swoole runner (`setRunnerConfig(RunnerConfig::forSwoole())`), call `seed()` inside
 `Swoole\Coroutine\run()` so the storage adapter's per-coroutine connection is available during import.
@@ -620,15 +629,15 @@ $server->seed(new FileLdifLoader('/etc/myapp/initial-data.ldif'))
     ->run();
 ```
 
-Unlike `seed()`, `applyChanges()` dispatches each request through the same write path the live server uses for client
-requests. Supported changetypes: `add`, `delete`, `modify` (`add:`/`delete:`/`replace:` mod-specs), and `modrdn`/`moddn`
-(rename or move; supports optional `newsuperior:` for moving across subtrees).
+Where `seed()` takes content records in one transaction, `applyChanges()` replays change records one at a time through
+the full request pipeline. Supported changetypes: `add`, `delete`, `modify` (`add:`/`delete:`/`replace:` mod-specs), and
+`modrdn`/`moddn` (rename or move; supports optional `newsuperior:` for moving across subtrees).
 
 ### Dumping the Directory
 
 `LdapServer::dump()` streams the configured storage backend's entries to an LDIF output as RFC 2849 content records.
 Operational attributes (`entryUUID`, `createTimestamp`, etc.) are preserved. So `dump()` then `seed()` restores the
-entries exactly as they were.
+entries exactly as they were, since seeding keeps the ones its source supplies rather than stamping new.
 
 ```php
 use FreeDSx\Ldap\LdapServer;

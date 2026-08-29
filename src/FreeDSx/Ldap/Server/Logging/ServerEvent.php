@@ -34,6 +34,9 @@ enum ServerEvent: string
     case EntryModified                  = 'entry.modified';
     case EntryDeleted                   = 'entry.deleted';
     case EntryRenamed                   = 'entry.renamed';
+    case EntryReplaced                  = 'entry.replaced';
+    case BulkImportCompleted            = 'import.completed';
+    case BulkImportFailed               = 'import.failed';
     case SearchAuthorized               = 'search.authorized';
     case CompareCompleted               = 'compare.completed';
     case PasswordModifySuccess          = 'password_modify.success';
@@ -64,6 +67,7 @@ enum ServerEvent: string
         return match ($this) {
             self::PasswordPolicyAccountLocked,
             self::SyncEntrySkipped,
+            self::BulkImportFailed,
             self::JournalPruneFailed => LogLevel::WARNING,
             self::BindFailure,
             self::StartTlsFailed,

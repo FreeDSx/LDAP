@@ -19,8 +19,6 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Container;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\SchemaConfig;
@@ -273,7 +271,7 @@ class LdapAclCommand extends Command
             $container,
         );
 
-        (new LdapImporter($container->get(EntryStorageInterface::class)))->importEntries($entries);
+        $server->seedEntries($entries);
         $server->run();
 
         return Command::SUCCESS;

@@ -13,89 +13,132 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Ldif;
 
-use FreeDSx\Ldap\Operations;
-use FreeDSx\Ldap\Search\Filters;
-use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use FreeDSx\Ldap\Container;
+use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedOptions;
+use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 
-final class LdapSeedServerTest extends ServerTestCase
+final class LdapSeedServerTest extends TestCase
 {
-    private const SEED_LDIF = __DIR__ . '/../../resources/seed/seed-test.ldif';
+    private const SEED_LDIF = <<<LDIF
+        dn: dc=example,dc=com
+        objectClass: top
+        objectClass: domain
+        dc: example
 
-    public static function setUpBeforeClass(): void
+        dn: cn=alice,dc=example,dc=com
+        objectClass: top
+        objectClass: person
+        cn: alice
+        sn: Anderson
+        LDIF;
+
+    private LdapServer $subject;
+
+    private EntryStorageInterface $storage;
+
+    protected function setUp(): void
     {
-        parent::setUpBeforeClass();
+        $options = TestServerOptions::sqlite();
+        $container = Container::forServer($options);
 
-        if (!extension_loaded('pcntl')) {
-            return;
-        }
-
-        static::initSharedServer(
-            'ldap-server',
-            'tcp',
-            ['--seed=' . self::SEED_LDIF],
+        $this->subject = new LdapServer(
+            $options,
+            $container,
         );
+        $this->storage = $container->get(EntryStorageInterface::class);
     }
 
-    public static function tearDownAfterClass(): void
+    public function test_it_seeds_the_content_records(): void
     {
-        parent::tearDownAfterClass();
-        static::tearDownSharedServer();
+        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
+
+        self::assertNotNull($this->storage->find(new Dn('dc=example,dc=com')));
+        self::assertNotNull($this->storage->find(new Dn('cn=alice,dc=example,dc=com')));
     }
 
-    public function setUp(): void
+    public function test_it_refuses_an_entry_that_already_exists(): void
     {
-        $this->setServerMode('ldap-server');
+        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
 
-        parent::setUp();
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::ENTRY_ALREADY_EXISTS);
 
-        $this->authenticateUser();
+        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
     }
 
-    public function test_it_serves_a_seeded_entry_with_its_attributes(): void
+    public function test_it_replaces_an_existing_entry_when_asked(): void
     {
-        $alice = $this->ldapClient()->read('cn=alice,dc=foo,dc=bar');
+        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
+        $uuid = $this->storage->find(new Dn('cn=alice,dc=example,dc=com'))
+            ?->get('entryUUID')
+            ?->firstValue();
 
-        $this->assertNotNull($alice);
-        $this->assertSame(
-            'Anderson',
+        $this->subject->seed(
+            new StringLdifLoader(str_replace('sn: Anderson', 'sn: Replaced', self::SEED_LDIF)),
+            (new SeedOptions())->setReplaceExisting(true),
+        );
+
+        $alice = $this->storage->find(new Dn('cn=alice,dc=example,dc=com'));
+        self::assertNotNull($alice);
+        self::assertSame(
+            'Replaced',
             $alice->get('sn')?->firstValue(),
         );
-    }
-
-    public function test_it_unfolds_a_folded_value_through_to_the_served_entry(): void
-    {
-        $alice = $this->ldapClient()->read('cn=alice,dc=foo,dc=bar');
-
-        $this->assertNotNull($alice);
-        $this->assertSame(
-            'A folded description value that is intentionally longer than seventy-six characters so the parser must unfold it.',
-            $alice->get('description')?->firstValue(),
+        self::assertNotSame(
+            $uuid,
+            $alice->get('entryUUID')?->firstValue(),
+            'An LDIF carrying no entryUUID gives the replacement a new one.',
         );
     }
 
-    public function test_it_serves_all_seeded_entries_in_a_subtree_search(): void
+    public function test_a_replacement_keeps_the_entry_uuid_the_source_supplies(): void
     {
-        $entries = $this->ldapClient()->search(
-            Operations::search(Filters::equal('objectClass', 'inetOrgPerson'))
-                ->base('dc=foo,dc=bar'),
+        $withUuid = self::SEED_LDIF . "\nentryUUID: 11111111-2222-4333-8444-555555555555\n";
+
+        $this->subject->seed(new StringLdifLoader($withUuid));
+        $this->subject->seed(
+            new StringLdifLoader($withUuid),
+            (new SeedOptions())->setReplaceExisting(true),
         );
 
-        $dns = [];
-        foreach ($entries as $entry) {
-            $dns[] = $entry->getDn()->toString();
+        self::assertSame(
+            '11111111-2222-4333-8444-555555555555',
+            $this->storage->find(new Dn('cn=alice,dc=example,dc=com'))
+                ?->get('entryUUID')
+                ?->firstValue(),
+        );
+    }
+
+    public function test_a_failure_rolls_the_whole_batch_back(): void
+    {
+        try {
+            $this->subject->seedEntries([
+                Entry::fromArray('dc=example,dc=com', ['objectClass' => ['top', 'domain'], 'dc' => 'example']),
+                Entry::fromArray('cn=alice,dc=example,dc=com', [
+                    'objectClass' => ['top', 'person'],
+                    'cn' => 'alice',
+                    'sn' => 'Anderson',
+                ]),
+                // Refused as a duplicate, which must take the two before it down with it.
+                Entry::fromArray('cn=alice,dc=example,dc=com', [
+                    'objectClass' => ['top', 'person'],
+                    'cn' => 'alice',
+                    'sn' => 'Anderson',
+                ]),
+            ]);
+            self::fail('The duplicate entry should have failed the batch.');
+        } catch (OperationException) {
         }
 
-        $this->assertContains(
-            'cn=alice,dc=foo,dc=bar',
-            $dns,
-        );
-        $this->assertContains(
-            'cn=bob,dc=foo,dc=bar',
-            $dns,
-        );
-        $this->assertContains(
-            'cn=user,dc=foo,dc=bar',
-            $dns,
-        );
+        self::assertNull($this->storage->find(new Dn('dc=example,dc=com')));
+        self::assertNull($this->storage->find(new Dn('cn=alice,dc=example,dc=com')));
     }
 }
