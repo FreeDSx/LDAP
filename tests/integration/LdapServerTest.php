@@ -21,11 +21,13 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Server\GeneratedEntry;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Throwable;
 
@@ -777,8 +779,8 @@ final class LdapServerTest extends ServerTestCase
         }
     }
 
-    #[DataProvider('rootDseWriteProvider')]
-    public function testAWriteOnTheRootDseIsRefusedRatherThanReportedMissing(RequestInterface $request): void
+    #[DataProvider('generatedEntryWriteProvider')]
+    public function testAWriteOnAGeneratedEntryIsRefusedRatherThanReportedMissing(RequestInterface $request): void
     {
         $this->authenticateAdmin();
 
@@ -787,7 +789,7 @@ final class LdapServerTest extends ServerTestCase
 
         try {
             $this->ldapClient()->sendAndReceive($request);
-            $this->fail('A write on the root DSE should have been refused.');
+            $this->fail('A write on a generated entry should have been refused.');
         } catch (OperationException $e) {
             $this->assertSame(
                 ResultCode::UNWILLING_TO_PERFORM,
@@ -799,20 +801,100 @@ final class LdapServerTest extends ServerTestCase
     /**
      * @return iterable<string, array{RequestInterface}>
      */
-    public static function rootDseWriteProvider(): iterable
+    public static function generatedEntryWriteProvider(): iterable
     {
-        yield 'add' => [
-            Operations::add(Entry::fromArray('', ['objectClass' => 'device', 'cn' => 'rootprobe'])),
+        foreach (GeneratedEntry::cases() as $entry) {
+            yield "add the {$entry->name} entry" => [
+                Operations::add(Entry::fromArray($entry->value, ['objectClass' => 'device', 'cn' => 'shadow'])),
+            ];
+            yield "modify the {$entry->name} entry" => [
+                Operations::modify($entry->value, Change::add('description', 'probe')),
+            ];
+            yield "delete the {$entry->name} entry" => [
+                Operations::delete($entry->value),
+            ];
+            yield "rename the {$entry->name} entry" => [
+                Operations::rename($entry->value, 'cn=shadow'),
+            ];
+        }
+
+        // RFC 4511 4.9 lets a rename name the root DSE as the new superior, which is where the reserved names sit.
+        yield 'rename another entry onto a generated name' => [
+            new ModifyDnRequest(
+                'dc=foo,dc=bar',
+                'cn=monitor',
+                true,
+                '',
+            ),
         ];
-        yield 'modify' => [
-            Operations::modify('', Change::add('description', 'probe')),
-        ];
-        yield 'delete' => [
-            Operations::delete(''),
-        ];
-        yield 'modify dn' => [
-            Operations::rename('', 'cn=rootprobe'),
-        ];
+    }
+
+    #[DataProvider('generatedParentProvider')]
+    public function testPlacingAnEntryBeneathAGeneratedEntryIsRefused(RequestInterface $request): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->sendAndReceive($request);
+            $this->fail('An entry beneath a generated entry should have been refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::UNWILLING_TO_PERFORM,
+                $e->getCode(),
+            );
+        }
+    }
+
+    /**
+     * @return iterable<string, array{RequestInterface}>
+     */
+    public static function generatedParentProvider(): iterable
+    {
+        foreach (GeneratedEntry::cases() as $entry) {
+            yield "move beneath the {$entry->name} entry" => [
+                new ModifyDnRequest(
+                    'cn=user,dc=foo,dc=bar',
+                    'cn=user',
+                    true,
+                    $entry->value,
+                ),
+            ];
+
+            // A top level add names no parent at all, so the RootDSE can never be one.
+            if ($entry === GeneratedEntry::RootDse) {
+                continue;
+            }
+
+            yield "add beneath the {$entry->name} entry" => [
+                Operations::add(Entry::fromArray(
+                    "cn=child,{$entry->value}",
+                    ['objectClass' => 'device', 'cn' => 'child'],
+                )),
+            ];
+        }
+    }
+
+    public function testAGeneratedEntryLeavesNoShadowInASubtreeSearch(): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->create(Entry::fromArray(
+                'cn=Subschema',
+                ['objectClass' => 'device', 'cn' => 'Subschema', 'description' => 'SHADOW'],
+            ));
+            $this->fail('A shadow entry should not have been created.');
+        } catch (OperationException) {
+        }
+
+        $this->assertCount(
+            0,
+            $this->ldapClient()->search(
+                Operations::search(Filters::equal('description', 'SHADOW'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+            ),
+        );
     }
 
     /**

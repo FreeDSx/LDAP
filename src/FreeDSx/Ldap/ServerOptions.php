@@ -183,11 +183,6 @@ final class ServerOptions implements ServerListenerOptionsInterface
         return $this;
     }
 
-    public function getSubschemaEntry(): Dn
-    {
-        return $this->schemaConfig->getSubschemaEntry();
-    }
-
     public function getDseVendorName(): string
     {
         return $this->dseVendorName;
@@ -348,12 +343,8 @@ final class ServerOptions implements ServerListenerOptionsInterface
 
     public function getAclRules(): AclRules
     {
-        // The subschema rule is applied here rather than in secureDefault(), since only this side knows the DN.
         return $this->aclRules ?? ($this->defaultAclRules ??= AclRules::secureDefault($this->administrators)
-            ->withSubschemaAccess(
-                Subject::authenticated(),
-                $this->getSubschemaEntry(),
-            ));
+            ->withSubschemaAccess(Subject::authenticated()));
     }
 
     public function getPasswordConfig(): PasswordConfig

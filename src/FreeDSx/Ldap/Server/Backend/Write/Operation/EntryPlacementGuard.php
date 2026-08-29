@@ -150,11 +150,13 @@ readonly class EntryPlacementGuard
     /**
      * A single-RDN superior is held to this too, so a move cannot strand the entry under a DN that holds nothing.
      *
+     * Note: The RootDSE is never stored, and whether an entry may sit beneath it is settled before this runs.
+     *
      * @throws OperationException
      */
     private function assertNewSuperiorExists(?Dn $newParent): void
     {
-        if ($newParent === null) {
+        if ($newParent === null || $newParent->isRootDse()) {
             return;
         }
         if (!$this->storage->exists($newParent->normalize())) {

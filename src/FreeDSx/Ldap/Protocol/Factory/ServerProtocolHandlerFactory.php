@@ -15,13 +15,12 @@ namespace FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
-use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerMonitorHandler;
+use FreeDSx\Ldap\Server\GeneratedEntry;
 use FreeDSx\Ldap\ServerOptions;
 
 /**
@@ -37,6 +36,11 @@ readonly class ServerProtocolHandlerFactory implements HandlerRouteResolverInter
         RequestInterface $request,
         ControlBag $controls,
     ): HandlerId {
+        $generated = $this->generatedRouteIdFor($request);
+        if ($generated !== null) {
+            return $generated;
+        }
+
         return match (true) {
             $request instanceof AbandonRequest => HandlerId::Abandon,
             $request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_CANCEL => HandlerId::Cancel,
@@ -45,9 +49,6 @@ readonly class ServerProtocolHandlerFactory implements HandlerRouteResolverInter
             $request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_PPOLICY_STATE_FORWARD => HandlerId::PasswordPolicyForward,
             $request instanceof ExtendedRequest && $request->getName() === ExtendedRequest::OID_START_TLS => HandlerId::StartTls,
             $request instanceof ExtendedRequest => HandlerId::UnsupportedExtended,
-            $this->isRootDseSearch($request) => HandlerId::RootDse,
-            $this->isSubschemaSearch($request) => HandlerId::Subschema,
-            $this->isMonitorSearch($request) => HandlerId::Monitor,
             $this->isSyncSearch($request, $controls) => HandlerId::Sync,
             $this->isPagingSearch($request, $controls) => HandlerId::Paging,
             $request instanceof SearchRequest => HandlerId::Search,
@@ -56,52 +57,23 @@ readonly class ServerProtocolHandlerFactory implements HandlerRouteResolverInter
         };
     }
 
-    private function isSubschemaSearch(RequestInterface $request): bool
-    {
-        if (!$request instanceof SearchRequest) {
-            return false;
-        }
-
-        return $this->isBaseSearchFor(
-            $request,
-            $this->options->getSubschemaEntry(),
-        );
-    }
-
-    private function isMonitorSearch(RequestInterface $request): bool
-    {
-        if (!$this->options->isMonitorEnabled() || !$request instanceof SearchRequest) {
-            return false;
-        }
-
-        return $this->isBaseSearchFor(
-            $request,
-            new Dn(ServerMonitorHandler::DN),
-        );
-    }
-
     /**
-     * Compared as names rather than as text, so a client spelling the DN differently still reaches the handler.
+     * The names are reserved unconditionally, but a disabled monitor generates nothing to route to.
      */
-    private function isBaseSearchFor(
-        SearchRequest $request,
-        Dn $dn,
-    ): bool {
-        $baseDn = $request->getBaseDn();
-
-        return $request->getScope() === SearchRequest::SCOPE_BASE_OBJECT
-            && $baseDn !== null
-            && $baseDn->equals($dn);
-    }
-
-    private function isRootDseSearch(RequestInterface $request): bool
+    private function generatedRouteIdFor(RequestInterface $request): ?HandlerId
     {
-        if (!$request instanceof SearchRequest) {
-            return false;
+        if (!$request instanceof SearchRequest || $request->getScope() !== SearchRequest::SCOPE_BASE_OBJECT) {
+            return null;
         }
 
-        return $request->getScope() === SearchRequest::SCOPE_BASE_OBJECT
-            && $request->getBaseDn()?->isRootDse();
+        return match (GeneratedEntry::at($request->getBaseDn())) {
+            GeneratedEntry::RootDse => HandlerId::RootDse,
+            GeneratedEntry::Subschema => HandlerId::Subschema,
+            GeneratedEntry::Monitor => $this->options->isMonitorEnabled()
+                ? HandlerId::Monitor
+                : null,
+            null => null,
+        };
     }
 
     private function isPagingSearch(

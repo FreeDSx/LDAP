@@ -494,10 +494,7 @@ final class AclRulesTest extends TestCase
     {
         $acl = new RuleBasedAccessControl(
             AclRules::secureDefault(Subject::dn(self::ADMIN_DN))
-                ->withSubschemaAccess(
-                    Subject::dn(self::ADMIN_DN),
-                    new Dn('cn=Subschema'),
-                ),
+                ->withSubschemaAccess(Subject::dn(self::ADMIN_DN)),
         );
 
         $this->expectException(OperationException::class);
@@ -514,10 +511,7 @@ final class AclRulesTest extends TestCase
     {
         $acl = new RuleBasedAccessControl(
             AclRules::secureDefault(Subject::dn(self::ADMIN_DN))
-                ->withSubschemaAccess(
-                    Subject::anyone(),
-                    new Dn('cn=Subschema'),
-                ),
+                ->withSubschemaAccess(Subject::anyone()),
         );
 
         $acl->authorizeOperation(

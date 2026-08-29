@@ -73,7 +73,8 @@ class Dn implements IteratorAggregate, Countable, Stringable
         Rdn $rdn,
         ?Dn $parent = null,
     ): self {
-        return $parent === null
+        // RFC 4511 4.9 lets a rename name the root DSE as the new superior.
+        return $parent === null || $parent->isRootDse()
             ? new self($rdn->toString())
             : new self($rdn->toString() . ',' . $parent->toString());
     }

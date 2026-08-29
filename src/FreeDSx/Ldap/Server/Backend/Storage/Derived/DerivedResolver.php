@@ -13,11 +13,11 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Derived;
 
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\GeneratedEntry;
 
 /**
  * Produces the operational attributes computed per read, so the read and filter paths share one definition.
@@ -26,10 +26,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
  */
 final readonly class DerivedResolver
 {
-    public function __construct(
-        private EntryStorageInterface $storage,
-        private Dn $subschemaEntry,
-    ) {}
+    public function __construct(private EntryStorageInterface $storage) {}
 
     /**
      * @param string $name A canonical type name, which callers get from {@see DerivedAttributeTrait}.
@@ -43,7 +40,7 @@ final readonly class DerivedResolver
             // RFC 5020: derived on read so a rename cannot leave it stale.
             AttributeTypeOid::NAME_ENTRY_DN => $entry->getDn()->toString(),
             // RFC 4512 §4.2: how a client locates the schema governing this entry.
-            AttributeTypeOid::NAME_SUBSCHEMA_SUBENTRY => $this->subschemaEntry->toString(),
+            AttributeTypeOid::NAME_SUBSCHEMA_SUBENTRY => GeneratedEntry::Subschema->value,
             // X.501: the one derived value needing a lookup rather than the entry alone.
             AttributeTypeOid::NAME_HAS_SUBORDINATES => $this->storage->hasChildren($entry->getDn())
                 ? 'TRUE'

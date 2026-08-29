@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Config;
 
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\SchemaParseException;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaLoadMode;
@@ -31,8 +30,6 @@ use FreeDSx\Ldap\Schema\Validation\SchemaReferenceValidator;
  */
 final class SchemaConfig
 {
-    private const DEFAULT_SUBSCHEMA_DN = 'cn=Subschema';
-
     /**
      * Sources merge in order, so a later one overrides an earlier one on OID or name collision. Vendor extensions
      * an overriding definition omits are carried forward, so protections such as X-CONFIDENTIAL survive.
@@ -49,14 +46,7 @@ final class SchemaConfig
 
     private SchemaLoadMode $loadMode = SchemaLoadMode::Strict;
 
-    private Dn $subschemaEntry;
-
     private ?Schema $resolved = null;
-
-    public function __construct()
-    {
-        $this->subschemaEntry = new Dn(self::DEFAULT_SUBSCHEMA_DN);
-    }
 
     /**
      * @return list<SchemaSourceInterface>
@@ -117,21 +107,6 @@ final class SchemaConfig
     {
         $this->loadMode = $mode;
         $this->resolved = null;
-
-        return $this;
-    }
-
-    /**
-     * The entry the schema is published on.
-     */
-    public function getSubschemaEntry(): Dn
-    {
-        return $this->subschemaEntry;
-    }
-
-    public function setSubschemaEntry(Dn $subschemaEntry): self
-    {
-        $this->subschemaEntry = $subschemaEntry;
 
         return $this;
     }

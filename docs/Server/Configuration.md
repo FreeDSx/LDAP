@@ -37,7 +37,6 @@ LDAP Server Configuration
     * [SchemaConfig:setSources](#schemaconfigsetsources)
     * [SchemaConfig:setValidationMode](#schemaconfigsetvalidationmode)
     * [SchemaConfig:setLoadMode](#schemaconfigsetloadmode)
-    * [SchemaConfig:setSubschemaEntry](#schemaconfigsetsubschemaentry)
 * [RootDSE Options](#rootdse-options)
     * [ServerOptions:setDseAltServer](#setdsealtserver)
     * [ServerOptions:setDseVendorName](#setdsevendorname)
@@ -631,13 +630,6 @@ Whether a definition referencing something no source provides fails the load. Se
 [SchemaLoadMode](Schema.md#schemaloadmode).
 
 **Default**: `SchemaLoadMode::Strict`
-
-------------------
-#### SchemaConfig:setSubschemaEntry
-
-The entry the schema is published on.
-
-**Default**: `cn=Subschema`
 
 ## RootDSE Options
 

@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
@@ -26,6 +25,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
+use FreeDSx\Ldap\Server\GeneratedEntry;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
@@ -113,7 +113,7 @@ final class ServerSubschemaHandlerTest extends TestCase
             new LdapMessageRequest(
                 1,
                 (new SearchRequest(Filters::equal('objectClass', 'subentry')))
-                    ->base($this->options->getSubschemaEntry()->toString())
+                    ->base(GeneratedEntry::Subschema->value)
                     ->useBaseScope(),
             ),
             $this->mockToken,
@@ -125,18 +125,15 @@ final class ServerSubschemaHandlerTest extends TestCase
         );
     }
 
-    public function test_it_uses_the_configured_subschema_entry_dn(): void
+    public function test_it_publishes_the_schema_on_the_reserved_subschema_dn(): void
     {
-        $this->options->getSchemaConfig()
-            ->setSubschemaEntry(new Dn('cn=schema,dc=example,dc=com'));
-
         $entry = $this->handleAndCaptureEntry();
 
         self::assertSame(
-            'cn=schema,dc=example,dc=com',
+            'cn=Subschema',
             $entry->getDn()->toString(),
         );
-        self::assertTrue($entry->get('cn')?->has('schema') ?? false);
+        self::assertTrue($entry->get('cn')?->has('Subschema') ?? false);
     }
 
     public function test_it_returns_non_empty_attribute_types_in_rfc4512_format(): void
@@ -249,7 +246,7 @@ final class ServerSubschemaHandlerTest extends TestCase
         return new LdapMessageRequest(
             1,
             (new SearchRequest(Filters::present('objectClass')))
-                ->base($this->options->getSubschemaEntry()->toString())
+                ->base(GeneratedEntry::Subschema->value)
                 ->useBaseScope()
                 ->setAttributes(...$selectors),
         );

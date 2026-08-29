@@ -71,6 +71,37 @@ class DnTest extends TestCase
         );
     }
 
+    #[DataProvider('rdnParentProvider')]
+    public function test_it_builds_a_dn_from_an_rdn_and_a_parent(
+        ?Dn $parent,
+        string $expected,
+    ): void {
+        self::assertSame(
+            $expected,
+            Dn::fromRdn(new Rdn('cn', 'foo'), $parent)->toString(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{?Dn, string}>
+     */
+    public static function rdnParentProvider(): iterable
+    {
+        yield 'a parent to sit beneath' => [
+            new Dn('dc=foo,dc=bar'),
+            'cn=foo,dc=foo,dc=bar',
+        ];
+        yield 'no parent' => [
+            null,
+            'cn=foo',
+        ];
+        // RFC 4511 4.9 lets a rename name the root DSE as the new superior.
+        yield 'the root dse as the parent' => [
+            new Dn(''),
+            'cn=foo',
+        ];
+    }
+
     public function test_only_the_zero_length_dn_names_the_root_dse(): void
     {
         self::assertTrue((new Dn(''))->isRootDse());
