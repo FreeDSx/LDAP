@@ -127,6 +127,141 @@ final class LdapSchemaConstraintTest extends ServerTestCase
         );
     }
 
+    public function test_the_subschema_entry_carries_a_structural_class_and_satisfies_its_must(): void
+    {
+        $this->authenticateAdmin();
+
+        $subschema = $this->ldapClient()->read(
+            'cn=Subschema',
+            [
+                'objectClass',
+                'structuralObjectClass',
+                'cn',
+                'subtreeSpecification',
+            ],
+        );
+
+        self::assertNotNull($subschema);
+        self::assertSame(
+            [
+                'top',
+                'subentry',
+                'subschema',
+            ],
+            $subschema->get('objectClass')?->getValues(),
+        );
+        self::assertSame(
+            ['subentry'],
+            $subschema->get('structuralObjectClass')?->getValues(),
+        );
+        self::assertSame(
+            ['{ }'],
+            $subschema->get('subtreeSpecification')?->getValues(),
+        );
+    }
+
+    public function test_the_subschema_entry_answers_a_filter_on_its_structural_class(): void
+    {
+        $this->authenticateAdmin();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('objectClass', 'subentry'))
+                ->base('cn=Subschema')
+                ->useBaseScope(),
+        );
+
+        self::assertCount(1, $entries);
+    }
+
+    #[DataProvider('telephoneNumberProvider')]
+    public function test_telephone_number_is_constrained_to_printable_characters(
+        string $value,
+        bool $isValid,
+    ): void {
+        $this->authenticateAdmin();
+
+        if (!$isValid) {
+            $this->expectException(OperationException::class);
+            $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
+        }
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=tel-' . md5($value) . ',dc=foo,dc=bar',
+            [
+                'cn' => 'tel-' . md5($value),
+                'sn' => 'Smith',
+                'objectClass' => 'inetOrgPerson',
+                'telephoneNumber' => $value,
+            ],
+        ));
+
+        self::assertTrue($isValid);
+    }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function telephoneNumberProvider(): iterable
+    {
+        yield 'an E.123 number' => [
+            '+1 512 315 0280',
+            true,
+        ];
+        // RFC 4517 3.3.31 constrains only the encoding, which E.123 formatting is a subset of.
+        yield 'printable but not a number' => [
+            'not-a-phone-number',
+            true,
+        ];
+        yield 'non-printable ascii' => [
+            'abc!@#$%',
+            false,
+        ];
+        yield 'non-ascii' => [
+            'h3llo-wörld',
+            false,
+        ];
+    }
+
+    public function test_add_named_by_an_attribute_with_no_equality_rule_is_rejected(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::NAMING_VIOLATION);
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'jpegPhoto=zz,dc=foo,dc=bar',
+            [
+                'sn' => 'Smith',
+                'objectClass' => 'inetOrgPerson',
+                'cn' => 'no-equality',
+            ],
+        ));
+    }
+
+    public function test_rename_onto_an_attribute_with_no_equality_rule_is_rejected(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=to-rename-naming,dc=foo,dc=bar',
+            [
+                'cn' => 'to-rename-naming',
+                'sn' => 'Smith',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::NAMING_VIOLATION);
+
+        $this->ldapClient()->rename(
+            'cn=to-rename-naming,dc=foo,dc=bar',
+            'jpegPhoto=zz',
+            false,
+        );
+    }
+
     public function test_add_omitting_the_naming_attribute_still_stores_it(): void
     {
         $this->authenticateAdmin();

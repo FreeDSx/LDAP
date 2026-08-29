@@ -75,6 +75,56 @@ final class ServerSubschemaHandlerTest extends TestCase
         );
     }
 
+    public function test_the_entry_carries_a_structural_object_class(): void
+    {
+        $entry = $this->handleAndCaptureEntry('+', '*');
+
+        self::assertSame(
+            [
+                'top',
+                'subentry',
+                'subschema',
+            ],
+            $entry->get('objectClass')?->getValues(),
+        );
+        self::assertSame(
+            ['subentry'],
+            $entry->get('structuralObjectClass')?->getValues(),
+        );
+    }
+
+    /**
+     * The structural class it carries declares subtreeSpecification as MUST.
+     */
+    public function test_the_entry_satisfies_the_must_of_the_class_it_declares(): void
+    {
+        $entry = $this->handleAndCaptureEntry('+', '*');
+
+        self::assertSame(
+            ['{ }'],
+            $entry->get('subtreeSpecification')?->getValues(),
+        );
+        self::assertTrue($entry->get('cn')?->has('Subschema') ?? false);
+    }
+
+    public function test_it_answers_a_filter_on_the_structural_class(): void
+    {
+        $stream = $this->subject->handleRequest(
+            new LdapMessageRequest(
+                1,
+                (new SearchRequest(Filters::equal('objectClass', 'subentry')))
+                    ->base($this->options->getSubschemaEntry()->toString())
+                    ->useBaseScope(),
+            ),
+            $this->mockToken,
+        );
+
+        self::assertInstanceOf(
+            SearchResultEntry::class,
+            ([...$stream->messages])[0]->getResponse(),
+        );
+    }
+
     public function test_it_uses_the_configured_subschema_entry_dn(): void
     {
         $this->options->getSchemaConfig()

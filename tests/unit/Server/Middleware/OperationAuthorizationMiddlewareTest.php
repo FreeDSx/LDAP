@@ -916,6 +916,33 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         );
     }
 
+    public function test_a_rename_of_the_root_dse_deleting_the_old_rdn_authorizes_only_the_new_one(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $seen = [];
+        $this->accessControl
+            ->method('authorizeAttribute')
+            ->willReturnCallback(
+                function (TokenInterface $token, Dn $dn, string $attribute) use (&$seen): void {
+                    $seen[] = $attribute;
+                },
+            );
+
+        $this->subject->process(
+            $this->contextFor(new ModifyDnRequest(
+                '',
+                'cn=bar',
+                true,
+            )),
+            $this->next,
+        );
+
+        self::assertSame(
+            ['cn'],
+            $seen,
+        );
+    }
+
     public function test_a_rename_authorizes_every_component_of_a_multivalued_rdn(): void
     {
         $this->routeResolvesTo(HandlerId::Dispatch);

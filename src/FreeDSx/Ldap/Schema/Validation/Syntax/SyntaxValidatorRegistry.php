@@ -39,6 +39,8 @@ final class SyntaxValidatorRegistry
             SyntaxOid::OID_OID => new OidSyntaxValidator(),
             SyntaxOid::OID_NUMERIC_STRING => new NumericStringSyntaxValidator(),
             SyntaxOid::OID_PRINTABLE_STRING => new PrintableStringSyntaxValidator(),
+            // RFC 4517 3.3.31 constrains the LDAP encoding to PrintableString. E.123 only describes the format.
+            SyntaxOid::OID_TELEPHONE_NUMBER => new PrintableStringSyntaxValidator(),
             SyntaxOid::OID_COUNTRY_STRING => new CountryStringSyntaxValidator(),
             SyntaxOid::OID_IA5_STRING => new Ia5StringSyntaxValidator(),
             SyntaxOid::OID_BIT_STRING => new BitStringSyntaxValidator(),

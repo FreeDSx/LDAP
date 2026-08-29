@@ -135,6 +135,6 @@ class ServerAuthorization
         }
 
         return $request->getScope() === SearchRequest::SCOPE_BASE_OBJECT
-            && ((string) $request->getBaseDn() === '');
+            && $request->getBaseDn()?->isRootDse();
     }
 }

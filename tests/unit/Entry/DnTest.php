@@ -71,6 +71,13 @@ class DnTest extends TestCase
         );
     }
 
+    public function test_only_the_zero_length_dn_names_the_root_dse(): void
+    {
+        self::assertTrue((new Dn(''))->isRootDse());
+        self::assertFalse($this->subject->isRootDse());
+        self::assertFalse((new Dn('dc=foo'))->isRootDse());
+    }
+
     public function test_it_should_check_if_it_is_a_valid_dn(): void
     {
         self::assertTrue(Dn::isValid('cn=foo,dc=bar,dc=foo'));

@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
@@ -28,6 +29,7 @@ use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class SchemaValidatorTest extends TestCase
@@ -61,6 +63,59 @@ final class SchemaValidatorTest extends TestCase
     {
         $this->expectNotToPerformAssertions();
         $this->subject->validateAdd($this->personEntry());
+    }
+
+    #[DataProvider('unmatchableNamingAttributeProvider')]
+    public function test_add_named_by_a_type_with_no_equality_rule_throws_naming_violation(string $dn): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NAMING_VIOLATION);
+
+        $this->subject->validateAdd($this->personEntry($dn));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function unmatchableNamingAttributeProvider(): iterable
+    {
+        yield 'single valued rdn' => [
+            'jpegPhoto=zz,dc=example,dc=com',
+        ];
+        // Every component of a multi-valued RDN names the entry, so one unmatchable component is enough.
+        yield 'multi valued rdn, unmatchable component second' => [
+            'cn=Alice+jpegPhoto=zz,dc=example,dc=com',
+        ];
+        yield 'multi valued rdn, unmatchable component first' => [
+            'jpegPhoto=zz+cn=Alice,dc=example,dc=com',
+        ];
+    }
+
+    public function test_add_named_by_a_type_inheriting_its_equality_rule_passes(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        // cn declares no EQUALITY of its own and inherits one from name through SUP.
+        $this->subject->validateAdd($this->personEntry('cn=Alice,dc=example,dc=com'));
+    }
+
+    public function test_add_below_an_ancestor_named_by_an_unmatchable_type_passes(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        // Only the leftmost RDN names this entry; the ancestor was its own add's problem.
+        $this->subject->validateAdd($this->personEntry('cn=Alice,jpegPhoto=zz,dc=example,dc=com'));
+    }
+
+    public function test_rename_onto_a_type_with_no_equality_rule_throws_naming_violation(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NAMING_VIOLATION);
+
+        $this->subject->validateModifyDn(
+            $this->personEntry('jpegPhoto=zz,dc=example,dc=com'),
+            new Rdn('jpegPhoto', 'zz'),
+        );
     }
 
     public function test_add_missing_structural_class_throws_object_class_violation(): void
