@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Server\GeneratedEntry;
 use FreeDSx\Ldap\Server\Subentry\SubtreeSpecification;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
@@ -39,7 +40,7 @@ readonly class ServerSubschemaHandler implements ServerProtocolHandlerInterface
         LdapMessageRequest $message,
         TokenInterface $token,
     ): ResponseStream {
-        $schemaDn = $this->options->getSubschemaEntry();
+        $schemaDn = GeneratedEntry::Subschema->dn();
         $rdn = $schemaDn->getRdn();
         $schema = $this->options->getSchema();
 

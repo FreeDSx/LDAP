@@ -23,7 +23,6 @@ use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
-use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
@@ -33,7 +32,6 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteCommandFactory;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Token\AnonToken;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class WriteCommandFactoryTest extends TestCase
@@ -131,39 +129,7 @@ final class WriteCommandFactoryTest extends TestCase
         );
     }
 
-    #[DataProvider('rootDseWriteProvider')]
-    public function test_a_write_naming_the_root_dse_is_refused_rather_than_reported_missing(
-        RequestInterface $request,
-    ): void {
-        self::expectException(OperationException::class);
-        self::expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
-
-        $this->subject->fromRequest(
-            $request,
-            $this->context(),
-        );
-    }
-
-    /**
-     * @return iterable<string, array{RequestInterface}>
-     */
-    public static function rootDseWriteProvider(): iterable
-    {
-        yield 'add' => [
-            new AddRequest(Entry::create('')),
-        ];
-        yield 'modify' => [
-            new ModifyRequest('', Change::add('description', 'probe')),
-        ];
-        yield 'delete' => [
-            new DeleteRequest(''),
-        ];
-        yield 'modify dn' => [
-            new ModifyDnRequest('', 'cn=foo', true),
-        ];
-    }
-
-    public function test_a_subtree_delete_of_the_root_dse_is_refused(): void
+    public function test_it_holds_a_write_to_the_generated_entry_guard(): void
     {
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);

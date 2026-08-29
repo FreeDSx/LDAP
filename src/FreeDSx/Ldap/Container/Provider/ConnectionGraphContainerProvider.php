@@ -146,12 +146,9 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
 
     private function makeOperationAuthorizationMiddleware(Container $container): OperationAuthorizationMiddleware
     {
-        $options = $container->get(ServerOptions::class);
-
         return new OperationAuthorizationMiddleware(
             $container->get(ServerProtocolHandlerFactory::class),
             $container->get(AccessControlInterface::class),
-            $options->getSubschemaEntry(),
         );
     }
 

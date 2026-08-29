@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\Nis\AttributeTypeOid as NisAttributeTypeOid;
@@ -268,25 +267,6 @@ final class ServerOptionsTest extends TestCase
         self::assertSame(
             'ldap://backup.example.com',
             $this->subject->getDseAltServer(),
-        );
-    }
-
-    public function test_subschema_entry_defaults_to_cn_subschema(): void
-    {
-        self::assertSame(
-            'cn=Subschema',
-            $this->subject->getSubschemaEntry()->toString(),
-        );
-    }
-
-    public function test_the_subschema_entry_comes_from_the_schema_config(): void
-    {
-        $this->subject->getSchemaConfig()
-            ->setSubschemaEntry(new Dn('cn=Subschema,dc=example,dc=com'));
-
-        self::assertSame(
-            'cn=Subschema,dc=example,dc=com',
-            $this->subject->getSubschemaEntry()->toString(),
         );
     }
 

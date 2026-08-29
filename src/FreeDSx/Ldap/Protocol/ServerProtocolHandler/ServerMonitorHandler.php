@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
+use FreeDSx\Ldap\Server\GeneratedEntry;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\MetricsSnapshot;
 use FreeDSx\Ldap\Server\ServerRunner\CoroutineServerRunnerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
@@ -38,7 +39,7 @@ use function time;
  */
 class ServerMonitorHandler implements ServerProtocolHandlerInterface
 {
-    public const DN = 'cn=monitor';
+    public const DN = GeneratedEntry::Monitor->value;
 
     public function __construct(
         private readonly ServerOptions $options,

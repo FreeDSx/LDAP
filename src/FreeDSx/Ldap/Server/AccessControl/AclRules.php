@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
-use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerMonitorHandler;
+use FreeDSx\Ldap\Server\GeneratedEntry;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
@@ -421,12 +421,10 @@ final readonly class AclRules
     /**
      * Restrict searches of the subschema subentry to $subject, replacing any earlier rule for that entry.
      */
-    public function withSubschemaAccess(
-        SubjectMatcherInterface $subject,
-        Dn $subschemaEntry,
-    ): self {
+    public function withSubschemaAccess(?SubjectMatcherInterface $subject): self
+    {
         return $this->withGeneratedEntryAccess(
-            $subschemaEntry,
+            GeneratedEntry::Subschema->dn(),
             $subject,
         );
     }
@@ -437,7 +435,7 @@ final readonly class AclRules
     public function withMonitorAccess(?SubjectMatcherInterface $subject): self
     {
         return $this->withGeneratedEntryAccess(
-            new Dn(ServerMonitorHandler::DN),
+            GeneratedEntry::Monitor->dn(),
             $subject,
         );
     }

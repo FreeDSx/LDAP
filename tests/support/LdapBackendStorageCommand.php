@@ -375,7 +375,6 @@ final class LdapBackendStorageCommand extends Command
             $serverOptions->setAclRules(
                 $serverOptions->getAclRules()->withSubschemaAccess(
                     Subject::group('cn=admins,dc=foo,dc=bar'),
-                    $serverOptions->getSubschemaEntry(),
                 ),
             );
         }

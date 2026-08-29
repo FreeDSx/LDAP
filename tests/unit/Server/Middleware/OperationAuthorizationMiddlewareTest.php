@@ -71,7 +71,6 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         $this->subject = new OperationAuthorizationMiddleware(
             $this->resolver,
             $this->accessControl,
-            new Dn(self::SUBSCHEMA_DN),
         );
         $this->next = new RecordingMiddlewareHandler(new CallLog());
     }
@@ -505,7 +504,6 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         $subject = new OperationAuthorizationMiddleware(
             $this->resolver,
             $this->accessControl,
-            new Dn(self::SUBSCHEMA_DN),
         );
         $this->routeResolvesTo(HandlerId::Sync);
         $this->accessControl
@@ -536,7 +534,6 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         $subject = new OperationAuthorizationMiddleware(
             $this->resolver,
             $this->accessControl,
-            new Dn(self::SUBSCHEMA_DN),
         );
         $this->routeResolvesTo(HandlerId::Sync);
         $this->accessControl
@@ -841,7 +838,6 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         $subject = new OperationAuthorizationMiddleware(
             $this->resolver,
             $this->accessControl,
-            new Dn(self::SUBSCHEMA_DN),
         );
         $this->routeResolvesTo(HandlerId::Sync);
         $this->accessControl

@@ -22,7 +22,6 @@ use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Text;
-use FreeDSx\Ldap\Server\AccessControl\OperationTargetDn;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteSubtreeCommand;
@@ -36,8 +35,12 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class WriteCommandFactory
+final readonly class WriteCommandFactory
 {
+    public function __construct(
+        private GeneratedEntryGuard $generatedEntries = new GeneratedEntryGuard(),
+    ) {}
+
     /**
      * @throws OperationException
      */
@@ -45,7 +48,7 @@ final class WriteCommandFactory
         RequestInterface $request,
         WriteContext $context,
     ): WriteRequestInterface {
-        $this->assertNotRootDse($request);
+        $this->generatedEntries->assertWritable($request, $context);
 
         return match (true) {
             $request instanceof AddRequest => new AddCommand($request->getEntry()),
@@ -60,23 +63,6 @@ final class WriteCommandFactory
                 ResultCode::NO_SUCH_OPERATION,
             ),
         };
-    }
-
-    /**
-     * Refused explicitly rather than reported missing incidentally.
-     *
-     * @throws OperationException
-     */
-    private function assertNotRootDse(RequestInterface $request): void
-    {
-        if (OperationTargetDn::of($request)?->isRootDse() !== true) {
-            return;
-        }
-
-        throw new OperationException(
-            'The RootDSE cannot be written to.',
-            ResultCode::UNWILLING_TO_PERFORM,
-        );
     }
 
     /**

@@ -258,10 +258,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeDerivedResolver(Container $container): DerivedResolver
     {
-        return new DerivedResolver(
-            $container->get(EntryStorageInterface::class),
-            $container->get(ServerOptions::class)->getSubschemaEntry(),
-        );
+        return new DerivedResolver($container->get(EntryStorageInterface::class));
     }
 
     /**

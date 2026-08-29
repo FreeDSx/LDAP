@@ -32,7 +32,7 @@ use FreeDSx\Ldap\Protocol\Factory\HandlerId;
 use FreeDSx\Ldap\Protocol\Factory\HandlerRouteResolverInterface;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
-use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerMonitorHandler;
+use FreeDSx\Ldap\Server\GeneratedEntry;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
@@ -70,7 +70,6 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
     public function __construct(
         private HandlerRouteResolverInterface $routeResolver,
         private AccessControlInterface $accessControl,
-        private Dn $subschemaEntry,
     ) {}
 
     /**
@@ -101,13 +100,13 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
             $this->accessControl->authorizeOperation(
                 OperationType::Search,
                 $context->tokenOrFail(),
-                new Dn(ServerMonitorHandler::DN),
+                GeneratedEntry::Monitor->dn(),
             );
         } elseif ($routeId === HandlerId::Subschema) {
             $this->accessControl->authorizeOperation(
                 OperationType::Search,
                 $context->tokenOrFail(),
-                $this->subschemaEntry,
+                GeneratedEntry::Subschema->dn(),
             );
         } elseif ($routeId === HandlerId::RootDse) {
             // Left ungated on purpose. RFC 4513 section 5.2.1.5 has servers allow all clients, including anonymous

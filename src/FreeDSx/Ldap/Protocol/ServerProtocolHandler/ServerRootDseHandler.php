@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\GeneratedEntry;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -59,7 +60,7 @@ class ServerRootDseHandler implements ServerProtocolHandlerInterface
                 fn(Dn $dn): string => $dn->toString(),
                 $this->storage->namingContexts(),
             ),
-            'subschemaSubentry' => [$this->options->getSubschemaEntry()->toString()],
+            'subschemaSubentry' => [GeneratedEntry::Subschema->value],
             'supportedControl' => [
                 Control::OID_PAGING,
                 Control::OID_SORTING,

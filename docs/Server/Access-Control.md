@@ -287,16 +287,15 @@ AclRules::secureDefault(Subject::group('cn=admins,ou=groups,dc=example,dc=com'))
     ->withMonitorAccess(Subject::authenticated());
 ```
 
-The subschema entry takes the DN it applies to, since that DN is configurable:
+The subschema entry is opened the same way:
 
 ```php
 $options->setAclRules(
-    $options->getAclRules()->withSubschemaAccess(
-        Subject::anyone(),
-        $options->getSubschemaEntry(),
-    ),
+    $options->getAclRules()->withSubschemaAccess(Subject::anyone()),
 );
 ```
+
+These three names are reserved. No client write may target them.
 
 The Root DSE is never gated. RFC 4513 section 5.2.1.5 has servers let all clients, "even those with an
 anonymous authorization", read `supportedSASLMechanisms` before authenticating, and comparing that list

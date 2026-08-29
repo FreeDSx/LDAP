@@ -239,24 +239,6 @@ final class ServerRootDseHandlerTest extends TestCase
         self::assertTrue($attr->has('cn=Subschema'));
     }
 
-    public function test_it_uses_configured_subschema_entry_dn(): void
-    {
-        $this->options->getSchemaConfig()
-            ->setSubschemaEntry(new Dn('cn=schema,dc=example,dc=com'));
-
-        $search = $this->rootDseSearch('*', '+');
-
-        $stream = $this->subject->handleRequest($search, $this->mockToken);
-        $messages = [...$stream->messages];
-
-        /** @var SearchResultEntry $result */
-        $result = $messages[0]->getResponse();
-        $attr = $result->getEntry()->get('subschemaSubentry');
-
-        self::assertNotNull($attr);
-        self::assertTrue($attr->has('cn=schema,dc=example,dc=com'));
-    }
-
     public function test_the_all_operational_selector_returns_every_root_dse_attribute_but_objectClass(): void
     {
         $this->options->setDseVendorName('Foo');
