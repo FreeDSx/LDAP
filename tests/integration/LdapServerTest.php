@@ -774,6 +774,39 @@ final class LdapServerTest extends ServerTestCase
         }
     }
 
+    /**
+     * RFC 4511 4.2 requires protocolError for an unsupported version, whatever the bind method is.
+     */
+    public function testAnUnsupportedVersionIsRefusedAsProtocolErrorWhenTheBindMethodIsAlsoUnavailable(): void
+    {
+        // Anonymous binds are disabled on this server, which is the refusal the version must outrank.
+        try {
+            $this->ldapClient()->send(Operations::bindAnonymously()->setVersion(2));
+            $this->fail('An unsupported version should not have been accepted.');
+        } catch (BindException $e) {
+            $this->assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function testAnUnsupportedVersionIsRefusedAsProtocolErrorOnASimpleBind(): void
+    {
+        try {
+            $this->ldapClient()->send(Operations::bind(
+                'cn=admin,dc=foo,dc=bar',
+                '12345',
+            )->setVersion(2));
+            $this->fail('An unsupported version should not have been accepted.');
+        } catch (BindException $e) {
+            $this->assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        }
+    }
+
     public function testRenameWithoutDeleteKeepsOldRdn(): void
     {
         $this->authenticateAdmin();

@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Middleware;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authenticator;
+use FreeDSx\Ldap\Protocol\Bind\VersionValidatorTrait;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
@@ -32,6 +33,8 @@ use FreeDSx\Ldap\Server\Token\AnonToken;
  */
 final readonly class BindMiddleware implements MiddlewareInterface
 {
+    use VersionValidatorTrait;
+
     public function __construct(
         private ServerAuthorization $authorization,
         private Authenticator $authenticator,
@@ -53,7 +56,8 @@ final readonly class BindMiddleware implements MiddlewareInterface
 
         // RFC 4511 §4.2.1: a bind discards any prior authentication; a failed bind leaves the session anonymous.
         $this->authorization->setToken(new AnonToken());
-
+        // RFC 4511 §4.2: the version belongs to the message layer, so it is settled before anything the bind asks for.
+        self::validateVersion($request);
         // Checked here because the authenticator writes the response itself.
         // RFC 4511 §4.1.11 refuses the operation before it is performed.
         $this->criticalControls->assertSupportedForBind($context->message->controls());

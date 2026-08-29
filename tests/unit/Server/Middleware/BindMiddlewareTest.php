@@ -195,6 +195,75 @@ final class BindMiddlewareTest extends TestCase
         }
     }
 
+    #[DataProvider('unsupportedVersionProvider')]
+    public function test_an_unsupported_version_is_refused_before_anything_else_the_bind_asks_for(
+        LdapMessageRequest $message,
+    ): void {
+        $this->authenticator
+            ->expects(self::never())
+            ->method('bind');
+
+        try {
+            $this->subject()->process(
+                new ServerRequestContext($message),
+                $this->next,
+            );
+            self::fail('Expected an OperationException.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        }
+    }
+
+    /**
+     * @return iterable<string, array{LdapMessageRequest}>
+     */
+    public static function unsupportedVersionProvider(): iterable
+    {
+        yield 'a simple bind, whose method is supported' => [
+            new LdapMessageRequest(
+                1,
+                new SimpleBindRequest(
+                    username: 'cn=user,dc=foo,dc=bar',
+                    password: 'secret',
+                    version: 2,
+                ),
+            ),
+        ];
+        // Anonymous binds are disabled by default, so the method gate would otherwise answer first.
+        yield 'an anonymous bind, whose method is unsupported' => [
+            new LdapMessageRequest(
+                1,
+                new AnonBindRequest(
+                    username: '',
+                    version: 2,
+                ),
+            ),
+        ];
+        yield 'a name with an empty password, which RFC 4513 refuses on its own terms' => [
+            new LdapMessageRequest(
+                1,
+                new AnonBindRequest(
+                    username: 'cn=foo,dc=foo,dc=bar',
+                    version: 2,
+                ),
+            ),
+        ];
+        yield 'a bind carrying an unrecognized critical control' => [
+            new LdapMessageRequest(
+                1,
+                new SimpleBindRequest(
+                    username: 'cn=user,dc=foo,dc=bar',
+                    password: 'secret',
+                    version: 2,
+                ),
+                new Control('1.2.3.4.5', criticality: true),
+            ),
+        ];
+    }
+
     public function test_a_name_with_an_empty_password_is_refused_as_unwilling_to_perform(): void
     {
         $this->authenticator
