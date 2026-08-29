@@ -124,6 +124,14 @@ class Dn implements IteratorAggregate, Countable, Stringable
     }
 
     /**
+     * RFC 4512 5.1: the zero-length DN names the root DSE.
+     */
+    public function isRootDse(): bool
+    {
+        return $this->dn === '';
+    }
+
+    /**
      * @inheritDoc
      * @psalm-return 0|positive-int
      * @throws UnexpectedValueException

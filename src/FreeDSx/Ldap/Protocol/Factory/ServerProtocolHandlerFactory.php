@@ -101,7 +101,7 @@ readonly class ServerProtocolHandlerFactory implements HandlerRouteResolverInter
         }
 
         return $request->getScope() === SearchRequest::SCOPE_BASE_OBJECT
-                && ((string) $request->getBaseDn() === '');
+            && $request->getBaseDn()?->isRootDse();
     }
 
     private function isPagingSearch(

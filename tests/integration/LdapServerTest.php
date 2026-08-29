@@ -16,14 +16,17 @@ namespace Tests\Integration\FreeDSx\Ldap;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Throwable;
 
 final class LdapServerTest extends ServerTestCase
@@ -772,6 +775,44 @@ final class LdapServerTest extends ServerTestCase
                 $e->getCode(),
             );
         }
+    }
+
+    #[DataProvider('rootDseWriteProvider')]
+    public function testAWriteOnTheRootDseIsRefusedRatherThanReportedMissing(RequestInterface $request): void
+    {
+        $this->authenticateAdmin();
+
+        // Proves the entry the refusal talks about is the one the same connection can read.
+        $this->assertNotNull($this->ldapClient()->read(''));
+
+        try {
+            $this->ldapClient()->sendAndReceive($request);
+            $this->fail('A write on the root DSE should have been refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::UNWILLING_TO_PERFORM,
+                $e->getCode(),
+            );
+        }
+    }
+
+    /**
+     * @return iterable<string, array{RequestInterface}>
+     */
+    public static function rootDseWriteProvider(): iterable
+    {
+        yield 'add' => [
+            Operations::add(Entry::fromArray('', ['objectClass' => 'device', 'cn' => 'rootprobe'])),
+        ];
+        yield 'modify' => [
+            Operations::modify('', Change::add('description', 'probe')),
+        ];
+        yield 'delete' => [
+            Operations::delete(''),
+        ];
+        yield 'modify dn' => [
+            Operations::rename('', 'cn=rootprobe'),
+        ];
     }
 
     /**

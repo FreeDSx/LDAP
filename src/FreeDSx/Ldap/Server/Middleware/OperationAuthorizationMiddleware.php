@@ -427,7 +427,8 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
         $dn = OperationTargetDn::resultOf($request);
         $components = $request->getNewRdn()->getAll();
 
-        if ($request->getDeleteOldRdn()) {
+        // The root DSE has no RDN to remove, and the write router refuses it before any of this is acted on.
+        if ($request->getDeleteOldRdn() && !$request->getDn()->isRootDse()) {
             $components = [
                 ...$components,
                 ...$request->getDn()->getRdn()->getAll(),

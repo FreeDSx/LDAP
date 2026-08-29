@@ -79,6 +79,9 @@ final class SchemaValidator
         }
         $this->checkDistinctAttributeDescriptions($entry);
         $this->checkNoEquivalentValues($entry);
+        if (!$entry->getDn()->isRootDse()) {
+            $this->checkNamingAttributesAreMatchable($entry->getDn()->getRdn());
+        }
         $this->validateStructure($entry);
     }
 
@@ -130,6 +133,7 @@ final class SchemaValidator
         }
 
         $this->checkNoEquivalentValues($result);
+        $this->checkNamingAttributesAreMatchable($newRdn);
         $this->validateStructure($result);
     }
 
@@ -150,6 +154,30 @@ final class SchemaValidator
             $this->fail(
                 sprintf('Attribute "%s" cannot be set by users.', $component->getName()),
                 ResultCode::CONSTRAINT_VIOLATION,
+            );
+        }
+    }
+
+    /**
+     * RFC 4512 §2.5.1: a type specifying no equality matching cannot be used for naming.
+     *
+     * @throws OperationException
+     */
+    private function checkNamingAttributesAreMatchable(Rdn $rdn): void
+    {
+        foreach ($rdn->getAll() as $component) {
+            $attrType = $this->schema->getAttributeType($component->getName());
+            // An undefined type is reported by its own check, which says something more useful about it.
+            if ($attrType === null || $this->schema->getEqualityRuleOid($attrType->oid) !== null) {
+                continue;
+            }
+
+            $this->fail(
+                sprintf(
+                    'Attribute "%s" has no equality matching rule and cannot name an entry.',
+                    $component->getName(),
+                ),
+                ResultCode::NAMING_VIOLATION,
             );
         }
     }

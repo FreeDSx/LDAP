@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Schema\Validation\Syntax;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\Validation\Syntax\BooleanSyntaxValidator;
 use FreeDSx\Ldap\Schema\Validation\Syntax\IntegerSyntaxValidator;
+use FreeDSx\Ldap\Schema\Validation\Syntax\PrintableStringSyntaxValidator;
 use FreeDSx\Ldap\Schema\Validation\Syntax\SyntaxValidatorInterface;
 use FreeDSx\Ldap\Schema\Validation\Syntax\SyntaxValidatorRegistry;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -62,6 +63,14 @@ final class SyntaxValidatorRegistryTest extends TestCase
         );
     }
 
+    public function test_telephone_number_is_enforced_as_a_printable_string(): void
+    {
+        self::assertInstanceOf(
+            PrintableStringSyntaxValidator::class,
+            SyntaxValidatorRegistry::default()->get(SyntaxOid::OID_TELEPHONE_NUMBER),
+        );
+    }
+
     /**
      * @return array<string, array{string}>
      */
@@ -76,6 +85,7 @@ final class SyntaxValidatorRegistryTest extends TestCase
             'oid' => [SyntaxOid::OID_OID],
             'numeric string' => [SyntaxOid::OID_NUMERIC_STRING],
             'printable string' => [SyntaxOid::OID_PRINTABLE_STRING],
+            'telephone number' => [SyntaxOid::OID_TELEPHONE_NUMBER],
             'ia5 string' => [SyntaxOid::OID_IA5_STRING],
             'bit string' => [SyntaxOid::OID_BIT_STRING],
             'uuid' => [SyntaxOid::OID_UUID],

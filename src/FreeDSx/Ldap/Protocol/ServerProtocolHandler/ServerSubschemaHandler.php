@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
 use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Server\Subentry\SubtreeSpecification;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -27,11 +28,11 @@ use FreeDSx\Ldap\ServerOptions;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class ServerSubschemaHandler implements ServerProtocolHandlerInterface
+readonly class ServerSubschemaHandler implements ServerProtocolHandlerInterface
 {
     public function __construct(
-        private readonly ServerOptions $options,
-        private readonly GeneratedEntryResponder $responder,
+        private ServerOptions $options,
+        private GeneratedEntryResponder $responder,
     ) {}
 
     public function handleRequest(
@@ -45,11 +46,16 @@ class ServerSubschemaHandler implements ServerProtocolHandlerInterface
         $entry = Entry::fromArray(
             $schemaDn->toString(),
             array_filter([
+                // RFC 4512 2.4.2: an entry has one structural class, and 4.2 declares subschema auxiliary.
                 AttributeTypeOid::NAME_OBJECT_CLASS => [
                     ObjectClassOid::NAME_TOP,
+                    ObjectClassOid::NAME_SUBENTRY,
                     ObjectClassOid::NAME_SUBSCHEMA,
                 ],
+                AttributeTypeOid::NAME_STRUCTURAL_OBJECT_CLASS => [ObjectClassOid::NAME_SUBENTRY],
                 $rdn->getName() => [$rdn->getValue()],
+                // Satisfies subentry's MUST, and RFC 3672 reads the empty specification as the whole subtree.
+                AttributeTypeOid::NAME_SUBTREE_SPECIFICATION => [(new SubtreeSpecification())->toString()],
                 // Self-referential, so a client discovering schema never has to special-case this entry.
                 AttributeTypeOid::NAME_SUBSCHEMA_SUBENTRY => [$schemaDn->toString()],
                 AttributeTypeOid::NAME_ATTRIBUTE_TYPES => array_map(

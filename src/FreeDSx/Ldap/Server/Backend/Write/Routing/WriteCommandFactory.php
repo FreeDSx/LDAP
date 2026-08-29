@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Text;
+use FreeDSx\Ldap\Server\AccessControl\OperationTargetDn;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteSubtreeCommand;
@@ -31,7 +32,7 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 
 /**
- * Translates LDAP protocol request objects into write command DTOs.
+ * Translates LDAP protocol request objects into write command DTOs, refusing those no command could carry out.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -44,6 +45,8 @@ final class WriteCommandFactory
         RequestInterface $request,
         WriteContext $context,
     ): WriteRequestInterface {
+        $this->assertNotRootDse($request);
+
         return match (true) {
             $request instanceof AddRequest => new AddCommand($request->getEntry()),
             $request instanceof DeleteRequest => $this->deleteCommand($request, $context),
@@ -57,6 +60,23 @@ final class WriteCommandFactory
                 ResultCode::NO_SUCH_OPERATION,
             ),
         };
+    }
+
+    /**
+     * Refused explicitly rather than reported missing incidentally.
+     *
+     * @throws OperationException
+     */
+    private function assertNotRootDse(RequestInterface $request): void
+    {
+        if (OperationTargetDn::of($request)?->isRootDse() !== true) {
+            return;
+        }
+
+        throw new OperationException(
+            'The RootDSE cannot be written to.',
+            ResultCode::UNWILLING_TO_PERFORM,
+        );
     }
 
     /**
