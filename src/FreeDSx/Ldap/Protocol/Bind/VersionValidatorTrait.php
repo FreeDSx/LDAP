@@ -15,17 +15,24 @@ namespace FreeDSx\Ldap\Protocol\Bind;
 
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
+use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 
 trait VersionValidatorTrait
 {
+    private const SUPPORTED_VERSION = 3;
+
     /**
      * @throws OperationException
      */
-    private static function validateVersion(BindRequest $request): void
+    private static function validateVersion(RequestInterface $request): void
     {
+        if (!$request instanceof BindRequest) {
+            return;
+        }
+
         # Per RFC 4.2, a result code of protocol error must be sent back for unsupported versions.
-        if ($request->getVersion() !== 3) {
+        if ($request->getVersion() !== self::SUPPORTED_VERSION) {
             throw new OperationException(
                 'Only LDAP version 3 is supported.',
                 ResultCode::PROTOCOL_ERROR,
