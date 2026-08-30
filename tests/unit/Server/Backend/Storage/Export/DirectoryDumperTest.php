@@ -91,6 +91,33 @@ final class DirectoryDumperTest extends TestCase
         );
     }
 
+    public function test_it_separates_records_with_a_blank_line(): void
+    {
+        $dumper = $this->makeDumper(
+            writer: new LdifWriter((new LdifOutputOptions())->setIncludeVersion(false)),
+        );
+
+        $ldif = implode('', iterator_to_array(
+            $dumper->dump(new DumpOptions()),
+            false,
+        ));
+
+        // RFC 2849 readers take a run of records with no blank line between them as one malformed record.
+        $records = explode("\n\n", $ldif);
+
+        self::assertCount(
+            3,
+            $records,
+        );
+
+        foreach ($records as $record) {
+            self::assertStringStartsWith(
+                'dn: ',
+                $record,
+            );
+        }
+    }
+
     public function test_it_restricts_to_the_options_base_dn_when_set(): void
     {
         $dumper = $this->makeDumper(

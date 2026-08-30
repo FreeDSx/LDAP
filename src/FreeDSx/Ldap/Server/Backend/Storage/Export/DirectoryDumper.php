@@ -52,12 +52,18 @@ final readonly class DirectoryDumper
         }
 
         $filter = $options->getFilter();
+        $separator = '';
 
         foreach ($this->resolveBases($options) as $base) {
-            yield from $this->streamNamingContext(
+            $records = $this->streamNamingContext(
                 $base,
                 $filter,
             );
+
+            foreach ($records as $record) {
+                yield $separator . $record;
+                $separator = $this->writer->recordSeparator();
+            }
         }
     }
 

@@ -64,6 +64,14 @@ final readonly class LdifWriter
     }
 
     /**
+     * The blank line RFC 2849 requires between records.
+     */
+    public function recordSeparator(): string
+    {
+        return $this->options->getLineEnding();
+    }
+
+    /**
      * Returns the LDIF "version: 1" header (with trailing blank line) when enabled, otherwise empty.
      */
     public function versionHeader(): string
