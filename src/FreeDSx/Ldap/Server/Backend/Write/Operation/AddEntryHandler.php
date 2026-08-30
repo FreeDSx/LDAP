@@ -13,8 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
-use FreeDSx\Ldap\Entry\Change;
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Write\AtomicWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -31,6 +29,8 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
  */
 readonly class AddEntryHandler
 {
+    use AppliesSystemChanges;
+
     public function __construct(
         private EntryStorageInterface $storage,
         private AtomicWriter $writer,
@@ -92,25 +92,5 @@ readonly class AddEntryHandler
                 $context,
             );
         });
-    }
-
-    /**
-     * Applied alongside the operational attributes, so what the server stamps is never held to the user rules.
-     *
-     * @param list<Change> $changes
-     */
-    private function applySystemChanges(
-        Entry $entry,
-        array $changes,
-    ): void {
-        foreach ($changes as $change) {
-            if ($change->getType() === Change::TYPE_REPLACE) {
-                $entry->set($change->getAttribute());
-
-                continue;
-            }
-
-            $entry->reset($change->getAttribute());
-        }
     }
 }

@@ -34,7 +34,6 @@ use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\PasswordPolicyWriteHandler;
-use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriter;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerDispatchHandler;
@@ -418,7 +417,6 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
             $this->backend,
             $writes,
             $guard,
-            new SystemChangeWriter($writes),
         );
 
         return new ServerDispatchHandler(

@@ -136,7 +136,6 @@ final class PasswordPolicyContainerProvider implements ContainerProviderInterfac
     {
         return new PasswordPolicyComponentFactory(
             backend: $container->get(ReadBackendInterface::class),
-            options: $container->get(ServerOptions::class),
             writeDispatcher: $container->get(WriteOperationDispatcher::class),
             passwordPolicyEngine: $container->get(PasswordPolicyEngine::class),
             policyResolver: $container->get(PasswordPolicyResolver::class),

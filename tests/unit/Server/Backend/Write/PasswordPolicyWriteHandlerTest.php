@@ -28,9 +28,10 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\PasswordPolicyWriteHandler;
-use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriter;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
+use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
+use FreeDSx\Ldap\Server\Backend\Write\WriteRequestInterface;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyChangeGuard;
@@ -123,6 +124,47 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
         );
         self::assertNotNull($entry->get(PasswordPolicyOid::NAME_PWD_CHANGED_TIME));
         self::assertNotNull($entry->get(PasswordPolicyOid::NAME_PWD_HISTORY));
+    }
+
+    public function test_a_password_change_and_its_bookkeeping_are_dispatched_as_one_command(): void
+    {
+        $dispatched = [];
+        $writes = $this->createMock(WriteHandlerInterface::class);
+        $writes->expects($this->once())
+            ->method('handle')
+            ->willReturnCallback(static function (WriteRequestInterface $request) use (&$dispatched): void {
+                $dispatched[] = $request;
+            });
+
+        $handler = $this->handler(
+            new PasswordPolicy(quality: new PasswordQualityRules(inHistory: 3)),
+            writes: $writes,
+        );
+
+        $handler->handle(
+            new UpdateCommand(
+                new Dn(self::USER_DN),
+                [Change::replace('userPassword', 'a-fresh-password')],
+            ),
+            $this->writeContext(),
+        );
+
+        $command = $dispatched[0] ?? null;
+        self::assertInstanceOf(
+            UpdateCommand::class,
+            $command,
+        );
+        self::assertSame(
+            [
+                PasswordPolicyOid::NAME_PWD_CHANGED_TIME,
+                PasswordPolicyOid::NAME_PWD_HISTORY,
+            ],
+            array_map(
+                static fn(Change $change): string => $change->getAttribute()->getName(),
+                $command->systemChanges,
+            ),
+            'The policy state must ride the same command as the password it governs.',
+        );
     }
 
     public function test_reused_password_is_rejected_and_password_left_unchanged(): void
@@ -347,11 +389,13 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
 
     /**
      * @param array<string, string> $userAttrs
+     * @param ?WriteHandlerInterface $writes Replaces the real pipeline when a test inspects what was dispatched.
      */
     private function handler(
         ?PasswordPolicy $policy,
         array $userAttrs = [],
         ?ServerOptions $options = null,
+        ?WriteHandlerInterface $writes = null,
     ): PasswordPolicyWriteHandler {
         $options ??= TestServerOptions::cheaplyHashed();
         $container = $this->containerFor(new InMemoryStorage([
@@ -373,7 +417,7 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
             ),
         ]), $options);
         $this->backend = $container->get(StorageReadBackend::class);
-        $writes = $container->get(WriteOperationDispatcher::class);
+        $writes ??= $container->get(WriteOperationDispatcher::class);
 
         $guard = new PasswordPolicyChangeGuard(
             $this->fromContainer(
@@ -394,7 +438,6 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
             $this->backend,
             $writes,
             $guard,
-            new SystemChangeWriter($writes),
         );
     }
 

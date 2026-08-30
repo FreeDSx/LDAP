@@ -26,6 +26,8 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
  */
 trait AppliesEntryUpdate
 {
+    use AppliesSystemChanges;
+
     /**
      * Runs within an already-open write; the caller owns the transaction.
      *
@@ -45,6 +47,10 @@ trait AppliesEntryUpdate
             $updated,
             $dn,
             $context->isSystem(),
+        );
+        $this->applySystemChanges(
+            $updated,
+            $command->systemChanges,
         );
 
         $this->storage->store($updated);
