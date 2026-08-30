@@ -132,7 +132,11 @@ Whether authentication (bind) should be required before an operation is allowed.
 ------------------
 #### setAllowAnonymous
 
-Whether anonymous binds should be allowed.
+Whether anonymous binds should be allowed. Governs both RFC 4513 mechanisms: an anonymous bind (empty DN and
+password) and an unauthenticated bind (a DN with an empty password). Either way the connection ends up
+anonymous, so the DN carries no authorization.
+
+Reading the RootDSE needs no bind at all, so leaving this off does not prevent discovery.
 
 **Default**: `false`
 

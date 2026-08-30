@@ -34,6 +34,7 @@ use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyService;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyTargetResolver;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -136,6 +137,54 @@ final class ServerPasswordModifyHandlerTest extends TestCase
             ResultCode::UNWILLING_TO_PERFORM,
             $this->singleResponse($stream->messages)->getResultCode(),
         );
+    }
+
+    public function test_a_request_naming_no_field_is_rejected_with_protocol_error(): void
+    {
+        $stream = $this->subject->handleRequest(
+            new LdapMessageRequest(1, new PasswordModifyRequest()),
+            $this->userToken,
+        );
+
+        self::assertSame(
+            ResultCode::PROTOCOL_ERROR,
+            $this->singleResponse($stream->messages)->getResultCode(),
+        );
+    }
+
+    #[DataProvider('singleFieldProvider')]
+    public function test_a_request_naming_one_field_is_accepted(PasswordModifyRequest $request): void
+    {
+        $this->mockBackend
+            ->method('get')
+            ->willReturn($this->userEntry);
+
+        $stream = $this->subject->handleRequest(
+            new LdapMessageRequest(1, $request),
+            $this->userToken,
+        );
+
+        self::assertNotSame(
+            ResultCode::PROTOCOL_ERROR,
+            $this->singleResponse($stream->messages)->getResultCode(),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{PasswordModifyRequest}>
+     */
+    public static function singleFieldProvider(): iterable
+    {
+        // Naming only the user is how an administrator asks the server to pick the new password.
+        yield 'userIdentity only' => [
+            new PasswordModifyRequest('cn=user,dc=foo,dc=bar'),
+        ];
+        yield 'newPasswd only' => [
+            new PasswordModifyRequest(null, null, 'newpass'),
+        ];
+        yield 'oldPasswd only' => [
+            new PasswordModifyRequest(null, '12345'),
+        ];
     }
 
     public function test_an_operation_error_is_sent_as_a_standard_response(): void
