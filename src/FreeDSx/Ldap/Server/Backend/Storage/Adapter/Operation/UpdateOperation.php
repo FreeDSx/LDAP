@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
@@ -164,8 +165,7 @@ final class UpdateOperation
                 );
             }
 
-            // Folded rather than matched by rule, so the value naming the entry is protected however it is spelled.
-            if ($rdnValue !== null && strcasecmp($value, $rdnValue) === 0) {
+            if ($rdnValue !== null && $comparator->equals($value, $rdnValue)) {
                 throw new OperationException(
                     sprintf(
                         'The RDN value of attribute "%s" cannot be removed.',
@@ -246,8 +246,9 @@ final class UpdateOperation
         }
 
         $rdnValue = $this->getRdnValueForAttribute($entry, $attribute->getName());
+        $comparator = $this->equalityResolver->for($attribute->getName());
 
-        if ($rdnValue !== null && !$attribute->has($rdnValue, caseSensitive: false)) {
+        if ($rdnValue !== null && !$this->matchesAny($comparator, $values, $rdnValue)) {
             throw new OperationException(
                 sprintf(
                     'Replacing attribute "%s" must retain its RDN value.',
@@ -286,12 +287,19 @@ final class UpdateOperation
             ->has($attrName);
     }
 
+    /**
+     * Unescaped, since an Rdn holds its DN spelling while a change carries the value itself.
+     */
     private function getRdnValueForAttribute(
         Entry $entry,
         string $attrName,
     ): ?string {
-        return $entry->getDn()
+        $value = $entry->getDn()
             ->getRdn()
             ->getValueOf($attrName);
+
+        return $value === null
+            ? null
+            : Rdn::unescape($value);
     }
 }

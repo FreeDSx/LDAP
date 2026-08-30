@@ -155,6 +155,69 @@ trait WriteTestsTrait
         ));
     }
 
+    public function testDeletingTheRdnValueUnderAnEquivalentSpellingIsRefused(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=Foo Bar,dc=foo,dc=bar',
+            [
+                'cn' => ['Foo Bar', 'Alias Name'],
+                'sn' => 'Bar',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        try {
+            // caseIgnoreMatch folds the repeated space, so this names the value giving the entry its DN.
+            $this->ldapClient()->send(Operations::modify(
+                'cn=Foo Bar,dc=foo,dc=bar',
+                Change::delete(new Attribute('cn', 'Foo  Bar')),
+            ));
+            self::fail('Removing the naming value under an equivalent spelling should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::NOT_ALLOWED_ON_RDN,
+                $e->getCode(),
+            );
+        }
+
+        $entry = $this->ldapClient()->read('cn=Foo Bar,dc=foo,dc=bar');
+        self::assertContains(
+            'Foo Bar',
+            $entry?->get('cn')?->getValues() ?? [],
+            'The entry must still hold the value its DN names.',
+        );
+    }
+
+    public function testDeletingAnEscapedRdnValueIsRefused(): void
+    {
+        $this->authenticateAdmin();
+
+        // A second value keeps schema validation out of it, leaving the RDN guard as the only thing that can refuse.
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=Doe\\, Jane,dc=foo,dc=bar',
+            [
+                'cn' => ['Doe, Jane', 'Janey'],
+                'sn' => 'Doe',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        try {
+            $this->ldapClient()->send(Operations::modify(
+                'cn=Doe\\, Jane,dc=foo,dc=bar',
+                Change::delete(new Attribute('cn', 'Doe, Jane')),
+            ));
+            self::fail('Removing the naming value should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::NOT_ALLOWED_ON_RDN,
+                $e->getCode(),
+            );
+        }
+    }
+
     public function testRenameToANewRdnThatIsNotUtf8IsRefused(): void
     {
         $this->authenticateAdmin();
