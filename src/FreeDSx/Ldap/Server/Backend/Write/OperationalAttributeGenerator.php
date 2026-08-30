@@ -61,6 +61,7 @@ final readonly class OperationalAttributeGenerator
             AttributeTypeOid::NAME_ENTRY_UUID,
             Uuid::v4(),
         );
+        $this->applySuperclasses($entry);
 
         $structuralOc = $this->resolveStructuralObjectClass($entry);
 
@@ -107,11 +108,12 @@ final readonly class OperationalAttributeGenerator
             AttributeTypeOid::NAME_MODIFIERS_NAME,
             $actorDn,
         );
+        $this->applySuperclasses($entry);
         $this->applyStructuralObjectClass($entry);
     }
 
     /**
-     * Updates modifyTimestamp and modifiersName only.
+     * Updates modifyTimestamp and modifiersName, and supplies any superclass a changed objectClass now implies.
      */
     public function applyForModify(
         Entry $entry,
@@ -125,6 +127,67 @@ final readonly class OperationalAttributeGenerator
             AttributeTypeOid::NAME_MODIFIERS_NAME,
             $context->getBoundDn() ?? '',
         );
+        $this->applySuperclasses($entry);
+    }
+
+    /**
+     * RFC 4512 3.3: the superclasses of every named class are added implicitly.
+     */
+    private function applySuperclasses(Entry $entry): void
+    {
+        $attribute = $entry->get(AttributeTypeOid::NAME_OBJECT_CLASS);
+        if ($attribute === null) {
+            return;
+        }
+
+        $missing = $this->missingSuperclassesOf(array_values($attribute->getValues()));
+        if ($missing !== []) {
+            $attribute->add(...$missing);
+        }
+    }
+
+    /**
+     * @param list<string> $names
+     * @return list<string>
+     */
+    private function missingSuperclassesOf(array $names): array
+    {
+        $seen = array_fill_keys(array_map(strtolower(...), $names), true);
+        $queue = $names;
+        $missing = [];
+
+        while ($queue !== []) {
+            $supers = array_values(array_filter(
+                $this->superclassNamesOf((string) array_shift($queue)),
+                static fn(string $name): bool => !isset($seen[strtolower($name)]),
+            ));
+
+            $seen += array_fill_keys(array_map(strtolower(...), $supers), true);
+            $missing = [...$missing, ...$supers];
+            $queue = [...$queue, ...$supers];
+        }
+
+        return $missing;
+    }
+
+    /**
+     * A class the schema does not define has no superclasses to supply, so validation reports it rather than this.
+     *
+     * @return list<string>
+     */
+    private function superclassNamesOf(string $name): array
+    {
+        $schema = $this->schema;
+        $class = $schema?->getObjectClass($name);
+
+        if ($schema === null || $class === null) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            static fn(string $oid): ?string => $schema->getObjectClass($oid)?->names[0],
+            $class->superClassOids,
+        )));
     }
 
     private function generateTimestamp(): string
