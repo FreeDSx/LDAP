@@ -16,6 +16,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
@@ -42,6 +43,55 @@ trait WriteTestsTrait
                 ->useSubtreeScope(),
         );
         self::assertCount(1, $entries);
+    }
+
+    public function testDnsDifferingOnlyByAccentAreDistinctEntries(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=josé,dc=foo,dc=bar',
+            ['cn' => 'josé', 'sn' => 'Accented', 'objectClass' => 'inetOrgPerson'],
+        ));
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=jose,dc=foo,dc=bar',
+            ['cn' => 'jose', 'sn' => 'Plain', 'objectClass' => 'inetOrgPerson'],
+        ));
+
+        $accented = $this->ldapClient()->read('cn=josé,dc=foo,dc=bar');
+        $plain = $this->ldapClient()->read('cn=jose,dc=foo,dc=bar');
+
+        self::assertSame(
+            'Accented',
+            $accented?->get('sn')?->firstValue(),
+            'An accent-folding DN collation resolves this lookup to the wrong entry.',
+        );
+        self::assertSame(
+            'Plain',
+            $plain?->get('sn')?->firstValue(),
+        );
+    }
+
+    public function testABindDoesNotSucceedUnderADnSpellingTheDirectoryDoesNotHold(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=rené,dc=foo,dc=bar',
+            [
+                'cn' => 'rené',
+                'sn' => 'Accented',
+                'userPassword' => '12345',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        $this->expectException(BindException::class);
+
+        $this->ldapClient()->bind(
+            'cn=rene,dc=foo,dc=bar',
+            '12345',
+        );
     }
 
     public function testAddPreservesAttributeOptionsOnRoundTrip(): void

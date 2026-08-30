@@ -66,7 +66,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     /**
      * The current schema revision shipped in resources/pdo-schema.
      */
-    public const SCHEMA_VERSION = 2;
+    public const SCHEMA_VERSION = 1;
 
     /**
      * Match ceiling for a composed AND's drivable leaf: below it the leaf is a cheap, complete driver via a near-free probe.
