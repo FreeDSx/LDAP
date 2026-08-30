@@ -262,6 +262,73 @@ final class LdapSchemaConstraintTest extends ServerTestCase
         );
     }
 
+    public function test_add_supplies_the_superclasses_of_the_named_object_classes(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=superclasses,dc=foo,dc=bar',
+            [
+                'cn' => 'superclasses',
+                'sn' => 'Smith',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        self::assertSame(
+            [
+                'inetOrgPerson',
+                'organizationalPerson',
+                'person',
+                'top',
+            ],
+            $this->ldapClient()
+                ->read('cn=superclasses,dc=foo,dc=bar', ['objectClass'])
+                ?->get('objectClass')
+                ?->getValues(),
+        );
+    }
+
+    /**
+     * The point of supplying them: a filter naming a superclass finds an entry that named only the subclass.
+     */
+    #[DataProvider('superclassFilterProvider')]
+    public function test_a_filter_naming_a_superclass_finds_the_entry(string $objectClass): void
+    {
+        $this->authenticateAdmin();
+
+        $cn = 'bysuperclass-' . strtolower($objectClass);
+        $dn = "cn=$cn,dc=foo,dc=bar";
+
+        $this->ldapClient()->create(Entry::fromArray(
+            $dn,
+            [
+                'cn' => $cn,
+                'sn' => 'Smith',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('objectClass', $objectClass))
+                ->base($dn)
+                ->useBaseScope(),
+        );
+
+        self::assertCount(1, $entries);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function superclassFilterProvider(): iterable
+    {
+        yield 'the named class' => ['inetOrgPerson'];
+        yield 'its immediate superclass' => ['organizationalPerson'];
+        yield 'a class further up the chain' => ['person'];
+        yield 'the abstract root' => ['top'];
+    }
+
     public function test_add_omitting_the_naming_attribute_still_stores_it(): void
     {
         $this->authenticateAdmin();

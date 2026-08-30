@@ -182,6 +182,66 @@ final class OperationalAttributeGeneratorTest extends TestCase
         );
     }
 
+    public function test_apply_for_add_supplies_the_superclasses_of_the_named_classes(): void
+    {
+        $entry = $this->personEntry('inetOrgPerson');
+
+        $this->classAwareGenerator()->applyForAdd(
+            $entry,
+            $this->anonymousContext(),
+        );
+
+        self::assertSame(
+            ['inetOrgPerson', 'person', 'top'],
+            $entry->get('objectClass')?->getValues(),
+        );
+    }
+
+    public function test_apply_for_add_keeps_a_superclass_the_entry_already_named(): void
+    {
+        $entry = $this->personEntry('top', 'inetOrgPerson');
+
+        $this->classAwareGenerator()->applyForAdd(
+            $entry,
+            $this->anonymousContext(),
+        );
+
+        self::assertSame(
+            ['top', 'inetOrgPerson', 'person'],
+            $entry->get('objectClass')?->getValues(),
+        );
+    }
+
+    public function test_apply_for_add_leaves_a_class_the_schema_does_not_define(): void
+    {
+        $entry = $this->personEntry('x-undefined');
+
+        $this->classAwareGenerator()->applyForAdd(
+            $entry,
+            $this->anonymousContext(),
+        );
+
+        self::assertSame(
+            ['x-undefined'],
+            $entry->get('objectClass')?->getValues(),
+        );
+    }
+
+    public function test_apply_for_modify_supplies_a_superclass_a_changed_class_implies(): void
+    {
+        $entry = $this->personEntry('inetOrgPerson');
+
+        $this->classAwareGenerator()->applyForModify(
+            $entry,
+            $this->anonymousContext(),
+        );
+
+        self::assertSame(
+            ['inetOrgPerson', 'person', 'top'],
+            $entry->get('objectClass')?->getValues(),
+        );
+    }
+
     public function test_apply_for_add_with_schema_but_no_object_class_skips_structural_object_class(): void
     {
         $schema = new Schema();
@@ -424,6 +484,37 @@ final class OperationalAttributeGeneratorTest extends TestCase
         self::assertSame(
             'person',
             $entry->get('structuralObjectClass')?->getValues()[0],
+        );
+    }
+
+    private function classAwareGenerator(): OperationalAttributeGenerator
+    {
+        return new OperationalAttributeGenerator(
+            (new Schema())
+                ->addObjectClass(new ObjectClass(
+                    oid: '2.5.6.0',
+                    names: ['top'],
+                    type: ObjectClassType::AbstractClass,
+                ))
+                ->addObjectClass(new ObjectClass(
+                    oid: '2.5.6.6',
+                    names: ['person'],
+                    superClassOids: ['2.5.6.0'],
+                ))
+                ->addObjectClass(new ObjectClass(
+                    oid: '2.16.840.1.113730.3.2.2',
+                    names: ['inetOrgPerson'],
+                    superClassOids: ['2.5.6.6'],
+                )),
+        );
+    }
+
+    private function personEntry(string ...$objectClasses): Entry
+    {
+        return new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'Alice'),
+            new Attribute('objectClass', ...$objectClasses),
         );
     }
 
