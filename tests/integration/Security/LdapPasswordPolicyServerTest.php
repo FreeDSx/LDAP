@@ -143,6 +143,41 @@ final class LdapPasswordPolicyServerTest extends ServerTestCase
         $this->assertNotNull($entry->get(PasswordPolicyOid::NAME_PWD_CHANGED_TIME));
     }
 
+    public function testAFractionalFailureTimestampIsMatchableByItsOwnValue(): void
+    {
+        $dn = 'cn=user,dc=foo,dc=bar';
+        $this->failBinds($dn, 1);
+
+        $client = $this->ldapClient();
+        $client->bind(self::ADMIN_DN, self::PASSWORD);
+
+        $recorded = $client->readOrFail(
+            $dn,
+            [PasswordPolicyOid::NAME_PWD_FAILURE_TIME],
+        )->get(PasswordPolicyOid::NAME_PWD_FAILURE_TIME)?->firstValue();
+
+        $this->assertIsString($recorded);
+        $this->assertStringContainsString(
+            '.',
+            $recorded,
+            'The server records these with a fraction to keep repeated failures distinct.',
+        );
+
+        $found = $client->search(
+            Operations::search(
+                Filters::equal(PasswordPolicyOid::NAME_PWD_FAILURE_TIME, $recorded),
+            )
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        $this->assertCount(
+            1,
+            $found,
+            'A timestamp carrying a fraction must match the value the server itself wrote.',
+        );
+    }
+
     public function testBindWithoutPolicyStateCarriesNoControl(): void
     {
         $response = $this->ldapClient()->bind(

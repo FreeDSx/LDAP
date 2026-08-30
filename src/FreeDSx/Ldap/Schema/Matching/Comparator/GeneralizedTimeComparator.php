@@ -13,51 +13,48 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
-use DateTimeImmutable;
-use DateTimeZone;
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 
 /**
  * Generalized time comparator (generalizedTimeMatch / generalizedTimeOrderingMatch).
- * Timestamps are parsed and compared as UTC Unix timestamps.
  */
 final class GeneralizedTimeComparator implements MatchingRuleComparatorInterface, IndexableComparatorInterface
 {
     /**
-     * RFC 4517 §3.3.13 allows three forms:
-     * - Z suffix (UTC): 20060102150405Z
-     * - Numeric offset: 20060102150405+0500
-     * - No suffix (treated as UTC per LDAP convention): 20060102150405
+     * A fixed-width UTC spelling that still orders lexically.
      */
-    private const FORMATS = [
-        'YmdHis\Z',
-        'YmdHisO',
-        'YmdHis',
-    ];
-
-    private static DateTimeZone $utc;
+    private const CANONICAL_FORMAT = 'YmdHis.u\Z';
 
     public function equals(
         string $a,
         string $b,
     ): bool {
-        $tsA = $this->toTimestamp($a);
-        $tsB = $this->toTimestamp($b);
+        $canonicalA = $this->canonical($a);
+        $canonicalB = $this->canonical($b);
 
-        if ($tsA === null || $tsB === null) {
+        if ($canonicalA === null || $canonicalB === null) {
             return false;
         }
 
-        return $tsA === $tsB;
+        return $canonicalA === $canonicalB;
     }
 
     public function compare(
         string $a,
         string $b,
     ): int {
-        return ($this->toTimestamp($a) ?? 0) <=> ($this->toTimestamp($b) ?? 0);
+        $canonicalA = $this->canonical($a);
+        $canonicalB = $this->canonical($b);
+
+        if ($canonicalA === null || $canonicalB === null) {
+            return ($canonicalA === null ? 1 : 0) <=> ($canonicalB === null ? 1 : 0);
+        }
+
+        return $canonicalA <=> $canonicalB;
     }
 
     public function substringMatches(
@@ -67,16 +64,9 @@ final class GeneralizedTimeComparator implements MatchingRuleComparatorInterface
         return false;
     }
 
-    /**
-     * A fixed-width UTC spelling rather than the timestamp itself, so the key still orders lexically.
-     */
     public function indexKey(string $value): ?string
     {
-        $timestamp = $this->toTimestamp($value);
-
-        return $timestamp === null
-            ? null
-            : gmdate('YmdHis\Z', $timestamp);
+        return $this->canonical($value);
     }
 
     public function indexFragment(string $fragment): ?string
@@ -84,17 +74,13 @@ final class GeneralizedTimeComparator implements MatchingRuleComparatorInterface
         return null;
     }
 
-    private function toTimestamp(string $value): ?int
+    private function canonical(string $value): ?string
     {
-        self::$utc ??= new DateTimeZone('UTC');
-
-        foreach (self::FORMATS as $format) {
-            $dt = DateTimeImmutable::createFromFormat($format, $value, self::$utc);
-            if ($dt !== false) {
-                return $dt->getTimestamp();
-            }
+        try {
+            return GeneralizedTime::parse($value)
+                ->format(self::CANONICAL_FORMAT);
+        } catch (InvalidArgumentException) {
+            return null;
         }
-
-        return null;
     }
 }
