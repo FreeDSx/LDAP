@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Search;
 
-use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -109,7 +108,7 @@ final readonly class SearchStreamBuilder
         Entry $entry,
         SearchRequest $request,
     ): Entry {
-        $requested = $this->requestedDerived($request);
+        $requested = self::derivedTypesRequested($request->getAttributes());
 
         if ($requested === []) {
             return $entry;
@@ -128,47 +127,6 @@ final readonly class SearchStreamBuilder
         }
 
         return $copy;
-    }
-
-    /**
-     * Derived attribute names the request asks for, by name, by OID, or through the operational wildcard.
-     *
-     * @return list<string>
-     */
-    private function requestedDerived(SearchRequest $request): array
-    {
-        $attributes = $request->getAttributes();
-        $wantsAllOperational = $this->namesAny(
-            $attributes,
-            SearchRequest::ATTRIBUTES_ALL_OPERATIONAL,
-        );
-        $requested = [];
-
-        foreach (array_keys(self::DERIVED_ATTRIBUTE_OIDS) as $name) {
-            if ($wantsAllOperational || $this->namesAny($attributes, $name)) {
-                $requested[] = $name;
-            }
-        }
-
-        return $requested;
-    }
-
-    /**
-     * Whether any requested description names the given type, allowing for its OID and its options.
-     *
-     * @param array<Attribute> $attributes
-     */
-    private function namesAny(
-        array $attributes,
-        string $name,
-    ): bool {
-        foreach ($attributes as $attr) {
-            if (self::describesType($attr->getName(), $name)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

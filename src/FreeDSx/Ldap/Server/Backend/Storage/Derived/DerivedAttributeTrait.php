@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Derived;
 
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 
 use function strcasecmp;
@@ -67,5 +68,53 @@ trait DerivedAttributeTrait
     private static function describesAnyDerivedAttribute(string $attributeDescription): bool
     {
         return self::derivedTypeName($attributeDescription) !== null;
+    }
+
+    /**
+     * Whether a description asks for the given derived type, either by naming it or through the operational wildcard.
+     */
+    private static function selectsDerivedType(
+        string $attributeDescription,
+        string $name,
+    ): bool {
+        return self::describesType($attributeDescription, $name)
+            || self::describesType($attributeDescription, SearchRequest::ATTRIBUTES_ALL_OPERATIONAL);
+    }
+
+    /**
+     * Whether a requested attribute list asks for the given derived type.
+     *
+     * @param array<Attribute> $requested
+     */
+    private static function requestsDerivedType(
+        array $requested,
+        string $name,
+    ): bool {
+        foreach ($requested as $attribute) {
+            if (self::selectsDerivedType($attribute->getName(), $name)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The derived types a requested attribute list asks for, in a stable order.
+     *
+     * @param array<Attribute> $requested
+     * @return list<string>
+     */
+    private static function derivedTypesRequested(array $requested): array
+    {
+        $names = [];
+
+        foreach (array_keys(self::DERIVED_ATTRIBUTE_OIDS) as $name) {
+            if (self::requestsDerivedType($requested, $name)) {
+                $names[] = $name;
+            }
+        }
+
+        return $names;
     }
 }

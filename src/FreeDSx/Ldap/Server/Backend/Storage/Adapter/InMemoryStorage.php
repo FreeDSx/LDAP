@@ -52,6 +52,8 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
 
     private int $nextKey = 1;
 
+    private int $atomicDepth = 0;
+
     /**
      * @param Entry[] $entries pre-populated into the store
      */
@@ -147,12 +149,26 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
      */
     public function atomic(callable $operation): void
     {
+        // Only the outermost call snapshots...
+        if ($this->atomicDepth > 0) {
+            $this->atomicDepth++;
+
+            try {
+                $operation();
+            } finally {
+                $this->atomicDepth--;
+            }
+
+            return;
+        }
+
         $entries = array_map(
             static fn(Entry $entry): Entry => $entry->makeCopy(),
             $this->entries,
         );
         $keys = $this->keys;
         $nextKey = $this->nextKey;
+        $this->atomicDepth = 1;
 
         try {
             $operation();
@@ -162,6 +178,8 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
             $this->nextKey = $nextKey;
 
             throw $e;
+        } finally {
+            $this->atomicDepth = 0;
         }
     }
 

@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
@@ -45,6 +46,13 @@ trait ArrayEntryStorageTrait
     ): EntryStream {
         $scoped = $this->yieldByScope($options, $entries);
 
+        if ($options->withHasSubordinates) {
+            $scoped = $this->withChildFlag(
+                $scoped,
+                $this->parentDnsIn($entries),
+            );
+        }
+
         if ($options->sortKeys === []) {
             return new EntryStream($this->pageByKey(
                 $scoped,
@@ -60,6 +68,50 @@ trait ArrayEntryStorageTrait
             $this->sortKeyComparator->sort($collected, $options->sortKeys),
             $options,
         ));
+    }
+
+    /**
+     * The normalised DN of every entry that is some other entry's parent.
+     *
+     * @param array<string, Entry> $entries
+     * @return array<string, true>
+     */
+    private function parentDnsIn(array $entries): array
+    {
+        $parents = [];
+
+        foreach ($entries as $entry) {
+            $parent = $entry->getDn()
+                ->getParent()
+                ?->normalize()
+                ->toString();
+
+            if ($parent !== null) {
+                $parents[$parent] = true;
+            }
+        }
+
+        return $parents;
+    }
+
+    /**
+     * @param iterable<Entry> $entries
+     * @param array<string, true> $parents
+     * @return Generator<int, Entry>
+     */
+    private function withChildFlag(
+        iterable $entries,
+        array $parents,
+    ): Generator {
+        foreach ($entries as $entry) {
+            $flagged = $entry->makeCopy();
+            $flagged->set(
+                AttributeTypeOid::NAME_HAS_SUBORDINATES,
+                isset($parents[$entry->getDn()->normalize()->toString()]) ? 'TRUE' : 'FALSE',
+            );
+
+            yield $flagged;
+        }
     }
 
     /**

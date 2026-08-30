@@ -76,18 +76,24 @@ interface PdoEntryDialectInterface
 
     /**
      * SELECT dn, attributes with no WHERE clause (returns all entries).
+     *
+     * @param bool $withChildFlag Also project whether each row has children, answering hasSubordinates in one pass.
      */
-    public function queryFetchAll(): string;
+    public function queryFetchAll(bool $withChildFlag = false): string;
 
     /**
      * `SELECT dn, attributes FROM entries WHERE lc_parent_dn = ?`. Parameters: [lc_parent_dn]
+     *
+     * @param bool $withChildFlag Also project whether each row has children, answering hasSubordinates in one pass.
      */
-    public function queryFetchChildren(): string;
+    public function queryFetchChildren(bool $withChildFlag = false): string;
 
     /**
      * Recursive CTE returning (dn, attributes) for the base entry and its descendants; PdoStorage may append `WHERE (filter)`. Parameters: [lc_dn]
+     *
+     * @param bool $withChildFlag Also project whether each row has children, answering hasSubordinates in one pass.
      */
-    public function querySubtree(): string;
+    public function querySubtree(bool $withChildFlag = false): string;
 
     /**
      * Parameterless condition restricting $dnColumn to entries that lack, or carry, the subentry object class.
