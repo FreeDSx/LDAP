@@ -122,13 +122,16 @@ final class LdapReplicaTest extends TestCase
             'from-primary',
         );
 
+        // The primary carries the cookie and refreshDone on one message, and the handler fires them in this order.
         $this->syncRepl->method('listen')
             ->willReturnCallback(function (Closure $entryHandler) use ($entry, $session): void {
                 $entryHandler($entry, $session);
-                ($this->refreshDoneHandler)($session);
                 ($this->cookieHandler)('cookie-after');
+                ($this->refreshDoneHandler)($session);
                 ($this->shutdown)();
             });
+
+        $checkpointDuringReconcile = 'unset';
 
         $this->applier->expects(self::once())
             ->method('beginRefresh');
@@ -139,13 +142,63 @@ final class LdapReplicaTest extends TestCase
                 $session,
             );
         $this->applier->expects(self::once())
-            ->method('reconcile');
+            ->method('reconcile')
+            ->willReturnCallback(function () use (&$checkpointDuringReconcile): void {
+                $checkpointDuringReconcile = $this->checkpoint->read();
+            });
+
+        $this->subject->run();
+
+        self::assertNull(
+            $checkpointDuringReconcile,
+            'A checkpoint written before the by-absence deletes would resume past them after a crash.',
+        );
+        self::assertSame(
+            'cookie-after',
+            $this->checkpoint->read(),
+        );
+    }
+
+    public function test_a_persist_phase_cookie_is_checkpointed_without_waiting(): void
+    {
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        );
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function () use ($session): void {
+                ($this->cookieHandler)('cookie-refresh');
+                ($this->refreshDoneHandler)($session);
+                ($this->cookieHandler)('cookie-persist');
+                ($this->shutdown)();
+            });
 
         $this->subject->run();
 
         self::assertSame(
-            'cookie-after',
+            'cookie-persist',
             $this->checkpoint->read(),
+            'Past the refresh there is nothing left to hold the cookie back for.',
+        );
+    }
+
+    public function test_a_refresh_that_never_completes_leaves_the_checkpoint_untouched(): void
+    {
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function (): void {
+                ($this->cookieHandler)('cookie-mid-refresh');
+                ($this->shutdown)();
+            });
+
+        $this->applier->expects(self::never())
+            ->method('reconcile');
+
+        $this->subject->run();
+
+        self::assertNull(
+            $this->checkpoint->read(),
+            'Losing the progress is the correct outcome for a refresh whose deletes were never applied.',
         );
     }
 

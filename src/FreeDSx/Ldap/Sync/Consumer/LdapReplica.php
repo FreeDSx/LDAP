@@ -47,6 +47,13 @@ final class LdapReplica
 
     private ?SyncRepl $activeSync = null;
 
+    private bool $refreshing = false;
+
+    /**
+     * The cookie held back until the refresh it belongs to has been reconciled.
+     */
+    private ?string $pendingCookie = null;
+
     public function __construct(
         private readonly PrimaryConnectionFactory $connectionFactory,
         private readonly ChangeApplierInterface $applier,
@@ -177,6 +184,8 @@ final class LdapReplica
             ->useRefreshDoneHandler($this->reconcileRefresh(...));
 
         $this->activeSync = $syncRepl;
+        $this->refreshing = true;
+        $this->pendingCookie = null;
 
         try {
             $this->applier->beginRefresh();
@@ -219,12 +228,33 @@ final class LdapReplica
         if (!$session->hasRefreshDeletes()) {
             $this->applier->reconcile();
         }
+
+        $this->flushCookie();
+        $this->refreshing = false;
     }
 
     private function persistCookie(?string $cookie): void
     {
-        if ($cookie !== null) {
-            $this->checkpoint->write($cookie);
+        if ($cookie === null) {
+            return;
         }
+
+        if ($this->refreshing) {
+            $this->pendingCookie = $cookie;
+
+            return;
+        }
+
+        $this->checkpoint->write($cookie);
+    }
+
+    private function flushCookie(): void
+    {
+        if ($this->pendingCookie === null) {
+            return;
+        }
+
+        $this->checkpoint->write($this->pendingCookie);
+        $this->pendingCookie = null;
     }
 }
