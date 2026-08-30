@@ -93,11 +93,32 @@ readonly class ServerPasswordModifyHandler implements ServerProtocolHandlerInter
 
         /** @var ExtendedRequest $raw */
         $raw = $message->getRequest();
+        $request = PasswordModifyRequest::fromAsn1($raw->toAsn1());
+        $this->assertNamesAField($request);
 
         return $this->service->change(
-            PasswordModifyRequest::fromAsn1($raw->toAsn1()),
+            $request,
             $token,
             $message->controls(),
         );
+    }
+
+    /**
+     * RFC 3062 2.1: a request value carries one or more fields.
+     *
+     * @throws OperationException
+     */
+    private function assertNamesAField(PasswordModifyRequest $request): void
+    {
+        $namesNothing = $request->getUsername() === null
+            && $request->getOldPassword() === null
+            && $request->getNewPassword() === null;
+
+        if ($namesNothing) {
+            throw new OperationException(
+                'The password modify request names no field.',
+                ResultCode::PROTOCOL_ERROR,
+            );
+        }
     }
 }

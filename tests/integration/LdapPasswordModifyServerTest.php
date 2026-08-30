@@ -112,6 +112,35 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
         $this->assertStoredPasswordIsHashed();
     }
 
+    /**
+     * RFC 3062 2.1: a request value carries one or more fields, so one naming nothing cannot rotate a password.
+     */
+    public function testARequestNamingNoFieldIsRejected(): void
+    {
+        $this->ldapClient()->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+
+        try {
+            $this->ldapClient()->sendAndReceive(new PasswordModifyRequest());
+            $this->fail('A password modify naming no field should have been refused.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::PROTOCOL_ERROR,
+                $e->getCode(),
+            );
+        }
+
+        // The bound identity's password is untouched, which is the point of the refusal.
+        $verifyClient = $this->buildClient('tcp');
+        $verifyClient->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+        $verifyClient->unbind();
+    }
+
     public function testExplicitIdentityPasswordChange(): void
     {
         $this->ldapClient()->bind(
