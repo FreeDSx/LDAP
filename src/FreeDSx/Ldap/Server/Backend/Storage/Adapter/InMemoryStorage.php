@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterfac
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
+use Throwable;
 
 /**
  * Array-backed storage; safe under Swoole or as a pre-seeded read-only fixture under PCNTL (child writes are not shared).
@@ -141,9 +142,27 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
         }
     }
 
+    /**
+     * Makes and restores copies for failures since in-memory mutates in place.
+     */
     public function atomic(callable $operation): void
     {
-        $operation();
+        $entries = array_map(
+            static fn(Entry $entry): Entry => $entry->makeCopy(),
+            $this->entries,
+        );
+        $keys = $this->keys;
+        $nextKey = $this->nextKey;
+
+        try {
+            $operation();
+        } catch (Throwable $e) {
+            $this->entries = $entries;
+            $this->keys = $keys;
+            $this->nextKey = $nextKey;
+
+            throw $e;
+        }
     }
 
     public function namingContexts(): array
