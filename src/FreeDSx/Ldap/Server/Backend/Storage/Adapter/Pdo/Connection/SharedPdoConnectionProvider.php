@@ -29,6 +29,11 @@ final class SharedPdoConnectionProvider implements PdoConnectionProviderInterfac
     private PdoTxState $txState;
 
     /**
+     * @var list<Closure(PDO): void>
+     */
+    private array $releaseListeners = [];
+
+    /**
      * @param Closure(): PDO|null $reconnectFactory Invoked by reset() to open a fresh PDO (required for fork-safe use)
      */
     public function __construct(
@@ -61,9 +66,23 @@ final class SharedPdoConnectionProvider implements PdoConnectionProviderInterfac
         return $this->txState;
     }
 
+    public function onConnectionReleased(Closure $listener): void
+    {
+        $this->releaseListeners[] = $listener;
+    }
+
     public function reset(): void
     {
+        $pdo = $this->pdo;
         $this->pdo = null;
         $this->txState = new PdoTxState();
+
+        if ($pdo === null) {
+            return;
+        }
+
+        foreach ($this->releaseListeners as $listener) {
+            $listener($pdo);
+        }
     }
 }

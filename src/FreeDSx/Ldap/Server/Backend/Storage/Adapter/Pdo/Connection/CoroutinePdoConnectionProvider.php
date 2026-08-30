@@ -36,6 +36,11 @@ final class CoroutinePdoConnectionProvider implements PdoConnectionProviderInter
     private array $txStates = [];
 
     /**
+     * @var list<Closure(PDO): void>
+     */
+    private array $releaseListeners = [];
+
+    /**
      * @param Closure(): PDO $factory  Creates and fully initialises a fresh PDO each time it is invoked.
      */
     public function __construct(private readonly Closure $factory) {}
@@ -49,14 +54,16 @@ final class CoroutinePdoConnectionProvider implements PdoConnectionProviderInter
             $this->txStates[$cid] = new PdoTxState();
 
             Coroutine::defer(function () use ($cid): void {
-                unset(
-                    $this->connections[$cid],
-                    $this->txStates[$cid],
-                );
+                $this->release($cid);
             });
         }
 
         return $this->connections[$cid];
+    }
+
+    public function onConnectionReleased(Closure $listener): void
+    {
+        $this->releaseListeners[] = $listener;
     }
 
     public function txState(): PdoTxState
@@ -74,6 +81,23 @@ final class CoroutinePdoConnectionProvider implements PdoConnectionProviderInter
      * No-op: connections are already isolated per coroutine, and coroutines do not cross fork boundaries.
      */
     public function reset(): void {}
+
+    private function release(int $cid): void
+    {
+        $pdo = $this->connections[$cid] ?? null;
+
+        unset(
+            $this->connections[$cid],
+            $this->txStates[$cid],
+        );
+        if ($pdo === null) {
+            return;
+        }
+
+        foreach ($this->releaseListeners as $listener) {
+            $listener($pdo);
+        }
+    }
 
     private function requireCoroutineId(): int
     {

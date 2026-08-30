@@ -36,7 +36,10 @@ final class PdoStatementPool
     public function __construct(
         private readonly PdoConnectionProviderInterface $provider,
         private readonly int $maxQueries = self::DEFAULT_MAX_QUERIES,
-    ) {}
+    ) {
+        // Make sure we clean-up cached statements when the provider closes the connection.
+        $provider->onConnectionReleased($this->forget(...));
+    }
 
     /**
      * Leases a statement for the query, executes it, and returns it to the pool once the result is released.
@@ -78,6 +81,11 @@ final class PdoStatementPool
     public function reset(): void
     {
         $this->pools = [];
+    }
+
+    private function forget(PDO $pdo): void
+    {
+        unset($this->pools[spl_object_id($pdo)]);
     }
 
     /**
