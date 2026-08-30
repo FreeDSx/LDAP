@@ -19,6 +19,7 @@ use Psr\Log\LoggerInterface;
 use function microtime;
 use function pcntl_fork;
 use function pcntl_waitpid;
+use function posix_getpid;
 use function posix_kill;
 use function sprintf;
 use function usleep;
@@ -46,6 +47,11 @@ final class PcntlBackgroundTasks implements BackgroundTasksInterface
     private Closure $childStart;
 
     /**
+     * Only the owner PID may interact with the tasks it created.
+     */
+    private readonly int $ownerPid;
+
+    /**
      * @param list<PeriodicTask> $periodicTasks
      * @param list<LongLivedTask> $longLivedTasks
      */
@@ -56,6 +62,7 @@ final class PcntlBackgroundTasks implements BackgroundTasksInterface
         private readonly int $gracefulStopSeconds = 0,
     ) {
         $this->childStart = static function (): void {};
+        $this->ownerPid = posix_getpid();
     }
 
     public function onChildStart(Closure $onStart): void
@@ -65,6 +72,10 @@ final class PcntlBackgroundTasks implements BackgroundTasksInterface
 
     public function start(): void
     {
+        if (!$this->ownsTasks()) {
+            return;
+        }
+
         foreach ($this->longLivedTasks as $index => $task) {
             $this->longLivedPids[$index] = $this->fork($task->run);
         }
@@ -72,12 +83,19 @@ final class PcntlBackgroundTasks implements BackgroundTasksInterface
 
     public function tick(): void
     {
+        if (!$this->ownsTasks()) {
+            return;
+        }
+
         $this->reapLongLived();
         $this->maintainPeriodic();
     }
 
     public function stop(): void
     {
+        if (!$this->ownsTasks()) {
+            return;
+        }
         $pids = [];
 
         foreach ($this->longLivedTasks as $index => $task) {
@@ -214,6 +232,11 @@ final class PcntlBackgroundTasks implements BackgroundTasksInterface
         }
 
         return $pid;
+    }
+
+    private function ownsTasks(): bool
+    {
+        return posix_getpid() === $this->ownerPid;
     }
 
     private function pidExited(?int $pid): bool

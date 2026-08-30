@@ -68,6 +68,11 @@ class PcntlServerRunner implements ServerRunnerInterface
     private bool $isMainProcess = true;
 
     /**
+     * Used to guard against certain handlers only the owning PID should run.
+     */
+    private readonly int $ownerPid;
+
+    /**
      * @var int[] These are the POSIX signals we handle for shutdown purposes.
      */
     private array $handledSignals = [];
@@ -116,8 +121,9 @@ class PcntlServerRunner implements ServerRunnerInterface
             SIGTERM,
             SIGQUIT,
         ];
+        $this->ownerPid = posix_getpid();
         $this->defaultContext = [
-            'pid' => posix_getpid(),
+            'pid' => $this->ownerPid,
         ];
 
         $backgroundTasks->onChildStart($this->enterChild(...));
@@ -300,9 +306,13 @@ class PcntlServerRunner implements ServerRunnerInterface
 
             $channel = $this->makeChildChannel();
 
+            // A child inherits the parent's handlers. Block them until it has installed its own.
+            $this->blockSignals();
+
             $pid = pcntl_fork();
             if ($pid == -1) {
                 // In parent process, but could not fork...
+                $this->unblockSignals();
                 $channel?->close();
                 $this->logAndThrow(
                     'Unable to fork process.',
@@ -317,6 +327,7 @@ class PcntlServerRunner implements ServerRunnerInterface
                 );
             } else {
                 // We are in the parent; the PID is the child process.
+                $this->unblockSignals();
                 $this->runAfterChildStarted(
                     $pid,
                     $socket,
@@ -368,6 +379,38 @@ class PcntlServerRunner implements ServerRunnerInterface
         );
     }
 
+    private function isOwnerProcess(): bool
+    {
+        return posix_getpid() === $this->ownerPid;
+    }
+
+    private function blockSignals(): void
+    {
+        pcntl_sigprocmask(
+            SIG_BLOCK,
+            $this->blockableSignals(),
+        );
+    }
+
+    private function unblockSignals(): void
+    {
+        pcntl_sigprocmask(
+            SIG_UNBLOCK,
+            $this->blockableSignals(),
+        );
+    }
+
+    /**
+     * @return int[]
+     */
+    private function blockableSignals(): array
+    {
+        return [
+            ...$this->handledSignals,
+            SIGHUP,
+        ];
+    }
+
     /**
      * Install signal handlers responsible for ending all child processes gracefully, sending a SIG_KILL if necessary.
      */
@@ -384,6 +427,10 @@ class PcntlServerRunner implements ServerRunnerInterface
         pcntl_signal(
             SIGHUP,
             function () {
+                if (!$this->isOwnerProcess()) {
+                    return;
+                }
+
                 $this->metricsRecorder->serverReloaded(time());
                 $this->reloadConfiguration($this->defaultContext);
                 $this->publishMetricsSnapshot();
@@ -403,6 +450,9 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     private function handleServerShutdown(): void
     {
+        if (!$this->isOwnerProcess()) {
+            return;
+        }
         // Want to make sure we are only handling this once...
         if ($this->isShuttingDown) {
             return;
@@ -506,6 +556,7 @@ class PcntlServerRunner implements ServerRunnerInterface
             $serverProtocolHandler,
             $context,
         );
+        $this->unblockSignals();
 
         $this->logInfo(
             'Handling LDAP connection in new child process.',
