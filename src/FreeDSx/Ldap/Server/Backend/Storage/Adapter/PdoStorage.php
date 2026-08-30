@@ -323,15 +323,17 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
      */
     public function removeAll(array $dns): void
     {
-        foreach (array_chunk($dns, self::DELETE_BATCH_SIZE) as $chunk) {
-            $this->statements->execute(
-                $this->dialect->queryDeleteIn(count($chunk)),
-                array_map(
-                    static fn(Dn $dn): string => $dn->normalize()->toString(),
-                    $chunk,
-                ),
-            );
-        }
+        $this->transactor->joinAtomic(function () use ($dns): void {
+            foreach (array_chunk($dns, self::DELETE_BATCH_SIZE) as $chunk) {
+                $this->statements->execute(
+                    $this->dialect->queryDeleteIn(count($chunk)),
+                    array_map(
+                        static fn(Dn $dn): string => $dn->normalize()->toString(),
+                        $chunk,
+                    ),
+                );
+            }
+        });
     }
 
     public function hasChildren(Dn $dn): bool

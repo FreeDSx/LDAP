@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer;
 
 use Closure;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
 use Throwable;
@@ -115,12 +116,16 @@ final class SwooleWriterQueue implements WriterQueueInterface
         $results = array_fill(
             0,
             count($batch),
-            true,
+            new StorageIoException('The write batch did not run.'),
         );
 
         try {
             $batchWrapper(static function () use ($batch, &$results): void {
                 foreach ($batch as $i => [$closure]) {
+                    // Reset per attempt.
+                    // The reissued batch should not carry the previous attempt's failures.
+                    $results[$i] = true;
+
                     try {
                         $closure();
                     } catch (Throwable $e) {

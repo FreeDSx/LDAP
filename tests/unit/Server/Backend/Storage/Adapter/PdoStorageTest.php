@@ -64,6 +64,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use RuntimeException;
+use Throwable;
 use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
@@ -1056,7 +1057,7 @@ final class PdoStorageTest extends TestCase
         );
     }
 
-    public function test_atomic_savepoint_failure_rolls_back_outer_transaction_when_caught(): void
+    public function test_atomic_savepoint_failure_rolls_back_and_surfaces_even_when_the_caller_swallows_it(): void
     {
         /** @var PDO&MockObject $mockPdo */
         $mockPdo = $this->createMock(PDO::class);
@@ -1078,14 +1079,30 @@ final class PdoStorageTest extends TestCase
 
         $storage = $this->storageOver($mockPdo);
 
-        $storage->atomic(function () use ($storage): void {
-            try {
-                $storage->atomic(fn() => null);
-            } catch (RuntimeException) {
-                // Caller swallows the inner failure; outer must still abort.
-            }
-        });
+        $surfaced = null;
 
+        try {
+            $storage->atomic(function () use ($storage): void {
+                try {
+                    $storage->atomic(fn() => null);
+                } catch (RuntimeException) {
+                    // Caller swallows the inner failure; outer must still abort and report it.
+                }
+            });
+        } catch (Throwable $e) {
+            $surfaced = $e;
+        }
+
+        self::assertInstanceOf(
+            RuntimeException::class,
+            $surfaced,
+            'A discarded transaction must never return as though it committed.',
+        );
+        self::assertSame(
+            'savepoint error',
+            $surfaced->getMessage(),
+            'The failure that broke the transaction must be the one reported.',
+        );
         self::assertSame(
             0,
             $commitCalls,
@@ -1113,12 +1130,15 @@ final class PdoStorageTest extends TestCase
 
         $storage = $this->storageOver($mockPdo);
 
-        $storage->atomic(function () use ($storage): void {
-            try {
-                $storage->atomic(fn() => null);
-            } catch (RuntimeException) {
-            }
-        });
+        try {
+            $storage->atomic(function () use ($storage): void {
+                try {
+                    $storage->atomic(fn() => null);
+                } catch (RuntimeException) {
+                }
+            });
+        } catch (RuntimeException) {
+        }
 
         $commitCalls = 0;
         $mockPdo = $this->createMock(PDO::class);

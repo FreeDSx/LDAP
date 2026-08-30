@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Utility\ExponentialBackoff;
@@ -107,49 +108,119 @@ final readonly class PdoTransactor
         $txState = $this->provider->txState();
 
         $depth = $txState->depth++;
-        $savepointCreated = false;
-        $transactionStarted = false;
+        $began = false;
+        $discarded = null;
 
         try {
-            if ($depth === 0) {
-                $this->dialect->beginTransaction($pdo);
-                $transactionStarted = true;
-            } else {
-                $pdo->exec("SAVEPOINT {$this->savepointName($depth)}");
-                $savepointCreated = true;
-            }
+            $this->begin(
+                $pdo,
+                $depth,
+            );
+            $began = true;
 
             $operation();
 
-            if ($depth === 0 && $txState->broken) {
-                $this->dialect->rollBack($pdo);
-            } elseif ($depth === 0) {
-                $this->dialect->commit($pdo);
-            } else {
-                $pdo->exec("RELEASE SAVEPOINT {$this->savepointName($depth)}");
-            }
+            $discarded = $this->finish(
+                $pdo,
+                $txState,
+                $depth,
+            );
         } catch (Throwable $e) {
-            try {
-                if ($transactionStarted) {
-                    $this->dialect->rollBack($pdo);
-                } elseif ($savepointCreated) {
-                    $pdo->exec("ROLLBACK TO SAVEPOINT {$this->savepointName($depth)}");
-                } elseif ($depth > 0) {
-                    // Savepoint creation itself failed; the outer transaction is now in an unknown state and must not be committed.
-                    $txState->broken = true;
-                }
-            } catch (Throwable) {
-                // Unwinding failed too
-                // Keep the error that caused it and stop the outer transaction committing.
-                $txState->broken = true;
-            }
+            $this->unwind(
+                $pdo,
+                $txState,
+                $depth,
+                $began,
+                $e,
+            );
 
             throw $e;
         } finally {
             $txState->depth--;
             if ($txState->depth === 0) {
-                $txState->broken = false;
+                $txState->clearBroken();
             }
+        }
+
+        // Thrown out here so the frame has already released its depth and the retry loop sees a settled state.
+        if ($discarded !== null) {
+            throw $discarded;
+        }
+    }
+
+    /**
+     * Opens the outermost transaction, or a savepoint for anything nested inside it.
+     */
+    private function begin(
+        PDO $pdo,
+        int $depth,
+    ): void {
+        if ($depth === 0) {
+            $this->dialect->beginTransaction($pdo);
+
+            return;
+        }
+
+        $pdo->exec("SAVEPOINT {$this->savepointName($depth)}");
+    }
+
+    /**
+     * Closes the frame, answering with the failure to rethrow when the transaction was discarded rather than committed.
+     */
+    private function finish(
+        PDO $pdo,
+        PdoTxState $txState,
+        int $depth,
+    ): ?Throwable {
+        if ($depth > 0) {
+            $pdo->exec("RELEASE SAVEPOINT {$this->savepointName($depth)}");
+
+            return null;
+        }
+
+        if (!$txState->broken) {
+            $this->dialect->commit($pdo);
+
+            return null;
+        }
+
+        // Read before rolling back, since the state is cleared as this frame unwinds.
+        $cause = $txState->cause ?? new StorageIoException('The transaction was rolled back.');
+        $this->dialect->rollBack($pdo);
+
+        return $cause;
+    }
+
+    /**
+     * Undoes the frame, marking the transaction unusable when it cannot be unwound.
+     */
+    private function unwind(
+        PDO $pdo,
+        PdoTxState $txState,
+        int $depth,
+        bool $began,
+        Throwable $cause,
+    ): void {
+        // Savepoint creation itself failed; the outer transaction is now in an unknown state and must not be committed.
+        if (!$began && $depth > 0) {
+            $txState->markBroken($cause);
+
+            return;
+        }
+
+        if (!$began) {
+            return;
+        }
+
+        try {
+            if ($depth === 0) {
+                $this->dialect->rollBack($pdo);
+            } else {
+                $pdo->exec("ROLLBACK TO SAVEPOINT {$this->savepointName($depth)}");
+            }
+        } catch (Throwable) {
+            // Unwinding failed too, so keep the error that caused it and stop the outer transaction committing.
+            $txState->markBroken($cause);
         }
     }
 
