@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer;
 use Closure;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SwooleWriterQueue;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 use Swoole\Coroutine;
@@ -228,6 +229,102 @@ final class SwooleWriterQueueTest extends TestCase
         foreach ($results as $result) {
             self::assertInstanceOf(LogicException::class, $result);
             self::assertSame('transaction failed', $result->getMessage());
+        }
+    }
+
+    public function test_executeBatch_reports_no_success_when_the_transaction_is_discarded_after_the_jobs_ran(): void
+    {
+        // The shape a deadlock produces: every job runs, then the transaction that held them all is rolled back.
+        $batchWrapper = static function (Closure $cb): void {
+            $cb();
+
+            throw new LogicException('deadlock rolled the transaction back');
+        };
+        $results = [];
+
+        Coroutine\run(function () use ($batchWrapper, &$results): void {
+            $replies = [new Channel(1), new Channel(1), new Channel(1)];
+            $batch = [
+                [static fn() => null, $replies[0]],
+                [static fn() => null, $replies[1]],
+                [static fn() => null, $replies[2]],
+            ];
+
+            SwooleWriterQueue::executeBatch($batch, $batchWrapper);
+
+            $results[0] = $replies[0]->pop();
+            $results[1] = $replies[1]->pop();
+            $results[2] = $replies[2]->pop();
+        });
+
+        foreach ($results as $result) {
+            self::assertInstanceOf(
+                LogicException::class,
+                $result,
+                'A job whose write was rolled back must never be told it succeeded.',
+            );
+        }
+    }
+
+    public function test_executeBatch_does_not_carry_a_failure_from_an_earlier_attempt(): void
+    {
+        // Stands in for the retry loop, which reissues the whole batch on a transient conflict.
+        $batchWrapper = static function (Closure $cb): void {
+            $cb();
+            $cb();
+        };
+        $attempts = 0;
+        $results = [];
+
+        Coroutine\run(function () use ($batchWrapper, &$attempts, &$results): void {
+            $replies = [new Channel(1), new Channel(1)];
+            $batch = [
+                [static fn() => null, $replies[0]],
+                [static function () use (&$attempts): void {
+                    $attempts++;
+
+                    if ($attempts === 1) {
+                        throw new LogicException('conflicted on the first attempt');
+                    }
+                }, $replies[1]],
+            ];
+
+            SwooleWriterQueue::executeBatch($batch, $batchWrapper);
+
+            $results[0] = $replies[0]->pop();
+            $results[1] = $replies[1]->pop();
+        });
+
+        self::assertTrue($results[0]);
+        self::assertTrue(
+            $results[1],
+            'A job that succeeded on the reissued attempt must not report the earlier attempt failure.',
+        );
+    }
+
+    public function test_executeBatch_reports_failure_when_the_wrapper_never_runs_the_jobs(): void
+    {
+        $batchWrapper = static function (Closure $cb): void {};
+        $results = [];
+
+        Coroutine\run(function () use ($batchWrapper, &$results): void {
+            $replies = [new Channel(1), new Channel(1)];
+            $batch = [
+                [static fn() => null, $replies[0]],
+                [static fn() => null, $replies[1]],
+            ];
+
+            SwooleWriterQueue::executeBatch($batch, $batchWrapper);
+
+            $results[0] = $replies[0]->pop();
+            $results[1] = $replies[1]->pop();
+        });
+
+        foreach ($results as $result) {
+            self::assertInstanceOf(
+                StorageIoException::class,
+                $result,
+            );
         }
     }
 

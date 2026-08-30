@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection;
 
+use Throwable;
+
 /**
  * Mutable transaction-depth counter bound to a single PDO connection.
  *
@@ -26,4 +28,21 @@ final class PdoTxState
      * Set when a nested savepoint fails before it is established.
      */
     public bool $broken = false;
+
+    /**
+     * The failure that broke the transaction.
+     */
+    public ?Throwable $cause = null;
+
+    public function markBroken(Throwable $cause): void
+    {
+        $this->broken = true;
+        $this->cause ??= $cause;
+    }
+
+    public function clearBroken(): void
+    {
+        $this->broken = false;
+        $this->cause = null;
+    }
 }

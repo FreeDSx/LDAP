@@ -194,4 +194,85 @@ final class PdoTransactorTest extends TestCase
             );
         }
     }
+
+    public function test_it_surfaces_a_swallowed_nested_failure_from_the_outermost_transaction(): void
+    {
+        $this->dialect->method('isRetryableConflict')
+            ->willReturn(false);
+
+        $subject = $this->subjectOverUnwindableSavepoint();
+
+        $this->expectException(PDOException::class);
+        $this->expectExceptionMessage('Deadlock found when trying to get lock');
+
+        $subject->atomic(static function () use ($subject): void {
+            try {
+                $subject->atomic(static function (): void {
+                    throw new PDOException('Deadlock found when trying to get lock');
+                });
+            } catch (PDOException) {
+                // Swallowed here, but the transaction it destroyed cannot report success.
+            }
+        });
+    }
+
+    public function test_it_reissues_a_swallowed_nested_conflict(): void
+    {
+        $this->dialect->method('isRetryableConflict')
+            ->willReturn(true);
+
+        $subject = $this->subjectOverUnwindableSavepoint();
+        $attempts = 0;
+
+        try {
+            $subject->atomic(static function () use ($subject, &$attempts): void {
+                $attempts++;
+
+                try {
+                    $subject->atomic(static function (): void {
+                        throw new PDOException('Deadlock found when trying to get lock');
+                    });
+                } catch (PDOException) {
+                }
+            });
+            self::fail('Expected the conflict to be rethrown.');
+        } catch (PDOException) {
+            // Expected once the budget is spent.
+        }
+
+        self::assertSame(
+            4,
+            $attempts,
+            'A conflict that destroyed the transaction must reach the retry loop, not be reported as success.',
+        );
+    }
+
+    /**
+     * A transactor whose savepoint cannot be rolled back, as when a deadlock has already discarded the transaction.
+     */
+    private function subjectOverUnwindableSavepoint(): PdoTransactor
+    {
+        /** @var PDO&MockObject $pdo */
+        $pdo = $this->createMock(PDO::class);
+        $pdo->method('exec')
+            ->willReturnCallback(static function (string $sql): int {
+                if (str_starts_with($sql, 'ROLLBACK TO SAVEPOINT')) {
+                    throw new PDOException('Deadlock found when trying to get lock');
+                }
+
+                return 0;
+            });
+
+        return new PdoTransactor(
+            new SharedPdoConnectionProvider($pdo),
+            $this->dialect,
+            $this->sleeper,
+            maxRetries: 3,
+            backoff: new ExponentialBackoff(
+                base: 0.001,
+                max: 0.05,
+                jitter: 0.0,
+            ),
+        );
+    }
 }
