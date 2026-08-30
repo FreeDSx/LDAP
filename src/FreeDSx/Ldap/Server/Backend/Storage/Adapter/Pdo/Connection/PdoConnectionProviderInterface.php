@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection;
 
+use Closure;
 use PDO;
 
 /**
@@ -25,6 +26,13 @@ interface PdoConnectionProviderInterface
     public function get(): PDO;
 
     public function txState(): PdoTxState;
+
+    /**
+     * Registers a listener notified as a connection leaves scope.
+     *
+     * @param Closure(PDO): void $listener
+     */
+    public function onConnectionReleased(Closure $listener): void;
 
     /**
      * Discard any cached connection and transaction state.

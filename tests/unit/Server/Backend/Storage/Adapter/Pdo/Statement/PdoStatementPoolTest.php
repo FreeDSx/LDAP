@@ -112,6 +112,26 @@ final class PdoStatementPoolTest extends TestCase
         );
     }
 
+    public function test_it_drops_pooled_statements_when_the_provider_releases_the_connection(): void
+    {
+        $query = 'SELECT name FROM t WHERE id = ?';
+        $provider = new SharedPdoConnectionProvider(
+            $this->pdo,
+            fn(): PDO => $this->pdo,
+        );
+        $pool = new PdoStatementPool($provider);
+
+        $pool->execute($query, [1]);
+        $provider->reset();
+        $pool->execute($query, [2]);
+
+        self::assertCount(
+            2,
+            $this->pdo->preparedMatching('WHERE id = ?'),
+            'A statement cached against a released connection would keep that connection alive.',
+        );
+    }
+
     public function test_it_binds_an_int_parameter_as_an_integer(): void
     {
         $rows = [];
