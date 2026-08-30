@@ -26,9 +26,11 @@ final readonly class UpdateCommand implements WriteRequestInterface
 {
     /**
      * @param Change[] $changes
+     * @param list<Change> $systemChanges Server-stamped bookkeeping applied after the caller's own changes are validated.
      */
     public function __construct(
         public Dn $dn,
         public array $changes,
+        public array $systemChanges = [],
     ) {}
 }

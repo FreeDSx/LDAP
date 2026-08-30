@@ -22,7 +22,6 @@ use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
-use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriterInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Attempt\PasswordModifyAttempt;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyChangeGuard;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
@@ -44,7 +43,6 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
         private ReadBackendInterface $backend,
         private WriteHandlerInterface $writes,
         private PasswordPolicyChangeGuard $changeGuard,
-        private SystemChangeWriterInterface $systemChangeWriter,
         private PasswordHashService $hashService = new PasswordHashService(),
     ) {}
 
@@ -138,13 +136,14 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
             $isSelf,
         ));
 
+        // One command puts the new password and the state governing it in a single transaction.
         $this->writes->handle(
-            $request,
+            new UpdateCommand(
+                $request->dn,
+                $request->changes,
+                $deltas->changes,
+            ),
             $context,
-        );
-        $this->systemChangeWriter->write(
-            $request->dn,
-            $deltas,
         );
 
         // A successful self-change satisfies any pwdReset requirement. no re-bind needed.

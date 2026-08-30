@@ -15,13 +15,9 @@ namespace FreeDSx\Ldap\Server\PasswordPolicy;
 
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\PasswordPolicyWriteHandler;
-use FreeDSx\Ldap\Server\Backend\Write\SystemChange\NullSystemChangeWriter;
-use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriter;
-use FreeDSx\Ldap\Server\Backend\Write\SystemChange\SystemChangeWriterInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\PasswordPolicy\Guard\PasswordPolicyChangeGuard;
-use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Builds the password-policy write-enforcement components from shared services plus per-connection state.
@@ -33,7 +29,6 @@ final readonly class PasswordPolicyComponentFactory
 {
     public function __construct(
         private ReadBackendInterface $backend,
-        private ServerOptions $options,
         private WriteHandlerInterface $writeDispatcher,
         private PasswordPolicyEngine $passwordPolicyEngine,
         private PasswordPolicyResolver $policyResolver,
@@ -56,7 +51,6 @@ final readonly class PasswordPolicyComponentFactory
             $this->backend,
             $this->writeDispatcher,
             $guard,
-            $this->makeSystemChangeWriter(),
         );
     }
 
@@ -87,17 +81,5 @@ final readonly class PasswordPolicyComponentFactory
             $passwordPolicyContext,
             $eventLogger,
         );
-    }
-
-    /**
-     * A read-only server has nothing to write the operational changes a policy decision produces back to.
-     */
-    private function makeSystemChangeWriter(): SystemChangeWriterInterface
-    {
-        if ($this->options->isReadOnly()) {
-            return new NullSystemChangeWriter();
-        }
-
-        return new SystemChangeWriter($this->writeDispatcher);
     }
 }
