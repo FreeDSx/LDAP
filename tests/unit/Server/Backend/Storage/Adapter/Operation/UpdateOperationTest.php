@@ -236,6 +236,57 @@ final class UpdateOperationTest extends TestCase
         ));
     }
 
+    public function test_type_delete_specific_value_protects_the_rdn_value_under_an_equivalent_spelling(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Foo Bar,dc=example,dc=com'),
+            new Attribute('cn', 'Foo Bar', 'Alias Name'),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NOT_ALLOWED_ON_RDN);
+
+        // caseIgnoreMatch folds the repeated space, so this names the value that gives the entry its DN.
+        $this->subject->execute($entry, new UpdateCommand(
+            new Dn('cn=Foo Bar,dc=example,dc=com'),
+            [new Change(Change::TYPE_DELETE, 'cn', 'Foo  Bar')],
+        ));
+    }
+
+    public function test_type_delete_specific_value_protects_an_rdn_value_whose_dn_spelling_is_escaped(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Smith\\, John,dc=example,dc=com'),
+            new Attribute('cn', 'Smith, John', 'Johnny'),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NOT_ALLOWED_ON_RDN);
+
+        $this->subject->execute($entry, new UpdateCommand(
+            new Dn('cn=Smith\\, John,dc=example,dc=com'),
+            [new Change(Change::TYPE_DELETE, 'cn', 'Smith, John')],
+        ));
+    }
+
+    public function test_type_replace_retaining_the_rdn_value_under_an_equivalent_spelling_is_allowed(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Foo Bar,dc=example,dc=com'),
+            new Attribute('cn', 'Foo Bar'),
+        );
+
+        $result = $this->subject->execute($entry, new UpdateCommand(
+            new Dn('cn=Foo Bar,dc=example,dc=com'),
+            [new Change(Change::TYPE_REPLACE, 'cn', 'Foo  Bar', 'Another')],
+        ));
+
+        self::assertSame(
+            ['Foo  Bar', 'Another'],
+            $result->get('cn')?->getValues(),
+        );
+    }
+
     public function test_type_delete_specific_value_allows_removing_non_rdn_value_from_rdn_attribute(): void
     {
         $entry = new Entry(
