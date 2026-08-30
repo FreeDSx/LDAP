@@ -19,8 +19,10 @@ use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Search\Filter\FilterAttributes;
+use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\SearchLimits;
@@ -39,6 +41,8 @@ use function strtolower;
  */
 final readonly class StorageListOptionsFactory
 {
+    use DerivedAttributeTrait;
+
     public function __construct(
         private Schema $schema,
         private SearchLimits $limits = new SearchLimits(),
@@ -73,6 +77,18 @@ final readonly class StorageListOptionsFactory
             subentries: $subentries,
             after: $slice?->after,
             maxCandidates: $slice?->limit,
+            withHasSubordinates: $this->wantsHasSubordinates($request),
+        );
+    }
+
+    /**
+     * A backend that can answer this alongside the row saves the per-entry lookup the resolver would otherwise make.
+     */
+    private function wantsHasSubordinates(SearchRequest $request): bool
+    {
+        return self::requestsDerivedType(
+            $request->getAttributes(),
+            AttributeTypeOid::NAME_HAS_SUBORDINATES,
         );
     }
 

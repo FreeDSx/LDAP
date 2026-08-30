@@ -42,10 +42,24 @@ final readonly class DerivedResolver
             // RFC 4512 §4.2: how a client locates the schema governing this entry.
             AttributeTypeOid::NAME_SUBSCHEMA_SUBENTRY => GeneratedEntry::Subschema->value,
             // X.501: the one derived value needing a lookup rather than the entry alone.
-            AttributeTypeOid::NAME_HAS_SUBORDINATES => $this->storage->hasChildren($entry->getDn())
-                ? 'TRUE'
-                : 'FALSE',
+            AttributeTypeOid::NAME_HAS_SUBORDINATES => $this->hasSubordinates($entry),
             default => throw new InvalidArgumentException("Unsupported derived attribute: $name"),
         };
+    }
+
+    /**
+     * A backend that answered this alongside the row already put it on the entry.
+     */
+    private function hasSubordinates(Entry $entry): string
+    {
+        $projected = $entry->get(AttributeTypeOid::NAME_HAS_SUBORDINATES)
+            ?->firstValue();
+        if ($projected !== null) {
+            return $projected;
+        }
+
+        return $this->storage->hasChildren($entry->getDn())
+            ? 'TRUE'
+            : 'FALSE';
     }
 }

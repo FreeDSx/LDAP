@@ -80,25 +80,31 @@ trait PdoDialectTrait
         SQL;
     }
 
-    public function queryFetchAll(): string
+    public function queryFetchAll(bool $withChildFlag = false): string
     {
+        $columns = $this->listColumns() . $this->childFlagColumn($withChildFlag, 'entries');
+
         return <<<SQL
-            SELECT {$this->listColumns()}
+            SELECT {$columns}
             FROM entries
         SQL;
     }
 
-    public function queryFetchChildren(): string
+    public function queryFetchChildren(bool $withChildFlag = false): string
     {
+        $columns = $this->listColumns() . $this->childFlagColumn($withChildFlag, 'entries');
+
         return <<<SQL
-            SELECT {$this->listColumns()}
+            SELECT {$columns}
             FROM entries
             WHERE lc_parent_dn = ?
         SQL;
     }
 
-    public function querySubtree(): string
+    public function querySubtree(bool $withChildFlag = false): string
     {
+        $columns = $this->listColumns() . $this->childFlagColumn($withChildFlag, 'subtree');
+
         return <<<SQL
             WITH RECURSIVE subtree AS (
                 SELECT entry_id, lc_dn, dn, attributes
@@ -109,7 +115,7 @@ trait PdoDialectTrait
                 FROM entries e
                 INNER JOIN subtree s ON e.lc_parent_dn = s.lc_dn
             )
-            SELECT {$this->listColumns()} FROM subtree
+            SELECT {$columns} FROM subtree
         SQL;
     }
 
@@ -281,6 +287,25 @@ trait PdoDialectTrait
                 $baseParams,
             ),
         );
+    }
+
+    /**
+     * Correlated against the row being returned.
+     */
+    protected function childFlagColumn(
+        bool $withChildFlag,
+        string $outerTable,
+    ): string {
+        if (!$withChildFlag) {
+            return '';
+        }
+
+        return <<<SQL
+            , EXISTS (
+                SELECT 1
+                FROM entries child
+                WHERE child.lc_parent_dn = {$outerTable}.lc_dn) AS has_children
+            SQL;
     }
 
     /**

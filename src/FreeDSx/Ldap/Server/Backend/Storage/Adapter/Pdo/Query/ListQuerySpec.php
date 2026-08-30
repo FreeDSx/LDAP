@@ -38,6 +38,7 @@ final readonly class ListQuerySpec
         public array $sortKeys = [],
         public SubentryVisibility $subentries = SubentryVisibility::All,
         public ?PageCursor $after = null,
+        public bool $withChildFlag = false,
     ) {}
 
     /**
@@ -57,6 +58,7 @@ final readonly class ListQuerySpec
             sortKeys: $sortKeys,
             subentries: $options->subentries,
             after: $options->after,
+            withChildFlag: $options->withHasSubordinates,
         );
     }
 
@@ -73,6 +75,7 @@ final readonly class ListQuerySpec
             sortKeys: $this->sortKeys,
             subentries: $this->subentries,
             after: $after,
+            withChildFlag: $this->withChildFlag,
         );
     }
 }

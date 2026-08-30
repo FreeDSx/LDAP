@@ -61,17 +61,20 @@ final readonly class PdoListQueryBuilder
                 $spec->filter,
                 $subentryCondition,
                 $seek,
+                $spec->withChildFlag,
             ),
             $spec->base === '' => $this->buildRootQuery(
                 $spec->filter,
                 $subentryCondition,
                 $seek,
+                $spec->withChildFlag,
             ),
             default => $this->buildSubtreeQuery(
                 $spec->base,
                 $spec->filter,
                 $subentryCondition,
                 $seek,
+                $spec->withChildFlag,
             ),
         };
 
@@ -110,7 +113,7 @@ final readonly class PdoListQueryBuilder
         array $filterParams,
         ListQuerySpec $spec,
     ): SqlQuery {
-        $fetchAll = $this->dialect->queryFetchAll();
+        $fetchAll = $this->dialect->queryFetchAll($spec->withChildFlag);
         $params = $filterParams;
         $base = $spec->base;
         $after = $spec->after;
@@ -200,9 +203,10 @@ final readonly class PdoListQueryBuilder
         ?SqlFilterResult $filterResult,
         ?string $subentryCondition,
         ?SqlQuery $seek,
+        bool $withChildFlag = false,
     ): SqlQuery {
         $query = new SqlQuery(
-            $this->dialect->queryFetchChildren(),
+            $this->dialect->queryFetchChildren($withChildFlag),
             [$base],
         );
 
@@ -230,6 +234,7 @@ final readonly class PdoListQueryBuilder
         ?SqlFilterResult $filterResult,
         ?string $subentryCondition,
         ?SqlQuery $seek,
+        bool $withChildFlag = false,
     ): SqlQuery {
         $conditions = [];
         $params = [];
@@ -252,11 +257,11 @@ final readonly class PdoListQueryBuilder
         }
 
         if ($conditions === []) {
-            return new SqlQuery($this->dialect->queryFetchAll());
+            return new SqlQuery($this->dialect->queryFetchAll($withChildFlag));
         }
 
         return new SqlQuery(
-            $this->dialect->queryFetchAll() . ' WHERE ' . implode(' AND ', $conditions),
+            $this->dialect->queryFetchAll($withChildFlag) . ' WHERE ' . implode(' AND ', $conditions),
             $params,
         );
     }
@@ -266,10 +271,11 @@ final readonly class PdoListQueryBuilder
         ?SqlFilterResult $filterResult,
         ?string $subentryCondition,
         ?SqlQuery $seek,
+        bool $withChildFlag = false,
     ): SqlQuery {
         if ($filterResult === null) {
             $query = new SqlQuery(
-                $this->dialect->querySubtree(),
+                $this->dialect->querySubtree($withChildFlag),
                 [$base],
             );
             $hasWhere = $subentryCondition !== null;
@@ -290,6 +296,7 @@ final readonly class PdoListQueryBuilder
             $filterResult,
             $subentryCondition,
             $seek,
+            $withChildFlag,
         );
     }
 
@@ -301,8 +308,9 @@ final readonly class PdoListQueryBuilder
         SqlFilterResult $filterResult,
         ?string $subentryCondition,
         ?SqlQuery $seek,
+        bool $withChildFlag = false,
     ): SqlQuery {
-        $fetchAll = $this->dialect->queryFetchAll();
+        $fetchAll = $this->dialect->queryFetchAll($withChildFlag);
         $filterSql = $filterResult->sql;
         $subentryClause = $subentryCondition !== null
             ? "AND $subentryCondition"

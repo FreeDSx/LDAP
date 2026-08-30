@@ -45,6 +45,7 @@ final readonly class StorageListOptions
         public SubentryVisibility $subentries = SubentryVisibility::All,
         public ?PageCursor $after = null,
         public ?int $maxCandidates = null,
+        public bool $withHasSubordinates = false,
     ) {}
 
     /**

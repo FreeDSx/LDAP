@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
@@ -788,6 +789,14 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             $attributes[] = Attribute::fromArray(
                 $name,
                 $values,
+            );
+        }
+
+        // Present only when the query projected it, which is what spares the resolver a query per entry.
+        if (isset($row['has_children'])) {
+            $attributes[] = new Attribute(
+                AttributeTypeOid::NAME_HAS_SUBORDINATES,
+                $row['has_children'] ? 'TRUE' : 'FALSE',
             );
         }
 
