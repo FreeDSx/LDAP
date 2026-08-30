@@ -38,6 +38,7 @@ $server = new LdapServer((new ServerOptions($storageConfig))->setLogger($logger)
 | `bind.anonymous`            | on      | info   | An anonymous bind is performed                            |
 | `starttls.succeeded`        | on      | info   | TLS is negotiated on the connection                       |
 | `starttls.failed`           | on      | notice | StartTLS rejected (no cert / already encrypted)           |
+| `starttls.buffer_discarded` | on      | warning | Plaintext was pipelined behind a StartTLS request and dropped unread |
 | `password_modify.success`   | on      | info   | Password modify completes                                 |
 | `password_modify.failed`    | on      | notice | Password modify rejected by ACL or constraint             |
 | `authz.denied.write`        | on      | notice | ACL denies an Add / Modify / Delete / ModifyDn / Compare  |
@@ -72,7 +73,7 @@ Every event carries a structured `context` array with a stable shape:
 | `target`                                                   | events that act on an entry                                        | Sub-array; shape varies (see below).                                                               |
 | `operation`                                                | write / compare events                                             | One of `add`, `modify`, `delete`, `modify_dn`, `compare`.                                          |
 | `result_code`                                              | failure events                                                     | LDAP result code from the caught `OperationException`.                                             |
-| `reason`                                                   | failure events                                                     | Human-readable diagnostic from the exception.                                                      |
+| `reason`                                                   | failure events, `starttls.buffer_discarded`                        | Human-readable diagnostic. Taken from the exception on failure events.                             |
 | `validation_mode`                                          | `schema.violation`                                                 | How it was handled: `strict` (rejected), `lenient` (allowed by policy), or `relaxed` (Relax control). |
 | `mechanism`, `version`                                     | bind events                                                        | SASL mechanism name (or `simple`) and LDAP protocol version.                                       |
 | `entries_added`, `entries_replaced`                        | `import.completed`, `import.failed`                                | Counts for the batch. On a failure they say how far it got before the rollback.                    |

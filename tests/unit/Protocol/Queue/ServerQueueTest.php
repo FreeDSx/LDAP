@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\CancelRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
+use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
@@ -33,6 +34,7 @@ use FreeDSx\Ldap\Exception\RequestValidationException;
 use FreeDSx\Ldap\Protocol\Queue\MessageWrapperInterface;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
+use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Queue\Buffer;
 use FreeDSx\Socket\Socket;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -324,6 +326,77 @@ final class ServerQueueTest extends TestCase
         self::assertInstanceOf(
             CancelRequest::class,
             $signal?->getRequest(),
+        );
+    }
+
+    public function test_encrypt_discards_plaintext_pipelined_behind_the_upgrade(): void
+    {
+        $encoder = new LdapEncoder();
+        $socket = $this->createMock(Socket::class);
+        $socket->method('read')->willReturn(
+            $encoder->encode((new LdapMessageRequest(1, new ExtendedRequest(ExtendedRequest::OID_START_TLS)))->toAsn1())
+                . $encoder->encode((new LdapMessageRequest(2, new DeleteRequest('dc=foo,dc=bar')))->toAsn1()),
+            false,
+        );
+
+        $queue = new ServerQueue($socket, $encoder);
+
+        self::assertSame(
+            1,
+            $queue->getMessage()->getMessageId(),
+        );
+        self::assertTrue(
+            $queue->hasBufferedInput(),
+            'The pipelined second PDU should be buffered ahead of the upgrade.',
+        );
+
+        $queue->encrypt();
+
+        self::assertFalse(
+            $queue->hasBufferedInput(),
+            'Plaintext read before the upgrade must not survive it.',
+        );
+
+        $this->expectException(ConnectionException::class);
+
+        $queue->getMessage();
+    }
+
+    public function test_it_writes_a_message_larger_than_the_send_buffer_without_an_oversized_write(): void
+    {
+        $encoder = new LdapEncoder();
+        $writes = [];
+
+        $socket = $this->createMock(Socket::class);
+        $socket->method('write')
+            ->willReturnCallback(function (string $bytes) use (&$writes, $socket): Socket {
+                $writes[] = $bytes;
+
+                return $socket;
+            });
+
+        $response = new LdapMessageResponse(
+            1,
+            new DeleteResponse(
+                0,
+                'dc=foo,dc=bar',
+                str_repeat('a', 32768),
+            ),
+        );
+
+        (new ServerQueue($socket, $encoder))->sendMessage($response);
+
+        foreach ($writes as $write) {
+            self::assertLessThanOrEqual(
+                8192,
+                strlen($write),
+                'A residual larger than the buffer means the flush left bytes behind to recopy.',
+            );
+        }
+
+        self::assertSame(
+            $encoder->encode($response->toAsn1()),
+            implode('', $writes),
         );
     }
 

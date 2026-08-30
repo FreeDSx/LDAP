@@ -30,6 +30,7 @@ enum ServerEvent: string
     case BindAnonymous                  = 'bind.anonymous';
     case StartTlsSucceeded              = 'starttls.succeeded';
     case StartTlsFailed                 = 'starttls.failed';
+    case StartTlsBufferDiscarded        = 'starttls.buffer_discarded';
     case EntryAdded                     = 'entry.added';
     case EntryModified                  = 'entry.modified';
     case EntryDeleted                   = 'entry.deleted';
@@ -66,6 +67,7 @@ enum ServerEvent: string
     {
         return match ($this) {
             self::PasswordPolicyAccountLocked,
+            self::StartTlsBufferDiscarded,
             self::SyncEntrySkipped,
             self::BulkImportFailed,
             self::JournalPruneFailed => LogLevel::WARNING,

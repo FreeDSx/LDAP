@@ -52,6 +52,7 @@ final readonly class EventLogPolicy
             ServerEvent::BindAnonymous,
             ServerEvent::StartTlsSucceeded,
             ServerEvent::StartTlsFailed,
+            ServerEvent::StartTlsBufferDiscarded,
             ServerEvent::PasswordModifySuccess,
             ServerEvent::PasswordModifyFailed,
             ServerEvent::AuthorizationDeniedWrite,

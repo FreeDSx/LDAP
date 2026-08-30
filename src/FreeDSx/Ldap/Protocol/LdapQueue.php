@@ -70,11 +70,20 @@ class LdapQueue extends Asn1MessageQueue
      */
     public function encrypt(): static
     {
+        // Anything read ahead arrived in the clear and should be dropped.
+        $this->buffer = '';
+        $this->toConsume = '';
+
         $this->socket->block(true);
         $this->socket->encrypt(true);
         $this->socket->block(false);
 
         return $this;
+    }
+
+    public function hasBufferedInput(): bool
+    {
+        return $this->hasBuffer();
     }
 
     public function isEncrypted(): bool
@@ -94,6 +103,7 @@ class LdapQueue extends Asn1MessageQueue
     {
         $this->socket->close();
         $this->buffer = '';
+        $this->toConsume = '';
         $this->id = 0;
     }
 
@@ -174,13 +184,10 @@ class LdapQueue extends Asn1MessageQueue
         foreach ($messages as $message) {
             $encoded = $this->encodeMessage($message);
             $this->onMessageEncoded($encoded);
-            $buffer .= $this->messageWrapper !== null ? $this->messageWrapper->wrap($encoded) : $encoded;
-            $bufferLen = strlen($buffer);
-            if ($bufferLen >= self::BUFFER_SIZE) {
-                $this->socket->write(substr($buffer, 0, self::BUFFER_SIZE));
-                $buffer = $bufferLen > self::BUFFER_SIZE ? substr($buffer, self::BUFFER_SIZE) : '';
-            }
+            $buffer .= $this->wrapEncoded($encoded);
+            $buffer = $this->flushFilledChunks($buffer);
         }
+
         if (strlen($buffer) > 0) {
             $this->socket->write($buffer);
         }
@@ -256,6 +263,23 @@ class LdapQueue extends Asn1MessageQueue
         }
 
         return  $message;
+    }
+
+    private function wrapEncoded(string $encoded): string
+    {
+        return $this->messageWrapper !== null
+            ? $this->messageWrapper->wrap($encoded)
+            : $encoded;
+    }
+
+    private function flushFilledChunks(string $buffer): string
+    {
+        while (strlen($buffer) >= self::BUFFER_SIZE) {
+            $this->socket->write(substr($buffer, 0, self::BUFFER_SIZE));
+            $buffer = substr($buffer, self::BUFFER_SIZE);
+        }
+
+        return $buffer;
     }
 
     /**

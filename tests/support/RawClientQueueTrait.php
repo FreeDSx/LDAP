@@ -23,13 +23,20 @@ use FreeDSx\Socket\SocketPoolOptions;
  */
 trait RawClientQueueTrait
 {
-    private function rawQueue(): ClientQueue
-    {
+    /**
+     * @param int $timeoutRead Shorten it when the assertion is that nothing arrives.
+     */
+    private function rawQueue(
+        int $timeoutRead = 15,
+        bool $validateSslCert = true,
+    ): ClientQueue {
         return new ClientQueue(new SocketPool(
             (new SocketPoolOptions(
                 (new SocketOptions())
                     ->setPort(TestWorker::port())
-                    ->setTimeoutConnect(1),
+                    ->setTimeoutConnect(1)
+                    ->setTimeoutRead($timeoutRead)
+                    ->setSslValidateCert($validateSslCert),
             ))->setServers(['127.0.0.1']),
         ));
     }

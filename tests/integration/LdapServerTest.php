@@ -21,18 +21,24 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Response\BindResponse;
+use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\GeneratedEntry;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 use Throwable;
 
 final class LdapServerTest extends ServerTestCase
 {
+    use RawClientQueueTrait;
+
     /**
      * The supertype arm is one the index cannot answer, so every candidate reaches the evaluator the limit counts.
      */
@@ -508,6 +514,47 @@ final class LdapServerTest extends ServerTestCase
         $result = $this->ldapClient()->read();
 
         $this->assertNotNull($result);
+    }
+
+    public function testItDiscardsPlaintextPipelinedBehindStartTls(): void
+    {
+        $queue = $this->rawQueue(
+            timeoutRead: 2,
+            validateSslCert: false,
+        );
+
+        // One variadic send buffers both PDUs into a single plaintext write, which is the command-injection shape.
+        $queue->sendMessage(
+            new LdapMessageRequest(1, Operations::extended(ExtendedRequest::OID_START_TLS)),
+            new LdapMessageRequest(2, Operations::whoami()),
+        );
+
+        $startTls = $queue->getMessage(1)->getResponse();
+
+        $this->assertInstanceOf(
+            ExtendedResponse::class,
+            $startTls,
+        );
+        $this->assertSame(
+            ResultCode::SUCCESS,
+            $startTls->getResultCode(),
+        );
+
+        $queue->encrypt();
+        $injected = null;
+
+        try {
+            $injected = $queue->getMessage();
+        } catch (Throwable) {
+            // Nothing to read is the expected outcome; the injected PDU was dropped with the plaintext buffer.
+        } finally {
+            $queue->close();
+        }
+
+        $this->assertNull(
+            $injected,
+            'A PDU pipelined ahead of the upgrade must not be answered over the encrypted channel.',
+        );
     }
 
     public function testItCanRunOverSSLOnly(): void
