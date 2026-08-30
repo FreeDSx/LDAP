@@ -78,7 +78,19 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
                 ExtendedRequest::OID_START_TLS,
             ),
         )->withOnComplete(function (ConnectionControl $connection) use ($message): void {
+            // Plaintext waiting behind the request is the command-injection shape, so its loss is worth reporting.
+            $discarded = $connection->hasBufferedInput();
+
             $connection->encrypt();
+
+            if ($discarded) {
+                $this->eventLogger->record(
+                    ServerEvent::StartTlsBufferDiscarded,
+                    [EventContext::REASON => 'Plaintext buffered behind the StartTLS request was discarded unread.'],
+                    message: $message,
+                );
+            }
+
             $this->eventLogger->record(
                 ServerEvent::StartTlsSucceeded,
                 message: $message,

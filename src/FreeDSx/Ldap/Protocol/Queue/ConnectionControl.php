@@ -23,6 +23,14 @@ interface ConnectionControl
 {
     public function isEncrypted(): bool;
 
+    /**
+     * Whether unread input is already buffered.
+     */
+    public function hasBufferedInput(): bool;
+
+    /**
+     * Upgrades the connection. Any input buffered before the upgrade is discarded.
+     */
     public function encrypt(): static;
 
     public function close(): void;
