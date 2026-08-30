@@ -114,11 +114,66 @@ final class GeneralizedTimeComparatorTest extends TestCase
         );
     }
 
-    public function test_index_key_reads_a_bare_spelling_as_utc(): void
+    public function test_a_bare_spelling_names_no_instant(): void
+    {
+        // RFC 4517 3.3.13 makes the zone mandatory, and the syntax validator refuses the value on the way in.
+        self::assertNull($this->subject->indexKey('20260101120000'));
+        self::assertFalse($this->subject->equals('20260101120000', '20260101120000'));
+    }
+
+    public function test_a_fractional_value_equals_itself(): void
+    {
+        self::assertTrue($this->subject->equals(
+            '20260101120000.500000Z',
+            '20260101120000.5Z',
+        ));
+        self::assertNotNull($this->subject->indexKey('20260101120000.500000Z'));
+    }
+
+    public function test_values_a_fraction_apart_stay_distinct(): void
+    {
+        self::assertFalse($this->subject->equals(
+            '20260101120000.100000Z',
+            '20260101120000.200000Z',
+        ));
+        self::assertNotSame(
+            $this->subject->indexKey('20260101120000.100000Z'),
+            $this->subject->indexKey('20260101120000.200000Z'),
+        );
+    }
+
+    public function test_index_keys_carrying_a_fraction_still_sort_chronologically(): void
+    {
+        $keys = [
+            (string) $this->subject->indexKey('20260101120000.200000Z'),
+            (string) $this->subject->indexKey('20260101120000Z'),
+            (string) $this->subject->indexKey('20260101120000.100000Z'),
+        ];
+        sort($keys);
+
+        self::assertSame(
+            [
+                (string) $this->subject->indexKey('20260101120000Z'),
+                (string) $this->subject->indexKey('20260101120000.100000Z'),
+                (string) $this->subject->indexKey('20260101120000.200000Z'),
+            ],
+            $keys,
+        );
+    }
+
+    public function test_an_unparseable_value_sorts_after_every_real_instant(): void
     {
         self::assertSame(
-            $this->subject->indexKey('20260101120000'),
-            $this->subject->indexKey('20260101120000Z'),
+            1,
+            $this->subject->compare('not-a-time', '19700101000000Z'),
+        );
+        self::assertSame(
+            -1,
+            $this->subject->compare('19700101000000Z', 'not-a-time'),
+        );
+        self::assertSame(
+            0,
+            $this->subject->compare('not-a-time', 'also-not-a-time'),
         );
     }
 
