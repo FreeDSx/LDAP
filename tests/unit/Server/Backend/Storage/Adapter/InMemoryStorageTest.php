@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 
@@ -55,6 +56,62 @@ final class InMemoryStorageTest extends TestCase
             'cn=Alice,dc=example,dc=com',
             $entry->getDn()->toString(),
         );
+    }
+
+    public function test_atomic_discards_entries_stored_before_a_failure(): void
+    {
+        $bob = new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('cn', 'Bob'),
+        );
+
+        try {
+            $this->subject->atomic(function () use ($bob): void {
+                $this->subject->store($bob);
+
+                throw new RuntimeException('failed part way through');
+            });
+            self::fail('The failure should have propagated.');
+        } catch (RuntimeException) {
+        }
+
+        self::assertNull(
+            $this->subject->find(new Dn('cn=Bob,dc=example,dc=com')),
+            'A seed failing on entry N must not leave the ones before it behind.',
+        );
+    }
+
+    public function test_atomic_discards_a_modification_made_in_place(): void
+    {
+        try {
+            $this->subject->atomic(function (): void {
+                $this->subject->find(new Dn('cn=Alice,dc=example,dc=com'))
+                    ?->set(new Attribute('cn', 'Changed'));
+
+                throw new RuntimeException('failed part way through');
+            });
+            self::fail('The failure should have propagated.');
+        } catch (RuntimeException) {
+        }
+
+        self::assertSame(
+            ['Alice'],
+            $this->subject->find(new Dn('cn=Alice,dc=example,dc=com'))?->get('cn')?->getValues(),
+        );
+    }
+
+    public function test_atomic_keeps_its_changes_when_the_operation_succeeds(): void
+    {
+        $bob = new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('cn', 'Bob'),
+        );
+
+        $this->subject->atomic(function () use ($bob): void {
+            $this->subject->store($bob);
+        });
+
+        self::assertNotNull($this->subject->find(new Dn('cn=Bob,dc=example,dc=com')));
     }
 
     public function test_find_returns_null_for_unknown_norm_dn(): void
