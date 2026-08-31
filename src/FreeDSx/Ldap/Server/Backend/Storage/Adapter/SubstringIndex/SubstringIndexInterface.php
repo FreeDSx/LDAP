@@ -20,6 +20,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 /**
  * A pluggable substring-search index for the PDO backend.
  *
+ * @internal
+ *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 interface SubstringIndexInterface
@@ -35,6 +37,11 @@ interface SubstringIndexInterface
      * Whether this strategy indexes the attribute, so a write can skip re-indexing when none of its own changed.
      */
     public function indexes(string $attributeLower): bool;
+
+    /**
+     * Whether this strategy reads the sidecar's value_original for the attribute.
+     */
+    public function readsOriginalValue(string $attributeLower): bool;
 
     /**
      * Re-index one entry, running each write through the executor inside the caller's transaction.

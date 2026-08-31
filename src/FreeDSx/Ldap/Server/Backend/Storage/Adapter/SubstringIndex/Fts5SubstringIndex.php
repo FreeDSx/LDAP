@@ -145,6 +145,14 @@ final class Fts5SubstringIndex implements SubstringIndexInterface
         return isset($this->attributes[$attributeLower]);
     }
 
+    /**
+     * The triggers copy the sidecar row's value into the FTS table, and only for the attributes in scope.
+     */
+    public function readsOriginalValue(string $attributeLower): bool
+    {
+        return $this->indexes($attributeLower);
+    }
+
     public function maintain(
         int $entryId,
         Entry $entry,

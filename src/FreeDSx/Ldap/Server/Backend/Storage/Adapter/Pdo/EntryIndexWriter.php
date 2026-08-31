@@ -214,12 +214,24 @@ final readonly class EntryIndexWriter
                     $entryId,
                     $attrNameLower,
                     $this->valueLower($attrNameLower, $value),
-                    $value,
+                    $this->valueOriginal($attrNameLower, $value),
                 ];
             }
         }
 
         return $rows;
+    }
+
+    /**
+     * Kept only for an index that reads it back.
+     */
+    private function valueOriginal(
+        string $attribute,
+        string $value,
+    ): string {
+        return $this->substringIndex?->readsOriginalValue($attribute) === true
+            ? $value
+            : '';
     }
 
     /**
