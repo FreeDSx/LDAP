@@ -30,6 +30,8 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
  */
 readonly class MoveEntryHandler
 {
+    use WritesLockedEntry;
+
     public function __construct(
         private EntryStorageInterface $storage,
         private AtomicWriter $writer,
@@ -46,37 +48,42 @@ readonly class MoveEntryHandler
         MoveCommand $command,
         WriteContext $context,
     ): void {
-        $this->writer->write(function () use ($command, $context): void {
-            $normOld = $command->dn->normalize();
-            $newEntry = $this->mutation->forMove(
-                $this->locator->findOrFail($normOld),
-                $command,
-                $context,
-            );
-            $this->placement->assertMovePlacement(
-                $command,
-                $newEntry,
-                $normOld,
-                $context->isSystem(),
-            );
+        $normOld = $command->dn->normalize();
 
-            $normNew = $newEntry->getDn()->normalize();
-            // Re-keyed before the base is stored, so the upsert lands on the moved row rather than inserting a second.
-            if ($normNew->toString() !== $normOld->toString()) {
-                $this->storage->renameSubtree(
-                    $normOld,
-                    $newEntry->getDn(),
+        // Only the moved entry is locked; the destination is held by the unique key the rename and store land on.
+        $this->writeLocked(
+            $normOld,
+            function () use ($command, $context, $normOld): void {
+                $newEntry = $this->mutation->forMove(
+                    $this->locator->findOrFail($normOld),
+                    $command,
+                    $context,
                 );
-            }
+                $this->placement->assertMovePlacement(
+                    $command,
+                    $newEntry,
+                    $normOld,
+                    $context->isSystem(),
+                );
 
-            $this->storage->store($newEntry);
-            $this->moveRecorder?->record(
-                $context,
-                $newEntry,
-                $command->dn,
-                $normOld,
-                $normNew,
-            );
-        });
+                $normNew = $newEntry->getDn()->normalize();
+                // Re-keyed before the base is stored, so the upsert lands on the moved row rather than inserting a second.
+                if ($normNew->toString() !== $normOld->toString()) {
+                    $this->storage->renameSubtree(
+                        $normOld,
+                        $newEntry->getDn(),
+                    );
+                }
+
+                $this->storage->store($newEntry);
+                $this->moveRecorder?->record(
+                    $context,
+                    $newEntry,
+                    $command->dn,
+                    $normOld,
+                    $normNew,
+                );
+            },
+        );
     }
 }

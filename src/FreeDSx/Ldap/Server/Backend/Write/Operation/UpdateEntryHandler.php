@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 readonly class UpdateEntryHandler
 {
     use AppliesEntryUpdate;
+    use WritesLockedEntry;
 
     public function __construct(
         private EntryStorageInterface $storage,
@@ -46,11 +47,14 @@ readonly class UpdateEntryHandler
         UpdateCommand $command,
         WriteContext $context,
     ): void {
-        $this->writer->write(function () use ($command, $context): void {
-            $this->applyUpdate(
-                $command,
-                $context,
-            );
-        });
+        $this->writeLocked(
+            $command->dn->normalize(),
+            function () use ($command, $context): void {
+                $this->applyUpdate(
+                    $command,
+                    $context,
+                );
+            },
+        );
     }
 }
