@@ -90,6 +90,14 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
         return isset($this->attributes[$attributeLower]);
     }
 
+    /**
+     * Trigrams live in a table of their own, so the sidecar's copy of the value is never read.
+     */
+    public function readsOriginalValue(string $attributeLower): bool
+    {
+        return false;
+    }
+
     public function maintain(
         int $entryId,
         Entry $entry,
