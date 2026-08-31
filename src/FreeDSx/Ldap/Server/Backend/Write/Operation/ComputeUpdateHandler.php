@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Write\AtomicWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -31,6 +30,7 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 readonly class ComputeUpdateHandler
 {
     use AppliesEntryUpdate;
+    use WritesLockedEntry;
 
     public function __construct(
         private EntryStorageInterface $storage,
@@ -48,32 +48,30 @@ readonly class ComputeUpdateHandler
         ComputeUpdateCommand $command,
         WriteContext $context,
     ): void {
-        $this->writer->write(function () use ($command, $context): void {
-            $dn = $command->dn->normalize();
+        $dn = $command->dn->normalize();
 
-            // Taken before the read, so what the changes are derived from cannot move under them.
-            if ($this->storage instanceof RowLockableInterface) {
-                $this->storage->lockForWrite($dn);
-            }
+        $this->writeLocked(
+            $dn,
+            function () use ($command, $context, $dn): void {
+                $entry = $this->storage->find($dn);
+                if ($entry === null) {
+                    return;
+                }
 
-            $entry = $this->storage->find($dn);
-            if ($entry === null) {
-                return;
-            }
+                $changes = ($command->compute)($entry);
+                if ($changes === []) {
+                    return;
+                }
 
-            $changes = ($command->compute)($entry);
-            if ($changes === []) {
-                return;
-            }
-
-            // Applied inline, since going back through the dispatcher would open a second transaction around this one.
-            $this->applyUpdate(
-                new UpdateCommand(
-                    $command->dn,
-                    $changes,
-                ),
-                $context,
-            );
-        });
+                // Applied inline, since going back through the dispatcher would open a second transaction around this one.
+                $this->applyUpdate(
+                    new UpdateCommand(
+                        $command->dn,
+                        $changes,
+                    ),
+                    $context,
+                );
+            },
+        );
     }
 }

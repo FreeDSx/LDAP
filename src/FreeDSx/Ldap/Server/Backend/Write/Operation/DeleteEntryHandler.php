@@ -28,6 +28,8 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
  */
 readonly class DeleteEntryHandler
 {
+    use WritesLockedEntry;
+
     public function __construct(
         private EntryStorageInterface $storage,
         private AtomicWriter $writer,
@@ -43,16 +45,20 @@ readonly class DeleteEntryHandler
         DeleteCommand $command,
         WriteContext $context,
     ): void {
-        $this->writer->write(function () use ($command, $context): void {
-            $dn = $command->dn->normalize();
-            $entry = $this->locator->findOrFail($dn);
-            $this->placement->assertDeletePlacement($command->dn);
+        $dn = $command->dn->normalize();
 
-            $this->storage->remove($dn);
-            $this->changeRecorder?->recordDelete(
-                $entry,
-                $context,
-            );
-        });
+        $this->writeLocked(
+            $dn,
+            function () use ($command, $context, $dn): void {
+                $entry = $this->locator->findOrFail($dn);
+                $this->placement->assertDeletePlacement($command->dn);
+
+                $this->storage->remove($dn);
+                $this->changeRecorder?->recordDelete(
+                    $entry,
+                    $context,
+                );
+            },
+        );
     }
 }
