@@ -57,6 +57,49 @@ trait ControlTestsTrait
         );
     }
 
+    /**
+     * The base entry and ou=people are in scope but carry no cn, so both are read as candidates and dropped after.
+     */
+    public function testNoPageExceedsTheRequestedSizeWhenEntriesAreDroppedAfterTheRead(): void
+    {
+        $this->authenticateUser();
+
+        foreach ([2, 3, 4] as $pageSize) {
+            $paging = $this->ldapClient()->paging(
+                Operations::search(Filters::present('cn'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+                $pageSize,
+            );
+
+            $sizes = [];
+            $total = 0;
+            $largest = 0;
+            while ($paging->hasEntries()) {
+                $count = count($paging->getEntries());
+                $sizes[] = $count;
+                $total += $count;
+                $largest = max($largest, $count);
+            }
+
+            self::assertLessThanOrEqual(
+                $pageSize,
+                $largest,
+                sprintf(
+                    'A page of at most %d was asked for, but one arrived with %d: pages were [%s].',
+                    $pageSize,
+                    $largest,
+                    implode(',', $sizes),
+                ),
+            );
+            self::assertSame(
+                6,
+                $total,
+                'Bounding the page must not lose or repeat an entry.',
+            );
+        }
+    }
+
     public function testSortedPagingReturnsEveryEntryOnceInOrder(): void
     {
         $this->authenticateUser();
