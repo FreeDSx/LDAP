@@ -43,6 +43,13 @@ class Attribute implements IteratorAggregate, Countable, Stringable
 {
     use EscapeTrait;
 
+    /**
+     * Longest attribute type allowed.
+     *
+     * The backend keys on these, and they should have a sane limit.
+     */
+    public const MAX_TYPE_LENGTH = 512;
+
     private const ESCAPE_MAP = [
         '\\' => '\5c',
         '*' => '\2a',
@@ -213,6 +220,15 @@ class Attribute implements IteratorAggregate, Countable, Stringable
             '/^([a-z][a-z0-9-]*|\d+(\.\d+)+)(;[a-z0-9-]+)*$/D',
             strtolower($description),
         ) === 1;
+    }
+
+    /**
+     * Is it within the length bound and ASCII (as RFC 4512 2.5 requires)?
+     */
+    public static function isStorableType(string $type): bool
+    {
+        return strlen($type) <= self::MAX_TYPE_LENGTH
+            && preg_match('/^[\x20-\x7E]*$/D', $type) === 1;
     }
 
     /**

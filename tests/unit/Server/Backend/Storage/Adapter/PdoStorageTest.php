@@ -29,6 +29,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
@@ -474,6 +476,38 @@ final class PdoStorageTest extends TestCase
         self::assertSame(
             1,
             (int) $count->fetchColumn(),
+        );
+    }
+
+    public function test_store_keeps_the_original_value_only_where_the_index_reads_it(): void
+    {
+        if (!Fts5SubstringIndex::isSupported()) {
+            self::markTestSkipped('This SQLite build lacks the FTS5 trigram tokenizer.');
+        }
+
+        self::assertSame(
+            [
+                'cn' => 'Smith',
+                'description' => '',
+            ],
+            $this->originalValuesFor(
+                new Fts5SubstringIndex(),
+                SubstringIndexMode::Auto,
+            ),
+        );
+    }
+
+    public function test_store_omits_every_original_value_when_no_index_reads_them(): void
+    {
+        self::assertSame(
+            [
+                'cn' => '',
+                'description' => '',
+            ],
+            $this->originalValuesFor(
+                new TrigramSubstringIndex(),
+                SubstringIndexMode::Trigram,
+            ),
         );
     }
 
@@ -1451,6 +1485,56 @@ final class PdoStorageTest extends TestCase
         }
 
         return $storage;
+    }
+
+    /**
+     * The sidecar's value_original per attribute, for an entry holding one indexed and one unindexed attribute.
+     *
+     * @return array<string, string>
+     */
+    private function originalValuesFor(
+        SubstringIndexInterface $index,
+        SubstringIndexMode $mode,
+    ): array {
+        $pdo = new PDO('sqlite::memory:');
+        PdoStorage::initialize(
+            $pdo,
+            new SqliteDialect(),
+            $index,
+        );
+
+        $storage = $this->fromContainer(
+            PdoStorageFactory::class,
+            options: TestServerOptions::forStorage(
+                PdoConfig::forSqlite(':memory:')
+                    ->setSubstringIndexMode($mode),
+            ),
+        )->storageOn(new SharedPdoConnectionProvider(
+            $pdo,
+            fn(): PDO => $pdo,
+        ));
+        $storage->store(new Entry(
+            new Dn('cn=Smith,dc=example,dc=com'),
+            new Attribute('cn', 'Smith'),
+            new Attribute('description', 'Not an indexed attribute'),
+        ));
+
+        $rows = $pdo->query(
+            "SELECT attr_name_lower, value_original FROM entry_attribute_values
+             WHERE attr_name_lower IN ('cn', 'description')",
+        );
+        self::assertNotFalse($rows);
+
+        $found = [];
+        foreach ($rows->fetchAll(PDO::FETCH_NUM) as $row) {
+            self::assertIsArray($row);
+            self::assertIsString($row[0]);
+            self::assertIsString($row[1]);
+            $found[$row[0]] = $row[1];
+        }
+        ksort($found);
+
+        return $found;
     }
 
     /**
