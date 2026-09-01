@@ -37,6 +37,8 @@ final readonly class PasswordPolicyRequestMiddleware implements MiddlewareInterf
         ServerRequestContext $context,
         MiddlewareHandlerInterface $next,
     ): ResponseStream {
+        // a refusal raised below answers after this middleware has unwound.
+        $this->policyContext->clear();
         $this->policyContext->setResponseRequested(
             $context->message->controls()->has(Control::OID_PWD_POLICY),
         );

@@ -82,7 +82,7 @@ final class PasswordPolicyResponseInterceptorTest extends TestCase
         );
     }
 
-    public function test_it_is_a_no_op_for_a_payload_free_outcome(): void
+    public function test_it_consumes_a_payload_free_outcome_without_attaching_a_control(): void
     {
         $this->context->setOutcome(PasswordPolicyOutcome::allow());
 
@@ -92,9 +92,25 @@ final class PasswordPolicyResponseInterceptorTest extends TestCase
             0,
             $response->controls()->toArray(),
         );
-        self::assertNotNull(
+        self::assertNull(
             $this->context->getOutcome(),
-            'A payload-free outcome is left intact since nothing was attached.',
+            'An outcome describes one operation, so the response it rode out with consumes it either way.',
+        );
+    }
+
+    public function test_an_unconsumed_outcome_does_not_survive_to_a_later_response(): void
+    {
+        // The client asked for nothing, so this outcome produces no control and would otherwise be left behind.
+        $this->context->setResponseRequested(false);
+        $this->context->setOutcome(PasswordPolicyOutcome::allowWithGraceWarning(3));
+        $this->subject->intercept($this->bindResponse());
+
+        $this->context->setResponseRequested(true);
+        $later = $this->subject->intercept($this->bindResponse());
+
+        self::assertFalse(
+            $later->controls()->has(Control::OID_PWD_POLICY),
+            'A later response carried policy state belonging to the operation before it.',
         );
     }
 
