@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS entries (
 -- Named apart from entries.entry_id so the correlated filter and sort SQL cannot bind to the inner scope.
 CREATE TABLE IF NOT EXISTS entry_attribute_values (
     owner_entry_id   BIGINT NOT NULL,
-    attr_name_lower  VARCHAR(255) NOT NULL,
+    attr_name_lower  VARCHAR(512) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
     value_lower      VARCHAR(255) NOT NULL,
     value_original   TEXT NOT NULL,
     INDEX idx_eav_attr_value (attr_name_lower, value_lower),

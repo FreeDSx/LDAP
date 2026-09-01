@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Parser;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Exception\SchemaParseException;
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
@@ -26,6 +27,7 @@ use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorRegistry;
 use function count;
 use function sprintf;
 use function strcasecmp;
+use function strlen;
 
 /**
  * Parses RFC 4512 description strings into schema definitions; the inverse of toDescriptionString().
@@ -108,10 +110,12 @@ final class SchemaDefinitionParser
             self::ATTRIBUTE_TYPE_KEYWORDS,
         );
         $this->assertComplete($reader);
+        $names = $body->values(DefinitionKeyword::NAME);
+        $this->assertNamesStorable($names, $oid);
 
         return new AttributeType(
             oid: $oid,
-            names: $body->values(DefinitionKeyword::NAME),
+            names: $names,
             equalityOid: $body->string(DefinitionKeyword::EQUALITY),
             orderingOid: $body->string(DefinitionKeyword::ORDERING),
             substringOid: $body->string(DefinitionKeyword::SUBSTR),
@@ -215,6 +219,30 @@ final class SchemaDefinitionParser
             desc: $body->string(DefinitionKeyword::DESC),
             extensions: $body->extensions(),
         );
+    }
+
+    /**
+     * Refused here rather than at the write, so the subschema never advertises a type no entry could carry.
+     *
+     * @param list<string> $names
+     * @throws SchemaParseException
+     */
+    private function assertNamesStorable(
+        array $names,
+        string $oid,
+    ): void {
+        foreach ($names as $name) {
+            if (Attribute::isStorableType($name)) {
+                continue;
+            }
+
+            throw new SchemaParseException(sprintf(
+                'The attribute type "%s" names a type of %d bytes, beyond the %d the directory stores, or one that is not ASCII.',
+                $oid,
+                strlen($name),
+                Attribute::MAX_TYPE_LENGTH,
+            ));
+        }
     }
 
     /**

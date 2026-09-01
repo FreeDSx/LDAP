@@ -35,7 +35,7 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 /**
  * Handles generic requests that are dispatched to the backend.
  *
- * @author Chad Sikorra <Chad.Sikorra@gmail.com>
+     * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
 {

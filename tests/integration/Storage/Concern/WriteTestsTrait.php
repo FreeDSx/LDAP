@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
@@ -1131,5 +1132,107 @@ trait WriteTestsTrait
                 ->useSubtreeScope(),
         );
         self::assertCount(0, $notFound);
+    }
+
+    public function testAddStoresAValueThatIsNotUtf8(): void
+    {
+        $this->authenticateAdmin();
+        $photo = "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x02\x03\xFE";
+
+        $this->ldapClient()->create(new Entry(
+            'cn=binary,dc=foo,dc=bar',
+            new Attribute('objectClass', 'top', 'inetOrgPerson'),
+            new Attribute('cn', 'binary'),
+            new Attribute('sn', 'Binary'),
+            new Attribute('jpegPhoto', $photo),
+        ));
+
+        self::assertSame(
+            $photo,
+            $this->ldapClient()->read('cn=binary,dc=foo,dc=bar')?->get('jpegPhoto')?->firstValue(),
+        );
+        self::assertCount(
+            1,
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('jpegPhoto'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+            ),
+        );
+
+        $this->ldapClient()->delete('cn=binary,dc=foo,dc=bar');
+    }
+
+    public function testAddStoresAValueLargerThanSixtyFourKilobytes(): void
+    {
+        $this->authenticateAdmin();
+        $value = str_repeat('a', 70000);
+
+        $this->ldapClient()->create(new Entry(
+            'cn=oversized,dc=foo,dc=bar',
+            new Attribute('objectClass', 'top', 'inetOrgPerson'),
+            new Attribute('cn', 'oversized'),
+            new Attribute('sn', 'Oversized'),
+            new Attribute('description', $value),
+        ));
+
+        self::assertSame(
+            $value,
+            $this->ldapClient()->read('cn=oversized,dc=foo,dc=bar')?->get('description')?->firstValue(),
+        );
+
+        $this->ldapClient()->delete('cn=oversized,dc=foo,dc=bar');
+    }
+
+    public function testAnAttributeTypeWithinTheStorageBoundIsStored(): void
+    {
+        $this->authenticateAdmin();
+        $type = 'a' . str_repeat('b', Attribute::MAX_TYPE_LENGTH - 1);
+
+        $this->ldapClient()->send(
+            Operations::add(new Entry(
+                'cn=longattr,dc=foo,dc=bar',
+                new Attribute('objectClass', 'top', 'inetOrgPerson'),
+                new Attribute('cn', 'longattr'),
+                new Attribute('sn', 'Long'),
+                new Attribute($type, 'value'),
+            )),
+            Controls::relaxRules(),
+        );
+
+        self::assertSame(
+            'value',
+            $this->ldapClient()->read('cn=longattr,dc=foo,dc=bar')?->get($type)?->firstValue(),
+        );
+
+        $this->ldapClient()->delete('cn=longattr,dc=foo,dc=bar');
+    }
+
+    public function testAnOverLongAttributeTypeIsRefusedAndTheSessionSurvives(): void
+    {
+        $this->authenticateAdmin();
+        $type = 'a' . str_repeat('b', Attribute::MAX_TYPE_LENGTH);
+
+        try {
+            $this->ldapClient()->send(
+                Operations::add(new Entry(
+                    'cn=toolongattr,dc=foo,dc=bar',
+                    new Attribute('objectClass', 'top', 'inetOrgPerson'),
+                    new Attribute('cn', 'toolongattr'),
+                    new Attribute('sn', 'Too Long'),
+                    new Attribute($type, 'value'),
+                )),
+                Controls::relaxRules(),
+            );
+            self::fail('An attribute type beyond the storage bound should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ADMIN_LIMIT_EXCEEDED,
+                $e->getCode(),
+            );
+        }
+
+        // The refusal answers the operation rather than dropping the connection, so the session still serves.
+        self::assertNotNull($this->ldapClient()->read('cn=admin,dc=foo,dc=bar'));
     }
 }

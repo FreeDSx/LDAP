@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Write\Schema;
 
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\SchemaRuleException;
@@ -25,7 +26,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
 /**
- * Decides whether a schema violation stops the write, recording every one it sees either way.
+ * Decides whether a write proceeds: schema violations under the relax policy, and backend limits that nothing waives.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -40,6 +41,8 @@ final readonly class SchemaViolationGate
         Entry $entry,
         WriteContext $context,
     ): void {
+        $this->assertTypesStorable($entry);
+
         try {
             $this->validator->validateAdd(
                 $entry,
@@ -61,6 +64,8 @@ final readonly class SchemaViolationGate
         Entry $updated,
         WriteContext $context,
     ): void {
+        $this->assertTypesStorable($updated);
+
         try {
             $this->validator->validateModify(
                 $command,
@@ -83,6 +88,8 @@ final readonly class SchemaViolationGate
         Entry $moved,
         WriteContext $context,
     ): void {
+        $this->assertTypesStorable($moved);
+
         try {
             $this->validator->validateModifyDn(
                 $moved,
@@ -93,6 +100,28 @@ final readonly class SchemaViolationGate
             $this->recordOrReject(
                 $e,
                 $context,
+            );
+        }
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function assertTypesStorable(Entry $entry): void
+    {
+        foreach ($entry->getAttributes() as $attribute) {
+            $type = $attribute->getName();
+            if (Attribute::isStorableType($type)) {
+                continue;
+            }
+
+            throw new OperationException(
+                sprintf(
+                    'The attribute type is %d bytes, beyond the %d the directory stores, or is not ASCII.',
+                    strlen($type),
+                    Attribute::MAX_TYPE_LENGTH,
+                ),
+                ResultCode::ADMIN_LIMIT_EXCEEDED,
             );
         }
     }
