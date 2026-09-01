@@ -19,6 +19,8 @@ use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 /**
  * Attaches the password-policy response control to the next outgoing response when the context holds one.
  *
+ * Consumes the outcome either way. A response is sent for every request whatever route answered it.
+ *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final readonly class PasswordPolicyResponseInterceptor implements ResponseInterceptor
@@ -28,13 +30,13 @@ final readonly class PasswordPolicyResponseInterceptor implements ResponseInterc
     public function intercept(LdapMessageResponse $response): LdapMessageResponse
     {
         $control = $this->context->buildResponseControl();
+        $this->context->clear();
 
         if ($control === null) {
             return $response;
         }
 
         $response->controls()->add($control);
-        $this->context->clear();
 
         return $response;
     }

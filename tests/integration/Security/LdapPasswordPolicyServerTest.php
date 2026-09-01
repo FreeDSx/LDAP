@@ -24,11 +24,15 @@ use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
 final class LdapPasswordPolicyServerTest extends ServerTestCase
 {
+    use RawClientQueueTrait;
+
     private const ADMIN_DN = 'cn=admin,dc=foo,dc=bar';
 
     private const PASSWORD = '12345';
@@ -188,6 +192,32 @@ final class LdapPasswordPolicyServerTest extends ServerTestCase
         $this->assertFalse(
             $response->controls()->has(Control::OID_PWD_POLICY),
             'A clean bind should not carry a password policy response control.',
+        );
+    }
+
+    public function testAnOutcomeFromAnEarlierRequestDoesNotRideALaterOne(): void
+    {
+        $queue = $this->rawQueue();
+
+        // Stashes a changeAfterReset outcome, but asks for no control, so nothing consumes it.
+        $queue->sendMessage(new LdapMessageRequest(
+            1,
+            Operations::bind('cn=reset-user,dc=foo,dc=bar', self::PASSWORD),
+        ));
+        $queue->getMessage(1);
+
+        // A different identity, failing for an unrelated reason, while asking for policy information.
+        $queue->sendMessage(new LdapMessageRequest(
+            2,
+            Operations::bind('cn=user,dc=foo,dc=bar', self::WRONG_PASSWORD),
+            Controls::pwdPolicy(),
+        ));
+        $response = $queue->getMessage(2);
+        $queue->close();
+
+        $this->assertFalse(
+            $response->controls()->has(Control::OID_PWD_POLICY),
+            'The failed bind carried policy state belonging to the identity bound before it.',
         );
     }
 
