@@ -77,6 +77,22 @@ final class ServerManager
         $this->awaitReady($this->process);
     }
 
+    /**
+     * Whatever the server wrote after it signalled readiness, which the teardown would otherwise discard with it.
+     */
+    public function diagnostics(): string
+    {
+        if ($this->process === null) {
+            return '';
+        }
+
+        return trim(
+            $this->process->getErrorOutput()
+            . PHP_EOL
+            . $this->process->getOutput(),
+        );
+    }
+
     public function stop(): void
     {
         if ($this->process === null) {

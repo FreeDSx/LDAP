@@ -29,6 +29,8 @@ use Throwable;
  */
 final class Driver
 {
+    private const MAX_DIAGNOSTIC_BYTES = 4_000;
+
     public function __construct(
         private readonly Config $config,
     ) {}
@@ -71,8 +73,30 @@ final class Driver
 
             return $snapshot;
         } finally {
+            $this->reportServerDiagnostics($progress, $serverManager);
             $serverManager?->stop();
         }
+    }
+
+    /**
+     * A warning the server logs mid-run says nothing to the client, so it has to be read off the process itself.
+     */
+    private function reportServerDiagnostics(
+        OutputInterface $progress,
+        ?ServerManager $serverManager,
+    ): void {
+        $diagnostics = $serverManager?->diagnostics() ?? '';
+        if ($diagnostics === '') {
+            return;
+        }
+
+        // Capped, since one repeating warning per operation would otherwise bury the run's own output.
+        if (strlen($diagnostics) > self::MAX_DIAGNOSTIC_BYTES) {
+            $diagnostics = '(truncated) ...' . substr($diagnostics, -self::MAX_DIAGNOSTIC_BYTES);
+        }
+
+        $progress->writeln('<comment>Server output during the run:</comment>');
+        $progress->writeln($diagnostics);
     }
 
     private function progressChannel(OutputInterface $output): OutputInterface
