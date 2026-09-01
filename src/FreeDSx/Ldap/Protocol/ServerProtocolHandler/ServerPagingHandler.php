@@ -323,13 +323,12 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $page = [];
         $cursor = $resumeFrom;
         $exhausted = false;
-        $sliceSize = $pageLimit ?? $this->limits->maxSearchPageSize;
 
         while (!$exhausted && $this->pageHasCapacity($page, $pageLimit)) {
             $stream = $this->readSlice(
                 $pagingRequest,
                 new PageSlice(
-                    max($sliceSize, 1),
+                    $this->sliceSizeFor($page, $pageLimit),
                     $cursor,
                 ),
             );
@@ -501,6 +500,22 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
     ): bool {
         return $pageLimit === null
             || count($page) < $pageLimit;
+    }
+
+    /**
+     * What the page can still take, since a slice appends everything it keeps and would otherwise overfill the page.
+     *
+     * @param list<Entry> $page
+     */
+    private function sliceSizeFor(
+        array $page,
+        ?int $pageLimit,
+    ): int {
+        $remaining = $pageLimit === null
+            ? $this->limits->maxSearchPageSize
+            : $pageLimit - count($page);
+
+        return max($remaining, 1);
     }
 
     private function generateCookie(): string
