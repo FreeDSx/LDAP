@@ -159,8 +159,44 @@ final class TrigramSubstringIndexTest extends TestCase
         );
         self::assertFalse($result->isExact);
         self::assertSame(
-            ['cn', 'smi', 'mit', 'ith'],
+            ['cn', 'smi', 'mit', 'ith', 'cn', "\x01"],
             $result->params,
+            'The predicate also admits whatever the trigrams could not cover, which it re-checks in PHP.',
+        );
+    }
+
+    public function test_maintain_marks_a_value_the_trigrams_cannot_cover(): void
+    {
+        (new TrigramSubstringIndex(['cn']))->maintain(
+            self::ENTRY_ID,
+            new Entry(
+                new Dn(self::DN),
+                new Attribute('cn', str_repeat('a', 300)),
+            ),
+            $this->recorder(),
+        );
+
+        self::assertSame(
+            [self::ENTRY_ID, 'cn', "\x01"],
+            $this->executed[1][1],
+            'A value past the indexed window must be marked, not indexed by its first 255 characters alone.',
+        );
+    }
+
+    public function test_maintain_marks_a_value_that_is_not_utf8(): void
+    {
+        (new TrigramSubstringIndex(['cn']))->maintain(
+            self::ENTRY_ID,
+            new Entry(
+                new Dn(self::DN),
+                new Attribute('cn', "\xFF\xD8\xFF\xE0abc"),
+            ),
+            $this->recorder(),
+        );
+
+        self::assertSame(
+            [self::ENTRY_ID, 'cn', "\x01"],
+            $this->executed[1][1],
         );
     }
 

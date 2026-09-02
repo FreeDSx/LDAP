@@ -479,6 +479,70 @@ final class PdoStorageTest extends TestCase
         );
     }
 
+    /**
+     * The trigram predicate only narrows, so excluding a true match cannot be undone by the caller's re-check.
+     */
+    public function test_a_substring_match_past_the_indexed_window_is_still_a_candidate(): void
+    {
+        $storage = $this->trigramStorage();
+        $storage->store(new Entry(
+            new Dn('dc=example,dc=com'),
+            new Attribute('dc', 'example'),
+        ));
+        $storage->store(new Entry(
+            new Dn('cn=late,dc=example,dc=com'),
+            new Attribute('cn', 'late'),
+            new Attribute('sn', str_repeat('x', 300) . 'needle'),
+        ));
+
+        $found = iterator_to_array($storage->list(new StorageListOptions(
+            baseDn: new Dn('dc=example,dc=com'),
+            subtree: true,
+            filter: Filters::contains('sn', 'needle'),
+        ))->entries);
+
+        self::assertSame(
+            ['cn=late,dc=example,dc=com'],
+            array_map(
+                static fn(Entry $entry): string => $entry->getDn()->toString(),
+                $found,
+            ),
+        );
+    }
+
+    public function test_a_substring_inside_the_indexed_window_still_narrows(): void
+    {
+        $storage = $this->trigramStorage();
+        $storage->store(new Entry(
+            new Dn('dc=example,dc=com'),
+            new Attribute('dc', 'example'),
+        ));
+        $storage->store(new Entry(
+            new Dn('cn=hit,dc=example,dc=com'),
+            new Attribute('cn', 'hit'),
+            new Attribute('sn', 'haystack-needle'),
+        ));
+        $storage->store(new Entry(
+            new Dn('cn=miss,dc=example,dc=com'),
+            new Attribute('cn', 'miss'),
+            new Attribute('sn', 'nothing-here'),
+        ));
+
+        $found = iterator_to_array($storage->list(new StorageListOptions(
+            baseDn: new Dn('dc=example,dc=com'),
+            subtree: true,
+            filter: Filters::contains('sn', 'needle'),
+        ))->entries);
+
+        self::assertSame(
+            ['cn=hit,dc=example,dc=com'],
+            array_map(
+                static fn(Entry $entry): string => $entry->getDn()->toString(),
+                $found,
+            ),
+        );
+    }
+
     public function test_store_keeps_the_original_value_only_where_the_index_reads_it(): void
     {
         if (!Fts5SubstringIndex::isSupported()) {
@@ -1485,6 +1549,27 @@ final class PdoStorageTest extends TestCase
         }
 
         return $storage;
+    }
+
+    private function trigramStorage(): PdoStorage
+    {
+        $pdo = new PDO('sqlite::memory:');
+        PdoStorage::initialize(
+            $pdo,
+            new SqliteDialect(),
+            new TrigramSubstringIndex(),
+        );
+
+        return $this->fromContainer(
+            PdoStorageFactory::class,
+            options: TestServerOptions::forStorage(
+                PdoConfig::forSqlite(':memory:')
+                    ->setSubstringIndexMode(SubstringIndexMode::Trigram),
+            ),
+        )->storageOn(new SharedPdoConnectionProvider(
+            $pdo,
+            fn(): PDO => $pdo,
+        ));
     }
 
     /**

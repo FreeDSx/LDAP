@@ -26,6 +26,18 @@ final class Trigrams
     private const SIZE = 3;
 
     /**
+     * Whether the trigrams of a value cover all of it.
+     */
+    public static function covers(string $value): bool
+    {
+        return Text::isUtf8($value)
+            && mb_strlen(
+                mb_strtolower($value, 'UTF-8'),
+                'UTF-8',
+            ) <= SqlFilterUtility::MAX_INDEXED_VALUE_CHARS;
+    }
+
+    /**
      * Distinct trigrams of the folded (lowercased, truncated) value; empty for non-UTF-8 or values shorter than 3 chars.
      *
      * @return list<string>
