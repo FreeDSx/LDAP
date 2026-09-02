@@ -44,6 +44,32 @@ trait SubtreeMoveTestsTrait
         $this->deleteSubtree('ou=division,dc=foo,dc=bar');
     }
 
+    public function testRenamingASubtreeWithMultibyteDnsRekeysEveryDescendant(): void
+    {
+        $this->authenticateAdmin();
+        $client = $this->ldapClient();
+
+        $client->create(Entry::fromArray('ou=café,dc=foo,dc=bar', ['ou' => 'café', 'objectClass' => 'organizationalUnit']));
+        $client->create(Entry::fromArray('ou=münchen,ou=café,dc=foo,dc=bar', ['ou' => 'münchen', 'objectClass' => 'organizationalUnit']));
+        $client->create(Entry::fromArray(
+            'cn=josé,ou=münchen,ou=café,dc=foo,dc=bar',
+            ['cn' => 'josé', 'sn' => 'Ortiz', 'objectClass' => 'inetOrgPerson'],
+        ));
+
+        $client->rename('ou=café,dc=foo,dc=bar', 'ou=zürich', true);
+
+        self::assertSame(
+            [
+                'cn=josé,ou=münchen,ou=zürich,dc=foo,dc=bar',
+                'ou=münchen,ou=zürich,dc=foo,dc=bar',
+                'ou=zürich,dc=foo,dc=bar',
+            ],
+            $this->dnsUnder('ou=zürich,dc=foo,dc=bar'),
+        );
+
+        $this->deleteSubtree('ou=zürich,dc=foo,dc=bar');
+    }
+
     public function testRenameLeavesNothingBehindAtTheOldSubtree(): void
     {
         $this->authenticateAdmin();

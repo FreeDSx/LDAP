@@ -238,10 +238,11 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     ): void {
         $normDn = $entry->getDn()->normalize();
         $dnString = $entry->getDn()->toString();
-
-        $this->assertDnFits($dnString);
-
         $lcDn = $normDn->toString();
+
+        // Both are stored, and normalising re-escapes, so the canonical form is not always the shorter of the two.
+        $this->assertDnFits($dnString);
+        $this->assertDnFits($lcDn);
 
         $this->atomic(function () use ($entry, $lcDn, $dnString, $normDn, $rebuildIndexes): void {
             // Read the row we are about to overwrite under its write lock, so the diff is against what is actually
@@ -282,6 +283,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         Dn $to,
     ): void {
         $this->assertDnFits($to->toString());
+        $this->assertDnFits($to->normalize()->toString());
 
         $this->atomic(function () use ($from, $to): void {
             // Locked before the walk reads it, so a concurrent rename of the same base cannot interleave with this one.

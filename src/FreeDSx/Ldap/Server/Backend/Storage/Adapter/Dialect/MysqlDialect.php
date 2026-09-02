@@ -78,14 +78,25 @@ final class MysqlDialect implements PdoDialectInterface
         SQL;
     }
 
+    /**
+     * What the DN columns hold, which is InnoDB's own ceiling for the unique key over one of them.
+     */
     public function maxDnLength(): int
     {
-        return 768;
+        return 3072;
     }
 
     protected function charLength(string $column): string
     {
         return "CHAR_LENGTH($column)";
+    }
+
+    /**
+     * The DN columns are binary, where CHAR_LENGTH and SUBSTR would count bytes rather than the characters PHP passes.
+     */
+    protected function textOf(string $column): string
+    {
+        return "CONVERT($column USING utf8mb4)";
     }
 
     protected function concat(

@@ -177,8 +177,9 @@ trait PdoDialectTrait
      */
     public function queryRenameDescendants(): string
     {
+        $storedDn = $this->textOf('dn');
         $carriesSuffix = $this->binaryCompare(
-            'SUBSTR(dn, ' . $this->charLength('dn') . ' - ? + 1)',
+            "SUBSTR($storedDn, " . $this->charLength($storedDn) . ' - ? + 1)',
             '?',
         );
         $stored = $this->replaceDnSuffix('dn');
@@ -321,10 +322,20 @@ trait PdoDialectTrait
      */
     protected function replaceDnSuffix(string $column): string
     {
+        $text = $this->textOf($column);
+
         return $this->concat(
-            "SUBSTR($column, 1, {$this->charLength($column)} - ?)",
+            "SUBSTR($text, 1, {$this->charLength($text)} - ?)",
             '?',
         );
+    }
+
+    /**
+     * The column read as text, so the DN arithmetic counts characters wherever a dialect stores the DN as bytes.
+     */
+    protected function textOf(string $column): string
+    {
+        return $column;
     }
 
     /**
