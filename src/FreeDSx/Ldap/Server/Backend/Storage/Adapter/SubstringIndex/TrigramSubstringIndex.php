@@ -42,6 +42,11 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
 
     private const SCHEMA_NAME = 'trigram';
 
+    /**
+     * Marks an attribute whose values the trigrams do not cover.
+     */
+    private const UNCOVERED = "\x01";
+
     private const DELETE_SQL = <<<SQL
         DELETE FROM entry_attribute_trigrams
         WHERE owner_entry_id = ?
@@ -53,12 +58,15 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
         SQL;
 
     private const PREDICATE_SQL = <<<SQL
-        entry_id IN (
+        (entry_id IN (
             SELECT owner_entry_id FROM entry_attribute_trigrams
             WHERE attr_name_lower = ? AND trigram IN (%s)
             GROUP BY owner_entry_id
             HAVING COUNT(DISTINCT trigram) = %d
-        )
+        ) OR entry_id IN (
+            SELECT owner_entry_id FROM entry_attribute_trigrams
+            WHERE attr_name_lower = ? AND trigram = ?
+        ))
         SQL;
 
     /**
@@ -150,9 +158,23 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
                 $markers,
                 count($trigrams),
             ),
-            [$attributeLower, ...$trigrams],
+            [$attributeLower, ...$trigrams, $attributeLower, self::UNCOVERED],
             isExact: false,
         );
+    }
+
+    /**
+     * @param array<array-key, string> $values
+     */
+    private function coversEvery(array $values): bool
+    {
+        foreach ($values as $value) {
+            if (!Trigrams::covers($value)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -167,6 +189,13 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
         foreach ($entry->getAttributes() as $attribute) {
             $attrLower = strtolower($attribute->getName());
             if (!isset($this->attributes[$attrLower])) {
+                continue;
+            }
+
+            // A value the trigrams do not cover would otherwise be excluded by a predicate meant only to narrow.
+            if (!$this->coversEvery($attribute->getValues())) {
+                $rows[] = [$entryId, $attrLower, self::UNCOVERED];
+
                 continue;
             }
 
