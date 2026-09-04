@@ -1000,6 +1000,56 @@ trait QueryTestsTrait
         ];
     }
 
+    #[DataProvider('baseScopeFilterProvider')]
+    public function testABaseScopeSearchAppliesTheFilter(
+        FilterInterface $filter,
+        int $expected,
+    ): void {
+        $this->authenticateUser();
+
+        self::assertCount(
+            $expected,
+            $this->ldapClient()->search(
+                Operations::search($filter)
+                    ->base('ou=people,dc=foo,dc=bar')
+                    ->useBaseScope(),
+            ),
+        );
+    }
+
+    /**
+     * RFC 4511 4.5.1 applies the filter at every scope; ou=people is an organizationalUnit holding only ou.
+     *
+     * @return iterable<string, array{FilterInterface, int}>
+     */
+    public static function baseScopeFilterProvider(): iterable
+    {
+        yield 'a filter the base entry matches' => [
+            Filters::equal('objectClass', 'organizationalUnit'),
+            1,
+        ];
+        yield 'a presence filter the base entry matches' => [
+            Filters::present('objectClass'),
+            1,
+        ];
+        yield 'an object class the base entry does not hold' => [
+            Filters::equal('objectClass', 'inetOrgPerson'),
+            0,
+        ];
+        yield 'a value the base entry does not hold' => [
+            Filters::equal('ou', 'nosuchvalue'),
+            0,
+        ];
+        yield 'an attribute the base entry does not hold' => [
+            Filters::present('uidNumber'),
+            0,
+        ];
+        yield 'a negation no entry can satisfy' => [
+            Filters::not(Filters::present('objectClass')),
+            0,
+        ];
+    }
+
     public function testAHexEscapeNamesTheSameEntryAsTheCharacterItEncodes(): void
     {
         $this->authenticateUser();

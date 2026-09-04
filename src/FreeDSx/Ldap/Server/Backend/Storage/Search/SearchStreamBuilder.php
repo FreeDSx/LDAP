@@ -45,12 +45,25 @@ final readonly class SearchStreamBuilder
         private DerivedResolver $derivedResolver,
     ) {}
 
+    /**
+     * @throws OperationException
+     */
     public function buildForBaseObject(
         Entry $entry,
         SearchRequest $request,
     ): EntryStream {
+        // RFC 4511 §4.5.1 applies the filter at every scope, and derived attributes are injected after it
+        $generator = $this->wrapWithFilterEvaluation(
+            $this->yieldSingle($entry),
+            $request->getFilter(),
+        );
+
         return new EntryStream(
-            $this->yieldSingle($this->injectDerived($entry, $request)),
+            $this->wrapWithDerived(
+                $generator,
+                $request,
+            ),
+            true,
         );
     }
 
