@@ -187,9 +187,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function list(StorageListOptions $options): EntryStream
     {
-        $deadline = $options->timeLimit > 0
-            ? microtime(true) + $options->timeLimit
-            : null;
+        $deadline = $options->deadline;
 
         $filterResult = $this->translator->translate($options->filter);
 
@@ -392,12 +390,13 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             default => null,
         };
 
-        if ($options->maxCandidates === null) {
+        $limit = $options->limit();
+        if ($limit === null) {
             return $ceiling;
         }
 
         // One past what a slice will hand over, so it can say whether more remain without the caller reading on.
-        $sliceRead = $options->maxCandidates + 1;
+        $sliceRead = $limit + 1;
 
         return $ceiling === null
             ? $sliceRead
@@ -533,19 +532,20 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         $allowed = $options->attributes === null
             ? null
             : array_fill_keys($options->attributes, true);
-        $cursor = $options->after;
+        $cursor = $options->resumeAfter();
         $read = 0;
 
         // A sort orders by something the key says nothing about, so its walk resumes by count rather than by key.
         $isSorted = $options->sortKeys !== [];
         $delivered = $isSorted
-            ? $options->after->position ?? 0
+            ? $options->resumeAfter()->position ?? 0
             : 0;
 
         while (true) {
-            $remaining = $options->maxCandidates === null
+            $limit = $options->limit();
+            $remaining = $limit === null
                 ? null
-                : $options->maxCandidates - $read;
+                : $limit - $read;
             $batch = yield from $this->generateBatch(
                 $query,
                 $deadline,

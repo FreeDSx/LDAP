@@ -302,17 +302,17 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $request = $pagingRequest->getSearchRequest();
         $projection = $this->projectionFor($request);
         $filter = $request->getFilter();
-        $effectivePageSize = $this->effectiveSizeLimit(
+        $effectivePageSize = $this->effectiveLimit(
             $pagingRequest->getSize(),
             $this->limits->maxSearchPageSize,
         );
-        $sizeLimit = $this->effectiveSizeLimit(
+        $sizeLimit = $this->effectiveLimit(
             $request->getSizeLimit(),
             $this->limits->maxSearchSize,
         );
 
         // Deliberate: the size limit bounds each page rather than the whole paged operation.
-        $collectCap = $this->effectiveSizeLimit(
+        $collectCap = $this->effectiveLimit(
             $effectivePageSize,
             $sizeLimit,
         );
@@ -364,7 +364,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
                 $page[] = $projection->project($kept);
             }
 
-            // The stream was abandoned mid-slice, so it can say nothing about where it stopped.
+            // The stream was abandoned mid-slice and can say nothing about where it stopped.
             if ($hasFurtherMatch) {
                 break;
             }

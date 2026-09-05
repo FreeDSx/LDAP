@@ -230,7 +230,7 @@ trait ServerSearchTrait
     /**
      * Returns the stricter of the client-requested limit and the server maximum. Zero means no limit.
      */
-    private function effectiveSizeLimit(
+    private function effectiveLimit(
         int $requestLimit,
         int $serverMax,
     ): int {

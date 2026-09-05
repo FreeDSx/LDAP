@@ -126,8 +126,9 @@ trait ArrayEntryStorageTrait
         array $keys,
         StorageListOptions $options,
     ): Generator {
-        $after = $options->after?->position;
-        $cursor = $options->after;
+        $after = $options->resumeAfter()?->position;
+        $cursor = $options->resumeAfter();
+        $limit = $options->limit();
         $taken = 0;
         $hasMore = false;
 
@@ -139,7 +140,7 @@ trait ArrayEntryStorageTrait
             }
 
             // Seen but not handed over: its only job is to prove the result did not end here.
-            if ($options->maxCandidates !== null && $taken >= $options->maxCandidates) {
+            if ($limit !== null && $taken >= $limit) {
                 $hasMore = true;
 
                 break;
@@ -174,7 +175,8 @@ trait ArrayEntryStorageTrait
         iterable $entries,
         StorageListOptions $options,
     ): Generator {
-        $delivered = $options->after->position ?? 0;
+        $delivered = $options->resumeAfter()->position ?? 0;
+        $limit = $options->limit();
         $skipped = 0;
         $taken = 0;
         $hasMore = false;
@@ -186,7 +188,7 @@ trait ArrayEntryStorageTrait
                 continue;
             }
 
-            if ($options->maxCandidates !== null && $taken >= $options->maxCandidates) {
+            if ($limit !== null && $taken >= $limit) {
                 $hasMore = true;
 
                 break;
@@ -233,9 +235,7 @@ trait ArrayEntryStorageTrait
         StorageListOptions $options,
         array $entries,
     ): Generator {
-        $deadline = $options->timeLimit > 0
-            ? microtime(true) + $options->timeLimit
-            : null;
+        $deadline = $options->deadline;
 
         foreach ($entries as $normDn => $entry) {
             if ($deadline !== null && microtime(true) >= $deadline) {

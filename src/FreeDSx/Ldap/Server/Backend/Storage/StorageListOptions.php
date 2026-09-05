@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
+use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 
 /**
@@ -29,26 +30,41 @@ final readonly class StorageListOptions
 {
     /**
      * @param SortKey[] $sortKeys
+     * @param ?float $deadline When the read must stop, established by the caller that knows the operation it serves.
      * @param int $maxEntries A hard row cap for internal callers that want a bounded read; never the client's size
      *                        limit, which access control can shrink after the read and so cannot bound it here.
      * @param list<string>|null $attributes Lowercase base attribute names to materialize, or null for all.
-     * @param ?PageCursor $after Resume after this entry rather than starting from the beginning.
-     * @param ?int $maxCandidates Stop after examining this many, so the caller can read the result to its end.
+     * @param ?PageSlice $slice Where to resume and how many candidates to examine, for a caller reading a page.
      */
     public function __construct(
         public Dn $baseDn,
         public bool $subtree,
         public FilterInterface $filter,
-        public int $timeLimit = 0,
+        public ?float $deadline = null,
         public int $maxEntries = 0,
         public array $sortKeys = [],
         public int $lookthroughLimit = 0,
         public ?array $attributes = null,
         public SubentryVisibility $subentries = SubentryVisibility::All,
-        public ?PageCursor $after = null,
-        public ?int $maxCandidates = null,
+        private ?PageSlice $slice = null,
         public bool $withHasSubordinates = false,
     ) {}
+
+    /**
+     * Candidates this read may examine, or null when it is not bounded to a page.
+     */
+    public function limit(): ?int
+    {
+        return $this->slice?->limit;
+    }
+
+    /**
+     * Where to resume, or null to start from the beginning.
+     */
+    public function resumeAfter(): ?PageCursor
+    {
+        return $this->slice?->after;
+    }
 
     /**
      * Every entry in scope, for internal callers that have no requested filter to apply.
@@ -58,14 +74,14 @@ final readonly class StorageListOptions
     public static function matchAll(
         Dn $baseDn,
         bool $subtree,
-        int $timeLimit = 0,
+        ?float $deadline = null,
         ?array $attributes = null,
     ): self {
         return new self(
             baseDn: $baseDn,
             subtree: $subtree,
             filter: new AndFilter(),
-            timeLimit: $timeLimit,
+            deadline: $deadline,
             attributes: $attributes,
         );
     }

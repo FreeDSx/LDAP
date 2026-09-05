@@ -326,7 +326,7 @@ final class InMemoryStorageTest extends TestCase
             $storage->list(StorageListOptions::matchAll(
                 new Dn('dc=example,dc=com'),
                 true,
-                timeLimit: 60,
+                deadline: microtime(true) + 60,
             ))->entries,
         );
 
