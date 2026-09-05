@@ -281,10 +281,13 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
             $this->next,
         );
 
+        // The moved entry is consulted alongside its containers, so a rule naming it covers moving it.
         self::assertSame(
             [
                 'Out:ou=here,dc=bar',
+                'Out:cn=foo,ou=here,dc=bar',
                 'In:ou=there,dc=bar',
+                'In:cn=baz,ou=there,dc=bar',
             ],
             $relocations,
         );

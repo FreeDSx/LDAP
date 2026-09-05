@@ -382,7 +382,7 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
     }
 
     /**
-     * Gates the containers an entry leaves and arrives in.
+     * Gates the containers an entry leaves and arrives in (which also consults itself).
      *
      * @throws OperationException
      */
@@ -399,16 +399,21 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
             return;
         }
 
-        $this->accessControl->authorizeRelocation(
-            $token,
-            $oldParentDn,
-            RelocationAccess::Out,
-        );
-        $this->accessControl->authorizeRelocation(
-            $token,
-            $newParentDn,
-            RelocationAccess::In,
-        );
+        foreach ([$oldParentDn, $request->getDn()] as $leaving) {
+            $this->accessControl->authorizeRelocation(
+                $token,
+                $leaving,
+                RelocationAccess::Out,
+            );
+        }
+
+        foreach ([$newParentDn, OperationTargetDn::resultOf($request)] as $arriving) {
+            $this->accessControl->authorizeRelocation(
+                $token,
+                $arriving,
+                RelocationAccess::In,
+            );
+        }
     }
 
     /**

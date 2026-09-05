@@ -244,6 +244,62 @@ trait SubtreeMoveTestsTrait
         $this->cleanUpRelocationFixtures();
     }
 
+    public function testMovingThePinnedContainerItselfIsRefused(): void
+    {
+        $this->authenticateAdmin();
+        $this->seedMover();
+        $this->seedPinnedContainer();
+        $this->ldapClient()->create(Entry::fromArray(
+            'ou=elsewhere,dc=foo,dc=bar',
+            ['ou' => 'elsewhere', 'objectClass' => 'organizationalUnit'],
+        ));
+
+        $this->authenticateMover();
+
+        try {
+            $this->ldapClient()->move(
+                LdapBackendStorageCommand::PINNED_CONTAINER_DN,
+                'ou=elsewhere,dc=foo,dc=bar',
+            );
+            self::fail('Moving the pinned container itself should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+                $e->getCode(),
+            );
+        }
+
+        $this->authenticateAdmin();
+        self::assertNotNull($this->ldapClient()->read('cn=held,ou=pinned,dc=foo,dc=bar'));
+
+        $this->ldapClient()->delete('ou=elsewhere,dc=foo,dc=bar');
+        $this->cleanUpRelocationFixtures();
+    }
+
+    public function testMovingAnUnguardedContainerIsAllowed(): void
+    {
+        $this->authenticateAdmin();
+        $this->seedMover();
+        $this->ldapClient()->create(Entry::fromArray(
+            'ou=loosecontainer,dc=foo,dc=bar',
+            ['ou' => 'loosecontainer', 'objectClass' => 'organizationalUnit'],
+        ));
+        $this->ldapClient()->create(Entry::fromArray(
+            'ou=elsewhere,dc=foo,dc=bar',
+            ['ou' => 'elsewhere', 'objectClass' => 'organizationalUnit'],
+        ));
+
+        $this->authenticateMover();
+        $this->ldapClient()->move('ou=loosecontainer,dc=foo,dc=bar', 'ou=elsewhere,dc=foo,dc=bar');
+
+        $this->authenticateAdmin();
+        self::assertNotNull($this->ldapClient()->read('ou=loosecontainer,ou=elsewhere,dc=foo,dc=bar'));
+
+        $this->ldapClient()->delete('ou=loosecontainer,ou=elsewhere,dc=foo,dc=bar');
+        $this->ldapClient()->delete('ou=elsewhere,dc=foo,dc=bar');
+        $this->ldapClient()->delete(LdapBackendStorageCommand::MOVER_DN);
+    }
+
     public function testMovingIntoASealedContainerIsRefused(): void
     {
         $this->authenticateAdmin();
