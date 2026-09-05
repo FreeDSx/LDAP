@@ -57,7 +57,7 @@ final readonly class ListQuerySpec
             limit: $limit,
             sortKeys: $sortKeys,
             subentries: $options->subentries,
-            after: $options->after,
+            after: $options->resumeAfter(),
             withChildFlag: $options->withHasSubordinates,
         );
     }

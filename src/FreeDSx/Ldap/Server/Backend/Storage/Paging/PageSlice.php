@@ -25,9 +25,11 @@ final readonly class PageSlice
     /**
      * @param int $limit Candidates this slice may examine.
      * @param ?PageCursor $after Where to resume, or null to start from the beginning.
+     * @param ?float $deadline When the page this slice belongs to runs out of time.
      */
     public function __construct(
         public int $limit,
         public ?PageCursor $after = null,
+        public ?float $deadline = null,
     ) {}
 }

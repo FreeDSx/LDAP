@@ -133,7 +133,7 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
         AttributeProjection $projection,
     ): Generator {
-        $sizeLimit = $this->effectiveSizeLimit(
+        $sizeLimit = $this->effectiveLimit(
             $request->getSizeLimit(),
             $this->limits->maxSearchSize,
         );

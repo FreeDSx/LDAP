@@ -67,17 +67,33 @@ final readonly class StorageListOptionsFactory
             baseDn: $baseDn,
             subtree: $request->getScope() === SearchRequest::SCOPE_WHOLE_SUBTREE,
             filter: $request->getFilter(),
-            timeLimit: $this->effectiveTimeLimit($request->getTimeLimit(), $limits),
+            deadline: $slice->deadline ?? $this->deadlineFor($request, $limits),
             sortKeys: $sortingControl instanceof SortingControl
                 ? $sortingControl->getSortKeys()
                 : [],
             lookthroughLimit: $limits->maxSearchLookthrough,
             attributes: $this->materializedAttributes($request),
             subentries: $subentries,
-            after: $slice?->after,
-            maxCandidates: $slice?->limit,
+            slice: $slice,
             withHasSubordinates: $this->wantsHasSubordinates($request),
         );
+    }
+
+    /**
+     * When a read that serves this request must stop, or null when neither side bounds it.
+     */
+    public function deadlineFor(
+        SearchRequest $request,
+        SearchLimits $limits,
+    ): ?float {
+        $seconds = $this->effectiveTimeLimit(
+            $request->getTimeLimit(),
+            $limits,
+        );
+
+        return $seconds > 0
+            ? microtime(true) + $seconds
+            : null;
     }
 
     /**

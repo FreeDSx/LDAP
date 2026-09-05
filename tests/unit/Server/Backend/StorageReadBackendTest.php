@@ -397,11 +397,18 @@ final class StorageReadBackendTest extends TestCase
             ->useSingleLevelScope()
             ->timeLimit($requestLimit);
 
+        $before = microtime(true);
         iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
+        $after = microtime(true);
 
-        self::assertSame(
-            $expectedLimit,
-            $capturedOptions?->timeLimit,
+        self::assertNotNull($capturedOptions?->deadline);
+        self::assertGreaterThanOrEqual(
+            $before + $expectedLimit,
+            $capturedOptions->deadline,
+        );
+        self::assertLessThanOrEqual(
+            $after + $expectedLimit,
+            $capturedOptions->deadline,
         );
     }
 
