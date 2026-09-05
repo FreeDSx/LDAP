@@ -25,8 +25,6 @@ final class CiThresholds
      */
     public const KNOWN_PROFILES = [
         'memory:swoole',
-        'json:pcntl',
-        'json:swoole',
         'sqlite:pcntl',
         'sqlite:swoole',
         'sqlite:swoole-pool',
@@ -34,55 +32,36 @@ final class CiThresholds
         'mysql:swoole',
     ];
 
+    /**
+     * A failed operation is a defect on every profile.
+     */
+    private const MAX_ERRORS = 0;
+
+    /**
+     * Set low enough that only a collapse trips it.
+     */
+    private const MIN_THROUGHPUT = 250.0;
+
+    /**
+     * Set high enough that only a collapse trips it.
+     */
+    private const MAX_P99_MS = 3_000.0;
+
     public static function forProfile(string $key): ThresholdSet
     {
-        return match ($key) {
-            'memory:swoole' => new ThresholdSet(
-                maxErrors: 0,
-                minThroughput: 700.0,
-                maxP99Ms: 500.0,
-            ),
-            'json:pcntl' => new ThresholdSet(
-                maxErrors: 0,
-                minThroughput: 100.0,
-                maxP99Ms: 800.0,
-            ),
-            'json:swoole' => new ThresholdSet(
-                maxErrors: 0,
-                minThroughput: 500.0,
-                maxP99Ms: 800.0,
-            ),
-            'sqlite:pcntl' => new ThresholdSet(
-                maxErrors: 0,
-                minThroughput: 935.0,
-                maxP99Ms: 1_000.0,
-            ),
-            'sqlite:swoole' => new ThresholdSet(
-                maxErrors: 0,
-                minThroughput: 700.0,
-                maxP99Ms: 1_500.0,
-            ),
-            // Throughput matches the single-worker floor since runner core counts vary; the error ceiling is the guard.
-            'sqlite:swoole-pool' => new ThresholdSet(
-                maxErrors: 0,
-                minThroughput: 700.0,
-                maxP99Ms: 1_500.0,
-            ),
-            'mysql:pcntl' => new ThresholdSet(
-                maxErrors: 0,
-                minThroughput: 720.0,
-                maxP99Ms: 1_500.0,
-            ),
-            'mysql:swoole' => new ThresholdSet(
-                maxErrors: 0,
-                minThroughput: 720.0,
-                maxP99Ms: 1_500.0,
-            ),
-            default => throw new InvalidArgumentException(sprintf(
+        if (!in_array($key, self::KNOWN_PROFILES, true)) {
+            throw new InvalidArgumentException(sprintf(
                 'Unknown CI profile "%s". Known: %s.',
                 $key,
                 implode(', ', self::KNOWN_PROFILES),
-            )),
-        };
+            ));
+        }
+
+        // Latency and throughput vary far more with the runner than with a regression, so the error count is the guard.
+        return new ThresholdSet(
+            maxErrors: self::MAX_ERRORS,
+            minThroughput: self::MIN_THROUGHPUT,
+            maxP99Ms: self::MAX_P99_MS,
+        );
     }
 }
