@@ -33,6 +33,32 @@ use PHPUnit\Framework\Attributes\DataProvider;
  */
 trait ControlTestsTrait
 {
+    public function testTheLookthroughLimitBoundsThePageRatherThanEachSliceOfIt(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::storageExtraArgs(),
+                '--seed-entries=10',
+                '--max-search-lookthrough=12',
+            ],
+        );
+        $this->authenticateUser();
+
+        $paging = $this->ldapClient()->paging(
+            Operations::search(Filters::not(Filters::contains('sn', 'Seeded')))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+            10,
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+
+        $paging->getEntries();
+    }
+
     public function testAFullPageWithNoFurtherMatchIsNotASizeLimitOverflow(): void
     {
         $this->stopServer();

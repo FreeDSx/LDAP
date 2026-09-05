@@ -62,12 +62,18 @@ final readonly class StorageListOptionsFactory
     ): StorageListOptions {
         $limits = $effectiveLimits ?? $this->limits;
         $sortingControl = $controls->get(Control::OID_SORTING);
+        $timeLimit = $this->effectiveTimeLimit(
+            $request->getTimeLimit(),
+            $limits,
+        );
 
         return new StorageListOptions(
             baseDn: $baseDn,
             subtree: $request->getScope() === SearchRequest::SCOPE_WHOLE_SUBTREE,
             filter: $request->getFilter(),
-            deadline: $slice->deadline ?? $this->deadlineFor($request, $limits),
+            deadline: $slice->deadline ?? ($timeLimit > 0
+                ? microtime(true) + $timeLimit
+                : null),
             sortKeys: $sortingControl instanceof SortingControl
                 ? $sortingControl->getSortKeys()
                 : [],
@@ -77,23 +83,6 @@ final readonly class StorageListOptionsFactory
             slice: $slice,
             withHasSubordinates: $this->wantsHasSubordinates($request),
         );
-    }
-
-    /**
-     * When a read that serves this request must stop, or null when neither side bounds it.
-     */
-    public function deadlineFor(
-        SearchRequest $request,
-        SearchLimits $limits,
-    ): ?float {
-        $seconds = $this->effectiveTimeLimit(
-            $request->getTimeLimit(),
-            $limits,
-        );
-
-        return $seconds > 0
-            ? microtime(true) + $seconds
-            : null;
     }
 
     /**

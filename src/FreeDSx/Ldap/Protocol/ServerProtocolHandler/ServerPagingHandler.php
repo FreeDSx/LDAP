@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
+use FreeDSx\Ldap\Server\Paging\PageBudget;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\Paging\PagingRequestComparator;
 use FreeDSx\Ldap\Server\Paging\PagingResponse;
@@ -320,6 +321,14 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
             ? $collectCap
             : null;
 
+        $budget = PageBudget::of(
+            $this->effectiveLimit(
+                $request->getTimeLimit(),
+                $this->limits->maxSearchTimeLimit,
+            ),
+            $this->limits->effectivePagedLookthrough(),
+        );
+
         $page = [];
         $cursor = $resumeFrom;
         $exhausted = false;
@@ -341,7 +350,9 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
                         $pageLimit,
                     ),
                     $cursor,
+                    $budget->deadline(),
                 ),
+                $budget->remainingLookthrough(),
             );
 
             foreach ($stream->entries as $entry) {
@@ -373,6 +384,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
             $read = $stream->entries->getReturn();
             $exhausted = $read === null || !$read->hasMore || $read->cursor === null;
             $cursor = $read->cursor ?? $cursor;
+            $budget->spend($read->rows ?? 0);
         }
 
         return new CollectedPage(
@@ -402,15 +414,15 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
     private function readSlice(
         PagingRequest $pagingRequest,
         PageSlice $slice,
+        int $lookthrough,
     ): EntryStream {
-        // Paged searches use the paged lookthrough limit (falls back to the regular one when unset), applied per page.
         return $this->backend->search(
             $pagingRequest->getSearchRequest(),
             $this->subentryVisibility($pagingRequest->controls()),
             $pagingRequest->controls(),
             new SearchLimits(
                 maxSearchTimeLimit: $this->limits->maxSearchTimeLimit,
-                maxSearchLookthrough: $this->limits->effectivePagedLookthrough(),
+                maxSearchLookthrough: $lookthrough,
             ),
             $slice,
         );

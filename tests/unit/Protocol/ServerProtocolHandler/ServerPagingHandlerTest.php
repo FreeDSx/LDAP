@@ -434,6 +434,57 @@ class ServerPagingHandlerTest extends TestCase
         self::assertSame([], $this->entryMessages());
     }
 
+    public function test_every_slice_of_one_page_carries_the_same_deadline(): void
+    {
+        $searchRequest = (new SearchRequest(Filters::raw('(foo=bar)')))
+            ->base('dc=foo,dc=bar')
+            ->timeLimit(30);
+
+        $entries = [];
+        foreach (range(1, 6) as $i) {
+            $entries[] = Entry::create("cn={$i},dc=foo,dc=bar", ['cn' => (string) $i]);
+        }
+
+        $deadlines = [];
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback(function (mixed ...$args) use ($entries, &$deadlines): EntryStream {
+                foreach ($args as $arg) {
+                    if ($arg instanceof PageSlice) {
+                        $deadlines[] = $arg->deadline;
+                    }
+                }
+
+                return ($this->sliceAware(...$entries))(...$args);
+            });
+
+        // Access control hides every entry, so the page is filled from slice after slice until the result runs out.
+        $mockAccessControl = $this->createMock(AccessControlInterface::class);
+        $mockAccessControl
+            ->method('filterEntry')
+            ->willReturn(null);
+
+        $subject = new ServerPagingHandler(
+            backend: $this->mockBackend,
+            filterEvaluator: $this->mockFilterEvaluator,
+            accessControl: $mockAccessControl,
+            requestHistory: $this->requestHistory,
+            schema: $this->schema,
+            limits: new SearchLimits(maxSearchPageSize: 2),
+        );
+        $this->drive($subject, $this->makeSearchMessage(size: 2, searchRequest: $searchRequest));
+
+        self::assertGreaterThan(
+            1,
+            count($deadlines),
+        );
+        self::assertNotNull($deadlines[0]);
+        self::assertCount(
+            1,
+            array_unique($deadlines),
+        );
+    }
+
     public function test_it_should_return_size_limit_exceeded_on_first_page_when_limit_is_hit(): void
     {
         $searchRequest = (new SearchRequest(Filters::raw('(foo=bar)')))
