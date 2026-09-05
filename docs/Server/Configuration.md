@@ -726,6 +726,9 @@ removes the cap.
 Per-identity search limits: an ordered list of `(subject, limits)` rules, evaluated first-match-wins. The first rule whose
 subject matches the bound identity supplies that request's limits; identities matching no rule get the global limits above.
 
+A rule overrides only the limits it names. Anything it leaves unset keeps the global value. Naming a limit as `0` is an
+explicit "no limit" for that identity, which is how a rule lifts a global cap rather than inheriting it.
+
 ```php
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\SearchLimit\SearchLimitRule;

@@ -135,7 +135,7 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
     ): Generator {
         $sizeLimit = $this->effectiveLimit(
             $request->getSizeLimit(),
-            $this->limits->maxSearchSize,
+            $this->limits->maxSearchSize(),
         );
         $filter = $request->getFilter();
         $emitted = 0;

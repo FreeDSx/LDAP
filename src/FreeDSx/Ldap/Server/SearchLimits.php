@@ -14,32 +14,57 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server;
 
 /**
- * Groups the server-side search limit caps. Zero on any field means no server-side limit.
+ * Groups the server-side search limit caps. Null on any field leaves it unset, and zero means no limit.
  */
 final readonly class SearchLimits
 {
     public function __construct(
-        public int $maxSearchSize = 0,
-        public int $maxSearchTimeLimit = 0,
-        public int $maxSearchPageSize = 0,
-        public int $maxSearchLookthrough = 0,
-        public int $maxSearchPagedLookthrough = 0,
-        public ?int $maxPagingSessions = null,
+        private ?int $maxSearchSize = null,
+        private ?int $maxSearchTimeLimit = null,
+        private ?int $maxSearchPageSize = null,
+        private ?int $maxSearchLookthrough = null,
+        private ?int $maxSearchPagedLookthrough = null,
+        private ?int $maxPagingSessions = null,
     ) {}
 
     /**
-     * A per-identity rule that says nothing about paging sessions keeps the server-wide cap rather than lifting it.
+     * These limits over the top of another set, for a per-identity rule that overrides only the caps it names.
      */
-    public function withMaxPagingSessions(?int $maxPagingSessions): self
+    public function mergedOver(self $default): self
     {
         return new self(
-            maxSearchSize: $this->maxSearchSize,
-            maxSearchTimeLimit: $this->maxSearchTimeLimit,
-            maxSearchPageSize: $this->maxSearchPageSize,
-            maxSearchLookthrough: $this->maxSearchLookthrough,
-            maxSearchPagedLookthrough: $this->maxSearchPagedLookthrough,
-            maxPagingSessions: $maxPagingSessions,
+            maxSearchSize: $this->maxSearchSize ?? $default->maxSearchSize,
+            maxSearchTimeLimit: $this->maxSearchTimeLimit ?? $default->maxSearchTimeLimit,
+            maxSearchPageSize: $this->maxSearchPageSize ?? $default->maxSearchPageSize,
+            maxSearchLookthrough: $this->maxSearchLookthrough ?? $default->maxSearchLookthrough,
+            maxSearchPagedLookthrough: $this->maxSearchPagedLookthrough ?? $default->maxSearchPagedLookthrough,
+            maxPagingSessions: $this->maxPagingSessions ?? $default->maxPagingSessions,
         );
+    }
+
+    public function maxSearchSize(): int
+    {
+        return $this->maxSearchSize ?? 0;
+    }
+
+    public function maxSearchTimeLimit(): int
+    {
+        return $this->maxSearchTimeLimit ?? 0;
+    }
+
+    public function maxSearchPageSize(): int
+    {
+        return $this->maxSearchPageSize ?? 0;
+    }
+
+    public function maxSearchLookthrough(): int
+    {
+        return $this->maxSearchLookthrough ?? 0;
+    }
+
+    public function maxPagingSessions(): ?int
+    {
+        return $this->maxPagingSessions;
     }
 
     /**
@@ -47,8 +72,8 @@ final readonly class SearchLimits
      */
     public function effectivePagedLookthrough(): int
     {
-        return $this->maxSearchPagedLookthrough > 0
-            ? $this->maxSearchPagedLookthrough
-            : $this->maxSearchLookthrough;
+        return ($this->maxSearchPagedLookthrough ?? 0) > 0
+            ? $this->maxSearchPagedLookthrough ?? 0
+            : $this->maxSearchLookthrough();
     }
 }
