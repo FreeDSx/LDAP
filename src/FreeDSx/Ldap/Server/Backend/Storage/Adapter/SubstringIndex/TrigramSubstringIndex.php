@@ -193,6 +193,7 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
             }
 
             // A value the trigrams do not cover would otherwise be excluded by a predicate meant only to narrow.
+            // The entry is then a candidate for every filter on this attribute, including for its shorter values.
             if (!$this->coversEvery($attribute->getValues())) {
                 $rows[] = [$entryId, $attrLower, self::UNCOVERED];
 
