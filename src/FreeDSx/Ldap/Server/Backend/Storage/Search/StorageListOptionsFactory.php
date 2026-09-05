@@ -68,7 +68,6 @@ final readonly class StorageListOptionsFactory
             subtree: $request->getScope() === SearchRequest::SCOPE_WHOLE_SUBTREE,
             filter: $request->getFilter(),
             timeLimit: $this->effectiveTimeLimit($request->getTimeLimit(), $limits),
-            sizeLimit: $request->getSizeLimit(),
             sortKeys: $sortingControl instanceof SortingControl
                 ? $sortingControl->getSortKeys()
                 : [],
