@@ -120,6 +120,30 @@ final class AddEntryHandlerTest extends TestCase
         self::assertNotNull($this->find('dc=example,dc=com'));
     }
 
+    public function test_a_system_write_may_not_create_an_entry_under_a_missing_parent(): void
+    {
+        $this->writeGraph(new InMemoryStorage());
+
+        $this->adds()->handle(
+            new AddCommand(new Entry(
+                new Dn('dc=example,dc=com'),
+                new Attribute('dc', 'example'),
+            )),
+            $this->systemContext(),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
+
+        $this->adds()->handle(
+            new AddCommand(new Entry(
+                new Dn('cn=orphan,ou=absent,dc=example,dc=com'),
+                new Attribute('cn', 'orphan'),
+            )),
+            $this->systemContext(),
+        );
+    }
+
     public function test_a_client_write_may_not_create_a_naming_context_root(): void
     {
         $this->writeGraph(new InMemoryStorage());

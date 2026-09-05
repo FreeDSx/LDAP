@@ -47,6 +47,19 @@ interface PdoEntryDialectInterface
     ): void;
 
     /**
+     * Take a shared lock on a row so it cannot be deleted before this transaction ends.
+     *
+     * @param string $table A fixed internal table identifier, never client input, so implementations may interpolate it.
+     * @param string $keyColumn A fixed internal column identifier, interpolated for the same reason as $table.
+     */
+    public function lockRowForReference(
+        PDO $pdo,
+        string $table,
+        string $keyColumn,
+        string|int $key,
+    ): bool;
+
+    /**
      * Roll back the current transaction started by beginTransaction().
      */
     public function rollBack(PDO $pdo): void;

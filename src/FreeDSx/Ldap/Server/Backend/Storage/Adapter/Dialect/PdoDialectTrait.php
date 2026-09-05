@@ -52,6 +52,22 @@ trait PdoDialectTrait
         string|int $key,
     ): void {}
 
+    public function lockRowForReference(
+        PDO $pdo,
+        string $table,
+        string $keyColumn,
+        string|int $key,
+    ): bool {
+        $statement = $pdo->prepare(<<<SQL
+            SELECT $keyColumn
+            FROM $table
+            WHERE $keyColumn = ?
+            SQL);
+        $statement->execute([$key]);
+
+        return $statement->fetch() !== false;
+    }
+
     public function queryInsert(): string
     {
         return <<<SQL

@@ -62,8 +62,8 @@ final class LdapImporterTest extends TestCase
 
     public function test_importEntries_requires_input_in_depth_first_order(): void
     {
-        self::expectException(InvalidArgumentException::class);
-        self::expectExceptionMessage('Parent entry "dc=example,dc=com" does not exist for "cn=Alice,dc=example,dc=com".');
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
 
         $this->importer()->importEntries([
             $this->person('cn=Alice,dc=example,dc=com'),
@@ -73,8 +73,8 @@ final class LdapImporterTest extends TestCase
 
     public function test_importEntries_throws_when_parent_is_missing(): void
     {
-        self::expectException(InvalidArgumentException::class);
-        self::expectExceptionMessage('Parent entry "dc=example,dc=com" does not exist for "cn=Alice,dc=example,dc=com".');
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
 
         $this->importer()->importEntries([
             $this->person('cn=Alice,dc=example,dc=com'),
@@ -89,14 +89,25 @@ final class LdapImporterTest extends TestCase
         self::assertNotNull($this->storage->find(new Dn('cn=alice,dc=example,dc=com')));
     }
 
-    public function test_importEntries_ignoreValidation_skips_parent_check(): void
+    public function test_importEntries_ignoreValidation_still_requires_a_parent(): void
     {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
+
         $this->importer()->importEntries(
             entries: [$this->person('cn=Alice,dc=example,dc=com')],
             ignoreValidation: true,
         );
+    }
 
-        self::assertNotNull($this->storage->find(new Dn('cn=alice,dc=example,dc=com')));
+    public function test_importEntries_ignoreValidation_still_loads_a_naming_context_root(): void
+    {
+        $this->importer()->importEntries(
+            entries: [$this->domain()],
+            ignoreValidation: true,
+        );
+
+        self::assertNotNull($this->storage->find(new Dn('dc=example,dc=com')));
     }
 
     public function test_importEntries_stamps_operational_attributes_by_default(): void

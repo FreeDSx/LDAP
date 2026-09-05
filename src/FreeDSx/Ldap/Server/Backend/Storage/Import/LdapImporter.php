@@ -52,10 +52,10 @@ final readonly class LdapImporter
      *
      * @param iterable<Entry> $entries
      * @param Dn $creatorDn recorded as creatorsName/modifiersName on entries that do not carry their own.
-     * @param bool $ignoreValidation when true, relaxes the schema rules and skips the parent check.
+     * @param bool $ignoreValidation when true, relaxes the schema rules.
      * @param bool $replaceExisting when true, an entry already at the same DN is overwritten rather than refused.
-     * @throws InvalidArgumentException when the creator DN is malformed, or a non-top-level entry's parent is not present in storage yet
-     * @throws OperationException when an entry is refused by the add operation
+     * @throws InvalidArgumentException when the creator DN is malformed
+     * @throws OperationException when an entry is refused by the add operation, including one whose parent is absent
      */
     public function importEntries(
         iterable $entries,
@@ -88,7 +88,6 @@ final readonly class LdapImporter
 
     /**
      * @param iterable<Entry> $entries
-     * @throws InvalidArgumentException
      * @throws OperationException
      */
     private function load(
@@ -99,10 +98,6 @@ final readonly class LdapImporter
         ImportResult $result,
     ): void {
         foreach ($entries as $entry) {
-            if (!$ignoreValidation) {
-                $this->assertParentExists($entry->getDn());
-            }
-
             // Read before the write, since afterwards the entry is present either way.
             $wasPresent = $replaceExisting
                 && $this->storage->exists($entry->getDn()->normalize());
@@ -186,28 +181,6 @@ final readonly class LdapImporter
             EventContext::ENTRIES_ADDED => $result->added(),
             EventContext::ENTRIES_REPLACED => $result->replacedCount(),
         ];
-    }
-
-    /**
-     * @throws InvalidArgumentException
-     */
-    private function assertParentExists(Dn $dn): void
-    {
-        $parent = $dn->normalize()->getParent();
-
-        if ($parent === null || $parent->getParent() === null) {
-            return;
-        }
-
-        if ($this->storage->exists($parent)) {
-            return;
-        }
-
-        throw new InvalidArgumentException(sprintf(
-            'Parent entry "%s" does not exist for "%s".',
-            $parent->toString(),
-            $dn->toString(),
-        ));
     }
 
     /**

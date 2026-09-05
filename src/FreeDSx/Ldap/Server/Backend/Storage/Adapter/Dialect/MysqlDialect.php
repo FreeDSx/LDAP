@@ -73,6 +73,23 @@ final class MysqlDialect implements PdoDialectInterface
         $statement->execute([$key]);
     }
 
+    public function lockRowForReference(
+        PDO $pdo,
+        string $table,
+        string $keyColumn,
+        string|int $key,
+    ): bool {
+        $statement = $pdo->prepare(<<<SQL
+            SELECT $keyColumn
+            FROM $table
+            WHERE $keyColumn = ?
+            FOR SHARE
+            SQL);
+        $statement->execute([$key]);
+
+        return $statement->fetch() !== false;
+    }
+
     /**
      * @todo Replace VALUES() with row alias syntax once MariaDB supports it.
      */
