@@ -576,6 +576,39 @@ final class PdoStorageTest extends TestCase
         );
     }
 
+    public function test_an_update_reindexes_a_base_form_an_option_bearing_form_shares_a_name_with(): void
+    {
+        $this->seed(new Entry(
+            new Dn('cn=subtyped,dc=example,dc=com'),
+            new Attribute('cn', 'subtyped'),
+            new Attribute('mail', 'base@example.com'),
+            new Attribute('mail;lang-en', 'tagged@example.com'),
+        ));
+
+        $this->storage->store(
+            new Entry(
+                new Dn('cn=subtyped,dc=example,dc=com'),
+                new Attribute('cn', 'subtyped'),
+                new Attribute('mail', 'replaced@example.com'),
+                new Attribute('mail;lang-en', 'tagged@example.com'),
+            ),
+            rebuildIndexes: false,
+        );
+
+        self::assertSame(
+            ['cn=subtyped,dc=example,dc=com'],
+            $this->dnsMatching(Filters::equal('mail', 'replaced@example.com')),
+        );
+        self::assertSame(
+            [],
+            $this->dnsMatching(Filters::equal('mail', 'base@example.com')),
+        );
+        self::assertSame(
+            ['cn=subtyped,dc=example,dc=com'],
+            $this->dnsMatching(Filters::equal('mail', 'tagged@example.com')),
+        );
+    }
+
     public function test_composed_and_streams_off_a_leaf_and_php_verifies_the_rest(): void
     {
         $this->seed(
