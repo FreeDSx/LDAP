@@ -129,6 +129,32 @@ final class WriteCommandFactoryTest extends TestCase
         );
     }
 
+    public function test_it_rejects_an_added_dn_whose_canonical_form_is_not_utf8(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INVALID_DN_SYNTAX);
+
+        $this->subject->fromRequest(
+            new AddRequest(Entry::fromArray('userPassword=\FF,dc=bar', ['objectClass' => 'top'])),
+            $this->context(),
+        );
+    }
+
+    public function test_it_rejects_a_new_rdn_whose_canonical_form_is_not_utf8(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::INVALID_DN_SYNTAX);
+
+        $this->subject->fromRequest(
+            new ModifyDnRequest(
+                'cn=foo,dc=bar',
+                'userPassword=\FF',
+                true,
+            ),
+            $this->context(),
+        );
+    }
+
     public function test_it_holds_a_write_to_the_generated_entry_guard(): void
     {
         self::expectException(OperationException::class);

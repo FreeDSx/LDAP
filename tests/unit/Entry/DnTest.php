@@ -166,6 +166,19 @@ class DnTest extends TestCase
         self::assertTrue(Dn::isValid('cn=a\00b,dc=x'));
     }
 
+    public function test_a_hexpair_escaping_a_non_utf8_octet_parses_but_has_no_utf8_canonical_form(): void
+    {
+        $dn = new Dn('userPassword=\FF,dc=x');
+
+        self::assertTrue(Dn::isValid('userPassword=\FF,dc=x'));
+        self::assertFalse($dn->hasUtf8CanonicalForm());
+    }
+
+    public function test_an_ordinary_dn_has_a_utf8_canonical_form(): void
+    {
+        self::assertTrue((new Dn('cn=José,dc=x'))->hasUtf8CanonicalForm());
+    }
+
     public function test_the_hexstring_value_form_is_refused(): void
     {
         self::assertFalse(Dn::isValid('cn=#0C03616263,dc=x'));
