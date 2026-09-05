@@ -444,8 +444,9 @@ class ServerPagingHandlerTest extends TestCase
         $entry1 = Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']);
         $entry2 = Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']);
 
+        // The page fills to the limit, then one more read looks for the further match that proves overflow.
         $this->mockBackend
-            ->expects(self::once())
+            ->expects(self::exactly(2))
             ->method('search')
             ->willReturnCallback($this->sliceAware($entry1, $entry2));
 
@@ -474,7 +475,7 @@ class ServerPagingHandlerTest extends TestCase
         $entry4 = Entry::create('cn=4,dc=foo,dc=bar', ['cn' => '4']);
 
         $this->mockBackend
-            ->expects(self::exactly(2))
+            ->expects(self::exactly(3))
             ->method('search')
             ->willReturnCallback($this->sliceAware($entry1, $entry2, $entry3, $entry4));
 
