@@ -78,6 +78,11 @@ interface PdoEntryDialectInterface
     public function isDuplicateEntry(PDOException $exception): bool;
 
     /**
+     * Whether the failure is a value exceeding its column's declared length (which for a DN is @see maxDnLength()}.
+     */
+    public function isValueTooLong(PDOException $exception): bool;
+
+    /**
      * Existence check: `SELECT 1 FROM entries WHERE lc_dn = ? LIMIT 1`. Parameters: [lc_dn]
      */
     public function queryExists(): string;

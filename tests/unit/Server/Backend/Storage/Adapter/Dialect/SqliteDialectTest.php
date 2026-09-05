@@ -46,6 +46,12 @@ final class SqliteDialectTest extends TestCase
         self::assertFalse($this->subject->isRetryableConflict(new PDOException('Unable to open database file')));
     }
 
+    public function test_no_failure_is_a_value_too_long_since_the_columns_declare_no_length(): void
+    {
+        self::assertFalse($this->subject->isValueTooLong($this->exceptionWithDriverCode(1406)));
+        self::assertFalse($this->subject->isValueTooLong($this->exceptionWithDriverCode(19)));
+    }
+
     private function exceptionWithDriverCode(int $driverCode): PDOException
     {
         $exception = new PDOException('Database failure.');

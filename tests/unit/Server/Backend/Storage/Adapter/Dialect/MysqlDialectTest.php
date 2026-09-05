@@ -52,6 +52,17 @@ final class MysqlDialectTest extends TestCase
         self::assertFalse($this->subject->isRetryableConflict($this->exceptionWithDriverCode(2013)));
     }
 
+    public function test_a_value_too_long_for_its_column_is_recognised(): void
+    {
+        self::assertTrue($this->subject->isValueTooLong($this->exceptionWithDriverCode(1406)));
+    }
+
+    public function test_an_unrelated_database_error_is_not_a_value_too_long(): void
+    {
+        self::assertFalse($this->subject->isValueTooLong($this->exceptionWithDriverCode(1062)));
+        self::assertFalse($this->subject->isValueTooLong(new PDOException('Connection refused')));
+    }
+
     private function exceptionWithDriverCode(int $driverCode): PDOException
     {
         $exception = new PDOException('Database failure.');

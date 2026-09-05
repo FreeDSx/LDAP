@@ -78,9 +78,11 @@ enum PdoDriver
                 'PRAGMA journal_mode = WAL',
                 'PRAGMA foreign_keys = ON',
             ],
+            // Strict mode is pinned: without it an overlong value is truncated and the write still reports success.
             self::Mysql => [
                 'SET NAMES utf8mb4',
                 "SET time_zone = '+00:00'",
+                "SET SESSION sql_mode = CONCAT(@@SESSION.sql_mode, ',STRICT_TRANS_TABLES')",
             ],
         };
     }
