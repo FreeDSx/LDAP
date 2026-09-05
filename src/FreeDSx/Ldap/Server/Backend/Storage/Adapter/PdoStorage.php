@@ -381,18 +381,14 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     /**
      * Rows worth reading at all, or null to walk the whole result.
-     *
-     * An exact filter makes the client size limit a real ceiling on the answer.
      */
     private function maxRowsFor(
         StorageListOptions $options,
         bool $isPreFiltered,
     ): ?int {
         $ceiling = match (true) {
-            $isPreFiltered => $options->sizeLimit > 0
-                ? $options->sizeLimit
-                : null,
-            $options->lookthroughLimit > 0 => $options->lookthroughLimit + 1,
+            $options->maxEntries > 0 => $options->maxEntries,
+            !$isPreFiltered && $options->lookthroughLimit > 0 => $options->lookthroughLimit + 1,
             default => null,
         };
 

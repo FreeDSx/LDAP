@@ -29,6 +29,8 @@ final readonly class StorageListOptions
 {
     /**
      * @param SortKey[] $sortKeys
+     * @param int $maxEntries A hard row cap for internal callers that want a bounded read; never the client's size
+     *                        limit, which access control can shrink after the read and so cannot bound it here.
      * @param list<string>|null $attributes Lowercase base attribute names to materialize, or null for all.
      * @param ?PageCursor $after Resume after this entry rather than starting from the beginning.
      * @param ?int $maxCandidates Stop after examining this many, so the caller can read the result to its end.
@@ -38,7 +40,7 @@ final readonly class StorageListOptions
         public bool $subtree,
         public FilterInterface $filter,
         public int $timeLimit = 0,
-        public int $sizeLimit = 0,
+        public int $maxEntries = 0,
         public array $sortKeys = [],
         public int $lookthroughLimit = 0,
         public ?array $attributes = null,
@@ -79,7 +81,7 @@ final readonly class StorageListOptions
             baseDn: $baseDn,
             subtree: false,
             filter: new AndFilter(),
-            sizeLimit: 1,
+            maxEntries: 1,
             subentries: $subentries,
         );
     }

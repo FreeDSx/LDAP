@@ -1875,6 +1875,55 @@ trait QueryTestsTrait
         );
     }
 
+    /**
+     * A filter the backend answers exactly is still bounded by the handler, which needs one match past the limit.
+     */
+    public function testAnExactlyAnswerableFilterSignalsSizeLimitOverflow(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::storageExtraArgs(),
+                '--seed-entries=10',
+            ],
+        );
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::SIZE_LIMIT_EXCEEDED);
+
+        $this->ldapClient()->search(
+            Operations::search(Filters::equal('sn', 'Seeded'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope()
+                ->setSizeLimit(3),
+        );
+    }
+
+    public function testAnExactlyAnswerableFilterWithinTheSizeLimitReturnsEveryMatch(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::storageExtraArgs(),
+                '--seed-entries=10',
+            ],
+        );
+        $this->authenticateUser();
+
+        self::assertCount(
+            10,
+            $this->ldapClient()->search(
+                Operations::search(Filters::equal('sn', 'Seeded'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope()
+                    ->setSizeLimit(10),
+            ),
+        );
+    }
+
     public function testMatchedDnIsEmptyOnASuccessfulSearch(): void
     {
         $this->authenticateUser();

@@ -154,12 +154,12 @@ final class PdoStorageTest extends TestCase
             ));
         }
 
-        foreach ([1, 2, 3] as $sizeLimit) {
+        foreach ([1, 2, 3] as $maxEntries) {
             iterator_count($storage->list(new StorageListOptions(
                 baseDn: new Dn('dc=example,dc=com'),
                 subtree: true,
                 filter: Filters::equal('sn', 'x'),
-                sizeLimit: $sizeLimit,
+                maxEntries: $maxEntries,
             ))->entries);
         }
 
