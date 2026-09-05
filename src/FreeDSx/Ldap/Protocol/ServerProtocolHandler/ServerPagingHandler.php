@@ -323,15 +323,27 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $page = [];
         $cursor = $resumeFrom;
         $exhausted = false;
+        $hasFurtherMatch = false;
 
-        while (!$exhausted && $this->pageHasCapacity($page, $pageLimit)) {
+        while (!$exhausted) {
+            $isFilling = $this->pageHasCapacity($page, $pageLimit);
+
+            // A full page only overflows the size limit if a further match exists
+            if (!$isFilling && !$this->mayExceedSizeLimit($page, $sizeLimit)) {
+                break;
+            }
+
             $stream = $this->readSlice(
                 $pagingRequest,
                 new PageSlice(
-                    $this->sliceSizeFor($page, $pageLimit),
+                    $this->sliceSizeFor(
+                        $isFilling ? $page : [],
+                        $pageLimit,
+                    ),
                     $cursor,
                 ),
             );
+
             foreach ($stream->entries as $entry) {
                 $kept = $this->keepForPage(
                     $entry,
@@ -339,9 +351,22 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
                     $filter,
                 );
 
-                if ($kept !== null) {
-                    $page[] = $projection->project($kept);
+                if ($kept === null) {
+                    continue;
                 }
+
+                if (!$isFilling) {
+                    $hasFurtherMatch = true;
+
+                    break;
+                }
+
+                $page[] = $projection->project($kept);
+            }
+
+            // The stream was abandoned mid-slice, so it can say nothing about where it stopped.
+            if ($hasFurtherMatch) {
+                break;
             }
 
             // A stream that reports nothing cannot be resumed, so the result has to be taken as finished.
@@ -353,9 +378,22 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         return new CollectedPage(
             $page,
             $exhausted,
-            !$exhausted && $sizeLimit > 0 && count($page) >= $sizeLimit,
+            $hasFurtherMatch,
             $cursor,
         );
+    }
+
+    /**
+     * Whether a page this full would overflow the size limit.
+     *
+     * @param list<Entry> $page
+     */
+    private function mayExceedSizeLimit(
+        array $page,
+        int $sizeLimit,
+    ): bool {
+        return $sizeLimit > 0
+            && count($page) >= $sizeLimit;
     }
 
     /**

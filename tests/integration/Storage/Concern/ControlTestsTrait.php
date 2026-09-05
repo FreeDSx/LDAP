@@ -33,6 +33,66 @@ use PHPUnit\Framework\Attributes\DataProvider;
  */
 trait ControlTestsTrait
 {
+    public function testAFullPageWithNoFurtherMatchIsNotASizeLimitOverflow(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::storageExtraArgs(),
+                '--seed-entries=10',
+            ],
+        );
+        $this->authenticateUser();
+
+        $paging = $this->ldapClient()->paging(
+            Operations::search(Filters::not(Filters::contains('sn', 'Seeded')))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope()
+                ->setSizeLimit(8),
+            8,
+        );
+
+        $entries = [];
+
+        while ($paging->hasEntries()) {
+            foreach ($paging->getEntries() as $entry) {
+                $entries[] = $entry->getDn()->toString();
+            }
+        }
+
+        self::assertCount(
+            8,
+            $entries,
+        );
+    }
+
+    public function testAFullPageWithAFurtherMatchIsASizeLimitOverflow(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::storageExtraArgs(),
+                '--seed-entries=10',
+            ],
+        );
+        $this->authenticateUser();
+
+        $paging = $this->ldapClient()->paging(
+            Operations::search(Filters::not(Filters::contains('sn', 'Seeded')))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope()
+                ->setSizeLimit(4),
+            4,
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::SIZE_LIMIT_EXCEEDED);
+
+        $paging->getEntries();
+    }
+
     public function testPagingReturnsAllEntriesAcrossMultiplePages(): void
     {
         $this->authenticateUser();
