@@ -111,6 +111,8 @@ final readonly class EntryIndexWriter
     /**
      * Attribute values keyed by lowercased name and sorted, so ordering alone never reads as a change.
      *
+     * Every option-bearing form merges into one key.
+     *
      * @return array<string, list<string>>
      */
     private function valuesByName(Entry $entry): array
@@ -118,12 +120,21 @@ final readonly class EntryIndexWriter
         $byName = [];
 
         foreach ($entry->getAttributes() as $attribute) {
-            $values = array_values($attribute->getValues());
-            sort($values);
-            $byName[strtolower($attribute->getName())] = $values;
+            $name = strtolower($attribute->getName());
+            $byName[$name] = [
+                ...$byName[$name] ?? [],
+                ...array_values($attribute->getValues()),
+            ];
         }
 
-        return $byName;
+        return array_map(
+            static function (array $values): array {
+                sort($values);
+
+                return $values;
+            },
+            $byName,
+        );
     }
 
     /**

@@ -15,6 +15,7 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
+use FreeDSx\Ldap\Entry\Entries;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Controls;
@@ -124,6 +125,42 @@ trait WriteTestsTrait
         self::assertSame(
             ['tagged'],
             $tagged->get(new Attribute('cn'), true)?->getValues(),
+        );
+    }
+
+    public function testModifyingABaseFormReindexesItWhenAnOptionBearingFormExists(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=subtyped,dc=foo,dc=bar',
+            [
+                'cn' => 'subtyped',
+                'sn' => 'Sub',
+                'mail' => 'base@foo.bar',
+                'mail;lang-en' => 'tagged@foo.bar',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        $entry = Entry::fromArray('cn=subtyped,dc=foo,dc=bar');
+        $entry->changes()->add(Change::replace(new Attribute('mail', 'replaced@foo.bar')));
+        $this->ldapClient()->update($entry);
+
+        self::assertCount(
+            1,
+            $this->mailSearch('replaced@foo.bar'),
+            'The value the entry now holds must be found.',
+        );
+        self::assertCount(
+            0,
+            $this->mailSearch('base@foo.bar'),
+            'The value the entry no longer holds must not be found.',
+        );
+        self::assertCount(
+            1,
+            $this->mailSearch('tagged@foo.bar'),
+            'The untouched option-bearing form must still be found.',
         );
     }
 
@@ -1234,5 +1271,14 @@ trait WriteTestsTrait
 
         // The refusal answers the operation rather than dropping the connection, so the session still serves.
         self::assertNotNull($this->ldapClient()->read('cn=admin,dc=foo,dc=bar'));
+    }
+
+    private function mailSearch(string $value): Entries
+    {
+        return $this->ldapClient()->search(
+            Operations::search(Filters::equal('mail', $value))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
     }
 }
