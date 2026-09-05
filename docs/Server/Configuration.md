@@ -698,9 +698,8 @@ scans many entries to return few. Raise it above the largest legitimate subtree 
 
 **Default**: `5000`
 
-> It applies only to filters evaluated in PHP. That means the in-memory backend, and SQL backends when the filter cannot
-> be pushed to the index. Indexed equality and prefix filters are bounded by the database and are not counted. Each page
-> of a paged search is counted on its own (see `setMaxSearchPagedLookthrough`).
+> Every entry the server examines counts, whether it was examined to evaluate the filter or to decide what the client is
+> allowed to see. Each page of a paged search is counted on its own (see `setMaxSearchPagedLookthrough`).
 
 ------------------
 #### setMaxSearchPagedLookthrough

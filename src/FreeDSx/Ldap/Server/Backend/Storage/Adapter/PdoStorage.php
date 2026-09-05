@@ -206,7 +206,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         }
 
         $isPreFiltered = $filterResult !== null && $filterResult->isExact;
-        $maxRows = $this->maxRowsFor($options, $isPreFiltered);
+        $maxRows = $this->maxRowsFor($options);
         $batchSize = $maxRows === null
             ? self::FETCH_BATCH_SIZE
             : min($maxRows, self::FETCH_BATCH_SIZE);
@@ -380,13 +380,11 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     /**
      * Rows worth reading at all, or null to walk the whole result.
      */
-    private function maxRowsFor(
-        StorageListOptions $options,
-        bool $isPreFiltered,
-    ): ?int {
+    private function maxRowsFor(StorageListOptions $options): ?int
+    {
         $ceiling = match (true) {
             $options->maxEntries > 0 => $options->maxEntries,
-            !$isPreFiltered && $options->lookthroughLimit > 0 => $options->lookthroughLimit + 1,
+            $options->lookthroughLimit > 0 => $options->lookthroughLimit + 1,
             default => null,
         };
 

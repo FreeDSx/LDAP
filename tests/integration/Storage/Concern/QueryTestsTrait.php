@@ -1684,6 +1684,29 @@ trait QueryTestsTrait
         );
     }
 
+    public function testAnIndexAnsweredFilterAlsoTripsTheLookthroughLimit(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::storageExtraArgs(),
+                '--seed-entries=10',
+                '--max-search-lookthrough=3',
+            ],
+        );
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+
+        $this->ldapClient()->search(
+            Operations::search(Filters::equal('sn', 'Seeded'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+    }
+
     /**
      * A base naming an alias resolves to the entry it names (RFC 4511 4.5.1.3 derefFindingBaseObj), while an alias
      * met while searching is returned as the ordinary entry it is rather than failing the search.

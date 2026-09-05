@@ -497,7 +497,7 @@ final class ServerOptions implements ServerListenerOptionsInterface
     }
 
     /**
-     * Maximum entries examined per search before adminLimitExceeded (default 5000). Guards unindexed scans. Zero disables.
+     * Maximum entries examined per search before adminLimitExceeded (default 5000). Zero disables.
      */
     public function getMaxSearchLookthrough(): int
     {
