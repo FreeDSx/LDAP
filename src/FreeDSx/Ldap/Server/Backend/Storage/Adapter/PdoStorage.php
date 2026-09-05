@@ -244,8 +244,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
         $this->atomic(function () use ($entry, $lcDn, $dnString, $normDn): void {
             // The unique key on lc_dn is the arbiter, since a row lock on a DN that holds no row locks only the gap.
-            $this->refusingDuplicate(
-                $normDn,
+            $this->translatingRefusal(
                 function () use ($lcDn, $dnString, $normDn, $entry): void {
                     $this->statements->execute($this->dialect->queryInsert(), [
                         $lcDn,
@@ -254,6 +253,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
                         $this->encodeAttributes($entry),
                     ]);
                 },
+                $normDn,
             );
 
             $this->indexes->rewrite(
@@ -330,13 +330,14 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
                 $base->getDn()->toString(),
             );
 
-            $this->statements->execute(
-                $this->dialect->queryRenameDescendants(),
-                $this->renameDescendantParams($rename),
-            );
+            $this->translatingRefusal(function () use ($rename): void {
+                $this->statements->execute(
+                    $this->dialect->queryRenameDescendants(),
+                    $this->renameDescendantParams($rename),
+                );
+            });
 
-            $this->refusingDuplicate(
-                $to->normalize(),
+            $this->translatingRefusal(
                 function () use ($rename, $to): void {
                     $this->statements->execute($this->dialect->queryRenameEntry(), [
                         $rename->toDisplay,
@@ -345,6 +346,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
                         $rename->lcFrom,
                     ]);
                 },
+                $to->normalize(),
             );
         });
     }
@@ -426,26 +428,37 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     }
 
     /**
-     * Runs a write that lands on one DN, translating the unique key's refusal into an answerable failure.
+     * Runs a write, turning the driver failures the dialect recognises into the directory conditions they mean.
      *
      * @param Closure(): void $write
+     * @param ?Dn $landsOn The DN written, where the write lands on exactly one.
      * @throws EntryAlreadyExistsException
+     * @throws DnTooLongException
      */
-    private function refusingDuplicate(
-        Dn $normDn,
+    private function translatingRefusal(
         Closure $write,
+        ?Dn $landsOn = null,
     ): void {
         try {
             $write();
         } catch (PDOException $e) {
-            if (!$this->dialect->isDuplicateEntry($e)) {
-                throw $e;
+            if ($landsOn !== null && $this->dialect->isDuplicateEntry($e)) {
+                throw new EntryAlreadyExistsException(
+                    sprintf('Entry already exists: %s', $landsOn->toString()),
+                    previous: $e,
+                );
+            }
+            if ($this->dialect->isValueTooLong($e)) {
+                throw new DnTooLongException(
+                    sprintf(
+                        'The resulting DN exceeds the storage backend limit of %d bytes.',
+                        $this->dialect->maxDnLength() ?? 0,
+                    ),
+                    previous: $e,
+                );
             }
 
-            throw new EntryAlreadyExistsException(
-                sprintf('Entry already exists: %s', $normDn->toString()),
-                previous: $e,
-            );
+            throw $e;
         }
     }
 

@@ -43,6 +43,11 @@ final class MysqlDialect implements PdoDialectInterface
     private const ERROR_DUPLICATE_ENTRY = 1062;
 
     /**
+     * Data too long for a column.
+     */
+    private const ERROR_DATA_TOO_LONG = 1406;
+
+    /**
      * InnoDB resolves lock conflicts by failing one transaction, which is then safe to reissue unchanged.
      */
     public function isRetryableConflict(PDOException $exception): bool
@@ -56,6 +61,11 @@ final class MysqlDialect implements PdoDialectInterface
     public function isDuplicateEntry(PDOException $exception): bool
     {
         return ($exception->errorInfo[1] ?? null) === self::ERROR_DUPLICATE_ENTRY;
+    }
+
+    public function isValueTooLong(PDOException $exception): bool
+    {
+        return ($exception->errorInfo[1] ?? null) === self::ERROR_DATA_TOO_LONG;
     }
 
     public function lockRowForWrite(

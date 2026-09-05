@@ -59,6 +59,14 @@ final class SqliteDialect implements PdoDialectInterface
     }
 
     /**
+     * SQLite declares no length on its columns.
+     */
+    public function isValueTooLong(PDOException $exception): bool
+    {
+        return false;
+    }
+
+    /**
      * `BEGIN IMMEDIATE` acquires the reserved lock up front so concurrent writers wait (honoring `busy_timeout`)
      * instead of racing, which returns SQLITE_BUSY immediately to avoid deadlock.
      */
