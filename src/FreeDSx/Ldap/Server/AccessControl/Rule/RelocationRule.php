@@ -22,6 +22,8 @@ use FreeDSx\Ldap\Server\AccessControl\Target\TargetMatcherInterface;
  *
  * Only consulted when a Modify DN changes the parent, so renaming an entry in place is never gated by these rules.
  *
+ * A target names a container by DN, so renaming that container leaves the rule matching nothing.
+ *
  * @api
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
