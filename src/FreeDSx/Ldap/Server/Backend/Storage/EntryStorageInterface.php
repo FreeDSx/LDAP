@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\DefaultHasChildrenTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 
@@ -90,6 +91,7 @@ interface EntryStorageInterface
      * Execute $operation as an atomic read-modify-write cycle; implementations must hold an exclusive lock or transaction.
      *
      * @param callable(): void $operation Calls back onto this instance, which routes itself into the open transaction.
+     * @throws AnswerableExceptionInterface
      */
     public function atomic(callable $operation): void;
 

@@ -80,7 +80,7 @@ final readonly class ResponseWriterMiddleware implements MiddlewareInterface
      */
     private function answerFor(Throwable $exception): ?OperationException
     {
-        // Already carries the code it should be answered with.
+        // Returned as-is rather than rebuilt, which is the only way its matched DN survives.
         if ($exception instanceof OperationException) {
             return $exception;
         }

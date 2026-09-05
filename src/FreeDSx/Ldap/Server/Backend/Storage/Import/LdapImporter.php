@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
@@ -74,7 +75,7 @@ final readonly class LdapImporter
                 $replaceExisting,
                 $result,
             ));
-        } catch (OperationException $e) {
+        } catch (AnswerableExceptionInterface $e) {
             $this->recordFailure(
                 $result,
                 $e,
@@ -163,11 +164,18 @@ final readonly class LdapImporter
      */
     private function recordFailure(
         ImportResult $result,
-        OperationException $exception,
+        AnswerableExceptionInterface $exception,
     ): void {
         $this->eventLogger->recordFailure(
             ServerEvent::BulkImportFailed,
-            $exception,
+            $exception instanceof OperationException
+                ? $exception
+                // The log wants the cause's own message, which is more specific than what a client is told.
+                : new OperationException(
+                    $exception->getMessage(),
+                    $exception->getCode(),
+                    $exception,
+                ),
             $this->counts($result),
         );
     }
