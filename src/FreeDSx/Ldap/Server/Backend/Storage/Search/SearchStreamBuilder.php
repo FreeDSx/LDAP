@@ -79,12 +79,13 @@ final readonly class SearchStreamBuilder
         // rather than failing the search. This is a deliberate RFC difference.
         $generator = $this->wrapWithTimeLimitHandling($stream->entries);
 
-        // Only unchecked candidates are counted: a backend that answered the filter itself looked through nothing.
+        // Every candidate examined is charged.
+        $generator = $this->wrapWithLookthrough(
+            $generator,
+            $effectiveLimits,
+        );
+
         if (!$stream->isPreFiltered) {
-            $generator = $this->wrapWithLookthrough(
-                $generator,
-                $effectiveLimits,
-            );
             $generator = $this->wrapWithFilterEvaluation(
                 $generator,
                 $request->getFilter(),

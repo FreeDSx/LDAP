@@ -1004,32 +1004,11 @@ final class PdoStorageTest extends TestCase
         )->entries);
     }
 
-    public function test_search_exact_filter_is_not_subject_to_lookthrough(): void
+    public function test_search_exact_filter_within_the_lookthrough_limit_returns_every_match(): void
     {
         $backend = $this->seededBackend(
             TestServerOptions::unvalidatedCore()
-                ->setMaxSearchLookthrough(1),
-            ...$this->namedEntries(['Ann', 'Bob', 'Cyd']),
-        );
-
-        $request = (new SearchRequest(Filters::equal('cn', 'Ann')))
-            ->base('dc=example,dc=com')
-            ->useSubtreeScope();
-
-        self::assertCount(
-            1,
-            iterator_to_array($backend->search(
-                $request,
-                SubentryVisibility::All,
-            )->entries),
-        );
-    }
-
-    public function test_search_exact_filter_returns_every_match_past_the_transfer_bound(): void
-    {
-        $backend = $this->seededBackend(
-            TestServerOptions::unvalidatedCore()
-                ->setMaxSearchLookthrough(2),
+                ->setMaxSearchLookthrough(5),
             ...$this->namedEntries(
                 ['Ann', 'Bob', 'Cyd', 'Dan', 'Eve'],
                 new Attribute('st', 'dup'),
@@ -1040,7 +1019,6 @@ final class PdoStorageTest extends TestCase
             ->base('dc=example,dc=com')
             ->useSubtreeScope();
 
-        // The bound is on how much one statement transfers, not on the answer, so the walk continues past it.
         self::assertCount(
             5,
             iterator_to_array($backend->search(
@@ -1048,6 +1026,29 @@ final class PdoStorageTest extends TestCase
                 SubentryVisibility::All,
             )->entries),
         );
+    }
+
+    public function test_search_exact_filter_trips_lookthrough_limit(): void
+    {
+        $backend = $this->seededBackend(
+            TestServerOptions::unvalidatedCore()
+                ->setMaxSearchLookthrough(2),
+            ...$this->namedEntries(
+                ['Ann', 'Bob', 'Cyd', 'Dan', 'Eve'],
+                new Attribute('st', 'dup'),
+            ),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+
+        $request = (new SearchRequest(Filters::equal('st', 'dup')))
+            ->base('dc=example,dc=com')
+            ->useSubtreeScope();
+        iterator_to_array($backend->search(
+            $request,
+            SubentryVisibility::All,
+        )->entries);
     }
 
     public function test_atomic_rolls_back_on_exception(): void
