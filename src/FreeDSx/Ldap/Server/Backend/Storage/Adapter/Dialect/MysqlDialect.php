@@ -38,6 +38,11 @@ final class MysqlDialect implements PdoDialectInterface
     private const ERROR_LOCK_WAIT_TIMEOUT = 1205;
 
     /**
+     * Duplicate entry for key.
+     */
+    private const ERROR_DUPLICATE_ENTRY = 1062;
+
+    /**
      * InnoDB resolves lock conflicts by failing one transaction, which is then safe to reissue unchanged.
      */
     public function isRetryableConflict(PDOException $exception): bool
@@ -46,6 +51,11 @@ final class MysqlDialect implements PdoDialectInterface
 
         return $driverCode === self::ERROR_DEADLOCK
             || $driverCode === self::ERROR_LOCK_WAIT_TIMEOUT;
+    }
+
+    public function isDuplicateEntry(PDOException $exception): bool
+    {
+        return ($exception->errorInfo[1] ?? null) === self::ERROR_DUPLICATE_ENTRY;
     }
 
     public function lockRowForWrite(

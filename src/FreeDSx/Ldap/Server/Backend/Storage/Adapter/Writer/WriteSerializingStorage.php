@@ -72,6 +72,11 @@ final readonly class WriteSerializingStorage implements
         return $this->readStorage()->list($options);
     }
 
+    public function insert(Entry $entry): void
+    {
+        $this->submit(fn() => $this->writes->insert($entry));
+    }
+
     public function store(
         Entry $entry,
         bool $rebuildIndexes = false,

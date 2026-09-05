@@ -38,6 +38,11 @@ final class SqliteDialect implements PdoDialectInterface
     private const ERROR_LOCKED = 6;
 
     /**
+     * A constraint was violated. For an entry insert that's the unique key on lc_dn.
+     */
+    private const ERROR_CONSTRAINT = 19;
+
+    /**
      * `busy_timeout` absorbs most contention by waiting, but it still gives up once the timeout is exhausted.
      */
     public function isRetryableConflict(PDOException $exception): bool
@@ -46,6 +51,11 @@ final class SqliteDialect implements PdoDialectInterface
 
         return $driverCode === self::ERROR_BUSY
             || $driverCode === self::ERROR_LOCKED;
+    }
+
+    public function isDuplicateEntry(PDOException $exception): bool
+    {
+        return ($exception->errorInfo[1] ?? null) === self::ERROR_CONSTRAINT;
     }
 
     /**

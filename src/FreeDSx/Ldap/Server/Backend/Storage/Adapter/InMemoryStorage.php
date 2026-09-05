@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SubtreeRename;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
@@ -87,6 +88,19 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
             $this->entries,
             $this->keys,
         );
+    }
+
+    public function insert(Entry $entry): void
+    {
+        $lcDn = $entry->getDn()->normalize()->toString();
+
+        if (isset($this->entries[$lcDn])) {
+            throw new EntryAlreadyExistsException(
+                sprintf('Entry already exists: %s', $lcDn),
+            );
+        }
+
+        $this->store($entry);
     }
 
     public function store(

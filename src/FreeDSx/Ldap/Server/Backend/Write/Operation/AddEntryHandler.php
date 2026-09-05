@@ -83,10 +83,16 @@ readonly class AddEntryHandler
                 $entry,
                 $command->systemChanges,
             );
-            $this->storage->store(
-                $entry,
-                rebuildIndexes: true,
-            );
+
+            if ($bulkLoad !== null && $bulkLoad->replaceExisting) {
+                $this->storage->store(
+                    $entry,
+                    rebuildIndexes: true,
+                );
+            } else {
+                $this->storage->insert($entry);
+            }
+
             $this->changeRecorder?->recordAdd(
                 $entry,
                 $context,

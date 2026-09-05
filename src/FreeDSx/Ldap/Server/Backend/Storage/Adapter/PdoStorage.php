@@ -37,6 +37,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
@@ -48,8 +49,10 @@ use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
+use Closure;
 use Generator;
 use PDO;
+use PDOException;
 
 /**
  * PDO-backed storage; the container builds it from a PdoConfig set via ServerOptions::setStorageConfig().
@@ -230,6 +233,36 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         );
     }
 
+    public function insert(Entry $entry): void
+    {
+        $normDn = $entry->getDn()->normalize();
+        $dnString = $entry->getDn()->toString();
+        $lcDn = $normDn->toString();
+
+        $this->assertDnFits($dnString);
+        $this->assertDnFits($lcDn);
+
+        $this->atomic(function () use ($entry, $lcDn, $dnString, $normDn): void {
+            // The unique key on lc_dn is the arbiter, since a row lock on a DN that holds no row locks only the gap.
+            $this->refusingDuplicate(
+                $normDn,
+                function () use ($lcDn, $dnString, $normDn, $entry): void {
+                    $this->statements->execute($this->dialect->queryInsert(), [
+                        $lcDn,
+                        $dnString,
+                        $normDn->getParent()?->toString() ?? '',
+                        $this->encodeAttributes($entry),
+                    ]);
+                },
+            );
+
+            $this->indexes->rewrite(
+                $this->entryIdFor($normDn),
+                $entry,
+            );
+        });
+    }
+
     public function store(
         Entry $entry,
         bool $rebuildIndexes = false,
@@ -302,12 +335,17 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
                 $this->renameDescendantParams($rename),
             );
 
-            $this->statements->execute($this->dialect->queryRenameEntry(), [
-                $rename->toDisplay,
-                $rename->lcTo,
-                $to->normalize()->getParent()?->toString() ?? '',
-                $rename->lcFrom,
-            ]);
+            $this->refusingDuplicate(
+                $to->normalize(),
+                function () use ($rename, $to): void {
+                    $this->statements->execute($this->dialect->queryRenameEntry(), [
+                        $rename->toDisplay,
+                        $rename->lcTo,
+                        $to->normalize()->getParent()?->toString() ?? '',
+                        $rename->lcFrom,
+                    ]);
+                },
+            );
         });
     }
 
@@ -375,6 +413,30 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             'lc_dn',
             $dn->normalize()->toString(),
         );
+    }
+
+    /**
+     * Runs a write that lands on one DN, translating the unique key's refusal into an answerable failure.
+     *
+     * @param Closure(): void $write
+     * @throws EntryAlreadyExistsException
+     */
+    private function refusingDuplicate(
+        Dn $normDn,
+        Closure $write,
+    ): void {
+        try {
+            $write();
+        } catch (PDOException $e) {
+            if (!$this->dialect->isDuplicateEntry($e)) {
+                throw $e;
+            }
+
+            throw new EntryAlreadyExistsException(
+                sprintf('Entry already exists: %s', $normDn->toString()),
+                previous: $e,
+            );
+        }
     }
 
     /**

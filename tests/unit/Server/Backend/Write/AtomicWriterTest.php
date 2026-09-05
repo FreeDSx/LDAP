@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Write\AtomicWriter;
 use PDOException;
@@ -68,6 +69,25 @@ final class AtomicWriterTest extends TestCase
             );
             $this->assertSame(
                 'DN length 3073 exceeds the limit.',
+                $e->getMessage(),
+            );
+        }
+    }
+
+    public function test_it_answers_a_taken_dn_with_entry_already_exists(): void
+    {
+        $this->storageThrows(new EntryAlreadyExistsException('Entry already exists: cn=taken,dc=foo,dc=bar'));
+
+        try {
+            $this->writer->write(static fn() => null);
+            $this->fail('An OperationException was expected.');
+        } catch (OperationException $e) {
+            $this->assertSame(
+                ResultCode::ENTRY_ALREADY_EXISTS,
+                $e->getCode(),
+            );
+            $this->assertSame(
+                'Entry already exists: cn=taken,dc=foo,dc=bar',
                 $e->getMessage(),
             );
         }

@@ -52,6 +52,14 @@ trait PdoDialectTrait
         string|int $key,
     ): void {}
 
+    public function queryInsert(): string
+    {
+        return <<<SQL
+            INSERT INTO entries (lc_dn, dn, lc_parent_dn, attributes)
+            VALUES (?, ?, ?, ?)
+        SQL;
+    }
+
     public function queryExists(): string
     {
         return <<<SQL
