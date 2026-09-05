@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Server\Backend\Write\AtomicWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
@@ -32,7 +31,6 @@ readonly class DeleteEntryHandler
 
     public function __construct(
         private EntryStorageInterface $storage,
-        private AtomicWriter $writer,
         private EntryLocator $locator,
         private EntryPlacementGuard $placement,
         private ?ChangeRecorder $changeRecorder = null,

@@ -13,11 +13,36 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Exception;
 
+use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Operation\ResultCode;
+use Throwable;
 
 /**
- * Thrown when a storage backend fails to read, lock, or atomically persist its state.
+ * Thrown when the storage backend cannot be read from or written to.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class StorageIoException extends RuntimeException {}
+final class StorageIoException extends RuntimeException implements AnswerableExceptionInterface
+{
+    private const DIAGNOSTIC = 'The backend storage is currently unavailable.';
+
+    public function __construct(
+        string $message,
+        ?Throwable $previous = null,
+    ) {
+        parent::__construct(
+            $message,
+            ResultCode::UNAVAILABLE,
+            $previous,
+        );
+    }
+
+    /**
+     * The message names the failing internal operation, which the client has no business being told.
+     */
+    public function getDiagnostic(): string
+    {
+        return self::DIAGNOSTIC;
+    }
+}

@@ -13,8 +13,9 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Middleware;
 
-use FreeDSx\Ldap\Exception\InvalidDnSyntaxException;
+use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\UnrecoverableExceptionInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
@@ -26,9 +27,10 @@ use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Operation\FailedOperationResult;
+use Throwable;
 
 /**
- * The single sink: drains the response stream to the queue, rendering any thrown OperationException as its response.
+ * The single sink: drains the response stream to the queue, rendering any thrown failure as its response.
  *
  * A streaming handler runs during the drain, so mid-stream failures are answered here too (a partial stream is followed by its error terminal).
  *
@@ -57,28 +59,47 @@ final readonly class ResponseWriterMiddleware implements MiddlewareInterface
                 $next->handle($context),
                 $messageId,
             );
-        } catch (OperationException $e) {
+        } catch (Throwable $e) {
+            $failure = $this->answerFor($e);
+
+            if ($failure === null) {
+                throw $e;
+            }
+
             $outcome = $this->writer->write(
-                $this->errorStream($context, $e),
-                $messageId,
-            );
-        } catch (InvalidDnSyntaxException $e) {
-            // A DN is only parsed once something needs its pieces, which is well past the decode. Answering it here
-            // keeps a malformed one from ending the session on its way out as an unhandled failure.
-            $outcome = $this->writer->write(
-                $this->errorStream(
-                    $context,
-                    new OperationException(
-                        $e->getMessage(),
-                        ResultCode::INVALID_DN_SYNTAX,
-                        $e,
-                    ),
-                ),
+                $this->errorStream($context, $failure),
                 $messageId,
             );
         }
 
         return ResponseStream::resolved($outcome);
+    }
+
+    /**
+     * The result to answer a thrown failure with, or null when it has to end the session instead.
+     */
+    private function answerFor(Throwable $exception): ?OperationException
+    {
+        // Already carries the code it should be answered with.
+        if ($exception instanceof OperationException) {
+            return $exception;
+        }
+        if ($exception instanceof UnrecoverableExceptionInterface) {
+            return null;
+        }
+        if ($exception instanceof AnswerableExceptionInterface) {
+            return new OperationException(
+                $exception->getDiagnostic(),
+                $exception->getCode(),
+                $exception,
+            );
+        }
+
+        return new OperationException(
+            'The result could not be completed.',
+            ResultCode::OTHER,
+            $exception,
+        );
     }
 
     private function errorStream(

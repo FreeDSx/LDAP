@@ -144,7 +144,7 @@ final class UpdateEntryHandlerTest extends TestCase
         self::assertNotNull($updated->get('modifiersName'));
     }
 
-    public function test_a_storage_failure_is_answered_as_unavailable(): void
+    public function test_a_storage_failure_propagates_carrying_its_result_code(): void
     {
         /** @var EntryStorageInterface&MockObject $storage */
         $storage = $this->createMock(EntryStorageInterface::class);
@@ -152,9 +152,8 @@ final class UpdateEntryHandlerTest extends TestCase
             ->willThrowException(new StorageIoException('Unable to stage the storage update.'));
         $this->writeGraph($storage);
 
-        self::expectException(OperationException::class);
+        self::expectException(StorageIoException::class);
         self::expectExceptionCode(ResultCode::UNAVAILABLE);
-        self::expectExceptionMessage('The backend storage is currently unavailable.');
 
         $this->modify(new Change(Change::TYPE_REPLACE, 'cn', 'Alicia'));
     }
