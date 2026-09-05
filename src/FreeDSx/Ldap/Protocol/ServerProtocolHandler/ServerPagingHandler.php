@@ -305,11 +305,11 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $filter = $request->getFilter();
         $effectivePageSize = $this->effectiveLimit(
             $pagingRequest->getSize(),
-            $this->limits->maxSearchPageSize,
+            $this->limits->maxSearchPageSize(),
         );
         $sizeLimit = $this->effectiveLimit(
             $request->getSizeLimit(),
-            $this->limits->maxSearchSize,
+            $this->limits->maxSearchSize(),
         );
 
         // Deliberate: the size limit bounds each page rather than the whole paged operation.
@@ -324,7 +324,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         $budget = PageBudget::of(
             $this->effectiveLimit(
                 $request->getTimeLimit(),
-                $this->limits->maxSearchTimeLimit,
+                $this->limits->maxSearchTimeLimit(),
             ),
             $this->limits->effectivePagedLookthrough(),
         );
@@ -421,7 +421,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
             $this->subentryVisibility($pagingRequest->controls()),
             $pagingRequest->controls(),
             new SearchLimits(
-                maxSearchTimeLimit: $this->limits->maxSearchTimeLimit,
+                maxSearchTimeLimit: $this->limits->maxSearchTimeLimit(),
                 maxSearchLookthrough: $lookthrough,
             ),
             $slice,
@@ -487,7 +487,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
      */
     private function evictOldestSessionAtLimit(): void
     {
-        $limit = $this->limits->maxPagingSessions ?? 0;
+        $limit = $this->limits->maxPagingSessions() ?? 0;
         $requests = $this->requestHistory->pagingRequest();
 
         if ($limit <= 0 || $requests->count() < $limit) {
@@ -562,7 +562,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         ?int $pageLimit,
     ): int {
         $remaining = $pageLimit === null
-            ? $this->limits->maxSearchPageSize
+            ? $this->limits->maxSearchPageSize()
             : $pageLimit - count($page);
 
         return max($remaining, 1);

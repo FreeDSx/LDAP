@@ -77,7 +77,7 @@ final readonly class StorageListOptionsFactory
             sortKeys: $sortingControl instanceof SortingControl
                 ? $sortingControl->getSortKeys()
                 : [],
-            lookthroughLimit: $limits->maxSearchLookthrough,
+            lookthroughLimit: $limits->maxSearchLookthrough(),
             attributes: $this->materializedAttributes($request),
             subentries: $subentries,
             slice: $slice,
@@ -103,7 +103,7 @@ final readonly class StorageListOptionsFactory
         int $requestLimit,
         SearchLimits $limits,
     ): int {
-        $serverMax = $limits->maxSearchTimeLimit;
+        $serverMax = $limits->maxSearchTimeLimit();
 
         if ($serverMax === 0) {
             return $requestLimit;

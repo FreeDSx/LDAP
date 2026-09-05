@@ -45,21 +45,10 @@ final class SearchLimitResolver implements SearchLimitResolverInterface, Backend
                 continue;
             }
 
-            return $this->withServerWidePagingCap($rule->limits);
+            // A rule overrides only the caps it names.
+            return $rule->limits->mergedOver($this->default);
         }
 
         return $this->default;
-    }
-
-    /**
-     * Paging sessions cap per-connection memory, so a rule saying nothing about them inherits rather than lifts.
-     */
-    private function withServerWidePagingCap(SearchLimits $limits): SearchLimits
-    {
-        if ($limits->maxPagingSessions !== null || $this->default->maxPagingSessions === null) {
-            return $limits;
-        }
-
-        return $limits->withMaxPagingSessions($this->default->maxPagingSessions);
     }
 }

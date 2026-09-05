@@ -169,7 +169,7 @@ final readonly class SearchStreamBuilder
         Generator $generator,
         ?SearchLimits $effectiveLimits = null,
     ): Generator {
-        $lookthrough = ($effectiveLimits ?? $this->limits)->maxSearchLookthrough;
+        $lookthrough = ($effectiveLimits ?? $this->limits)->maxSearchLookthrough();
         $examined = 0;
 
         foreach ($generator as $entry) {

@@ -55,8 +55,46 @@ final class SearchLimitResolverTest extends TestCase
         );
 
         self::assertSame(
-            $authLimits,
-            $resolver->resolve($this->authenticatedToken()),
+            50,
+            $resolver->resolve($this->authenticatedToken())->maxSearchSize(),
+        );
+    }
+
+    public function test_a_rule_keeps_the_server_wide_value_for_a_cap_it_does_not_name(): void
+    {
+        $resolver = new SearchLimitResolver(
+            (new SearchLimitRules())->withRules(
+                SearchLimitRule::for(Subject::authenticated(), new SearchLimits(maxSearchLookthrough: 10)),
+            ),
+            new SearchLimits(
+                maxSearchSize: 1000,
+                maxSearchLookthrough: 5000,
+            ),
+        );
+        $resolved = $resolver->resolve($this->authenticatedToken());
+
+        self::assertSame(
+            10,
+            $resolved->maxSearchLookthrough(),
+        );
+        self::assertSame(
+            1000,
+            $resolved->maxSearchSize(),
+        );
+    }
+
+    public function test_a_rule_can_still_lift_a_cap_it_names(): void
+    {
+        $resolver = new SearchLimitResolver(
+            (new SearchLimitRules())->withRules(
+                SearchLimitRule::for(Subject::authenticated(), new SearchLimits(maxSearchSize: 0)),
+            ),
+            new SearchLimits(maxSearchSize: 1000),
+        );
+
+        self::assertSame(
+            0,
+            $resolver->resolve($this->authenticatedToken())->maxSearchSize(),
         );
     }
 
@@ -71,7 +109,7 @@ final class SearchLimitResolverTest extends TestCase
 
         self::assertSame(
             25,
-            $resolver->resolve($this->authenticatedToken())->maxPagingSessions,
+            $resolver->resolve($this->authenticatedToken())->maxPagingSessions(),
         );
     }
 
@@ -86,7 +124,7 @@ final class SearchLimitResolverTest extends TestCase
 
         self::assertSame(
             100,
-            $resolver->resolve($this->authenticatedToken())->maxPagingSessions,
+            $resolver->resolve($this->authenticatedToken())->maxPagingSessions(),
         );
     }
 
@@ -101,7 +139,7 @@ final class SearchLimitResolverTest extends TestCase
 
         self::assertSame(
             0,
-            $resolver->resolve($this->authenticatedToken())->maxPagingSessions,
+            $resolver->resolve($this->authenticatedToken())->maxPagingSessions(),
         );
     }
 
@@ -133,8 +171,8 @@ final class SearchLimitResolverTest extends TestCase
         );
 
         self::assertSame(
-            $first,
-            $resolver->resolve($this->authenticatedToken()),
+            10,
+            $resolver->resolve($this->authenticatedToken())->maxSearchSize(),
         );
     }
 
