@@ -533,6 +533,9 @@ $config = PdoConfig::forSqlite('/var/lib/myapp/ldap.sqlite')
 The index adds write cost and disk, so turn it off for a directory that never runs substring filters. Changing
 the mode on a directory that already holds entries needs the index rebuilt before those filters match again.
 
+The trigram index only covers values up to 255 characters. An entry with a longer one is searched directly for
+that attribute, so filters on it slow down as more entries carry such a value.
+
 **Default**: `SubstringIndexMode::Auto`.
 
 ## LDIF Data
