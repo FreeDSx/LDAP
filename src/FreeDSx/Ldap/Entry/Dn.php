@@ -187,6 +187,14 @@ class Dn implements IteratorAggregate, Countable, Stringable
     }
 
     /**
+     * Whether the canonical form is UTF-8. Parsing does not settle this since a hexpair un-escapes to any octet.
+     */
+    public function hasUtf8CanonicalForm(): bool
+    {
+        return preg_match('//u', $this->normalize()->toString()) === 1;
+    }
+
+    /**
      * Return true if this DN and $other name the same entry.
      *
      * @throws UnexpectedValueException

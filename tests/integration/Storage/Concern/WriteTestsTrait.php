@@ -164,6 +164,47 @@ trait WriteTestsTrait
         );
     }
 
+    public function testAddIsRefusedWhenAHexpairEscapeLeavesTheDnWithoutAUtf8CanonicalForm(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INVALID_DN_SYNTAX);
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'userPassword=\FF,dc=foo,dc=bar',
+            [
+                'userPassword' => "\xFF",
+                'cn' => 'poison',
+                'sn' => 'Poison',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+    }
+
+    public function testRenameIsRefusedWhenAHexpairEscapeLeavesTheDnWithoutAUtf8CanonicalForm(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=repoison,dc=foo,dc=bar',
+            ['cn' => 'repoison', 'sn' => 'Repoison', 'objectClass' => 'inetOrgPerson'],
+        ));
+
+        try {
+            $this->ldapClient()->rename('cn=repoison,dc=foo,dc=bar', 'userPassword=\FF', true);
+            self::fail('A new RDN with no UTF-8 canonical form should have been refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INVALID_DN_SYNTAX,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNotNull($this->ldapClient()->read('cn=repoison,dc=foo,dc=bar'));
+        $this->ldapClient()->delete('cn=repoison,dc=foo,dc=bar');
+    }
+
     public function testAddRejectsAnAttributeCarryingNoValues(): void
     {
         $this->authenticateAdmin();

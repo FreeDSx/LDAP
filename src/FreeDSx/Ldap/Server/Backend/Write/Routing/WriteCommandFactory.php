@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Write\Routing;
 
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
@@ -22,6 +23,7 @@ use FreeDSx\Ldap\Operation\Request\ModifyRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Text;
+use FreeDSx\Ldap\Server\AccessControl\OperationTargetDn;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteSubtreeCommand;
@@ -51,7 +53,7 @@ final readonly class WriteCommandFactory
         $this->generatedEntries->assertWritable($request, $context);
 
         return match (true) {
-            $request instanceof AddRequest => new AddCommand($request->getEntry()),
+            $request instanceof AddRequest => $this->addCommand($request),
             $request instanceof DeleteRequest => $this->deleteCommand($request, $context),
             $request instanceof ModifyRequest => new UpdateCommand(
                 $request->getDn(),
@@ -63,6 +65,31 @@ final readonly class WriteCommandFactory
                 ResultCode::NO_SUCH_OPERATION,
             ),
         };
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function addCommand(AddRequest $request): AddCommand
+    {
+        $this->assertCanonicalFormIsUtf8($request->getEntry()->getDn());
+
+        return new AddCommand($request->getEntry());
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function assertCanonicalFormIsUtf8(Dn $dn): void
+    {
+        if ($dn->hasUtf8CanonicalForm()) {
+            return;
+        }
+
+        throw new OperationException(
+            'The DN is not encoded as UTF-8.',
+            ResultCode::INVALID_DN_SYNTAX,
+        );
     }
 
     /**
@@ -91,7 +118,6 @@ final readonly class WriteCommandFactory
                 ResultCode::INVALID_DN_SYNTAX,
             );
         }
-
         // A RelativeLDAPDN is an LDAPString, so bytes that do not spell one cannot name an entry.
         if (!Text::isUtf8($request->getNewRdn()->toString())) {
             throw new OperationException(
@@ -99,6 +125,7 @@ final readonly class WriteCommandFactory
                 ResultCode::INVALID_DN_SYNTAX,
             );
         }
+        $this->assertCanonicalFormIsUtf8(OperationTargetDn::resultOf($request));
 
         return new MoveCommand(
             $request->getDn(),
