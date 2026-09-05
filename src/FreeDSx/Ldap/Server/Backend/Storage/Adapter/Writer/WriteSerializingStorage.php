@@ -120,6 +120,14 @@ final readonly class WriteSerializingStorage implements
         $this->rowLockable($this->writes)->lockForWrite($dn);
     }
 
+    /**
+     * Only meaningful inside an atomic block.
+     */
+    public function lockForReference(Dn $dn): bool
+    {
+        return $this->rowLockable($this->writes)->lockForReference($dn);
+    }
+
     public function namingContexts(): array
     {
         return $this->readStorage()->namingContexts();

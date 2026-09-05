@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
@@ -143,11 +144,11 @@ readonly class EntryPlacementGuard
     ): void {
         $parent = $dn->getParent();
 
-        if ($parent !== null && $this->storage->exists($parent)) {
+        if ($parent !== null && $this->holdAgainstDeletion($parent)) {
             return;
         }
-        // New naming-context roots may only be created by system writes.
-        if ($isSystem) {
+        // A system write may create a naming-context root, but not a hole partway down an existing tree.
+        if ($isSystem && ($parent === null || $parent->getParent() === null)) {
             return;
         }
 
@@ -166,9 +167,21 @@ readonly class EntryPlacementGuard
         if ($newParent === null || $newParent->isRootDse()) {
             return;
         }
-        if (!$this->storage->exists($newParent->normalize())) {
+        if (!$this->holdAgainstDeletion($newParent->normalize())) {
             $this->locator->throwNoSuchObject($newParent);
         }
+    }
+
+    /**
+     * Whether the entry is there, held so a concurrent delete of it cannot commit before this write does.
+     */
+    private function holdAgainstDeletion(Dn $dn): bool
+    {
+        if (!$this->storage instanceof RowLockableInterface) {
+            return $this->storage->exists($dn);
+        }
+
+        return $this->storage->lockForReference($dn);
     }
 
     /**
@@ -231,7 +244,7 @@ readonly class EntryPlacementGuard
         Dn $normNew,
         Dn $newDn,
     ): void {
-        // A system write may create an entry whose parent is absent, so the target can hold subordinates yet not exist.
+        // A bulk load may leave an entry whose parent is absent, so the target can hold subordinates yet not exist.
         if (!$this->storage->exists($normNew) && !$this->storage->hasChildren($normNew)) {
             return;
         }

@@ -415,6 +415,16 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         );
     }
 
+    public function lockForReference(Dn $dn): bool
+    {
+        return $this->dialect->lockRowForReference(
+            $this->transactor->pdo(),
+            'entries',
+            'lc_dn',
+            $dn->normalize()->toString(),
+        );
+    }
+
     /**
      * Runs a write that lands on one DN, translating the unique key's refusal into an answerable failure.
      *

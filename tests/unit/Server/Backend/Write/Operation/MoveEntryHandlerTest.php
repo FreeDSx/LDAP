@@ -141,14 +141,19 @@ final class MoveEntryHandlerTest extends TestCase
 
     public function test_it_refuses_a_target_that_already_holds_subordinates(): void
     {
-        $this->addPeopleOu();
-        $this->adds()->handle(
-            new AddCommand(new Entry(
+        // Seeded straight into storage: no write reaches this state, since one cannot land under a missing parent.
+        $this->writeGraph(new InMemoryStorage([
+            new Entry(
+                new Dn('dc=example,dc=com'),
+                new Attribute('dc', 'example'),
+                new Attribute('objectClass', 'dcObject'),
+            ),
+            new Entry(
                 new Dn('cn=Orphan,ou=Staff,dc=example,dc=com'),
                 new Attribute('cn', 'Orphan'),
-            )),
-            $this->systemContext(),
-        );
+            ),
+        ]));
+        $this->addPeopleOu();
 
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::ENTRY_ALREADY_EXISTS);

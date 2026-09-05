@@ -82,8 +82,8 @@ class LdapServer
      *
      * @throws LdifParseException when the LDIF cannot be parsed
      * @throws RuntimeException when the LDIF contains a non-add change record
-     * @throws InvalidArgumentException when the creator DN is malformed or an entry's parent is missing
-     * @throws OperationException when an entry violates the schema and validation mode is strict
+     * @throws InvalidArgumentException when the creator DN is malformed
+     * @throws OperationException when an entry is refused, such as one violating the schema or missing its parent
      */
     public function seed(
         LdifLoaderInterface $loader,
@@ -100,8 +100,8 @@ class LdapServer
      *
      * @param iterable<Entry> $entries Depth-first, since a parent has to exist before the entries beneath it.
      *
-     * @throws InvalidArgumentException when the creator DN is malformed or an entry's parent is missing
-     * @throws OperationException when an entry violates the schema and validation mode is strict
+     * @throws InvalidArgumentException when the creator DN is malformed
+     * @throws OperationException when an entry is refused, such as one violating the schema or missing its parent
      */
     public function seedEntries(
         iterable $entries,
