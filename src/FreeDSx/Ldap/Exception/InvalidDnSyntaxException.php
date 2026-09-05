@@ -13,7 +13,27 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Exception;
 
+use FreeDSx\Ldap\Operation\ResultCode;
+use Throwable;
+
 /**
  * Thrown when a DN or RDN cannot be parsed, so a client-supplied one can be answered with invalidDNSyntax.
  */
-class InvalidDnSyntaxException extends InvalidArgumentException {}
+class InvalidDnSyntaxException extends InvalidArgumentException implements AnswerableExceptionInterface
+{
+    public function __construct(
+        string $message,
+        ?Throwable $previous = null,
+    ) {
+        parent::__construct(
+            $message,
+            ResultCode::INVALID_DN_SYNTAX,
+            $previous,
+        );
+    }
+
+    public function getDiagnostic(): string
+    {
+        return $this->getMessage();
+    }
+}

@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Server\Backend\Write\AtomicWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
 use FreeDSx\Ldap\Server\Backend\Write\OperationalAttributeGenerator;
@@ -33,7 +32,6 @@ readonly class AddEntryHandler
 
     public function __construct(
         private EntryStorageInterface $storage,
-        private AtomicWriter $writer,
         private EntryPlacementGuard $placement,
         private SchemaViolationGate $schemaGate,
         private OperationalAttributeGenerator $operationalAttrs,
@@ -47,7 +45,7 @@ readonly class AddEntryHandler
         AddCommand $command,
         WriteContext $context,
     ): void {
-        $this->writer->write(function () use ($command, $context): void {
+        $this->storage->atomic(function () use ($command, $context): void {
             // Worked on a copy, so a retried attempt never sees what an earlier one merged or stamped.
             $entry = $command->entry->makeCopy();
             // Merged before validation, so the values naming the entry count toward what its object classes require.

@@ -285,9 +285,24 @@ class LdapQueue extends Asn1MessageQueue
     /**
      * Encodes a message to BER, taking a dedicated fast path for search result entries.
      *
-     * @throws EncoderException
+     * @throws ProtocolException
      */
     private function encodeMessage(LdapMessage $message): string
+    {
+        try {
+            return $this->encodeMessageBody($message);
+        } catch (EncoderException $e) {
+            throw new ProtocolException(
+                'The response could not be encoded.',
+                previous: $e,
+            );
+        }
+    }
+
+    /**
+     * @throws EncoderException
+     */
+    private function encodeMessageBody(LdapMessage $message): string
     {
         $response = $message instanceof LdapMessageResponse
             ? $message->getResponse()

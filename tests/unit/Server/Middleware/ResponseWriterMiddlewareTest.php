@@ -16,6 +16,8 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Middleware;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ProtocolException;
+use RuntimeException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -31,6 +33,8 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Middleware\ResponseWriterMiddleware;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
@@ -218,6 +222,75 @@ final class ResponseWriterMiddlewareTest extends TestCase
         self::assertSame(
             '',
             $response->getDn()->toString(),
+        );
+    }
+
+    public function test_it_answers_a_storage_failure_without_naming_the_internals(): void
+    {
+        $this->subject->process(
+            $this->contextFor(new DeleteRequest('cn=missing,dc=bar')),
+            new ThrowingMiddlewareHandler(new StorageIoException('Failed to prepare SQL statement.')),
+        );
+
+        $response = $this->firstSent()?->getResponse();
+        self::assertInstanceOf(DeleteResponse::class, $response);
+        self::assertSame(
+            ResultCode::UNAVAILABLE,
+            $response->getResultCode(),
+        );
+        self::assertSame(
+            'The backend storage is currently unavailable.',
+            $response->getDiagnosticMessage(),
+        );
+    }
+
+    public function test_it_answers_a_taken_dn_with_entry_already_exists(): void
+    {
+        $this->subject->process(
+            $this->contextFor(new DeleteRequest('cn=missing,dc=bar')),
+            new ThrowingMiddlewareHandler(
+                new EntryAlreadyExistsException('Entry already exists: cn=taken,dc=bar'),
+            ),
+        );
+
+        $response = $this->firstSent()?->getResponse();
+        self::assertInstanceOf(DeleteResponse::class, $response);
+        self::assertSame(
+            ResultCode::ENTRY_ALREADY_EXISTS,
+            $response->getResultCode(),
+        );
+        self::assertSame(
+            'Entry already exists: cn=taken,dc=bar',
+            $response->getDiagnosticMessage(),
+        );
+    }
+
+    public function test_it_answers_an_unmapped_failure_generically(): void
+    {
+        $this->subject->process(
+            $this->contextFor(new DeleteRequest('cn=missing,dc=bar')),
+            new ThrowingMiddlewareHandler(new RuntimeException('a bug naming internals')),
+        );
+
+        $response = $this->firstSent()?->getResponse();
+        self::assertInstanceOf(DeleteResponse::class, $response);
+        self::assertSame(
+            ResultCode::OTHER,
+            $response->getResultCode(),
+        );
+        self::assertSame(
+            'The result could not be completed.',
+            $response->getDiagnosticMessage(),
+        );
+    }
+
+    public function test_it_leaves_a_session_ending_failure_to_the_connection(): void
+    {
+        $this->expectException(ProtocolException::class);
+
+        $this->subject->process(
+            $this->contextFor(new DeleteRequest('cn=missing,dc=bar')),
+            new ThrowingMiddlewareHandler(new ProtocolException('The response could not be encoded.')),
         );
     }
 

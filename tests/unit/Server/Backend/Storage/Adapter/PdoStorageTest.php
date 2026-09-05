@@ -1374,7 +1374,7 @@ final class PdoStorageTest extends TestCase
         }
     }
 
-    public function test_a_write_translates_dn_too_long_to_admin_limit_exceeded(): void
+    public function test_a_write_refuses_a_dn_longer_than_the_dialect_allows(): void
     {
         $container = $this->containerFor($this->createPdoStorageWithMaxDnLength(5));
 
@@ -1386,15 +1386,11 @@ final class PdoStorageTest extends TestCase
                 )),
                 $this->systemContext(),
             );
-            self::fail('Expected OperationException was not thrown.');
-        } catch (OperationException $e) {
+            self::fail('Expected DnTooLongException was not thrown.');
+        } catch (DnTooLongException $e) {
             self::assertSame(
                 ResultCode::ADMIN_LIMIT_EXCEEDED,
                 $e->getCode(),
-            );
-            self::assertInstanceOf(
-                DnTooLongException::class,
-                $e->getPrevious(),
             );
         }
     }

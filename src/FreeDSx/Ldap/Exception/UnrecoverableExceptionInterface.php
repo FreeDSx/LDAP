@@ -13,6 +13,11 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Exception;
 
-use Exception;
+use Throwable;
 
-class ProtocolException extends Exception implements UnrecoverableExceptionInterface {}
+/**
+ * A failure no result code can answer which ends the session (RFC 4511 §4.1.1).
+ *
+ * @author Chad Sikorra <Chad.Sikorra@gmail.com>
+ */
+interface UnrecoverableExceptionInterface extends Throwable {}

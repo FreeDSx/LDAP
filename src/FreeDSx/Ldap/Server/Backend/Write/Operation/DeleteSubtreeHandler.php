@@ -17,7 +17,6 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\Write\AtomicWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -41,7 +40,6 @@ readonly class DeleteSubtreeHandler
 
     public function __construct(
         private EntryStorageInterface $storage,
-        private AtomicWriter $writer,
         private EntryLocator $locator,
         private EntryPlacementGuard $placement,
         private SubtreeEnumerator $subtree,
@@ -69,7 +67,7 @@ readonly class DeleteSubtreeHandler
         }
 
         foreach (array_chunk($dnList, self::BATCH_SIZE) as $batch) {
-            $this->writer->write(function () use ($batch, $context): void {
+            $this->storage->atomic(function () use ($batch, $context): void {
                 $preImages = $this->changeRecorder === null
                     ? []
                     : $this->subtree->entriesAt($batch);

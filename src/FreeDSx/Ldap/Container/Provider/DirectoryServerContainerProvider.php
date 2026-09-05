@@ -34,7 +34,6 @@ use FreeDSx\Ldap\Server\Backend\Write\Replay\WriteRequestReplayer;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
-use FreeDSx\Ldap\Server\Backend\Write\AtomicWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
@@ -134,9 +133,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                 $c->get(EntryStorageInterface::class),
             ),
             SubtreeEnumerator::class => static fn(Container $c): SubtreeEnumerator => new SubtreeEnumerator(
-                $c->get(EntryStorageInterface::class),
-            ),
-            AtomicWriter::class => static fn(Container $c): AtomicWriter => new AtomicWriter(
                 $c->get(EntryStorageInterface::class),
             ),
             SubentryPlacementGuard::class => static fn(Container $c): SubentryPlacementGuard => new SubentryPlacementGuard(
@@ -327,7 +323,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     {
         return new AddEntryHandler(
             storage: $container->get(EntryStorageInterface::class),
-            writer: $container->get(AtomicWriter::class),
             placement: $container->get(EntryPlacementGuard::class),
             schemaGate: $container->get(SchemaViolationGate::class),
             operationalAttrs: $container->get(OperationalAttributeGenerator::class),
@@ -339,7 +334,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     {
         return new DeleteEntryHandler(
             storage: $container->get(EntryStorageInterface::class),
-            writer: $container->get(AtomicWriter::class),
             locator: $container->get(EntryLocator::class),
             placement: $container->get(EntryPlacementGuard::class),
             changeRecorder: $this->changeRecorderFor($container),
@@ -350,7 +344,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     {
         return new DeleteSubtreeHandler(
             storage: $container->get(EntryStorageInterface::class),
-            writer: $container->get(AtomicWriter::class),
             locator: $container->get(EntryLocator::class),
             placement: $container->get(EntryPlacementGuard::class),
             subtree: $container->get(SubtreeEnumerator::class),
@@ -363,7 +356,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     {
         return new UpdateEntryHandler(
             storage: $container->get(EntryStorageInterface::class),
-            writer: $container->get(AtomicWriter::class),
             locator: $container->get(EntryLocator::class),
             mutation: $container->get(EntryMutation::class),
             placement: $container->get(EntryPlacementGuard::class),
@@ -375,7 +367,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     {
         return new ComputeUpdateHandler(
             storage: $container->get(EntryStorageInterface::class),
-            writer: $container->get(AtomicWriter::class),
             locator: $container->get(EntryLocator::class),
             mutation: $container->get(EntryMutation::class),
             placement: $container->get(EntryPlacementGuard::class),
@@ -389,7 +380,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
         return new MoveEntryHandler(
             storage: $container->get(EntryStorageInterface::class),
-            writer: $container->get(AtomicWriter::class),
             locator: $container->get(EntryLocator::class),
             mutation: $container->get(EntryMutation::class),
             placement: $container->get(EntryPlacementGuard::class),

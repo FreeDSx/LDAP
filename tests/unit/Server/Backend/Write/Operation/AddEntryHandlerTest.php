@@ -171,7 +171,7 @@ final class AddEntryHandlerTest extends TestCase
         self::assertNotNull($stored->get('entryUUID'));
     }
 
-    public function test_a_storage_failure_is_answered_as_unavailable(): void
+    public function test_a_storage_failure_propagates_carrying_its_result_code(): void
     {
         $ioException = new StorageIoException('Unable to publish the storage update.');
         /** @var EntryStorageInterface&MockObject $storage */
@@ -188,19 +188,15 @@ final class AddEntryHandlerTest extends TestCase
                 )),
                 $this->context(),
             );
-            self::fail('Expected OperationException was not thrown.');
-        } catch (OperationException $e) {
+            self::fail('Expected StorageIoException was not thrown.');
+        } catch (StorageIoException $e) {
             self::assertSame(
                 ResultCode::UNAVAILABLE,
                 $e->getCode(),
             );
             self::assertSame(
                 'The backend storage is currently unavailable.',
-                $e->getMessage(),
-            );
-            self::assertSame(
-                $ioException,
-                $e->getPrevious(),
+                $e->getDiagnostic(),
             );
         }
     }
