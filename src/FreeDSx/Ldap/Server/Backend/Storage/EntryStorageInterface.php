@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\DefaultHasChildrenTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 
 /**
  * Raw persistence contract; LDAP semantics live in the read backend and write handlers above it. Dn parameters are always normalised (lowercased).
@@ -55,6 +56,13 @@ interface EntryStorageInterface
         Entry $entry,
         bool $rebuildIndexes = false,
     ): void;
+
+    /**
+     * Persist the entry only if its normalised DN is free (handles concurrency races).
+     *
+     * @throws EntryAlreadyExistsException when the DN is taken.
+     */
+    public function insert(Entry $entry): void;
 
     /**
      * Re-key the entry at $from and every descendant under $to, leaving attributes and secondary-index rows untouched.

@@ -49,6 +49,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
@@ -707,6 +708,57 @@ final class PdoStorageTest extends TestCase
         ));
 
         self::assertNotNull($this->storage->find(new Dn('cn=persistent,dc=example,dc=com')));
+    }
+
+    public function test_insert_persists_entry(): void
+    {
+        $this->storage->insert(new Entry(
+            new Dn('cn=Fresh,dc=example,dc=com'),
+            new Attribute('cn', 'Fresh'),
+        ));
+
+        self::assertNotNull($this->storage->find(new Dn('cn=fresh,dc=example,dc=com')));
+    }
+
+    public function test_insert_refuses_a_dn_that_is_taken(): void
+    {
+        $this->expectException(EntryAlreadyExistsException::class);
+
+        $this->storage->insert(new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'Alice'),
+        ));
+    }
+
+    public function test_insert_leaves_the_entry_it_refused_untouched(): void
+    {
+        try {
+            $this->storage->insert(new Entry(
+                new Dn('cn=Alice,dc=example,dc=com'),
+                new Attribute('cn', 'Alice'),
+                new Attribute('description', 'overwritten'),
+            ));
+        } catch (EntryAlreadyExistsException) {
+        }
+
+        self::assertNull(
+            $this->storage->find(new Dn('cn=alice,dc=example,dc=com'))?->get('description'),
+        );
+    }
+
+    public function test_rename_subtree_onto_an_occupied_dn_is_answerable(): void
+    {
+        $this->seed(new Entry(
+            new Dn('cn=Taken,dc=example,dc=com'),
+            new Attribute('cn', 'Taken'),
+        ));
+
+        $this->expectException(EntryAlreadyExistsException::class);
+
+        $this->storage->renameSubtree(
+            new Dn('cn=alice,dc=example,dc=com'),
+            new Dn('cn=Taken,dc=example,dc=com'),
+        );
     }
 
     public function test_remove_deletes_entry(): void

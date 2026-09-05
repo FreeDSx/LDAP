@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use Throwable;
 
@@ -42,6 +43,12 @@ final readonly class AtomicWriter
         } catch (OperationException|InvalidDnSyntaxException $e) {
             // Already answerable: one carries its own result code, the other is mapped on the way out.
             throw $e;
+        } catch (EntryAlreadyExistsException $e) {
+            throw new OperationException(
+                $e->getMessage(),
+                ResultCode::ENTRY_ALREADY_EXISTS,
+                $e,
+            );
         } catch (DnTooLongException $e) {
             throw new OperationException(
                 $e->getMessage(),

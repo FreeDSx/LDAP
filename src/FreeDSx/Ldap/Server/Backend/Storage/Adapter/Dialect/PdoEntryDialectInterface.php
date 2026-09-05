@@ -60,6 +60,11 @@ interface PdoEntryDialectInterface
     public function isRetryableConflict(PDOException $exception): bool;
 
     /**
+     * Whether the failure is the unique key on lc_dn refusing a second entry at one DN.
+     */
+    public function isDuplicateEntry(PDOException $exception): bool;
+
+    /**
      * Existence check: `SELECT 1 FROM entries WHERE lc_dn = ? LIMIT 1`. Parameters: [lc_dn]
      */
     public function queryExists(): string;
@@ -117,6 +122,13 @@ interface PdoEntryDialectInterface
      * Upsert a single entry. Parameters: [lc_dn, dn, lc_parent_dn, attributes]
      */
     public function queryUpsert(): string;
+
+    /**
+     * Insert a single entry, failing when the DN is taken.
+     *
+     * Parameters: [lc_dn, dn, lc_parent_dn, attributes]
+     */
+    public function queryInsert(): string;
 
     /**
      * Re-key one entry in place.
