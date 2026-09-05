@@ -27,7 +27,7 @@ use Throwable;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class OperationException extends Exception
+class OperationException extends Exception implements AnswerableExceptionInterface
 {
     public function __construct(
         string $message = '',
@@ -52,6 +52,11 @@ class OperationException extends Exception
     public function getMatchedDn(): ?Dn
     {
         return $this->matchedDn;
+    }
+
+    public function getDiagnostic(): string
+    {
+        return $this->getMessage();
     }
 
     /**

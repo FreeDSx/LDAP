@@ -22,6 +22,8 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
+use PHPUnit\Framework\MockObject\MockObject;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
@@ -222,6 +224,27 @@ final class LdapImporterTest extends TestCase
         try {
             $this->importerFor($this->storage, $options)->importEntries([$this->domain()]);
         } catch (OperationException) {
+        }
+
+        self::assertSame(
+            [ServerEvent::BulkImportFailed->value],
+            $this->loggedEvents($logger),
+        );
+    }
+
+    public function test_importEntries_records_a_failure_the_storage_layer_raised(): void
+    {
+        $logger = new RecordingLogger();
+        /** @var EntryStorageInterface&MockObject $storage */
+        $storage = $this->createMock(EntryStorageInterface::class);
+        $storage->method('atomic')
+            ->willThrowException(new StorageIoException('Unable to stage the import.'));
+
+        try {
+            $this->importerFor($storage, $this->optionsLogging($logger))
+                ->importEntries([$this->domain()]);
+            self::fail('Expected StorageIoException was not thrown.');
+        } catch (StorageIoException) {
         }
 
         self::assertSame(
