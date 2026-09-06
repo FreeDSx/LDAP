@@ -74,6 +74,8 @@ class SocketServerFactory
             ->setSslCryptoMethod($this->network->getMinTlsVersion()->toServerCryptoMethod())
             ->setSslCiphers($this->network->getSslCiphers())
             ->setSslValidateCert($this->network->isSslValidateCert())
+            // Swoole does not support populating the peer certificate. Asking for one breaks StartTLS.
+            ->setSslCapturePeerCert($this->runner !== RunnerMode::Swoole)
             ->setSslAllowSelfSigned($this->network->getSslAllowSelfSigned())
             ->setSslCaCert($this->network->getSslCaCert())
             ->setReusePort($this->reusePort);

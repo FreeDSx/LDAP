@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Server\Logging\ServerEvent;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
+use Throwable;
 
 use function extension_loaded;
 
@@ -81,7 +82,17 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
             // Plaintext waiting behind the request is the command-injection shape, so its loss is worth reporting.
             $discarded = $connection->hasBufferedInput();
 
-            $connection->encrypt();
+            try {
+                $connection->encrypt();
+            } catch (Throwable $e) {
+                $this->eventLogger->record(
+                    ServerEvent::StartTlsFailed,
+                    [EventContext::REASON => $e->getMessage()],
+                    message: $message,
+                );
+
+                throw $e;
+            }
 
             if ($discarded) {
                 $this->eventLogger->record(
