@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
-use FreeDSx\Ldap\Server\AccessControl\ConfidentialFilterRewriter;
+use FreeDSx\Ldap\Server\AccessControl\WithheldFilterRewriter;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
@@ -25,19 +25,16 @@ use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 
 /**
- * Withholds confidential attributes from assertions before the request reaches storage.
- *
- * An assertion the requester cannot satisfy is answered here, so the value never selects candidates and a
- * guess costs the same whether or not it was right.
+ * Withholds attributes from assertions before the request reaches storage.
  *
  * @internal
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class ConfidentialAttributeMiddleware implements MiddlewareInterface
+final readonly class WithheldAttributeMiddleware implements MiddlewareInterface
 {
     public function __construct(
-        private ConfidentialFilterRewriter $rewriter,
+        private WithheldFilterRewriter $rewriter,
         private ResponseFactory $responseFactory = new ResponseFactory(),
     ) {}
 

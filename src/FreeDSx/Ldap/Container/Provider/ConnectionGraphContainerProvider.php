@@ -24,11 +24,11 @@ use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributePolicy;
-use FreeDSx\Ldap\Server\AccessControl\ConfidentialFilterRewriter;
+use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
+use FreeDSx\Ldap\Server\AccessControl\WithheldFilterRewriter;
 use FreeDSx\Ldap\Server\Middleware\AliasDereferenceMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
-use FreeDSx\Ldap\Server\Middleware\ConfidentialAttributeMiddleware;
+use FreeDSx\Ldap\Server\Middleware\WithheldAttributeMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\Middleware\MetricsMiddleware;
@@ -66,7 +66,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
             CriticalControlMiddleware::class => $this->makeCriticalControlMiddleware(...),
             OperationAuthorizationMiddleware::class => $this->makeOperationAuthorizationMiddleware(...),
             AliasDereferenceMiddleware::class => $this->makeAliasDereferenceMiddleware(...),
-            ConfidentialAttributeMiddleware::class => $this->makeConfidentialAttributeMiddleware(...),
+            WithheldAttributeMiddleware::class => $this->makeWithheldAttributeMiddleware(...),
             AssertionMiddleware::class => $this->makeAssertionMiddleware(...),
             ResourceLimitMiddleware::class => $this->makeResourceLimitMiddleware(...),
         ];
@@ -160,10 +160,10 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
         );
     }
 
-    private function makeConfidentialAttributeMiddleware(Container $container): ConfidentialAttributeMiddleware
+    private function makeWithheldAttributeMiddleware(Container $container): WithheldAttributeMiddleware
     {
-        return new ConfidentialAttributeMiddleware(new ConfidentialFilterRewriter(
-            new ConfidentialAttributePolicy(
+        return new WithheldAttributeMiddleware(new WithheldFilterRewriter(
+            new WithheldAttributePolicy(
                 $container->get(AccessControlInterface::class),
                 $container->get(ServerOptions::class)->getSchema(),
             ),

@@ -109,6 +109,16 @@ interface AccessControlInterface
     ): bool;
 
     /**
+     * Whether $token may name an attribute in a search filter. Separate from read access, which only strips values.
+     *
+     * Target-independent by design: this is answered before a search runs, when no entry is in hand yet.
+     */
+    public function mayFilterOnAttribute(
+        TokenInterface $token,
+        string $attribute,
+    ): bool;
+
+    /**
      * Return $entry with unreadable attributes removed, or null to suppress the entry entirely.
      */
     public function filterEntry(

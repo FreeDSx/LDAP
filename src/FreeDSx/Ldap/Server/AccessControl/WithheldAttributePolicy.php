@@ -24,7 +24,7 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class ConfidentialAttributePolicy
+final readonly class WithheldAttributePolicy
 {
     public function __construct(
         private AccessControlInterface $accessControl,
@@ -32,9 +32,9 @@ final readonly class ConfidentialAttributePolicy
     ) {}
 
     /**
-     * Whether the schema marks the attribute confidential and the token holds no grant over it.
+     * Whether the schema marks the attribute confidential, and the token holds no grant over it.
      */
-    public function isWithheld(
+    public function isWithheldFromResult(
         string $attribute,
         TokenInterface $token,
     ): bool {
@@ -48,6 +48,23 @@ final readonly class ConfidentialAttributePolicy
         return !$this->accessControl->hasConfidentialAccess(
             $token,
             $name,
+        );
+    }
+
+    /**
+     * Whether the attribute is withheld from a filter.
+     */
+    public function isWithheldFromFilter(
+        string $attribute,
+        TokenInterface $token,
+    ): bool {
+        if ($this->isWithheldFromResult($attribute, $token)) {
+            return true;
+        }
+
+        return !$this->accessControl->mayFilterOnAttribute(
+            $token,
+            Attribute::normalizeName($attribute),
         );
     }
 }

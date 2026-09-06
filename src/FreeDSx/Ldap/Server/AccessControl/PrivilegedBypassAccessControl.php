@@ -140,6 +140,17 @@ final readonly class PrivilegedBypassAccessControl implements AccessControlInter
             );
     }
 
+    public function mayFilterOnAttribute(
+        TokenInterface $token,
+        string $attribute,
+    ): bool {
+        return $token instanceof PrivilegedTokenInterface
+            || $this->inner->mayFilterOnAttribute(
+                $token,
+                $attribute,
+            );
+    }
+
     public function filterEntry(
         TokenInterface $token,
         Entry $entry,

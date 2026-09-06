@@ -32,7 +32,7 @@ final readonly class ConfidentialAttributeAccessControl implements AccessControl
 {
     public function __construct(
         private AccessControlInterface $inner,
-        private ConfidentialAttributePolicy $policy,
+        private WithheldAttributePolicy $policy,
     ) {}
 
     public function setBackend(ReadBackendInterface $backend): void
@@ -143,6 +143,16 @@ final readonly class ConfidentialAttributeAccessControl implements AccessControl
         );
     }
 
+    public function mayFilterOnAttribute(
+        TokenInterface $token,
+        string $attribute,
+    ): bool {
+        return $this->inner->mayFilterOnAttribute(
+            $token,
+            $attribute,
+        );
+    }
+
     public function isEntryVisible(
         TokenInterface $token,
         Entry $entry,
@@ -161,7 +171,7 @@ final readonly class ConfidentialAttributeAccessControl implements AccessControl
         $kept = [];
 
         foreach ($all as $attribute) {
-            if (!$this->policy->isWithheld($attribute->getName(), $token)) {
+            if (!$this->policy->isWithheldFromResult($attribute->getName(), $token)) {
                 $kept[] = $attribute;
             }
         }

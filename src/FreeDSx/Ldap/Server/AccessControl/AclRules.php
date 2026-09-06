@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ExtendedOperationRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\FilterAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
@@ -63,6 +64,7 @@ final readonly class AclRules
      * @param ExtendedOperationRule[] $extendedOps Evaluated per extended operation in order; first match wins.
      * @param ConfidentialAccessRule[] $confidential Evaluated per confidential attribute in order; first match wins.
      * @param RelocationRule[] $relocations Evaluated per container and direction in order; first match wins.
+     * @param FilterAccessRule[] $filters Evaluated per filter attribute in order; first match wins.
      */
     private function __construct(
         public array $operations = [],
@@ -71,6 +73,7 @@ final readonly class AclRules
         public array $extendedOps = [],
         public array $confidential = [],
         public array $relocations = [],
+        public array $filters = [],
     ) {}
 
     /**
@@ -84,6 +87,7 @@ final readonly class AclRules
      * @param ExtendedOperationRule[] $extendedOps
      * @param ConfidentialAccessRule[] $confidential
      * @param RelocationRule[] $relocations
+     * @param FilterAccessRule[] $filters
      */
     public static function fromEmpty(
         array $operations = [],
@@ -92,6 +96,7 @@ final readonly class AclRules
         array $extendedOps = [],
         array $confidential = [],
         array $relocations = [],
+        array $filters = [],
     ): self {
         return new self(
             $operations,
@@ -100,6 +105,7 @@ final readonly class AclRules
             $extendedOps,
             $confidential,
             $relocations,
+            $filters,
         );
     }
 
@@ -115,6 +121,7 @@ final readonly class AclRules
             $this->extendedOps,
             $this->confidential,
             $this->relocations,
+            $this->filters,
         );
     }
 
@@ -130,6 +137,7 @@ final readonly class AclRules
             $this->extendedOps,
             $this->confidential,
             $this->relocations,
+            $this->filters,
         );
     }
 
@@ -145,6 +153,7 @@ final readonly class AclRules
             $this->extendedOps,
             $this->confidential,
             $this->relocations,
+            $this->filters,
         );
     }
 
@@ -160,6 +169,7 @@ final readonly class AclRules
             $extendedOps,
             $this->confidential,
             $this->relocations,
+            $this->filters,
         );
     }
 
@@ -177,6 +187,7 @@ final readonly class AclRules
             $this->extendedOps,
             $confidential,
             $this->relocations,
+            $this->filters,
         );
     }
 
@@ -194,6 +205,25 @@ final readonly class AclRules
             $this->extendedOps,
             $this->confidential,
             $relocations,
+            $this->filters,
+        );
+    }
+
+    /**
+     * Rules gating which attributes may be named in a search filter; anything unmatched stays filterable.
+     *
+     * Discards every filter rule already present.
+     */
+    public function replaceFilterAccess(FilterAccessRule ...$filters): self
+    {
+        return new self(
+            $this->operations,
+            $this->attributes,
+            $this->controls,
+            $this->extendedOps,
+            $this->confidential,
+            $this->relocations,
+            $filters,
         );
     }
 
@@ -249,6 +279,17 @@ final readonly class AclRules
         return $this->replaceConfidentialAccess(
             ...$this->confidential,
             ...$confidential,
+        );
+    }
+
+    /**
+     * Append filter access rules, so anything already present matches first.
+     */
+    public function appendFilterAccess(FilterAccessRule ...$filters): self
+    {
+        return $this->replaceFilterAccess(
+            ...$this->filters,
+            ...$filters,
         );
     }
 
@@ -315,6 +356,17 @@ final readonly class AclRules
         return $this->replaceConfidentialAccess(
             ...$confidential,
             ...$this->confidential,
+        );
+    }
+
+    /**
+     * Prepend filter access rules. These match ahead of anything already present.
+     */
+    public function prependFilterAccess(FilterAccessRule ...$filters): self
+    {
+        return $this->replaceFilterAccess(
+            ...$filters,
+            ...$this->filters,
         );
     }
 

@@ -24,7 +24,7 @@ use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributeAccessControl;
-use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributePolicy;
+use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackend;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
@@ -191,7 +191,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
         $acl = new PrivilegedBypassAccessControl(new ConfidentialAttributeAccessControl(
             $configured,
-            new ConfidentialAttributePolicy(
+            new WithheldAttributePolicy(
                 $configured,
                 $options->getSchema(),
             ),

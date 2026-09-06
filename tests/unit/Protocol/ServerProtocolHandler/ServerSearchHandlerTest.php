@@ -142,6 +142,46 @@ final class ServerSearchHandlerTest extends TestCase
         );
     }
 
+    public function test_it_rejects_an_extensible_match_that_names_no_attribute(): void
+    {
+        $this->mockBackend
+            ->expects(self::never())
+            ->method('search');
+
+        self::expectExceptionObject(new OperationException(
+            'An extensible match must name an attribute type.',
+            ResultCode::INAPPROPRIATE_MATCHING,
+        ));
+
+        $this->subject->handleRequest(
+            new LdapMessageRequest(
+                2,
+                self::searchRequest()->setFilter(
+                    Filters::extensible(null, 'secret', 'caseIgnoreMatch'),
+                ),
+            ),
+            $this->mockToken,
+        );
+    }
+
+    public function test_it_accepts_an_extensible_match_that_names_an_attribute(): void
+    {
+        $this->mockBackend
+            ->expects(self::once())
+            ->method('search')
+            ->willReturn(EntryStream::of($this->makeGenerator()));
+
+        $this->subject->handleRequest(
+            new LdapMessageRequest(
+                2,
+                self::searchRequest()->setFilter(
+                    Filters::extensible('cn', 'secret', 'caseIgnoreMatch'),
+                ),
+            ),
+            $this->mockToken,
+        );
+    }
+
     #[DataProvider('outOfRangeParameterProvider')]
     public function test_it_rejects_a_search_parameter_outside_its_permitted_range(
         SearchRequest $request,

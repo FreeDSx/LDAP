@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\AccessControl;
 
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterAttributeInterface;
 use FreeDSx\Ldap\Search\Filter\FilterAttributes;
@@ -24,7 +26,7 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 use function count;
 
 /**
- * Folds assertions on withheld confidential attributes out of a filter, so their values never select candidates.
+ * Folds assertions on withheld attributes out of a filter so their values never select candidates.
  *
  * A withheld attribute is treated as absent, matching the per-entry redaction, which makes its assertion false
  * and collapses the surrounding tree by boolean algebra. Constants are the RFC 4526 absolute filters.
@@ -33,12 +35,14 @@ use function count;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class ConfidentialFilterRewriter
+final readonly class WithheldFilterRewriter
 {
-    public function __construct(private ConfidentialAttributePolicy $policy) {}
+    public function __construct(private WithheldAttributePolicy $policy) {}
 
     /**
      * The filter with withheld assertions folded away, or the original when none apply.
+     *
+     * @throws OperationException when an assertion names no attribute to fold against.
      */
     public function rewrite(
         FilterInterface $filter,
@@ -59,14 +63,27 @@ final readonly class ConfidentialFilterRewriter
     }
 
     /**
-     * A null referenced set is indeterminate, so there is nothing to fold on.
+     * An indeterminate set names an assertion reaching every attribute, which nothing here can fold against one.
+     *
+     * Refused with the same code request validation uses, so which one answers first cannot matter.
+     *
+     * @throws OperationException
      */
     private function hasWithheldAttribute(
         FilterInterface $filter,
         TokenInterface $token,
     ): bool {
-        foreach (FilterAttributes::referenced($filter) ?? [] as $attribute) {
-            if ($this->policy->isWithheld($attribute, $token)) {
+        $referenced = FilterAttributes::referenced($filter);
+
+        if ($referenced === null) {
+            throw new OperationException(
+                'An extensible match must name an attribute type.',
+                ResultCode::INAPPROPRIATE_MATCHING,
+            );
+        }
+
+        foreach ($referenced as $attribute) {
+            if ($this->policy->isWithheldFromFilter($attribute, $token)) {
                 return true;
             }
         }
@@ -159,7 +176,7 @@ final readonly class ConfidentialFilterRewriter
             return $filter;
         }
 
-        return $this->policy->isWithheld($attribute, $token)
+        return $this->policy->isWithheldFromFilter($attribute, $token)
             ? self::never()
             : $filter;
     }
