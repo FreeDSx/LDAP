@@ -128,7 +128,7 @@ final class PdoStorageTest extends TestCase
             subtree: true,
             filter: Filters::present('sn'),
             sortKeys: [new SortKey('sn')],
-        ))->entries);
+        ))->entries());
 
         self::assertSame(
             ['cn=spaced, dc=example,dc=com', 'cn=plain,dc=example,dc=com'],
@@ -161,7 +161,7 @@ final class PdoStorageTest extends TestCase
                 subtree: true,
                 filter: Filters::equal('sn', 'x'),
                 maxEntries: $maxEntries,
-            ))->entries);
+            ))->entries());
         }
 
         self::assertCount(
@@ -183,7 +183,7 @@ final class PdoStorageTest extends TestCase
             subtree: true,
             filter: Filters::equal('sn', 'x'),
             attributes: [],
-        ))->entries);
+        ))->entries());
 
         self::assertCount(
             1,
@@ -368,7 +368,7 @@ final class PdoStorageTest extends TestCase
             baseDn: new Dn('dc=example,dc=com'),
             subtree: true,
             filter: Filters::equal('pwdChangedTime', '20260101120000Z'),
-        ))->entries);
+        ))->entries());
 
         self::assertCount(1, $entries);
     }
@@ -500,7 +500,7 @@ final class PdoStorageTest extends TestCase
             baseDn: new Dn('dc=example,dc=com'),
             subtree: true,
             filter: Filters::contains('sn', 'needle'),
-        ))->entries);
+        ))->entries());
 
         self::assertSame(
             ['cn=late,dc=example,dc=com'],
@@ -533,7 +533,7 @@ final class PdoStorageTest extends TestCase
             baseDn: new Dn('dc=example,dc=com'),
             subtree: true,
             filter: Filters::contains('sn', 'needle'),
-        ))->entries);
+        ))->entries());
 
         self::assertSame(
             ['cn=hit,dc=example,dc=com'],
@@ -812,7 +812,7 @@ final class PdoStorageTest extends TestCase
         $results = iterator_to_array($this->subject->search(
             $request,
             SubentryVisibility::All,
-        )->entries);
+        )->entries());
 
         self::assertCount(1, $results);
         self::assertSame(
@@ -832,7 +832,7 @@ final class PdoStorageTest extends TestCase
         $results = iterator_to_array($this->subject->search(
             $request,
             SubentryVisibility::All,
-        )->entries);
+        )->entries());
 
         $dns = array_map(
             static fn(Entry $entry): string => $entry->getDn()->toString(),
@@ -861,7 +861,7 @@ final class PdoStorageTest extends TestCase
     {
         // Test the storage interface directly with an empty base DN (root listing).
         // StorageReadBackend requires the base DN to exist, so bypass it here.
-        $results = iterator_to_array($this->storage->list(StorageListOptions::matchAll(new Dn(''), true))->entries);
+        $results = iterator_to_array($this->storage->list(StorageListOptions::matchAll(new Dn(''), true))->entries());
 
         self::assertCount(2, $results);
     }
@@ -882,7 +882,7 @@ final class PdoStorageTest extends TestCase
                 subtree: true,
                 filter: new AndFilter(),
                 attributes: ['cn'],
-            ))->entries,
+            ))->entries(),
             'cn=narrow,dc=example,dc=com',
         );
 
@@ -911,7 +911,7 @@ final class PdoStorageTest extends TestCase
                 baseDn: new Dn(''),
                 subtree: true,
                 filter: new AndFilter(),
-            ))->entries,
+            ))->entries(),
             'cn=full,dc=example,dc=com',
         );
 
@@ -935,7 +935,7 @@ final class PdoStorageTest extends TestCase
         $outerIterator = $this->storage->list(StorageListOptions::matchAll(
             new Dn('dc=example,dc=com'),
             true,
-        ))->entries;
+        ))->entries();
 
         $outerIterator->current();
         $outerIterator->next();
@@ -943,7 +943,7 @@ final class PdoStorageTest extends TestCase
         $inner = iterator_to_array($this->storage->list(StorageListOptions::matchAll(
             new Dn('dc=example,dc=com'),
             true,
-        ))->entries);
+        ))->entries());
 
         $remaining = [];
         while ($outerIterator->valid()) {
@@ -1060,7 +1060,7 @@ final class PdoStorageTest extends TestCase
         $results = iterator_to_array($this->subject->search(
             $request,
             SubentryVisibility::All,
-        )->entries);
+        )->entries());
 
         self::assertCount(1, $results);
         self::assertSame(
@@ -1086,7 +1086,7 @@ final class PdoStorageTest extends TestCase
         iterator_to_array($backend->search(
             $request,
             SubentryVisibility::All,
-        )->entries);
+        )->entries());
     }
 
     public function test_search_exact_filter_within_the_lookthrough_limit_returns_every_match(): void
@@ -1109,7 +1109,7 @@ final class PdoStorageTest extends TestCase
             iterator_to_array($backend->search(
                 $request,
                 SubentryVisibility::All,
-            )->entries),
+            )->entries()),
         );
     }
 
@@ -1133,7 +1133,7 @@ final class PdoStorageTest extends TestCase
         iterator_to_array($backend->search(
             $request,
             SubentryVisibility::All,
-        )->entries);
+        )->entries());
     }
 
     public function test_atomic_rolls_back_on_exception(): void
@@ -1383,7 +1383,7 @@ final class PdoStorageTest extends TestCase
         $this->expectException(StorageIoException::class);
 
         iterator_to_array(
-            $storage->list(StorageListOptions::matchAll(new Dn('dc=example,dc=com'), false))->entries,
+            $storage->list(StorageListOptions::matchAll(new Dn('dc=example,dc=com'), false))->entries(),
         );
     }
 
@@ -1452,7 +1452,7 @@ final class PdoStorageTest extends TestCase
         iterator_to_array($backend->search(
             $request,
             SubentryVisibility::All,
-        )->entries);
+        )->entries());
     }
 
     public function test_subtree_includes_entries_with_escaped_comma_under_correct_parent(): void
@@ -1475,7 +1475,7 @@ final class PdoStorageTest extends TestCase
         $results = iterator_to_array($backend->search(
             $request,
             SubentryVisibility::All,
-        )->entries);
+        )->entries());
 
         self::assertCount(2, $results);
     }
@@ -1758,7 +1758,7 @@ final class PdoStorageTest extends TestCase
             baseDn: new Dn('dc=example,dc=com'),
             subtree: true,
             filter: $filter,
-        ))->entries;
+        ))->entries();
 
         $dns = [];
         foreach ($entries as $entry) {
@@ -1801,7 +1801,7 @@ final class PdoStorageTest extends TestCase
             ->useSubtreeScope();
 
         $dns = [];
-        foreach ($this->subject->search($request, SubentryVisibility::All)->entries as $entry) {
+        foreach ($this->subject->search($request, SubentryVisibility::All)->entries() as $entry) {
             $dns[] = $entry->getDn()->toString();
         }
 

@@ -195,7 +195,7 @@ trait SubtreeRenameStorageContractTests
         $dns = [];
 
         $stream = $storage->list(StorageListOptions::matchAll(new Dn($baseDn), false));
-        foreach ($stream->entries as $entry) {
+        foreach ($stream->entries() as $entry) {
             $dns[] = $entry->getDn()->toString();
         }
         sort($dns);

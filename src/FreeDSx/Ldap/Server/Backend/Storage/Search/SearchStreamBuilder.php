@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
+use FreeDSx\Ldap\Server\Backend\Storage\FetchedEntry;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\SearchLimits;
 use Generator;
@@ -58,7 +59,7 @@ final readonly class SearchStreamBuilder
             $request->getFilter(),
         );
 
-        return new EntryStream(
+        return EntryStream::positioned(
             $this->wrapWithDerived(
                 $generator,
                 $request,
@@ -77,7 +78,7 @@ final readonly class SearchStreamBuilder
     ): EntryStream {
         // In-search alias dereferencing is not implemented, so an alias is returned as the ordinary entry it is
         // rather than failing the search. This is a deliberate RFC difference.
-        $generator = $this->wrapWithTimeLimitHandling($stream->entries);
+        $generator = $this->wrapWithTimeLimitHandling($stream->fetched());
 
         // Every candidate examined is charged.
         $generator = $this->wrapWithLookthrough(
@@ -94,22 +95,25 @@ final readonly class SearchStreamBuilder
 
         $generator = $this->wrapWithDerived($generator, $request);
 
-        return new EntryStream(
+        return EntryStream::positioned(
             $generator,
             true,
         );
     }
 
     /**
-     * @param Generator<int, Entry, mixed, ?FetchedBatch> $generator
-     * @return Generator<int, Entry, mixed, ?FetchedBatch>
+     * @param Generator<int, FetchedEntry, mixed, ?FetchedBatch> $generator
+     * @return Generator<int, FetchedEntry, mixed, ?FetchedBatch>
      */
     private function wrapWithDerived(
         Generator $generator,
         SearchRequest $request,
     ): Generator {
-        foreach ($generator as $entry) {
-            yield $this->injectDerived($entry, $request);
+        foreach ($generator as $fetched) {
+            yield new FetchedEntry(
+                $this->injectDerived($fetched->entry, $request),
+                $fetched->cursor,
+            );
         }
 
         return $generator->getReturn();
@@ -144,17 +148,17 @@ final readonly class SearchStreamBuilder
     }
 
     /**
-     * @param Generator<int, Entry, mixed, ?FetchedBatch> $generator
-     * @return Generator<int, Entry, mixed, ?FetchedBatch>
+     * @param Generator<int, FetchedEntry, mixed, ?FetchedBatch> $generator
+     * @return Generator<int, FetchedEntry, mixed, ?FetchedBatch>
      * @throws OperationException
      */
     private function wrapWithFilterEvaluation(
         Generator $generator,
         FilterInterface $filter,
     ): Generator {
-        foreach ($generator as $entry) {
-            if ($this->filterEvaluator->evaluate($entry, $filter)) {
-                yield $entry;
+        foreach ($generator as $fetched) {
+            if ($this->filterEvaluator->evaluate($fetched->entry, $filter)) {
+                yield $fetched;
             }
         }
 
@@ -162,8 +166,8 @@ final readonly class SearchStreamBuilder
     }
 
     /**
-     * @param Generator<int, Entry, mixed, ?FetchedBatch> $generator
-     * @return Generator<int, Entry, mixed, ?FetchedBatch>
+     * @param Generator<int, FetchedEntry, mixed, ?FetchedBatch> $generator
+     * @return Generator<int, FetchedEntry, mixed, ?FetchedBatch>
      * @throws OperationException
      */
     private function wrapWithLookthrough(
@@ -173,7 +177,7 @@ final readonly class SearchStreamBuilder
         $lookthrough = ($effectiveLimits ?? $this->limits)->maxSearchLookthrough();
         $examined = 0;
 
-        foreach ($generator as $entry) {
+        foreach ($generator as $fetched) {
             if ($lookthrough > 0 && ++$examined > $lookthrough) {
                 throw new OperationException(
                     'Administrative limit exceeded.',
@@ -181,22 +185,22 @@ final readonly class SearchStreamBuilder
                 );
             }
 
-            yield $entry;
+            yield $fetched;
         }
 
         return $generator->getReturn();
     }
 
     /**
-     * @param Generator<int, Entry, mixed, ?FetchedBatch> $generator
-     * @return Generator<int, Entry, mixed, ?FetchedBatch>
+     * @param Generator<int, FetchedEntry, mixed, ?FetchedBatch> $generator
+     * @return Generator<int, FetchedEntry, mixed, ?FetchedBatch>
      * @throws OperationException
      */
     private function wrapWithTimeLimitHandling(Generator $generator): Generator
     {
         try {
-            foreach ($generator as $entry) {
-                yield $entry;
+            foreach ($generator as $fetched) {
+                yield $fetched;
             }
         } catch (TimeLimitExceededException) {
             throw new OperationException(
@@ -209,11 +213,11 @@ final readonly class SearchStreamBuilder
     }
 
     /**
-     * @return Generator<int, Entry, mixed, ?FetchedBatch>
+     * @return Generator<int, FetchedEntry, mixed, ?FetchedBatch>
      */
     private function yieldSingle(Entry $entry): Generator
     {
-        yield $entry;
+        yield new FetchedEntry($entry);
 
         // A base-object read is one entry, so there is never anywhere to resume from.
         return null;

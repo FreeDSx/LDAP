@@ -28,7 +28,7 @@ trait DefaultHasChildrenTrait
 
     public function hasChildren(Dn $dn): bool
     {
-        foreach ($this->list(StorageListOptions::firstChild($dn))->entries as $ignored) {
+        foreach ($this->list(StorageListOptions::firstChild($dn))->entries() as $ignored) {
             return true;
         }
 

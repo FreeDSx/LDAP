@@ -252,9 +252,8 @@ class ContainerTest extends TestCase
 
     public function test_it_should_make_the_default_ServerRunner(): void
     {
-        if (str_starts_with(strtoupper(PHP_OS), 'WIN')) {
-            self::markTestSkipped('Cannot construct the default PCNTL runner on Windows.');
-        }
+        $this->requirePcntl();
+        $this->requirePosix();
 
         // Shared storage, since the forking runner refuses anything a fork would not carry.
         $container = $this->containerFor(TestServerOptions::forStorage($this->sharedStorage()));
@@ -325,9 +324,8 @@ class ContainerTest extends TestCase
 
     public function test_the_pcntl_runner_builds_with_journaling_and_retention_configured(): void
     {
-        if (str_starts_with(strtoupper(PHP_OS), 'WIN')) {
-            self::markTestSkipped('Cannot construct the default PCNTL runner on Windows.');
-        }
+        $this->requirePcntl();
+        $this->requirePosix();
 
         $container = $this->containerFor($this->journalingOptions());
 
@@ -402,6 +400,9 @@ class ContainerTest extends TestCase
 
     public function test_the_pcntl_runner_accepts_client_certificate_validation(): void
     {
+        $this->requirePcntl();
+        $this->requirePosix();
+
         $container = $this->containerFor(
             TestServerOptions::forStorage($this->sharedStorage())
                 ->setNetworkConfig((new NetworkConfig())->setSslValidateCert(true))

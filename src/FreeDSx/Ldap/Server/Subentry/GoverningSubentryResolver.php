@@ -132,7 +132,7 @@ final readonly class GoverningSubentryResolver
                 $request,
                 SubentryVisibility::Only,
                 new ControlBag(),
-            )->entries,
+            )->entries(),
             false,
         );
 

@@ -32,4 +32,13 @@ final readonly class FetchedBatch
         public ?PageCursor $cursor = null,
         public bool $hasMore = false,
     ) {}
+
+    /**
+     * Whether the result ended here, either because nothing follows or because there is no position to resume from.
+     */
+    public function isExhausted(): bool
+    {
+        return !$this->hasMore
+            || $this->cursor === null;
+    }
 }

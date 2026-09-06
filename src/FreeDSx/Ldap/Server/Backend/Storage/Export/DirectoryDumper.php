@@ -95,7 +95,7 @@ final readonly class DirectoryDumper
         );
         $stream = $this->storage->list($listOptions);
 
-        foreach ($stream->entries as $entry) {
+        foreach ($stream->entries() as $entry) {
             if (!$stream->isPreFiltered && $filter !== null) {
                 if (!$this->filterEvaluator->evaluate($entry, $filter)) {
                     continue;

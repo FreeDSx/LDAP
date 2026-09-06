@@ -108,7 +108,7 @@ final class WriteSerializingStorageTest extends TestCase
             baseDn: new Dn('dc=example,dc=com'),
             subtree: true,
         );
-        $stream = new EntryStream(
+        $stream = EntryStream::of(
             (function (): Generator {
                 yield from [];
 

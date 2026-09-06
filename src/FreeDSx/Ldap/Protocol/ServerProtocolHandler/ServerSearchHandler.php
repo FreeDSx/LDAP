@@ -140,7 +140,7 @@ class ServerSearchHandler implements ServerProtocolHandlerInterface
         $filter = $request->getFilter();
         $emitted = 0;
 
-        foreach ($backend->entries as $entry) {
+        foreach ($backend->entries() as $entry) {
             $filtered = $this->accessControl->filterEntry(
                 $token,
                 $entry,

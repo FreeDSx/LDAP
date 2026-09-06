@@ -61,7 +61,7 @@ final class AttributeSearchBindNameResolver implements BindNameResolverInterface
 
         /** @var Entry[] $entries */
         $entries = iterator_to_array(
-            $stream->entries,
+            $stream->entries(),
             false,
         );
 

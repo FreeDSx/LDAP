@@ -15,27 +15,21 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Entry\Entries;
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
-use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\Schema;
-use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
-use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
-use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
-use FreeDSx\Ldap\Server\Paging\PageBudget;
+use FreeDSx\Ldap\Server\Paging\CollectedPage;
+use FreeDSx\Ldap\Server\Paging\PageFiller;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\Paging\PagingRequestComparator;
 use FreeDSx\Ldap\Server\Paging\PagingResponse;
 use FreeDSx\Ldap\Server\RequestHistory;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Operation\SearchOperationResult;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -56,10 +50,10 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
 
     public function __construct(
         private readonly ReadBackendInterface $backend,
-        private readonly FilterEvaluatorInterface $filterEvaluator,
         private readonly AccessControlInterface $accessControl,
         private readonly RequestHistory $requestHistory,
         private readonly Schema $schema,
+        private readonly PageFiller $pageFiller,
         private readonly PagingRequestComparator $requestComparator = new PagingRequestComparator(),
         private readonly SearchLimits $limits = new SearchLimits(),
         private readonly ?EventLogger $eventLogger = null,
@@ -202,7 +196,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
         PagingRequest $pagingRequest,
         TokenInterface $token,
     ): PagingResponse {
-        $collected = $this->collectPage(
+        $collected = $this->pageFiller->fill(
             $pagingRequest,
             $token,
             null,
@@ -249,7 +243,7 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
 
         $this->requestHistory->removePagingCursor($currentCookie);
 
-        $collected = $this->collectPage(
+        $collected = $this->pageFiller->fill(
             $pagingRequest,
             $token,
             $resumeFrom,
@@ -287,178 +281,6 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
 
         return PagingResponse::make(
             new Entries(...$collected->entries),
-        );
-    }
-
-    /**
-     * Fills one page from $resumeFrom, reading bounded slices to their end so each says where it stopped.
-     *
-     * @throws OperationException
-     */
-    private function collectPage(
-        PagingRequest $pagingRequest,
-        TokenInterface $token,
-        ?PageCursor $resumeFrom,
-    ): CollectedPage {
-        $request = $pagingRequest->getSearchRequest();
-        $projection = $this->projectionFor($request);
-        $filter = $request->getFilter();
-        $effectivePageSize = $this->effectiveLimit(
-            $pagingRequest->getSize(),
-            $this->limits->maxSearchPageSize(),
-        );
-        $sizeLimit = $this->effectiveLimit(
-            $request->getSizeLimit(),
-            $this->limits->maxSearchSize(),
-        );
-
-        // Deliberate: the size limit bounds each page rather than the whole paged operation.
-        $collectCap = $this->effectiveLimit(
-            $effectivePageSize,
-            $sizeLimit,
-        );
-        $pageLimit = $collectCap > 0
-            ? $collectCap
-            : null;
-
-        $budget = PageBudget::of(
-            $this->effectiveLimit(
-                $request->getTimeLimit(),
-                $this->limits->maxSearchTimeLimit(),
-            ),
-            $this->limits->effectivePagedLookthrough(),
-        );
-
-        $page = [];
-        $cursor = $resumeFrom;
-        $exhausted = false;
-        $hasFurtherMatch = false;
-
-        while (!$exhausted) {
-            $isFilling = $this->pageHasCapacity($page, $pageLimit);
-
-            // A full page only overflows the size limit if a further match exists
-            if (!$isFilling && !$this->mayExceedSizeLimit($page, $sizeLimit)) {
-                break;
-            }
-
-            $stream = $this->readSlice(
-                $pagingRequest,
-                new PageSlice(
-                    $this->sliceSizeFor(
-                        $isFilling ? $page : [],
-                        $pageLimit,
-                    ),
-                    $cursor,
-                    $budget->deadline(),
-                ),
-                $budget->remainingLookthrough(),
-            );
-
-            foreach ($stream->entries as $entry) {
-                $kept = $this->keepForPage(
-                    $entry,
-                    $token,
-                    $filter,
-                );
-
-                if ($kept === null) {
-                    continue;
-                }
-
-                if (!$isFilling) {
-                    $hasFurtherMatch = true;
-
-                    break;
-                }
-
-                $page[] = $projection->project($kept);
-            }
-
-            // The stream was abandoned mid-slice and can say nothing about where it stopped.
-            if ($hasFurtherMatch) {
-                break;
-            }
-
-            // A stream that reports nothing cannot be resumed, so the result has to be taken as finished.
-            $read = $stream->entries->getReturn();
-            $exhausted = $read === null || !$read->hasMore || $read->cursor === null;
-            $cursor = $read->cursor ?? $cursor;
-            $budget->spend($read->rows ?? 0);
-        }
-
-        return new CollectedPage(
-            $page,
-            $exhausted,
-            $hasFurtherMatch,
-            $cursor,
-        );
-    }
-
-    /**
-     * Whether a page this full would overflow the size limit.
-     *
-     * @param list<Entry> $page
-     */
-    private function mayExceedSizeLimit(
-        array $page,
-        int $sizeLimit,
-    ): bool {
-        return $sizeLimit > 0
-            && count($page) >= $sizeLimit;
-    }
-
-    /**
-     * @throws OperationException
-     */
-    private function readSlice(
-        PagingRequest $pagingRequest,
-        PageSlice $slice,
-        int $lookthrough,
-    ): EntryStream {
-        return $this->backend->search(
-            $pagingRequest->getSearchRequest(),
-            $this->subentryVisibility($pagingRequest->controls()),
-            $pagingRequest->controls(),
-            new SearchLimits(
-                maxSearchTimeLimit: $this->limits->maxSearchTimeLimit(),
-                maxSearchLookthrough: $lookthrough,
-            ),
-            $slice,
-        );
-    }
-
-    /**
-     * The entry as this identity may see it, or null when it may not see it at all.
-     *
-     * @throws OperationException
-     */
-    private function keepForPage(
-        Entry $entry,
-        TokenInterface $token,
-        FilterInterface $filter,
-    ): ?Entry {
-        $filtered = $this->accessControl->filterEntry(
-            $token,
-            $entry,
-        );
-
-        if ($filtered === null) {
-            return null;
-        }
-
-        // Stripping an attribute can cost the entry its match, so a changed entry is judged against the filter again.
-        return $filtered !== $entry && !$this->filterEvaluator->evaluate($filtered, $filter)
-            ? null
-            : $filtered;
-    }
-
-    private function projectionFor(SearchRequest $request): AttributeProjection
-    {
-        return AttributeProjection::forRequest(
-            $request->getAttributes(),
-            $request->getAttributesOnly(),
-            $this->schema,
         );
     }
 
@@ -539,33 +361,6 @@ class ServerPagingHandler implements ServerProtocolHandlerInterface
                 ResultCode::UNWILLING_TO_PERFORM,
             );
         }
-    }
-
-    /**
-     * @param list<Entry> $page
-     */
-    private function pageHasCapacity(
-        array $page,
-        ?int $pageLimit,
-    ): bool {
-        return $pageLimit === null
-            || count($page) < $pageLimit;
-    }
-
-    /**
-     * What the page can still take, since a slice appends everything it keeps and would otherwise overfill the page.
-     *
-     * @param list<Entry> $page
-     */
-    private function sliceSizeFor(
-        array $page,
-        ?int $pageLimit,
-    ): int {
-        $remaining = $pageLimit === null
-            ? $this->limits->maxSearchPageSize()
-            : $pageLimit - count($page);
-
-        return max($remaining, 1);
     }
 
     private function generateCookie(): string

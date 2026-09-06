@@ -43,7 +43,7 @@ final readonly class SubtreeEnumerator
         );
 
         $dnList = [];
-        foreach ($this->storage->list($options)->entries as $entry) {
+        foreach ($this->storage->list($options)->entries() as $entry) {
             $dnList[] = $entry->getDn()->normalize();
         }
         usort(
@@ -67,7 +67,7 @@ final readonly class SubtreeEnumerator
             subtree: true,
         );
 
-        foreach ($this->storage->list($options)->entries as $entry) {
+        foreach ($this->storage->list($options)->entries() as $entry) {
             if ($entry->getDn()->normalize()->toString() !== $base->toString()) {
                 $descendants[] = $entry;
             }

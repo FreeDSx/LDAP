@@ -46,6 +46,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
+use FreeDSx\Ldap\Server\Backend\Storage\FetchedEntry;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
@@ -197,7 +198,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         // A composed filter with a selective drivable leaf streams off that leaf; PHP re-evaluates the full filter.
         $composed = $this->tryComposedStreamingQuery($filterResult, $options);
         if ($composed !== null) {
-            return new EntryStream(
+            return EntryStream::positioned(
                 $this->generateBatches(
                     $composed,
                     $deadline,
@@ -220,7 +221,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             $this->sortSpecs($options),
         );
 
-        return new EntryStream(
+        return EntryStream::positioned(
             $this->generateBatches(
                 $this->queryBuilder->build($spec),
                 $deadline,
@@ -602,7 +603,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     /**
      * Walks the result in bounded batches, seeking past the last row read rather than holding one cursor open.
      *
-     * @return Generator<int, Entry, mixed, FetchedBatch>
+     * @return Generator<int, FetchedEntry, mixed, FetchedBatch>
      */
     private function generateBatches(
         SqlQuery $query,
@@ -634,6 +635,9 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
                 $deadline,
                 $allowed,
                 $remaining,
+                $isSorted
+                    ? $delivered
+                    : null,
             );
             $read += $batch->rows;
             $delivered += $batch->rows;
@@ -663,13 +667,15 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
      * One statement's worth of rows, released as this returns so only one is ever open.
      *
      * @param array<string, true>|null $allowed
-     * @return Generator<int, Entry, mixed, FetchedBatch>
+     * @param ?int $deliveredBefore Rows handed over prior to this batch.
+     * @return Generator<int, FetchedEntry, mixed, FetchedBatch>
      */
     private function generateBatch(
         SqlQuery $query,
         ?float $deadline,
         ?array $allowed,
         ?int $yieldCap = null,
+        ?int $deliveredBefore = null,
     ): Generator {
         $stmt = $this->statements->execute(
             $query->sql,
@@ -699,7 +705,12 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             );
 
             if ($entry !== null) {
-                yield $entry;
+                yield new FetchedEntry(
+                    $entry,
+                    $deliveredBefore === null
+                        ? $cursor
+                        : PageCursor::afterSorted($deliveredBefore + $rows),
+                );
             }
         }
 

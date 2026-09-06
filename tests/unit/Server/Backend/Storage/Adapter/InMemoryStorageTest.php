@@ -132,7 +132,7 @@ final class InMemoryStorageTest extends TestCase
 
     public function test_list_returns_all_entries(): void
     {
-        $entries = iterator_to_array($this->subject->list(StorageListOptions::matchAll(new Dn(''), true))->entries);
+        $entries = iterator_to_array($this->subject->list(StorageListOptions::matchAll(new Dn(''), true))->entries());
 
         self::assertCount(
             1,
@@ -151,7 +151,7 @@ final class InMemoryStorageTest extends TestCase
         $grandchild = new Entry(new Dn('cn=Sub,cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Sub'));
         $storage = new InMemoryStorage([$parent, $child, $grandchild]);
 
-        $entries = iterator_to_array($storage->list(StorageListOptions::matchAll(new Dn('dc=example,dc=com'), false))->entries);
+        $entries = iterator_to_array($storage->list(StorageListOptions::matchAll(new Dn('dc=example,dc=com'), false))->entries());
 
         self::assertCount(
             1,
@@ -174,7 +174,7 @@ final class InMemoryStorageTest extends TestCase
             $storage->list(StorageListOptions::matchAll(
                 new Dn('dc=example,dc=com'),
                 true,
-            ))->entries,
+            ))->entries(),
         );
 
         $dns = array_map(
@@ -214,7 +214,7 @@ final class InMemoryStorageTest extends TestCase
         $entries = iterator_to_array($storage->list(StorageListOptions::matchAll(
             new Dn('John,dc=example,dc=com'),
             true,
-        ))->entries);
+        ))->entries());
 
         self::assertCount(
             0,
@@ -277,7 +277,7 @@ final class InMemoryStorageTest extends TestCase
                         new Dn(''),
                         true,
                     ),
-                )->entries,
+                )->entries(),
             ),
         );
     }
@@ -296,7 +296,7 @@ final class InMemoryStorageTest extends TestCase
 
         self::assertCount(
             0,
-            iterator_to_array($storage->list(StorageListOptions::matchAll(new Dn(''), true))->entries),
+            iterator_to_array($storage->list(StorageListOptions::matchAll(new Dn(''), true))->entries()),
         );
     }
 
@@ -310,7 +310,7 @@ final class InMemoryStorageTest extends TestCase
             $storage->list(StorageListOptions::matchAll(
                 new Dn('dc=example,dc=com'),
                 true,
-            ))->entries,
+            ))->entries(),
         );
 
         self::assertCount(2, $entries);
@@ -327,7 +327,7 @@ final class InMemoryStorageTest extends TestCase
                 new Dn('dc=example,dc=com'),
                 true,
                 deadline: microtime(true) + 60,
-            ))->entries,
+            ))->entries(),
         );
 
         self::assertCount(2, $entries);

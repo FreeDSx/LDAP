@@ -154,7 +154,7 @@ final class DirectoryDumperTest extends TestCase
             ['cn' => 'bob'],
         );
         $storage = $this->createMock(EntryStorageInterface::class);
-        $storage->method('list')->willReturn(new EntryStream(
+        $storage->method('list')->willReturn(EntryStream::of(
             entries: (function () use ($alice, $bob): Generator {
                 yield $alice;
                 yield $bob;
@@ -194,7 +194,7 @@ final class DirectoryDumperTest extends TestCase
     {
         $alice = Entry::create('cn=alice,dc=foo,dc=bar', ['cn' => 'alice']);
         $storage = $this->createMock(EntryStorageInterface::class);
-        $storage->method('list')->willReturn(new EntryStream(
+        $storage->method('list')->willReturn(EntryStream::of(
             entries: (function () use ($alice): Generator {
                 yield $alice;
 
@@ -226,7 +226,7 @@ final class DirectoryDumperTest extends TestCase
                 fn(StorageListOptions $opts): bool
                     => $opts->subtree === true && $opts->baseDn->toString() === 'dc=foo,dc=bar',
             ))
-            ->willReturn(new EntryStream(
+            ->willReturn(EntryStream::of(
                 entries: (function (): Generator {
                     yield from [];
 

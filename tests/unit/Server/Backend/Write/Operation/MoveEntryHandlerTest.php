@@ -227,7 +227,7 @@ final class MoveEntryHandlerTest extends TestCase
         $storage->method('exists')
             ->willReturn(true);
         $storage->method('list')
-            ->willReturn(new EntryStream($this->oneEntry($alice)));
+            ->willReturn(EntryStream::of($this->oneEntry($alice)));
         $storage->method('atomic')
             ->willThrowException(new StorageIoException('Unable to publish the storage update.'));
         $this->writeGraph($storage);

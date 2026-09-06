@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+namespace FreeDSx\Ldap\Server\Paging;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
@@ -27,8 +27,8 @@ final readonly class CollectedPage
 {
     /**
      * @param Entry[] $entries
-     * @param bool $isResultExhausted Whether the result ran out, so no further page can exist.
-     * @param ?PageCursor $cursor Where to resume, or null when nothing was read.
+     * @param bool $isResultExhausted Whether the result ran out.
+     * @param ?PageCursor $cursor Where to resume.
      */
     public function __construct(
         public array $entries,

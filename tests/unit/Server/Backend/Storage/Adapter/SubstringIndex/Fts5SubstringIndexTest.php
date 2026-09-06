@@ -124,7 +124,7 @@ final class Fts5SubstringIndexTest extends TestCase
         ));
 
         $dns = [];
-        foreach ($stream->entries as $entry) {
+        foreach ($stream->entries() as $entry) {
             $dns[] = $entry->getDn()->toString();
         }
 
