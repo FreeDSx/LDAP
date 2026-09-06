@@ -14,6 +14,7 @@ use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\FilterAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\Effect;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
@@ -261,6 +262,13 @@ class LdapAclCommand extends Command
                             ConfidentialAccessRule::allow(
                                 Subject::group('cn=admins,dc=foo,dc=bar'),
                                 'userPassword',
+                            ),
+                        )
+                        // The read deny above still leaves the value guessable through a filter, so pair it with this.
+                        ->replaceFilterAccess(
+                            FilterAccessRule::deny(
+                                Subject::anyone(),
+                                'telephoneNumber',
                             ),
                         ),
                 );

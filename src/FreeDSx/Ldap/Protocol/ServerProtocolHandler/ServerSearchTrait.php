@@ -36,6 +36,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
 use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Search\Filter\FilterAttributes;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use Generator;
 
@@ -111,8 +112,28 @@ trait ServerSearchTrait
 
         $this->assertSearchParametersInRange($request);
         $this->assertBaseDnParses($request);
+        $this->assertEveryAssertionNamesAnAttribute($request);
 
         return $request;
+    }
+
+    /**
+     * An extensible match may omit the attribute type which asserts against every attribute at once.
+     *
+     * Not supported: the assertion cannot be weighed against the rules that govern an attribute.
+     *
+     * @throws OperationException
+     */
+    private function assertEveryAssertionNamesAnAttribute(SearchRequest $request): void
+    {
+        if (FilterAttributes::referenced($request->getFilter()) !== null) {
+            return;
+        }
+
+        throw new OperationException(
+            'An extensible match must name an attribute type.',
+            ResultCode::INAPPROPRIATE_MATCHING,
+        );
     }
 
     /**

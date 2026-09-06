@@ -21,10 +21,10 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
-use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributePolicy;
-use FreeDSx\Ldap\Server\AccessControl\ConfidentialFilterRewriter;
+use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
+use FreeDSx\Ldap\Server\AccessControl\WithheldFilterRewriter;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
-use FreeDSx\Ldap\Server\Middleware\ConfidentialAttributeMiddleware;
+use FreeDSx\Ldap\Server\Middleware\WithheldAttributeMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
@@ -34,20 +34,20 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
-final class ConfidentialAttributeMiddlewareTest extends TestCase
+final class WithheldAttributeMiddlewareTest extends TestCase
 {
     private MiddlewareHandlerInterface&MockObject $next;
 
     private TokenInterface $token;
 
-    private ConfidentialAttributeMiddleware $subject;
+    private WithheldAttributeMiddleware $subject;
 
     protected function setUp(): void
     {
         $this->next = $this->createMock(MiddlewareHandlerInterface::class);
         $this->token = BindToken::fromDn('cn=user,dc=foo,dc=bar');
-        $this->subject = new ConfidentialAttributeMiddleware(new ConfidentialFilterRewriter(
-            new ConfidentialAttributePolicy(
+        $this->subject = new WithheldAttributeMiddleware(new WithheldFilterRewriter(
+            new WithheldAttributePolicy(
                 new RuleBasedAccessControl(AclRules::fromEmpty()),
                 SchemaResource::Core->load(),
             ),

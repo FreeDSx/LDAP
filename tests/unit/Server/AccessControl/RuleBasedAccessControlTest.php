@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ConfidentialAccessRule;
+use FreeDSx\Ldap\Server\AccessControl\Rule\FilterAccessRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\ControlRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\OperationRule;
 use FreeDSx\Ldap\Server\AccessControl\Rule\RelocationAccess;
@@ -796,6 +797,90 @@ final class RuleBasedAccessControlTest extends TestCase
         ));
     }
 
+    public function test_an_attribute_is_filterable_when_no_rule_denies_it(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty());
+
+        self::assertTrue($subject->mayFilterOnAttribute(
+            $this->bindToken,
+            'telephoneNumber',
+        ));
+    }
+
+    public function test_a_filter_deny_naming_the_attribute_refuses_it(): void
+    {
+        $subject = new RuleBasedAccessControl($this->rulesDenyingFilterOn('telephoneNumber'));
+
+        self::assertFalse($subject->mayFilterOnAttribute(
+            $this->bindToken,
+            'telephoneNumber',
+        ));
+    }
+
+    public function test_a_filter_deny_leaves_every_other_attribute_alone(): void
+    {
+        $subject = new RuleBasedAccessControl($this->rulesDenyingFilterOn('telephoneNumber'));
+
+        self::assertTrue($subject->mayFilterOnAttribute(
+            $this->bindToken,
+            'sn',
+        ));
+    }
+
+    public function test_a_filter_deny_naming_nothing_refuses_every_attribute(): void
+    {
+        $subject = new RuleBasedAccessControl($this->rulesDenyingFilterOn());
+
+        self::assertFalse($subject->mayFilterOnAttribute(
+            $this->bindToken,
+            'sn',
+        ));
+    }
+
+    /**
+     * Unlike the grant-style questions, which consider only authenticated identities.
+     */
+    public function test_a_filter_deny_binds_an_anonymous_identity_too(): void
+    {
+        $subject = new RuleBasedAccessControl($this->rulesDenyingFilterOn('telephoneNumber'));
+
+        self::assertFalse($subject->mayFilterOnAttribute(
+            new AnonToken(),
+            'telephoneNumber',
+        ));
+    }
+
+    public function test_an_allow_ahead_of_a_deny_keeps_the_attribute_filterable(): void
+    {
+        $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
+            filters: [
+                FilterAccessRule::allow(
+                    new AnySubjectMatcher(),
+                    'telephoneNumber',
+                ),
+                FilterAccessRule::deny(
+                    new AnySubjectMatcher(),
+                    'telephoneNumber',
+                ),
+            ],
+        ));
+
+        self::assertTrue($subject->mayFilterOnAttribute(
+            $this->bindToken,
+            'telephoneNumber',
+        ));
+    }
+
+    public function test_a_filter_deny_governs_the_attribute_however_it_is_spelled(): void
+    {
+        $subject = new RuleBasedAccessControl($this->rulesDenyingFilterOn('TelephoneNumber'));
+
+        self::assertFalse($subject->mayFilterOnAttribute(
+            $this->bindToken,
+            'telephonenumber',
+        ));
+    }
+
     public function test_a_deny_still_applies_when_its_subject_cannot_be_decided(): void
     {
         $subject = new RuleBasedAccessControl(AclRules::fromEmpty(
@@ -1023,6 +1108,18 @@ final class RuleBasedAccessControlTest extends TestCase
             $this->bindToken,
             $this->dn,
             RelocationAccess::Out,
+        );
+    }
+
+    private function rulesDenyingFilterOn(string ...$attributes): AclRules
+    {
+        return AclRules::fromEmpty(
+            filters: [
+                FilterAccessRule::deny(
+                    new AnySubjectMatcher(),
+                    ...$attributes,
+                ),
+            ],
         );
     }
 }

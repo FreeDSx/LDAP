@@ -55,6 +55,7 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
             ...$this->rules->controls,
             ...$this->rules->extendedOps,
             ...$this->rules->confidential,
+            ...$this->rules->filters,
         ];
 
         foreach ($allRules as $rule) {
@@ -165,6 +166,26 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
             $token,
             Effect::Deny,
         ) === Effect::Allow;
+    }
+
+    public function mayFilterOnAttribute(
+        TokenInterface $token,
+        string $attribute,
+    ): bool {
+        // Unlike the grant-style questions this defaults to allow, so an anonymous identity is bound by a deny too.
+        foreach ($this->rules->filters as $rule) {
+            if (!$this->namesAttribute($rule->attributes, $attribute)) {
+                continue;
+            }
+
+            if (!$this->subjectMatches($rule->subject, $rule->effect, $token, null)) {
+                continue;
+            }
+
+            return $rule->effect === Effect::Allow;
+        }
+
+        return true;
     }
 
     public function filterEntry(
@@ -327,11 +348,26 @@ final readonly class RuleBasedAccessControl implements AccessControlInterface, B
         ConfidentialAccessRule $rule,
         string $attribute,
     ): bool {
-        if ($rule->attributes === []) {
+        return $this->namesAttribute(
+            $rule->attributes,
+            $attribute,
+        );
+    }
+
+    /**
+     * Whether a targetless rule's attribute list covers this attribute (an empty list meaning every one).
+     *
+     * @param string[] $attributes
+     */
+    private function namesAttribute(
+        array $attributes,
+        string $attribute,
+    ): bool {
+        if ($attributes === []) {
             return true;
         }
 
-        foreach ($rule->attributes as $name) {
+        foreach ($attributes as $name) {
             if (strcasecmp($name, $attribute) === 0) {
                 return true;
             }

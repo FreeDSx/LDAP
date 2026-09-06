@@ -14,6 +14,7 @@ Access Control
 * [Subject Reference](#subject-reference)
 * [Target Reference](#target-reference)
 * [Attribute Rules](#attribute-rules)
+* [Filter Rules](#filter-rules)
 * [Confidential Attributes](#confidential-attributes)
 * [Control Rules](#control-rules)
 * [Extended Operation Rules](#extended-operation-rules)
@@ -215,6 +216,7 @@ The defaults are fixed rather than configurable:
 - Operations that match no rule are denied.
 - Attribute writes that match no rule are denied.
 - Attribute reads that match no rule are allowed, so a search still returns attributes you wrote no rule for.
+- Filter rules that match no rule are allowed, so any attribute may be named in a filter unless one denies it.
 - Controls and extended operations that match no rule are denied, so privileged controls are off unless granted.
 - Relocations that match no rule are denied. Moving an entry between containers needs a grant.
 
@@ -398,6 +400,9 @@ Attribute rules are enforced in three places:
 - **Compare**: a Compare request is rejected if the bound user is denied access to the compared attribute.
 - **Add / Modify**: the request is rejected if the bound user is denied access to any attribute being written.
 
+A read deny strips the value, but does not stop the attribute being named in a filter. To also stop that, pair it
+with a [Filter Rule](#filter-rules), or mark the attribute [confidential](#confidential-attributes), which does both.
+
 ```php
 AclRules::fromEmpty()->replaceAttributeRules(
     // Only admins can see or write userPassword.
@@ -418,6 +423,37 @@ AclRules::fromEmpty()->replaceAttributeRules(
     ),
 )
 ```
+
+## Filter Rules
+
+`FilterAccessRule` gates which attributes an identity may name in a search filter. Filtering is allowed by default, so
+nothing changes until a rule denies it.
+
+Unlike the other rules this carries no target. A filter is answered before a search runs, when no entry is in hand, so
+it can only depend on the subject. A subject that needs an entry, such as `Subject::self()`, is refused.
+
+```php
+$rules = AclRules::secureDefault($admins)->prependFilterAccess(
+    FilterAccessRule::deny(
+        Subject::anyone(),
+        'telephoneNumber',
+    ),
+);
+```
+
+A denied assertion is folded away before the query runs, so the attribute behaves as though it is not present:
+
+```
+(telephoneNumber=555-0100)                -> no entries
+(!(telephoneNumber=555-0100))             -> every entry, whatever the guess
+(|(cn=bob)(telephoneNumber=555-0100))     -> the cn=bob match, the other branch drops
+```
+
+This is what stops a value being recovered a guess at a time. Reads are unaffected: denying the filter does not strip
+the value, and denying the read does not stop the filter. Pair the two to get both.
+
+An extensible match that names no attribute type is refused with `inappropriateMatching`, since it asserts against
+every attribute at once and it's not possible to make attribute level ACL decisions against it.
 
 ## Confidential Attributes
 

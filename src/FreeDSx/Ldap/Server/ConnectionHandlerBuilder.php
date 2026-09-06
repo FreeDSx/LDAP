@@ -55,7 +55,7 @@ use FreeDSx\Ldap\Server\Middleware\AliasDereferenceMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AuthorizationResolutionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\BindMiddleware;
-use FreeDSx\Ldap\Server\Middleware\ConfidentialAttributeMiddleware;
+use FreeDSx\Ldap\Server\Middleware\WithheldAttributeMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ConfidentialityMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
@@ -424,7 +424,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                 $this->container->get(AliasDereferenceMiddleware::class),
                 $this->container->get(OperationAuthorizationMiddleware::class),
                 // Below the authorization gate, so an assertion the identity cannot satisfy never reaches storage.
-                $this->container->get(ConfidentialAttributeMiddleware::class),
+                $this->container->get(WithheldAttributeMiddleware::class),
                 $this->container->get(AssertionMiddleware::class),
             ],
             new HandlerInvoker($handlerProvider),

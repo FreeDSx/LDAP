@@ -23,7 +23,10 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
+use Generator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\LdapAclCommand;
 
@@ -611,6 +614,150 @@ final class AclIntegrationTest extends ServerTestCase
         );
     }
 
+    /**
+     * @param callable(string): FilterInterface $assertion
+     */
+    #[DataProvider('filterDeniedAssertionProvider')]
+    public function testNegatingAFilterDeniedAssertionCannotTellACorrectGuessFromAWrongOne(
+        callable $assertion,
+        string $matching,
+        string $notMatching,
+    ): void {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        // uid=bob2 alone holds telephoneNumber, and cn=user may neither read nor filter on it.
+        self::assertSame(
+            $this->countMatching(Filters::not($assertion($notMatching))),
+            $this->countMatching(Filters::not($assertion($matching))),
+            'A correct guess must return the same entries as a wrong one.',
+        );
+    }
+
+    /**
+     * @return Generator<string, array{callable(string): FilterInterface, string, string}>
+     */
+    public static function filterDeniedAssertionProvider(): Generator
+    {
+        yield 'equality' => [
+            static fn(string $value): FilterInterface => Filters::equal(
+                'telephoneNumber',
+                $value,
+            ),
+            '555-0100',
+            '555-9999',
+        ];
+
+        yield 'substring' => [
+            static fn(string $value): FilterInterface => Filters::startsWith(
+                'telephoneNumber',
+                $value,
+            ),
+            '555-01',
+            '555-02',
+        ];
+
+        yield 'greater or equal' => [
+            static fn(string $value): FilterInterface => Filters::gte(
+                'telephoneNumber',
+                $value,
+            ),
+            '555-0100',
+            '999-9999',
+        ];
+
+        yield 'less or equal' => [
+            static fn(string $value): FilterInterface => Filters::lte(
+                'telephoneNumber',
+                $value,
+            ),
+            '555-0100',
+            '111-1111',
+        ];
+
+        yield 'approximate' => [
+            static fn(string $value): FilterInterface => Filters::approximate(
+                'telephoneNumber',
+                $value,
+            ),
+            '555-0100',
+            '555-9999',
+        ];
+
+        yield 'extensible match' => [
+            static fn(string $value): FilterInterface => Filters::extensible(
+                'telephoneNumber',
+                $value,
+                'caseIgnoreMatch',
+            ),
+            '555-0100',
+            '555-9999',
+        ];
+
+    }
+
+    public function testNegatingThePresenceOfAFilterDeniedAttributeSinglesOutNobody(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        self::assertSame(
+            $this->countMatching(Filters::present('objectClass')),
+            $this->countMatching(Filters::not(Filters::present('telephoneNumber'))),
+            'A withheld attribute is absent everywhere, so negating its presence matches every visible entry.',
+        );
+    }
+
+    public function testFilteringOnAFilterDeniedAttributeMatchesNothing(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        self::assertSame(
+            0,
+            $this->countMatching(Filters::equal('telephoneNumber', '555-0100')),
+        );
+    }
+
+    /**
+     * A withheld branch folds away rather than taking the whole disjunction with it.
+     */
+    public function testADisjunctionKeepsTheBranchThatDoesNotNameAFilterDeniedAttribute(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $readableBranch = $this->countMatching(Filters::equal('cn', 'bob2'));
+        $disjunction = $this->countMatching(Filters::or(
+            Filters::equal('cn', 'bob2'),
+            Filters::equal('telephoneNumber', '555-0100'),
+        ));
+
+        self::assertGreaterThan(
+            0,
+            $readableBranch,
+        );
+        self::assertSame(
+            $readableBranch,
+            $disjunction,
+        );
+    }
+
+    public function testAnExtensibleMatchNamingNoAttributeIsRefused(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        try {
+            $this->ldapClient()->search(
+                Operations::search(Filters::extensible(null, '555-0100', 'caseIgnoreMatch'))
+                    ->base('dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+            );
+            self::fail('Expected the search to be refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::INAPPROPRIATE_MATCHING,
+                $e->getCode(),
+            );
+        }
+    }
+
     public function testFilteringOnAPasswordPrefixMatchesNothing(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
@@ -1033,5 +1180,14 @@ final class AclIntegrationTest extends ServerTestCase
     private static function alicePasswordHash(): string
     {
         return '{SHA}' . base64_encode(sha1('alicepass', true));
+    }
+
+    private function countMatching(FilterInterface $filter): int
+    {
+        return count($this->ldapClient()->search(
+            Operations::search($filter)
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        )->toArray());
     }
 }
