@@ -133,7 +133,7 @@ final class ServerSyncHandlerTest extends TestCase
             ->willReturnCallback(fn(): bool => $this->filterMatches);
         $this->backend
             ->method('search')
-            ->willReturnCallback(fn(): EntryStream => new EntryStream($this->stream(...$this->searchEntries)));
+            ->willReturnCallback(fn(): EntryStream => EntryStream::of($this->stream(...$this->searchEntries)));
         $this->backend
             ->method('get')
             ->willReturnCallback(fn(Dn $dn): ?Entry => $this->liveEntries[$dn->toString()] ?? null);

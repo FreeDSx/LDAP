@@ -104,7 +104,7 @@ final class StorageReadBackendTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('dc=example,dc=com')
             ->useBaseScope();
-        $entries = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
+        $entries = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries());
 
         self::assertCount(
             1,
@@ -121,7 +121,7 @@ final class StorageReadBackendTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('dc=example,dc=com')
             ->useSingleLevelScope();
-        $entries = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
+        $entries = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries());
 
         // Only alice is a direct child of dc=example,dc=com; bob is under ou=People
         self::assertCount(
@@ -139,7 +139,7 @@ final class StorageReadBackendTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('dc=example,dc=com')
             ->useSubtreeScope();
-        $entries = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
+        $entries = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries());
 
         $dns = array_map(
             static fn(Entry $entry): string => $entry->getDn()->toString(),
@@ -203,7 +203,7 @@ final class StorageReadBackendTest extends TestCase
         $storage = $this->createMock(EntryStorageInterface::class);
         $storage->method('exists')->willReturn(true);
         $storage->method('list')->willReturn(
-            new EntryStream($this->makeTimeLimitStream()),
+            EntryStream::of($this->makeTimeLimitStream()),
         );
 
         $subject = $this->backendFor($storage);
@@ -214,7 +214,7 @@ final class StorageReadBackendTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('dc=example,dc=com')
             ->useSingleLevelScope();
-        iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
+        iterator_to_array($subject->search($request, SubentryVisibility::All)->entries());
     }
 
     public function test_search_trips_lookthrough_limit_when_examined_exceeds_cap(): void
@@ -231,7 +231,7 @@ final class StorageReadBackendTest extends TestCase
         $request = (new SearchRequest(new PresentFilter('objectClass')))
             ->base('dc=example,dc=com')
             ->useSubtreeScope();
-        iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
+        iterator_to_array($subject->search($request, SubentryVisibility::All)->entries());
     }
 
     public function test_search_does_not_trip_lookthrough_limit_within_cap(): void
@@ -248,7 +248,7 @@ final class StorageReadBackendTest extends TestCase
 
         self::assertCount(
             3,
-            iterator_to_array($subject->search($request, SubentryVisibility::All)->entries),
+            iterator_to_array($subject->search($request, SubentryVisibility::All)->entries()),
         );
     }
 
@@ -260,7 +260,7 @@ final class StorageReadBackendTest extends TestCase
             ->base('cn=ref,dc=example,dc=com')
             ->useBaseScope()
             ->setDereferenceAliases(SearchRequest::DEREF_FINDING_BASE_OBJECT);
-        $entries = iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
+        $entries = iterator_to_array($subject->search($request, SubentryVisibility::All)->entries());
 
         self::assertCount(1, $entries);
         self::assertSame(
@@ -277,7 +277,7 @@ final class StorageReadBackendTest extends TestCase
             ->base('cn=ref,dc=example,dc=com')
             ->useBaseScope()
             ->setDereferenceAliases(SearchRequest::DEREF_NEVER);
-        $entries = iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
+        $entries = iterator_to_array($subject->search($request, SubentryVisibility::All)->entries());
 
         self::assertCount(1, $entries);
         self::assertSame(
@@ -304,7 +304,7 @@ final class StorageReadBackendTest extends TestCase
             ->setDereferenceAliases(SearchRequest::DEREF_IN_SEARCHING);
         $dns = array_map(
             static fn(Entry $entry): string => $entry->getDn()->toString(),
-            array_values(iterator_to_array($subject->search($request, SubentryVisibility::All)->entries)),
+            array_values(iterator_to_array($subject->search($request, SubentryVisibility::All)->entries())),
         );
 
         self::assertContains('cn=ref,dc=example,dc=com', $dns);
@@ -320,7 +320,7 @@ final class StorageReadBackendTest extends TestCase
             ->setDereferenceAliases(SearchRequest::DEREF_NEVER);
         $dns = array_map(
             static fn(Entry $entry): string => $entry->getDn()->toString(),
-            iterator_to_array($subject->search($request, SubentryVisibility::All)->entries),
+            iterator_to_array($subject->search($request, SubentryVisibility::All)->entries()),
         );
 
         self::assertContains(
@@ -338,7 +338,7 @@ final class StorageReadBackendTest extends TestCase
 
         self::assertCount(
             3,
-            iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries),
+            iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries()),
         );
     }
 
@@ -363,7 +363,7 @@ final class StorageReadBackendTest extends TestCase
 
         self::assertSame(
             [],
-            iterator_to_array($stream->entries),
+            iterator_to_array($stream->entries()),
         );
     }
 
@@ -383,7 +383,7 @@ final class StorageReadBackendTest extends TestCase
             ->willReturnCallback(function (StorageListOptions $opts) use (&$capturedOptions): EntryStream {
                 $capturedOptions = $opts;
 
-                return new EntryStream($this->makeGenerator());
+                return EntryStream::of($this->makeGenerator());
             });
 
         $subject = $this->backendFor(
@@ -398,7 +398,7 @@ final class StorageReadBackendTest extends TestCase
             ->timeLimit($requestLimit);
 
         $before = microtime(true);
-        iterator_to_array($subject->search($request, SubentryVisibility::All)->entries);
+        iterator_to_array($subject->search($request, SubentryVisibility::All)->entries());
         $after = microtime(true);
 
         self::assertNotNull($capturedOptions?->deadline);
@@ -432,7 +432,7 @@ final class StorageReadBackendTest extends TestCase
             ->useSubtreeScope()
             ->select('+');
 
-        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
+        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries());
 
         foreach ($results as $entry) {
             self::assertNotNull(
@@ -449,7 +449,7 @@ final class StorageReadBackendTest extends TestCase
             ->useSubtreeScope()
             ->select('hasSubordinates');
 
-        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
+        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries());
 
         foreach ($results as $entry) {
             self::assertNotNull(
@@ -466,7 +466,7 @@ final class StorageReadBackendTest extends TestCase
             ->useSubtreeScope()
             ->select('cn');
 
-        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
+        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries());
 
         foreach ($results as $entry) {
             self::assertNull(
@@ -484,7 +484,7 @@ final class StorageReadBackendTest extends TestCase
             ->useBaseScope()
             ->select('+');
 
-        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
+        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries());
 
         self::assertCount(1, $results);
         self::assertSame(
@@ -501,7 +501,7 @@ final class StorageReadBackendTest extends TestCase
             ->useBaseScope()
             ->select('+');
 
-        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
+        $results = iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries());
 
         self::assertCount(1, $results);
         self::assertSame(
@@ -517,7 +517,7 @@ final class StorageReadBackendTest extends TestCase
             ->useBaseScope()
             ->select('+');
 
-        iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries);
+        iterator_to_array($this->subject->search($request, SubentryVisibility::All)->entries());
 
         // Read the stored entry directly — hasSubordinates must not be persisted.
         $stored = $this->subject->get(new Dn('dc=example,dc=com'));

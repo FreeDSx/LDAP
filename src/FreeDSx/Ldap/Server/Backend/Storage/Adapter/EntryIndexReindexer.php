@@ -66,7 +66,7 @@ final readonly class EntryIndexReindexer
                 subtree: true,
             ));
 
-            foreach ($stream->entries as $entry) {
+            foreach ($stream->entries() as $entry) {
                 $dns[] = $entry->getDn();
             }
         }

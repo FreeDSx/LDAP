@@ -121,7 +121,7 @@ final readonly class StorageReadBackend implements ReadBackendInterface, Resetta
             $stream = $this->storage->list($options);
         } catch (InvalidAttributeException) {
             # RFC 4511 §4.5.1.7: unrecognized attribute descriptions evaluate to Undefined; yield zero entries.
-            return new EntryStream((static function (): Generator {
+            return EntryStream::of((static function (): Generator {
                 yield from [];
 
                 return null;

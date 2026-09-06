@@ -117,7 +117,7 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         );
 
         $stale = [];
-        foreach ($this->storage->list($options)->entries as $entry) {
+        foreach ($this->storage->list($options)->entries() as $entry) {
             $dn = $entry->getDn()
                 ->normalize();
 
@@ -193,7 +193,7 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         $wanted = strtolower($uuid);
 
         // Storage answers the filter only where it can, so each candidate is checked rather than trusted.
-        foreach ($this->storage->list($options)->entries as $entry) {
+        foreach ($this->storage->list($options)->entries() as $entry) {
             $candidate = $entry->get(AttributeTypeOid::NAME_ENTRY_UUID)
                 ?->firstValue();
 

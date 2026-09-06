@@ -101,7 +101,7 @@ final readonly class SubentryPlacementGuard
             SubentryVisibility::Only,
         ));
 
-        foreach ($stream->entries as $ignored) {
+        foreach ($stream->entries() as $ignored) {
             return true;
         }
 

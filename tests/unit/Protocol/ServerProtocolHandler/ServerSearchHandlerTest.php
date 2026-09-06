@@ -116,7 +116,7 @@ final class ServerSearchHandlerTest extends TestCase
             ->expects(self::once())
             ->method('search')
             ->with(self::isInstanceOf(SearchRequest::class))
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
+            ->willReturn(EntryStream::of($this->makeGenerator($entry1, $entry2)));
 
         $this->mockFilterEvaluator
             ->method('evaluate')
@@ -208,7 +208,7 @@ final class ServerSearchHandlerTest extends TestCase
     {
         $this->mockBackend
             ->method('search')
-            ->willReturnCallback(fn(): EntryStream => new EntryStream($this->makeGenerator()));
+            ->willReturnCallback(fn(): EntryStream => EntryStream::of($this->makeGenerator()));
 
         foreach (SearchRequest::SUPPORTED_SCOPES as $scope) {
             $result = $this->drive(
@@ -243,7 +243,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry)));
+            ->willReturn(EntryStream::of($this->makeGenerator($entry)));
 
         $this->mockFilterEvaluator
             ->method('evaluate')
@@ -305,7 +305,7 @@ final class ServerSearchHandlerTest extends TestCase
         $this->mockBackend
             ->expects(self::once())
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
+            ->willReturn(EntryStream::of($this->makeGenerator($entry1, $entry2)));
 
         $this->mockFilterEvaluator
             ->method('evaluate')
@@ -336,7 +336,7 @@ final class ServerSearchHandlerTest extends TestCase
         $this->mockBackend
             ->expects(self::once())
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1)));
+            ->willReturn(EntryStream::of($this->makeGenerator($entry1)));
 
         $this->mockFilterEvaluator
             ->method('evaluate')
@@ -365,7 +365,7 @@ final class ServerSearchHandlerTest extends TestCase
         $this->mockBackend
             ->expects(self::once())
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
+            ->willReturn(EntryStream::of($this->makeGenerator($entry1, $entry2)));
 
         $this->mockFilterEvaluator
             ->method('evaluate')
@@ -394,7 +394,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
+            ->willReturn(EntryStream::of($this->makeGenerator($entry1, $entry2)));
 
         $this->mockFilterEvaluator
             ->method('evaluate')
@@ -426,7 +426,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
+            ->willReturn(EntryStream::of($this->makeGenerator($entry1, $entry2)));
 
         $this->mockFilterEvaluator
             ->method('evaluate')
@@ -458,7 +458,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry1, $entry2)));
+            ->willReturn(EntryStream::of($this->makeGenerator($entry1, $entry2)));
 
         $this->mockFilterEvaluator
             ->method('evaluate')
@@ -486,7 +486,7 @@ final class ServerSearchHandlerTest extends TestCase
         $this->mockBackend
             ->expects(self::once())
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator()));
+            ->willReturn(EntryStream::of($this->makeGenerator()));
 
         $this->drive(
             $this->subject,
@@ -526,7 +526,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator(
+            ->willReturn(EntryStream::of($this->makeGenerator(
                 $entry1,
                 $entry2,
             )));
@@ -570,7 +570,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry)));
+            ->willReturn(EntryStream::of($this->makeGenerator($entry)));
 
         $this->mockFilterEvaluator
             ->method('evaluate')
@@ -603,7 +603,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator(...$entries)));
+            ->willReturn(EntryStream::of($this->makeGenerator(...$entries)));
 
         $this->mockFilterEvaluator
             ->method('evaluate')
@@ -639,7 +639,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator(...$entries)));
+            ->willReturn(EntryStream::of($this->makeGenerator(...$entries)));
 
         $this->mockFilterEvaluator
             ->method('evaluate')
@@ -682,7 +682,7 @@ final class ServerSearchHandlerTest extends TestCase
         $this->mockBackend
             ->expects(self::once())
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator()));
+            ->willReturn(EntryStream::of($this->makeGenerator()));
 
         $this->drive(
             $this->subject,
@@ -707,7 +707,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator()));
+            ->willReturn(EntryStream::of($this->makeGenerator()));
 
         $this->drive(
             $this->subject,
@@ -737,7 +737,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator()));
+            ->willReturn(EntryStream::of($this->makeGenerator()));
 
         $this->drive(
             $this->subject,
@@ -774,7 +774,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator()));
+            ->willReturn(EntryStream::of($this->makeGenerator()));
 
         $this->drive(
             $this->subject,
@@ -800,7 +800,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator()));
+            ->willReturn(EntryStream::of($this->makeGenerator()));
 
         $this->drive(
             $this->subject,
@@ -823,7 +823,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator()));
+            ->willReturn(EntryStream::of($this->makeGenerator()));
 
         $this->drive(
             $this->subject,
@@ -849,7 +849,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator()));
+            ->willReturn(EntryStream::of($this->makeGenerator()));
 
         $this->drive(
             $this->subject,
@@ -875,7 +875,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator()));
+            ->willReturn(EntryStream::of($this->makeGenerator()));
 
         $this->drive(
             $this->subject,
@@ -947,7 +947,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator($entry)));
+            ->willReturn(EntryStream::of($this->makeGenerator($entry)));
         $this->mockFilterEvaluator
             ->method('evaluate')
             ->willReturn(true);
@@ -972,7 +972,7 @@ final class ServerSearchHandlerTest extends TestCase
 
         $this->mockBackend
             ->method('search')
-            ->willReturn(new EntryStream($this->makeGenerator()));
+            ->willReturn(EntryStream::of($this->makeGenerator()));
 
         $this->drive(
             $this->subject,

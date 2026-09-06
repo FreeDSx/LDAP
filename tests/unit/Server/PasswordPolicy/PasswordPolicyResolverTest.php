@@ -293,7 +293,7 @@ final class PasswordPolicyResolverTest extends TestCase
                 )
                 : null);
         $backend->method('search')
-            ->willReturn(new EntryStream((static function () use ($subentry): Generator {
+            ->willReturn(EntryStream::of((static function () use ($subentry): Generator {
                 yield $subentry;
 
                 return null;

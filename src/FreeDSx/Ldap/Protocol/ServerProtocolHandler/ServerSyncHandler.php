@@ -268,7 +268,7 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
             $this->limits,
         );
 
-        foreach ($result->entries as $entry) {
+        foreach ($result->entries() as $entry) {
             yield from $this->emit(
                 $this->toResponse(
                     $message->getMessageId(),

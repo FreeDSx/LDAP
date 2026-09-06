@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
+use FreeDSx\Ldap\Server\Backend\Storage\FetchedEntry;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Subentry\SubentryDetector;
@@ -54,7 +55,7 @@ trait ArrayEntryStorageTrait
         }
 
         if ($options->sortKeys === []) {
-            return new EntryStream($this->pageByKey(
+            return EntryStream::positioned($this->pageByKey(
                 $scoped,
                 $keys,
                 $options,
@@ -64,7 +65,7 @@ trait ArrayEntryStorageTrait
         /** @var list<Entry> $collected */
         $collected = iterator_to_array($scoped, false);
 
-        return new EntryStream($this->pageByCount(
+        return EntryStream::positioned($this->pageByCount(
             $this->sortKeyComparator->sort($collected, $options->sortKeys),
             $options,
         ));
@@ -119,7 +120,7 @@ trait ArrayEntryStorageTrait
      *
      * @param iterable<Entry> $entries
      * @param array<string, int> $keys Entry key per normalised DN string
-     * @return Generator<int, Entry, mixed, FetchedBatch>
+     * @return Generator<int, FetchedEntry, mixed, FetchedBatch>
      */
     private function pageByKey(
         iterable $entries,
@@ -152,7 +153,12 @@ trait ArrayEntryStorageTrait
                 $cursor = PageCursor::afterEntry($key);
             }
 
-            yield $entry;
+            yield new FetchedEntry(
+                $entry,
+                $key !== null
+                    ? $cursor
+                    : null,
+            );
         }
 
         return new FetchedBatch(
@@ -169,7 +175,7 @@ trait ArrayEntryStorageTrait
      * anything. The sort is recomputed identically for every page.
      *
      * @param iterable<Entry> $entries
-     * @return Generator<int, Entry, mixed, FetchedBatch>
+     * @return Generator<int, FetchedEntry, mixed, FetchedBatch>
      */
     private function pageByCount(
         iterable $entries,
@@ -196,7 +202,10 @@ trait ArrayEntryStorageTrait
 
             $taken++;
 
-            yield $entry;
+            yield new FetchedEntry(
+                $entry,
+                PageCursor::afterSorted($delivered + $taken),
+            );
         }
 
         return new FetchedBatch(

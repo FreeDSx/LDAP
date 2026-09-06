@@ -38,8 +38,10 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
+use FreeDSx\Ldap\Server\Backend\Storage\FetchedEntry;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
+use FreeDSx\Ldap\Server\Paging\PageFiller;
 use FreeDSx\Ldap\Server\Paging\PagingRequest;
 use FreeDSx\Ldap\Server\RequestHistory;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
@@ -108,13 +110,7 @@ class ServerPagingHandlerTest extends TestCase
                 return $this->mockQueue;
             });
 
-        $this->subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
-            accessControl: $this->mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
-        );
+        $this->subject = $this->makeHandler();
     }
 
     public function test_a_page_is_filled_past_entries_access_control_hides(): void
@@ -138,13 +134,7 @@ class ServerPagingHandlerTest extends TestCase
                 $visible,
             ));
 
-        $subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
-            accessControl: $mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
-        );
+        $subject = $this->makeHandler($mockAccessControl);
 
         // A page of one, whose first candidate is hidden, so filling it means reading on rather than answering short.
         $this->drive(
@@ -154,6 +144,68 @@ class ServerPagingHandlerTest extends TestCase
 
         self::assertEquals(
             [new LdapMessageResponse(2, new SearchResultEntry($visible))],
+            $this->entryMessages(),
+        );
+    }
+
+    public function test_a_page_filled_part_way_through_a_read_resumes_from_the_last_entry_it_took(): void
+    {
+        $entries = [];
+        for ($i = 1; $i <= 10; $i++) {
+            $entries[] = Entry::create("cn=$i,dc=foo,dc=bar", ['cn' => (string) $i]);
+        }
+
+        // Hiding the first two starves the opening read, so the next one is widened and overshoots the page.
+        $mockAccessControl = $this->createMock(AccessControlInterface::class);
+        $mockAccessControl
+            ->method('filterEntry')
+            ->willReturnCallback(
+                static fn(TokenInterface $token, Entry $entry): ?Entry => in_array(
+                    $entry,
+                    [$entries[0], $entries[1]],
+                    true,
+                )
+                    ? null
+                    : $entry,
+            );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback($this->sliceAware(...$entries));
+
+        $subject = $this->makeHandler(
+            $mockAccessControl,
+            new SearchLimits(maxSearchPageSize: 10),
+        );
+
+        $this->drive($subject, $this->makeSearchMessage(size: 2));
+
+        self::assertEquals(
+            [
+                new LdapMessageResponse(2, new SearchResultEntry($entries[2])),
+                new LdapMessageResponse(2, new SearchResultEntry($entries[3])),
+            ],
+            $this->entryMessages(),
+        );
+
+        $cookie = $this->donePagingControl()->getCookie();
+        $pagingRequest = $this->requestHistory->pagingRequest()->findByNextCookie($cookie);
+        $this->sentMessages = [];
+
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(
+                size: 2,
+                cookie: $cookie,
+                searchRequest: $pagingRequest->getSearchRequest(),
+            ),
+        );
+
+        self::assertEquals(
+            [
+                new LdapMessageResponse(2, new SearchResultEntry($entries[4])),
+                new LdapMessageResponse(2, new SearchResultEntry($entries[5])),
+            ],
             $this->entryMessages(),
         );
     }
@@ -393,14 +445,7 @@ class ServerPagingHandlerTest extends TestCase
             ->method('search')
             ->willReturnCallback($this->sliceAware($entry1, $entry2, $entry3));
 
-        $subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
-            accessControl: $this->mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
-            limits: new SearchLimits(maxSearchPageSize: 1),
-        );
+        $subject = $this->makeHandler(limits: new SearchLimits(maxSearchPageSize: 1));
         $this->drive($subject, $this->makeSearchMessage(size: 1));
 
         $cookie = $this->donePagingControl()->getCookie();
@@ -464,13 +509,9 @@ class ServerPagingHandlerTest extends TestCase
             ->method('filterEntry')
             ->willReturn(null);
 
-        $subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
-            accessControl: $mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
-            limits: new SearchLimits(maxSearchPageSize: 2),
+        $subject = $this->makeHandler(
+            $mockAccessControl,
+            new SearchLimits(maxSearchPageSize: 2),
         );
         $this->drive($subject, $this->makeSearchMessage(size: 2, searchRequest: $searchRequest));
 
@@ -573,14 +614,7 @@ class ServerPagingHandlerTest extends TestCase
             ->method('search')
             ->willReturnCallback($this->sliceAware($entry1, $entry2));
 
-        $subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
-            accessControl: $this->mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
-            limits: new SearchLimits(maxSearchSize: 1),
-        );
+        $subject = $this->makeHandler(limits: new SearchLimits(maxSearchSize: 1));
         $this->drive($subject, $message);
 
         self::assertEquals(
@@ -602,14 +636,7 @@ class ServerPagingHandlerTest extends TestCase
                 Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']),
             ));
 
-        $subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
-            accessControl: $this->mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
-            limits: new SearchLimits(maxPagingSessions: 2),
-        );
+        $subject = $this->makeHandler(limits: new SearchLimits(maxPagingSessions: 2));
 
         // Each leaves a page outstanding, so none of them completes and releases its slot.
         $this->drive($subject, $this->makeSearchMessage(size: 1));
@@ -639,14 +666,7 @@ class ServerPagingHandlerTest extends TestCase
                 Entry::create('cn=1,dc=foo,dc=bar', ['cn' => '1']),
             ));
 
-        $subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
-            accessControl: $this->mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
-            limits: new SearchLimits(maxPagingSessions: 2),
-        );
+        $subject = $this->makeHandler(limits: new SearchLimits(maxPagingSessions: 2));
 
         // A page larger than the result set finishes the search outright.
         $this->drive($subject, $this->makeSearchMessage(size: 10));
@@ -669,14 +689,7 @@ class ServerPagingHandlerTest extends TestCase
                 Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']),
             ));
 
-        $subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
-            accessControl: $this->mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
-            limits: new SearchLimits(maxPagingSessions: 2),
-        );
+        $subject = $this->makeHandler(limits: new SearchLimits(maxPagingSessions: 2));
 
         $this->drive($subject, $this->makeSearchMessage(size: 1));
         $cookie = $this->donePagingControl()->getCookie();
@@ -700,14 +713,7 @@ class ServerPagingHandlerTest extends TestCase
                 Entry::create('cn=2,dc=foo,dc=bar', ['cn' => '2']),
             ));
 
-        $subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
-            accessControl: $this->mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
-            limits: new SearchLimits(maxPagingSessions: 0),
-        );
+        $subject = $this->makeHandler(limits: new SearchLimits(maxPagingSessions: 0));
 
         $this->drive($subject, $this->makeSearchMessage(size: 1));
         $this->drive($subject, $this->makeSearchMessage(size: 1));
@@ -730,14 +736,7 @@ class ServerPagingHandlerTest extends TestCase
             ->method('search')
             ->willReturnCallback($this->sliceAware($entry1, $entry2));
 
-        $subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
-            accessControl: $this->mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
-            limits: new SearchLimits(maxSearchPageSize: 1),
-        );
+        $subject = $this->makeHandler(limits: new SearchLimits(maxSearchPageSize: 1));
         $this->drive($subject, $message);
 
         // Only 1 entry returned despite client requesting page size 10.
@@ -762,14 +761,7 @@ class ServerPagingHandlerTest extends TestCase
             ->method('search')
             ->willReturnCallback($this->sliceAware($entry1, $entry2, $entry3));
 
-        $subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
-            accessControl: $this->mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
-            limits: new SearchLimits(maxSearchPageSize: 2),
-        );
+        $subject = $this->makeHandler(limits: new SearchLimits(maxSearchPageSize: 2));
         $this->drive($subject, $message);
 
         // Server applies its max of 2 entries per page.
@@ -789,14 +781,7 @@ class ServerPagingHandlerTest extends TestCase
             ->method('search')
             ->willReturnCallback($this->sliceAware($entry1, $entry2));
 
-        $subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
-            accessControl: $this->mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
-            limits: new SearchLimits(maxSearchPageSize: 5),
-        );
+        $subject = $this->makeHandler(limits: new SearchLimits(maxSearchPageSize: 5));
         $this->drive($subject, $message);
 
         // Client requested 1 per page; server max is 5 — client's lower value wins.
@@ -833,13 +818,7 @@ class ServerPagingHandlerTest extends TestCase
                 $entry2,
             ));
 
-        $subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
-            accessControl: $mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
-        );
+        $subject = $this->makeHandler($mockAccessControl);
         $this->drive($subject, $message);
 
         self::assertEquals(
@@ -874,12 +853,9 @@ class ServerPagingHandlerTest extends TestCase
             ->method('search')
             ->willReturnCallback($this->sliceAware($entry));
 
-        $subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
+        $subject = $this->makeHandler(
+            $mockAccessControl,
             filterEvaluator: $mockFilterEvaluator,
-            accessControl: $mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
         );
         $this->drive($subject, $message);
 
@@ -1130,13 +1106,7 @@ class ServerPagingHandlerTest extends TestCase
             ->method('filterEntry')
             ->willReturn(null);
 
-        $subject = new ServerPagingHandler(
-            backend: $this->mockBackend,
-            filterEvaluator: $this->mockFilterEvaluator,
-            accessControl: $mockAccessControl,
-            requestHistory: $this->requestHistory,
-            schema: $this->schema,
-        );
+        $subject = $this->makeHandler($mockAccessControl);
 
         $this->drive(
             $subject,
@@ -1170,6 +1140,30 @@ class ServerPagingHandlerTest extends TestCase
         );
     }
 
+    private function makeHandler(
+        ?AccessControlInterface $accessControl = null,
+        ?SearchLimits $limits = null,
+        ?FilterEvaluatorInterface $filterEvaluator = null,
+    ): ServerPagingHandler {
+        $accessControl ??= $this->mockAccessControl;
+        $limits ??= new SearchLimits();
+
+        return new ServerPagingHandler(
+            backend: $this->mockBackend,
+            accessControl: $accessControl,
+            requestHistory: $this->requestHistory,
+            schema: $this->schema,
+            pageFiller: new PageFiller(
+                $this->mockBackend,
+                $filterEvaluator ?? $this->mockFilterEvaluator,
+                $accessControl,
+                $this->schema,
+                $limits,
+            ),
+            limits: $limits,
+        );
+    }
+
     /**
      * A search that honours the slice the way real storage does, keying entries by their position.
      *
@@ -1177,7 +1171,7 @@ class ServerPagingHandlerTest extends TestCase
      */
     private function sliceAware(Entry ...$entries): callable
     {
-        return fn(mixed ...$args): EntryStream => new EntryStream($this->sliceOf(
+        return fn(mixed ...$args): EntryStream => EntryStream::positioned($this->sliceOf(
             array_values($entries),
             array_values(array_filter(
                 $args,
@@ -1188,7 +1182,7 @@ class ServerPagingHandlerTest extends TestCase
 
     /**
      * @param list<Entry> $entries
-     * @return Generator<int, Entry, mixed, FetchedBatch>
+     * @return Generator<int, FetchedEntry, mixed, FetchedBatch>
      */
     private function sliceOf(
         array $entries,
@@ -1215,7 +1209,7 @@ class ServerPagingHandlerTest extends TestCase
             $taken++;
             $cursor = PageCursor::afterEntry($key);
 
-            yield $entry;
+            yield new FetchedEntry($entry, $cursor);
         }
 
         return new FetchedBatch(

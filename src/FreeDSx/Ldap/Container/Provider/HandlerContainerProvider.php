@@ -46,6 +46,7 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
+use FreeDSx\Ldap\Server\Paging\PageFiller;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyService;
 use FreeDSx\Ldap\Server\PasswordModify\PasswordModifyTargetResolver;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyComponentFactory;
@@ -254,14 +255,23 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         ?SearchLimits $searchLimits,
     ): ServerPagingHandler {
         $options = $container->get(ServerOptions::class);
+        $backend = $container->get(ReadBackendInterface::class);
+        $accessControl = $container->get(AccessControlInterface::class);
+        $limits = $searchLimits ?? $options->makeSearchLimits();
 
         return new ServerPagingHandler(
-            backend: $container->get(ReadBackendInterface::class),
-            filterEvaluator: $container->get(FilterEvaluatorInterface::class),
-            accessControl: $container->get(AccessControlInterface::class),
+            backend: $backend,
+            accessControl: $accessControl,
             requestHistory: $context->requestHistory,
             schema: $options->getSchema(),
-            limits: $searchLimits ?? $options->makeSearchLimits(),
+            pageFiller: new PageFiller(
+                $backend,
+                $container->get(FilterEvaluatorInterface::class),
+                $accessControl,
+                $options->getSchema(),
+                $limits,
+            ),
+            limits: $limits,
             eventLogger: $context->eventLogger,
         );
     }

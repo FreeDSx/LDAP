@@ -128,7 +128,7 @@ abstract class LdapReindexTestCase extends TestCase
             baseDn: new Dn('dc=foo,dc=bar'),
             subtree: true,
             filter: $filter,
-        ))->entries;
+        ))->entries();
 
         $dns = [];
         foreach ($entries as $entry) {
