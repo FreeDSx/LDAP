@@ -16,6 +16,8 @@ namespace Tests\Integration\FreeDSx\Ldap\Runner;
 use Tests\Integration\FreeDSx\Ldap\Runner\Concern\TlsTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 
+use function extension_loaded;
+
 /**
  * Behavior that runs against every server runner.
  */
@@ -25,6 +27,9 @@ abstract class ServerRunnerTestCase extends ServerTestCase
 
     public static function setUpBeforeClass(): void
     {
+        if (!static::isRunnerAvailable()) {
+            return;
+        }
         parent::setUpBeforeClass();
 
         static::initSharedServer(
@@ -70,5 +75,14 @@ abstract class ServerRunnerTestCase extends ServerTestCase
     protected static function runnerArgs(): array
     {
         return [];
+    }
+
+    /**
+     * Whether this runner can run here, which the pcntl one cannot without process control.
+     */
+    protected static function isRunnerAvailable(): bool
+    {
+        return extension_loaded('pcntl')
+            && extension_loaded('posix');
     }
 }

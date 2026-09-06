@@ -20,15 +20,6 @@ use function extension_loaded;
  */
 final class ServerRunnerSwooleTest extends ServerRunnerTestCase
 {
-    public static function setUpBeforeClass(): void
-    {
-        if (!extension_loaded('swoole')) {
-            return;
-        }
-
-        parent::setUpBeforeClass();
-    }
-
     public function setUp(): void
     {
         $this->requireSwoole();
@@ -39,5 +30,10 @@ final class ServerRunnerSwooleTest extends ServerRunnerTestCase
     protected static function runnerArgs(): array
     {
         return ['--runner=swoole'];
+    }
+
+    protected static function isRunnerAvailable(): bool
+    {
+        return extension_loaded('swoole');
     }
 }
