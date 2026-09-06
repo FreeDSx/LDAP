@@ -17,6 +17,7 @@ use Closure;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Container\ContainerReloadFactory;
 use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotWriter;
@@ -39,6 +40,7 @@ use FreeDSx\Ldap\Server\ServerRunner\Swoole\WorkerFactory;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\Server\Utility\CpuCount;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
+use FreeDSx\Ldap\ServerOptions;
 
 /**
  * Registers the listener services shared by every server type: the socket, runner, reload, authorization, and metrics.
@@ -88,6 +90,7 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
         $metricsRecorder = $container->get(MetricsRecorderInterface::class);
 
         if ($options->isRunnerMode(RunnerMode::Swoole)) {
+            $this->assertClientCertificatesAreNotExpected($options);
             $workers = $this->resolveWorkerCount($container);
             $workerFactory = new WorkerFactory(
                 serverProtocolFactory: $protocolFactoryProvider($options),
@@ -118,6 +121,29 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
             resettable: $container->get(ListenerContributorInterface::class)->forkResettable(),
             backgroundTasks: $container->get(BackgroundTasksInterface::class),
         );
+    }
+
+    /**
+     * The following features are not supported with Swoole:
+     *
+     *   * mTLS
+     *   * External SASL
+     *
+     * Swoole does not support capturing client certificates.
+     */
+    private function assertClientCertificatesAreNotExpected(ServerListenerOptionsInterface $options): void
+    {
+        if ($options->getNetworkConfig()->isSslValidateCert()) {
+            throw new RuntimeException(
+                'The Swoole runner cannot verify client certificates. Unset sslValidateCert or use the PCNTL runner.',
+            );
+        }
+
+        if (in_array(ServerOptions::SASL_EXTERNAL, $options->getSaslMechanisms(), true)) {
+            throw new RuntimeException(
+                'The Swoole runner cannot support the EXTERNAL SASL mechanism. Remove it or use the PCNTL runner.',
+            );
+        }
     }
 
     /**

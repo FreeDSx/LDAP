@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
+use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
@@ -63,6 +64,7 @@ use FreeDSx\Ldap\ProxyServerOptions;
 use FreeDSx\Ldap\Server\Proxy\ProxyProtocolFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
+use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\ServerRunnerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\PooledServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
@@ -362,6 +364,52 @@ class ContainerTest extends TestCase
 
         self::assertInstanceOf(
             SwooleServerRunner::class,
+            $container->get(ServerRunnerInterface::class),
+        );
+    }
+
+    public function test_the_swoole_runner_is_refused_when_client_certificate_validation_is_on(): void
+    {
+        $this->requireSwoole();
+
+        $container = $this->containerFor(
+            (TestServerOptions::defaults())
+                ->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole))
+                ->setNetworkConfig((new NetworkConfig())->setSslValidateCert(true)),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('The Swoole runner cannot verify client certificates.');
+
+        $container->get(ServerRunnerInterface::class);
+    }
+
+    public function test_the_swoole_runner_is_refused_when_external_sasl_is_offered(): void
+    {
+        $this->requireSwoole();
+
+        $container = $this->containerFor(
+            (TestServerOptions::defaults())
+                ->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole))
+                ->setSaslMechanisms(ServerOptions::SASL_EXTERNAL),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('The Swoole runner cannot support the EXTERNAL SASL mechanism.');
+
+        $container->get(ServerRunnerInterface::class);
+    }
+
+    public function test_the_pcntl_runner_accepts_client_certificate_validation(): void
+    {
+        $container = $this->containerFor(
+            TestServerOptions::forStorage($this->sharedStorage())
+                ->setNetworkConfig((new NetworkConfig())->setSslValidateCert(true))
+                ->setSaslMechanisms(ServerOptions::SASL_EXTERNAL),
+        );
+
+        self::assertInstanceOf(
+            PcntlServerRunner::class,
             $container->get(ServerRunnerInterface::class),
         );
     }
