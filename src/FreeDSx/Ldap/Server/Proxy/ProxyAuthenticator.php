@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Proxy;
 
 use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
@@ -40,11 +42,12 @@ final readonly class ProxyAuthenticator implements PasswordAuthenticatableInterf
         #[SensitiveParameter]
         string $password,
     ): AuthenticatedTokenInterface {
-        if ($this->useStartTls) {
-            $this->client->startTls();
-        }
-
         try {
+            // Re-issuing it on a connection already upgraded is an operations error the upstream answers by hanging up.
+            if ($this->useStartTls && !$this->client->isEncrypted()) {
+                $this->client->startTls();
+            }
+
             $this->client->bind(
                 $name,
                 $password,
@@ -53,6 +56,11 @@ final readonly class ProxyAuthenticator implements PasswordAuthenticatableInterf
             throw new OperationException(
                 $e->getMessage(),
                 $e->getCode(),
+            );
+        } catch (ConnectionException) {
+            throw new OperationException(
+                'The upstream LDAP server is unavailable.',
+                ResultCode::UNAVAILABLE,
             );
         }
 

@@ -289,6 +289,7 @@ final class ResponseFactoryTest extends TestCase
             ResultCode::SUCCESS,
             '',
             null,
+            [],
             $control,
         );
 

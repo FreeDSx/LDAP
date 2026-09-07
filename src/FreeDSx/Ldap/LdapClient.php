@@ -501,6 +501,20 @@ class LdapClient
     }
 
     /**
+     * Whether the established connection is encrypted (whether by LDAPS or by a StartTLS already issued on it).
+     */
+    public function isEncrypted(): bool
+    {
+        if ($this->handler === null) {
+            return false;
+        }
+
+        return $this->container
+            ->get(ClientQueueInstantiator::class)
+            ->isInstantiatedAndEncrypted();
+    }
+
+    /**
      * A simple check to determine if this client has an established connection to a server.
      */
     public function isConnected(): bool

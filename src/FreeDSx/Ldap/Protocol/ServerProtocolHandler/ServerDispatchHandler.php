@@ -148,6 +148,7 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
                 ResultCode::SUCCESS,
                 '',
                 null,
+                [],
                 ...$this->successControls($preRead, $postRead),
             )],
             WriteOperationResult::success(

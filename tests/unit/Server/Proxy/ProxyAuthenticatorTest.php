@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Proxy;
 
 use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -47,6 +48,54 @@ final class ProxyAuthenticatorTest extends TestCase
         $this->client
             ->expects(self::once())
             ->method('bind');
+
+        (new ProxyAuthenticator($this->client, true))->authenticate(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+    }
+
+    public function test_it_does_not_re_issue_start_tls_on_a_connection_already_upgraded(): void
+    {
+        $this->client
+            ->method('isEncrypted')
+            ->willReturn(true);
+        $this->client
+            ->expects(self::never())
+            ->method('startTls');
+        $this->client
+            ->expects(self::once())
+            ->method('bind');
+
+        (new ProxyAuthenticator($this->client, true))->authenticate(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+    }
+
+    public function test_it_answers_rather_than_raises_when_the_upstream_is_gone(): void
+    {
+        $this->client
+            ->method('bind')
+            ->willThrowException(new ConnectionException('gone'));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNAVAILABLE);
+
+        (new ProxyAuthenticator($this->client))->authenticate(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+    }
+
+    public function test_it_answers_rather_than_raises_when_start_tls_cannot_be_issued(): void
+    {
+        $this->client
+            ->method('startTls')
+            ->willThrowException(new ConnectionException('gone'));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNAVAILABLE);
 
         (new ProxyAuthenticator($this->client, true))->authenticate(
             'cn=user,dc=foo,dc=bar',

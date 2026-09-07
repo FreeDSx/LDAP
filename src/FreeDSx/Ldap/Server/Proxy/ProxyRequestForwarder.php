@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Proxy;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
@@ -89,6 +90,17 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
             ));
 
             return ResponseStream::resolved(OperationOutcomeResult::failed($e->getCode()));
+        } catch (ReferralException $e) {
+            // Only a search treats a referral as an ordinary result.
+            $this->queue->sendMessage($this->responseFactory->getStandardResponse(
+                $message,
+                ResultCode::REFERRAL,
+                $e->getMessage(),
+                null,
+                $e->getReferrals(),
+            ));
+
+            return ResponseStream::resolved(OperationOutcomeResult::failed(ResultCode::REFERRAL));
         }
 
         if ($request instanceof SearchRequest) {

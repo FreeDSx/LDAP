@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Factory;
 
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\BindRequest;
@@ -47,6 +48,7 @@ class ResponseFactory
      * Retrieve the expected response type for the request that was given.
      *
      * @param Dn|null $matchedDn Matched ancestor; emitted as matchedDN when non-null.
+     * @param LdapUrl[] $referrals Where the operation should be retried. For a result code that names somewhere else.
      * @param Control ...$controls Response controls to attach to the resulting message.
      */
     public function getStandardResponse(
@@ -54,6 +56,7 @@ class ResponseFactory
         int $resultCode = ResultCode::SUCCESS,
         string $diagnostic = '',
         ?Dn $matchedDn = null,
+        array $referrals = [],
         Control ...$controls,
     ): LdapMessageResponse {
         $request = $message->getRequest();
@@ -65,37 +68,44 @@ class ResponseFactory
                     $resultCode,
                     $dn,
                     $diagnostic,
+                    ...$referrals,
                 ),
             ),
             $request instanceof SearchRequest => new SearchResultDone(
                 $resultCode,
                 $dn,
                 $diagnostic,
+                ...$referrals,
             ),
             $request instanceof AddRequest => new AddResponse(
                 $resultCode,
                 $dn,
                 $diagnostic,
+                ...$referrals,
             ),
             $request instanceof CompareRequest => new CompareResponse(
                 $resultCode,
                 $dn,
                 $diagnostic,
+                ...$referrals,
             ),
             $request instanceof DeleteRequest => new DeleteResponse(
                 $resultCode,
                 $dn,
                 $diagnostic,
+                ...$referrals,
             ),
             $request instanceof ModifyDnRequest => new ModifyDnResponse(
                 $resultCode,
                 $dn,
                 $diagnostic,
+                ...$referrals,
             ),
             $request instanceof ModifyRequest => new ModifyResponse(
                 $resultCode,
                 $dn,
                 $diagnostic,
+                ...$referrals,
             ),
             // RFC 4511 4.12 makes the name optional, and the operations built on it require it absent on error.
             $request instanceof ExtendedRequest => new ExtendedResponse(
@@ -103,6 +113,7 @@ class ResponseFactory
                     $resultCode,
                     $dn,
                     $diagnostic,
+                    ...$referrals,
                 ),
             ),
             default => null,
