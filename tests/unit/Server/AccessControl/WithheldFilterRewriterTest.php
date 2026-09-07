@@ -167,6 +167,18 @@ final class WithheldFilterRewriterTest extends TestCase
         );
     }
 
+    public function test_a_filter_deny_covers_a_derived_attribute(): void
+    {
+        $subject = $this->rewriterDenyingFilterOn('hasSubordinates');
+
+        $rewritten = $subject->rewrite(
+            Filters::equal('hasSubordinates', 'TRUE'),
+            $this->token,
+        );
+
+        self::assertTrue($subject->isAbsoluteFalse($rewritten));
+    }
+
     public function test_a_filter_deny_leaves_every_other_attribute_alone(): void
     {
         $subject = $this->rewriterDenyingFilterOn('telephoneNumber');

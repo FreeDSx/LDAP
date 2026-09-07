@@ -20,10 +20,11 @@ use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Search\Result\EntryResult;
+use FreeDSx\Ldap\Search\Result\ReferralResult;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
-use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
@@ -65,6 +66,13 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
         // Synchronous, sequential forwarding means nothing is ever in flight upstream to abandon.
         if ($request instanceof AbandonRequest) {
             return ResponseStream::resolved(OperationOutcomeResult::succeeded());
+        }
+
+        if ($request instanceof SearchRequest) {
+            $this->relayResultsAsTheyArrive(
+                $request,
+                $message->getMessageId(),
+            );
         }
 
         try {
@@ -124,6 +132,43 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
         ));
     }
 
+    /**
+     * An upstream PDU carried over under this client's message id, keeping whatever controls it arrived with.
+     */
+    private function relayed(
+        int $messageId,
+        LdapMessageResponse $upstream,
+    ): LdapMessageResponse {
+        return new LdapMessageResponse(
+            $messageId,
+            $upstream->getResponse(),
+            ...$upstream->controls()->toArray(),
+        );
+    }
+
+    /**
+     * Hands each result to the client as it arrives, rather than collecting the whole set first.
+     */
+    private function relayResultsAsTheyArrive(
+        SearchRequest $request,
+        int $messageId,
+    ): void {
+        // Taken from the upstream message rather than the bare entry, so per-entry controls survive the hop.
+        $request->useEntryHandler(function (EntryResult $result) use ($messageId): void {
+            $this->queue->sendMessage($this->relayed(
+                $messageId,
+                $result->getMessage(),
+            ));
+        });
+
+        $request->useReferralHandler(function (ReferralResult $result) use ($messageId): void {
+            $this->queue->sendMessage($this->relayed(
+                $messageId,
+                $result->getMessage(),
+            ));
+        });
+    }
+
     private function relaySearch(
         LdapMessageRequest $message,
         LdapMessageResponse $response,
@@ -136,26 +181,15 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
             return;
         }
 
-        $messageId = $message->getMessageId();
-        $messages = [];
-
-        foreach ($searchResponse->getEntries() as $entry) {
-            $messages[] = new LdapMessageResponse(
-                $messageId,
-                new SearchResultEntry($entry),
-            );
-        }
-
-        $messages[] = new LdapMessageResponse(
-            $messageId,
+        // Only the terminal message is left to send.
+        $this->queue->sendMessage(new LdapMessageResponse(
+            $message->getMessageId(),
             new SearchResultDone(
                 $searchResponse->getResultCode(),
                 $searchResponse->getDn(),
                 $searchResponse->getDiagnosticMessage(),
             ),
             ...$response->controls()->toArray(),
-        );
-
-        $this->queue->sendMessages($messages);
+        ));
     }
 }
