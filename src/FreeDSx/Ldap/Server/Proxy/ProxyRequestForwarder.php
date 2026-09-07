@@ -123,6 +123,8 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
         array $controls,
     ): LdapMessageResponse {
         try {
+            $this->session->ensureEncrypted();
+
             return $this->client->sendAndReceive(
                 $request,
                 ...$controls,

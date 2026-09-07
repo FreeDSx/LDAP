@@ -85,6 +85,21 @@ final class ProxyUpstreamSession
     }
 
     /**
+     * Upgrades the upstream link before anything crosses it.
+     *
+     * @throws ConnectionException
+     */
+    public function ensureEncrypted(): void
+    {
+        // Re-issuing it on a connection already upgraded is an operations error the upstream answers by hanging up.
+        if (!$this->useStartTls || $this->client->isEncrypted()) {
+            return;
+        }
+
+        $this->client->startTls();
+    }
+
+    /**
      * Ends the upstream session so it cannot keep serving an identity the proxy no longer holds.
      */
     public function reset(): void
@@ -126,10 +141,7 @@ final class ProxyUpstreamSession
         #[SensitiveParameter]
         string $password,
     ): void {
-        // Re-issuing it on a connection already upgraded is an operations error the upstream answers by hanging up.
-        if ($this->useStartTls && !$this->client->isEncrypted()) {
-            $this->client->startTls();
-        }
+        $this->ensureEncrypted();
 
         $this->client->bind(
             $name,

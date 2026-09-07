@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Container;
+use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
@@ -147,6 +148,47 @@ class ContainerTest extends TestCase
     public function test_a_proxy_container_uses_the_proxy_protocol_factory(): void
     {
         $container = Container::forProxy(new ProxyOptions(new ProxyServerOptions()));
+
+        self::assertInstanceOf(
+            ProxyProtocolFactory::class,
+            $container->get(ServerProtocolFactoryInterface::class),
+        );
+    }
+
+    public function test_a_proxy_is_refused_when_it_requires_an_upstream_that_cannot_be_encrypted(): void
+    {
+        $container = Container::forProxy(new ProxyOptions(
+            serverOptions: new ProxyServerOptions(),
+            requireUpstreamConfidentiality: true,
+        ));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('The upstream connection is not encrypted.');
+
+        $container->get(ServerProtocolFactoryInterface::class);
+    }
+
+    public function test_a_proxy_requiring_upstream_confidentiality_accepts_an_upstream_using_start_tls(): void
+    {
+        $container = Container::forProxy(new ProxyOptions(
+            serverOptions: new ProxyServerOptions(),
+            useStartTls: true,
+            requireUpstreamConfidentiality: true,
+        ));
+
+        self::assertInstanceOf(
+            ProxyProtocolFactory::class,
+            $container->get(ServerProtocolFactoryInterface::class),
+        );
+    }
+
+    public function test_a_proxy_requiring_upstream_confidentiality_accepts_an_upstream_using_ldaps(): void
+    {
+        $container = Container::forProxy(new ProxyOptions(
+            serverOptions: new ProxyServerOptions(),
+            clientOptions: (new ClientOptions())->setUseSsl(true),
+            requireUpstreamConfidentiality: true,
+        ));
 
         self::assertInstanceOf(
             ProxyProtocolFactory::class,

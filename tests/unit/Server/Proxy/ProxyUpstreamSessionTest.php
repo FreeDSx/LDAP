@@ -86,6 +86,36 @@ final class ProxyUpstreamSessionTest extends TestCase
         );
     }
 
+    public function test_it_upgrades_the_link_before_anything_that_is_not_a_bind(): void
+    {
+        $this->client
+            ->expects(self::once())
+            ->method('startTls');
+
+        $this->makeSession(useStartTls: true)->ensureEncrypted();
+    }
+
+    public function test_it_leaves_the_link_alone_when_start_tls_is_not_configured(): void
+    {
+        $this->client
+            ->expects(self::never())
+            ->method('startTls');
+
+        $this->subject->ensureEncrypted();
+    }
+
+    public function test_it_does_not_upgrade_a_link_already_encrypted(): void
+    {
+        $this->client
+            ->method('isEncrypted')
+            ->willReturn(true);
+        $this->client
+            ->expects(self::never())
+            ->method('startTls');
+
+        $this->makeSession(useStartTls: true)->ensureEncrypted();
+    }
+
     public function test_it_reissues_a_bind_that_failed_on_the_transport(): void
     {
         $attempts = 0;

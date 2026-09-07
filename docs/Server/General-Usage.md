@@ -304,6 +304,9 @@ or `ProxyOptions` `useStartTls: true`), and the **downstream** hop on the `Proxy
 [setRequireConfidentiality](Configuration.md#setrequireconfidentiality), which refuses proxied binds that would
 otherwise carry a password to the proxy in the clear.
 
+`ProxyOptions` accepts `setRequireUpstreamConfidentiality`, which refuses to start the proxy unless the upstream hop
+uses LDAPS or StartTLS.
+
 **Note**: only simple and anonymous binds are proxied (SASL is not), and every request is forwarded to the
 single configured upstream.
 
