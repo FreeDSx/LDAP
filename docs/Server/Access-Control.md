@@ -455,6 +455,11 @@ the value, and denying the read does not stop the filter. Pair the two to get bo
 An extensible match that names no attribute type is refused with `inappropriateMatching`, since it asserts against
 every attribute at once and it's not possible to make attribute level ACL decisions against it.
 
+`entryDN`, `subschemaSubentry` and `hasSubordinates` are derived per read rather than stored. A read rule strips
+them from a result but does not stop a filter matching on them. `hasSubordinates` is the one worth thinking about: it
+reports whether an entry has children (including children the identity may not be able to see). Deny it with a filter
+rule if that matters to you.
+
 ## Confidential Attributes
 
 An attribute the schema marks `X-CONFIDENTIAL` is withheld from anyone without an explicit grant, both in results and
