@@ -56,7 +56,7 @@ interface PdoJournalDialectInterface
     public function queryJournalDeleteBelow(): string;
 
     /**
-     * `DELETE FROM ldap_change_journal WHERE created_at < ?`. Parameters: [cutoffUnixSeconds]
+     * `SELECT MIN(seq) FROM ldap_change_journal WHERE created_at >= ?`. Parameters: [cutoffUnixSeconds]
      */
-    public function queryJournalDeleteByAge(): string;
+    public function queryJournalAgeKeepFloor(): string;
 }

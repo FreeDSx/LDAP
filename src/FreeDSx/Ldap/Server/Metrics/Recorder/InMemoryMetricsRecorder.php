@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Metrics\Recorder;
 
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
+use FreeDSx\Ldap\Server\Metrics\Observation\JournalObservation;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\Observation\OperationObservation;
@@ -22,6 +23,7 @@ use FreeDSx\Ldap\Server\Metrics\Observation\TrafficObservation;
 use FreeDSx\Ldap\Server\Metrics\Rollup\MetricsDelta;
 use FreeDSx\Ldap\Server\Metrics\Rollup\MetricsRollupInterface;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\ConnectionMetrics;
+use FreeDSx\Ldap\Server\Metrics\Snapshot\JournalMetrics;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\LifecycleMetrics;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\MetricsSnapshot;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\OperationMetrics;
@@ -84,6 +86,16 @@ final class InMemoryMetricsRecorder implements MetricsRecorderInterface, Metrics
      * @var int<0, max>
      */
     private int $unavailable = 0;
+
+    /**
+     * @var int<0, max>
+     */
+    private int $journalPruneSuccesses = 0;
+
+    /**
+     * @var int<0, max>
+     */
+    private int $journalPruneFailures = 0;
 
     /**
      * @var array<string, int<0, max>>
@@ -192,6 +204,14 @@ final class InMemoryMetricsRecorder implements MetricsRecorderInterface, Metrics
         };
     }
 
+    public function journalObserved(JournalObservation $observation): void
+    {
+        match ($observation) {
+            JournalObservation::PruneSucceeded => $this->journalPruneSuccesses = $this->journalPruneSuccesses + 1,
+            JournalObservation::PruneFailed => $this->journalPruneFailures = $this->journalPruneFailures + 1,
+        };
+    }
+
     public function serverStarted(int $startedAt): void
     {
         $this->startedAt = $startedAt;
@@ -224,6 +244,10 @@ final class InMemoryMetricsRecorder implements MetricsRecorderInterface, Metrics
             $this->operationMetrics(),
             $this->operationsInProgress,
             $this->trafficMetrics(),
+            new JournalMetrics(
+                $this->journalPruneSuccesses,
+                $this->journalPruneFailures,
+            ),
         );
     }
 

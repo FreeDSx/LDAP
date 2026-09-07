@@ -83,11 +83,12 @@ trait PdoJournalDialectTrait
         SQL;
     }
 
-    public function queryJournalDeleteByAge(): string
+    public function queryJournalAgeKeepFloor(): string
     {
         return <<<SQL
-            DELETE FROM ldap_change_journal
-            WHERE created_at < ?
+            SELECT MIN(seq)
+            FROM ldap_change_journal
+            WHERE created_at >= ?
         SQL;
     }
 }

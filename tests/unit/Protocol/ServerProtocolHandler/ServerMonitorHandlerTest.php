@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerMonitorHandler;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
+use FreeDSx\Ldap\Server\Metrics\Observation\JournalObservation;
 use FreeDSx\Ldap\Server\Metrics\Observation\OperationObservation;
 use FreeDSx\Ldap\Server\Metrics\Observation\TrafficObservation;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
@@ -272,6 +273,24 @@ final class ServerMonitorHandlerTest extends TestCase
         self::assertSame(
             ['2'],
             $entry->get('connectionsProtocolErrors')?->getValues(),
+        );
+    }
+
+    public function test_it_reports_journal_retention_sweep_outcomes(): void
+    {
+        $this->metrics->journalObserved(JournalObservation::PruneSucceeded);
+        $this->metrics->journalObserved(JournalObservation::PruneFailed);
+        $this->metrics->journalObserved(JournalObservation::PruneFailed);
+
+        $entry = $this->handleAndCaptureEntry();
+
+        self::assertSame(
+            ['1'],
+            $entry->get('journalPruneSuccesses')?->getValues(),
+        );
+        self::assertSame(
+            ['2'],
+            $entry->get('journalPruneFailures')?->getValues(),
         );
     }
 

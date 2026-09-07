@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Metrics;
 
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
+use FreeDSx\Ldap\Server\Metrics\Observation\JournalObservation;
 use FreeDSx\Ldap\Server\Metrics\Observation\OperationObservation;
 use FreeDSx\Ldap\Server\Metrics\Observation\TrafficObservation;
 
@@ -41,6 +42,11 @@ interface MetricsRecorderInterface
     public function trafficObserved(TrafficObservation $observation): void;
 
     public function connectionObserved(ConnectionObservation $observation): void;
+
+    /**
+     * Records the outcome of a change-journal related operation.
+     */
+    public function journalObserved(JournalObservation $observation): void;
 
     /**
      * @param int $startedAt The server start time as a Unix timestamp.

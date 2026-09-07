@@ -16,10 +16,12 @@ namespace FreeDSx\Ldap\Server\Metrics\Recorder;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
+use FreeDSx\Ldap\Server\Metrics\Observation\JournalObservation;
 use FreeDSx\Ldap\Server\Metrics\Observation\OperationObservation;
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\Metrics\Observation\TrafficObservation;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\ConnectionMetrics;
+use FreeDSx\Ldap\Server\Metrics\Snapshot\JournalMetrics;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\LifecycleMetrics;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\MetricsSnapshot;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\OperationMetrics;
@@ -72,6 +74,10 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
     private const CONNECTIONS_PROTOCOL_ERRORS = 'conn.protocolErrors';
 
     private const CONNECTIONS_UNAVAILABLE = 'conn.unavailable';
+
+    private const JOURNAL_PRUNE_SUCCESSES = 'journal.pruneSuccesses';
+
+    private const JOURNAL_PRUNE_FAILURES = 'journal.pruneFailures';
 
     private const TRAFFIC_SENT = 'traffic.sent';
 
@@ -198,6 +204,14 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
         };
     }
 
+    public function journalObserved(JournalObservation $observation): void
+    {
+        match ($observation) {
+            JournalObservation::PruneSucceeded => $this->add(self::JOURNAL_PRUNE_SUCCESSES, 1),
+            JournalObservation::PruneFailed => $this->add(self::JOURNAL_PRUNE_FAILURES, 1),
+        };
+    }
+
     /**
      * Every worker reports the same start, so the first to record it wins rather than the last.
      */
@@ -284,6 +298,10 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
                 bytesSent: $this->get(self::TRAFFIC_SENT),
                 bytesReceived: $this->get(self::TRAFFIC_RECEIVED),
                 entriesReturned: $this->get(self::TRAFFIC_ENTRIES),
+            ),
+            journal: new JournalMetrics(
+                pruneSuccesses: $this->get(self::JOURNAL_PRUNE_SUCCESSES),
+                pruneFailures: $this->get(self::JOURNAL_PRUNE_FAILURES),
             ),
         );
     }
