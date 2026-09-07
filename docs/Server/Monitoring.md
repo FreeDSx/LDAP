@@ -55,6 +55,7 @@ off rather than returned empty.
 | `connectionsWriteTimeouts`, `connectionsIdleTimeouts` | Connections closed by the write or idle timeout. |
 | `connectionsRequestSizeExceeded` | Connections dropped because a request exceeded `setMaxRequestSize`. |
 | `connectionsProtocolErrors` | Connections dropped by a malformed/undecodable request PDU (Notice of Disconnection). |
+| `connectionsUnavailable` | Connections dropped because the connection the session depended on was lost (Notice of Disconnection). On a proxy this counts sessions ended with their upstream. |
 | `connectionsMax` | The configured connection limit (`0` is unlimited). |
 | `operationsCompleted`, `operationsFailed` | Total operations and the failed subset. |
 | `operationsByType` | Per-type counts, e.g. `search=1402, bind=210, add=8`. |

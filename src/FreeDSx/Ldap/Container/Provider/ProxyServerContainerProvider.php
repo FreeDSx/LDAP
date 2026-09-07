@@ -18,6 +18,9 @@ use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
 use FreeDSx\Ldap\Container\Contributor\ProxyListenerContributor;
 use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\ProxyServerOptions;
+use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
+use FreeDSx\Ldap\Server\Clock\Sleeper\CoroutineSleeper;
+use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\SwooleBackgroundTasks;
@@ -35,10 +38,26 @@ final class ProxyServerContainerProvider implements ContainerProviderInterface
     public function factories(): array
     {
         return [
-            ServerProtocolFactoryInterface::class => static fn(Container $c): ServerProtocolFactoryInterface => new ProxyProtocolFactory($c->get(ProxyOptions::class)),
+            ServerProtocolFactoryInterface::class => $this->makeProtocolFactory(...),
+            SleeperInterface::class => $this->makeSleeper(...),
             BackgroundTasksInterface::class => $this->makeBackgroundTasks(...),
             ListenerContributorInterface::class => static fn(): ListenerContributorInterface => new ProxyListenerContributor(),
         ];
+    }
+
+    private function makeProtocolFactory(Container $container): ServerProtocolFactoryInterface
+    {
+        return new ProxyProtocolFactory(
+            $container->get(ProxyOptions::class),
+            $container->get(SleeperInterface::class),
+        );
+    }
+
+    private function makeSleeper(Container $container): SleeperInterface
+    {
+        return $container->get(ProxyServerOptions::class)->isRunnerMode(RunnerMode::Swoole)
+            ? new CoroutineSleeper()
+            : new BlockingSleeper();
     }
 
     private function makeBackgroundTasks(Container $container): BackgroundTasksInterface

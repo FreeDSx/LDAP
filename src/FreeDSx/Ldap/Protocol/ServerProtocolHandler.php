@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\Exception\ConnectionException as LdapConnectionException;
 use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
@@ -118,6 +119,14 @@ readonly class ServerProtocolHandler
             # error. The NoticeOfDisconnectSent event records the specific reason.
             $this->sendNoticeOfDisconnect('The message could not be processed.');
             $closeReason = ConnectionObservation::ProtocolError;
+        } catch (LdapConnectionException $e) {
+            # The connection this session depended on is gone, which no result code can answer (RFC 4511 §4.4.1).
+            $this->sendNoticeOfDisconnect(
+                $e->getMessage(),
+                ResultCode::UNAVAILABLE,
+                $e,
+            );
+            $closeReason = ConnectionObservation::Unavailable;
         } catch (Throwable $e) {
             if ($this->queue->isConnected()) {
                 $this->sendNoticeOfDisconnect(cause: $e);

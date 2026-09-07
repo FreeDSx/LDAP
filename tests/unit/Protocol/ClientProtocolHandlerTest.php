@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Exception\NoticeOfDisconnectException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
@@ -28,6 +29,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
+use FreeDSx\Socket\Exception\IdleTimeoutException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Unit\FreeDSx\Ldap\TestFactoryTrait;
@@ -116,6 +118,57 @@ final class ClientProtocolHandlerTest extends TestCase
             ->willThrowException(new \FreeDSx\Socket\Exception\ConnectionException(
                 'foo',
             ));
+
+        $this->subject->send(new DeleteRequest('foo'));
+    }
+
+    public function test_it_should_raise_a_notice_of_disconnect_exception_when_the_peer_ends_the_session(): void
+    {
+        $this->expectException(NoticeOfDisconnectException::class);
+
+        $this->mockRequestHandler
+            ->expects($this->any())
+            ->method('handleRequest')
+            ->willThrowException(
+                new UnsolicitedNotificationException(
+                    'foo',
+                    0,
+                    null,
+                    ExtendedResponse::OID_NOTICE_OF_DISCONNECTION,
+                ),
+            );
+
+        $this->subject->send(new DeleteRequest('foo'));
+    }
+
+    public function test_it_should_close_the_queue_on_a_transport_failure_so_the_next_request_reconnects(): void
+    {
+        $this->expectException(ConnectionException::class);
+
+        $this->mockRequestHandler
+            ->expects($this->any())
+            ->method('handleRequest')
+            ->willThrowException(new \FreeDSx\Socket\Exception\ConnectionException('foo'));
+
+        $this->mockQueue
+            ->expects($this->once())
+            ->method('close');
+
+        $this->subject->send(new DeleteRequest('foo'));
+    }
+
+    public function test_it_should_keep_the_queue_open_when_only_the_read_timed_out(): void
+    {
+        $this->expectException(ConnectionException::class);
+
+        $this->mockRequestHandler
+            ->expects($this->any())
+            ->method('handleRequest')
+            ->willThrowException(new IdleTimeoutException('foo'));
+
+        $this->mockQueue
+            ->expects($this->never())
+            ->method('close');
 
         $this->subject->send(new DeleteRequest('foo'));
     }

@@ -46,6 +46,7 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
     public function __construct(
         private LdapClient $client,
         private ServerQueue $queue,
+        private ProxyUpstreamSession $session,
         private ResponseFactory $responseFactory = new ResponseFactory(),
     ) {}
 
@@ -114,6 +115,7 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
 
     /**
      * @param array<int, Control> $controls
+     * @throws ConnectionException When a bound session loses the upstream identity it was answering for.
      * @throws OperationException
      */
     private function sendUpstream(
@@ -125,7 +127,13 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
                 $request,
                 ...$controls,
             );
-        } catch (ConnectionException) {
+        } catch (ConnectionException $e) {
+            // Reconnecting returns an anonymous session
+            // Ending it beats answering as an identity we no longer are.
+            if ($this->session->isBound()) {
+                throw $e;
+            }
+
             throw new OperationException(
                 'The upstream LDAP server is unavailable.',
                 ResultCode::UNAVAILABLE,

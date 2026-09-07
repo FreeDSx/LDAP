@@ -28,6 +28,8 @@ use FreeDSx\Ldap\Server\Middleware\BindMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ConfidentialityMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareChain;
+use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
+use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Middleware\RequestValidationMiddleware;
 use FreeDSx\Ldap\Server\ServerConnectionScaffoldingTrait;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
@@ -47,6 +49,7 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
 
     public function __construct(
         private readonly ProxyOptions $proxyOptions,
+        private readonly SleeperInterface $sleeper = new BlockingSleeper(),
     ) {
         $this->options = $proxyOptions->getServerOptions();
     }
@@ -59,14 +62,16 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
         $eventLogger = $this->makeEventLogger($context);
         $upstream = new LdapClient($this->proxyOptions->getClientOptions());
         $serverAuthorization = new ServerAuthorization($this->options);
+        $session = new ProxyUpstreamSession(
+            client: $upstream,
+            useStartTls: $this->proxyOptions->getUseStartTls(),
+            sleeper: $this->sleeper,
+        );
 
         $authenticators = [
             new SimpleBind(
                 queue: $queue,
-                authenticator: new ProxyAuthenticator(
-                    $upstream,
-                    $this->proxyOptions->getUseStartTls(),
-                ),
+                authenticator: new ProxyAuthenticator($session),
                 eventLogger: $eventLogger,
             ),
             $this->makeAnonymousBind(
@@ -82,6 +87,10 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
                 new ConfidentialityMiddleware(
                     $this->options,
                     $queue,
+                ),
+                new ProxyBindResetMiddleware(
+                    $serverAuthorization,
+                    $session,
                 ),
                 new BindMiddleware(
                     $serverAuthorization,
@@ -101,6 +110,7 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
                 new ProxyRequestForwarder(
                     $upstream,
                     $queue,
+                    $session,
                 ),
                 new ResponseWriter($queue),
             ),

@@ -17,6 +17,7 @@ use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Exception\NoticeOfDisconnectException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
@@ -25,6 +26,7 @@ use FreeDSx\Ldap\Protocol\Factory\ClientProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueue;
 use FreeDSx\Ldap\Protocol\Queue\ClientQueueInstantiator;
 use FreeDSx\Socket\Exception\ConnectionException as SocketException;
+use FreeDSx\Socket\Exception\IdleTimeoutException;
 
 /**
  * Handles client specific protocol communication details.
@@ -78,7 +80,7 @@ class ClientProtocolHandler
             if ($exception->isNoticeOfDisconnection()) {
                 $this->queue()->close();
 
-                throw new ConnectionException(
+                throw new NoticeOfDisconnectException(
                     sprintf(
                         'The remote server has disconnected the session. %s',
                         $exception->getMessage(),
@@ -89,6 +91,11 @@ class ClientProtocolHandler
 
             throw $exception;
         } catch (SocketException $exception) {
+            // A read timeout leaves the socket usable, unlike a transport failure.
+            if (!$exception instanceof IdleTimeoutException) {
+                $this->queue?->close();
+            }
+
             throw new ConnectionException(
                 $exception->getMessage(),
                 $exception->getCode(),

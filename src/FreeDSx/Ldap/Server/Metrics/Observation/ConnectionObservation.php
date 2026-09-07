@@ -33,4 +33,6 @@ enum ConnectionObservation: string
     case RequestSizeExceeded = 'request_size_exceeded';
 
     case ProtocolError = 'protocol_error';
+
+    case Unavailable = 'unavailable';
 }

@@ -71,6 +71,8 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
 
     private const CONNECTIONS_PROTOCOL_ERRORS = 'conn.protocolErrors';
 
+    private const CONNECTIONS_UNAVAILABLE = 'conn.unavailable';
+
     private const TRAFFIC_SENT = 'traffic.sent';
 
     private const TRAFFIC_RECEIVED = 'traffic.received';
@@ -192,6 +194,7 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
             ConnectionObservation::IdleTimeout => $this->add(self::CONNECTIONS_IDLE_TIMEOUTS, 1),
             ConnectionObservation::RequestSizeExceeded => $this->add(self::CONNECTIONS_REQUEST_SIZE, 1),
             ConnectionObservation::ProtocolError => $this->add(self::CONNECTIONS_PROTOCOL_ERRORS, 1),
+            ConnectionObservation::Unavailable => $this->add(self::CONNECTIONS_UNAVAILABLE, 1),
         };
     }
 
@@ -266,6 +269,7 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
                 idleTimeouts: $this->get(self::CONNECTIONS_IDLE_TIMEOUTS),
                 requestSizeExceeded: $this->get(self::CONNECTIONS_REQUEST_SIZE),
                 protocolErrors: $this->get(self::CONNECTIONS_PROTOCOL_ERRORS),
+                unavailable: $this->get(self::CONNECTIONS_UNAVAILABLE),
             ),
             operations: new OperationMetrics(
                 counts: $counts,
