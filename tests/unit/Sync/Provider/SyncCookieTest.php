@@ -147,6 +147,14 @@ final class SyncCookieTest extends TestCase
         );
     }
 
+    public function test_the_content_key_ignores_the_case_and_spacing_of_the_base_dn(): void
+    {
+        self::assertSame(
+            SyncCookie::contentKey($this->request()->base('dc=example,dc=com')),
+            SyncCookie::contentKey($this->request()->base('DC=example, DC=com')),
+        );
+    }
+
     private function request(): SearchRequest
     {
         return (new SearchRequest(Filters::present('objectClass')))

@@ -106,7 +106,12 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
             ? $this->fullRefreshEntries($message, $request, $token, $state)
             : $this->incrementalEntries($message, $request, $token, $streamer, $sinceSeq, $state);
 
-        $cookie = (new SyncCookie($stream->origin(), $latestSeq, $contentKey))->encode();
+        $cookie = (new SyncCookie(
+            $stream->origin(),
+            $latestSeq,
+            $contentKey,
+            $stream->generation(),
+        ))->encode();
         $outcome = fn(): SearchOperationResult => SearchOperationResult::success(
             $message,
             $state->entriesReturned,
@@ -368,6 +373,11 @@ final class ServerSyncHandler implements ServerProtocolHandlerInterface
         }
 
         if (!$decoded->origin->equals($stream->origin()) || $decoded->seq > $latestSeq) {
+            return null;
+        }
+
+        // A rebuilt provider reissues the same seq numbering over different data.
+        if (!hash_equals($decoded->generation, $stream->generation())) {
             return null;
         }
 

@@ -91,4 +91,22 @@ trait PdoJournalDialectTrait
             WHERE created_at >= ?
         SQL;
     }
+
+    public function queryJournalGenerationRead(): string
+    {
+        return <<<SQL
+            SELECT generation
+            FROM ldap_change_journal_seq
+            WHERE id = 1
+        SQL;
+    }
+
+    public function queryJournalGenerationClaim(): string
+    {
+        return <<<SQL
+            UPDATE ldap_change_journal_seq
+            SET generation = ?
+            WHERE id = 1 AND generation = ''
+        SQL;
+    }
 }

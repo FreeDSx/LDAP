@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnecti
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoChangeJournal;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoJournalGeneration;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use PDO;
 use Tests\Support\FreeDSx\Ldap\Journal\JournalConcurrencyTestCase;
@@ -59,13 +60,19 @@ final class PdoChangeJournalConcurrencyTest extends JournalConcurrencyTestCase
         $dialect = new SqliteDialect();
         $provider = new SharedPdoConnectionProvider($this->connect());
 
+        $statements = new PdoStatementPool($provider);
+
         return new PdoChangeJournal(
             new PdoTransactor(
                 $provider,
                 $dialect,
             ),
             $dialect,
-            new PdoStatementPool($provider),
+            $statements,
+            new PdoJournalGeneration(
+                $dialect,
+                $statements,
+            ),
             new ReplicaId('node'),
         );
     }

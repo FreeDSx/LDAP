@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoChangeJournal;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoJournalGeneration;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use PDO;
@@ -40,24 +41,13 @@ final class PdoChangeJournalTest extends TestCase
 
     private FrozenClock $clock;
 
+    private PDO $pdo;
+
     protected function setUp(): void
     {
         $this->clock = FrozenClock::fromString('2025-05-15T12:00:00');
-        $pdo = new PDO('sqlite::memory:');
-        $dialect = new SqliteDialect();
-        PdoStorage::initialize($pdo, $dialect);
-        $provider = new SharedPdoConnectionProvider($pdo);
-
-        $this->subject = new PdoChangeJournal(
-            new PdoTransactor(
-                $provider,
-                $dialect,
-            ),
-            $dialect,
-            new PdoStatementPool($provider),
-            new ReplicaId('node-a'),
-            $this->clock,
-        );
+        $this->pdo = new PDO('sqlite::memory:');
+        $this->subject = $this->journalOn($this->pdo);
     }
 
     public function test_it_allocates_strictly_increasing_seq_numbers(): void
@@ -311,10 +301,15 @@ final class PdoChangeJournalTest extends TestCase
             $provider,
             $dialect,
         );
+        $statements = new PdoStatementPool($provider);
         $journal = new PdoChangeJournal(
             $transactor,
             $dialect,
-            new PdoStatementPool($provider),
+            $statements,
+            new PdoJournalGeneration(
+                $dialect,
+                $statements,
+            ),
             new ReplicaId('node-a'),
             $this->clock,
         );
@@ -335,6 +330,59 @@ final class PdoChangeJournalTest extends TestCase
         self::assertCount(
             1,
             iterator_to_array($journal->read()),
+        );
+    }
+
+    public function test_the_generation_is_minted_once_and_stable_for_the_same_database(): void
+    {
+        $first = $this->subject->generation();
+
+        self::assertNotSame(
+            '',
+            $first,
+        );
+        self::assertSame(
+            $first,
+            $this->subject->generation(),
+        );
+        self::assertSame(
+            $first,
+            $this->journalOn($this->pdo)->generation(),
+        );
+    }
+
+    public function test_a_rebuilt_database_does_not_reuse_the_generation_it_replaced(): void
+    {
+        $original = $this->subject->generation();
+
+        $rebuilt = $this->journalOn(new PDO('sqlite::memory:'));
+
+        self::assertNotSame(
+            $original,
+            $rebuilt->generation(),
+        );
+    }
+
+    private function journalOn(PDO $pdo): PdoChangeJournal
+    {
+        $dialect = new SqliteDialect();
+        PdoStorage::initialize($pdo, $dialect);
+        $provider = new SharedPdoConnectionProvider($pdo);
+        $statements = new PdoStatementPool($provider);
+
+        return new PdoChangeJournal(
+            new PdoTransactor(
+                $provider,
+                $dialect,
+            ),
+            $dialect,
+            $statements,
+            new PdoJournalGeneration(
+                $dialect,
+                $statements,
+            ),
+            new ReplicaId('node-a'),
+            $this->clock,
         );
     }
 

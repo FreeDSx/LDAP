@@ -67,6 +67,13 @@ interface ChangeJournalInterface
     public function origin(): ReplicaId;
 
     /**
+     * Identifies the data this journal was built over.
+     *
+     * @api
+     */
+    public function generation(): string;
+
+    /**
      * Whether appends are observable from a separate OS process.
      *
      * @api

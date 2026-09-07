@@ -41,8 +41,9 @@ CREATE TABLE IF NOT EXISTS ldap_change_journal (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS ldap_change_journal_seq (
-    id   INT NOT NULL,
-    seq  BIGINT NOT NULL DEFAULT 0,
+    id         INT NOT NULL,
+    seq        BIGINT NOT NULL DEFAULT 0,
+    generation VARCHAR(64) NOT NULL DEFAULT '',
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

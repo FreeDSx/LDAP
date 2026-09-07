@@ -66,6 +66,18 @@ final class PooledStatement
             : null;
     }
 
+    /**
+     * The first column of the next row or null
+     */
+    public function fetchStringColumn(): ?string
+    {
+        $value = $this->statement->fetchColumn();
+
+        return is_scalar($value)
+            ? (string) $value
+            : null;
+    }
+
     public function rowCount(): int
     {
         return $this->statement->rowCount();

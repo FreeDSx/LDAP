@@ -40,6 +40,7 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
         private PdoTransactor $transactor,
         private PdoJournalDialectInterface $dialect,
         private PdoStatementPool $statements,
+        private PdoJournalGeneration $generation,
         private ReplicaId $origin = new ReplicaId(),
         private ClockInterface $clock = new SystemClock(),
     ) {}
@@ -129,6 +130,11 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
     public function origin(): ReplicaId
     {
         return $this->origin;
+    }
+
+    public function generation(): string
+    {
+        return $this->generation->value();
     }
 
     public function sharesAcrossProcesses(): bool

@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoChangeJournal;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoJournalGeneration;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
@@ -127,6 +128,10 @@ final readonly class PdoStorageFactory
                     $transactor,
                     $this->dialect,
                     $statements,
+                    new PdoJournalGeneration(
+                        $this->dialect,
+                        $statements,
+                    ),
                     $this->origin,
                 ),
                 $this->journalConfig,
