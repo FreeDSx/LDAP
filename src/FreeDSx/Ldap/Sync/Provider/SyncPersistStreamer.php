@@ -112,6 +112,7 @@ final readonly class SyncPersistStreamer
     ): Generator {
         $lastSeq = $startSeq;
         $origin = $this->stream->origin();
+        $generation = $this->stream->generation();
         $contentKey = SyncCookie::contentKey($request);
 
         while (true) {
@@ -132,7 +133,12 @@ final readonly class SyncPersistStreamer
             // Advances the client cookie, and doubles as a keepalive that surfaces a dead peer on the next poll.
             yield new LdapMessageResponse(
                 $messageId,
-                new SyncNewCookie((new SyncCookie($origin, $lastSeq, $contentKey))->encode()),
+                new SyncNewCookie((new SyncCookie(
+                    $origin,
+                    $lastSeq,
+                    $contentKey,
+                    $generation,
+                ))->encode()),
             );
 
             $signal = $cancellation->signal();
@@ -146,6 +152,7 @@ final readonly class SyncPersistStreamer
                         $origin,
                         $lastSeq,
                         $contentKey,
+                        $generation,
                     );
                 }
 
@@ -233,12 +240,18 @@ final readonly class SyncPersistStreamer
         ReplicaId $origin,
         int $lastSeq,
         string $contentKey,
+        string $generation,
     ): Generator {
         yield new LdapMessageResponse(
             $messageId,
             new SearchResultDone(ResultCode::CANCELED),
             new SyncDoneControl(
-                (new SyncCookie($origin, $lastSeq, $contentKey))->encode(),
+                (new SyncCookie(
+                    $origin,
+                    $lastSeq,
+                    $contentKey,
+                    $generation,
+                ))->encode(),
                 true,
             ),
         );

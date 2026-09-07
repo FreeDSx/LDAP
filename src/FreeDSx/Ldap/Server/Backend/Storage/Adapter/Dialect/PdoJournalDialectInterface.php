@@ -59,4 +59,16 @@ interface PdoJournalDialectInterface
      * `SELECT MIN(seq) FROM ldap_change_journal WHERE created_at >= ?`. Parameters: [cutoffUnixSeconds]
      */
     public function queryJournalAgeKeepFloor(): string;
+
+    /**
+     * `SELECT generation FROM ldap_change_journal_seq WHERE id = 1`.
+     */
+    public function queryJournalGenerationRead(): string;
+
+    /**
+     * Claims the generation only while it is unset, so concurrent minters settle on one.
+     *
+     * Parameters: [generation]
+     */
+    public function queryJournalGenerationClaim(): string;
 }

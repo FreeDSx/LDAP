@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\Clock\SystemClock;
+use FreeDSx\Ldap\Server\Utility\Uuid;
 
 /**
  * Array-backed change journal. Used for in-process runners.
@@ -32,10 +33,14 @@ final class InMemoryChangeJournal implements ChangeJournalInterface
 
     private int $seq = 0;
 
+    private readonly string $generation;
+
     public function __construct(
         private readonly ReplicaId $origin = new ReplicaId(),
         private readonly ClockInterface $clock = new SystemClock(),
-    ) {}
+    ) {
+        $this->generation = Uuid::v4();
+    }
 
     public function append(PendingChange $change): ChangeRecord
     {
@@ -78,6 +83,11 @@ final class InMemoryChangeJournal implements ChangeJournalInterface
     public function origin(): ReplicaId
     {
         return $this->origin;
+    }
+
+    public function generation(): string
+    {
+        return $this->generation;
     }
 
     public function sharesAcrossProcesses(): bool

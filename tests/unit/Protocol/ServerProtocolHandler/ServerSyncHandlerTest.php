@@ -296,6 +296,15 @@ final class ServerSyncHandlerTest extends TestCase
             ))->encode(),
             false,
         ];
+        yield 'cookie issued against a provider rebuilt since' => [
+            (new SyncCookie(
+                new ReplicaId(self::ORIGIN),
+                0,
+                $content,
+                'a-generation-this-journal-never-had',
+            ))->encode(),
+            false,
+        ];
     }
 
     public function test_a_valid_cookie_streams_the_delta_as_modifies_and_deletes(): void
@@ -575,6 +584,7 @@ final class ServerSyncHandlerTest extends TestCase
             new ReplicaId(self::ORIGIN),
             $seq,
             SyncCookie::contentKey(self::searchRequest()),
+            $this->journal->generation(),
         ))->encode();
     }
 

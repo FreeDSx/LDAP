@@ -43,8 +43,9 @@ CREATE INDEX IF NOT EXISTS idx_journal_lc_dn ON ldap_change_journal (lc_dn);
 CREATE INDEX IF NOT EXISTS idx_journal_lc_parent_dn ON ldap_change_journal (lc_parent_dn);
 
 CREATE TABLE IF NOT EXISTS ldap_change_journal_seq (
-    id   INTEGER NOT NULL PRIMARY KEY,
-    seq  INTEGER NOT NULL DEFAULT 0
+    id         INTEGER NOT NULL PRIMARY KEY,
+    seq        INTEGER NOT NULL DEFAULT 0,
+    generation TEXT NOT NULL DEFAULT ''
 );
 
 INSERT OR IGNORE INTO ldap_change_journal_seq (id, seq) VALUES (1, 0);

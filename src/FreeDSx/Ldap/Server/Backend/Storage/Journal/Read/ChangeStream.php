@@ -79,6 +79,14 @@ final readonly class ChangeStream
     }
 
     /**
+     * Identifies the data this journal was built over.
+     */
+    public function generation(): string
+    {
+        return $this->journal->generation();
+    }
+
+    /**
      * A move is judged at both ends, since one leaving the scope is only tellable from where it used to be.
      */
     private function touchesScope(

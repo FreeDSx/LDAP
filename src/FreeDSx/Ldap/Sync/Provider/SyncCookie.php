@@ -32,12 +32,13 @@ final readonly class SyncCookie
     /**
      * Encoding version; bumped if the blob grows (e.g. a per-origin vector for multi-master).
      */
-    private const VERSION = 2;
+    private const VERSION = 1;
 
     public function __construct(
         public ReplicaId $origin,
         public int $seq,
         public string $content = '',
+        public string $generation = '',
     ) {
         if ($this->seq < 0) {
             throw new InvalidArgumentException('A sync cookie seq cannot be negative.');
@@ -59,7 +60,7 @@ final readonly class SyncCookie
         sort($attributes);
 
         return hash('sha256', implode("\0", [
-            (string) $request->getBaseDn(),
+            (string) $request->getBaseDn()?->normalize(),
             (string) $request->getScope(),
             (string) $request->getDereferenceAliases(),
             $request->getAttributesOnly() ? '1' : '0',
@@ -76,6 +77,7 @@ final readonly class SyncCookie
                 'origin' => (string) $this->origin,
                 'seq' => $this->seq,
                 'content' => $this->content,
+                'generation' => $this->generation,
             ],
             JSON_THROW_ON_ERROR,
         ));
@@ -112,6 +114,7 @@ final readonly class SyncCookie
         $origin = $data['origin'] ?? null;
         $seq = $data['seq'] ?? null;
         $content = $data['content'] ?? null;
+        $generation = $data['generation'] ?? null;
 
         if (!is_string($origin) || $origin === '' || !is_int($seq) || $seq < 0) {
             throw new MalformedSyncCookieException('The sync cookie is missing a valid origin or seq.');
@@ -121,10 +124,15 @@ final readonly class SyncCookie
             throw new MalformedSyncCookieException('The sync cookie is missing its content key.');
         }
 
+        if (!is_string($generation)) {
+            throw new MalformedSyncCookieException('The sync cookie is missing its generation.');
+        }
+
         return new self(
             new ReplicaId($origin),
             $seq,
             $content,
+            $generation,
         );
     }
 }
