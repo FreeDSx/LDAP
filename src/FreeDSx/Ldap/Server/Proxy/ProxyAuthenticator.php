@@ -17,7 +17,6 @@ use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslIdentity;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
@@ -33,8 +32,7 @@ use SensitiveParameter;
 final readonly class ProxyAuthenticator implements PasswordAuthenticatableInterface
 {
     public function __construct(
-        private LdapClient $client,
-        private bool $useStartTls = false,
+        private ProxyUpstreamSession $session,
     ) {}
 
     public function authenticate(
@@ -43,12 +41,7 @@ final readonly class ProxyAuthenticator implements PasswordAuthenticatableInterf
         string $password,
     ): AuthenticatedTokenInterface {
         try {
-            // Re-issuing it on a connection already upgraded is an operations error the upstream answers by hanging up.
-            if ($this->useStartTls && !$this->client->isEncrypted()) {
-                $this->client->startTls();
-            }
-
-            $this->client->bind(
+            $this->session->bind(
                 $name,
                 $password,
             );

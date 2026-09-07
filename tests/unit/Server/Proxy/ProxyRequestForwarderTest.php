@@ -31,6 +31,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Proxy\ProxyRequestForwarder;
+use FreeDSx\Ldap\Server\Proxy\ProxyUpstreamSession;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -43,6 +44,8 @@ final class ProxyRequestForwarderTest extends TestCase
     private ServerQueue&MockObject $queue;
 
     private TokenInterface&MockObject $token;
+
+    private ProxyUpstreamSession $session;
 
     private ProxyRequestForwarder $subject;
 
@@ -68,9 +71,11 @@ final class ProxyRequestForwarderTest extends TestCase
                 return $this->queue;
             });
 
+        $this->session = new ProxyUpstreamSession($this->client);
         $this->subject = new ProxyRequestForwarder(
             $this->client,
             $this->queue,
+            $this->session,
         );
     }
 

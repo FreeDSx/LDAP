@@ -28,6 +28,7 @@ final readonly class ConnectionMetrics
         public int $idleTimeouts = 0,
         public int $requestSizeExceeded = 0,
         public int $protocolErrors = 0,
+        public int $unavailable = 0,
     ) {}
 
     /**
@@ -43,6 +44,7 @@ final readonly class ConnectionMetrics
             'idle_timeouts' => $this->idleTimeouts,
             'request_size_exceeded' => $this->requestSizeExceeded,
             'protocol_errors' => $this->protocolErrors,
+            'unavailable' => $this->unavailable,
         ];
     }
 
@@ -59,6 +61,7 @@ final readonly class ConnectionMetrics
             idleTimeouts: SnapshotValue::toInt($data['idle_timeouts'] ?? null),
             requestSizeExceeded: SnapshotValue::toInt($data['request_size_exceeded'] ?? null),
             protocolErrors: SnapshotValue::toInt($data['protocol_errors'] ?? null),
+            unavailable: SnapshotValue::toInt($data['unavailable'] ?? null),
         );
     }
 }

@@ -81,6 +81,11 @@ final class InMemoryMetricsRecorder implements MetricsRecorderInterface, Metrics
     private int $protocolErrors = 0;
 
     /**
+     * @var int<0, max>
+     */
+    private int $unavailable = 0;
+
+    /**
      * @var array<string, int<0, max>>
      */
     private array $operationCounts = [];
@@ -183,6 +188,7 @@ final class InMemoryMetricsRecorder implements MetricsRecorderInterface, Metrics
             ConnectionObservation::IdleTimeout => $this->idleTimeouts++,
             ConnectionObservation::RequestSizeExceeded => $this->requestSizeExceeded++,
             ConnectionObservation::ProtocolError => $this->protocolErrors++,
+            ConnectionObservation::Unavailable => $this->unavailable++,
         };
     }
 
@@ -213,6 +219,7 @@ final class InMemoryMetricsRecorder implements MetricsRecorderInterface, Metrics
                 $this->idleTimeouts,
                 $this->requestSizeExceeded,
                 $this->protocolErrors,
+                $this->unavailable,
             ),
             $this->operationMetrics(),
             $this->operationsInProgress,

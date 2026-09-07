@@ -275,6 +275,19 @@ final class ServerMonitorHandlerTest extends TestCase
         );
     }
 
+    public function test_it_reports_connections_closed_by_a_lost_dependency(): void
+    {
+        $this->metrics->connectionObserved(ConnectionObservation::Unavailable);
+        $this->metrics->connectionObserved(ConnectionObservation::Unavailable);
+
+        $entry = $this->handleAndCaptureEntry();
+
+        self::assertSame(
+            ['2'],
+            $entry->get('connectionsUnavailable')?->getValues(),
+        );
+    }
+
     public function test_it_reports_traffic_totals(): void
     {
         $this->metrics->trafficObserved(new TrafficObservation(

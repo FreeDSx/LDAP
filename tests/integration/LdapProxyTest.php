@@ -18,8 +18,12 @@ use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
+use Tests\Support\FreeDSx\Ldap\TestWorker;
 
 final class LdapProxyTest extends ServerTestCase
 {
@@ -157,5 +161,84 @@ final class LdapProxyTest extends ServerTestCase
             'dn:cn=user,dc=foo,dc=bar',
             $this->ldapClient()->whoami(),
         );
+    }
+
+    public function testARefusedBindLeavesTheUpstreamSessionAnonymous(): void
+    {
+        $this->authenticateAdmin();
+        self::assertSame(
+            'dn:cn=admin,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+
+        try {
+            $this->ldapClient()->send(Operations::bindAnonymously());
+            self::fail('The proxy was expected to refuse an anonymous bind.');
+        } catch (BindException) {
+        }
+
+        self::assertNull($this->ldapClient()->whoami());
+    }
+
+    public function testLosingTheUpstreamEndsTheProxiedSession(): void
+    {
+        $this->authenticateAdmin();
+        self::assertNotEmpty($this->ldapClient()->search(
+            Operations::search(Filters::equal('objectClass', 'inetOrgPerson'))
+                ->base('dc=foo,dc=bar'),
+        )->toArray());
+
+        self::killUpstreamConnections();
+
+        try {
+            $this->ldapClient()->whoami();
+            self::fail('The proxy was expected to end the session with its upstream.');
+        } catch (ConnectionException $e) {
+            self::assertSame(
+                ResultCode::UNAVAILABLE,
+                $e->getCode(),
+            );
+        }
+    }
+
+    public function testTheClientCanRebuildASessionTheUpstreamEnded(): void
+    {
+        $this->authenticateAdmin();
+        self::killUpstreamConnections();
+
+        try {
+            $this->ldapClient()->whoami();
+        } catch (ConnectionException) {
+        }
+
+        $this->authenticateAdmin();
+
+        self::assertSame(
+            'dn:cn=admin,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
+    /**
+     * Ends the forked upstream sessions while leaving its listener accepting, so only the proxied hop is lost.
+     */
+    private static function killUpstreamConnections(): void
+    {
+        $pattern = sprintf(
+            'ldap-server.php.*--port=%d',
+            TestWorker::port(TestWorker::OFFSET_UPSTREAM),
+        );
+        exec(
+            sprintf('pgrep -f %s', escapeshellarg($pattern)),
+            $pids,
+        );
+        sort($pids);
+
+        // The listener is the oldest of them, and every process forked from it is holding a proxied connection.
+        foreach (array_slice($pids, 1) as $pid) {
+            posix_kill((int) $pid, SIGKILL);
+        }
+
+        usleep(300_000);
     }
 }
