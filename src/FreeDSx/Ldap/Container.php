@@ -123,6 +123,7 @@ class Container
                             : throw new RuntimeException('A proxy server can only reload into ProxyServerOptions.'),
                         $options->getClientOptions(),
                         $options->getUseStartTls(),
+                        $options->getRequireUpstreamConfidentiality(),
                     ),
                     $shared,
                 ),

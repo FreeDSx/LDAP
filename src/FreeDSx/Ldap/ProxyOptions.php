@@ -26,6 +26,7 @@ final class ProxyOptions
         private ProxyServerOptions $serverOptions,
         private ClientOptions $clientOptions = new ClientOptions(),
         private bool $useStartTls = false,
+        private bool $requireUpstreamConfidentiality = false,
     ) {}
 
     /**
@@ -62,6 +63,21 @@ final class ProxyOptions
     public function setUseStartTls(bool $useStartTls): self
     {
         $this->useStartTls = $useStartTls;
+
+        return $this;
+    }
+
+    /**
+     * Whether the proxy refuses to start unless the upstream hop is encrypted.
+     */
+    public function getRequireUpstreamConfidentiality(): bool
+    {
+        return $this->requireUpstreamConfidentiality;
+    }
+
+    public function setRequireUpstreamConfidentiality(bool $requireUpstreamConfidentiality): self
+    {
+        $this->requireUpstreamConfidentiality = $requireUpstreamConfidentiality;
 
         return $this;
     }

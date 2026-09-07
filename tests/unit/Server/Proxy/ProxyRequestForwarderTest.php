@@ -79,6 +79,33 @@ final class ProxyRequestForwarderTest extends TestCase
         );
     }
 
+    public function test_it_upgrades_the_upstream_link_before_forwarding_anything(): void
+    {
+        $forwarder = new ProxyRequestForwarder(
+            $this->client,
+            $this->queue,
+            new ProxyUpstreamSession(
+                client: $this->client,
+                useStartTls: true,
+            ),
+        );
+        $this->client
+            ->method('sendAndReceive')
+            ->willReturn(new LdapMessageResponse(
+                99,
+                new DeleteResponse(ResultCode::SUCCESS),
+            ));
+
+        $this->client
+            ->expects(self::once())
+            ->method('startTls');
+
+        $forwarder->handle($this->contextFor(
+            7,
+            new DeleteRequest('cn=foo,dc=bar'),
+        ));
+    }
+
     public function test_it_relays_a_single_response_under_the_original_message_id(): void
     {
         $this->client

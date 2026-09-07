@@ -219,6 +219,38 @@ final class LdapProxyTest extends ServerTestCase
         );
     }
 
+    public function testItProtectsTheUpstreamHopBeforeForwardingAnythingUnbound(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            [
+                '--upstream-start-tls',
+                '--upstream-require-confidentiality=all',
+            ],
+        );
+
+        // The upstream refuses every unprotected operation, so an answer at all proves the hop was upgraded first.
+        self::assertNull($this->ldapClient()->whoami());
+    }
+
+    public function testItProtectsTheUpstreamHopForABindThatFollowsNoOtherOperation(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            [
+                '--upstream-start-tls',
+                '--upstream-require-confidentiality=all',
+            ],
+        );
+
+        $this->authenticateAdmin();
+
+        self::assertSame(
+            'dn:cn=admin,dc=foo,dc=bar',
+            $this->ldapClient()->whoami(),
+        );
+    }
+
     /**
      * Ends the forked upstream sessions while leaving its listener accepting, so only the proxied hop is lost.
      */

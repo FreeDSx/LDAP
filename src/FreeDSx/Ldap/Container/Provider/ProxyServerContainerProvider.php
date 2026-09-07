@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Container\Provider;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
 use FreeDSx\Ldap\Container\Contributor\ProxyListenerContributor;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\ProxyServerOptions;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
@@ -47,9 +48,27 @@ final class ProxyServerContainerProvider implements ContainerProviderInterface
 
     private function makeProtocolFactory(Container $container): ServerProtocolFactoryInterface
     {
+        $options = $container->get(ProxyOptions::class);
+        self::assertUpstreamIsConfidentialIfRequired($options);
+
         return new ProxyProtocolFactory(
-            $container->get(ProxyOptions::class),
+            $options,
             $container->get(SleeperInterface::class),
+        );
+    }
+
+    private static function assertUpstreamIsConfidentialIfRequired(ProxyOptions $options): void
+    {
+        if (!$options->getRequireUpstreamConfidentiality()) {
+            return;
+        }
+
+        if ($options->getClientOptions()->isUseSsl() || $options->getUseStartTls()) {
+            return;
+        }
+
+        throw new RuntimeException(
+            'The upstream connection is not encrypted. Set useSsl or useStartTls on it, or unset requireUpstreamConfidentiality.',
         );
     }
 
