@@ -14,8 +14,11 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server;
 
 use FreeDSx\Ldap\Protocol\Bind\AnonymousBind;
+use FreeDSx\Ldap\Protocol\DisconnectSender;
+use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseInterceptor;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Protocol\SessionEndPolicy;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
@@ -45,6 +48,21 @@ trait ServerConnectionScaffoldingTrait
             maxReceiveSize: $this->serverOptions()->getNetworkConfig()->getMaxRequestSize(),
             interceptors: $interceptors,
             metricsRecorder: $metricsRecorder,
+        );
+    }
+
+    private function makeSessionEndPolicy(
+        ServerQueue $queue,
+        EventLogger $eventLogger,
+        ResponseFactory $responseFactory = new ResponseFactory(),
+    ): SessionEndPolicy {
+        return new SessionEndPolicy(
+            new DisconnectSender(
+                $queue,
+                $eventLogger,
+                $responseFactory,
+            ),
+            $eventLogger,
         );
     }
 

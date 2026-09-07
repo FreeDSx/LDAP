@@ -119,6 +119,10 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
         return new ServerProtocolHandler(
             queue: $queue,
             requestPipeline: $pipeline,
+            sessionEndPolicy: $this->makeSessionEndPolicy(
+                $queue,
+                $eventLogger,
+            ),
             eventLogger: $eventLogger,
             connectionContext: $context,
         );

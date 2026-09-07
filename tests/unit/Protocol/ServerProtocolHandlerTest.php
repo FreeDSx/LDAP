@@ -27,7 +27,9 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Protocol\DisconnectSender;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+use FreeDSx\Ldap\Protocol\SessionEndPolicy;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
@@ -402,10 +404,19 @@ final class ServerProtocolHandlerTest extends TestCase
         MiddlewareHandlerInterface $pipeline,
         ?EventLogger $eventLogger = null,
     ): ServerProtocolHandler {
+        $eventLogger ??= new EventLogger(null);
+
         return new ServerProtocolHandler(
             $this->mockQueue,
             $pipeline,
-            $eventLogger ?? new EventLogger(null),
+            new SessionEndPolicy(
+                new DisconnectSender(
+                    $this->mockQueue,
+                    $eventLogger,
+                ),
+                $eventLogger,
+            ),
+            $eventLogger,
         );
     }
 
