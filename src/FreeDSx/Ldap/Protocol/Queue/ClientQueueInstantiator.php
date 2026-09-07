@@ -47,6 +47,16 @@ class ClientQueueInstantiator
     }
 
     /**
+     * Whether the queue exists and its connection has been upgraded.
+     */
+    public function isInstantiatedAndEncrypted(): bool
+    {
+        return $this->clientQueue !== null
+            && $this->clientQueue->isConnected()
+            && $this->clientQueue->isEncrypted();
+    }
+
+    /**
      * Close the connection socket if the queue was instantiated. It will reconnect on next use.
      */
     public function close(): void

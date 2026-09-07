@@ -7,6 +7,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Proxy;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\LdapUrl;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
@@ -122,6 +123,30 @@ final class ProxyRequestForwarderTest extends TestCase
         ));
 
         self::assertSame(OperationOutcome::Failed, $result->outcome()->outcome());
+    }
+
+    public function test_it_answers_an_upstream_referral_on_a_non_search_operation(): void
+    {
+        $referral = new LdapUrl('ldap://other.example.com/dc=sub,dc=foo,dc=bar');
+
+        $this->client
+            ->method('sendAndReceive')
+            ->willThrowException(new ReferralException('go elsewhere', $referral));
+
+        $this->subject->handle($this->contextFor(
+            7,
+            new DeleteRequest('cn=foo,dc=bar'),
+        ));
+
+        self::assertEquals(
+            new DeleteResponse(
+                ResultCode::REFERRAL,
+                '',
+                'go elsewhere',
+                $referral,
+            ),
+            $this->relayed[0]->getResponse(),
+        );
     }
 
     public function test_it_closes_both_connections_on_unbind(): void
