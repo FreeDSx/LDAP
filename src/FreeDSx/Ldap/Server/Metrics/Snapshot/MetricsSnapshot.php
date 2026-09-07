@@ -29,6 +29,7 @@ final readonly class MetricsSnapshot
         public OperationMetrics $operations = new OperationMetrics(),
         public array $operationsInProgress = [],
         public TrafficMetrics $traffic = new TrafficMetrics(),
+        public JournalMetrics $journal = new JournalMetrics(),
     ) {}
 
     /**
@@ -42,6 +43,7 @@ final readonly class MetricsSnapshot
             'operations' => $this->operations->toArray(),
             'operations_in_progress' => $this->operationsInProgress,
             'traffic' => $this->traffic->toArray(),
+            'journal' => $this->journal->toArray(),
         ];
     }
 
@@ -67,6 +69,10 @@ final readonly class MetricsSnapshot
             traffic: TrafficMetrics::fromArray(self::section(
                 $data,
                 'traffic',
+            )),
+            journal: JournalMetrics::fromArray(self::section(
+                $data,
+                'journal',
             )),
         );
     }

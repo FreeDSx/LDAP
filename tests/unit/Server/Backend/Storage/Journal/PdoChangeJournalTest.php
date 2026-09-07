@@ -205,6 +205,56 @@ final class PdoChangeJournalTest extends TestCase
         );
     }
 
+    public function test_the_age_window_keeps_a_record_a_lower_seq_outlived(): void
+    {
+        $this->subject->append($this->change('cn=a,dc=example,dc=com'));
+        // A writer that waited on the sequence row gets a later seq with an earlier stamp.
+        $this->clock->setTo($this->clock->now()->modify('+10 seconds'));
+        $this->subject->append($this->change('cn=late-stamp,dc=example,dc=com'));
+        $this->clock->setTo($this->clock->now()->modify('-10 seconds'));
+        $this->subject->append($this->change('cn=older-than-its-predecessor,dc=example,dc=com'));
+        $this->clock->setTo($this->clock->now()->modify('+10 seconds'));
+        $this->subject->append($this->change('cn=b,dc=example,dc=com'));
+
+        $this->subject->prune(new RetentionPolicy(maxAgeSeconds: 5));
+
+        // Seq 3 is older than the cutoff, but seq 2 outlived it, so removing it would leave a gap MIN(seq) hides.
+        $seqs = array_map(
+            static fn(ChangeRecord $record): int => $record->seq,
+            iterator_to_array($this->subject->read()),
+        );
+        self::assertSame(
+            [2, 3, 4],
+            $seqs,
+        );
+    }
+
+    public function test_the_age_window_drops_a_whole_prefix_rather_than_a_record_inside_it(): void
+    {
+        $this->subject->append($this->change('cn=a,dc=example,dc=com'));
+        $this->clock->setTo($this->clock->now()->modify('+10 seconds'));
+        $this->subject->append($this->change('cn=late-stamp,dc=example,dc=com'));
+        $this->clock->setTo($this->clock->now()->modify('-10 seconds'));
+        $this->subject->append($this->change('cn=older-than-its-predecessor,dc=example,dc=com'));
+        $this->clock->setTo($this->clock->now()->modify('+30 seconds'));
+        $this->subject->append($this->change('cn=b,dc=example,dc=com'));
+
+        $removed = $this->subject->prune(new RetentionPolicy(maxAgeSeconds: 5));
+
+        $seqs = array_map(
+            static fn(ChangeRecord $record): int => $record->seq,
+            iterator_to_array($this->subject->read()),
+        );
+        self::assertSame(
+            3,
+            $removed,
+        );
+        self::assertSame(
+            [4],
+            $seqs,
+        );
+    }
+
     public function test_the_seq_counter_survives_a_full_prune_and_keeps_climbing(): void
     {
         $this->subject->append($this->change('cn=a,dc=example,dc=com'));

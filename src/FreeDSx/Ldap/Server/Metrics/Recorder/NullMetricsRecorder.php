@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Metrics\Recorder;
 
 use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
+use FreeDSx\Ldap\Server\Metrics\Observation\JournalObservation;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Observation\OperationObservation;
 use FreeDSx\Ldap\Server\Metrics\Observation\TrafficObservation;
@@ -33,6 +34,8 @@ final class NullMetricsRecorder implements MetricsRecorderInterface
     public function trafficObserved(TrafficObservation $observation): void {}
 
     public function connectionObserved(ConnectionObservation $observation): void {}
+
+    public function journalObserved(JournalObservation $observation): void {}
 
     public function serverStarted(int $startedAt): void {}
 

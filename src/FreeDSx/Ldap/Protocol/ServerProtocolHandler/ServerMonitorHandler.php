@@ -70,6 +70,7 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
         $connections = $snapshot->connections;
         $operations = $snapshot->operations;
         $traffic = $snapshot->traffic;
+        $journal = $snapshot->journal;
 
         return array_filter([
             'objectClass' => ['top', 'extensibleObject'],
@@ -89,6 +90,8 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
             'connectionsRequestSizeExceeded' => [(string) $connections->requestSizeExceeded],
             'connectionsProtocolErrors' => [(string) $connections->protocolErrors],
             'connectionsUnavailable' => [(string) $connections->unavailable],
+            'journalPruneSuccesses' => [(string) $journal->pruneSuccesses],
+            'journalPruneFailures' => [(string) $journal->pruneFailures],
             'connectionsMax' => [(string) $this->options->getNetworkConfig()->getMaxConnections()],
             'operationsCompleted' => [(string) $operations->total()],
             'operationsFailed' => [(string) $operations->totalErrors()],

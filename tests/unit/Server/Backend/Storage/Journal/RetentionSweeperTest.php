@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\EventLogPolicy;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
+use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
@@ -151,6 +152,54 @@ final class RetentionSweeperTest extends TestCase
         self::assertCount(
             1,
             $this->recordsFor(ServerEvent::JournalPruneFailed),
+        );
+    }
+
+    public function test_a_prune_failure_is_counted_where_an_operator_can_see_it_without_a_logger(): void
+    {
+        $metrics = new InMemoryMetricsRecorder();
+        $journal = $this->createMock(ChangeJournalInterface::class);
+        $journal->method('prune')
+            ->willThrowException(new RuntimeException('boom'));
+        $sweeper = new RetentionSweeper(
+            $journal,
+            new RetentionPolicy(maxRecords: 1),
+            new EventLogger(null),
+            $metrics,
+        );
+
+        $sweeper->sweep();
+
+        self::assertSame(
+            1,
+            $metrics->snapshot()->journal->pruneFailures,
+        );
+        self::assertSame(
+            0,
+            $metrics->snapshot()->journal->pruneSuccesses,
+        );
+    }
+
+    public function test_a_successful_sweep_is_counted_too(): void
+    {
+        $metrics = new InMemoryMetricsRecorder();
+        $this->appendChanges(3);
+        $sweeper = new RetentionSweeper(
+            $this->journal,
+            new RetentionPolicy(maxRecords: 1),
+            new EventLogger(null),
+            $metrics,
+        );
+
+        $sweeper->sweep();
+
+        self::assertSame(
+            1,
+            $metrics->snapshot()->journal->pruneSuccesses,
+        );
+        self::assertSame(
+            0,
+            $metrics->snapshot()->journal->pruneFailures,
         );
     }
 

@@ -16,6 +16,9 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Journal;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
+use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
+use FreeDSx\Ldap\Server\Metrics\Observation\JournalObservation;
+use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use Throwable;
 
 use function microtime;
@@ -35,6 +38,7 @@ final readonly class RetentionSweeper
         private ChangeJournalInterface $journal,
         private RetentionPolicy $policy,
         private EventLogger $eventLogger = new EventLogger(null),
+        private MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
     ) {}
 
     /**
@@ -61,6 +65,7 @@ final readonly class RetentionSweeper
         try {
             $removed = $this->journal->prune($this->policy);
         } catch (Throwable $e) {
+            $this->metricsRecorder->journalObserved(JournalObservation::PruneFailed);
             $this->eventLogger->record(
                 ServerEvent::JournalPruneFailed,
                 $this->eventLogger->exceptionContextFor($e),
@@ -68,6 +73,8 @@ final readonly class RetentionSweeper
 
             return 0;
         }
+
+        $this->metricsRecorder->journalObserved(JournalObservation::PruneSucceeded);
 
         if ($removed > 0) {
             $this->eventLogger->record(

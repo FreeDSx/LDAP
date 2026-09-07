@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Journal;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoJournalDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
@@ -45,14 +46,16 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
 
     public function append(PendingChange $change): ChangeRecord
     {
-        $createdAt = $this->clock->now();
         $normDn = $change->dn->normalize();
         $seq = 0;
+        $createdAt = null;
 
         // Joins the write transaction that a journaled change already runs in, rather than nesting a savepoint in it.
-        $this->transactor->joinAtomic(function () use ($change, $normDn, $createdAt, &$seq): void {
+        $this->transactor->joinAtomic(function () use ($change, $normDn, &$createdAt, &$seq): void {
             $this->statements->execute($this->dialect->queryJournalSeqBump());
             $seq = $this->latestSeq();
+            // Stamped under the sequence row lock that orders the seq.
+            $createdAt = $this->clock->now();
 
             $this->statements->execute($this->dialect->queryJournalInsert(), [
                 $seq,
@@ -72,7 +75,7 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
         return new ChangeRecord(
             seq: $seq,
             origin: $this->origin,
-            createdAt: $createdAt,
+            createdAt: $createdAt ?? throw new RuntimeException('The journal record was not stamped.'),
             change: $change,
         );
     }
@@ -154,14 +157,23 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
             ->rowCount();
     }
 
+    /**
+     * Deletes by seq rather than by timestamp, so the age window can only ever remove a prefix.
+     */
     private function pruneToAgeWindow(int $maxAgeSeconds): int
     {
         $cutoff = EpochMicroseconds::fromSeconds($this->clock->now()->getTimestamp() - $maxAgeSeconds);
+        $keepFrom = $this->statements
+            ->execute(
+                $this->dialect->queryJournalAgeKeepFloor(),
+                [$cutoff],
+            )
+            ->fetchIntColumn();
 
         return $this->statements
             ->execute(
-                $this->dialect->queryJournalDeleteByAge(),
-                [$cutoff],
+                $this->dialect->queryJournalDeleteBelow(),
+                [$keepFrom ?? $this->latestSeq() + 1],
             )
             ->rowCount();
     }

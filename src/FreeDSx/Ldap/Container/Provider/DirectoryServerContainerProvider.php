@@ -82,6 +82,7 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
+use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Logging\OperationAuditor;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
@@ -628,6 +629,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                 $options->getLogger(),
                 $options->getEventLogPolicy(),
             ),
+            $container->get(MetricsRecorderInterface::class),
         );
     }
 
