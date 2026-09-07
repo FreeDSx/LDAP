@@ -14,7 +14,7 @@ return ECSConfig::configure()
         __DIR__ . '/src',
         __DIR__ . '/tests',
     ])
-    ->withPhpCsFixerSets(perCS30: true)
+    ->withPreparedSets(perCs: true)
     ->withRules([
         BlankLineAfterStrictTypesFixer::class,
         BlankLineAfterOpeningTagFixer::class,
