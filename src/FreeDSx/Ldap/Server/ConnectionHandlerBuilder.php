@@ -199,6 +199,10 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                 $backend,
                 $handlerProvider,
             ),
+            sessionEndPolicy: $this->makeSessionEndPolicy(
+                $serverQueue,
+                $eventLogger,
+            ),
             eventLogger: $eventLogger,
             connectionContext: $context,
         );
