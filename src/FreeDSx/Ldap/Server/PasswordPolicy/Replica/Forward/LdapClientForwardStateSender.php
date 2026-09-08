@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward;
 
 use FreeDSx\Ldap\Exception\ForwardStateException;
+use FreeDSx\Ldap\Exception\ForwardStateRejectedException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\Request\ForwardPasswordPolicyStateRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
@@ -45,6 +47,7 @@ class LdapClientForwardStateSender implements ForwardStateSenderInterface
     }
 
     /**
+     * @throws ForwardStateRejectedException when the primary answered with a result code (the connection stays open).
      * @throws ForwardStateException on a transport failure (the connection is dropped so the next send reconnects).
      */
     private function exchange(ForwardPasswordPolicyStateRequest $request): object
@@ -53,6 +56,15 @@ class LdapClientForwardStateSender implements ForwardStateSenderInterface
             return $this->connect()
                 ->sendAndReceive($request)
                 ->getResponse();
+        } catch (OperationException $e) {
+            throw new ForwardStateRejectedException(
+                sprintf(
+                    'The primary rejected the password-policy forward with result code %d.',
+                    $e->getCode(),
+                ),
+                $e->getCode(),
+                $e,
+            );
         } catch (Throwable $e) {
             $this->reset();
 
@@ -78,7 +90,7 @@ class LdapClientForwardStateSender implements ForwardStateSenderInterface
             throw new ForwardStateException('The primary returned an unexpected response to the password-policy forward.');
         }
         if ($response->getResultCode() !== ResultCode::SUCCESS) {
-            throw new ForwardStateException(sprintf(
+            throw new ForwardStateRejectedException(sprintf(
                 'The primary rejected the password-policy forward with result code %d.',
                 $response->getResultCode(),
             ));

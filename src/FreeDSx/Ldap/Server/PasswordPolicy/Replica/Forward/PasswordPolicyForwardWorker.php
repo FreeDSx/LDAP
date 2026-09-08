@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward;
 
 use FreeDSx\Ldap\Exception\ForwardStateException;
+use FreeDSx\Ldap\Exception\ForwardStateRejectedException;
 use FreeDSx\Ldap\Operation\Request\ForwardPasswordPolicyStateRequest;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Logging\ExceptionLogging;
@@ -37,6 +38,13 @@ class PasswordPolicyForwardWorker
     public const DEFAULT_INTERVAL_SECONDS = 5.0;
 
     private bool $stopping = false;
+
+    private int $drain = 0;
+
+    /**
+     * @var array<string, RefusedForward>
+     */
+    private array $refused = [];
 
     public function __construct(
         private readonly ReplicaPasswordStateStoreInterface $store,
@@ -91,9 +99,30 @@ class PasswordPolicyForwardWorker
     public function forwardOnce(): int
     {
         $forwarded = 0;
+        $refused = [];
+        ++$this->drain;
 
         foreach ($this->store->listUnforwarded() as $pending) {
-            $this->sender->send($this->requestFor($pending));
+            $key = self::keyFor($pending);
+            $previous = $this->refusalFor($pending);
+
+            if ($previous !== null && !$previous->isDue($this->drain)) {
+                $refused[$key] = $previous;
+
+                continue;
+            }
+
+            try {
+                $this->sender->send($this->requestFor($pending));
+            } catch (ForwardStateRejectedException $e) {
+                // One subject the primary refuses must not hold back every other subject behind it.
+                $this->reportRefusal($pending, $previous, $e);
+                $refused[$key] = $previous?->again($this->drain)
+                    ?? RefusedForward::after($pending->sequence, $this->drain);
+
+                continue;
+            }
+
             $this->store->markForwarded(
                 $pending->dn,
                 $pending->sequence,
@@ -101,7 +130,49 @@ class PasswordPolicyForwardWorker
             ++$forwarded;
         }
 
+        $this->refused = $refused;
+
         return $forwarded;
+    }
+
+    /**
+     * The standing refusal for this subject, or null when its state has moved on and deserves a fresh attempt.
+     */
+    private function refusalFor(ReplicaForwardState $pending): ?RefusedForward
+    {
+        $refusal = $this->refused[self::keyFor($pending)] ?? null;
+
+        return $refusal?->sequence === $pending->sequence
+            ? $refusal
+            : null;
+    }
+
+    /**
+     * Normalized, so one subject cannot occupy two entries under two spellings of its DN.
+     */
+    private static function keyFor(ReplicaForwardState $pending): string
+    {
+        return $pending->dn
+            ->normalize()
+            ->toString();
+    }
+
+    /**
+     * Reported once per subject state to avoid logging this indefinitely.
+     */
+    private function reportRefusal(
+        ReplicaForwardState $pending,
+        ?RefusedForward $previous,
+        ForwardStateRejectedException $exception,
+    ): void {
+        if ($previous !== null) {
+            return;
+        }
+
+        $this->logger?->warning(
+            'The primary refused a password-policy forward; leaving it pending and continuing.',
+            ExceptionLogging::makeLogContext($exception) + ['dn' => $pending->dn->toString()],
+        );
     }
 
     private function requestFor(ReplicaForwardState $pending): ForwardPasswordPolicyStateRequest

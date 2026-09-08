@@ -18,6 +18,8 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\ForwardStateException;
+use FreeDSx\Ldap\Exception\ForwardStateRejectedException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operation\Request\ForwardPasswordPolicyStateRequest;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
@@ -152,6 +154,94 @@ final class PasswordPolicyForwardWorkerTest extends TestCase
                 $this->store->listUnforwarded(),
             );
         }
+    }
+
+    public function test_a_subject_the_primary_refuses_does_not_hold_back_the_others(): void
+    {
+        $this->sender
+            ->method('send')
+            ->willReturnCallback(function (ForwardPasswordPolicyStateRequest $request): void {
+                if ($request->getDn()->toString() === 'cn=a,dc=example,dc=com') {
+                    throw new ForwardStateRejectedException('Access denied.', ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+                }
+
+                $this->sent[] = $request;
+            });
+        $this->seedFailure('20260520120000Z', 'cn=a,dc=example,dc=com');
+        $this->seedFailure('20260520120000Z', 'cn=b,dc=example,dc=com');
+
+        $forwarded = $this->subject->forwardOnce();
+
+        self::assertSame(
+            1,
+            $forwarded,
+        );
+        self::assertSame(
+            ['cn=b,dc=example,dc=com'],
+            array_map(
+                static fn(ForwardPasswordPolicyStateRequest $request): string => $request->getDn()->toString(),
+                $this->sent,
+            ),
+        );
+        self::assertSame(
+            ['cn=a,dc=example,dc=com'],
+            array_map(
+                static fn($pending): string => $pending->dn->toString(),
+                $this->store->listUnforwarded(),
+            ),
+        );
+    }
+
+    public function test_a_refused_subject_is_retried_on_a_widening_gap_rather_than_every_drain(): void
+    {
+        $attempts = 0;
+        $this->sender
+            ->method('send')
+            ->willReturnCallback(static function () use (&$attempts): void {
+                $attempts++;
+
+                throw new ForwardStateRejectedException('Access denied.', ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+            });
+        $this->seedFailure('20260520120000Z');
+
+        for ($drain = 1; $drain <= 8; $drain++) {
+            $this->subject->forwardOnce();
+        }
+
+        // Attempted on drains 1, 2, 4 and 8 only.
+        self::assertSame(
+            4,
+            $attempts,
+        );
+        self::assertCount(
+            1,
+            $this->store->listUnforwarded(),
+        );
+    }
+
+    public function test_a_refused_subject_is_attempted_again_as_soon_as_its_state_changes(): void
+    {
+        $attempts = 0;
+        $this->sender
+            ->method('send')
+            ->willReturnCallback(static function () use (&$attempts): void {
+                $attempts++;
+
+                throw new ForwardStateRejectedException('Access denied.', ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+            });
+        $this->seedFailure('20260520120000Z');
+
+        $this->subject->forwardOnce();
+        $this->subject->forwardOnce();
+        $this->subject->forwardOnce();
+        // A new observation moves the subject on, so the widening gap no longer applies to it.
+        $this->seedFailure('20260520120500Z');
+        $this->subject->forwardOnce();
+
+        self::assertSame(
+            3,
+            $attempts,
+        );
     }
 
     public function test_run_drains_then_sleeps_the_poll_interval(): void
