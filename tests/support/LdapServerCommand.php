@@ -117,6 +117,13 @@ final class LdapServerCommand extends Command
                 '0',
             )
             ->addOption(
+                'shutdown-timeout',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Seconds children are given to end gracefully before they are killed (0 kills them at once)',
+                '0',
+            )
+            ->addOption(
                 'max-search-lookthrough',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -300,7 +307,7 @@ final class LdapServerCommand extends Command
             ->setSslCertKey(self::SSL_KEY)
             ->setUseSsl($useSsl)
             ->setSocketAcceptTimeout(0.1)
-            ->setShutdownTimeout(0);
+            ->setShutdownTimeout((int) $this->getStringOption($input, 'shutdown-timeout'));
 
         $options = (new ServerOptions($this->createStorageConfig($storageType), $network))
             ->setRunnerConfig(new RunnerConfig($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl))

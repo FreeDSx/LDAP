@@ -13,8 +13,13 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Runner;
 
+use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
+use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use Tests\Integration\FreeDSx\Ldap\Runner\Concern\TlsTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 
 use function extension_loaded;
 
@@ -24,6 +29,7 @@ use function extension_loaded;
 abstract class ServerRunnerTestCase extends ServerTestCase
 {
     use TlsTestsTrait;
+    use RawClientQueueTrait;
 
     public static function setUpBeforeClass(): void
     {
@@ -50,6 +56,38 @@ abstract class ServerRunnerTestCase extends ServerTestCase
         $this->setServerMode('ldap-server');
 
         parent::setUp();
+    }
+
+    public function testAnIdleConnectionReceivesANoticeOfDisconnectionOnShutdown(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            ['--shutdown-timeout=10'],
+        );
+
+        $queue = $this->rawQueue();
+        $queue->sendMessage(new LdapMessageRequest(
+            1,
+            new SimpleBindRequest(
+                'cn=user,dc=foo,dc=bar',
+                '12345',
+            ),
+        ));
+        $queue->getMessage(1);
+
+        $this->sendServerSignal(SIGTERM);
+        try {
+            $queue->getMessage();
+            self::fail('The connection ended without a notice of disconnection.');
+        } catch (UnsolicitedNotificationException $e) {
+            self::assertTrue($e->isNoticeOfDisconnection());
+            self::assertSame(
+                ResultCode::UNAVAILABLE,
+                $e->getCode(),
+            );
+        } finally {
+            $queue->close();
+        }
     }
 
     /**
