@@ -78,6 +78,7 @@ class SocketServerFactory
             ->setSslCapturePeerCert($this->runner !== RunnerMode::Swoole)
             ->setSslAllowSelfSigned($this->network->getSslAllowSelfSigned())
             ->setSslCaCert($this->network->getSslCaCert())
+            ->setTimeoutHandshake($this->network->getSslHandshakeTimeout())
             ->setReusePort($this->reusePort);
 
         return SocketServer::bind(

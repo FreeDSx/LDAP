@@ -44,6 +44,24 @@ final class NetworkConfigTest extends TestCase
         );
     }
 
+    public function test_ssl_handshake_timeout_defaults_to_five_seconds(): void
+    {
+        self::assertSame(
+            5,
+            $this->subject->getSslHandshakeTimeout(),
+        );
+    }
+
+    public function test_it_can_set_the_ssl_handshake_timeout(): void
+    {
+        $this->subject->setSslHandshakeTimeout(15);
+
+        self::assertSame(
+            15,
+            $this->subject->getSslHandshakeTimeout(),
+        );
+    }
+
     public function test_it_can_set_max_connections(): void
     {
         $this->subject->setMaxConnections(500);
