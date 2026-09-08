@@ -26,6 +26,7 @@ LDAP Server Configuration
         * [NetworkConfig:setSslValidateCert](#setsslvalidatecert)
         * [NetworkConfig:setSslAllowSelfSigned](#setsslallowselfsigned)
         * [NetworkConfig:setSslCaCert](#setsslcacert)
+        * [NetworkConfig:setSslHandshakeTimeout](#setsslhandshaketimeout)
 * [Access Control](#access-control)
     * [ServerOptions:setAclRules](#setaclrules)
     * [ServerOptions:setAccessControl](#setaccesscontrol)
@@ -425,6 +426,20 @@ default (not allowed).
 Path to a CA certificate bundle used to verify client certificates when `setSslValidateCert` is enabled.
 
 **Default**: `(null)`
+
+------------------
+#### setSslHandshakeTimeout
+
+Seconds a TLS handshake may take before the connection is dropped. This bounds a client that connects and then stalls,
+which would otherwise hold the connection for the whole idle timeout.
+
+```php
+$options->getNetworkConfig()->setSslHandshakeTimeout(10);
+```
+
+Raise it if legitimate clients on slow links fail to connect.
+
+**Default**: `5`
 
 ## Access Control
 

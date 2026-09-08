@@ -75,6 +75,8 @@ final class NetworkConfig
 
     private ?string $sslCaCert = null;
 
+    private int $sslHandshakeTimeout = 5;
+
     /**
      * Convenience constructor for the common case of only choosing the listening port.
      */
@@ -291,6 +293,18 @@ final class NetworkConfig
     public function setSslValidateCert(bool $sslValidateCert): self
     {
         $this->sslValidateCert = $sslValidateCert;
+
+        return $this;
+    }
+
+    public function getSslHandshakeTimeout(): int
+    {
+        return $this->sslHandshakeTimeout;
+    }
+
+    public function setSslHandshakeTimeout(int $sslHandshakeTimeout): self
+    {
+        $this->sslHandshakeTimeout = $sslHandshakeTimeout;
 
         return $this;
     }
