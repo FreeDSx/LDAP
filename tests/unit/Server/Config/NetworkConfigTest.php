@@ -36,16 +36,22 @@ final class NetworkConfigTest extends TestCase
         );
     }
 
-    public function test_max_connections_defaults_to_zero(): void
+    public function test_max_connections_defaults_to_the_maintenance_branch_value(): void
     {
-        self::assertSame(0, $this->subject->getMaxConnections());
+        self::assertSame(
+            1024,
+            $this->subject->getMaxConnections(),
+        );
     }
 
     public function test_it_can_set_max_connections(): void
     {
         $this->subject->setMaxConnections(500);
 
-        self::assertSame(500, $this->subject->getMaxConnections());
+        self::assertSame(
+            500,
+            $this->subject->getMaxConnections(),
+        );
     }
 
     public function test_max_request_size_defaults_to_five_mib(): void

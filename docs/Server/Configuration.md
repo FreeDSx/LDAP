@@ -15,6 +15,7 @@ LDAP Server Configuration
     * [NetworkConfig:setIdleTimeout](#setidletimeout)
     * [NetworkConfig:setWriteTimeout](#setwritetimeout)
     * [NetworkConfig:setSocketAcceptTimeout](#setsocketaccepttimeout)
+    * [NetworkConfig:setMaxConnections](#setmaxconnections)
     * [TLS](#tls)
         * [NetworkConfig:setUseSsl](#setusessl)
         * [NetworkConfig:setSslCert](#setsslcert)
@@ -312,6 +313,21 @@ make the server more responsive to shutdown signals and connection-limit changes
 in the accept loop.
 
 **Default**: `0.5`
+
+------------------
+#### setMaxConnections
+
+The most concurrent client connections to accept. Once reached, further connections are closed without being served,
+and `connectionsRejected` in [cn=monitor](Monitoring.md) counts them. Set `0` for no limit.
+
+```php
+$options->getNetworkConfig()->setMaxConnections(4096);
+```
+
+The Pcntl runner forks a process per connection, so this bounds process count rather than memory alone. Pick a value
+the host can fork, keeping the process limit and open file descriptors (`ulimit -n`) in mind.
+
+**Default**: `1024`
 
 ### TLS
 

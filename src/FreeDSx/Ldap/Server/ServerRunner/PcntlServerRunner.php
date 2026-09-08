@@ -150,6 +150,16 @@ class PcntlServerRunner implements ServerRunnerInterface
         }
     }
 
+    private function isConnectionLimitReached(): bool
+    {
+        $maxConnections = $this->options
+            ->getNetworkConfig()
+            ->getMaxConnections();
+
+        return $maxConnections > 0
+            && count($this->childProcesses) >= $maxConnections;
+    }
+
     /**
      * Check each child process we have and see if it is stopped. This will clean up zombie processes.
      */
@@ -292,8 +302,11 @@ class PcntlServerRunner implements ServerRunnerInterface
                 continue;
             }
 
-            $maxConnections = $this->options->getNetworkConfig()->getMaxConnections();
-            if ($maxConnections > 0 && count($this->childProcesses) >= $maxConnections) {
+            if ($this->isConnectionLimitReached()) {
+                $this->cleanUpChildProcesses();
+            }
+
+            if ($this->isConnectionLimitReached()) {
                 $this->logConnectionLimitReached($this->defaultContext);
                 $this->metricsRecorder->connectionObserved(ConnectionObservation::Rejected);
                 $this->publishMetricsSnapshot();
