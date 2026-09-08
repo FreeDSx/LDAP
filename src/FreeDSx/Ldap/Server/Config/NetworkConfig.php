@@ -53,9 +53,9 @@ final class NetworkConfig
     private int $maxRequestSize = 5_242_880;
 
     /**
-     * The maximum number of concurrent connections the server will accept; zero (the default) means no limit.
+     * The maximum number of concurrent connections the server will accept; zero means no limit.
      */
-    private int $maxConnections = 0;
+    private int $maxConnections = 1024;
 
     private bool $useSsl = false;
 
