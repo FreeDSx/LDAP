@@ -30,6 +30,8 @@ use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Command\ComputeUpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
+use FreeDSx\Ldap\Server\Clock\ClockInterface;
+use FreeDSx\Ldap\Server\Clock\SystemClock;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyEngine;
 use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyResolver;
@@ -45,12 +47,18 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandlerInterface
 {
+    /**
+     * Allowance for the clock difference between a replica and the primary.
+     */
+    private const CLOCK_SKEW_TOLERANCE_SECONDS = 30;
+
     public function __construct(
         private ReadBackendInterface $backend,
         private WriteHandlerInterface $writes,
         private PasswordPolicyResolver $policyResolver,
         private PasswordPolicyEngine $engine,
         private AccessControlInterface $accessControl,
+        private ClockInterface $clock = new SystemClock(),
     ) {}
 
     /**
@@ -70,6 +78,7 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
             );
         }
 
+        $this->assertTimesArePlausible($request);
         $this->apply(
             $request,
             $token,
@@ -80,6 +89,29 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
             OperationOutcomeResult::succeeded(),
             new ExtendedResponse(new LdapResult(ResultCode::SUCCESS)),
         );
+    }
+
+    /**
+     * A forward reports what a replica observed, so a time it could not yet have observed is refused outright.
+     *
+     * A future lastSuccess cannot merely be clamped, since it would still clear every retained failure.
+     *
+     * @throws OperationException
+     */
+    private function assertTimesArePlausible(ForwardPasswordPolicyStateRequest $request): void
+    {
+        $horizon = $this->clock
+            ->now()
+            ->modify(sprintf('+%d seconds', self::CLOCK_SKEW_TOLERANCE_SECONDS));
+
+        foreach ([...$request->getFailureTimes(), $request->getLastSuccess()] as $observed) {
+            if ($observed !== null && $observed > $horizon) {
+                throw new OperationException(
+                    'The password policy forward carries a time that has not happened yet.',
+                    ResultCode::CONSTRAINT_VIOLATION,
+                );
+            }
+        }
     }
 
     /**
@@ -106,7 +138,7 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
 
         $this->writes->handle(
             new ComputeUpdateCommand(
-                $request->getDn(),
+                $target->getDn(),
                 function (Entry $entry) use ($request, $token, $policy): array {
                     $changes = $this->engine->recordForwardedState(
                         UserPasswordState::fromEntry($entry),
