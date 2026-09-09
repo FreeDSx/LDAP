@@ -61,6 +61,15 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      */
     private readonly array $interceptors;
 
+    private bool $isSending = false;
+
+    private bool $isCloseDeferred = false;
+
+    /**
+     * @var LdapMessageResponse[]
+     */
+    private array $deferredMessages = [];
+
     /**
      * @param ResponseInterceptor[] $interceptors applied to every outgoing response, in order.
      */
@@ -131,16 +140,47 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     }
 
     /**
+     * Anything sent while a response is already going out waits for it to finish.
+     *
      * @throws EncoderException
      */
     public function sendMessage(LdapMessageResponse ...$response): self
     {
-        $this->sendLdapMessage(array_map(
-            $this->applyInterceptors(...),
-            $response,
-        ));
+        if ($this->isSending) {
+            array_push(
+                $this->deferredMessages,
+                ...$response,
+            );
+
+            return $this;
+        }
+        $this->isSending = true;
+
+        try {
+            $this->sendLdapMessage(array_map(
+                $this->applyInterceptors(...),
+                $response,
+            ));
+        } finally {
+            $this->isSending = false;
+        }
+        $this->flushDeferred();
 
         return $this;
+    }
+
+    /**
+     * A close that would truncate a response still going out waits until it has been written.
+     */
+    public function close(): void
+    {
+        if ($this->isSending) {
+            $this->isCloseDeferred = true;
+
+            return;
+        }
+
+        parent::close();
     }
 
     /**
@@ -151,7 +191,15 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      */
     public function sendMessages(iterable $responses): self
     {
-        $this->sendLdapMessage($this->interceptLazily($responses));
+        $this->isSending = true;
+
+        try {
+            $this->sendLdapMessage($this->interceptLazily($responses));
+        } finally {
+            $this->isSending = false;
+        }
+
+        $this->flushDeferred();
 
         return $this;
     }
@@ -203,8 +251,33 @@ class ServerQueue extends LdapQueue implements ConnectionControl
     private function interceptLazily(iterable $responses): Generator
     {
         foreach ($responses as $response) {
+            if ($this->isCloseDeferred) {
+                return;
+            }
+
             yield $this->applyInterceptors($response);
         }
+    }
+
+    /**
+     * Sends what was held back, then applies a close that waited with it.
+     *
+     * @throws EncoderException
+     */
+    private function flushDeferred(): void
+    {
+        $deferred = $this->deferredMessages;
+        $this->deferredMessages = [];
+
+        if ($deferred !== []) {
+            $this->sendMessage(...$deferred);
+        }
+        if (!$this->isCloseDeferred) {
+            return;
+        }
+
+        $this->isCloseDeferred = false;
+        $this->close();
     }
 
     private function applyInterceptors(LdapMessageResponse $response): LdapMessageResponse

@@ -37,6 +37,7 @@ use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
 use FreeDSx\Socket\Exception\ConnectionException;
 use FreeDSx\Socket\Queue\Buffer;
 use FreeDSx\Socket\Socket;
+use Generator;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Middleware\CallLog;
@@ -122,6 +123,130 @@ final class ServerQueueTest extends TestCase
         $this->subject->sendMessage(
             new LdapMessageResponse(1, new DeleteResponse(0)),
             new LdapMessageResponse(2, new DeleteResponse(0)),
+        );
+    }
+
+    public function test_a_response_sent_while_another_is_going_out_is_not_written_into_the_middle_of_it(): void
+    {
+        $this->mockEncoder
+            ->method('encode')
+            ->willReturn(str_repeat('f', 8000));
+
+        $log = new CallLog();
+
+        $this->mockSocket
+            ->method('write')
+            ->willReturnCallback(function () use ($log) {
+                $log->record('start');
+
+                // Stands in for the signal handler, which sends from inside the write it interrupted.
+                if (count($log->entries) === 1) {
+                    $this->subject->sendMessage(new LdapMessageResponse(
+                        0,
+                        new DeleteResponse(0),
+                    ));
+                }
+
+                $log->record('end');
+
+                return $this->mockSocket;
+            });
+
+        $this->subject->sendMessage(
+            new LdapMessageResponse(1, new DeleteResponse(0)),
+            new LdapMessageResponse(2, new DeleteResponse(0)),
+        );
+
+        $alternating = [];
+
+        foreach (array_keys($log->entries) as $index) {
+            $alternating[] = $index % 2 === 0
+                ? 'start'
+                : 'end';
+        }
+
+        self::assertSame(
+            $alternating,
+            $log->entries,
+            'A response was written while another was still going out.',
+        );
+    }
+
+    public function test_a_close_while_a_response_is_going_out_waits_until_it_has_been_written(): void
+    {
+        $this->mockEncoder
+            ->method('encode')
+            ->willReturn(str_repeat('f', 8000));
+
+        $log = new CallLog();
+
+        $this->mockSocket
+            ->method('write')
+            ->willReturnCallback(function () use ($log) {
+                $log->record('write');
+
+                if (count($log->entries) === 1) {
+                    $this->subject->close();
+                }
+
+                return $this->mockSocket;
+            });
+        $this->mockSocket
+            ->method('close')
+            ->willReturnCallback(function () use ($log) {
+                $log->record('close');
+
+                return $this->mockSocket;
+            });
+
+        $this->subject->sendMessage(
+            new LdapMessageResponse(1, new DeleteResponse(0)),
+            new LdapMessageResponse(2, new DeleteResponse(0)),
+        );
+
+        self::assertSame(
+            'close',
+            end($log->entries),
+            'The socket was closed while a response was still going out.',
+        );
+        self::assertCount(
+            1,
+            array_keys($log->entries, 'close', true),
+        );
+    }
+
+    public function test_a_close_while_streaming_stops_the_responses_that_have_not_been_sent(): void
+    {
+        $this->mockEncoder
+            ->method('encode')
+            ->willReturn(str_repeat('f', 8000));
+
+        $log = new CallLog();
+        $responses = (function () use ($log): Generator {
+            foreach (range(1, 20) as $id) {
+                $log->record("entry-{$id}");
+
+                yield new LdapMessageResponse(
+                    $id,
+                    new DeleteResponse(0),
+                );
+            }
+        })();
+
+        $this->mockSocket
+            ->method('write')
+            ->willReturnCallback(function () {
+                $this->subject->close();
+
+                return $this->mockSocket;
+            });
+
+        $this->subject->sendMessages($responses);
+
+        self::assertLessThan(
+            20,
+            count($log->entries),
+            'The whole result set was produced even though the session was ending.',
         );
     }
 
