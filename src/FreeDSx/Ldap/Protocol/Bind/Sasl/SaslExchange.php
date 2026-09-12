@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Protocol\Bind\Sasl;
 
 use Closure;
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -33,6 +34,8 @@ use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
+use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
+use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Sasl\Exception\SaslException;
@@ -52,6 +55,8 @@ final class SaslExchange
         private readonly ResponseFactory $responseFactory,
         private readonly MechanismOptionsBuilderFactory $optionsBuilderFactory,
         private readonly AuthzIdResolver $authzIdResolver,
+        private readonly CriticalControlValidator $criticalControls,
+        private readonly PasswordPolicyContext $policyContext,
         private readonly SaslUsernameExtractorFactory $usernameExtractorFactory = new SaslUsernameExtractorFactory(),
     ) {}
 
@@ -327,6 +332,26 @@ final class SaslExchange
     }
 
     /**
+     * A continuation never reaches the middleware. So we need per-message control handling applied here.
+     *
+     * @throws OperationException when a control the server does not recognise is marked critical.
+     */
+    private function applyContinuationControls(LdapMessageRequest $message): void
+    {
+        $controls = $message->controls();
+
+        // RFC 4511 4.1.11 refuses the operation, and the continuation is part of the operation it refuses.
+        $this->criticalControls->assertSupportedForBind($controls);
+
+        // The continuation is the message that completes the bind, so a request made on it counts.
+        if (!$controls->has(Control::OID_PWD_POLICY)) {
+            return;
+        }
+
+        $this->policyContext->setResponseRequested(true);
+    }
+
+    /**
      * The message received mid-exchange, as a continuation of the mechanism currently running.
      *
      * @throws OperationException when an empty mechanism aborts, or the message is not a bind at all.
@@ -354,6 +379,8 @@ final class SaslExchange
         }
 
         if ($request instanceof SaslBindRequest && $request->getMechanism() === $mechName->value) {
+            $this->applyContinuationControls($message);
+
             return $request;
         }
 
