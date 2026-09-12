@@ -22,10 +22,10 @@ use FreeDSx\Asn1\Type\IncompleteType;
 use FreeDSx\Asn1\Type\OctetStringType;
 use FreeDSx\Asn1\Type\SequenceType;
 use FreeDSx\Asn1\Type\SetType;
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Protocol\LdapEncoder;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
+use FreeDSx\Ldap\Schema\Validation\Syntax\UuidSyntaxValidator;
 use Throwable;
 
 use function array_map;
@@ -40,7 +40,6 @@ use function is_string;
  * carries nothing but bind state, so it cannot express any other modification.
  *
  * ForwardPasswordPolicyStateValue ::= SEQUENCE {
- *     dn            OCTET STRING,
  *     entryUuid     OCTET STRING,
  *     failureTimes  SET OF OCTET STRING,
  *     lastSuccess   [0] OCTET STRING OPTIONAL }
@@ -49,8 +48,6 @@ use function is_string;
  */
 class ForwardPasswordPolicyStateRequest extends ExtendedRequest
 {
-    private Dn $dn;
-
     /**
      * @var list<DateTimeImmutable>
      */
@@ -61,21 +58,12 @@ class ForwardPasswordPolicyStateRequest extends ExtendedRequest
      * @param DateTimeImmutable|null $lastSuccess Latest observed successful bind, bounding which failures it clears.
      */
     public function __construct(
-        Dn|string $dn,
-        private string $entryUuid = '',
+        private readonly string $entryUuid,
         array $failureTimes = [],
-        private ?DateTimeImmutable $lastSuccess = null,
+        private readonly ?DateTimeImmutable $lastSuccess = null,
     ) {
-        $this->dn = $dn instanceof Dn
-            ? $dn
-            : new Dn($dn);
         $this->failureTimes = array_values($failureTimes);
         parent::__construct(ExtendedRequest::OID_PPOLICY_STATE_FORWARD);
-    }
-
-    public function getDn(): Dn
-    {
-        return $this->dn;
     }
 
     public function getEntryUuid(): string
@@ -99,7 +87,6 @@ class ForwardPasswordPolicyStateRequest extends ExtendedRequest
     public function toAsn1(): SequenceType
     {
         $sequence = Asn1::sequence(
-            Asn1::octetString($this->dn->toString()),
             Asn1::octetString($this->entryUuid),
             Asn1::setOf(...array_map(
                 static fn(DateTimeImmutable $time): OctetStringType
@@ -134,22 +121,23 @@ class ForwardPasswordPolicyStateRequest extends ExtendedRequest
         $childCount = $request instanceof SequenceType
             ? count($request->getChildren())
             : 0;
-        if (!($request instanceof SequenceType) || $childCount < 3 || $childCount > 4) {
+        if (!($request instanceof SequenceType) || $childCount < 2 || $childCount > 3) {
             throw new ProtocolException('The password policy forward request is malformed.');
         }
 
-        $dn = $request->getChild(0);
-        $entryUuid = $request->getChild(1);
-        $failureTimes = $request->getChild(2);
-        if (!($dn instanceof OctetStringType && $entryUuid instanceof OctetStringType && $failureTimes instanceof SetType)) {
+        $entryUuid = $request->getChild(0);
+        $failureTimes = $request->getChild(1);
+        if (!($entryUuid instanceof OctetStringType && $failureTimes instanceof SetType)) {
             throw new ProtocolException('The password policy forward request is malformed.');
+        }
+        if (!(new UuidSyntaxValidator())->isValid($entryUuid->getValue())) {
+            throw new ProtocolException('The password policy forward request has an invalid entry UUID.');
         }
 
         return new static(
-            $dn->getValue(),
             $entryUuid->getValue(),
             self::parseFailureTimes($failureTimes),
-            self::parseLastSuccess($request->getChild(3)),
+            self::parseLastSuccess($request->getChild(2)),
         );
     }
 

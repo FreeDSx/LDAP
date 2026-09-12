@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Sync\Consumer;
+namespace FreeDSx\Ldap\Server\Config;
 
 use function min;
 

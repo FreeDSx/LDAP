@@ -14,16 +14,9 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Sync\Consumer;
 
 use FreeDSx\Ldap\Exception\CancelRequestException;
-use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
-use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
-use FreeDSx\Ldap\Server\Clock\Sleeper\CoroutineSleeper;
-use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
+use FreeDSx\Ldap\Server\Clock\Sleeper\BackoffSleeper;
 use FreeDSx\Ldap\Server\Logging\ExceptionLogging;
-use FreeDSx\Ldap\Server\Process\Signals\PcntlShutdownSignals;
 use FreeDSx\Ldap\Server\Process\Signals\ShutdownSignalsInterface;
-use FreeDSx\Ldap\Server\Process\Signals\SwooleShutdownSignals;
 use FreeDSx\Ldap\Sync\Consumer\Checkpoint\ReplicationCheckpointInterface;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
@@ -54,55 +47,17 @@ final class LdapReplica
      */
     private ?string $pendingCookie = null;
 
+    /**
+     * @param ?ShutdownSignalsInterface $signals null when a host server owns SIGTERM and drives {@see stop()} instead
+     */
     public function __construct(
         private readonly PrimaryConnectionFactory $connectionFactory,
         private readonly ChangeApplierInterface $applier,
         private readonly ReplicationCheckpointInterface $checkpoint,
-        private readonly SleeperInterface $sleeper,
+        private readonly BackoffSleeper $backoff,
         private readonly ?ShutdownSignalsInterface $signals = null,
         private readonly ?LoggerInterface $logger = null,
-        private readonly ReconnectBackoff $backoff = new ReconnectBackoff(),
     ) {}
-
-    public static function forPcntl(
-        ConsumerConfig $config,
-        EntryStorageInterface $storage,
-        ?LoggerInterface $logger = null,
-        ?PrimaryConnectionFactory $connectionFactory = null,
-        ?ReplicaPasswordStateStoreInterface $passwordStateStore = null,
-    ): self {
-        return self::create(
-            $config,
-            $storage,
-            new BlockingSleeper(),
-            new PcntlShutdownSignals(),
-            $logger,
-            $connectionFactory,
-            $passwordStateStore,
-        );
-    }
-
-    /**
-     * @param ?ShutdownSignalsInterface $signals null when a host server owns SIGTERM and drives {@see stop()} instead
-     */
-    public static function forSwoole(
-        ConsumerConfig $config,
-        EntryStorageInterface $storage,
-        ?LoggerInterface $logger = null,
-        ?ShutdownSignalsInterface $signals = new SwooleShutdownSignals(),
-        ?PrimaryConnectionFactory $connectionFactory = null,
-        ?ReplicaPasswordStateStoreInterface $passwordStateStore = null,
-    ): self {
-        return self::create(
-            $config,
-            $storage,
-            new CoroutineSleeper(),
-            $signals,
-            $logger,
-            $connectionFactory,
-            $passwordStateStore,
-        );
-    }
 
     /**
      * Consume from the primary until a shutdown signal, reconnecting with bounded backoff on failure.
@@ -112,12 +67,10 @@ final class LdapReplica
         $this->signals?->onShutdown($this->stop(...));
         $this->logger?->info('Starting replica synchronization.');
 
-        $delay = $this->backoff->initial();
-
         while (!$this->stopping) {
             try {
                 $this->sync();
-                $delay = $this->backoff->initial();
+                $this->backoff->reset();
             } catch (CancelRequestException) {
                 // A shutdown was requested; listen() was cancelled cleanly by the entry handler.
             } catch (Throwable $e) {
@@ -127,10 +80,9 @@ final class LdapReplica
 
                 $this->logger?->warning(
                     'Replica synchronization failed; reconnecting after backoff.',
-                    ExceptionLogging::makeLogContext($e) + ['backoff_seconds' => $delay],
+                    ExceptionLogging::makeLogContext($e) + ['backoff_seconds' => $this->backoff->delay()],
                 );
-                $this->sleeper->sleep($delay);
-                $delay = $this->backoff->next($delay);
+                $this->backoff->wait();
             }
         }
 
@@ -144,34 +96,6 @@ final class LdapReplica
     {
         $this->stopping = true;
         $this->activeSync?->disconnect();
-    }
-
-    private static function create(
-        ConsumerConfig $config,
-        EntryStorageInterface $storage,
-        SleeperInterface $sleeper,
-        ?ShutdownSignalsInterface $signals,
-        ?LoggerInterface $logger,
-        ?PrimaryConnectionFactory $connectionFactory = null,
-        ?ReplicaPasswordStateStoreInterface $passwordStateStore = null,
-    ): self {
-        // listen() must not time out its blocking read, or the persist phase would abort each interval.
-        $config->getPrimary()
-            ->setTimeoutRead(-1);
-
-        $applier = new VerbatimStorageApplier($storage);
-
-        return new self(
-            connectionFactory: $connectionFactory ?? new PrimaryConnectionFactory($config),
-            applier: $passwordStateStore !== null
-                ? new ReconcilingChangeApplier($applier, $passwordStateStore)
-                : $applier,
-            checkpoint: $config->getCheckpoint(),
-            sleeper: $sleeper,
-            signals: $signals,
-            logger: $logger,
-            backoff: $config->getReconnectBackoff(),
-        );
     }
 
     private function sync(): void

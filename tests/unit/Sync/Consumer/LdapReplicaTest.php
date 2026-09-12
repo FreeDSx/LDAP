@@ -14,10 +14,9 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Sync\Consumer;
 
 use Closure;
-use FreeDSx\Ldap\ClientOptions;
-use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Clock\Sleeper\BackoffSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
+use FreeDSx\Ldap\Server\Config\ReconnectBackoff;
 use FreeDSx\Ldap\Server\Process\Signals\ShutdownSignalsInterface;
 use FreeDSx\Ldap\Sync\Consumer\ChangeApplierInterface;
 use FreeDSx\Ldap\Sync\Consumer\Checkpoint\InMemoryReplicationCheckpoint;
@@ -30,12 +29,9 @@ use FreeDSx\Ldap\Sync\SyncRepl;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
-use Tests\Support\FreeDSx\Ldap\RequiresExtensionsTrait;
 
 final class LdapReplicaTest extends TestCase
 {
-    use RequiresExtensionsTrait;
-
     private ChangeApplierInterface&MockObject $applier;
 
     private InMemoryReplicationCheckpoint $checkpoint;
@@ -109,7 +105,10 @@ final class LdapReplicaTest extends TestCase
             connectionFactory: $connectionFactory,
             applier: $this->applier,
             checkpoint: $this->checkpoint,
-            sleeper: $this->sleeper,
+            backoff: new BackoffSleeper(
+                new ReconnectBackoff(),
+                $this->sleeper,
+            ),
             signals: $this->signals,
         );
     }
@@ -280,29 +279,5 @@ final class LdapReplicaTest extends TestCase
             });
 
         $this->subject->run();
-    }
-
-    public function test_for_pcntl_builds_a_replica(): void
-    {
-        $this->requirePcntl();
-
-        $this->expectNotToPerformAssertions();
-
-        LdapReplica::forPcntl(
-            new ConsumerConfig(new ClientOptions()),
-            new InMemoryStorage(),
-        );
-    }
-
-    public function test_for_swoole_builds_a_replica(): void
-    {
-        $this->requireSwoole();
-
-        $this->expectNotToPerformAssertions();
-
-        LdapReplica::forSwoole(
-            new ConsumerConfig(new ClientOptions()),
-            new InMemoryStorage(),
-        );
     }
 }

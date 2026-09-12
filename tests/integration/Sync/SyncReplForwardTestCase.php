@@ -13,11 +13,21 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Sync;
 
+use DateTimeImmutable;
+use DateTimeZone;
+use FreeDSx\Asn1\Asn1;
 use FreeDSx\Ldap\ClientOptions;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapClient;
+use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
+use FreeDSx\Ldap\Operation\Request\ForwardPasswordPolicyStateRequest;
 use FreeDSx\Ldap\Operation\Request\PasswordModifyRequest;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Server\Utility\Uuid;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\LdapServerCommand;
 use Tests\Support\FreeDSx\Ldap\TestWorker;
@@ -80,6 +90,89 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
             $this->pollUntil(fn(): bool => $this->replicaBindSucceeds($dn, 'newpass')),
             'The replica should retire its local lock once the reset replicates.',
         );
+    }
+
+    public function test_a_forward_naming_an_unknown_uuid_applies_nowhere(): void
+    {
+        $before = $this->lockedDnsOnProvider();
+
+        $client = $this->providerClient();
+
+        try {
+            $client->bind(
+                'cn=user,dc=foo,dc=bar',
+                '12345',
+            );
+            $client->sendAndReceive(new ForwardPasswordPolicyStateRequest(
+                Uuid::v4(),
+                [
+                    new DateTimeImmutable('-2 seconds', new DateTimeZone('UTC')),
+                    new DateTimeImmutable('-1 second', new DateTimeZone('UTC')),
+                ],
+            ));
+        } finally {
+            $this->quietUnbind($client);
+        }
+
+        self::assertSame(
+            $before,
+            $this->lockedDnsOnProvider(),
+            'A forward for a UUID the primary does not hold must lock nothing.',
+        );
+    }
+
+    public function test_a_forward_with_a_malformed_uuid_is_refused(): void
+    {
+        $client = $this->providerClient();
+
+        try {
+            $client->bind(
+                'cn=user,dc=foo,dc=bar',
+                '12345',
+            );
+
+            $this->expectException(OperationException::class);
+            $this->expectExceptionCode(ResultCode::PROTOCOL_ERROR);
+
+            $client->sendAndReceive(
+                (new ExtendedRequest(ExtendedRequest::OID_PPOLICY_STATE_FORWARD))
+                    ->setValue(Asn1::sequence(
+                        Asn1::octetString('not-a-uuid'),
+                        Asn1::setOf(),
+                    )),
+            );
+        } finally {
+            $this->quietUnbind($client);
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function lockedDnsOnProvider(): array
+    {
+        $manager = $this->providerClient();
+
+        try {
+            $manager->bind(
+                LdapServerCommand::MANAGER_DN,
+                LdapServerCommand::MANAGER_PASSWORD,
+            );
+            $entries = $manager->search(Operations::search(
+                Filters::present(self::PWD_LOCKED_TIME),
+                '1.1',
+            )->base('ou=people,dc=foo,dc=bar'));
+
+            $dns = [];
+            foreach ($entries as $entry) {
+                $dns[] = $entry->getDn()->toString();
+            }
+            sort($dns);
+
+            return $dns;
+        } finally {
+            $this->quietUnbind($manager);
+        }
     }
 
     private function providerHasLock(string $dn): bool
