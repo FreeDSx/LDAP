@@ -36,7 +36,6 @@ use FreeDSx\Ldap\Server\Metrics\Observation\TrafficObservation;
 use FreeDSx\Ldap\Exception\MetricsSnapshotException;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
-use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -271,13 +270,28 @@ final class ServerMonitorHandlerTest extends TestCase
         );
     }
 
-    public function test_it_reports_the_runner_class(): void
+    public function test_it_reports_the_process_model_it_runs_under(): void
     {
         $entry = $this->handleAndCaptureEntry();
 
         self::assertSame(
-            [PcntlServerRunner::class],
+            ['pcntl'],
             $entry->get('serverRunner')?->getValues(),
+        );
+    }
+
+    public function test_it_reports_the_process_model_under_swoole_whether_pooled_or_not(): void
+    {
+        $subject = new ServerMonitorHandler(
+            options: TestServerOptions::defaults()
+                ->setRunnerConfig(RunnerConfig::forSwoole(4)),
+            snapshots: $this->metrics,
+            responder: $this->responder(),
+        );
+
+        self::assertSame(
+            ['swoole'],
+            $this->handleAndCaptureEntry($subject)->get('serverRunner')?->getValues(),
         );
     }
 

@@ -21,8 +21,6 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\GeneratedEntry;
 use FreeDSx\Ldap\Server\ServerRunner\CoroutineServerRunnerInterface;
-use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
-use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -85,7 +83,7 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
             'cn' => ['monitor'],
             'serverHost' => $this->serverHost(),
             'serverVersion' => $this->optionalString($this->options->getDseVendorVersion()),
-            'serverRunner' => [$this->runnerClass()],
+            'serverRunner' => [$this->options->getRunnerConfig()->getMode()->value],
             'connectionsMax' => [(string) $this->options->getNetworkConfig()->getMaxConnections()],
         ];
     }
@@ -112,6 +110,7 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
         return [
             'serverStartTime' => $this->generalizedTime($lifecycle->startedAt),
             'serverUptimeSeconds' => $this->uptimeSeconds($lifecycle->startedAt),
+            'serverWorkers' => $this->workers($lifecycle->workers),
             'configReloadCount' => [(string) $lifecycle->reloadCount],
             'configReloadTime' => $this->generalizedTime($lifecycle->lastReloadAt),
             'connectionsActive' => [(string) $connections->active],
@@ -139,6 +138,20 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
             'trafficBytesReceived' => [(string) $traffic->bytesReceived],
             'trafficEntriesReturned' => [(string) $traffic->entriesReturned],
         ];
+    }
+
+    /**
+     * Omitted when the runner has no worker model.
+     *
+     * @return list<string>
+     */
+    private function workers(int $workers): array
+    {
+        if ($workers <= 0) {
+            return [];
+        }
+
+        return [(string) $workers];
     }
 
     /**
@@ -207,22 +220,6 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
         }
 
         return [$host];
-    }
-
-    /**
-     * The configured runner's class, falling back to the built-in default selected by the swoole flag.
-     */
-    private function runnerClass(): string
-    {
-        $runner = $this->options->getServerRunner();
-
-        if ($runner !== null) {
-            return $runner::class;
-        }
-
-        return $this->options->isRunnerMode(RunnerMode::Swoole)
-            ? SwooleServerRunner::class
-            : PcntlServerRunner::class;
     }
 
     /**

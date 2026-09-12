@@ -107,6 +107,8 @@ final class SwooleTableMetricsRecorder implements
 
     private const SEARCH_SCOPE = 'scope.';
 
+    private const WORKER_PRESENT = 'worker.present.';
+
     private int $workerId = 0;
 
     /**
@@ -125,6 +127,12 @@ final class SwooleTableMetricsRecorder implements
 
             $this->table->del($key);
         }
+
+        // Reporting for duty is what makes the worker count an observation rather than a prediction.
+        $this->set(
+            self::WORKER_PRESENT . $workerId,
+            1,
+        );
     }
 
     /**
@@ -271,6 +279,7 @@ final class SwooleTableMetricsRecorder implements
         $inProgress = [];
         $active = 0;
         $reloadCount = 0;
+        $workers = 0;
 
         foreach ($this->table as $key => $row) {
             $value = $row[self::COLUMN];
@@ -291,6 +300,12 @@ final class SwooleTableMetricsRecorder implements
 
             if ($this->isKeyFor($key, self::LIFECYCLE_RELOAD_COUNT)) {
                 $reloadCount = max($reloadCount, $value);
+
+                continue;
+            }
+
+            if ($this->isKeyFor($key, self::WORKER_PRESENT)) {
+                $workers += $value;
 
                 continue;
             }
@@ -317,6 +332,7 @@ final class SwooleTableMetricsRecorder implements
                 startedAt: $this->get(self::LIFECYCLE_STARTED),
                 lastReloadAt: $this->get(self::LIFECYCLE_RELOAD_AT),
                 reloadCount: $reloadCount,
+                workers: $workers,
             ),
             connections: new ConnectionMetrics(
                 active: $active,

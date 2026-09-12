@@ -23,11 +23,13 @@ final readonly class LifecycleMetrics
     /**
      * @param int $startedAt Server start time (Unix timestamp), or 0 when unknown.
      * @param int $lastReloadAt Last config reload (Unix timestamp), or 0 when never reloaded.
+     * @param int $workers Workers that reported for duty, or 0 when the runner has no worker model.
      */
     public function __construct(
         public int $startedAt = 0,
         public int $lastReloadAt = 0,
         public int $reloadCount = 0,
+        public int $workers = 0,
     ) {}
 
     /**
@@ -39,6 +41,7 @@ final readonly class LifecycleMetrics
             'started_at' => $this->startedAt,
             'last_reload_at' => $this->lastReloadAt,
             'reload_count' => $this->reloadCount,
+            'workers' => $this->workers,
         ];
     }
 
@@ -51,6 +54,7 @@ final readonly class LifecycleMetrics
             startedAt: SnapshotValue::toInt($data['started_at'] ?? null),
             lastReloadAt: SnapshotValue::toInt($data['last_reload_at'] ?? null),
             reloadCount: SnapshotValue::toInt($data['reload_count'] ?? null),
+            workers: SnapshotValue::toInt($data['workers'] ?? null),
         );
     }
 }
