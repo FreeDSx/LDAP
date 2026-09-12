@@ -46,7 +46,8 @@ off rather than returned empty.
 | --- | --- |
 | `serverHost` | Host name, to tell instances apart behind a load balancer. |
 | `serverVersion` | The configured DSE vendor version, if set. |
-| `serverRunner` | The runner class in use. |
+| `serverRunner` | The process model in use (`pcntl`, `swoole`, etc). |
+| `serverWorkers` | Workers accepting connections. Omitted when the runner has no worker model. |
 | `serverStartTime`, `serverUptimeSeconds` | Start time and seconds since. |
 | `configReloadCount`, `configReloadTime` | Reloads that were actually performed, and the last one's time. A SIGHUP with no `ConfigReloader` configured, or one whose reload throws, does not count. |
 | `connectionsActive` | Currently-open connections. |

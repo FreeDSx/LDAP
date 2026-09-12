@@ -38,7 +38,6 @@ use FreeDSx\Ldap\Server\ServerRunner\Swoole\PooledServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\WorkerFactory;
 use FreeDSx\Ldap\Server\SocketServerFactory;
-use FreeDSx\Ldap\Server\Utility\CpuCount;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
 use FreeDSx\Ldap\ServerOptions;
 
@@ -154,16 +153,10 @@ final class ServerListenerContainerProvider implements ContainerProviderInterfac
     private function resolveWorkerCount(Container $container): int
     {
         $options = $container->get(ServerListenerOptionsInterface::class);
-
         if (!$options->isRunnerMode(RunnerMode::Swoole)) {
             return 1;
         }
-
-        $configured = $options->getRunnerConfig()->getWorkers();
-        $workers = $configured > 0
-            ? $configured
-            : (new CpuCount())->available();
-
+        $workers = $options->getRunnerConfig()->resolvedWorkers();
         if ($workers === 1 || $container->get(ListenerContributorInterface::class)->supportsMultipleWorkers()) {
             return $workers;
         }

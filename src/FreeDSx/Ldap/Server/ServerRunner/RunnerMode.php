@@ -18,9 +18,9 @@ namespace FreeDSx\Ldap\Server\ServerRunner;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-enum RunnerMode
+enum RunnerMode: string
 {
-    case Pcntl;
+    case Pcntl = 'pcntl';
 
-    case Swoole;
+    case Swoole = 'swoole';
 }

@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Config;
 
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
+use FreeDSx\Ldap\Server\Utility\CpuCount;
 
 /**
  * The process model a server runs under.
@@ -29,6 +30,8 @@ final class RunnerConfig
     public const AUTO_DETECT_WORKERS = 0;
 
     private int $workers;
+
+    private ?int $resolvedWorkers = null;
 
     public function __construct(
         private RunnerMode $mode = RunnerMode::Pcntl,
@@ -90,8 +93,19 @@ final class RunnerConfig
             throw new InvalidArgumentException('The worker count cannot be negative.');
         }
         $this->workers = $workers;
+        $this->resolvedWorkers = null;
 
         return $this;
+    }
+
+    /**
+     * The configured count with auto-detection applied, worked out once and kept.
+     */
+    public function resolvedWorkers(): int
+    {
+        return $this->resolvedWorkers ??= $this->workers > 0
+            ? $this->workers
+            : (new CpuCount())->available();
     }
 
     /**

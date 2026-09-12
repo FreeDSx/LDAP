@@ -262,6 +262,36 @@ final class SwooleTableMetricsRecorderTest extends TestCase
         );
     }
 
+    public function test_it_counts_the_workers_that_reported_for_duty(): void
+    {
+        $table = SwooleTableMetricsRecorder::createTable(1024);
+
+        foreach ([0, 1, 2] as $workerId) {
+            (new SwooleTableMetricsRecorder($table))->beginWorker($workerId);
+        }
+
+        self::assertSame(
+            3,
+            (new SwooleTableMetricsRecorder($table))->snapshot()->lifecycle->workers,
+        );
+    }
+
+    public function test_a_restarted_worker_does_not_add_to_the_worker_count_twice(): void
+    {
+        $table = SwooleTableMetricsRecorder::createTable(1024);
+
+        (new SwooleTableMetricsRecorder($table))->beginWorker(0);
+        (new SwooleTableMetricsRecorder($table))->beginWorker(1);
+
+        // The pool restarts a killed worker under the id it already had.
+        (new SwooleTableMetricsRecorder($table))->beginWorker(0);
+
+        self::assertSame(
+            2,
+            (new SwooleTableMetricsRecorder($table))->snapshot()->lifecycle->workers,
+        );
+    }
+
     public function test_it_tracks_connections_opening_and_closing(): void
     {
         $this->subject->connectionObserved(ConnectionObservation::Opened);
