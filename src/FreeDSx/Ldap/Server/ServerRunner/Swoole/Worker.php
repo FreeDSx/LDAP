@@ -185,7 +185,12 @@ class Worker
         $this->isShuttingDown = true;
         $this->backgroundTasks?->stop();
         $this->logShutdownStarted($context + ['signal' => $signal]);
-        $this->acceptor?->shutdown();
+
+        // Notifying clients writes through hooked I/O, which Swoole refuses outside a coroutine, and a pool
+        // worker runs this callback without one.
+        Coroutine::create(function (): void {
+            $this->acceptor?->shutdown();
+        });
 
         return null;
     }
