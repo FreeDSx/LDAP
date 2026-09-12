@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\ServerRunner;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\Exception\MetricsSnapshotException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
@@ -78,6 +79,8 @@ class PcntlServerRunner implements ServerRunnerInterface
     private array $handledSignals = [];
 
     private bool $isShuttingDown = false;
+
+    private bool $isSnapshotFailing = false;
 
     private readonly BackgroundTasksInterface $backgroundTasks;
 
@@ -205,7 +208,45 @@ class PcntlServerRunner implements ServerRunnerInterface
 
     private function publishMetricsSnapshot(): void
     {
-        $this->snapshotPublisher?->publish();
+        if ($this->snapshotPublisher === null) {
+            return;
+        }
+
+        try {
+            $this->snapshotPublisher->publish();
+        } catch (MetricsSnapshotException $e) {
+            $this->reportSnapshotFailed($e);
+
+            return;
+        }
+
+        $this->reportSnapshotRecovered();
+    }
+
+    private function reportSnapshotFailed(MetricsSnapshotException $e): void
+    {
+        if ($this->isSnapshotFailing) {
+            return;
+        }
+
+        $this->isSnapshotFailing = true;
+        $this->logWarning(
+            $e->getMessage(),
+            $this->defaultContext,
+        );
+    }
+
+    private function reportSnapshotRecovered(): void
+    {
+        if (!$this->isSnapshotFailing) {
+            return;
+        }
+
+        $this->isSnapshotFailing = false;
+        $this->logInfo(
+            'Publishing the metrics snapshot recovered.',
+            $this->defaultContext,
+        );
     }
 
     /**
@@ -739,6 +780,20 @@ class PcntlServerRunner implements ServerRunnerInterface
     ): void {
         $this->options->getLogger()?->log(
             LogLevel::INFO,
+            $message,
+            $context,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function logWarning(
+        string $message,
+        array $context = [],
+    ): void {
+        $this->options->getLogger()?->log(
+            LogLevel::WARNING,
             $message,
             $context,
         );

@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Metrics\File;
 
+use FreeDSx\Ldap\Exception\MetricsSnapshotException;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\ConnectionMetrics;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\LifecycleMetrics;
@@ -55,37 +56,34 @@ final class FileSnapshotProviderTest extends TestCase
         );
     }
 
-    public function test_a_missing_file_degrades_to_an_empty_snapshot(): void
+    public function test_a_missing_file_is_reported_as_unavailable_rather_than_as_zeroes(): void
     {
-        self::assertEquals(
-            new MetricsSnapshot(),
-            $this->subject->snapshot(),
-        );
+        $this->expectException(MetricsSnapshotException::class);
+
+        $this->subject->snapshot();
     }
 
-    public function test_malformed_json_degrades_to_an_empty_snapshot(): void
+    public function test_malformed_json_is_reported_as_unavailable_rather_than_as_zeroes(): void
     {
         file_put_contents(
             $this->path,
             '{not valid json',
         );
 
-        self::assertEquals(
-            new MetricsSnapshot(),
-            $this->subject->snapshot(),
-        );
+        $this->expectException(MetricsSnapshotException::class);
+
+        $this->subject->snapshot();
     }
 
-    public function test_non_object_json_degrades_to_an_empty_snapshot(): void
+    public function test_non_object_json_is_reported_as_unavailable_rather_than_as_zeroes(): void
     {
         file_put_contents(
             $this->path,
             '"a string"',
         );
 
-        self::assertEquals(
-            new MetricsSnapshot(),
-            $this->subject->snapshot(),
-        );
+        $this->expectException(MetricsSnapshotException::class);
+
+        $this->subject->snapshot();
     }
 }

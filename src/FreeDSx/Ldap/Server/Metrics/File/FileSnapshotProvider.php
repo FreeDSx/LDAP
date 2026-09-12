@@ -13,12 +13,14 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Metrics\File;
 
+use FreeDSx\Ldap\Exception\MetricsSnapshotException;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\MetricsSnapshot;
 
 use function file_get_contents;
 use function is_array;
 use function json_decode;
+use function sprintf;
 
 /**
  * Reads a metrics snapshot another process published to a file.
@@ -30,23 +32,27 @@ final readonly class FileSnapshotProvider implements MetricsSnapshotProvider
     public function __construct(private string $path) {}
 
     /**
-     * Returns an empty snapshot when the file is missing or unreadable, so cn=monitor still serves what it can.
+     * @throws MetricsSnapshotException when no snapshot can be read.
      */
     public function snapshot(): MetricsSnapshot
     {
         $contents = @file_get_contents($this->path);
 
         if ($contents === false) {
-            return new MetricsSnapshot();
+            throw new MetricsSnapshotException(sprintf(
+                'The metrics snapshot at "%s" could not be read.',
+                $this->path,
+            ));
         }
-
         $data = json_decode(
             $contents,
             true,
         );
-
         if (!is_array($data)) {
-            return new MetricsSnapshot();
+            throw new MetricsSnapshotException(sprintf(
+                'The metrics snapshot at "%s" could not be decoded.',
+                $this->path,
+            ));
         }
 
         return MetricsSnapshot::fromArray($data);
