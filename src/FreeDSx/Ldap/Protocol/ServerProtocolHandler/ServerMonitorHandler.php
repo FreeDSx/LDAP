@@ -15,11 +15,11 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\MetricsSnapshotException;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\GeneratedEntry;
-use FreeDSx\Ldap\Server\Metrics\Snapshot\MetricsSnapshot;
 use FreeDSx\Ldap\Server\ServerRunner\CoroutineServerRunnerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner as SwooleServerRunner;
@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
 
 use function array_filter;
+use function array_merge;
 use function gethostname;
 use function gmdate;
 use function max;
@@ -55,7 +56,7 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
             $message,
             Entry::fromArray(
                 self::DN,
-                $this->attributes($this->snapshots->snapshot()),
+                $this->attributes(),
             ),
             $token,
         );
@@ -64,20 +65,51 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
     /**
      * @return array<string, list<string>>
      */
-    private function attributes(MetricsSnapshot $snapshot): array
+    private function attributes(): array
     {
+        return array_filter(array_merge(
+            $this->serverAttributes(),
+            $this->metricAttributes(),
+        ));
+    }
+
+    /**
+     * What the server knows about itself, which stands whether any metrics can be read.
+     *
+     * @return array<string, list<string>>
+     */
+    private function serverAttributes(): array
+    {
+        return [
+            'objectClass' => ['top', 'extensibleObject'],
+            'cn' => ['monitor'],
+            'serverHost' => $this->serverHost(),
+            'serverVersion' => $this->optionalString($this->options->getDseVendorVersion()),
+            'serverRunner' => [$this->runnerClass()],
+            'connectionsMax' => [(string) $this->options->getNetworkConfig()->getMaxConnections()],
+        ];
+    }
+
+    /**
+     * Counters nobody could read are left out rather than published as zeroes.
+     *
+     * @return array<string, list<string>>
+     */
+    private function metricAttributes(): array
+    {
+        try {
+            $snapshot = $this->snapshots->snapshot();
+        } catch (MetricsSnapshotException) {
+            return [];
+        }
+
         $lifecycle = $snapshot->lifecycle;
         $connections = $snapshot->connections;
         $operations = $snapshot->operations;
         $traffic = $snapshot->traffic;
         $journal = $snapshot->journal;
 
-        return array_filter([
-            'objectClass' => ['top', 'extensibleObject'],
-            'cn' => ['monitor'],
-            'serverHost' => $this->serverHost(),
-            'serverVersion' => $this->optionalString($this->options->getDseVendorVersion()),
-            'serverRunner' => [$this->runnerClass()],
+        return [
             'serverStartTime' => $this->generalizedTime($lifecycle->startedAt),
             'serverUptimeSeconds' => $this->uptimeSeconds($lifecycle->startedAt),
             'configReloadCount' => [(string) $lifecycle->reloadCount],
@@ -92,7 +124,6 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
             'connectionsUnavailable' => [(string) $connections->unavailable],
             'journalPruneSuccesses' => [(string) $journal->pruneSuccesses],
             'journalPruneFailures' => [(string) $journal->pruneFailures],
-            'connectionsMax' => [(string) $this->options->getNetworkConfig()->getMaxConnections()],
             'operationsCompleted' => [(string) $operations->total()],
             'operationsFailed' => [(string) $operations->totalErrors()],
             'operationsByType' => $this->formatCounts($operations->counts),
@@ -107,7 +138,7 @@ class ServerMonitorHandler implements ServerProtocolHandlerInterface
             'trafficBytesSent' => [(string) $traffic->bytesSent],
             'trafficBytesReceived' => [(string) $traffic->bytesReceived],
             'trafficEntriesReturned' => [(string) $traffic->entriesReturned],
-        ]);
+        ];
     }
 
     /**

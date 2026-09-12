@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Metrics\File;
 
+use FreeDSx\Ldap\Exception\MetricsSnapshotException;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotWriter;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\ConnectionMetrics;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\LifecycleMetrics;
@@ -78,6 +79,24 @@ final class FileSnapshotWriterTest extends TestCase
             [],
             glob($this->path . '.*.tmp') ?: [],
         );
+    }
+
+    public function test_an_unwritable_path_is_reported_rather_than_swallowed(): void
+    {
+        $directory = sys_get_temp_dir() . '/freedsx_metrics_dir_' . uniqid('', true);
+        mkdir($directory);
+        chmod($directory, 0500);
+
+        $subject = new FileSnapshotWriter($directory . '/snapshot.json');
+
+        try {
+            $this->expectException(MetricsSnapshotException::class);
+
+            $subject->write(new MetricsSnapshot());
+        } finally {
+            chmod($directory, 0700);
+            rmdir($directory);
+        }
     }
 
     public function test_remove_deletes_the_snapshot_file(): void

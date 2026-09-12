@@ -33,6 +33,8 @@ use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
 use FreeDSx\Ldap\Server\Metrics\Observation\JournalObservation;
 use FreeDSx\Ldap\Server\Metrics\Observation\OperationObservation;
 use FreeDSx\Ldap\Server\Metrics\Observation\TrafficObservation;
+use FreeDSx\Ldap\Exception\MetricsSnapshotException;
+use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
 use FreeDSx\Ldap\Server\ServerRunner\PcntlServerRunner;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -86,6 +88,43 @@ final class ServerMonitorHandlerTest extends TestCase
             ),
             $messages[1],
         );
+    }
+
+    public function test_an_unreadable_snapshot_omits_the_counters_instead_of_reporting_zeroes(): void
+    {
+        $snapshots = $this->createMock(MetricsSnapshotProvider::class);
+        $snapshots->method('snapshot')
+            ->willThrowException(new MetricsSnapshotException('No snapshot.'));
+
+        $entry = $this->handleAndCaptureEntry(new ServerMonitorHandler(
+            options: TestServerOptions::defaults(),
+            snapshots: $snapshots,
+            responder: $this->responder(),
+        ));
+
+        self::assertNull($entry->get('connectionsTotal'));
+        self::assertNull($entry->get('operationsCompleted'));
+        self::assertNull($entry->get('trafficBytesSent'));
+    }
+
+    public function test_an_unreadable_snapshot_still_serves_what_the_server_knows_about_itself(): void
+    {
+        $snapshots = $this->createMock(MetricsSnapshotProvider::class);
+        $snapshots->method('snapshot')
+            ->willThrowException(new MetricsSnapshotException('No snapshot.'));
+
+        $entry = $this->handleAndCaptureEntry(new ServerMonitorHandler(
+            options: TestServerOptions::defaults(),
+            snapshots: $snapshots,
+            responder: $this->responder(),
+        ));
+
+        self::assertSame(
+            'cn=monitor',
+            $entry->getDn()->toString(),
+        );
+        self::assertTrue($entry->get('objectClass')?->has('extensibleObject') ?? false);
+        self::assertNotNull($entry->get('serverRunner'));
     }
 
     public function test_it_reports_the_live_connection_gauges(): void
