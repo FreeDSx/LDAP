@@ -28,6 +28,8 @@ use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactor
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
 use FreeDSx\Ldap\Protocol\Bind\SaslBind;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
+use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
+use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
@@ -57,12 +59,7 @@ final class SaslBindTest extends TestCase
 
         $this->subject = new SaslBind(
             queue: $this->mockQueue,
-            exchange: new SaslExchange(
-                $this->mockQueue,
-                new ResponseFactory(),
-                new MechanismOptionsBuilderFactory($this->mockAuthenticator),
-                $this->authzIdResolver(),
-            ),
+            exchange: $this->makeExchange(),
             mechanisms: [ServerOptions::SASL_PLAIN],
         );
     }
@@ -272,12 +269,7 @@ final class SaslBindTest extends TestCase
     {
         $subject = new SaslBind(
             queue: $this->mockQueue,
-            exchange: new SaslExchange(
-                $this->mockQueue,
-                new ResponseFactory(),
-                new MechanismOptionsBuilderFactory($this->mockAuthenticator),
-                $this->authzIdResolver(),
-            ),
+            exchange: $this->makeExchange(),
             mechanisms: [ServerOptions::SASL_CRAM_MD5],
         );
 
@@ -336,12 +328,7 @@ final class SaslBindTest extends TestCase
     {
         $subject = new SaslBind(
             queue: $this->mockQueue,
-            exchange: new SaslExchange(
-                $this->mockQueue,
-                new ResponseFactory(),
-                new MechanismOptionsBuilderFactory($this->mockAuthenticator),
-                $this->authzIdResolver(),
-            ),
+            exchange: $this->makeExchange(),
             mechanisms: [ServerOptions::SASL_CRAM_MD5],
         );
 
@@ -364,6 +351,18 @@ final class SaslBindTest extends TestCase
             1,
             new SaslBindRequest('CRAM-MD5'),
         ));
+    }
+
+    private function makeExchange(?AuthzIdResolver $authzIdResolver = null): SaslExchange
+    {
+        return new SaslExchange(
+            $this->mockQueue,
+            new ResponseFactory(),
+            new MechanismOptionsBuilderFactory($this->mockAuthenticator),
+            $authzIdResolver ?? $this->authzIdResolver(),
+            new CriticalControlValidator(),
+            new PasswordPolicyContext(),
+        );
     }
 
     private function authzIdResolver(): AuthzIdResolver
@@ -390,12 +389,7 @@ final class SaslBindTest extends TestCase
     {
         return new SaslBind(
             queue: $this->mockQueue,
-            exchange: new SaslExchange(
-                $this->mockQueue,
-                new ResponseFactory(),
-                new MechanismOptionsBuilderFactory($this->mockAuthenticator),
-                $resolver,
-            ),
+            exchange: $this->makeExchange($resolver),
             mechanisms: [ServerOptions::SASL_PLAIN],
         );
     }

@@ -165,9 +165,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                 $eventLogger,
                 $passwordAuthenticator,
                 $authzIdResolver,
-                $backend,
                 $policyContext,
-                $saslMechanisms,
             );
         }
 
@@ -231,19 +229,15 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
         );
     }
 
-    /**
-     * @param string[] $saslMechanisms
-     */
     private function makeSaslBind(
         ServerQueue $queue,
         EventLogger $eventLogger,
         PasswordAuthenticatableInterface $authenticator,
         AuthzIdResolver $authzIdResolver,
-        ReadBackendInterface $backend,
-        ?PasswordPolicyContext $policyContext,
-        array $saslMechanisms,
+        PasswordPolicyContext $policyContext,
     ): SaslBind {
         $responseFactory = new ResponseFactory();
+        $saslMechanisms = $this->serverOptions()->getSaslMechanisms();
 
         return new SaslBind(
             queue: $queue,
@@ -257,6 +251,8 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                     $authzIdResolver,
                 ),
                 $authzIdResolver,
+                $this->container->get(CriticalControlValidator::class),
+                $policyContext,
             ),
             sasl: new Sasl(new SaslOptions(
                 supported: $this->parseKnownMechanisms($saslMechanisms),
@@ -264,24 +260,20 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
             mechanisms: $saslMechanisms,
             responseFactory: $responseFactory,
             eventLogger: $eventLogger,
-            policyEnforcer: $policyContext !== null
-                ? $this->makeSaslPolicyEnforcer(
-                    $backend,
-                    $policyContext,
-                    $eventLogger,
-                )
-                : null,
+            policyEnforcer: $this->makeSaslPolicyEnforcer(
+                $policyContext,
+                $eventLogger,
+            ),
         );
     }
 
     private function makeSaslPolicyEnforcer(
-        ReadBackendInterface $backend,
         PasswordPolicyContext $policyContext,
         EventLogger $eventLogger,
     ): SaslBindPolicyEnforcer {
         return new SaslBindPolicyEnforcer(
             $this->container->get(BindNameResolverInterface::class),
-            $backend,
+            $this->container->get(ReadBackendInterface::class),
             $this->container->get(PasswordPolicyResolver::class),
             $this->makeBindGuard(
                 $policyContext,

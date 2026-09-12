@@ -25,6 +25,8 @@ use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactor
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchangeInput;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
+use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
+use FreeDSx\Ldap\Server\PasswordPolicy\PasswordPolicyContext;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
@@ -55,24 +57,15 @@ final class SaslExchangeTest extends TestCase
 
     private ChallengeInterface&MockObject $mockChallenge;
 
+    private PasswordPolicyContext $policyContext;
+
     protected function setUp(): void
     {
         $this->mockQueue = $this->createMock(ServerQueue::class);
         $this->mockChallenge = $this->createMock(ChallengeInterface::class);
 
-        $mockAuthenticator = $this->createMock(PasswordAuthenticatableInterface::class);
-
-        $this->subject = new SaslExchange(
-            queue: $this->mockQueue,
-            responseFactory: new ResponseFactory(),
-            optionsBuilderFactory: new MechanismOptionsBuilderFactory($mockAuthenticator),
-            authzIdResolver: new AuthzIdResolver(
-                $this->createMock(AccessControlInterface::class),
-                $this->createMock(ReadBackendInterface::class),
-                $this->createMock(BindNameResolverInterface::class),
-                new EventLogger(null),
-            ),
-        );
+        $this->policyContext = new PasswordPolicyContext();
+        $this->subject = $this->makeSubject($this->createMock(PasswordAuthenticatableInterface::class));
     }
 
     public function test_it_breaks_immediately_on_invalid_proof(): void
@@ -359,17 +352,7 @@ final class SaslExchangeTest extends TestCase
                 new Dn('cn=user,dc=foo,dc=bar'),
             ));
 
-        $subject = new SaslExchange(
-            queue: $this->mockQueue,
-            responseFactory: new ResponseFactory(),
-            optionsBuilderFactory: new MechanismOptionsBuilderFactory($authenticator),
-            authzIdResolver: new AuthzIdResolver(
-                $this->createMock(AccessControlInterface::class),
-                $this->createMock(ReadBackendInterface::class),
-                $this->createMock(BindNameResolverInterface::class),
-                new EventLogger(null),
-            ),
-        );
+        $subject = $this->makeSubject($authenticator);
 
         // A digest computed offline over an empty challenge, sent before the server issued one.
         $forged = 'user ' . hash_hmac('md5', '', $password);
@@ -382,6 +365,23 @@ final class SaslExchangeTest extends TestCase
         ));
 
         self::assertFalse($result->getContext()->isAuthenticated());
+    }
+
+    private function makeSubject(PasswordAuthenticatableInterface $authenticator): SaslExchange
+    {
+        return new SaslExchange(
+            queue: $this->mockQueue,
+            responseFactory: new ResponseFactory(),
+            optionsBuilderFactory: new MechanismOptionsBuilderFactory($authenticator),
+            authzIdResolver: new AuthzIdResolver(
+                $this->createMock(AccessControlInterface::class),
+                $this->createMock(ReadBackendInterface::class),
+                $this->createMock(BindNameResolverInterface::class),
+                new EventLogger(null),
+            ),
+            criticalControls: new CriticalControlValidator(),
+            policyContext: $this->policyContext,
+        );
     }
 
     private function makeInput(?string $initialCredentials = null): SaslExchangeInput
