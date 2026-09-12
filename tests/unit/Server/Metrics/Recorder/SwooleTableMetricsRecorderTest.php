@@ -165,6 +165,87 @@ final class SwooleTableMetricsRecorderTest extends TestCase
         );
     }
 
+    public function test_the_gauges_are_the_sum_of_every_worker(): void
+    {
+        $table = SwooleTableMetricsRecorder::createTable(1024);
+
+        $one = new SwooleTableMetricsRecorder($table);
+        $one->beginWorker(0);
+        $one->connectionObserved(ConnectionObservation::Opened);
+        $one->connectionObserved(ConnectionObservation::Opened);
+        $one->operationStarted(OperationType::Search);
+
+        $two = new SwooleTableMetricsRecorder($table);
+        $two->beginWorker(1);
+        $two->connectionObserved(ConnectionObservation::Opened);
+        $two->operationStarted(OperationType::Search);
+
+        $snapshot = $two->snapshot();
+
+        self::assertSame(
+            3,
+            $snapshot->connections->active,
+        );
+        self::assertSame(
+            2,
+            $snapshot->operationsInProgress[OperationType::Search->value],
+        );
+    }
+
+    public function test_a_restarted_worker_discards_what_its_predecessor_left_behind(): void
+    {
+        $table = SwooleTableMetricsRecorder::createTable(1024);
+
+        $killed = new SwooleTableMetricsRecorder($table);
+        $killed->beginWorker(0);
+        $killed->connectionObserved(ConnectionObservation::Opened);
+        $killed->connectionObserved(ConnectionObservation::Opened);
+        $killed->operationStarted(OperationType::Search);
+
+        $survivor = new SwooleTableMetricsRecorder($table);
+        $survivor->beginWorker(1);
+        $survivor->connectionObserved(ConnectionObservation::Opened);
+
+        // The pool restarts the dead worker, which reuses its id and never ran its decrements.
+        $restarted = new SwooleTableMetricsRecorder($table);
+        $restarted->beginWorker(0);
+
+        $snapshot = $restarted->snapshot();
+
+        self::assertSame(
+            1,
+            $snapshot->connections->active,
+        );
+        self::assertSame(
+            0,
+            $snapshot->operationsInProgress[OperationType::Search->value] ?? 0,
+        );
+    }
+
+    public function test_a_restarted_worker_leaves_the_cumulative_counters_alone(): void
+    {
+        $table = SwooleTableMetricsRecorder::createTable(1024);
+
+        $killed = new SwooleTableMetricsRecorder($table);
+        $killed->beginWorker(0);
+        $killed->connectionObserved(ConnectionObservation::Opened);
+        $killed->connectionObserved(ConnectionObservation::Rejected);
+
+        $restarted = new SwooleTableMetricsRecorder($table);
+        $restarted->beginWorker(0);
+
+        $connections = $restarted->snapshot()->connections;
+
+        self::assertSame(
+            1,
+            $connections->total,
+        );
+        self::assertSame(
+            1,
+            $connections->rejected,
+        );
+    }
+
     public function test_it_tracks_connections_opening_and_closing(): void
     {
         $this->subject->connectionObserved(ConnectionObservation::Opened);
