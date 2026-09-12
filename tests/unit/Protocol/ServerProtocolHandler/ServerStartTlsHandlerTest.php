@@ -117,7 +117,7 @@ final class ServerStartTlsHandlerTest extends TestCase
         $this->assertNull($stream->onComplete);
     }
 
-    public function test_it_should_send_back_an_error_if_encryption_is_not_supported(): void
+    public function test_a_server_with_no_tls_configured_answers_protocol_error(): void
     {
         $this->mockConnection
             ->method('isEncrypted')
@@ -139,7 +139,7 @@ final class ServerStartTlsHandlerTest extends TestCase
                 1,
                 new ExtendedResponse(
                     new LdapResult(
-                        ResultCode::UNAVAILABLE,
+                        ResultCode::PROTOCOL_ERROR,
                         '',
                         'The server is not configured to provide TLS.',
                     ),
