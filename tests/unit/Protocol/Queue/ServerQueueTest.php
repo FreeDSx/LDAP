@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\CancelRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
+use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
@@ -357,6 +358,25 @@ final class ServerQueueTest extends TestCase
         $queue = new ServerQueue($socket, new LdapEncoder());
 
         self::assertNull($queue->peekForCancelSignal(2));
+    }
+
+    public function test_peek_signals_an_unbind_and_still_leaves_it_to_be_read(): void
+    {
+        $queue = $this->makeQueueWithEncodedRequest(
+            new LdapMessageRequest(3, new UnbindRequest()),
+        );
+
+        $signal = $queue->peekForCancelSignal(2);
+
+        self::assertInstanceOf(
+            UnbindRequest::class,
+            $signal?->getRequest(),
+        );
+        // The session still ends the way an unbind ends it, so the message must survive the peek.
+        self::assertInstanceOf(
+            UnbindRequest::class,
+            $queue->getMessage()->getRequest(),
+        );
     }
 
     public function test_peek_returns_abandon_request_targeting_in_flight_message(): void

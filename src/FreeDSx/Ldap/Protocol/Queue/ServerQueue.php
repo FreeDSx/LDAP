@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Exception\UnsolicitedNotificationException;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\CancelRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
+use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\LdapQueue;
@@ -133,8 +134,13 @@ class ServerQueue extends LdapQueue implements ConnectionControl
         if ($this->isAbandonOrCancelRequest($request, $inFlightMessageId)) {
             return $message;
         }
-
         $this->pendingMessages[] = $message;
+
+        // Buffered as well as signalled.
+        // The session still has to end the way an unbind normally ends it.
+        if ($request instanceof UnbindRequest) {
+            return $message;
+        }
 
         return null;
     }

@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\CancelRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
@@ -661,6 +662,48 @@ final class ServerSearchHandlerTest extends TestCase
         );
 
         self::assertEmpty($sentDone);
+    }
+
+    public function test_unbind_mid_stream_stops_entries_and_sends_no_response(): void
+    {
+        $entries = array_map(
+            static fn(int $i): Entry => Entry::create("cn=$i,dc=foo,dc=bar"),
+            range(1, 51),
+        );
+
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar'),
+        );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturn(EntryStream::of($this->makeGenerator(...$entries)));
+
+        $this->mockFilterEvaluator
+            ->method('evaluate')
+            ->willReturn(true);
+
+        $this->mockQueue
+            ->method('peekForCancelSignal')
+            ->willReturn(new LdapMessageRequest(3, new UnbindRequest()));
+
+        $this->drive($this->subject, $search);
+
+        $sentEntries = array_filter(
+            $this->sentMessages,
+            static fn(LdapMessageResponse $r): bool => $r->getResponse() instanceof SearchResultEntry,
+        );
+        $sentDone = array_filter(
+            $this->sentMessages,
+            static fn(LdapMessageResponse $r): bool => $r->getResponse() instanceof SearchResultDone,
+        );
+
+        self::assertEmpty($sentDone);
+        self::assertLessThan(
+            count($entries),
+            count($sentEntries),
+        );
     }
 
     public function test_cancel_mid_stream_stops_entries_and_sends_canceled_plus_success(): void
