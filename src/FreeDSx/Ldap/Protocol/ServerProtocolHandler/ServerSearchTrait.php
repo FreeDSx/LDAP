@@ -67,7 +67,8 @@ trait ServerSearchTrait
             }
         }
 
-        if ($cancellation->isAbandoned()) {
+        // Nobody is left to read a response once the client has unbound, so none is transmitted.
+        if ($cancellation->isAbandoned() || $cancellation->isUnbound()) {
             return;
         }
         $cancelSignal = $cancellation->signal();

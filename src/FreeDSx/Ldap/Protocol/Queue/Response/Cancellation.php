@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Protocol\Queue\Response;
 
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\CancelRequest;
+use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 
 /**
@@ -51,6 +52,14 @@ final class Cancellation
     public function isCanceled(): bool
     {
         return $this->signal?->getRequest() instanceof CancelRequest;
+    }
+
+    /**
+     * RFC 4511 3.1 leaves an operation in flight when the client unbinds with nobody to answer.
+     */
+    public function isUnbound(): bool
+    {
+        return $this->signal?->getRequest() instanceof UnbindRequest;
     }
 
     public function signal(): ?LdapMessageRequest
