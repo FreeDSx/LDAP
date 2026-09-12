@@ -161,6 +161,13 @@ final class LdapServerCommand extends Command
                 'Enable SASL mechanisms with plaintext-password storage',
             )
             ->addOption(
+                'workers',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Swoole worker processes to accept on; more than one uses the pooled runner',
+                '1',
+            )
+            ->addOption(
                 'monitor',
                 null,
                 InputOption::VALUE_NONE,
@@ -325,7 +332,10 @@ final class LdapServerCommand extends Command
             ->setShutdownTimeout((int) $this->getStringOption($input, 'shutdown-timeout'));
 
         $options = (new ServerOptions($this->createStorageConfig($storageType), $network))
-            ->setRunnerConfig(new RunnerConfig($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl))
+            ->setRunnerConfig(new RunnerConfig(
+                $runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl,
+                (int) $this->getStringOption($input, 'workers'),
+            ))
             ->setAllowAnonymous($allowAnonymous)
             ->setRequireConfidentiality($confidentiality)
             ->setMonitorEnabled($input->getOption('monitor') === true)
