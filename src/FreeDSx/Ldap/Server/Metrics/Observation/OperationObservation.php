@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Operation\OperationType;
 final readonly class OperationObservation
 {
     /**
-     * @param int $resultCode The LDAP result code the operation produced.
+     * @param int|null $resultCode The LDAP result code, or null for an operation the client is never answered on.
      * @param string|null $bindMethod The bind sub-type (anonymous/simple/sasl) for binds, null otherwise.
      * @param string|null $searchScope The search scope (base/one/sub) for searches, null otherwise.
      */
@@ -31,7 +31,7 @@ final readonly class OperationObservation
         public OperationType $operation,
         public bool $succeeded,
         public float $durationSeconds,
-        public int $resultCode,
+        public ?int $resultCode,
         public ?string $bindMethod = null,
         public ?string $searchScope = null,
     ) {}

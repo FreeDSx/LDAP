@@ -81,22 +81,15 @@ final class FileSnapshotWriterTest extends TestCase
         );
     }
 
-    public function test_an_unwritable_path_is_reported_rather_than_swallowed(): void
+    public function test_a_path_that_cannot_be_written_is_reported_rather_than_swallowed(): void
     {
-        $directory = sys_get_temp_dir() . '/freedsx_metrics_dir_' . uniqid('', true);
-        mkdir($directory);
-        chmod($directory, 0500);
+        $subject = new FileSnapshotWriter(
+            sys_get_temp_dir() . '/freedsx_metrics_absent_' . uniqid('', true) . '/snapshot.json',
+        );
 
-        $subject = new FileSnapshotWriter($directory . '/snapshot.json');
+        $this->expectException(MetricsSnapshotException::class);
 
-        try {
-            $this->expectException(MetricsSnapshotException::class);
-
-            $subject->write(new MetricsSnapshot());
-        } finally {
-            chmod($directory, 0700);
-            rmdir($directory);
-        }
+        $subject->write(new MetricsSnapshot());
     }
 
     public function test_remove_deletes_the_snapshot_file(): void

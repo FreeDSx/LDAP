@@ -108,7 +108,9 @@ final readonly class MetricsMiddleware implements MiddlewareInterface
             $operation,
             $succeeded,
             $durationSeconds,
-            $resultCode,
+            $operation->hasResponse()
+                ? $resultCode
+                : null,
             $this->bindMethod($request),
             $this->searchScope($request),
         ));

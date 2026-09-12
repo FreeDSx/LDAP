@@ -178,10 +178,12 @@ final class SwooleTableMetricsRecorder implements
             self::OPERATION_MICROS . $operation,
             (int) ($observation->durationSeconds * self::MICROSECONDS),
         );
-        $this->add(
-            self::RESULT_CODE . $observation->resultCode,
-            1,
-        );
+        if ($observation->resultCode !== null) {
+            $this->add(
+                self::RESULT_CODE . $observation->resultCode,
+                1,
+            );
+        }
 
         if (!$observation->succeeded) {
             $this->add(
@@ -326,6 +328,8 @@ final class SwooleTableMetricsRecorder implements
                 default => null,
             };
         }
+        // A row lingers at zero once its operation has been seen, which would report idle types as in flight.
+        $inProgress = array_filter($inProgress);
 
         return new MetricsSnapshot(
             lifecycle: new LifecycleMetrics(

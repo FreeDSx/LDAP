@@ -159,9 +159,20 @@ final class SwooleTableMetricsRecorderTest extends TestCase
         // A worker killed mid-operation leaves the decrement without its increment.
         $this->observe(OperationType::Search);
 
+        self::assertArrayNotHasKey(
+            OperationType::Search->value,
+            $this->subject->snapshot()->operationsInProgress,
+        );
+    }
+
+    public function test_an_operation_that_is_no_longer_running_is_not_reported_as_in_flight(): void
+    {
+        $this->subject->operationStarted(OperationType::Search);
+        $this->observe(OperationType::Search);
+
         self::assertSame(
-            0,
-            $this->subject->snapshot()->operationsInProgress[OperationType::Search->value],
+            [],
+            $this->subject->snapshot()->operationsInProgress,
         );
     }
 
