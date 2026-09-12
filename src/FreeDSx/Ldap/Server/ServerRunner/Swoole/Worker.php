@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\ServerRunner\Swoole;
 use Closure;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
+use FreeDSx\Ldap\Server\Metrics\WorkerScopedMetricsInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
 use FreeDSx\Ldap\Server\ServerRunner\ReloadsConfigurationTrait;
@@ -71,6 +72,7 @@ class Worker
     {
         Runtime::enableCoroutine(SWOOLE_HOOK_ALL);
         $this->adoptCurrentConfiguration($context);
+        $this->claimWorkerMetrics($context);
 
         $acceptor = new ConnectionAcceptor(
             $this->serverProtocolFactory,
@@ -89,6 +91,20 @@ class Worker
         });
 
         $this->logShutdownCompleted($context);
+    }
+
+    /**
+     * A worker the pool restarts reuses its id, so claiming it here discards what its predecessor left behind.
+     *
+     * @param array<string, scalar> $context
+     */
+    private function claimWorkerMetrics(array $context): void
+    {
+        if (!$this->metricsRecorder instanceof WorkerScopedMetricsInterface) {
+            return;
+        }
+
+        $this->metricsRecorder->beginWorker((int) ($context['worker_id'] ?? 0));
     }
 
     /**

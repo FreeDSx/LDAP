@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Server\Metrics\Observation\JournalObservation;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Observation\OperationObservation;
 use FreeDSx\Ldap\Server\Metrics\Observation\TrafficObservation;
+use FreeDSx\Ldap\Server\Metrics\WorkerScopedMetricsInterface;
 
 use function array_values;
 
@@ -27,7 +28,7 @@ use function array_values;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class MetricsRecorderChain implements MetricsRecorderInterface
+final readonly class MetricsRecorderChain implements MetricsRecorderInterface, WorkerScopedMetricsInterface
 {
     /**
      * @var list<MetricsRecorderInterface>
@@ -37,6 +38,17 @@ final readonly class MetricsRecorderChain implements MetricsRecorderInterface
     public function __construct(MetricsRecorderInterface ...$recorders)
     {
         $this->recorders = array_values($recorders);
+    }
+
+    public function beginWorker(int $workerId): void
+    {
+        foreach ($this->recorders as $recorder) {
+            if (!$recorder instanceof WorkerScopedMetricsInterface) {
+                continue;
+            }
+
+            $recorder->beginWorker($workerId);
+        }
     }
 
     public function operationObserved(OperationObservation $observation): void

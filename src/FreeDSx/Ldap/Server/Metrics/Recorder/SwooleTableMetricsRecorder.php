@@ -26,12 +26,14 @@ use FreeDSx\Ldap\Server\Metrics\Snapshot\LifecycleMetrics;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\MetricsSnapshot;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\OperationMetrics;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\TrafficMetrics;
+use FreeDSx\Ldap\Server\Metrics\WorkerScopedMetricsInterface;
 use Swoole\Table;
 
 use function is_int;
 use function max;
 use function str_starts_with;
 use function strlen;
+use function strpos;
 use function substr;
 
 /**
@@ -39,7 +41,10 @@ use function substr;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, MetricsSnapshotProvider
+final class SwooleTableMetricsRecorder implements
+    MetricsRecorderInterface,
+    MetricsSnapshotProvider,
+    WorkerScopedMetricsInterface
 {
     private const COLUMN = 'v';
 
@@ -59,7 +64,10 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
 
     private const LIFECYCLE_RELOAD_COUNT = 'life.reloadCount';
 
-    private const CONNECTIONS_ACTIVE = 'conn.active';
+    /**
+     * Gauges go up and back down. These must be work scoped to properly track them (workers can be killed).
+     */
+    private const CONNECTIONS_ACTIVE = 'conn.active.';
 
     private const CONNECTIONS_TOTAL = 'conn.total';
 
@@ -99,10 +107,25 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
 
     private const SEARCH_SCOPE = 'scope.';
 
+    private int $workerId = 0;
+
     /**
      * @param Table<array{v: int}> $table Must be created before the pool forks, so every worker shares the one mapping.
      */
     public function __construct(private readonly Table $table) {}
+
+    public function beginWorker(int $workerId): void
+    {
+        $this->workerId = $workerId;
+
+        foreach ($this->table as $key => $row) {
+            if (!$this->belongsToWorker($key, $workerId)) {
+                continue;
+            }
+
+            $this->table->del($key);
+        }
+    }
 
     /**
      * Builds the shared table; call before starting a worker pool.
@@ -126,7 +149,7 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
     public function operationStarted(OperationType $operation): void
     {
         $this->add(
-            self::OPERATION_IN_PROGRESS . $operation->value,
+            $this->inProgressKey($operation->value),
             1,
         );
     }
@@ -136,7 +159,7 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
         $operation = $observation->operation->value;
 
         $this->add(
-            self::OPERATION_IN_PROGRESS . $operation,
+            $this->inProgressKey($operation),
             -1,
         );
         $this->add(
@@ -194,7 +217,7 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
     {
         match ($observation) {
             ConnectionObservation::Opened => $this->onOpened(),
-            ConnectionObservation::Closed => $this->add(self::CONNECTIONS_ACTIVE, -1),
+            ConnectionObservation::Closed => $this->add($this->activeKey(), -1),
             ConnectionObservation::Rejected => $this->add(self::CONNECTIONS_REJECTED, 1),
             ConnectionObservation::WriteTimeout => $this->add(self::CONNECTIONS_WRITE_TIMEOUTS, 1),
             ConnectionObservation::IdleTimeout => $this->add(self::CONNECTIONS_IDLE_TIMEOUTS, 1),
@@ -246,24 +269,37 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
         $binds = [];
         $scopes = [];
         $inProgress = [];
+        $active = 0;
 
         foreach ($this->table as $key => $row) {
             $value = $row[self::COLUMN];
 
+            // Each worker keeps its own gauge row, floored on its own, and the pool total is their sum.
+            if ($this->isKeyFor($key, self::CONNECTIONS_ACTIVE)) {
+                $active += max(0, $value);
+
+                continue;
+            }
+
+            if ($this->isKeyFor($key, self::OPERATION_IN_PROGRESS)) {
+                $operation = $this->inProgressOperation($key);
+                $inProgress[$operation] = ($inProgress[$operation] ?? 0) + max(0, $value);
+
+                continue;
+            }
+
             match (true) {
-                str_starts_with($key, self::OPERATION_COUNT)
+                $this->isKeyFor($key, self::OPERATION_COUNT)
                     => $counts[$this->suffix($key, self::OPERATION_COUNT)] = $value,
-                str_starts_with($key, self::OPERATION_ERROR)
+                $this->isKeyFor($key, self::OPERATION_ERROR)
                     => $errors[$this->suffix($key, self::OPERATION_ERROR)] = $value,
-                str_starts_with($key, self::OPERATION_MICROS)
+                $this->isKeyFor($key, self::OPERATION_MICROS)
                     => $durations[$this->suffix($key, self::OPERATION_MICROS)] = $value / self::MICROSECONDS,
-                str_starts_with($key, self::OPERATION_IN_PROGRESS)
-                    => $inProgress[$this->suffix($key, self::OPERATION_IN_PROGRESS)] = max(0, $value),
-                str_starts_with($key, self::RESULT_CODE)
+                $this->isKeyFor($key, self::RESULT_CODE)
                     => $resultCodes[(int) $this->suffix($key, self::RESULT_CODE)] = $value,
-                str_starts_with($key, self::BIND_METHOD)
+                $this->isKeyFor($key, self::BIND_METHOD)
                     => $binds[$this->suffix($key, self::BIND_METHOD)] = $value,
-                str_starts_with($key, self::SEARCH_SCOPE)
+                $this->isKeyFor($key, self::SEARCH_SCOPE)
                     => $scopes[$this->suffix($key, self::SEARCH_SCOPE)] = $value,
                 default => null,
             };
@@ -276,7 +312,7 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
                 reloadCount: $this->get(self::LIFECYCLE_RELOAD_COUNT),
             ),
             connections: new ConnectionMetrics(
-                active: max(0, $this->get(self::CONNECTIONS_ACTIVE)),
+                active: $active,
                 total: $this->get(self::CONNECTIONS_TOTAL),
                 rejected: $this->get(self::CONNECTIONS_REJECTED),
                 writeTimeouts: $this->get(self::CONNECTIONS_WRITE_TIMEOUTS),
@@ -309,12 +345,49 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
     private function onOpened(): void
     {
         $this->add(
-            self::CONNECTIONS_ACTIVE,
+            $this->activeKey(),
             1,
         );
         $this->add(
             self::CONNECTIONS_TOTAL,
             1,
+        );
+    }
+
+    /**
+     * The gauge row this worker owns, which only it adds to and only it clears.
+     */
+    private function activeKey(): string
+    {
+        return self::CONNECTIONS_ACTIVE . $this->workerId;
+    }
+
+    private function inProgressKey(string $operation): string
+    {
+        return self::OPERATION_IN_PROGRESS . $this->workerId . '.' . $operation;
+    }
+
+    /**
+     * Whether a key is one of the gauge rows scoped to the given worker.
+     */
+    private function belongsToWorker(
+        string $key,
+        int $workerId,
+    ): bool {
+        return $key === self::CONNECTIONS_ACTIVE . $workerId
+            || $this->isKeyFor($key, self::OPERATION_IN_PROGRESS . $workerId . '.');
+    }
+
+    /**
+     * Whether a row belongs to the group a prefix names.
+     */
+    private function isKeyFor(
+        string $key,
+        string $prefix,
+    ): bool {
+        return str_starts_with(
+            $key,
+            $prefix,
         );
     }
 
@@ -367,5 +440,18 @@ final class SwooleTableMetricsRecorder implements MetricsRecorderInterface, Metr
         string $prefix,
     ): string {
         return substr($key, strlen($prefix));
+    }
+
+    /**
+     * Reads the operation back out of a gauge key, which carries the worker it belongs to ahead of it.
+     */
+    private function inProgressOperation(string $key): string
+    {
+        $scoped = $this->suffix($key, self::OPERATION_IN_PROGRESS);
+        $separator = strpos($scoped, '.');
+
+        return $separator === false
+            ? $scoped
+            : substr($scoped, $separator + 1);
     }
 }
