@@ -35,6 +35,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
+use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\SubtreeMoveRecorder;
@@ -65,9 +66,11 @@ use FreeDSx\Ldap\Server\Backend\Storage\Search\StorageListOptionsFactory;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
+use FreeDSx\Ldap\Server\Clock\Sleeper\BackoffSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\CoroutineSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
+use FreeDSx\Ldap\Server\Config\Replication\ConsumerConfig;
 use FreeDSx\Ldap\Server\Clock\SystemClock;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\ConnectionHandlerBuilderInterface;
@@ -91,6 +94,7 @@ use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareChain;
 use FreeDSx\Ldap\Server\Middleware\ReadOnlyMiddleware;
 use FreeDSx\Ldap\Server\Middleware\RequestValidationMiddleware;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\LdapClientForwardStateSender;
+use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\PasswordPolicyForwarder;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\PasswordPolicyForwardWorker;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
@@ -106,6 +110,8 @@ use FreeDSx\Ldap\Ldif\LdifParser;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Sync\Consumer\LdapReplica;
 use FreeDSx\Ldap\Sync\Consumer\PrimaryConnectionFactory;
+use FreeDSx\Ldap\Sync\Consumer\ReconcilingChangeApplier;
+use FreeDSx\Ldap\Sync\Consumer\VerbatimStorageApplier;
 use Psr\Log\NullLogger;
 
 /**
@@ -132,6 +138,10 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             LdifParser::class => static fn(): LdifParser => new LdifParser(),
             EntryLocator::class => static fn(Container $c): EntryLocator => new EntryLocator(
                 $c->get(EntryStorageInterface::class),
+            ),
+            EntryUuidLocator::class => static fn(Container $c): EntryUuidLocator => new EntryUuidLocator(
+                $c->get(EntryStorageInterface::class),
+                $c->get(FilterEvaluatorInterface::class),
             ),
             SubtreeEnumerator::class => static fn(Container $c): SubtreeEnumerator => new SubtreeEnumerator(
                 $c->get(EntryStorageInterface::class),
@@ -727,10 +737,17 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             return null;
         }
 
-        return new PasswordPolicyForwardWorker(
+        $forwarder = new PasswordPolicyForwarder(
             $container->get(ReplicaPasswordStateStoreInterface::class),
             new LdapClientForwardStateSender(new PrimaryConnectionFactory($config)),
+            $container->get(ReadBackendInterface::class),
+            $options->getLogger(),
+        );
+
+        return new PasswordPolicyForwardWorker(
+            $forwarder,
             $container->get(SleeperInterface::class),
+            $this->makeBackoffSleeper($container, $config),
             interval: $config->getForwardInterval(),
             signals: $useCoroutineSleeper
                 ? null
@@ -755,24 +772,41 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             return null;
         }
 
-        $storage = $container->get(EntryStorageInterface::class);
+        // listen() must not time out its blocking read, or the persist phase would abort each interval.
+        $config->getPrimary()
+            ->setTimeoutRead(-1);
 
-        // Pair reconciliation with forwarding: the store drops forwarded state once the primary's entry replicates back.
-        $passwordStateStore = $container->get(ReplicaPasswordStateStoreInterface::class);
+        $applier = new VerbatimStorageApplier(
+            $container->get(EntryStorageInterface::class),
+            $container->get(EntryUuidLocator::class),
+        );
 
-        return $hostManagedShutdown
-            ? LdapReplica::forSwoole(
-                $config,
-                $storage,
-                $options->getLogger(),
-                signals: null,
-                passwordStateStore: $passwordStateStore,
-            )
-            : LdapReplica::forPcntl(
-                $config,
-                $storage,
-                $options->getLogger(),
-                passwordStateStore: $passwordStateStore,
-            );
+        return new LdapReplica(
+            connectionFactory: new PrimaryConnectionFactory($config),
+            // Pair reconciliation with forwarding: the store drops forwarded state once the primary's entry replicates back.
+            applier: new ReconcilingChangeApplier(
+                $applier,
+                $container->get(ReplicaPasswordStateStoreInterface::class),
+            ),
+            checkpoint: $config->getCheckpoint(),
+            backoff: $this->makeBackoffSleeper($container, $config),
+            signals: $hostManagedShutdown
+                ? null
+                : new PcntlShutdownSignals(),
+            logger: $options->getLogger(),
+        );
+    }
+
+    /**
+     * A fresh backoff sleeper over the configured policy, since each daemon tracks its own delay.
+     */
+    private function makeBackoffSleeper(
+        Container $container,
+        ConsumerConfig $config,
+    ): BackoffSleeper {
+        return new BackoffSleeper(
+            $config->getReconnectBackoff(),
+            $container->get(SleeperInterface::class),
+        );
     }
 }

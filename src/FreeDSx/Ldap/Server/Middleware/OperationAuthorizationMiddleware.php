@@ -22,7 +22,6 @@ use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
-use FreeDSx\Ldap\Operation\Request\ForwardPasswordPolicyStateRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Request\ModifyRequest;
@@ -180,8 +179,6 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
     {
         return match (true) {
             $request instanceof SearchRequest => $request->getBaseDn(),
-            // An extended operation names no entry in general, but this one does, and a rule may name it too.
-            $request instanceof ForwardPasswordPolicyStateRequest => $request->getDn(),
             default => OperationTargetDn::of($request),
         };
     }

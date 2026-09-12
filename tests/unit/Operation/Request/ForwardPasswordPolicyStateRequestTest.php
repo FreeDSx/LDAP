@@ -25,6 +25,8 @@ use PHPUnit\Framework\TestCase;
 
 final class ForwardPasswordPolicyStateRequestTest extends TestCase
 {
+    private const UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
     private DateTimeImmutable $time;
 
     private DateTimeImmutable $success;
@@ -42,21 +44,16 @@ final class ForwardPasswordPolicyStateRequestTest extends TestCase
             new DateTimeZone('UTC'),
         );
         $this->subject = new ForwardPasswordPolicyStateRequest(
-            'cn=user,dc=foo,dc=bar',
-            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            self::UUID,
             [$this->time],
             $this->success,
         );
     }
 
-    public function test_it_exposes_the_dn_uuid_failure_times_and_last_success(): void
+    public function test_it_exposes_the_uuid_failure_times_and_last_success(): void
     {
         self::assertSame(
-            'cn=user,dc=foo,dc=bar',
-            $this->subject->getDn()->toString(),
-        );
-        self::assertSame(
-            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            self::UUID,
             $this->subject->getEntryUuid(),
         );
         self::assertEquals(
@@ -72,7 +69,7 @@ final class ForwardPasswordPolicyStateRequestTest extends TestCase
     public function test_last_success_defaults_to_null(): void
     {
         self::assertNull(
-            (new ForwardPasswordPolicyStateRequest('cn=user,dc=foo,dc=bar'))->getLastSuccess(),
+            (new ForwardPasswordPolicyStateRequest(self::UUID))->getLastSuccess(),
         );
     }
 
@@ -92,8 +89,7 @@ final class ForwardPasswordPolicyStateRequestTest extends TestCase
             Asn1::application(23, Asn1::sequence(
                 Asn1::context(0, Asn1::octetString(ExtendedRequest::OID_PPOLICY_STATE_FORWARD)),
                 Asn1::context(1, Asn1::octetString($encoder->encode(Asn1::sequence(
-                    Asn1::octetString('cn=user,dc=foo,dc=bar'),
-                    Asn1::octetString('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+                    Asn1::octetString(self::UUID),
                     Asn1::setOf(Asn1::octetString(GeneralizedTime::formatWithFraction($this->time))),
                     Asn1::context(0, Asn1::octetString(GeneralizedTime::format($this->success))),
                 )))),
@@ -106,8 +102,7 @@ final class ForwardPasswordPolicyStateRequestTest extends TestCase
     {
         $encoder = new LdapEncoder();
         $request = new ForwardPasswordPolicyStateRequest(
-            'cn=user,dc=foo,dc=bar',
-            'uuid',
+            self::UUID,
             [$this->time],
         );
 
@@ -115,8 +110,7 @@ final class ForwardPasswordPolicyStateRequestTest extends TestCase
             Asn1::application(23, Asn1::sequence(
                 Asn1::context(0, Asn1::octetString(ExtendedRequest::OID_PPOLICY_STATE_FORWARD)),
                 Asn1::context(1, Asn1::octetString($encoder->encode(Asn1::sequence(
-                    Asn1::octetString('cn=user,dc=foo,dc=bar'),
-                    Asn1::octetString('uuid'),
+                    Asn1::octetString(self::UUID),
                     Asn1::setOf(Asn1::octetString(GeneralizedTime::formatWithFraction($this->time))),
                 )))),
             )),
@@ -137,8 +131,7 @@ final class ForwardPasswordPolicyStateRequestTest extends TestCase
     public function test_it_round_trips_without_a_last_success(): void
     {
         $request = new ForwardPasswordPolicyStateRequest(
-            'cn=user,dc=foo,dc=bar',
-            'uuid',
+            self::UUID,
             [$this->time],
         );
 
@@ -151,6 +144,20 @@ final class ForwardPasswordPolicyStateRequestTest extends TestCase
         );
     }
 
+    public function test_it_rejects_a_malformed_entry_uuid(): void
+    {
+        $this->expectException(ProtocolException::class);
+
+        ForwardPasswordPolicyStateRequest::fromAsn1(
+            (new ExtendedRequest(ExtendedRequest::OID_PPOLICY_STATE_FORWARD))
+                ->setValue(Asn1::sequence(
+                    Asn1::octetString('not-a-uuid'),
+                    Asn1::setOf(),
+                ))
+                ->toAsn1(),
+        );
+    }
+
     public function test_it_rejects_an_invalid_failure_time(): void
     {
         $this->expectException(ProtocolException::class);
@@ -158,8 +165,7 @@ final class ForwardPasswordPolicyStateRequestTest extends TestCase
         ForwardPasswordPolicyStateRequest::fromAsn1(
             (new ExtendedRequest(ExtendedRequest::OID_PPOLICY_STATE_FORWARD))
                 ->setValue(Asn1::sequence(
-                    Asn1::octetString('cn=user,dc=foo,dc=bar'),
-                    Asn1::octetString('uuid'),
+                    Asn1::octetString(self::UUID),
                     Asn1::setOf(Asn1::octetString('not-a-time')),
                 ))
                 ->toAsn1(),
@@ -173,10 +179,38 @@ final class ForwardPasswordPolicyStateRequestTest extends TestCase
         ForwardPasswordPolicyStateRequest::fromAsn1(
             (new ExtendedRequest(ExtendedRequest::OID_PPOLICY_STATE_FORWARD))
                 ->setValue(Asn1::sequence(
-                    Asn1::octetString('cn=user,dc=foo,dc=bar'),
-                    Asn1::octetString('uuid'),
+                    Asn1::octetString(self::UUID),
                     Asn1::setOf(),
                     Asn1::context(0, Asn1::octetString('not-a-time')),
+                ))
+                ->toAsn1(),
+        );
+    }
+
+    public function test_it_rejects_too_few_children(): void
+    {
+        $this->expectException(ProtocolException::class);
+
+        ForwardPasswordPolicyStateRequest::fromAsn1(
+            (new ExtendedRequest(ExtendedRequest::OID_PPOLICY_STATE_FORWARD))
+                ->setValue(Asn1::sequence(
+                    Asn1::octetString(self::UUID),
+                ))
+                ->toAsn1(),
+        );
+    }
+
+    public function test_it_rejects_too_many_children(): void
+    {
+        $this->expectException(ProtocolException::class);
+
+        ForwardPasswordPolicyStateRequest::fromAsn1(
+            (new ExtendedRequest(ExtendedRequest::OID_PPOLICY_STATE_FORWARD))
+                ->setValue(Asn1::sequence(
+                    Asn1::octetString(self::UUID),
+                    Asn1::setOf(),
+                    Asn1::context(0, Asn1::octetString(GeneralizedTime::format($this->success))),
+                    Asn1::octetString('extra'),
                 ))
                 ->toAsn1(),
         );

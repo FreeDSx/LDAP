@@ -11,9 +11,9 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Unit\FreeDSx\Ldap\Sync\Consumer;
+namespace Tests\Unit\FreeDSx\Ldap\Server\Config;
 
-use FreeDSx\Ldap\Sync\Consumer\ReconnectBackoff;
+use FreeDSx\Ldap\Server\Config\ReconnectBackoff;
 use PHPUnit\Framework\TestCase;
 
 final class ReconnectBackoffTest extends TestCase

@@ -22,7 +22,10 @@ use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Search\Result\EntryResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Utility\Uuid;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Sync\Consumer\ChangeApplierInterface;
 use FreeDSx\Ldap\Sync\Consumer\VerbatimStorageApplier;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
@@ -32,6 +35,8 @@ use PHPUnit\Framework\TestCase;
 
 final class VerbatimStorageApplierTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private const UUID_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
     private const UUID_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -45,7 +50,13 @@ final class VerbatimStorageApplierTest extends TestCase
     protected function setUp(): void
     {
         $this->storage = new InMemoryStorage();
-        $this->subject = new VerbatimStorageApplier($this->storage);
+        $this->subject = new VerbatimStorageApplier(
+            $this->storage,
+            new EntryUuidLocator(
+                $this->storage,
+                $this->fromContainer(FilterEvaluatorInterface::class),
+            ),
+        );
     }
 
     public function test_an_add_stores_the_entry(): void

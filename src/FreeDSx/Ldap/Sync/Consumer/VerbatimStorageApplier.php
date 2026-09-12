@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Sync\Consumer;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
-use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
@@ -45,7 +45,10 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
      */
     private array $presentUuids = [];
 
-    public function __construct(private readonly EntryStorageInterface $storage) {}
+    public function __construct(
+        private readonly EntryStorageInterface $storage,
+        private readonly EntryUuidLocator $locator,
+    ) {}
 
     public function beginRefresh(): void
     {
@@ -181,31 +184,10 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
      */
     private function dnHolding(string $uuid): ?Dn
     {
-        $options = new StorageListOptions(
-            baseDn: new Dn(''),
-            subtree: true,
-            filter: Filters::equal(
-                AttributeTypeOid::NAME_ENTRY_UUID,
-                $uuid,
-            ),
-        );
-
-        $wanted = strtolower($uuid);
-
-        // Storage answers the filter only where it can, so each candidate is checked rather than trusted.
-        foreach ($this->storage->list($options)->entries() as $entry) {
-            $candidate = $entry->get(AttributeTypeOid::NAME_ENTRY_UUID)
-                ?->firstValue();
-
-            if ($candidate === null || strtolower($candidate) !== $wanted) {
-                continue;
-            }
-
-            return $entry->getDn()
-                ->normalize();
-        }
-
-        return null;
+        return $this->locator
+            ->findByUuid($uuid)
+            ?->getDn()
+            ->normalize();
     }
 
     /**

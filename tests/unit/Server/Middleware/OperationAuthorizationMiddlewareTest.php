@@ -467,10 +467,7 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         self::assertNotNull($this->next->received);
     }
 
-    /**
-     * This extended operation names an entry, so a DN-scoped rule can match instead of falling back to the root.
-     */
-    public function test_a_privileged_control_on_a_forward_is_authorized_against_its_target_dn(): void
+    public function test_a_privileged_control_on_a_forward_is_gated_against_the_root(): void
     {
         $this->routeResolvesTo(HandlerId::PasswordPolicyForward);
 
@@ -487,7 +484,7 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
 
         $message = new LdapMessageRequest(
             1,
-            new ForwardPasswordPolicyStateRequest('cn=locked,ou=people,dc=foo,dc=bar', 'uuid', []),
+            new ForwardPasswordPolicyStateRequest('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', []),
             new Control(Control::OID_RELAX_RULES, criticality: true),
         );
 
@@ -497,7 +494,7 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         );
 
         self::assertSame(
-            'cn=locked,ou=people,dc=foo,dc=bar',
+            '',
             $authorized,
         );
     }

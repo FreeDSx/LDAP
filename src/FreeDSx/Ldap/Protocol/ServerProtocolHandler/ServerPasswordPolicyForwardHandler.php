@@ -24,9 +24,10 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
-use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
 use FreeDSx\Ldap\Server\Backend\Write\Command\ComputeUpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
@@ -53,7 +54,7 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
     private const CLOCK_SKEW_TOLERANCE_SECONDS = 30;
 
     public function __construct(
-        private ReadBackendInterface $backend,
+        private EntryUuidLocator $locator,
         private WriteHandlerInterface $writes,
         private PasswordPolicyResolver $policyResolver,
         private PasswordPolicyEngine $engine,
@@ -124,7 +125,8 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
         ForwardPasswordPolicyStateRequest $request,
         TokenInterface $token,
     ): void {
-        $target = $this->backend->get($request->getDn());
+        $uuid = $request->getEntryUuid();
+        $target = $this->locator->findByUuid($uuid);
 
         if ($target === null) {
             return;
@@ -139,7 +141,12 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
         $this->writes->handle(
             new ComputeUpdateCommand(
                 $target->getDn(),
-                function (Entry $entry) use ($request, $token, $policy): array {
+                function (Entry $entry) use ($request, $token, $policy, $uuid): array {
+                    // The DN could have been re-occupied between the resolve and the lock, so the UUID is re-checked.
+                    if (!$this->isSameEntry($entry, $uuid)) {
+                        return [];
+                    }
+
                     $changes = $this->engine->recordForwardedState(
                         UserPasswordState::fromEntry($entry),
                         $policy,
@@ -161,6 +168,16 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
                 new ControlBag(),
             ),
         );
+    }
+
+    private function isSameEntry(
+        Entry $entry,
+        string $uuid,
+    ): bool {
+        $current = $entry->get(AttributeTypeOid::NAME_ENTRY_UUID)
+            ?->firstValue();
+
+        return $current !== null && strtolower($current) === strtolower($uuid);
     }
 
     /**

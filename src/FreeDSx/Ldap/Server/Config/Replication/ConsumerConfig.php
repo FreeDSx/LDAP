@@ -20,7 +20,7 @@ use FreeDSx\Ldap\Operation\Request\BindRequest;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Sync\Consumer\Checkpoint\InMemoryReplicationCheckpoint;
 use FreeDSx\Ldap\Sync\Consumer\Checkpoint\ReplicationCheckpointInterface;
-use FreeDSx\Ldap\Sync\Consumer\ReconnectBackoff;
+use FreeDSx\Ldap\Server\Config\ReconnectBackoff;
 
 /**
  * How a server mirrors an upstream primary over RFC 4533.
