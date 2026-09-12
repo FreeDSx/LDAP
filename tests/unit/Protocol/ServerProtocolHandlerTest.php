@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Operation\Request\ModifyDnRequest;
 use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\Response\ModifyDnResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
@@ -414,6 +415,10 @@ final class ServerProtocolHandlerTest extends TestCase
                     $this->mockQueue,
                     $eventLogger,
                 ),
+                $eventLogger,
+            ),
+            new DecodeFailureResponder(
+                $this->mockQueue,
                 $eventLogger,
             ),
             $eventLogger,

@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Operation\Response\DeleteResponse;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
@@ -85,7 +86,10 @@ final class ResponseWriterMiddlewareTest extends TestCase
             });
 
         $this->subject = new ResponseWriterMiddleware(
-            new ResponseWriter($this->mockQueue),
+            new ResponseWriter(
+                $this->mockQueue,
+                new DecodeFailureResponder($this->mockQueue),
+            ),
             $this->mockBackend,
             $this->mockAccessControl,
         );

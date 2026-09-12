@@ -17,6 +17,7 @@ use FreeDSx\Asn1\Encoder\EncoderInterface;
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Asn1\Exception\PartialPduException;
 use FreeDSx\Asn1\Type\AbstractType;
+use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RequestValidationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
@@ -108,7 +109,8 @@ class ServerQueue extends LdapQueue implements ConnectionControl
      *
      * Other messages received while peeking are buffered.
      *
-     * @throws RequestValidationException if a peeked message carries an unusable message ID.
+     * @throws RequestValidationException If a peeked message carries an unusable message ID.
+     * @throws MessageDecodeException If a peeked message has an envelope that parses and a body that does not.
      */
     public function peekForCancelSignal(int $inFlightMessageId): ?LdapMessageRequest
     {

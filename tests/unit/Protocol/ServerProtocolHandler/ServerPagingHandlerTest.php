@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
@@ -1134,7 +1135,10 @@ class ServerPagingHandlerTest extends TestCase
             $this->mockToken,
         );
 
-        return (new ResponseWriter($this->mockQueue))->write(
+        return (new ResponseWriter(
+            $this->mockQueue,
+            new DecodeFailureResponder($this->mockQueue),
+        ))->write(
             $stream,
             $message->getMessageId(),
         );

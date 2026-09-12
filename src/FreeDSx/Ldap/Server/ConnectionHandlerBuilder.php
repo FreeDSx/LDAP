@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Protocol\Bind\BindInterface;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
 use FreeDSx\Ldap\Protocol\Bind\SaslBind;
 use FreeDSx\Ldap\Protocol\Bind\SimpleBind;
+use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\Factory\HandlerContext;
 use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerFactoryMap;
 use FreeDSx\Ldap\Protocol\Factory\ProtocolHandlerProvider;
@@ -198,6 +199,10 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                 $handlerProvider,
             ),
             sessionEndPolicy: $this->makeSessionEndPolicy(
+                $serverQueue,
+                $eventLogger,
+            ),
+            decodeFailures: new DecodeFailureResponder(
                 $serverQueue,
                 $eventLogger,
             ),
@@ -406,7 +411,13 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                 new OperationAuditMiddleware(new OperationAuditor($eventLogger)),
                 // The single sink: drains every operation response and renders any thrown failure.
                 new ResponseWriterMiddleware(
-                    new ResponseWriter($queue),
+                    new ResponseWriter(
+                        $queue,
+                        new DecodeFailureResponder(
+                            $queue,
+                            $eventLogger,
+                        ),
+                    ),
                     $backend,
                     $this->container->get(AccessControlInterface::class),
                 ),

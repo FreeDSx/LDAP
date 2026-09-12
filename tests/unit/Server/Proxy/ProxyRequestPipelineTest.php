@@ -7,6 +7,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Proxy;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
+use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
@@ -35,7 +36,10 @@ final class ProxyRequestPipelineTest extends TestCase
         $this->subject = new ProxyRequestPipeline(
             $this->startTlsHandler,
             $this->forwarder,
-            new ResponseWriter($this->createMock(ServerQueue::class)),
+            new ResponseWriter(
+                $queue = $this->createMock(ServerQueue::class),
+                new DecodeFailureResponder($queue),
+            ),
         );
     }
 
