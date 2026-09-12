@@ -17,6 +17,7 @@ use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Protocol\Authenticator;
 use FreeDSx\Ldap\Protocol\Authorization\DispatchAuthorizer;
 use FreeDSx\Ldap\Protocol\Bind\SimpleBind;
+use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
@@ -112,7 +113,13 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
                     $queue,
                     $session,
                 ),
-                new ResponseWriter($queue),
+                new ResponseWriter(
+                    $queue,
+                    new DecodeFailureResponder(
+                        $queue,
+                        $eventLogger,
+                    ),
+                ),
             ),
         );
 
@@ -120,6 +127,10 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
             queue: $queue,
             requestPipeline: $pipeline,
             sessionEndPolicy: $this->makeSessionEndPolicy(
+                $queue,
+                $eventLogger,
+            ),
+            decodeFailures: new DecodeFailureResponder(
                 $queue,
                 $eventLogger,
             ),

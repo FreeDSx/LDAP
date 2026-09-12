@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\MessageDecodeException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\LdapResult;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
@@ -29,6 +30,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessage;
+use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
@@ -706,6 +708,53 @@ final class ServerSearchHandlerTest extends TestCase
         );
     }
 
+    public function test_an_undecodable_message_mid_stream_is_answered_without_ending_the_session(): void
+    {
+        $entries = array_map(
+            static fn(int $i): Entry => Entry::create("cn=$i,dc=foo,dc=bar"),
+            range(1, 51),
+        );
+
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar'),
+        );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturn(EntryStream::of($this->makeGenerator(...$entries)));
+
+        $this->mockFilterEvaluator
+            ->method('evaluate')
+            ->willReturn(true);
+
+        // A message whose envelope parsed and whose body did not, arriving while the stream is running.
+        $this->mockQueue
+            ->method('peekForCancelSignal')
+            ->willThrowException(new MessageDecodeException(
+                messageId: 3,
+                protocolOpTag: 3,
+                message: 'The search request is malformed',
+            ));
+
+        $this->drive($this->subject, $search);
+
+        $sentDone = array_filter(
+            $this->sentMessages,
+            static fn(LdapMessageResponse $r): bool => $r->getResponse() instanceof SearchResultDone,
+        );
+
+        // The search still completes, and the malformed message is answered rather than ending the session.
+        self::assertCount(
+            count($entries),
+            array_filter(
+                $this->sentMessages,
+                static fn(LdapMessageResponse $r): bool => $r->getResponse() instanceof SearchResultEntry,
+            ),
+        );
+        self::assertNotEmpty($sentDone);
+    }
+
     public function test_cancel_mid_stream_stops_entries_and_sends_canceled_plus_success(): void
     {
         $entries = array_map(
@@ -1098,7 +1147,10 @@ final class ServerSearchHandlerTest extends TestCase
             $this->mockToken,
         );
 
-        return (new ResponseWriter($this->mockQueue))->write(
+        return (new ResponseWriter(
+            $this->mockQueue,
+            new DecodeFailureResponder($this->mockQueue),
+        ))->write(
             $stream,
             $search->getMessageId(),
         );

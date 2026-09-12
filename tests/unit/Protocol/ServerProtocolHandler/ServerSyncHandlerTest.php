@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncRefreshPresent;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
+use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
@@ -550,7 +551,10 @@ final class ServerSyncHandlerTest extends TestCase
         ServerSyncHandler $handler,
         LdapMessageRequest $message,
     ): OperationResult {
-        return (new ResponseWriter($this->queue))->write(
+        return (new ResponseWriter(
+            $this->queue,
+            new DecodeFailureResponder($this->queue),
+        ))->write(
             $handler->handleRequest(
                 $message,
                 $this->token,

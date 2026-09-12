@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Protocol\Queue\Response;
 
+use FreeDSx\Ldap\Exception\MessageDecodeException;
+use FreeDSx\Ldap\Protocol\DecodeFailureResponder;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\Operation\OperationResult;
 
@@ -26,7 +29,10 @@ use function count;
  */
 final readonly class ResponseWriter
 {
-    public function __construct(private ServerQueue $queue) {}
+    public function __construct(
+        private ServerQueue $queue,
+        private DecodeFailureResponder $decodeFailures,
+    ) {}
 
     public function write(
         ResponseStream $stream,
@@ -76,12 +82,30 @@ final readonly class ResponseWriter
 
             if ($config->signalInterval > 0 && $sincePoll >= $config->signalInterval) {
                 $sincePoll = 0;
-                $stream->cancellation?->offer($this->queue->peekForCancelSignal($messageId));
+                $stream->cancellation?->offer($this->pollForSignal($messageId));
             }
         }
 
         if ($chunk !== []) {
             $this->queue->sendMessages($chunk);
+        }
+    }
+
+    /**
+     * A message that arrives mid-stream is answered the same way one between operations is.
+     *
+     * @throws MessageDecodeException When the message cannot be answered at all.
+     */
+    private function pollForSignal(int $messageId): ?LdapMessageRequest
+    {
+        try {
+            return $this->queue->peekForCancelSignal($messageId);
+        } catch (MessageDecodeException $e) {
+            if ($this->decodeFailures->answer($e)) {
+                return null;
+            }
+
+            throw $e;
         }
     }
 }
