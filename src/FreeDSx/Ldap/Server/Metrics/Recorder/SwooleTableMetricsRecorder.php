@@ -62,7 +62,7 @@ final class SwooleTableMetricsRecorder implements
 
     private const LIFECYCLE_RELOAD_AT = 'life.reloadAt';
 
-    private const LIFECYCLE_RELOAD_COUNT = 'life.reloadCount';
+    private const LIFECYCLE_RELOAD_COUNT = 'life.reloadCount.';
 
     /**
      * Gauges go up and back down. These must be work scoped to properly track them (workers can be killed).
@@ -255,7 +255,7 @@ final class SwooleTableMetricsRecorder implements
             $reloadedAt,
         );
         $this->add(
-            self::LIFECYCLE_RELOAD_COUNT,
+            self::LIFECYCLE_RELOAD_COUNT . $this->workerId,
             1,
         );
     }
@@ -270,6 +270,7 @@ final class SwooleTableMetricsRecorder implements
         $scopes = [];
         $inProgress = [];
         $active = 0;
+        $reloadCount = 0;
 
         foreach ($this->table as $key => $row) {
             $value = $row[self::COLUMN];
@@ -284,6 +285,12 @@ final class SwooleTableMetricsRecorder implements
             if ($this->isKeyFor($key, self::OPERATION_IN_PROGRESS)) {
                 $operation = $this->inProgressOperation($key);
                 $inProgress[$operation] = ($inProgress[$operation] ?? 0) + max(0, $value);
+
+                continue;
+            }
+
+            if ($this->isKeyFor($key, self::LIFECYCLE_RELOAD_COUNT)) {
+                $reloadCount = max($reloadCount, $value);
 
                 continue;
             }
@@ -309,7 +316,7 @@ final class SwooleTableMetricsRecorder implements
             lifecycle: new LifecycleMetrics(
                 startedAt: $this->get(self::LIFECYCLE_STARTED),
                 lastReloadAt: $this->get(self::LIFECYCLE_RELOAD_AT),
-                reloadCount: $this->get(self::LIFECYCLE_RELOAD_COUNT),
+                reloadCount: $reloadCount,
             ),
             connections: new ConnectionMetrics(
                 active: $active,

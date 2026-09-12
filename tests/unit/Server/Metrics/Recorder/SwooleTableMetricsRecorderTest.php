@@ -246,6 +246,22 @@ final class SwooleTableMetricsRecorderTest extends TestCase
         );
     }
 
+    public function test_one_reload_of_a_pool_is_counted_once_rather_than_once_per_worker(): void
+    {
+        $table = SwooleTableMetricsRecorder::createTable(1024);
+
+        foreach ([0, 1, 2, 3] as $workerId) {
+            $worker = new SwooleTableMetricsRecorder($table);
+            $worker->beginWorker($workerId);
+            $worker->serverReloaded(1_000);
+        }
+
+        self::assertSame(
+            1,
+            (new SwooleTableMetricsRecorder($table))->snapshot()->lifecycle->reloadCount,
+        );
+    }
+
     public function test_it_tracks_connections_opening_and_closing(): void
     {
         $this->subject->connectionObserved(ConnectionObservation::Opened);

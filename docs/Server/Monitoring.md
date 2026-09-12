@@ -48,7 +48,7 @@ off rather than returned empty.
 | `serverVersion` | The configured DSE vendor version, if set. |
 | `serverRunner` | The runner class in use. |
 | `serverStartTime`, `serverUptimeSeconds` | Start time and seconds since. |
-| `configReloadCount`, `configReloadTime` | SIGHUP reload count and last reload time. |
+| `configReloadCount`, `configReloadTime` | Reloads that were actually performed, and the last one's time. A SIGHUP with no `ConfigReloader` configured, or one whose reload throws, does not count. |
 | `connectionsActive` | Currently-open connections. |
 | `connectionsTotal` | Connections accepted since start. |
 | `connectionsRejected` | Connections turned away at the connection limit. |
