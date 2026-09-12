@@ -175,7 +175,10 @@ final class InMemoryMetricsRecorder implements MetricsRecorderInterface, Metrics
         $this->operationCounts[$operation] = ($this->operationCounts[$operation] ?? 0) + 1;
         $this->operationDurationSeconds[$operation] = ($this->operationDurationSeconds[$operation] ?? 0.0)
             + $observation->durationSeconds;
-        $this->resultCodeCounts[$observation->resultCode] = ($this->resultCodeCounts[$observation->resultCode] ?? 0) + 1;
+
+        if ($observation->resultCode !== null) {
+            $this->resultCodeCounts[$observation->resultCode] = ($this->resultCodeCounts[$observation->resultCode] ?? 0) + 1;
+        }
 
         if (!$observation->succeeded) {
             $this->operationErrors[$operation] = ($this->operationErrors[$operation] ?? 0) + 1;

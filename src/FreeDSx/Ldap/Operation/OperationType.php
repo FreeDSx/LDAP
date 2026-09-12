@@ -56,6 +56,17 @@ enum OperationType: string
     }
 
     /**
+     * Whether the client is answered, which RFC 4511 denies unbind (4.3) and abandon (4.11).
+     */
+    public function hasResponse(): bool
+    {
+        return match ($this) {
+            self::Unbind, self::Abandon => false,
+            default => true,
+        };
+    }
+
+    /**
      * The operation type for any request, including the non-access-controlled ones (bind, unbind, abandon, extended).
      */
     public static function classify(RequestInterface $request): self

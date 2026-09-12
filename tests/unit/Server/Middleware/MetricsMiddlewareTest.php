@@ -14,10 +14,12 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Middleware;
 
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\AnonBindRequest;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
+use FreeDSx\Ldap\Operation\Request\UnbindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
@@ -64,6 +66,38 @@ final class MetricsMiddlewareTest extends TestCase
         self::assertSame(
             [ResultCode::SUCCESS => 1],
             $operations->resultCodeCounts,
+        );
+    }
+
+    public function test_an_unbind_is_counted_without_inventing_a_result_code_for_it(): void
+    {
+        $this->subject->process(
+            $this->contextFor(new UnbindRequest()),
+            new StubMiddlewareHandler(OperationOutcomeResult::succeeded()),
+        );
+
+        $operations = $this->recorder->snapshot()->operations;
+
+        self::assertSame(
+            ['unbind' => 1],
+            $operations->counts,
+        );
+        self::assertSame(
+            [],
+            $operations->resultCodeCounts,
+        );
+    }
+
+    public function test_an_abandon_is_counted_without_inventing_a_result_code_for_it(): void
+    {
+        $this->subject->process(
+            $this->contextFor(new AbandonRequest(1)),
+            new StubMiddlewareHandler(OperationOutcomeResult::succeeded()),
+        );
+
+        self::assertSame(
+            [],
+            $this->recorder->snapshot()->operations->resultCodeCounts,
         );
     }
 
