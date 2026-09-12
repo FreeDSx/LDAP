@@ -53,11 +53,11 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
         LdapMessageRequest $message,
         TokenInterface $token,
     ): ResponseStream {
-        # RFC 4511 §4.14.2: return unavailable (not protocolError) when the server cannot negotiate TLS.
+        # RFC 4511 §4.14.1: a server that does not support TLS, by design or by configuration, answers protocolError.
         if ($this->options->getNetworkConfig()->getSslCert() === null || !self::$hasOpenssl) {
             return $this->failure(
                 $message,
-                ResultCode::UNAVAILABLE,
+                ResultCode::PROTOCOL_ERROR,
                 'The server is not configured to provide TLS.',
             );
         }
