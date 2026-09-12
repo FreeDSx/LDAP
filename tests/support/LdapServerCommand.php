@@ -38,6 +38,9 @@ use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\ServerOptions;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\FileFlagConfigReloader;
 use PDO;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LoggerInterface;
+use Stringable;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -156,6 +159,18 @@ final class LdapServerCommand extends Command
                 null,
                 InputOption::VALUE_NONE,
                 'Enable SASL mechanisms with plaintext-password storage',
+            )
+            ->addOption(
+                'monitor',
+                null,
+                InputOption::VALUE_NONE,
+                'Serve the cn=monitor entry',
+            )
+            ->addOption(
+                'log',
+                null,
+                InputOption::VALUE_NONE,
+                'Write server log messages to stdout, so a test can wait on one instead of sleeping',
             )
             ->addOption(
                 'allow-anonymous',
@@ -313,6 +328,8 @@ final class LdapServerCommand extends Command
             ->setRunnerConfig(new RunnerConfig($runner === 'swoole' ? RunnerMode::Swoole : RunnerMode::Pcntl))
             ->setAllowAnonymous($allowAnonymous)
             ->setRequireConfidentiality($confidentiality)
+            ->setMonitorEnabled($input->getOption('monitor') === true)
+            ->setLogger($input->getOption('log') === true ? $this->makeStdoutLogger() : null)
             ->setAdministrators(Subject::dn(self::ADMIN_DN))
             ->setMaxSearchLookthrough((int) $this->getStringOption($input, 'max-search-lookthrough'))
             ->setMaxSearchPagedLookthrough((int) $this->getStringOption($input, 'max-search-paged-lookthrough'))
@@ -452,6 +469,32 @@ final class LdapServerCommand extends Command
         $server->run();
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Lets a test wait for a specific server event rather than sleeping and hoping it happened.
+     */
+    private function makeStdoutLogger(): LoggerInterface
+    {
+        return new class extends AbstractLogger {
+            /**
+             * @param mixed[] $context
+             */
+            public function log(
+                $level,
+                Stringable|string $message,
+                array $context = [],
+            ): void {
+                fwrite(
+                    STDOUT,
+                    sprintf(
+                        "[%s] %s\n",
+                        is_string($level) ? $level : 'log',
+                        $message,
+                    ),
+                );
+            }
+        };
     }
 
     private function createStorageConfig(string $storageType): StorageConfigInterface

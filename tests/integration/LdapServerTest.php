@@ -967,6 +967,52 @@ final class LdapServerTest extends ServerTestCase
         $first->getEntries();
     }
 
+    public function testSighupWithNoReloaderConfiguredIsNotCountedAsAConfigReload(): void
+    {
+        $this->requirePosix();
+        $this->createServerProcess(
+            'tcp',
+            ['--monitor', '--log'],
+        );
+        $this->authenticateAdmin();
+
+        $this->sendServerSignal(SIGHUP);
+
+        // Waiting for the server to say it handled the signal beats sleeping and hoping that it did.
+        $this->waitForServerOutput('no configuration reloader is configured');
+
+        $this->assertSame(
+            ['0'],
+            $this->monitorValues('configReloadCount'),
+        );
+        $this->assertNull($this->monitorEntry()->get('configReloadTime'));
+    }
+
+    public function testAReloadThatIsActuallyPerformedIsCounted(): void
+    {
+        $this->requirePosix();
+        $flagFile = sys_get_temp_dir() . '/freedsx_reload_' . uniqid('', true);
+        touch($flagFile);
+        $this->createServerProcess(
+            'tcp',
+            ['--monitor', '--log', '--reload-flag-file=' . $flagFile],
+        );
+        $this->authenticateAdmin();
+
+        try {
+            $this->sendServerSignal(SIGHUP);
+            $this->waitForServerOutput('Server configuration reloaded');
+
+            $this->assertSame(
+                ['1'],
+                $this->monitorValues('configReloadCount'),
+            );
+            $this->assertNotNull($this->monitorEntry()->get('configReloadTime'));
+        } finally {
+            @unlink($flagFile);
+        }
+    }
+
     public function testSighupDoesNotShutdownTheServer(): void
     {
         $this->requirePosix();
@@ -1005,6 +1051,31 @@ final class LdapServerTest extends ServerTestCase
                 // Connection may already be closed; ignore unbind failures.
             }
         }
+    }
+
+    private function monitorEntry(): Entry
+    {
+        foreach ($this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'))
+                ->base('cn=monitor')
+                ->useBaseScope(),
+        ) as $entry) {
+            return $entry;
+        }
+
+        self::fail('The cn=monitor entry was not served.');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function monitorValues(string $attribute): array
+    {
+        return array_values(
+            $this->monitorEntry()
+                ->get($attribute)
+                ?->getValues() ?? [],
+        );
     }
 
     private function personEntry(string $cn): Entry

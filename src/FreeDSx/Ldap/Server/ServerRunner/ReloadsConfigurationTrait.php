@@ -38,8 +38,9 @@ trait ReloadsConfigurationTrait
      * Adopts a reloaded configuration for new connections. In-flight connections keep their current config.
      *
      * @param array<string, mixed> $context
+     * @return bool Whether a new configuration was adopted.
      */
-    private function reloadConfiguration(array $context = []): void
+    private function reloadConfiguration(array $context = []): bool
     {
         $result = (new ReloadCoordinator())->reload(
             $this->options,
@@ -48,10 +49,12 @@ trait ReloadsConfigurationTrait
         );
 
         if ($result === null) {
-            return;
+            return false;
         }
 
         $this->options = $result->options;
         $this->serverProtocolFactory = $result->protocolFactory;
+
+        return true;
     }
 }

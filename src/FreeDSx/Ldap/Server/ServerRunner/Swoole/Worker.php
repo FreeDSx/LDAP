@@ -158,8 +158,11 @@ class Worker
         int $signal,
         array $context,
     ): null {
+        if (!$this->reloadConfiguration($context + ['signal' => $signal])) {
+            return null;
+        }
+
         $this->metricsRecorder->serverReloaded(time());
-        $this->reloadConfiguration($context + ['signal' => $signal]);
         $this->acceptor?->useConfiguration(
             $this->options,
             $this->serverProtocolFactory,

@@ -485,8 +485,11 @@ class PcntlServerRunner implements ServerRunnerInterface
                     return;
                 }
 
+                if (!$this->reloadConfiguration($this->defaultContext)) {
+                    return;
+                }
+
                 $this->metricsRecorder->serverReloaded(time());
-                $this->reloadConfiguration($this->defaultContext);
                 $this->publishMetricsSnapshot();
             },
         );
