@@ -24,6 +24,8 @@ use function extension_loaded;
 /**
  * Runs the coroutine accept loop in a pool of worker processes.
  *
+ * Every connection lands on one worker on macOS, where SO_REUSEPORT does not balance as it does on Linux.
+ *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 class PooledServerRunner implements CoroutineServerRunnerInterface
