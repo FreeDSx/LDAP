@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Write\BulkLoadOptions;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
@@ -42,6 +43,7 @@ final readonly class LdapImporter
     public function __construct(
         private EntryStorageInterface $storage,
         private WriteRequestRouter $router,
+        private AttributeTypeSpelling $spelling,
         private EventLogger $eventLogger = new EventLogger(null),
     ) {}
 
@@ -99,6 +101,7 @@ final readonly class LdapImporter
         ImportResult $result,
     ): void {
         foreach ($entries as $entry) {
+            $entry = $this->spelling->entry($entry);
             // Read before the write, since afterwards the entry is present either way.
             $wasPresent = $replaceExisting
                 && $this->storage->exists($entry->getDn()->normalize());

@@ -447,6 +447,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return new LdapImporter(
             $container->get(EntryStorageInterface::class),
             new WriteRequestRouter($container->get(WriteOperationDispatcher::class)),
+            $container->get(AttributeTypeSpelling::class),
             new EventLogger(
                 $options->getLogger(),
                 $options->getEventLogPolicy(),
