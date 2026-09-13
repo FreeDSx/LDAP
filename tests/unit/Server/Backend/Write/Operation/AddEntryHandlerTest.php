@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
@@ -97,6 +98,68 @@ final class AddEntryHandlerTest extends TestCase
             $postRead->get('cn')?->getValues(),
         );
         self::assertNotNull($postRead->get('entryUUID'));
+    }
+
+    public function test_a_failing_assertion_refuses_the_add_and_stores_nothing(): void
+    {
+        try {
+            $this->adds()->handle(
+                new AddCommand(new Entry(
+                    new Dn('cn=New,dc=example,dc=com'),
+                    new Attribute('cn', 'New'),
+                )),
+                $this->controlledContext(Controls::assertion(Filters::equal('cn', 'Other'))),
+            );
+            self::fail('The assertion should have refused the add.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNull($this->find('cn=New,dc=example,dc=com'));
+    }
+
+    public function test_an_assertion_is_evaluated_against_the_entry_as_it_will_be_stored(): void
+    {
+        $this->adds()->handle(
+            new AddCommand(new Entry(
+                new Dn('cn=New,dc=example,dc=com'),
+                new Attribute('cn', 'New'),
+            )),
+            $this->controlledContext(Controls::assertion(Filters::and(
+                Filters::equal('cn', 'New'),
+                Filters::present('entryUUID'),
+            ))),
+        );
+
+        self::assertNotNull($this->find('cn=New,dc=example,dc=com'));
+    }
+
+    public function test_a_missing_parent_answers_before_the_assertion(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
+
+        $this->adds()->handle(
+            new AddCommand(new Entry(
+                new Dn('cn=New,ou=Missing,dc=example,dc=com'),
+                new Attribute('cn', 'New'),
+            )),
+            $this->controlledContext(Controls::assertion(Filters::equal('cn', 'Other'))),
+        );
+    }
+
+    public function test_an_existing_entry_answers_before_the_assertion(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::ENTRY_ALREADY_EXISTS);
+
+        $this->adds()->handle(
+            new AddCommand($this->alice),
+            $this->controlledContext(Controls::assertion(Filters::equal('cn', 'Other'))),
+        );
     }
 
     public function test_it_refuses_an_entry_that_already_exists(): void

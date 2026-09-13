@@ -97,6 +97,30 @@ final class WriteControlEvaluatorTest extends TestCase
         );
     }
 
+    public function test_an_addition_failing_the_assertion_answers_assertion_failed(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ASSERTION_FAILED);
+
+        $this->evaluatorFor(Controls::assertion(Filters::equal('sn', 'Jones')))
+            ->evaluateAddition($this->entry);
+    }
+
+    public function test_an_addition_satisfying_the_assertion_is_kept_for_a_post_read(): void
+    {
+        $subject = $this->evaluatorFor(
+            Controls::assertion(Filters::equal('sn', 'Smith')),
+            new PostReadControl('sn'),
+        );
+
+        $subject->evaluateAddition($this->entry);
+
+        self::assertSame(
+            ['Smith'],
+            $subject->postReadEntry()?->get('sn')?->getValues(),
+        );
+    }
+
     public function test_nothing_is_kept_without_a_read_control(): void
     {
         $subject = $this->evaluatorFor();

@@ -83,7 +83,7 @@ readonly class AddEntryHandler
                 $entry,
                 $command->systemChanges,
             );
-            $context->controlEvaluator()?->captureResult($entry);
+            $context->controlEvaluator()?->evaluateAddition($entry);
 
             if ($bulkLoad !== null && $bulkLoad->replaceExisting) {
                 $this->storage->store(
