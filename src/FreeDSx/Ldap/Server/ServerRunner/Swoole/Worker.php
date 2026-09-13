@@ -77,6 +77,7 @@ class Worker
         $acceptor = new ConnectionAcceptor(
             $this->serverProtocolFactory,
             $this->options,
+            $this->socketServerFactory->isTlsHandshakeDeferred(),
             $this->metricsRecorder,
             $this->backgroundTasks,
         );

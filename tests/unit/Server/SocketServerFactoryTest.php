@@ -153,7 +153,7 @@ final class SocketServerFactoryTest extends TestCase
         self::assertFalse($subject->makeAndBind()->getOptions()->isUseSsl());
     }
 
-    public function test_it_leaves_the_tls_handshake_to_the_listener_for_the_swoole_runner(): void
+    public function test_it_defers_the_tls_handshake_to_the_connection_handler_for_the_swoole_runner(): void
     {
         $subject = new SocketServerFactory(
             (new NetworkConfig())
@@ -163,7 +163,8 @@ final class SocketServerFactoryTest extends TestCase
             $this->mockLogger,
         );
 
-        self::assertFalse($subject->isTlsHandshakeDeferred());
+        self::assertTrue($subject->isTlsHandshakeDeferred());
+        self::assertFalse($subject->makeAndBind()->getOptions()->isUseSsl());
     }
 
     public function test_it_has_no_tls_handshake_to_defer_without_ssl(): void

@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Protocol\Queue\ConnectionControl;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerStartTlsHandler;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
+use FreeDSx\Socket\Exception\ConnectionException;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -80,6 +81,32 @@ final class ServerStartTlsHandlerTest extends TestCase
             ->expects(self::once())
             ->method('encrypt')
             ->willReturnSelf();
+
+        $this->assertNotNull($stream->onComplete);
+        ($stream->onComplete)($this->mockConnection);
+    }
+
+    public function test_a_failed_upgrade_closes_the_connection_instead_of_throwing(): void
+    {
+        $this->options->getNetworkConfig()->setSslCert('foo');
+
+        $this->mockConnection
+            ->method('isEncrypted')
+            ->willReturn(false);
+        $this->mockConnection
+            ->method('encrypt')
+            ->willThrowException(new ConnectionException('The handshake timed out.'));
+        $this->mockConnection
+            ->expects(self::once())
+            ->method('close');
+
+        $stream = $this->subject->handleRequest(
+            new LdapMessageRequest(
+                1,
+                new ExtendedRequest(ExtendedRequest::OID_START_TLS),
+            ),
+            $this->mockToken,
+        );
 
         $this->assertNotNull($stream->onComplete);
         ($stream->onComplete)($this->mockConnection);

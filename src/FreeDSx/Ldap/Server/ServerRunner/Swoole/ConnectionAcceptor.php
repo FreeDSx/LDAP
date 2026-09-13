@@ -61,11 +61,13 @@ class ConnectionAcceptor
     private readonly WaitGroup $waitGroup;
 
     /**
+     * @param bool $isTlsHandshakeDeferred Whether each connection negotiates TLS itself rather than the listener.
      * @param ?BackgroundTasksInterface $backgroundTasks Ticked between accepts; null when this process runs none.
      */
     public function __construct(
         private ServerProtocolFactoryInterface $serverProtocolFactory,
         private ServerListenerOptionsInterface $options,
+        private readonly bool $isTlsHandshakeDeferred,
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
         private readonly ?BackgroundTasksInterface $backgroundTasks = null,
     ) {
@@ -178,6 +180,10 @@ class ConnectionAcceptor
         Socket $socket,
         int $socketId,
     ): void {
+        if (!$this->encryptConnectionIfDeferred($socket)) {
+            return;
+        }
+
         try {
             $handler = $this->serverProtocolFactory->make(
                 $socket,
@@ -196,6 +202,27 @@ class ConnectionAcceptor
             $this->logClientClosed();
             $socket->close();
         }
+    }
+
+    /**
+     * Runs in the connection's own coroutine, so a slow or silent handshake never holds up the accept loop.
+     */
+    private function encryptConnectionIfDeferred(Socket $socket): bool
+    {
+        if (!$this->isTlsHandshakeDeferred) {
+            return true;
+        }
+
+        try {
+            $socket->encrypt(true);
+        } catch (Throwable $e) {
+            $this->logTlsHandshakeError($e);
+            $socket->close();
+
+            return false;
+        }
+
+        return true;
     }
 
     private function notifyClientsOfShutdown(): void
