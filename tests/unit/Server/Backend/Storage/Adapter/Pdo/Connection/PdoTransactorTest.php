@@ -13,8 +13,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection;
 
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageBusyException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Utility\ExponentialBackoff;
 use PDO;
@@ -76,27 +78,58 @@ final class PdoTransactorTest extends TestCase
         );
     }
 
-    public function test_it_gives_up_once_the_retry_budget_is_spent(): void
+    public function test_it_answers_busy_once_the_retry_budget_is_spent(): void
     {
         $this->dialect->method('isRetryableConflict')
             ->willReturn(true);
 
         $attempts = 0;
+        $conflict = new PDOException('Deadlock found when trying to get lock');
 
         try {
-            $this->subject->atomic(function () use (&$attempts): void {
+            $this->subject->atomic(function () use (&$attempts, $conflict): void {
                 $attempts++;
 
-                throw new PDOException('Deadlock found when trying to get lock');
+                throw $conflict;
             });
-            self::fail('Expected the conflict to be rethrown.');
-        } catch (PDOException) {
-            // Expected once the budget is spent.
+            self::fail('Expected the spent budget to answer busy.');
+        } catch (StorageBusyException $e) {
+            self::assertSame(
+                ResultCode::BUSY,
+                $e->getCode(),
+            );
+            self::assertSame(
+                $conflict,
+                $e->getPrevious(),
+            );
         }
 
         self::assertSame(
             4,
             $attempts,
+        );
+    }
+
+    public function test_a_nested_transaction_hands_the_raw_conflict_to_the_outermost_one(): void
+    {
+        $this->dialect->method('isRetryableConflict')
+            ->willReturn(true);
+
+        $caught = null;
+
+        $this->subject->atomic(function () use (&$caught): void {
+            try {
+                $this->subject->atomic(static function (): void {
+                    throw new PDOException('Deadlock found when trying to get lock');
+                });
+            } catch (PDOException $e) {
+                $caught = $e;
+            }
+        });
+
+        self::assertInstanceOf(
+            PDOException::class,
+            $caught,
         );
     }
 
@@ -145,8 +178,8 @@ final class PdoTransactorTest extends TestCase
                     throw new PDOException('Deadlock found when trying to get lock');
                 });
             });
-            self::fail('Expected the conflict to be rethrown.');
-        } catch (PDOException) {
+            self::fail('Expected the spent budget to answer busy.');
+        } catch (StorageBusyException) {
             // Expected once the budget is spent.
         }
 
@@ -235,8 +268,8 @@ final class PdoTransactorTest extends TestCase
                 } catch (PDOException) {
                 }
             });
-            self::fail('Expected the conflict to be rethrown.');
-        } catch (PDOException) {
+            self::fail('Expected the spent budget to answer busy.');
+        } catch (StorageBusyException) {
             // Expected once the budget is spent.
         }
 
