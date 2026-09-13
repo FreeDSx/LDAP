@@ -1507,6 +1507,37 @@ trait QueryTestsTrait
         ));
     }
 
+    public function testAnUpperCaseEntryUuidMatchesInAFilterAndACompare(): void
+    {
+        $this->authenticateUser();
+
+        $alice = $this->ldapClient()->search(
+            Operations::search(Filters::equal('cn', 'alice'), 'entryUUID')
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        )->first();
+        $uuid = strtoupper((string) $alice?->get('entryUUID')?->firstValue());
+
+        $matched = $this->ldapClient()->search(
+            Operations::search(Filters::equal('entryUUID', $uuid))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            ['cn=alice,ou=people,dc=foo,dc=bar'],
+            array_map(
+                static fn(Entry $entry): string => $entry->getDn()->toString(),
+                $matched->toArray(),
+            ),
+        );
+        self::assertTrue($this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'entryUUID',
+            $uuid,
+        ));
+    }
+
     public function testCompareReturnsFalseForNonMatchingValue(): void
     {
         $this->authenticateUser();

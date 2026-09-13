@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Schema\Matching\Comparator\NameAndOptionalUidComparator;
 use FreeDSx\Ldap\Schema\Matching\Comparator\NumericStringComparator;
 use FreeDSx\Ldap\Schema\Matching\Comparator\OctetStringComparator;
 use FreeDSx\Ldap\Schema\Matching\Comparator\TelephoneNumberComparator;
+use FreeDSx\Ldap\Schema\Matching\Comparator\UuidComparator;
 
 /**
  * Maps a matching rule OID to the comparator that implements it.
@@ -58,6 +59,7 @@ final readonly class MatchingRuleComparatorRegistry
         $telephoneNumber = new TelephoneNumberComparator();
         $numericString = new NumericStringComparator();
         $octetString = new OctetStringComparator();
+        $uuid = new UuidComparator();
 
         return new self([
             MatchingRuleOid::OID_OBJECT_IDENTIFIER_MATCH => $caseIgnore,
@@ -87,9 +89,8 @@ final readonly class MatchingRuleComparatorRegistry
             MatchingRuleOid::OID_CASE_IGNORE_LIST_MATCH => $caseIgnore,
             MatchingRuleOid::OID_CASE_IGNORE_LIST_SUBSTRINGS_MATCH => $caseIgnore,
             MatchingRuleOid::OID_BIT_STRING_MATCH => new BitStringComparator(),
-            // RFC 4530 defines both in terms of octetStringMatch.
-            MatchingRuleOid::OID_UUID_MATCH => $octetString,
-            MatchingRuleOid::OID_UUID_ORDERING_MATCH => $octetString,
+            MatchingRuleOid::OID_UUID_MATCH => $uuid,
+            MatchingRuleOid::OID_UUID_ORDERING_MATCH => $uuid,
             MatchingRuleOid::OID_INTEGER_FIRST_COMPONENT_MATCH => new FirstComponentComparator($integer),
             MatchingRuleOid::OID_OBJECT_IDENTIFIER_FIRST_COMPONENT_MATCH => new FirstComponentComparator($caseIgnore),
             MatchingRuleOid::OID_BIT_AND_MATCH => new BitMaskComparator(requireAllBits: true),
