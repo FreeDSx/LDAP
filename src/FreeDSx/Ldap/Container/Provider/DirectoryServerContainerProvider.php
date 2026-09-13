@@ -91,7 +91,7 @@ use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Logging\OperationAuditor;
-use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuditMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareChain;
@@ -306,11 +306,11 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                     ? [new ReadOnlyMiddleware($consumerConfig)]
                     : []),
                 $container->get(CriticalControlMiddleware::class),
-                $container->get(AssertionMiddleware::class),
             ],
-            new ReplayWriteHandler(new WriteRequestRouter(
-                $container->get(WriteOperationDispatcher::class),
-            )),
+            new ReplayWriteHandler(
+                new WriteRequestRouter($container->get(WriteOperationDispatcher::class)),
+                $container->get(AssertionEvaluator::class),
+            ),
         ));
     }
 

@@ -68,6 +68,7 @@ readonly class ComputeUpdateHandler
                         $changes,
                     ),
                     $context,
+                    $entry,
                 );
             },
         );

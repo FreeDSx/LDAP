@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -45,12 +46,14 @@ readonly class UpdateEntryHandler
         UpdateCommand $command,
         WriteContext $context,
     ): void {
-        $this->writeLocked(
+        $this->writeLockedEntry(
             $command->dn->normalize(),
-            function () use ($command, $context): void {
+            $context,
+            function (Entry $current) use ($command, $context): void {
                 $this->applyUpdate(
                     $command,
                     $context,
+                    $current,
                 );
             },
         );

@@ -383,6 +383,27 @@ class LdapServerTest extends TestCase
         self::assertNotNull($this->storage()->find(new Dn('cn=child,ou=people,dc=example,dc=com')));
     }
 
+    public function test_it_should_refuse_a_change_record_whose_assertion_does_not_match(): void
+    {
+        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
+
+        try {
+            $this->subject->applyChanges(new StringLdifLoader(
+                "dn: cn=foo,dc=example,dc=com\n"
+                . "control: 1.3.6.1.1.12 true:: owoEAnNuBAROb3Bl\n"
+                . "changetype: delete\n",
+            ));
+            self::fail('The assertion should have refused the change record.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNotNull($this->storage()->find(new Dn('cn=foo,dc=example,dc=com')));
+    }
+
     public function test_it_should_refuse_to_seed_a_read_only_replica(): void
     {
         $options = (new ServerOptions(

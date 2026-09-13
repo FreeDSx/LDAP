@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
+use FreeDSx\Ldap\Server\Backend\Write\WriteControlEvaluator;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
 use FreeDSx\Ldap\Server\Operation\WriteOperationResult;
@@ -45,11 +46,11 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
         private ReadBackendInterface $backend,
         private WriteRequestRouter $router,
         private AccessControlInterface $accessControl,
+        private AssertionEvaluator $assertions,
         Schema $schema,
         private ResponseFactory $responseFactory = new ResponseFactory(),
     ) {
         $this->readEntryControlHandler = new ReadEntryControlHandler(
-            $this->backend,
             $schema,
             $this->accessControl,
         );
@@ -123,10 +124,10 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
         SchemaViolations $schemaViolations,
     ): ResponseStream {
-        $preRead = $this->readEntryControlHandler->preReadFor(
-            $request,
-            $controls,
+        $controlEvaluator = new WriteControlEvaluator(
+            $this->assertions,
             $token,
+            $controls,
         );
 
         $this->dispatchWrite(
@@ -134,10 +135,16 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
             $controls,
             $token,
             $schemaViolations,
+            $controlEvaluator,
         );
 
-        $postRead = $this->readEntryControlHandler->postReadFor(
-            $request,
+        $preRead = $this->readEntryControlHandler->preRead(
+            $controlEvaluator->preReadEntry(),
+            $controls,
+            $token,
+        );
+        $postRead = $this->readEntryControlHandler->postRead(
+            $controlEvaluator->postReadEntry(),
             $controls,
             $token,
         );
@@ -166,6 +173,7 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
         ControlBag $controls,
         TokenInterface $token,
         SchemaViolations $schemaViolations,
+        WriteControlEvaluator $controlEvaluator,
     ): void {
         $this->router->route(
             $request,
@@ -173,6 +181,7 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
                 $token,
                 $controls,
                 schemaViolations: $schemaViolations,
+                controlEvaluator: $controlEvaluator,
             ),
         );
     }

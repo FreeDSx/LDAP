@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Control\AssertionControl;
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
@@ -88,6 +89,22 @@ final class AssertionEvaluatorTest extends TestCase
         $this->subject->assertSatisfied(
             $this->targetDn,
             new ControlBag(new AssertionControl(Filters::equal('cn', 'bar'))),
+            $this->token,
+        );
+    }
+
+    public function test_an_assertion_left_undecoded_is_still_evaluated(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ASSERTION_FAILED);
+
+        $this->subject->assertSatisfiedBy(
+            Entry::fromArray('cn=foo,dc=ex,dc=com', ['cn' => ['foo']]),
+            new ControlBag(new Control(
+                Control::OID_ASSERTION,
+                true,
+                Filters::equal('cn', 'bar')->toAsn1(),
+            )),
             $this->token,
         );
     }

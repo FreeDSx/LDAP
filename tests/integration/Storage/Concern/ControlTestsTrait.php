@@ -15,7 +15,9 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
+use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
 use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
+use FreeDSx\Ldap\Control\ReadEntry\PreReadResponseControl;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
@@ -416,6 +418,104 @@ trait ControlTestsTrait
                 $e->getCode(),
             );
         }
+    }
+
+    public function testANonCriticalControlASubtreeDeleteCannotHonorIsIgnored(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray('ou=ignored-controls,dc=foo,dc=bar', [
+            'objectClass' => ['organizationalUnit'],
+            'ou' => ['ignored-controls'],
+        ]));
+        $this->ldapClient()->create(Entry::fromArray('cn=child,ou=ignored-controls,dc=foo,dc=bar', [
+            'objectClass' => ['inetOrgPerson'],
+            'cn' => ['child'],
+            'sn' => ['Child'],
+        ]));
+
+        $response = $this->ldapClient()->sendAndReceive(
+            Operations::delete('ou=ignored-controls,dc=foo,dc=bar'),
+            Controls::subtreeDelete(),
+            Controls::assertion(Filters::equal('ou', 'nomatch'))->setCriticality(false),
+            Controls::preRead('ou')->setCriticality(false),
+        );
+
+        self::assertNull($response->controls()->get(Control::OID_PRE_READ));
+        self::assertNull($this->ldapClient()->read('ou=ignored-controls,dc=foo,dc=bar'));
+    }
+
+    public function testAPostReadMatchesTheEntryAsStoredAfterTheModify(): void
+    {
+        $this->authenticateAdmin();
+        $dn = 'cn=post-read-modify,dc=foo,dc=bar';
+        $this->ldapClient()->create(Entry::fromArray($dn, [
+            'objectClass' => ['inetOrgPerson'],
+            'cn' => ['post-read-modify'],
+            'sn' => ['Before'],
+        ]));
+
+        $response = $this->ldapClient()->sendAndReceive(
+            Operations::modify(
+                $dn,
+                Change::replace('sn', 'After'),
+            ),
+            Controls::postRead(),
+        );
+        $stored = $this->ldapClient()->read($dn);
+        $this->ldapClient()->delete($dn);
+
+        $postRead = $response->controls()->get(Control::OID_POST_READ);
+        self::assertInstanceOf(
+            PostReadResponseControl::class,
+            $postRead,
+        );
+        self::assertEquals(
+            $stored?->toArray(),
+            $postRead->getEntry()->toArray(),
+        );
+    }
+
+    public function testThePreReadAndPostReadOfAModifyDnCarryTheOldAndNewNames(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray('cn=before-rename,dc=foo,dc=bar', [
+            'objectClass' => ['inetOrgPerson'],
+            'cn' => ['before-rename'],
+            'sn' => ['Renamed'],
+        ]));
+
+        $response = $this->ldapClient()->sendAndReceive(
+            Operations::rename(
+                'cn=before-rename,dc=foo,dc=bar',
+                'cn=after-rename',
+            ),
+            Controls::preRead('cn'),
+            Controls::postRead('cn'),
+        );
+        $this->ldapClient()->delete('cn=after-rename,dc=foo,dc=bar');
+
+        $preRead = $response->controls()->get(Control::OID_PRE_READ);
+        $postRead = $response->controls()->get(Control::OID_POST_READ);
+        self::assertInstanceOf(
+            PreReadResponseControl::class,
+            $preRead,
+        );
+        self::assertInstanceOf(
+            PostReadResponseControl::class,
+            $postRead,
+        );
+        self::assertSame(
+            'cn=before-rename,dc=foo,dc=bar',
+            $preRead->getEntry()->getDn()->toString(),
+        );
+        self::assertSame(
+            'cn=after-rename,dc=foo,dc=bar',
+            $postRead->getEntry()->getDn()->toString(),
+        );
+        self::assertSame(
+            ['after-rename'],
+            $postRead->getEntry()->get('cn')?->getValues(),
+        );
     }
 
     public function testACriticalSortThatCannotBePerformedFailsAPagedSearch(): void

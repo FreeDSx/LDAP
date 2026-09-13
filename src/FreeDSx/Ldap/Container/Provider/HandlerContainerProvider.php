@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPagingHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPasswordModifyHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPasswordPolicyForwardHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerProtocolHandlerInterface;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\GeneratedEntryResponder;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerRootDseHandler;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSearchHandler;
@@ -231,6 +232,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
                 ),
             ),
             accessControl: $container->get(AccessControlInterface::class),
+            assertions: $container->get(AssertionEvaluator::class),
             schema: $container->get(ServerOptions::class)->getSchema(),
         );
     }

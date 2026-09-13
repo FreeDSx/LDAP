@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -45,10 +46,10 @@ readonly class DeleteEntryHandler
     ): void {
         $dn = $command->dn->normalize();
 
-        $this->writeLocked(
+        $this->writeLockedEntry(
             $dn,
-            function () use ($command, $context, $dn): void {
-                $entry = $this->locator->findOrFail($dn);
+            $context,
+            function (Entry $entry) use ($command, $context, $dn): void {
                 $this->placement->assertDeletePlacement($command->dn);
 
                 $this->storage->remove($dn);

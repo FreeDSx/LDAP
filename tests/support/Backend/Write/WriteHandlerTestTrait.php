@@ -14,17 +14,24 @@ declare(strict_types=1);
 namespace Tests\Support\FreeDSx\Ldap\Backend\Write;
 
 use FreeDSx\Ldap\Container;
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
+use FreeDSx\Ldap\Server\AccessControl\AclRules;
+use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
+use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\AddEntryHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\DeleteEntryHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\MoveEntryHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\UpdateEntryHandler;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
+use FreeDSx\Ldap\Server\Backend\Write\WriteControlEvaluator;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\ServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
@@ -124,6 +131,29 @@ trait WriteHandlerTestTrait
         return new WriteContext(
             new AnonToken(),
             new ControlBag(),
+        );
+    }
+
+    /**
+     * A client write's context, whose controls the handler evaluates under its lock.
+     */
+    private function controlledContext(Control ...$controls): WriteContext
+    {
+        $token = new AnonToken();
+        $controlBag = new ControlBag(...$controls);
+
+        return new WriteContext(
+            $token,
+            $controlBag,
+            controlEvaluator: new WriteControlEvaluator(
+                new AssertionEvaluator(
+                    $this->graph->get(FilterEvaluatorInterface::class),
+                    $this->graph->get(ReadBackendInterface::class),
+                    new RuleBasedAccessControl(AclRules::fromEmpty()),
+                ),
+                $token,
+                $controlBag,
+            ),
         );
     }
 
