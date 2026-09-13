@@ -29,7 +29,6 @@ LDAP Server Configuration
         * [NetworkConfig:setSslHandshakeTimeout](#setsslhandshaketimeout)
 * [Access Control](#access-control)
     * [ServerOptions:setAclRules](#setaclrules)
-    * [ServerOptions:setAccessControl](#setaccesscontrol)
 * [Storage](#storage)
     * [ServerOptions:setStorageConfig](#setstorageconfig)
 * [Authentication](#authentication)
@@ -471,14 +470,6 @@ See [Access Control](Access-Control.md) for rule evaluation, subject/target matc
 control-rule grants for privileged controls (e.g. Relax Rules).
 
 **Default**: `AclRules::secureDefault()`. See [Access Control](Access-Control.md).
-
-------------------
-#### setAccessControl
-
-Provide a fully custom `FreeDSx\Ldap\Server\AccessControl\AccessControlInterface` implementation, used instead of the
-rule engine. Prefer `setAclRules()` unless the built-in rules are insufficient.
-
-**Default**: `RuleBasedAccessControl` over the rules from `setAclRules()`.
 
 ## Storage
 

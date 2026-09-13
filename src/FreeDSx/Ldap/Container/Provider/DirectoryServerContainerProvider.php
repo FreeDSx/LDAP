@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributeAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
+use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackend;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -203,7 +204,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeAccessControl(Container $container): AccessControlInterface
     {
         $options = $container->get(ServerOptions::class);
-        $configured = $options->getAccessControl();
+        $configured = new RuleBasedAccessControl($options->getAclRules());
 
         $acl = new PrivilegedBypassAccessControl(new ConfidentialAttributeAccessControl(
             $configured,

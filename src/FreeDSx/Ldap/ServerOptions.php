@@ -24,9 +24,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\ExternalCredentialMapperInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
-use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
-use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Subject\SubjectMatcherInterface;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
@@ -117,15 +115,11 @@ final class ServerOptions implements ServerListenerOptionsInterface
 
     private ?ExternalCredentialMapperInterface $externalCredentialMapper = null;
 
-    private ?AccessControlInterface $accessControl = null;
-
     private ?AclRules $aclRules = null;
 
     /**
      * Memoized secure default, rebuilt when the administrator subject changes so it never goes stale.
      */
-    private ?AccessControlInterface $defaultAccessControl = null;
-
     private ?AclRules $defaultAclRules = null;
 
     private ?ServerRunnerInterface $serverRunner = null;
@@ -259,7 +253,6 @@ final class ServerOptions implements ServerListenerOptionsInterface
         $this->administrators = $administrators;
         // Drop any memoized secure default so it is rebuilt with the new administrator instead of a stale one.
         $this->defaultAclRules = null;
-        $this->defaultAccessControl = null;
 
         return $this;
     }
@@ -318,25 +311,9 @@ final class ServerOptions implements ServerListenerOptionsInterface
         return $this->schemaConfig->getValidationMode();
     }
 
-    public function getAccessControl(): AccessControlInterface
-    {
-        return $this->accessControl ?? ($this->defaultAccessControl ??= new RuleBasedAccessControl(
-            $this->getAclRules(),
-        ));
-    }
-
-    public function setAccessControl(AccessControlInterface $accessControl): self
-    {
-        $this->accessControl = $accessControl;
-
-        return $this;
-    }
-
     public function setAclRules(AclRules $aclRules): self
     {
         $this->aclRules = $aclRules;
-        // Drop any access control derived from the previous rules so it is rebuilt from these.
-        $this->defaultAccessControl = null;
 
         return $this;
     }

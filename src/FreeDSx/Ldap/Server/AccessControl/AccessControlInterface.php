@@ -24,6 +24,8 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 /**
  * Guards LDAP operations and read-side attribute visibility.
  *
+ * @internal
+ *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 interface AccessControlInterface
