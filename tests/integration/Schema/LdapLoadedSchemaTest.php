@@ -338,15 +338,18 @@ final class LdapLoadedSchemaTest extends ServerTestCase
         );
     }
 
-    public function test_uuid_is_case_sensitive(): void
+    public function test_uuid_matches_regardless_of_hex_digit_case(): void
     {
         $this->createRecord(
             'uuid-case',
             ['projectUuid' => '597ae2f6-16a6-1027-98f4-d28b5365dc14'],
         );
 
-        // RFC 4530 defines uuidMatch as octetStringMatch, so case-insensitive matching would be wrong.
-        self::assertNull($this->findOne(Filters::equal('projectUuid', '597AE2F6-16A6-1027-98F4-D28B5365DC14')));
+        // RFC 4122 §3 reads the hex digits of the string form case insensitively.
+        self::assertSame(
+            'uuid-case',
+            $this->findOne(Filters::equal('projectUuid', '597AE2F6-16A6-1027-98F4-D28B5365DC14')),
+        );
     }
 
     public function test_the_standard_schema_still_applies_alongside_loaded_definitions(): void
