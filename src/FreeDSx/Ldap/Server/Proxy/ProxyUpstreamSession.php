@@ -15,11 +15,7 @@ namespace FreeDSx\Ldap\Server\Proxy;
 
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
-use FreeDSx\Ldap\Exception\NoticeOfDisconnectException;
 use FreeDSx\Ldap\LdapClient;
-use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
-use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
-use FreeDSx\Ldap\Server\Utility\ExponentialBackoff;
 use SensitiveParameter;
 
 /**
@@ -34,12 +30,6 @@ final class ProxyUpstreamSession
     public function __construct(
         private readonly LdapClient $client,
         private readonly bool $useStartTls = false,
-        private readonly SleeperInterface $sleeper = new BlockingSleeper(),
-        private readonly int $maxAttempts = 3,
-        private readonly ExponentialBackoff $backoff = new ExponentialBackoff(
-            base: 0.05,
-            max: 1.0,
-        ),
     ) {}
 
     /**
@@ -51,7 +41,7 @@ final class ProxyUpstreamSession
     }
 
     /**
-     * Establishes the identity upstream, reissuing only failures that prove the credential never landed.
+     * Establishes the identity upstream, sending the credential once since a failed send cannot prove it never landed.
      *
      * @throws BindException
      * @throws ConnectionException
@@ -61,42 +51,51 @@ final class ProxyUpstreamSession
         #[SensitiveParameter]
         string $password,
     ): void {
-        $attempt = 0;
+        try {
+            $this->ensureReady();
+            $this->client->bind(
+                $name,
+                $password,
+            );
+        } catch (ConnectionException $e) {
+            $this->dropConnection();
 
-        while (true) {
-            try {
-                $this->connectAndBind(
-                    $name,
-                    $password,
-                );
-                $this->isBound = true;
-
-                return;
-            } catch (ConnectionException $e) {
-                $attempt++;
-
-                if (!$this->canRetry($e, $attempt)) {
-                    throw $e;
-                }
-
-                $this->sleeper->sleep($this->backoff->delayFor($attempt));
-            }
+            throw $e;
         }
+
+        $this->isBound = true;
     }
 
     /**
-     * Upgrades the upstream link before anything crosses it.
+     * Readies the upstream link before anything crosses it.
      *
      * @throws ConnectionException
      */
-    public function ensureEncrypted(): void
+    public function ensureReady(): void
     {
+        $isClosed = !$this->client->isConnected();
+
+        if ($isClosed && $this->isBound) {
+            throw new ConnectionException('The upstream connection backing the bound session was lost.');
+        }
+        if ($isClosed) {
+            $this->client->disconnect();
+        }
+
         // Re-issuing it on a connection already upgraded is an operations error the upstream answers by hanging up.
         if (!$this->useStartTls || $this->client->isEncrypted()) {
             return;
         }
 
         $this->client->startTls();
+    }
+
+    /**
+     * Drops the upstream connection after a failed request, so a late reply cannot answer the next one.
+     */
+    public function dropConnection(): void
+    {
+        $this->client->disconnect();
     }
 
     /**
@@ -119,33 +118,5 @@ final class ProxyUpstreamSession
         } catch (ConnectionException) {
             $this->client->disconnect();
         }
-    }
-
-    /**
-     * Only a true transport failure is worth retrying.
-     */
-    private function canRetry(
-        ConnectionException $exception,
-        int $attempt,
-    ): bool {
-        return !$exception instanceof NoticeOfDisconnectException
-            && $attempt < $this->maxAttempts;
-    }
-
-    /**
-     * @throws BindException
-     * @throws ConnectionException
-     */
-    private function connectAndBind(
-        string $name,
-        #[SensitiveParameter]
-        string $password,
-    ): void {
-        $this->ensureEncrypted();
-
-        $this->client->bind(
-            $name,
-            $password,
-        );
     }
 }

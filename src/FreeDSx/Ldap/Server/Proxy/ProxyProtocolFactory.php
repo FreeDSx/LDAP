@@ -29,8 +29,6 @@ use FreeDSx\Ldap\Server\Middleware\BindMiddleware;
 use FreeDSx\Ldap\Server\Middleware\ConfidentialityMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareChain;
-use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
-use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Middleware\RequestValidationMiddleware;
 use FreeDSx\Ldap\Server\ServerConnectionScaffoldingTrait;
 use FreeDSx\Ldap\Server\ServerProtocolFactoryInterface;
@@ -48,10 +46,8 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
 
     private readonly ServerListenerOptionsInterface $options;
 
-    public function __construct(
-        private readonly ProxyOptions $proxyOptions,
-        private readonly SleeperInterface $sleeper = new BlockingSleeper(),
-    ) {
+    public function __construct(private readonly ProxyOptions $proxyOptions)
+    {
         $this->options = $proxyOptions->getServerOptions();
     }
 
@@ -66,7 +62,6 @@ final class ProxyProtocolFactory implements ServerProtocolFactoryInterface
         $session = new ProxyUpstreamSession(
             client: $upstream,
             useStartTls: $this->proxyOptions->getUseStartTls(),
-            sleeper: $this->sleeper,
         );
 
         $authenticators = [

@@ -6,31 +6,22 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Proxy;
 
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
-use FreeDSx\Ldap\Exception\NoticeOfDisconnectException;
 use FreeDSx\Ldap\LdapClient;
-use FreeDSx\Ldap\Operation\LdapResult;
-use FreeDSx\Ldap\Operation\Response\BindResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Server\Proxy\ProxyUpstreamSession;
-use FreeDSx\Ldap\Server\Utility\ExponentialBackoff;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Server\Clock\RecordingSleeper;
 
 final class ProxyUpstreamSessionTest extends TestCase
 {
     private LdapClient&MockObject $client;
-
-    private RecordingSleeper $sleeper;
 
     private ProxyUpstreamSession $subject;
 
     protected function setUp(): void
     {
         $this->client = $this->createMock(LdapClient::class);
-        $this->sleeper = new RecordingSleeper();
-        $this->subject = $this->makeSession();
+        $this->subject = new ProxyUpstreamSession($this->client);
     }
 
     public function test_it_is_not_bound_before_a_bind(): void
@@ -62,7 +53,7 @@ final class ProxyUpstreamSessionTest extends TestCase
             ->expects(self::once())
             ->method('bind');
 
-        $this->makeSession(useStartTls: true)->bind(
+        $this->makeStartTlsSession()->bind(
             'cn=user,dc=foo,dc=bar',
             '12345',
         );
@@ -80,7 +71,7 @@ final class ProxyUpstreamSessionTest extends TestCase
             ->expects(self::once())
             ->method('bind');
 
-        $this->makeSession(useStartTls: true)->bind(
+        $this->makeStartTlsSession()->bind(
             'cn=user,dc=foo,dc=bar',
             '12345',
         );
@@ -92,7 +83,7 @@ final class ProxyUpstreamSessionTest extends TestCase
             ->expects(self::once())
             ->method('startTls');
 
-        $this->makeSession(useStartTls: true)->ensureEncrypted();
+        $this->makeStartTlsSession()->ensureReady();
     }
 
     public function test_it_leaves_the_link_alone_when_start_tls_is_not_configured(): void
@@ -101,7 +92,7 @@ final class ProxyUpstreamSessionTest extends TestCase
             ->expects(self::never())
             ->method('startTls');
 
-        $this->subject->ensureEncrypted();
+        $this->subject->ensureReady();
     }
 
     public function test_it_does_not_upgrade_a_link_already_encrypted(): void
@@ -113,48 +104,63 @@ final class ProxyUpstreamSessionTest extends TestCase
             ->expects(self::never())
             ->method('startTls');
 
-        $this->makeSession(useStartTls: true)->ensureEncrypted();
+        $this->makeStartTlsSession()->ensureReady();
     }
 
-    public function test_it_reissues_a_bind_that_failed_on_the_transport(): void
+    public function test_it_replaces_a_connection_the_upstream_closed_before_sending_anything(): void
     {
-        $attempts = 0;
         $this->client
-            ->method('bind')
-            ->willReturnCallback(function () use (&$attempts): LdapMessageResponse {
-                $attempts++;
+            ->method('isConnected')
+            ->willReturn(false);
+        $this->client
+            ->expects(self::once())
+            ->method('disconnect');
 
-                if ($attempts < 3) {
-                    throw new ConnectionException('gone');
-                }
+        $this->subject->ensureReady();
+    }
 
-                return new LdapMessageResponse(
-                    1,
-                    new BindResponse(new LdapResult(ResultCode::SUCCESS)),
-                );
+    public function test_it_does_not_replace_a_closed_connection_that_carried_a_bound_identity(): void
+    {
+        $calls = 0;
+        $this->client
+            ->method('isConnected')
+            ->willReturnCallback(function () use (&$calls): bool {
+                $calls++;
+
+                return $calls === 1;
             });
-
         $this->subject->bind(
             'cn=user,dc=foo,dc=bar',
             '12345',
         );
 
-        self::assertSame(
-            3,
-            $attempts,
-        );
-        self::assertCount(
-            2,
-            $this->sleeper->durations,
-        );
-        self::assertTrue($this->subject->isBound());
+        $this->client
+            ->expects(self::never())
+            ->method('disconnect');
+
+        $this->expectException(ConnectionException::class);
+
+        $this->subject->ensureReady();
     }
 
-    public function test_it_gives_up_once_the_attempts_are_spent(): void
+    public function test_it_keeps_a_live_connection_before_sending_anything(): void
     {
         $this->client
+            ->method('isConnected')
+            ->willReturn(true);
+        $this->client
+            ->expects(self::never())
+            ->method('disconnect');
+
+        $this->subject->ensureReady();
+    }
+
+    public function test_it_sends_a_bind_that_fails_on_the_transport_only_once(): void
+    {
+        $this->client
+            ->expects(self::once())
             ->method('bind')
-            ->willThrowException(new ConnectionException('gone'));
+            ->willThrowException(new ConnectionException('The connection to the server has been lost.'));
 
         $this->expectException(ConnectionException::class);
 
@@ -164,68 +170,46 @@ final class ProxyUpstreamSessionTest extends TestCase
                 '12345',
             );
         } finally {
-            self::assertCount(
-                2,
-                $this->sleeper->durations,
-            );
             self::assertFalse($this->subject->isBound());
         }
     }
 
-    public function test_it_does_not_reissue_a_bind_the_upstream_answered_by_disconnecting(): void
+    public function test_it_drops_the_connection_after_a_bind_fails_on_the_transport(): void
     {
-        $attempts = 0;
+        $this->client
+            ->method('isConnected')
+            ->willReturn(true);
         $this->client
             ->method('bind')
-            ->willReturnCallback(function () use (&$attempts): never {
-                $attempts++;
+            ->willThrowException(new ConnectionException('The connection was idle for longer than the read timeout.'));
+        $this->client
+            ->expects(self::once())
+            ->method('disconnect');
 
-                throw new NoticeOfDisconnectException('the peer said so');
-            });
+        $this->expectException(ConnectionException::class);
 
-        $this->expectException(NoticeOfDisconnectException::class);
-
-        try {
-            $this->subject->bind(
-                'cn=user,dc=foo,dc=bar',
-                '12345',
-            );
-        } finally {
-            self::assertSame(
-                1,
-                $attempts,
-            );
-            self::assertSame(
-                [],
-                $this->sleeper->durations,
-            );
-        }
+        $this->subject->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
     }
 
     public function test_it_does_not_reissue_a_bind_the_upstream_refused(): void
     {
-        $attempts = 0;
         $this->client
+            ->expects(self::once())
             ->method('bind')
-            ->willReturnCallback(function () use (&$attempts): never {
-                $attempts++;
-
-                throw new BindException('Invalid credentials.', ResultCode::INVALID_CREDENTIALS);
-            });
+            ->willThrowException(new BindException(
+                'Invalid credentials.',
+                ResultCode::INVALID_CREDENTIALS,
+            ));
 
         $this->expectException(BindException::class);
 
-        try {
-            $this->subject->bind(
-                'cn=user,dc=foo,dc=bar',
-                'wrong',
-            );
-        } finally {
-            self::assertSame(
-                1,
-                $attempts,
-            );
-        }
+        $this->subject->bind(
+            'cn=user,dc=foo,dc=bar',
+            'wrong',
+        );
     }
 
     public function test_it_unbinds_upstream_when_reset_while_bound(): void
@@ -278,17 +262,11 @@ final class ProxyUpstreamSessionTest extends TestCase
         self::assertFalse($this->subject->isBound());
     }
 
-    private function makeSession(bool $useStartTls = false): ProxyUpstreamSession
+    private function makeStartTlsSession(): ProxyUpstreamSession
     {
         return new ProxyUpstreamSession(
             client: $this->client,
-            useStartTls: $useStartTls,
-            sleeper: $this->sleeper,
-            maxAttempts: 3,
-            backoff: new ExponentialBackoff(
-                base: 0.01,
-                max: 0.02,
-            ),
+            useStartTls: true,
         );
     }
 }

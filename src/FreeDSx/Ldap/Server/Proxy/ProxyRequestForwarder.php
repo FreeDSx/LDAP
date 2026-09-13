@@ -125,13 +125,15 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
         array $controls,
     ): LdapMessageResponse {
         try {
-            $this->session->ensureEncrypted();
+            $this->session->ensureReady();
 
             return $this->client->sendAndReceive(
                 $request,
                 ...$controls,
             );
         } catch (ConnectionException $e) {
+            $this->session->dropConnection();
+
             // Reconnecting returns an anonymous session
             // Ending it beats answering as an identity we no longer are.
             if ($this->session->isBound()) {
