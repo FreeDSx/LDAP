@@ -20,7 +20,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
-use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslBindPolicyEnforcer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
@@ -208,7 +208,7 @@ final class SaslBindPolicyEnforcerTest extends TestCase
         );
 
         return new SaslBindPolicyEnforcer(
-            new DnBindNameResolver(),
+            $container->get(BindNameResolverInterface::class),
             $this->backend,
             new PasswordPolicyResolver(
                 $this->backend,

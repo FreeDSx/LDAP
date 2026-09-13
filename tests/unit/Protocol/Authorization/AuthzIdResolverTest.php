@@ -19,6 +19,8 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzIdResolver;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
@@ -56,6 +58,7 @@ final class AuthzIdResolverTest extends TestCase
             $this->accessControl,
             $this->backend,
             $this->identityResolver,
+            new AttributeTypeSpelling(SchemaResource::Core->load()),
             new EventLogger(
                 new RecordingLogger(),
                 EventLogPolicy::all(),
@@ -77,6 +80,35 @@ final class AuthzIdResolverTest extends TestCase
         self::assertSame(
             self::PROXIED_DN,
             $entry?->getDn()->toString(),
+        );
+    }
+
+    public function test_it_resolves_a_dn_authz_id_spelled_with_an_alias_through_its_primary_names(): void
+    {
+        $this->backend
+            ->expects(self::once())
+            ->method('get')
+            ->with(new Dn(self::PROXIED_DN))
+            ->willReturn(new Entry(new Dn(self::PROXIED_DN)));
+
+        $entry = $this->subject->resolve(AuthzId::fromString('dn:commonName=alice,dc=example,dc=com'));
+
+        self::assertSame(
+            self::PROXIED_DN,
+            $entry?->getDn()->toString(),
+        );
+    }
+
+    public function test_assume_returns_the_authenticated_token_when_an_alias_spelled_dn_names_self(): void
+    {
+        $result = $this->subject->assume(
+            $this->boundToken,
+            AuthzId::fromString('dn:commonName=admin,dc=example,dc=com'),
+        );
+
+        self::assertSame(
+            $this->boundToken,
+            $result,
         );
     }
 

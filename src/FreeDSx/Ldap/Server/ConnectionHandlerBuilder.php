@@ -38,6 +38,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseWriter;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerAwareAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
@@ -145,6 +146,7 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
             $this->container->get(AccessControlInterface::class),
             $backend,
             $this->container->get(BindNameResolverInterface::class),
+            $this->container->get(AttributeTypeSpelling::class),
             $eventLogger,
         );
 

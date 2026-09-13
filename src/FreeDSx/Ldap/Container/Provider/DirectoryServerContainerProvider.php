@@ -239,7 +239,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         $configured = $container->get(ServerOptions::class)->getIdentityResolver();
 
         return new BindNameResolverChain([
-            new DnBindNameResolver(),
+            new DnBindNameResolver($container->get(AttributeTypeSpelling::class)),
             $configured ?? new AttributeSearchBindNameResolver(),
         ]);
     }

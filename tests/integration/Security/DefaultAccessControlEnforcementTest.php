@@ -23,9 +23,7 @@ use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerAwareAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
-use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
-use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
@@ -56,7 +54,7 @@ final class DefaultAccessControlEnforcementTest extends TestCase
 
     protected function setUp(): void
     {
-        $backend = $this->backendFor(new InMemoryStorage([
+        $container = $this->containerFor(new InMemoryStorage([
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [
@@ -85,15 +83,12 @@ final class DefaultAccessControlEnforcementTest extends TestCase
         ]));
 
         $this->authenticator = new ManagerAwareAuthenticator(
-            new PasswordAuthenticator(
-                new DnBindNameResolver(),
-                $backend,
-            ),
+            $container->get(PasswordAuthenticatableInterface::class),
             new ManagerIdentity(
                 new Dn(self::MANAGER_DN),
                 self::HASH,
             ),
-            new PasswordHashService(),
+            $container->get(PasswordHashService::class),
         );
         $this->accessControl = new PrivilegedBypassAccessControl(
             new RuleBasedAccessControl(AclRules::secureDefault()),

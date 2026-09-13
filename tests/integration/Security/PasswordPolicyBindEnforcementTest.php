@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
-use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
+use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordPolicyAwareAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
@@ -617,7 +617,7 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
         ]));
         $this->backend = $container->get(StorageReadBackend::class);
 
-        $nameResolver = new DnBindNameResolver();
+        $nameResolver = $container->get(BindNameResolverInterface::class);
         $engine = new PasswordPolicyEngine(
             clock: $this->clock,
             changeConstraints: new PasswordChangeConstraintChain([]),

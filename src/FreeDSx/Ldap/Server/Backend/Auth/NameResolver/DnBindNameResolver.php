@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Auth\NameResolver;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 
 /**
@@ -22,12 +23,16 @@ use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class DnBindNameResolver implements BindNameResolverInterface
+final readonly class DnBindNameResolver implements BindNameResolverInterface
 {
+    public function __construct(
+        private AttributeTypeSpelling $spelling,
+    ) {}
+
     public function resolve(
         string $name,
         ReadBackendInterface $backend,
     ): ?Entry {
-        return $backend->get(new Dn($name));
+        return $backend->get($this->spelling->dn(new Dn($name)));
     }
 }
