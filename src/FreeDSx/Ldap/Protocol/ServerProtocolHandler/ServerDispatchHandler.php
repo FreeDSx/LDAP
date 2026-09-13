@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Control\Control;
-use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -66,23 +65,19 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
         LdapMessageRequest $message,
         TokenInterface $token,
     ): ResponseStream {
-        $schemaViolations = new SchemaViolations();
         $request = $message->getRequest();
-        $controls = $message->controls();
 
         if ($request instanceof Request\CompareRequest) {
             return $this->handleCompare(
                 $message,
                 $request,
+                $token,
             );
         }
 
         return $this->handleWrite(
             $message,
-            $request,
-            $controls,
             $token,
-            $schemaViolations,
         );
     }
 
@@ -93,9 +88,17 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
     private function handleCompare(
         LdapMessageRequest $message,
         Request\CompareRequest $request,
+        TokenInterface $token,
     ): ResponseStream {
+        // The assertion and the comparison are answered from one read of the entry (RFC 4528 §3).
+        $entry = $this->backend->getOrFail($request->getDn());
+        $this->assertions->assertSatisfiedBy(
+            $entry,
+            $message->controls(),
+            $token,
+        );
         $match = $this->backend->compare(
-            $request->getDn(),
+            $entry,
             $request->getFilter(),
         );
 
@@ -119,23 +122,24 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
      */
     private function handleWrite(
         LdapMessageRequest $message,
-        Request\RequestInterface $request,
-        ControlBag $controls,
         TokenInterface $token,
-        SchemaViolations $schemaViolations,
     ): ResponseStream {
+        $controls = $message->controls();
+        $schemaViolations = new SchemaViolations();
         $controlEvaluator = new WriteControlEvaluator(
             $this->assertions,
             $token,
             $controls,
         );
 
-        $this->dispatchWrite(
-            $request,
-            $controls,
-            $token,
-            $schemaViolations,
-            $controlEvaluator,
+        $this->router->route(
+            $message->getRequest(),
+            new WriteContext(
+                $token,
+                $controls,
+                schemaViolations: $schemaViolations,
+                controlEvaluator: $controlEvaluator,
+            ),
         );
 
         $preRead = $this->readEntryControlHandler->preRead(
@@ -161,27 +165,6 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
             WriteOperationResult::success(
                 $message,
                 $schemaViolations,
-            ),
-        );
-    }
-
-    /**
-     * @throws OperationException
-     */
-    private function dispatchWrite(
-        Request\RequestInterface $request,
-        ControlBag $controls,
-        TokenInterface $token,
-        SchemaViolations $schemaViolations,
-        WriteControlEvaluator $controlEvaluator,
-    ): void {
-        $this->router->route(
-            $request,
-            new WriteContext(
-                $token,
-                $controls,
-                schemaViolations: $schemaViolations,
-                controlEvaluator: $controlEvaluator,
             ),
         );
     }

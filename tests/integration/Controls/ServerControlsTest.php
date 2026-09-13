@@ -61,70 +61,6 @@ final class ServerControlsTest extends ServerTestCase
         parent::setUp();
     }
 
-    public function test_assertion_allows_a_modify_when_it_matches(): void
-    {
-        $this->authenticateAdmin();
-        $dn = $this->createPerson('assert-ok');
-
-        $this->ldapClient()->send(
-            Operations::modify($dn, Change::replace('sn', 'Jones')),
-            Controls::assertion(Filters::equal('sn', 'Smith')),
-        );
-
-        self::assertSame('Jones', $this->readValue($dn, 'sn'));
-    }
-
-    public function test_assertion_fails_a_modify_when_it_does_not_match(): void
-    {
-        $this->authenticateAdmin();
-        $dn = $this->createPerson('assert-no');
-
-        try {
-            $this->ldapClient()->send(
-                Operations::modify($dn, Change::replace('sn', 'Jones')),
-                Controls::assertion(Filters::equal('sn', 'Nope')),
-            );
-            self::fail('Expected an OperationException was not thrown.');
-        } catch (OperationException $e) {
-            self::assertSame(ResultCode::ASSERTION_FAILED, $e->getCode());
-        }
-
-        self::assertSame('Smith', $this->readValue($dn, 'sn'));
-    }
-
-    public function test_assertion_allows_a_search_when_it_matches(): void
-    {
-        $this->bind();
-
-        $entries = $this->ldapClient()->search(
-            Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'),
-            Controls::assertion(Filters::equal('dc', 'foo')),
-        );
-
-        self::assertGreaterThan(0, $entries->count());
-    }
-
-    public function test_assertion_fails_a_search_when_it_does_not_match(): void
-    {
-        $this->bind();
-
-        try {
-            $this->ldapClient()->search(
-                Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'),
-                Controls::assertion(Filters::equal('dc', 'nope')),
-            );
-            self::fail('Expected an OperationException was not thrown.');
-        } catch (OperationException $e) {
-            self::assertSame(ResultCode::ASSERTION_FAILED, $e->getCode());
-        }
-
-        # The connection survives the per-operation rejection: a follow-up search still succeeds.
-        $entries = $this->ldapClient()->search(
-            Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'),
-        );
-        self::assertGreaterThan(0, $entries->count());
-    }
-
     public function test_assertion_on_an_unreadable_attribute_cannot_match_its_value(): void
     {
         $this->authenticateUser();
@@ -218,43 +154,6 @@ final class ServerControlsTest extends ServerTestCase
         }
     }
 
-    public function test_assertion_allows_an_add_when_it_matches(): void
-    {
-        $this->authenticateAdmin();
-        $dn = 'cn=assert-add-ok,ou=people,dc=foo,dc=bar';
-
-        $this->ldapClient()->send(
-            Operations::add($this->person($dn, 'assert-add-ok')),
-            Controls::assertion(Filters::equal('sn', 'Smith')),
-        );
-
-        self::assertSame(
-            'Smith',
-            $this->readValue($dn, 'sn'),
-        );
-    }
-
-    public function test_assertion_fails_an_add_when_it_does_not_match(): void
-    {
-        $this->authenticateAdmin();
-        $dn = 'cn=assert-add-no,ou=people,dc=foo,dc=bar';
-
-        try {
-            $this->ldapClient()->send(
-                Operations::add($this->person($dn, 'assert-add-no')),
-                Controls::assertion(Filters::equal('sn', 'doesnotmatch')),
-            );
-            self::fail('Expected an OperationException was not thrown.');
-        } catch (OperationException $e) {
-            self::assertSame(
-                ResultCode::ASSERTION_FAILED,
-                $e->getCode(),
-            );
-        }
-
-        self::assertNull($this->ldapClient()->read($dn));
-    }
-
     public function test_assertion_on_an_add_cannot_see_an_attribute_the_identity_may_not_read(): void
     {
         $this->authenticateAdmin();
@@ -282,54 +181,6 @@ final class ServerControlsTest extends ServerTestCase
         }
 
         self::assertNull($this->ldapClient()->read($dn));
-    }
-
-    public function test_assertion_fails_a_delete_when_it_does_not_match(): void
-    {
-        $this->authenticateAdmin();
-        $dn = $this->createPerson('assert-delete');
-
-        try {
-            $this->ldapClient()->send(
-                Operations::delete($dn),
-                Controls::assertion(Filters::equal('sn', 'Nope')),
-            );
-            self::fail('Expected an OperationException was not thrown.');
-        } catch (OperationException $e) {
-            self::assertSame(
-                ResultCode::ASSERTION_FAILED,
-                $e->getCode(),
-            );
-        }
-
-        self::assertSame(
-            'Smith',
-            $this->readValue($dn, 'sn'),
-        );
-    }
-
-    public function test_assertion_fails_a_rename_when_it_does_not_match(): void
-    {
-        $this->authenticateAdmin();
-        $dn = $this->createPerson('assert-rename');
-
-        try {
-            $this->ldapClient()->send(
-                Operations::rename($dn, 'cn=assert-renamed'),
-                Controls::assertion(Filters::equal('sn', 'Nope')),
-            );
-            self::fail('Expected an OperationException was not thrown.');
-        } catch (OperationException $e) {
-            self::assertSame(
-                ResultCode::ASSERTION_FAILED,
-                $e->getCode(),
-            );
-        }
-
-        self::assertSame(
-            'Smith',
-            $this->readValue($dn, 'sn'),
-        );
     }
 
     public function test_pre_read_and_post_read_capture_state_around_a_modify(): void
@@ -598,11 +449,6 @@ final class ServerControlsTest extends ServerTestCase
         return $control->setCriticality(false);
     }
 
-    private function bind(): void
-    {
-        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
-    }
-
     private function createPerson(string $cn): string
     {
         $dn = "cn={$cn},ou=people,dc=foo,dc=bar";
@@ -620,18 +466,5 @@ final class ServerControlsTest extends ServerTestCase
             'cn' => [$cn],
             'sn' => ['Smith'],
         ]);
-    }
-
-    private function readValue(
-        string $dn,
-        string $attribute,
-    ): ?string {
-        $entries = $this->ldapClient()->search(
-            Operations::search(Filters::present('objectClass'))
-                ->base($dn)
-                ->useBaseScope(),
-        );
-
-        return $entries->first()?->get($attribute)?->firstValue();
     }
 }

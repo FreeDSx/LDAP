@@ -50,12 +50,19 @@ interface ReadBackendInterface
     public function get(Dn $dn): ?Entry;
 
     /**
-     * Evaluate a compare assertion; throws OperationException(NO_SUCH_OBJECT) when the entry is missing.
+     * Fetch a single entry by DN, or answer NO_SUCH_OBJECT carrying the deepest ancestor that exists.
+     *
+     * @throws OperationException
+     */
+    public function getOrFail(Dn $dn): Entry;
+
+    /**
+     * Evaluate a compare assertion against an entry already read.
      *
      * @throws OperationException
      */
     public function compare(
-        Dn $dn,
+        Entry $entry,
         EqualityFilter $filter,
     ): bool;
 }
