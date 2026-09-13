@@ -18,7 +18,6 @@ Access Control
 * [Confidential Attributes](#confidential-attributes)
 * [Control Rules](#control-rules)
 * [Extended Operation Rules](#extended-operation-rules)
-* [Custom Access Control](#custom-access-control)
 
 ## Overview
 
@@ -587,82 +586,4 @@ AclRules::fromEmpty()->replaceExtendedOperationRules(
         '1.3.6.1.4.1....',
     ),
 );
-```
-
-## Custom Access Control
-
-For cases where the built-in rule system is insufficient, implement `AccessControlInterface` and pass it via
-`ServerOptions::setAccessControl()`:
-
-```php
-use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Operation\OperationType;
-use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
-use FreeDSx\Ldap\Server\Token\TokenInterface;
-
-class MyAccessControl implements AccessControlInterface
-{
-    public function authorizeOperation(
-        OperationType $operation,
-        TokenInterface $token,
-        Dn $dn,
-    ): void {
-        if (!$this->isAllowed($operation, $token, $dn)) {
-            throw new OperationException(
-                'Access denied.',
-                ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
-            );
-        }
-    }
-
-    public function authorizeAttribute(
-        TokenInterface $token,
-        Dn $dn,
-        string $attribute,
-        AttributeAccess $access,
-    ): void {
-        // Throw OperationException to deny access to the attribute.
-    }
-
-    public function authorizeControl(
-        TokenInterface $token,
-        Dn $dn,
-        string $controlOid,
-    ): void {
-        // Throw OperationException to deny use of a privileged control.
-    }
-
-    public function authorizeExtendedOperation(
-        TokenInterface $token,
-        string $oid,
-    ): void {
-        // Throw OperationException to deny use of a privileged extended operation.
-    }
-
-    /**
-     * Return null to suppress the entry from search results entirely.
-     */
-    public function filterEntry(
-        TokenInterface $token,
-        Entry $entry,
-    ): ?Entry {
-        return $entry;
-    }
-
-    /**
-     * Return false to withhold an attribute the schema marks X-CONFIDENTIAL.
-     */
-    public function hasConfidentialAccess(
-        TokenInterface $token,
-        string $attribute,
-    ): bool {
-        return false;
-    }
-}
-
-$options->setAccessControl(new MyAccessControl());
 ```
