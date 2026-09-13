@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\UnexpectedValueException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
@@ -42,6 +43,7 @@ final readonly class AuthzIdResolver
         private AccessControlInterface $accessControl,
         private ReadBackendInterface $backend,
         private BindNameResolverInterface $identityResolver,
+        private AttributeTypeSpelling $spelling,
         private EventLogger $eventLogger,
     ) {}
 
@@ -52,7 +54,7 @@ final readonly class AuthzIdResolver
     {
         try {
             return match (true) {
-                $authzId->isType(AuthzIdType::Dn) => $this->backend->get(new Dn($authzId->getValue())),
+                $authzId->isType(AuthzIdType::Dn) => $this->backend->get($this->spelling->dn(new Dn($authzId->getValue()))),
                 $authzId->isType(AuthzIdType::Username) => $this->identityResolver->resolve(
                     $authzId->getValue(),
                     $this->backend,
@@ -188,7 +190,7 @@ final readonly class AuthzIdResolver
         Dn $resolvedDn,
     ): bool {
         try {
-            $normalized = (new Dn($candidate))->normalize()->toString();
+            $normalized = $this->spelling->dn(new Dn($candidate))->normalize()->toString();
         } catch (InvalidArgumentException|UnexpectedValueException) {
             return false;
         }

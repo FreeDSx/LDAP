@@ -20,6 +20,8 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzIdResolver;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\ExternalMechanismOptionsBuilder;
 use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
@@ -59,6 +61,7 @@ final class ExternalMechanismOptionsBuilderTest extends TestCase
             $this->accessControl,
             $this->backend,
             $this->createMock(BindNameResolverInterface::class),
+            new AttributeTypeSpelling(SchemaResource::Core->load()),
             new EventLogger(
                 new RecordingLogger(),
                 EventLogPolicy::all(),

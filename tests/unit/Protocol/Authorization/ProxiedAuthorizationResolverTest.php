@@ -26,6 +26,8 @@ use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzIdResolver;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Protocol\Authorization\ProxiedAuthorizationResolver;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
@@ -70,6 +72,7 @@ final class ProxiedAuthorizationResolverTest extends TestCase
                 $this->accessControl,
                 $this->backend,
                 $this->identityResolver,
+                new AttributeTypeSpelling(SchemaResource::Core->load()),
                 new EventLogger(
                     $this->recordingLogger,
                     EventLogPolicy::all(),

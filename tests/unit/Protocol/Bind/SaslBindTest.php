@@ -24,6 +24,8 @@ use FreeDSx\Ldap\Operation\Request\SaslBindRequest;
 use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzIdResolver;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\OptionsBuilder\MechanismOptionsBuilderFactory;
 use FreeDSx\Ldap\Protocol\Bind\Sasl\SaslExchange;
 use FreeDSx\Ldap\Protocol\Bind\SaslBind;
@@ -381,6 +383,7 @@ final class SaslBindTest extends TestCase
             $accessControl,
             $backend,
             $this->createMock(BindNameResolverInterface::class),
+            new AttributeTypeSpelling(SchemaResource::Core->load()),
             new EventLogger(null),
         );
     }

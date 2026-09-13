@@ -78,6 +78,27 @@ final class LdapProxiedAuthorizationControlTest extends ServerTestCase
         );
     }
 
+    public function test_a_proxied_identity_spelled_with_an_alias_resolves_to_the_entry(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $response = $this->ldapClient()->send(
+            Operations::whoami(),
+            Controls::proxyAuthorization(AuthzId::fromString('dn:commonName=alice,ou=people,dc=foo,dc=bar')),
+        );
+
+        self::assertNotNull($response);
+        $extended = $response->getResponse();
+        self::assertInstanceOf(
+            ExtendedResponse::class,
+            $extended,
+        );
+        self::assertSame(
+            'dn:' . self::PROXIED_DN,
+            $extended->getValue(),
+        );
+    }
+
     public function test_whoami_reports_the_bound_identity_without_the_control(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');

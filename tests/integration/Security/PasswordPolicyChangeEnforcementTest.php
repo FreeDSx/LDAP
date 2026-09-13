@@ -28,7 +28,6 @@ use FreeDSx\Ldap\Protocol\Queue\Response\PasswordPolicyResponseInterceptor;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\DnBindNameResolver;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
@@ -370,10 +369,7 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
 
         return new ServerPasswordModifyHandler(
             service: new PasswordModifyService(
-                targetResolver: new PasswordModifyTargetResolver(
-                    $this->backend,
-                    new DnBindNameResolver(),
-                ),
+                targetResolver: $container->get(PasswordModifyTargetResolver::class),
                 accessControl: $this->createMock(AccessControlInterface::class),
                 writeDispatcher: $container->get(WriteOperationDispatcher::class),
                 changeGuard: new PasswordPolicyChangeGuard(

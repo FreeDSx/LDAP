@@ -46,6 +46,23 @@ final class LdapSaslServerTest extends ServerTestCase
         $this->assertSame(0, $response->getResultCode());
     }
 
+    public function testItCanAuthenticateWithSaslPlainNamingTheEntryByAnAliasSpelledDn(): void
+    {
+        $response = $this->ldapClient()->bindSasl(
+            (new PlainOptions())->setUsername('commonName=user,dc=foo,dc=bar')->setPassword('12345'),
+            MechanismName::PLAIN,
+        )->getResponse();
+
+        $this->assertInstanceOf(
+            BindResponse::class,
+            $response,
+        );
+        $this->assertSame(
+            0,
+            $response->getResultCode(),
+        );
+    }
+
     public function testSaslPlainFailsWithInvalidCredentials(): void
     {
         $this->expectException(BindException::class);

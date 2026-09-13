@@ -162,6 +162,27 @@ final class LdapPasswordModifyServerTest extends ServerTestCase
         $this->assertStoredPasswordIsHashed();
     }
 
+    public function testExplicitIdentityPasswordChangeNamedByAnAliasSpelledDn(): void
+    {
+        $this->ldapClient()->bind(
+            self::USER_DN,
+            self::USER_PASSWORD,
+        );
+
+        $this->ldapClient()->sendAndReceive(
+            new PasswordModifyRequest('commonName=user,dc=foo,dc=bar', null, 'aliaspass'),
+        );
+
+        $verifyClient = $this->buildClient('tcp');
+        $verifyClient->bind(
+            self::USER_DN,
+            'aliaspass',
+        );
+        $verifyClient->unbind();
+
+        $this->assertStoredPasswordIsHashed();
+    }
+
     public function testWrongOldPasswordReturnsInvalidCredentials(): void
     {
         $this->ldapClient()->bind(

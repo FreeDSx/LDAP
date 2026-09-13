@@ -23,6 +23,8 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Protocol\Authorization\DispatchAuthorizer;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzIdResolver;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Protocol\Authorization\ProxiedAuthorizationResolver;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
@@ -66,6 +68,7 @@ final class DispatchAuthorizerTest extends TestCase
                     $this->accessControl,
                     $this->backend,
                     $this->createMock(BindNameResolverInterface::class),
+                    new AttributeTypeSpelling(SchemaResource::Core->load()),
                     new EventLogger(null),
                 ),
             ),
