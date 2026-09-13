@@ -28,10 +28,10 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class UpdateOperation
+final readonly class UpdateOperation
 {
     public function __construct(
-        private readonly EqualityComparatorResolver $equalityResolver,
+        private EqualityComparatorResolver $equalityResolver,
     ) {}
 
     /**

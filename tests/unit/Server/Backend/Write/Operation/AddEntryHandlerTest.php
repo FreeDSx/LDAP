@@ -61,6 +61,22 @@ final class AddEntryHandlerTest extends TestCase
         self::assertNotNull($this->find('cn=New,dc=example,dc=com'));
     }
 
+    public function test_it_does_not_repeat_a_naming_value_held_under_an_equivalent_spelling(): void
+    {
+        $this->adds()->handle(
+            new AddCommand(new Entry(
+                new Dn('cn=Über,dc=example,dc=com'),
+                new Attribute('cn', 'über'),
+            )),
+            $this->context(),
+        );
+
+        self::assertSame(
+            ['über'],
+            $this->find('cn=Über,dc=example,dc=com')?->get('cn')?->getValues(),
+        );
+    }
+
     public function test_it_refuses_an_entry_that_already_exists(): void
     {
         self::expectException(OperationException::class);
