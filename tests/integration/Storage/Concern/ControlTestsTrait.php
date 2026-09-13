@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
 use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Control\Sorting\SortingResponseControl;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -380,6 +381,35 @@ trait ControlTestsTrait
                 $control->setCriticality(true),
             );
             self::fail('The critical control should have failed the operation.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+                $e->getCode(),
+            );
+        }
+    }
+
+    /**
+     * @return iterable<string, array{Control}>
+     */
+    public static function controlsASubtreeDeleteCannotHonor(): iterable
+    {
+        yield 'assertion' => [Controls::assertion(Filters::present('objectClass'))];
+        yield 'pre-read' => [new PreReadControl('cn')];
+    }
+
+    #[DataProvider('controlsASubtreeDeleteCannotHonor')]
+    public function testACriticalControlASubtreeDeleteCannotHonorIsRefused(Control $control): void
+    {
+        $this->authenticateAdmin();
+
+        try {
+            $this->ldapClient()->sendAndReceive(
+                Operations::delete('ou=no-such-subtree,dc=foo,dc=bar'),
+                Controls::subtreeDelete(),
+                $control->setCriticality(true),
+            );
+            self::fail('The critical control should have failed the subtree delete.');
         } catch (OperationException $e) {
             self::assertSame(
                 ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,

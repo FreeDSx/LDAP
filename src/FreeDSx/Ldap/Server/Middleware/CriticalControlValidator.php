@@ -49,6 +49,7 @@ final readonly class CriticalControlValidator
             $this->controlRegistry->supportedControlsFor(
                 $routeId,
                 $request,
+                $controls,
             ),
         );
     }
