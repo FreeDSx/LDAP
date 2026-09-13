@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageBusyException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
@@ -65,6 +66,9 @@ final readonly class PdoTransactor
      * Runs the operation in a transaction, reissuing it when the database rejects it as a transient conflict.
      *
      * @param callable(): void $operation
+     *
+     * @throws StorageBusyException when the conflict outlasts the retry budget
+     * @throws PDOException when the failure is not a transient conflict, or the transaction is nested
      */
     public function atomic(callable $operation): void
     {
@@ -76,10 +80,17 @@ final readonly class PdoTransactor
 
                 return;
             } catch (PDOException $e) {
+                if (!$this->isReissuable($e)) {
+                    throw $e;
+                }
+
                 $attempt++;
 
-                if (!$this->canRetry($e, $attempt)) {
-                    throw $e;
+                if ($attempt > $this->maxRetries) {
+                    throw new StorageBusyException(
+                        'The transaction kept conflicting with concurrent writes.',
+                        $e,
+                    );
                 }
 
                 $this->sleeper->sleep($this->backoff->delayFor($attempt));
@@ -90,12 +101,9 @@ final readonly class PdoTransactor
     /**
      * Only the outermost transaction can be reissued, since a savepoint cannot be replayed on its own.
      */
-    private function canRetry(
-        PDOException $exception,
-        int $attempt,
-    ): bool {
-        return $attempt <= $this->maxRetries
-            && $this->provider->txState()->depth === 0
+    private function isReissuable(PDOException $exception): bool
+    {
+        return $this->provider->txState()->depth === 0
             && $this->dialect->isRetryableConflict($exception);
     }
 

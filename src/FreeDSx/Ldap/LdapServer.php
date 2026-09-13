@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\LdifParseException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageBusyException;
 use FreeDSx\Ldap\Ldif\LdifChangeRecord;
 use FreeDSx\Ldap\Ldif\LdifParser;
 use FreeDSx\Ldap\Ldif\Url\LdifUrlResolverInterface;
@@ -84,6 +85,7 @@ class LdapServer
      * @throws RuntimeException when the LDIF contains a non-add change record
      * @throws InvalidArgumentException when the creator DN is malformed
      * @throws OperationException when an entry is refused, such as one violating the schema or missing its parent
+     * @throws StorageBusyException when a write keeps conflicting with concurrent writes
      */
     public function seed(
         LdifLoaderInterface $loader,
@@ -102,6 +104,7 @@ class LdapServer
      *
      * @throws InvalidArgumentException when the creator DN is malformed
      * @throws OperationException when an entry is refused, such as one violating the schema or missing its parent
+     * @throws StorageBusyException when a write keeps conflicting with concurrent writes
      */
     public function seedEntries(
         iterable $entries,
@@ -126,6 +129,7 @@ class LdapServer
      *
      * @throws LdifParseException when the LDIF cannot be parsed
      * @throws OperationException when a write fails (no such entry, schema violation, etc.)
+     * @throws StorageBusyException when a write keeps conflicting with concurrent writes
      */
     public function applyChanges(
         LdifLoaderInterface $loader,
