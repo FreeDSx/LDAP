@@ -316,6 +316,31 @@ final class LdapImporterTest extends TestCase
         );
     }
 
+    public function test_importEntries_stores_an_entry_spelled_with_aliases_under_the_primary_names(): void
+    {
+        $this->importer()->importEntries([
+            $this->domain(),
+            new Entry(
+                new Dn('commonName=Alice,dc=example,dc=com'),
+                new Attribute('commonName', 'Alice'),
+                new Attribute('surname', 'Anderson'),
+                new Attribute('objectClass', 'top', 'person'),
+            ),
+        ]);
+
+        $alice = $this->storage->find(new Dn('cn=alice,dc=example,dc=com'));
+
+        self::assertNotNull($alice);
+        self::assertSame(
+            'cn=Alice,dc=example,dc=com',
+            $alice->getDn()->toString(),
+        );
+        self::assertSame(
+            ['Anderson'],
+            $alice->get('sn')?->getValues(),
+        );
+    }
+
     private function optionsLogging(RecordingLogger $logger): ServerOptions
     {
         return TestServerOptions::unvalidatedCore()->setLogger($logger);

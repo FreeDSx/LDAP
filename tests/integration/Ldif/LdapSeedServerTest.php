@@ -64,6 +64,63 @@ final class LdapSeedServerTest extends TestCase
         self::assertNotNull($this->storage->find(new Dn('cn=alice,dc=example,dc=com')));
     }
 
+    public function test_it_seeds_an_entry_spelled_with_aliases_under_the_primary_names(): void
+    {
+        $this->subject->seed(new StringLdifLoader(<<<LDIF
+            dn: dc=example,dc=com
+            objectClass: top
+            objectClass: domain
+            dc: example
+
+            dn: commonName=bob,dc=example,dc=com
+            objectClass: top
+            objectClass: person
+            commonName: bob
+            surname: Builder
+            LDIF));
+
+        $bob = $this->storage->find(new Dn('cn=bob,dc=example,dc=com'));
+
+        self::assertNotNull($bob);
+        self::assertSame(
+            'cn=bob,dc=example,dc=com',
+            $bob->getDn()->toString(),
+        );
+        self::assertSame(
+            ['bob'],
+            $bob->get('cn')?->getValues(),
+        );
+        self::assertSame(
+            ['Builder'],
+            $bob->get('sn')?->getValues(),
+        );
+    }
+
+    public function test_a_replacement_named_by_a_numeric_oid_replaces_the_existing_entry(): void
+    {
+        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
+
+        $this->subject->seed(
+            new StringLdifLoader(str_replace(
+                ['dn: cn=alice', 'sn: Anderson'],
+                ['dn: 2.5.4.3=alice', 'sn: Replaced'],
+                self::SEED_LDIF,
+            )),
+            (new SeedOptions())->setReplaceExisting(true),
+        );
+
+        $alice = $this->storage->find(new Dn('cn=alice,dc=example,dc=com'));
+        self::assertNotNull($alice);
+        self::assertSame(
+            'cn=alice,dc=example,dc=com',
+            $alice->getDn()->toString(),
+        );
+        self::assertSame(
+            'Replaced',
+            $alice->get('sn')?->firstValue(),
+        );
+    }
+
     public function test_it_refuses_an_entry_that_already_exists(): void
     {
         $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
