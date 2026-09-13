@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Proxy;
 
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ReferralException;
@@ -293,6 +294,52 @@ final class ProxyRequestForwarderTest extends TestCase
         );
     }
 
+    public function test_it_relays_the_controls_a_failed_search_ended_with(): void
+    {
+        $paging = new Control(Control::OID_PAGING);
+        $this->upstreamStreams(
+            [],
+            ResultCode::SIZE_LIMIT_EXCEEDED,
+            $paging,
+        );
+
+        $this->subject->handle($this->contextFor(
+            7,
+            $this->searchRequest(),
+        ));
+
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $this->relayed[0]->getResponse(),
+        );
+        self::assertEquals(
+            [$paging],
+            $this->relayed[0]->controls()->toArray(),
+        );
+    }
+
+    public function test_it_relays_the_controls_a_failed_operation_answered_with(): void
+    {
+        $control = new Control('1.3.6.1.4.1.42.2.27.8.5.1');
+        $this->client
+            ->method('sendAndReceive')
+            ->willThrowException(new OperationException(
+                'Unwilling.',
+                ResultCode::UNWILLING_TO_PERFORM,
+                controls: new ControlBag($control),
+            ));
+
+        $this->subject->handle($this->contextFor(
+            7,
+            new DeleteRequest('cn=foo,dc=bar'),
+        ));
+
+        self::assertEquals(
+            [$control],
+            $this->relayed[0]->controls()->toArray(),
+        );
+    }
+
     /**
      * Stands in for the client, which hands each result to the request's handler before raising the result code.
      *
@@ -301,11 +348,12 @@ final class ProxyRequestForwarderTest extends TestCase
     private function upstreamStreams(
         array $results,
         int $resultCode,
+        Control ...$doneControls,
     ): void {
         $this->client
             ->method('sendAndReceive')
             ->willReturnCallback(
-                static function (SearchRequest $request) use ($results, $resultCode): LdapMessageResponse {
+                static function (SearchRequest $request) use ($results, $resultCode, $doneControls): LdapMessageResponse {
                     foreach ($results as $result) {
                         $response = $result->getResponse();
 
@@ -323,12 +371,17 @@ final class ProxyRequestForwarderTest extends TestCase
                     }
 
                     if ($resultCode !== ResultCode::SUCCESS) {
-                        throw new OperationException('Size limit exceeded.', $resultCode);
+                        throw new OperationException(
+                            'Size limit exceeded.',
+                            $resultCode,
+                            controls: new ControlBag(...$doneControls),
+                        );
                     }
 
                     return new LdapMessageResponse(
                         99,
                         new SearchResponse(new LdapResult($resultCode)),
+                        ...$doneControls,
                     );
                 },
             );

@@ -133,6 +133,9 @@ readonly class ServerProtocolHandler
                 $message,
                 $e->getCode(),
                 $e->getMessage(),
+                null,
+                [],
+                ...$e->controls()->toArray(),
             ));
         }
     }

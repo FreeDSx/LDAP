@@ -88,6 +88,8 @@ final readonly class ProxyRequestForwarder implements MiddlewareHandlerInterface
                 $e->getCode(),
                 $e->getMessage(),
                 $e->getMatchedDn(),
+                [],
+                ...$e->controls()->toArray(),
             ));
 
             return ResponseStream::resolved(OperationOutcomeResult::failed($e->getCode()));

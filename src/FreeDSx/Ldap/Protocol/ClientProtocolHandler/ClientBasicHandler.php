@@ -98,6 +98,7 @@ class ClientBasicHandler implements RequestHandlerInterface, ResponseHandlerInte
             matchedDn: $matchedDn->toString() === ''
                 ? null
                 : $matchedDn,
+            controls: $messageFrom->controls(),
         );
     }
 }

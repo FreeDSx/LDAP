@@ -117,6 +117,8 @@ final readonly class ResponseWriterMiddleware implements MiddlewareInterface
                     $this->backend,
                     $this->accessControl,
                 ),
+                [],
+                ...$exception->controls()->toArray(),
             )],
             new FailedOperationResult(
                 $context->message,

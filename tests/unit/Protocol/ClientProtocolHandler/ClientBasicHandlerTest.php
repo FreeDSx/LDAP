@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ClientProtocolHandler;
 
+use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\LdapResult;
@@ -124,6 +125,33 @@ final class ClientBasicHandlerTest extends TestCase
             $messageRequest,
             $messageFrom,
         );
+    }
+
+    public function test_an_operation_exception_carries_the_controls_the_response_arrived_with(): void
+    {
+        $control = new Control(Control::OID_PAGING);
+        $messageRequest = new LdapMessageRequest(
+            1,
+            new DeleteRequest('cn=foo'),
+        );
+        $messageFrom = new LdapMessageResponse(
+            1,
+            new DeleteResponse(ResultCode::BUSY),
+            $control,
+        );
+
+        try {
+            $this->subject->handleResponse(
+                $messageRequest,
+                $messageFrom,
+            );
+            self::fail('Expected an operation exception.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                [$control],
+                $e->controls()->toArray(),
+            );
+        }
     }
 
     public function test_it_should_throw_a_specific_bind_exception_for_a_bind_response(): void

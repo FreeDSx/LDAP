@@ -20,13 +20,19 @@ use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\BindException;
 use FreeDSx\Ldap\Exception\ConnectionException;
+use FreeDSx\Ldap\Operation\Request\SimpleBindRequest;
+use FreeDSx\Ldap\Operation\Response\SearchResultDone;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
+use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 use Tests\Support\FreeDSx\Ldap\TestWorker;
 
 final class LdapProxyTest extends ServerTestCase
 {
+    use RawClientQueueTrait;
+
     public static function setUpBeforeClass(): void
     {
         parent::setUpBeforeClass();
@@ -150,6 +156,45 @@ final class LdapProxyTest extends ServerTestCase
             ['proxied-ctrl'],
             $postRead->getEntry()->get('ou')?->getValues(),
         );
+    }
+
+    public function testItRelaysThePagingControlOnASizeLimitedPage(): void
+    {
+        $queue = $this->rawQueue();
+
+        try {
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                new SimpleBindRequest(
+                    'cn=user,dc=foo,dc=bar',
+                    '12345',
+                ),
+            ));
+            $queue->getMessage(1);
+
+            $queue->sendMessage(new LdapMessageRequest(
+                2,
+                Operations::search(Filters::equal(
+                    'objectClass',
+                    'inetOrgPerson',
+                ))
+                    ->base('dc=foo,dc=bar')
+                    ->sizeLimit(3),
+                Controls::paging(5),
+            ));
+
+            do {
+                $message = $queue->getMessage(2);
+            } while (!$message->getResponse() instanceof SearchResultDone);
+        } finally {
+            $queue->close();
+        }
+
+        self::assertSame(
+            ResultCode::SIZE_LIMIT_EXCEEDED,
+            $message->getResponse()->getResultCode(),
+        );
+        self::assertTrue($message->controls()->has(Control::OID_PAGING));
     }
 
     public function testItUpgradesTheDownstreamConnectionWithStartTls(): void
