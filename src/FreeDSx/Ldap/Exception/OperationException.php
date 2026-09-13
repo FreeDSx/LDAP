@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Exception;
 
 use Exception;
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Operation\ResultCode;
 use Throwable;
@@ -34,6 +35,7 @@ class OperationException extends Exception implements AnswerableExceptionInterfa
         int $code = ResultCode::OPERATIONS_ERROR,
         ?Throwable $previous = null,
         private readonly ?Dn $matchedDn = null,
+        private readonly ControlBag $controls = new ControlBag(),
     ) {
         $message = empty($message)
             ? $this->generateMessage($code)
@@ -52,6 +54,14 @@ class OperationException extends Exception implements AnswerableExceptionInterfa
     public function getMatchedDn(): ?Dn
     {
         return $this->matchedDn;
+    }
+
+    /**
+     * The response controls that accompany the result.
+     */
+    public function controls(): ControlBag
+    {
+        return $this->controls;
     }
 
     public function getDiagnostic(): string

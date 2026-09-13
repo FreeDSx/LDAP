@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Middleware;
 
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -134,6 +136,25 @@ final class ResponseWriterMiddlewareTest extends TestCase
         self::assertSame(
             ResultCode::UNWILLING_TO_PERFORM,
             $response->getResultCode(),
+        );
+    }
+
+    public function test_it_answers_a_thrown_failure_with_the_controls_it_carries(): void
+    {
+        $control = new Control('1.3.6.1.4.1.42.2.27.8.5.1');
+
+        $this->subject->process(
+            $this->contextFor(new DeleteRequest('cn=foo,dc=bar')),
+            new ThrowingMiddlewareHandler(new OperationException(
+                'Unwilling.',
+                ResultCode::UNWILLING_TO_PERFORM,
+                controls: new ControlBag($control),
+            )),
+        );
+
+        self::assertEquals(
+            [$control],
+            $this->firstSent()?->controls()->toArray(),
         );
     }
 

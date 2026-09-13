@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol;
 
 use FreeDSx\Asn1\Exception\EncoderException;
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ProtocolException;
 use FreeDSx\Ldap\Exception\RequestSizeExceededException;
@@ -137,6 +139,40 @@ final class ServerProtocolHandlerTest extends TestCase
                 )),
             ],
             $captured,
+        );
+    }
+
+    public function test_a_pre_pipeline_operation_error_is_answered_with_the_controls_it_carries(): void
+    {
+        $control = new Control('1.3.6.1.4.1.42.2.27.8.5.1');
+        $captured = [];
+        $this->mockQueue
+            ->method('sendMessage')
+            ->willReturnCallback(function (LdapMessageResponse $response) use (&$captured): ServerQueue {
+                $captured[] = $response;
+
+                return $this->mockQueue;
+            });
+        $this->queueReturns([
+            new LdapMessageRequest(
+                1,
+                new ModifyDnRequest(
+                    'cn=a,dc=bar',
+                    'cn=b',
+                    true,
+                ),
+            ),
+        ]);
+
+        $this->handlerWith(new ThrowingMiddlewareHandler(new OperationException(
+            'Authentication required.',
+            ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+            controls: new ControlBag($control),
+        )))->handle();
+
+        self::assertEquals(
+            [$control],
+            $captured[0]->controls()->toArray(),
         );
     }
 

@@ -31,6 +31,7 @@ final class SchemaRuleException extends OperationException
             $violation->getCode(),
             $violation,
             $violation->getMatchedDn(),
+            $violation->controls(),
         );
     }
 
