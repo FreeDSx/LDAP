@@ -11,10 +11,8 @@ use FreeDSx\Ldap\LdapClient;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Proxy\ProxyAuthenticator;
 use FreeDSx\Ldap\Server\Proxy\ProxyUpstreamSession;
-use FreeDSx\Ldap\Server\Utility\ExponentialBackoff;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Server\Clock\RecordingSleeper;
 
 final class ProxyAuthenticatorTest extends TestCase
 {
@@ -25,15 +23,7 @@ final class ProxyAuthenticatorTest extends TestCase
     protected function setUp(): void
     {
         $this->client = $this->createMock(LdapClient::class);
-        $this->subject = new ProxyAuthenticator(new ProxyUpstreamSession(
-            client: $this->client,
-            sleeper: new RecordingSleeper(),
-            maxAttempts: 1,
-            backoff: new ExponentialBackoff(
-                base: 0.01,
-                max: 0.02,
-            ),
-        ));
+        $this->subject = new ProxyAuthenticator(new ProxyUpstreamSession($this->client));
     }
 
     public function test_it_binds_upstream_and_returns_a_token(): void
@@ -83,11 +73,7 @@ final class ProxyAuthenticatorTest extends TestCase
 
     public function test_it_does_not_hold_a_session_after_a_failed_bind(): void
     {
-        $session = new ProxyUpstreamSession(
-            client: $this->client,
-            sleeper: new RecordingSleeper(),
-            maxAttempts: 1,
-        );
+        $session = new ProxyUpstreamSession($this->client);
         $this->client
             ->method('bind')
             ->willThrowException(new BindException('Invalid credentials.', ResultCode::INVALID_CREDENTIALS));

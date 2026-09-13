@@ -7,6 +7,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Proxy;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\ConnectionException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\ReferralException;
 use FreeDSx\Ldap\LdapClient;
@@ -156,6 +157,35 @@ final class ProxyRequestForwarderTest extends TestCase
         ));
 
         self::assertSame(OperationOutcome::Failed, $result->outcome()->outcome());
+    }
+
+    public function test_it_drops_the_upstream_connection_after_a_transport_failure(): void
+    {
+        $this->client
+            ->method('isConnected')
+            ->willReturn(true);
+        $this->client
+            ->method('sendAndReceive')
+            ->willThrowException(new ConnectionException('The connection was idle for longer than the read timeout.'));
+
+        $this->client
+            ->expects(self::once())
+            ->method('disconnect');
+
+        $this->subject->handle($this->contextFor(
+            1,
+            new DeleteRequest('cn=foo,dc=bar'),
+        ));
+
+        $result = $this->relayed[0]->getResponse();
+        self::assertInstanceOf(
+            LdapResult::class,
+            $result,
+        );
+        self::assertSame(
+            ResultCode::UNAVAILABLE,
+            $result->getResultCode(),
+        );
     }
 
     public function test_it_answers_an_upstream_referral_on_a_non_search_operation(): void

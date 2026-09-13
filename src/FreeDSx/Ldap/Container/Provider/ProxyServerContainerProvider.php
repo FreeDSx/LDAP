@@ -19,9 +19,6 @@ use FreeDSx\Ldap\Container\Contributor\ProxyListenerContributor;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\ProxyOptions;
 use FreeDSx\Ldap\ProxyServerOptions;
-use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
-use FreeDSx\Ldap\Server\Clock\Sleeper\CoroutineSleeper;
-use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\BackgroundTasksInterface;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\PcntlBackgroundTasks;
 use FreeDSx\Ldap\Server\Process\BackgroundTask\SwooleBackgroundTasks;
@@ -40,7 +37,6 @@ final class ProxyServerContainerProvider implements ContainerProviderInterface
     {
         return [
             ServerProtocolFactoryInterface::class => $this->makeProtocolFactory(...),
-            SleeperInterface::class => $this->makeSleeper(...),
             BackgroundTasksInterface::class => $this->makeBackgroundTasks(...),
             ListenerContributorInterface::class => static fn(): ListenerContributorInterface => new ProxyListenerContributor(),
         ];
@@ -51,10 +47,7 @@ final class ProxyServerContainerProvider implements ContainerProviderInterface
         $options = $container->get(ProxyOptions::class);
         self::assertUpstreamIsConfidentialIfRequired($options);
 
-        return new ProxyProtocolFactory(
-            $options,
-            $container->get(SleeperInterface::class),
-        );
+        return new ProxyProtocolFactory($options);
     }
 
     private static function assertUpstreamIsConfidentialIfRequired(ProxyOptions $options): void
@@ -70,13 +63,6 @@ final class ProxyServerContainerProvider implements ContainerProviderInterface
         throw new RuntimeException(
             'The upstream connection is not encrypted. Set useSsl or useStartTls on it, or unset requireUpstreamConfidentiality.',
         );
-    }
-
-    private function makeSleeper(Container $container): SleeperInterface
-    {
-        return $container->get(ProxyServerOptions::class)->isRunnerMode(RunnerMode::Swoole)
-            ? new CoroutineSleeper()
-            : new BlockingSleeper();
     }
 
     private function makeBackgroundTasks(Container $container): BackgroundTasksInterface
