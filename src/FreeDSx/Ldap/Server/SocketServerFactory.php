@@ -34,16 +34,11 @@ class SocketServerFactory
     ) {}
 
     /**
-     * Whether the handler that owns a connection must negotiate TLS itself, rather than the listener doing it as part
-     * of accepting.
-     *
-     * A session negotiated in the accept loop is inherited by every connection forked after it, and the first of those
-     * to exit sends the close alert that ends the connection for the handler that actually owns it.
+     * Whether each connection negotiates TLS itself, keeping slow handshakes out of the accept loop and sessions unshared.
      */
     public function isTlsHandshakeDeferred(): bool
     {
-        return $this->runner === RunnerMode::Pcntl
-            && $this->network->isUseSsl()
+        return $this->network->isUseSsl()
             && Transport::from($this->network->getTransport()) === Transport::Tcp;
     }
 

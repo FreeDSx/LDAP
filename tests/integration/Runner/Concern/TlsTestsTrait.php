@@ -19,6 +19,8 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Socket\Exception\ConnectionException;
+use FreeDSx\Socket\Exception\IdleTimeoutException;
 use Tests\Support\FreeDSx\Ldap\RawClientQueueTrait;
 use Throwable;
 
@@ -75,6 +77,79 @@ trait TlsTestsTrait
         );
     }
 
+    public function testASilentStartTlsClientIsDisconnectedWithoutStallingOtherClients(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            ['--ssl-handshake-timeout=1'],
+        );
+
+        $silent = $this->rawQueue(
+            timeoutRead: 4,
+            validateSslCert: false,
+        );
+        $silent->sendMessage(new LdapMessageRequest(
+            1,
+            Operations::extended(ExtendedRequest::OID_START_TLS),
+        ));
+        $startTls = $silent->getMessage(1)->getResponse();
+
+        // Past the handshake timeout, so the server has already given up on the silent client.
+        usleep(1_500_000);
+
+        $other = $this->rawQueue(timeoutRead: 2);
+        try {
+            $other->sendMessage(new LdapMessageRequest(
+                1,
+                Operations::whoami(),
+            ));
+            $whoami = $other->getMessage(1)->getResponse();
+        } finally {
+            $other->close();
+        }
+
+        $answer = null;
+        $failure = null;
+        try {
+            $answer = $silent->getMessage();
+        } catch (Throwable $e) {
+            $failure = $e;
+        } finally {
+            $silent->close();
+        }
+
+        $this->assertInstanceOf(
+            ExtendedResponse::class,
+            $startTls,
+        );
+        $this->assertSame(
+            ResultCode::SUCCESS,
+            $startTls->getResultCode(),
+        );
+        $this->assertInstanceOf(
+            ExtendedResponse::class,
+            $whoami,
+        );
+        $this->assertSame(
+            ResultCode::SUCCESS,
+            $whoami->getResultCode(),
+        );
+        $this->assertNull(
+            $answer,
+            'A failed TLS negotiation must not be answered.',
+        );
+        $this->assertInstanceOf(
+            ConnectionException::class,
+            $failure,
+        );
+        $this->assertNotInstanceOf(
+            IdleTimeoutException::class,
+            $failure,
+            'The server must end the session rather than leave it open.',
+        );
+    }
+
     public function testItCanRunOverSSLOnly(): void
     {
         $this->stopServer();
@@ -82,6 +157,37 @@ trait TlsTestsTrait
 
         $result = $this->ldapClient()->read('');
         $this->assertNotNull($result);
+    }
+
+    public function testItAcceptsAnSslClientWhoseHandshakeStartsAfterTheAcceptTimeout(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess('ssl');
+
+        $queue = $this->rawQueue(validateSslCert: false);
+
+        // Longer than the harness accept timeout, which a handshake bound to the accept call cannot outlast.
+        usleep(500_000);
+
+        try {
+            $queue->encrypt();
+            $queue->sendMessage(new LdapMessageRequest(
+                1,
+                Operations::whoami(),
+            ));
+            $whoami = $queue->getMessage(1)->getResponse();
+        } finally {
+            $queue->close();
+        }
+
+        $this->assertInstanceOf(
+            ExtendedResponse::class,
+            $whoami,
+        );
+        $this->assertSame(
+            ResultCode::SUCCESS,
+            $whoami->getResultCode(),
+        );
     }
 
     public function testItRefusesASimpleBindInTheClearWhenConfidentialityIsRequired(): void

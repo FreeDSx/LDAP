@@ -127,6 +127,13 @@ final class LdapServerCommand extends Command
                 '0',
             )
             ->addOption(
+                'ssl-handshake-timeout',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Seconds a TLS handshake may take before the connection is dropped',
+                '5',
+            )
+            ->addOption(
                 'max-search-lookthrough',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -329,6 +336,7 @@ final class LdapServerCommand extends Command
             ->setSslCertKey(self::SSL_KEY)
             ->setUseSsl($useSsl)
             ->setSocketAcceptTimeout(0.1)
+            ->setSslHandshakeTimeout((int) $this->getStringOption($input, 'ssl-handshake-timeout'))
             ->setShutdownTimeout((int) $this->getStringOption($input, 'shutdown-timeout'));
 
         $options = (new ServerOptions($this->createStorageConfig($storageType), $network))

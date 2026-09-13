@@ -90,8 +90,11 @@ class ServerStartTlsHandler implements ServerProtocolHandlerInterface
                     [EventContext::REASON => $e->getMessage()],
                     message: $message,
                 );
+                // A half-negotiated stream cannot carry an answer
+                // Writing one can stall a coroutine worker.
+                $connection->close();
 
-                throw $e;
+                return;
             }
 
             if ($discarded) {
