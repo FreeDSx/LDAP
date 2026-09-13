@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Server\AccessControl\AclRuleNames;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributeAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
@@ -126,6 +127,9 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     public function factories(): array
     {
         return [
+            AclRuleNames::class => static fn(Container $c): AclRuleNames => new AclRuleNames(
+                $c->get(ServerOptions::class)->getSchema(),
+            ),
             AccessControlInterface::class => $this->makeAccessControl(...),
             BindNameResolverInterface::class => $this->makeIdentityResolverChain(...),
             PasswordAuthenticatableInterface::class => $this->makePasswordAuthenticator(...),
@@ -204,7 +208,9 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeAccessControl(Container $container): AccessControlInterface
     {
         $options = $container->get(ServerOptions::class);
-        $configured = new RuleBasedAccessControl($options->getAclRules());
+        $configured = new RuleBasedAccessControl(
+            $container->get(AclRuleNames::class)->canonicalize($options->getAclRules()),
+        );
 
         $acl = new PrivilegedBypassAccessControl(new ConfidentialAttributeAccessControl(
             $configured,

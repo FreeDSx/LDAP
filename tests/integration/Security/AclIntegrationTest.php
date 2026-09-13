@@ -521,6 +521,20 @@ final class AclIntegrationTest extends ServerTestCase
         self::assertNull($results->first()?->get('telephoneNumber'));
     }
 
+    public function testARuleSpelledWithAnAliasStripsTheAttributeUnderItsPrimaryName(): void
+    {
+        $this->authenticateAdmin();
+
+        $delegate = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'cn', 'sn')
+                ->base(LdapAclCommand::DELEGATE_DN)
+                ->useBaseScope(),
+        )->first();
+
+        self::assertNotNull($delegate);
+        self::assertNull($delegate->get('sn'));
+    }
+
     public function testRenameAuthorizesEveryComponentOfAMultivaluedRdn(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');

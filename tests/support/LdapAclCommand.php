@@ -211,6 +211,12 @@ class LdapAclCommand extends Command
                             OperationRule::deny(Subject::anyone()),
                         )
                         ->replaceAttributeRules(
+                            // Spelled with an alias, so the rule only bites if rule names are canonicalized.
+                            AttributeRule::deny(
+                                Subject::anyone(),
+                                Target::dn(self::DELEGATE_DN),
+                                'surname',
+                            )->forRead(),
                             // Built through the public constructor with a mixed-case name, so the rule only bites
                             // if names are normalized wherever a rule is made.
                             new AttributeRule(

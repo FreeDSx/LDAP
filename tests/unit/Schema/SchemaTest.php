@@ -60,6 +60,46 @@ final class SchemaTest extends TestCase
         );
     }
 
+    public function test_canonical_attribute_name_spells_an_alias_by_the_primary_name(): void
+    {
+        $this->subject->addAttributeType($this->cn);
+
+        self::assertSame(
+            'cn',
+            $this->subject->canonicalAttributeName('COMMONNAME'),
+        );
+    }
+
+    public function test_canonical_attribute_name_spells_a_numeric_oid_by_the_primary_name(): void
+    {
+        $this->subject->addAttributeType($this->cn);
+
+        self::assertSame(
+            'cn',
+            $this->subject->canonicalAttributeName('2.5.4.3'),
+        );
+    }
+
+    public function test_canonical_attribute_name_keeps_a_case_variant_of_the_primary_name(): void
+    {
+        $this->subject->addAttributeType($this->cn);
+
+        self::assertSame(
+            'CN',
+            $this->subject->canonicalAttributeName('CN'),
+        );
+    }
+
+    public function test_canonical_attribute_name_keeps_an_unknown_name(): void
+    {
+        $this->subject->addAttributeType($this->cn);
+
+        self::assertSame(
+            'shoeSize',
+            $this->subject->canonicalAttributeName('shoeSize'),
+        );
+    }
+
     public function test_add_and_get_attribute_type_by_oid(): void
     {
         $this->subject->addAttributeType($this->cn);
