@@ -34,6 +34,20 @@ sn: Davis
 description: first
 DESCRIPTION: second
 
+# Names the entry and its attributes by aliases, then reaches it through a numeric OID.
+# RFC 4512 2.5 makes each spelling the same attribute type.
+dn: commonName=frank,dc=foo,dc=bar
+changetype: add
+objectClass: inetOrgPerson
+commonName: frank
+surname: Franklin
+
+dn: 2.5.4.3=frank,dc=foo,dc=bar
+changetype: modify
+replace: surname
+surname: Frankly
+-
+
 # A subtree the record below removes whole, which only works if the control is honored on replay.
 dn: ou=team,dc=foo,dc=bar
 changetype: add

@@ -116,6 +116,21 @@ final class LdapApplyChangesServerTest extends ServerTestCase
         $this->assertNull($this->ldapClient()->read('ou=team,dc=foo,dc=bar'));
     }
 
+    public function test_changes_spelling_types_by_an_alias_or_numeric_oid_reach_one_entry(): void
+    {
+        $frank = $this->ldapClient()->read('cn=frank,dc=foo,dc=bar');
+
+        $this->assertNotNull($frank);
+        $this->assertSame(
+            'cn=frank,dc=foo,dc=bar',
+            $frank->getDn()->toString(),
+        );
+        $this->assertSame(
+            ['Frankly'],
+            $frank->get('sn')?->getValues(),
+        );
+    }
+
     public function test_an_added_entry_groups_descriptions_that_differ_only_in_case(): void
     {
         $dave = $this->ldapClient()->read('cn=dave,dc=foo,dc=bar');

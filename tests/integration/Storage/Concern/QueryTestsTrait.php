@@ -1538,6 +1538,65 @@ trait QueryTestsTrait
         ));
     }
 
+    public function testAFilterNamingAnAttributeByAnAliasMatchesItsValues(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::equal('surname', 'Smith'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            ['cn=alice,ou=people,dc=foo,dc=bar'],
+            array_map(
+                static fn(Entry $entry): string => $entry->getDn()->toString(),
+                $entries->toArray(),
+            ),
+        );
+    }
+
+    public function testASearchBaseSpelledWithAnAliasFindsTheEntry(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'))
+                ->base('commonName=alice,ou=people,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+
+        self::assertSame(
+            ['cn=alice,ou=people,dc=foo,dc=bar'],
+            array_map(
+                static fn(Entry $entry): string => $entry->getDn()->toString(),
+                $entries->toArray(),
+            ),
+        );
+    }
+
+    public function testCompareReachesAnEntryThroughANumericOidSpelledDn(): void
+    {
+        $this->authenticateUser();
+
+        self::assertTrue($this->ldapClient()->compare(
+            '2.5.4.3=alice,ou=people,dc=foo,dc=bar',
+            'sn',
+            'Smith',
+        ));
+    }
+
+    public function testABindNameSpelledWithAnAliasAuthenticatesTheEntry(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->ldapClient()->bind(
+            'commonName=user,dc=foo,dc=bar',
+            '12345',
+        );
+    }
+
     public function testCompareReturnsFalseForNonMatchingValue(): void
     {
         $this->authenticateUser();

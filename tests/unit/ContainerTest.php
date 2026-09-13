@@ -51,6 +51,7 @@ use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
 use FreeDSx\Ldap\Server\Metrics\Recorder\MetricsRecorderChain;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
+use FreeDSx\Ldap\Server\Middleware\AttributeTypeCanonicalizationMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
 use FreeDSx\Ldap\Server\Middleware\MetricsMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuthorizationMiddleware;
@@ -253,6 +254,7 @@ class ContainerTest extends TestCase
             [CriticalControlMiddleware::class],
             [OperationAuthorizationMiddleware::class],
             [AssertionMiddleware::class],
+            [AttributeTypeCanonicalizationMiddleware::class],
             [ResourceLimitMiddleware::class],
             [ProtocolHandlerFactoryMap::class],
         ];

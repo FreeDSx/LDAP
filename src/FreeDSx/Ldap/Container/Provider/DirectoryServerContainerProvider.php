@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\AclRuleNames;
 use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributeAccessControl;
@@ -95,6 +96,7 @@ use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
 use FreeDSx\Ldap\Server\Middleware\OperationAuditMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareChain;
 use FreeDSx\Ldap\Server\Middleware\ReadOnlyMiddleware;
+use FreeDSx\Ldap\Server\Middleware\AttributeTypeCanonicalizationMiddleware;
 use FreeDSx\Ldap\Server\Middleware\RequestValidationMiddleware;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\LdapClientForwardStateSender;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\PasswordPolicyForwarder;
@@ -127,6 +129,9 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     public function factories(): array
     {
         return [
+            AttributeTypeSpelling::class => static fn(Container $c): AttributeTypeSpelling => new AttributeTypeSpelling(
+                $c->get(ServerOptions::class)->getSchema(),
+            ),
             AclRuleNames::class => static fn(Container $c): AclRuleNames => new AclRuleNames(
                 $c->get(ServerOptions::class)->getSchema(),
             ),
@@ -291,6 +296,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return new WriteRequestReplayer(new MiddlewareChain(
             [
                 new RequestValidationMiddleware(),
+                $container->get(AttributeTypeCanonicalizationMiddleware::class),
                 new OperationAuditMiddleware(new OperationAuditor(new EventLogger(
                     $options->getLogger(),
                     $options->getEventLogPolicy(),

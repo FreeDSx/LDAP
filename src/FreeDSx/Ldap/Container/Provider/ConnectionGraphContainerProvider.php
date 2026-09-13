@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Protocol\Factory\ServerProtocolHandlerFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\MetricsResponseInterceptor;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
+use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\AliasResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
@@ -28,6 +29,7 @@ use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\WithheldFilterRewriter;
 use FreeDSx\Ldap\Server\Middleware\AliasDereferenceMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
+use FreeDSx\Ldap\Server\Middleware\AttributeTypeCanonicalizationMiddleware;
 use FreeDSx\Ldap\Server\Middleware\WithheldAttributeMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlMiddleware;
 use FreeDSx\Ldap\Server\Middleware\CriticalControlValidator;
@@ -65,6 +67,9 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
             CriticalControlValidator::class => $this->makeCriticalControlValidator(...),
             CriticalControlMiddleware::class => $this->makeCriticalControlMiddleware(...),
             OperationAuthorizationMiddleware::class => $this->makeOperationAuthorizationMiddleware(...),
+            AttributeTypeCanonicalizationMiddleware::class => static fn(Container $container): AttributeTypeCanonicalizationMiddleware => new AttributeTypeCanonicalizationMiddleware(
+                $container->get(AttributeTypeSpelling::class),
+            ),
             AliasDereferenceMiddleware::class => $this->makeAliasDereferenceMiddleware(...),
             WithheldAttributeMiddleware::class => $this->makeWithheldAttributeMiddleware(...),
             AssertionMiddleware::class => $this->makeAssertionMiddleware(...),
