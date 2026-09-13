@@ -32,7 +32,7 @@ final class SwooleBackgroundTasks implements BackgroundTasksInterface
     private bool $stopping = false;
 
     /**
-     * @var list<Channel<bool>>
+     * @var list<Channel<mixed>>
      */
     private array $wakeups = [];
 
