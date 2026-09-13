@@ -361,6 +361,28 @@ class LdapServerTest extends TestCase
         self::assertNull($this->storage()->find(new Dn('cn=foo,dc=example,dc=com')));
     }
 
+    public function test_it_should_refuse_a_subtree_delete_record_carrying_a_critical_assertion(): void
+    {
+        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF . "\n\n" . self::SUBTREE_LDIF));
+
+        try {
+            $this->subject->applyChanges(new StringLdifLoader(
+                "dn: ou=people,dc=example,dc=com\n"
+                . "control: 1.2.840.113556.1.4.805 true\n"
+                . "control: 1.3.6.1.1.12 true\n"
+                . "changetype: delete\n",
+            ));
+            self::fail('The critical assertion should have refused the subtree delete.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::UNAVAILABLE_CRITICAL_EXTENSION,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNotNull($this->storage()->find(new Dn('cn=child,ou=people,dc=example,dc=com')));
+    }
+
     public function test_it_should_refuse_to_seed_a_read_only_replica(): void
     {
         $options = (new ServerOptions(
