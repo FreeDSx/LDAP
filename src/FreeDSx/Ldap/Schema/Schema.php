@@ -302,6 +302,23 @@ final class Schema
         ]));
     }
 
+    /**
+     * The primary name of an attribute type, or the spelling as given when it is unknown or differs only by case.
+     */
+    public function canonicalAttributeName(string $nameOrOid): string
+    {
+        $attributeType = $this->getAttributeType($nameOrOid);
+        if ($attributeType === null) {
+            return $nameOrOid;
+        }
+        // RFC 4512 §2.5 lets an alias or the numeric OID name the type.
+        $primary = $attributeType->names[0] ?? $attributeType->oid;
+
+        return strcasecmp($primary, $nameOrOid) === 0
+            ? $nameOrOid
+            : $primary;
+    }
+
     public function getObjectClass(string $nameOrOid): ?ObjectClass
     {
         return $this->objectClasses[$nameOrOid]
