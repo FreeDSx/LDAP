@@ -58,6 +58,21 @@ class WriteControlEvaluator
     }
 
     /**
+     * Holds the entry being added to the assertion, as it is the Add's target (RFC 4528 §3), then keeps it for a Post-Read.
+     *
+     * @throws OperationException
+     */
+    public function evaluateAddition(Entry $entry): void
+    {
+        $this->assertions->assertSatisfiedBy(
+            $entry,
+            $this->controls,
+            $this->token,
+        );
+        $this->captureResult($entry);
+    }
+
+    /**
      * Keeps the entry the write is about to store, for a Post-Read (RFC 4527 §3.2).
      */
     public function captureResult(Entry $result): void

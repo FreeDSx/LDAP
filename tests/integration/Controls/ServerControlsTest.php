@@ -218,6 +218,72 @@ final class ServerControlsTest extends ServerTestCase
         }
     }
 
+    public function test_assertion_allows_an_add_when_it_matches(): void
+    {
+        $this->authenticateAdmin();
+        $dn = 'cn=assert-add-ok,ou=people,dc=foo,dc=bar';
+
+        $this->ldapClient()->send(
+            Operations::add($this->person($dn, 'assert-add-ok')),
+            Controls::assertion(Filters::equal('sn', 'Smith')),
+        );
+
+        self::assertSame(
+            'Smith',
+            $this->readValue($dn, 'sn'),
+        );
+    }
+
+    public function test_assertion_fails_an_add_when_it_does_not_match(): void
+    {
+        $this->authenticateAdmin();
+        $dn = 'cn=assert-add-no,ou=people,dc=foo,dc=bar';
+
+        try {
+            $this->ldapClient()->send(
+                Operations::add($this->person($dn, 'assert-add-no')),
+                Controls::assertion(Filters::equal('sn', 'doesnotmatch')),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNull($this->ldapClient()->read($dn));
+    }
+
+    public function test_assertion_on_an_add_cannot_see_an_attribute_the_identity_may_not_read(): void
+    {
+        $this->authenticateAdmin();
+        $dn = 'cn=assert-add-secret,ou=people,dc=foo,dc=bar';
+        $entry = $this->person(
+            $dn,
+            'assert-add-secret',
+        );
+        $entry->set(
+            'userPassword',
+            self::SEEDED_PASSWORD_HASH,
+        );
+
+        try {
+            $this->ldapClient()->send(
+                Operations::add($entry),
+                Controls::assertion(Filters::present('userPassword')),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNull($this->ldapClient()->read($dn));
+    }
+
     public function test_assertion_fails_a_delete_when_it_does_not_match(): void
     {
         $this->authenticateAdmin();
