@@ -1239,6 +1239,96 @@ trait WriteTestsTrait
         $this->ldapClient()->delete('cn=variants,dc=foo,dc=bar');
     }
 
+    public function testAnAddSpelledWithAliasesIsStoredUnderThePrimaryNames(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'commonName=Alias Spelled,dc=foo,dc=bar',
+            ['commonName' => 'Alias Spelled', 'surname' => 'Alias', 'objectClass' => 'inetOrgPerson'],
+        ));
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'cn', 'sn')
+                ->base('cn=Alias Spelled,dc=foo,dc=bar')
+                ->useBaseScope(),
+        )->first();
+
+        self::assertNotNull($found);
+        self::assertSame(
+            'cn=Alias Spelled,dc=foo,dc=bar',
+            $found->getDn()->toString(),
+        );
+        $descriptions = array_map(
+            static fn(Attribute $attribute): string => $attribute->getDescription(),
+            $found->getAttributes(),
+        );
+        sort($descriptions);
+        self::assertSame(
+            ['cn', 'sn'],
+            $descriptions,
+        );
+
+        $this->ldapClient()->delete('2.5.4.3=Alias Spelled,dc=foo,dc=bar');
+        self::assertNull($this->ldapClient()->read('cn=Alias Spelled,dc=foo,dc=bar'));
+    }
+
+    public function testAnEntryCannotBeAddedAgainUnderANumericOidSpellingOfItsNamingType(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=Spelled Twice,dc=foo,dc=bar',
+            ['cn' => 'Spelled Twice', 'sn' => 'Twice', 'objectClass' => 'inetOrgPerson'],
+        ));
+
+        try {
+            $this->ldapClient()->create(Entry::fromArray(
+                '2.5.4.3=Spelled Twice,dc=foo,dc=bar',
+                ['cn' => 'Spelled Twice', 'sn' => 'Twice', 'objectClass' => 'inetOrgPerson'],
+            ));
+            self::fail('The numeric OID spelling should have named the entry already added.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ENTRY_ALREADY_EXISTS,
+                $e->getCode(),
+            );
+        } finally {
+            $this->ldapClient()->delete('cn=Spelled Twice,dc=foo,dc=bar');
+        }
+    }
+
+    public function testModifyAndRenameReachAnEntryThroughAnAliasSpelledDn(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=Reach Me,dc=foo,dc=bar',
+            ['cn' => 'Reach Me', 'sn' => 'Reach', 'objectClass' => 'inetOrgPerson'],
+        ));
+
+        $this->ldapClient()->send(Operations::modify(
+            'commonName=Reach Me,dc=foo,dc=bar',
+            Change::replace(new Attribute('surname', 'Reached')),
+        ));
+        $this->ldapClient()->rename('commonName=Reach Me,dc=foo,dc=bar', 'commonName=Reached', true);
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'cn', 'sn')
+                ->base('cn=Reached,dc=foo,dc=bar')
+                ->useBaseScope(),
+        )->first();
+
+        self::assertNotNull($found);
+        self::assertSame(
+            ['Reached'],
+            $found->get('cn')?->getValues(),
+        );
+        self::assertSame(
+            ['Reached'],
+            $found->get('sn')?->getValues(),
+        );
+
+        $this->ldapClient()->delete('cn=Reached,dc=foo,dc=bar');
+    }
+
     public function testRenameCanRespellTheRdnInADifferentCase(): void
     {
         $this->authenticateAdmin();

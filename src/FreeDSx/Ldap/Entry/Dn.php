@@ -148,6 +148,7 @@ class Dn implements IteratorAggregate, Countable, Stringable
 
     /**
      * @return Rdn[]
+     * @throws InvalidDnSyntaxException
      * @throws UnexpectedValueException
      */
     public function toArray(): array

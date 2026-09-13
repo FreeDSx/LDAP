@@ -554,6 +554,28 @@ trait ControlTestsTrait
         );
     }
 
+    public function testSortControlOrdersByAKeySpelledWithAnAlias(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present('sn'))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+            new SortingControl(SortKey::descending('surname')),
+        );
+
+        $sns = array_map(
+            static fn(Entry $e): string => $e->get('sn')?->getValues()[0] ?? '',
+            $entries->toArray(),
+        );
+
+        self::assertSame(
+            ['Smith', 'Admin', 'Admin'],
+            $sns,
+        );
+    }
+
     public function testSortControlOrdersAnIntegerAttributeNumerically(): void
     {
         $this->authenticateUser();

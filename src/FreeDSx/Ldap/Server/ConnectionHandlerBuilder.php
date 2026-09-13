@@ -54,6 +54,7 @@ use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Recorder\NullMetricsRecorder;
 use FreeDSx\Ldap\Server\Middleware\AliasDereferenceMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
+use FreeDSx\Ldap\Server\Middleware\AttributeTypeCanonicalizationMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AuthorizationResolutionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\BindMiddleware;
 use FreeDSx\Ldap\Server\Middleware\WithheldAttributeMiddleware;
@@ -387,6 +388,8 @@ final class ConnectionHandlerBuilder implements ConnectionHandlerBuilderInterfac
                 // Order matters: AuthorizationResolutionMiddleware injects the token via withToken(), so
                 // every middleware after it may rely on tokenOrFail(). Keep token consumers below it.
                 new RequestValidationMiddleware(),
+                // Ahead of anything reading a DN or attribute name. Every later step then sees one spelling per type.
+                $this->container->get(AttributeTypeCanonicalizationMiddleware::class),
                 // Ahead of the bind, so a credential is refused before it is read rather than after it is compared.
                 new ConfidentialityMiddleware(
                     $options,
