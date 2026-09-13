@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Paging;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AttributeProjection;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerSearchTrait;
 use FreeDSx\Ldap\Schema\Schema;
@@ -129,33 +130,42 @@ final readonly class PageFiller
         FilterInterface $filter,
         AttributeProjection $projection,
     ): SliceEnd {
-        foreach ($entries as $fetched) {
-            $kept = $this->keepForPage(
-                $fetched->entry,
-                $token,
-                $filter,
-            );
+        try {
+            foreach ($entries as $fetched) {
+                $kept = $this->keepForPage(
+                    $fetched->entry,
+                    $token,
+                    $filter,
+                );
 
-            if ($kept === null) {
-                continue;
+                if ($kept === null) {
+                    continue;
+                }
+
+                if (!$isFilling) {
+                    return SliceEnd::FurtherMatch;
+                }
+
+                if (!$page->hasCapacity()) {
+                    return SliceEnd::PageFull;
+                }
+
+                if (!$page->canPlace($fetched->cursor)) {
+                    return SliceEnd::Unplaceable;
+                }
+
+                $page->add(
+                    $projection->project($kept),
+                    $fetched->cursor,
+                );
+            }
+        } catch (OperationException $e) {
+            // Reading on past a full page can exhaust the lookthrough
+            if (!$isFilling || $page->hasCapacity() || $e->getCode() !== ResultCode::ADMIN_LIMIT_EXCEEDED) {
+                throw $e;
             }
 
-            if (!$isFilling) {
-                return SliceEnd::FurtherMatch;
-            }
-
-            if (!$page->hasCapacity()) {
-                return SliceEnd::PageFull;
-            }
-
-            if (!$page->canPlace($fetched->cursor)) {
-                return SliceEnd::Unplaceable;
-            }
-
-            $page->add(
-                $projection->project($kept),
-                $fetched->cursor,
-            );
+            return SliceEnd::PageFull;
         }
 
         return SliceEnd::Complete;
