@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Server\Backend\Write\Replay\ReplayWriteHandler;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
@@ -29,9 +30,12 @@ use FreeDSx\Ldap\Server\Operation\OperationOutcome;
 use FreeDSx\Ldap\Server\Token\SystemToken;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class ReplayWriteHandlerTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private const DN = 'cn=foo,dc=example,dc=com';
 
     private WriteHandlerInterface&MockObject $writeHandler;
@@ -42,7 +46,27 @@ final class ReplayWriteHandlerTest extends TestCase
     {
         $this->writeHandler = $this->createMock(WriteHandlerInterface::class);
 
-        $this->subject = new ReplayWriteHandler(new WriteRequestRouter($this->writeHandler));
+        $this->subject = new ReplayWriteHandler(
+            new WriteRequestRouter($this->writeHandler),
+            $this->fromContainer(AssertionEvaluator::class),
+        );
+    }
+
+    public function test_the_write_is_handed_its_controls_to_evaluate_under_the_lock(): void
+    {
+        $seen = null;
+        $this->writeHandler
+            ->method('handle')
+            ->willReturnCallback(static function (
+                WriteRequestInterface $request,
+                WriteContext $context,
+            ) use (&$seen): void {
+                $seen = $context->controlEvaluator();
+            });
+
+        $this->subject->handle($this->contextWith());
+
+        self::assertNotNull($seen);
     }
 
     public function test_it_applies_the_write_and_reports_success(): void

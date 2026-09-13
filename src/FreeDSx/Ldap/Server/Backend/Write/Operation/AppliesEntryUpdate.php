@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
@@ -36,10 +37,11 @@ trait AppliesEntryUpdate
     private function applyUpdate(
         UpdateCommand $command,
         WriteContext $context,
+        Entry $current,
     ): void {
         $dn = $command->dn->normalize();
         $updated = $this->mutation->forUpdate(
-            $this->locator->findOrFail($dn),
+            $current,
             $command,
             $context,
         );
@@ -52,6 +54,7 @@ trait AppliesEntryUpdate
             $updated,
             $command->systemChanges,
         );
+        $context->controlEvaluator()?->captureResult($updated);
 
         $this->storage->store($updated);
         $this->changeRecorder?->recordModify(

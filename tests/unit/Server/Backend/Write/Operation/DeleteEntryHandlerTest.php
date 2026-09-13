@@ -13,11 +13,14 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Write\Operation;
 
+use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
@@ -77,6 +80,50 @@ final class DeleteEntryHandlerTest extends TestCase
                 $e->getMatchedDn()?->toString(),
             );
         }
+    }
+
+    public function test_a_failing_assertion_refuses_the_delete_and_leaves_the_entry(): void
+    {
+        try {
+            $this->deletes()->handle(
+                new DeleteCommand(new Dn('cn=Alice,dc=example,dc=com')),
+                $this->controlledContext(Controls::assertion(Filters::equal('cn', 'Nobody'))),
+            );
+            self::fail('The assertion should have refused the delete.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNotNull($this->find('cn=Alice,dc=example,dc=com'));
+    }
+
+    public function test_an_assertion_answers_before_the_subordinate_check(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::ASSERTION_FAILED);
+
+        $this->deletes()->handle(
+            new DeleteCommand(new Dn('dc=example,dc=com')),
+            $this->controlledContext(Controls::assertion(Filters::equal('dc', 'nomatch'))),
+        );
+    }
+
+    public function test_the_deleted_entry_is_kept_for_a_pre_read(): void
+    {
+        $context = $this->controlledContext(new PreReadControl('cn'));
+
+        $this->deletes()->handle(
+            new DeleteCommand(new Dn('cn=Alice,dc=example,dc=com')),
+            $context,
+        );
+
+        self::assertSame(
+            ['Alice'],
+            $context->controlEvaluator()?->preReadEntry()?->get('cn')?->getValues(),
+        );
     }
 
     public function test_it_refuses_an_entry_that_holds_subordinates(): void

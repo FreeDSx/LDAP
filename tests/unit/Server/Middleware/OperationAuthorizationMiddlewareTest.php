@@ -722,6 +722,35 @@ final class OperationAuthorizationMiddlewareTest extends TestCase
         );
     }
 
+    public function test_an_assertion_on_a_subtree_delete_authorizes_no_read(): void
+    {
+        $this->routeResolvesTo(HandlerId::Dispatch);
+        $seen = [];
+        $this->accessControl
+            ->method('authorizeOperation')
+            ->willReturnCallback(function (OperationType $operation, TokenInterface $token, Dn $dn) use (&$seen): void {
+                if ($operation === OperationType::Search) {
+                    $seen[] = $dn->toString();
+                }
+            });
+        $assertion = Controls::assertion(Filters::equal('cn', 'foo'));
+        $assertion->setCriticality(false);
+
+        $this->subject->process(
+            $this->contextFor(
+                new DeleteRequest('cn=foo,dc=bar'),
+                $assertion,
+                Controls::subtreeDelete(),
+            ),
+            $this->next,
+        );
+
+        self::assertSame(
+            [],
+            $seen,
+        );
+    }
+
     public function test_a_request_without_a_read_bearing_control_authorizes_no_read(): void
     {
         $this->routeResolvesTo(HandlerId::Dispatch);

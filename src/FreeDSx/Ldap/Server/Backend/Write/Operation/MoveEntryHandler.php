@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -49,11 +50,12 @@ readonly class MoveEntryHandler
         $normOld = $command->dn->normalize();
 
         // Only the moved entry is locked; the destination is held by the unique key the rename and store land on.
-        $this->writeLocked(
+        $this->writeLockedEntry(
             $normOld,
-            function () use ($command, $context, $normOld): void {
+            $context,
+            function (Entry $current) use ($command, $context, $normOld): void {
                 $newEntry = $this->mutation->forMove(
-                    $this->locator->findOrFail($normOld),
+                    $current,
                     $command,
                     $context,
                 );
@@ -63,6 +65,7 @@ readonly class MoveEntryHandler
                     $normOld,
                     $context->isSystem(),
                 );
+                $context->controlEvaluator()?->captureResult($newEntry);
 
                 $normNew = $newEntry->getDn()->normalize();
                 // Re-keyed before the base is stored, so the upsert lands on the moved row rather than inserting a second.

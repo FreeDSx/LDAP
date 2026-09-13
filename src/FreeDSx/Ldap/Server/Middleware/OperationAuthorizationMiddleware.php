@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
+use FreeDSx\Ldap\Operation\Request\DeleteRequest;
 use FreeDSx\Ldap\Operation\Request\AbandonRequest;
 use FreeDSx\Ldap\Operation\Request\ExtendedRequest;
 use FreeDSx\Ldap\Operation\Request\UnbindRequest;
@@ -189,9 +190,6 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
      * Only controls the client marked critical are enforced here, per RFC 4511 section 4.1.11. A non-critical
      * read-entry control is left to be dropped from the response instead of failing an otherwise valid operation.
      *
-     * An assertion is always enforced, critical or not, since ignoring a precondition would let a write land that
-     * the client conditioned on state it cannot verify.
-     *
      * @see \FreeDSx\Ldap\Protocol\ServerProtocolHandler\ReadEntryControlHandler
      *
      * @throws OperationException
@@ -221,7 +219,7 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
     ): array {
         $targets = [];
 
-        if ($controls->has(Control::OID_ASSERTION)) {
+        if ($controls->has(Control::OID_ASSERTION) && !$this->isSubtreeDelete($request, $controls)) {
             $targets[] = $this->targetDnFor($request);
         }
 
@@ -237,6 +235,14 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
         }
 
         return array_values(array_filter($targets));
+    }
+
+    private function isSubtreeDelete(
+        RequestInterface $request,
+        ControlBag $controls,
+    ): bool {
+        return $request instanceof DeleteRequest
+            && $controls->has(Control::OID_SUBTREE_DELETE);
     }
 
     /**

@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Control\AssertionControl;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
@@ -55,15 +56,34 @@ final readonly class AssertionEvaluator
         ControlBag $controls,
         TokenInterface $token,
     ): void {
-        $control = $controls->get(Control::OID_ASSERTION);
-
-        if (!$control instanceof AssertionControl) {
+        if ($this->assertionIn($controls) === null) {
             return;
         }
 
         $entry = $this->backend->get($targetDn);
-
         if ($entry === null) {
+            return;
+        }
+
+        $this->assertSatisfiedBy(
+            $entry,
+            $controls,
+            $token,
+        );
+    }
+
+    /**
+     * Throws ASSERTION_FAILED when an assertion control is present and its filter does not match the given entry.
+     *
+     * @throws OperationException
+     */
+    public function assertSatisfiedBy(
+        Entry $entry,
+        ControlBag $controls,
+        TokenInterface $token,
+    ): void {
+        $control = $this->assertionIn($controls);
+        if ($control === null) {
             return;
         }
 
@@ -80,5 +100,19 @@ final readonly class AssertionEvaluator
             'The assertion control filter did not match the target entry.',
             ResultCode::ASSERTION_FAILED,
         );
+    }
+
+    /**
+     * A replayed change record carries its controls undecoded, so the assertion filter is decoded here when needed.
+     */
+    private function assertionIn(ControlBag $controls): ?AssertionControl
+    {
+        $control = $controls->get(Control::OID_ASSERTION);
+
+        return match (true) {
+            $control === null => null,
+            $control instanceof AssertionControl => $control,
+            default => AssertionControl::fromAsn1($control->toAsn1()),
+        };
     }
 }

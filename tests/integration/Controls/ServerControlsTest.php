@@ -218,6 +218,54 @@ final class ServerControlsTest extends ServerTestCase
         }
     }
 
+    public function test_assertion_fails_a_delete_when_it_does_not_match(): void
+    {
+        $this->authenticateAdmin();
+        $dn = $this->createPerson('assert-delete');
+
+        try {
+            $this->ldapClient()->send(
+                Operations::delete($dn),
+                Controls::assertion(Filters::equal('sn', 'Nope')),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+
+        self::assertSame(
+            'Smith',
+            $this->readValue($dn, 'sn'),
+        );
+    }
+
+    public function test_assertion_fails_a_rename_when_it_does_not_match(): void
+    {
+        $this->authenticateAdmin();
+        $dn = $this->createPerson('assert-rename');
+
+        try {
+            $this->ldapClient()->send(
+                Operations::rename($dn, 'cn=assert-renamed'),
+                Controls::assertion(Filters::equal('sn', 'Nope')),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+
+        self::assertSame(
+            'Smith',
+            $this->readValue($dn, 'sn'),
+        );
+    }
+
     public function test_pre_read_and_post_read_capture_state_around_a_modify(): void
     {
         $this->authenticateAdmin();

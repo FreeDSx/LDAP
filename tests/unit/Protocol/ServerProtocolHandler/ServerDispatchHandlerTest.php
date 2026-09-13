@@ -14,6 +14,12 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 
 use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
+use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
+use FreeDSx\Ldap\Operations;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
@@ -63,7 +69,49 @@ final class ServerDispatchHandlerTest extends TestCase
             backend: $this->mockBackend,
             router: new WriteRequestRouter($this->mockWriteHandler),
             accessControl: $this->mockAccessControl,
+            assertions: new AssertionEvaluator(
+                $this->createMock(FilterEvaluatorInterface::class),
+                $this->mockBackend,
+                $this->mockAccessControl,
+            ),
             schema: new Schema(),
+        );
+    }
+
+    public function test_a_post_read_is_built_from_the_entry_the_write_kept(): void
+    {
+        $this->mockBackend
+            ->expects(self::never())
+            ->method('get');
+        $this->mockAccessControl
+            ->method('filterEntry')
+            ->willReturnArgument(1);
+        $this->mockWriteHandler
+            ->method('handle')
+            ->willReturnCallback(static function (WriteRequestInterface $request, WriteContext $context): void {
+                $context->controlEvaluator()?->captureResult(Entry::fromArray(
+                    'cn=foo,dc=bar',
+                    ['cn' => ['kept']],
+                ));
+            });
+
+        $stream = $this->subject->handleRequest(
+            new LdapMessageRequest(
+                1,
+                Operations::modify('cn=foo,dc=bar'),
+                new PostReadControl('cn'),
+            ),
+            $this->mockToken,
+        );
+        $postRead = ([...$stream->messages][0])->controls()->get(Control::OID_POST_READ);
+
+        self::assertInstanceOf(
+            PostReadResponseControl::class,
+            $postRead,
+        );
+        self::assertSame(
+            ['kept'],
+            $postRead->getEntry()->get('cn')?->getValues(),
         );
     }
 

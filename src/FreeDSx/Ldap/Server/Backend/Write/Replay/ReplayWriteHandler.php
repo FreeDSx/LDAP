@@ -18,9 +18,11 @@ use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
+use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
+use FreeDSx\Ldap\Server\Backend\Write\WriteControlEvaluator;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Operation\WriteOperationResult;
@@ -44,13 +46,16 @@ final readonly class ReplayWriteHandler implements MiddlewareHandlerInterface
         Control::OID_SUBTREE_DELETE,
         // Read off the write context by the storage backend.
         Control::OID_RELAX_RULES,
-        // Evaluated ahead of this handler by AssertionMiddleware.
+        // Evaluated by the write under the lock it takes on the entry.
         Control::OID_ASSERTION,
         // Recognized server-wide and inert, since there are no referral entries to reinterpret.
         Control::OID_MANAGE_DSA_IT,
     ];
 
-    public function __construct(private WriteRequestRouter $router) {}
+    public function __construct(
+        private WriteRequestRouter $router,
+        private AssertionEvaluator $assertions,
+    ) {}
 
     /**
      * @throws OperationException
@@ -60,11 +65,18 @@ final readonly class ReplayWriteHandler implements MiddlewareHandlerInterface
         $controls = $context->message->controls();
         $this->assertAnswerable($controls);
 
+        $token = $context->tokenOrFail();
         $this->router->route(
             $context->message->getRequest(),
-            WriteContext::system(
-                $context->tokenOrFail(),
+            new WriteContext(
+                $token,
                 $controls,
+                isSystem: true,
+                controlEvaluator: new WriteControlEvaluator(
+                    $this->assertions,
+                    $token,
+                    $controls,
+                ),
             ),
         );
 

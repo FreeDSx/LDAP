@@ -15,8 +15,10 @@ namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use Closure;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
+use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
 /**
  * Opens the atomic write and takes the entry's row lock ahead of the body.
@@ -37,6 +39,27 @@ trait WritesLockedEntry
             $this->lockForWrite($dn);
             $body();
         });
+    }
+
+    /**
+     * Locates the entry under the lock, so a missing target answers before any control the write carries is evaluated.
+     *
+     * @param Closure(Entry): void $body
+     * @throws OperationException
+     */
+    private function writeLockedEntry(
+        Dn $dn,
+        WriteContext $context,
+        Closure $body,
+    ): void {
+        $this->writeLocked(
+            $dn,
+            function () use ($dn, $context, $body): void {
+                $current = $this->locator->findOrFail($dn);
+                $context->controlEvaluator()?->evaluateTarget($current);
+                $body($current);
+            },
+        );
     }
 
     private function lockForWrite(Dn $dn): void

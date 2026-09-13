@@ -14,6 +14,9 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
+use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
@@ -21,6 +24,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
@@ -99,6 +103,71 @@ final class UpdateEntryHandlerTest extends TestCase
         $this->modify(new Change(Change::TYPE_REPLACE, 'userPassword'));
 
         self::assertNull($this->find(self::ALICE)?->get('userPassword'));
+    }
+
+    public function test_a_failing_assertion_refuses_the_modify_and_leaves_the_entry(): void
+    {
+        try {
+            $this->updates()->handle(
+                new UpdateCommand(
+                    new Dn(self::ALICE),
+                    [Change::replace('userPassword', 'changed')],
+                ),
+                $this->controlledContext(Controls::assertion(Filters::equal('cn', 'Nobody'))),
+            );
+            self::fail('The assertion should have refused the modify.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+
+        self::assertSame(
+            ['secret'],
+            $this->find(self::ALICE)?->get('userPassword')?->getValues(),
+        );
+    }
+
+    public function test_a_missing_entry_answers_before_its_assertion(): void
+    {
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
+
+        $this->updates()->handle(
+            new UpdateCommand(
+                new Dn('cn=Nobody,dc=example,dc=com'),
+                [Change::replace('sn', 'Nobody')],
+            ),
+            $this->controlledContext(Controls::assertion(Filters::equal('cn', 'Somebody'))),
+        );
+    }
+
+    public function test_the_entries_around_the_modify_are_kept_for_the_read_controls(): void
+    {
+        $context = $this->controlledContext(
+            new PreReadControl('userPassword'),
+            new PostReadControl('userPassword'),
+        );
+
+        $this->updates()->handle(
+            new UpdateCommand(
+                new Dn(self::ALICE),
+                [Change::replace('userPassword', 'changed')],
+            ),
+            $context,
+        );
+
+        $kept = $context->controlEvaluator();
+        self::assertNotNull($kept);
+        self::assertSame(
+            ['secret'],
+            $kept->preReadEntry()?->get('userPassword')?->getValues(),
+        );
+        self::assertSame(
+            ['changed'],
+            $kept->postReadEntry()?->get('userPassword')?->getValues(),
+        );
     }
 
     public function test_it_refuses_an_entry_that_does_not_exist(): void

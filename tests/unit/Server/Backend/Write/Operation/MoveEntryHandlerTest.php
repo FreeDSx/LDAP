@@ -13,12 +13,16 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Write\Operation;
 
+use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
+use FreeDSx\Ldap\Control\ReadEntry\PreReadControl;
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
@@ -93,6 +97,65 @@ final class MoveEntryHandlerTest extends TestCase
         self::expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
 
         $this->rename('cn=Nobody,dc=example,dc=com', 'cn=Ghost');
+    }
+
+    public function test_a_failing_assertion_refuses_the_rename_and_leaves_the_entry(): void
+    {
+        try {
+            $this->moves()->handle(
+                new MoveCommand(
+                    new Dn(self::ALICE),
+                    Rdn::create('cn=Alicia'),
+                    true,
+                    null,
+                ),
+                $this->controlledContext(Controls::assertion(Filters::equal('cn', 'Nobody'))),
+            );
+            self::fail('The assertion should have refused the rename.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNotNull($this->find(self::ALICE));
+        self::assertNull($this->find('cn=Alicia,dc=example,dc=com'));
+    }
+
+    public function test_the_entries_around_the_rename_are_kept_for_the_read_controls(): void
+    {
+        $context = $this->controlledContext(
+            new PreReadControl('cn'),
+            new PostReadControl('cn'),
+        );
+
+        $this->moves()->handle(
+            new MoveCommand(
+                new Dn(self::ALICE),
+                Rdn::create('cn=Alicia'),
+                true,
+                null,
+            ),
+            $context,
+        );
+
+        $kept = $context->controlEvaluator();
+        self::assertNotNull($kept);
+        self::assertSame(
+            self::ALICE,
+            $kept->preReadEntry()?->getDn()->toString(),
+        );
+        $postRead = $kept->postReadEntry();
+        self::assertNotNull($postRead);
+        self::assertSame(
+            'cn=Alicia,dc=example,dc=com',
+            $postRead->getDn()->toString(),
+        );
+        self::assertSame(
+            ['Alicia'],
+            $postRead->get('cn')?->getValues(),
+        );
     }
 
     public function test_it_relocates_an_entry_that_has_children(): void

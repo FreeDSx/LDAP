@@ -18,7 +18,9 @@ use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
+use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -69,7 +71,7 @@ final class AssertionMiddlewareTest extends TestCase
     public function test_it_delegates_when_no_assertion_control_is_present(): void
     {
         $this->subject->process(
-            $this->contextFor(new DeleteRequest('cn=foo,dc=bar')),
+            $this->contextFor($this->compare()),
             $this->next,
         );
 
@@ -80,7 +82,7 @@ final class AssertionMiddlewareTest extends TestCase
     {
         $this->subject->process(
             $this->contextFor(
-                new DeleteRequest('cn=foo,dc=bar'),
+                $this->compare(),
                 Controls::assertion(Filters::equal('cn', 'foo')),
             ),
             $this->next,
@@ -94,7 +96,7 @@ final class AssertionMiddlewareTest extends TestCase
         try {
             $this->subject->process(
                 $this->contextFor(
-                    new DeleteRequest('cn=foo,dc=bar'),
+                    $this->compare(),
                     Controls::assertion(Filters::equal('cn', 'nope')),
                 ),
                 $this->next,
@@ -146,6 +148,28 @@ final class AssertionMiddlewareTest extends TestCase
         self::assertNotNull(
             $this->next->received,
             'A non-matching assertion on a continuation page is not re-evaluated, so the chain proceeds.',
+        );
+    }
+
+    public function test_a_write_is_passed_on_for_its_handler_to_evaluate_under_the_lock(): void
+    {
+        $this->subject->process(
+            $this->contextFor(
+                new DeleteRequest('cn=foo,dc=bar'),
+                Controls::assertion(Filters::equal('cn', 'nope')),
+            ),
+            $this->next,
+        );
+
+        self::assertNotNull($this->next->received);
+    }
+
+    private function compare(): CompareRequest
+    {
+        return Operations::compare(
+            'cn=foo,dc=bar',
+            'cn',
+            'foo',
         );
     }
 

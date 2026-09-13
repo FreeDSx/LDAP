@@ -33,6 +33,7 @@ final readonly class WriteContext
         private bool $isSystem = false,
         private SchemaViolations $schemaViolations = new SchemaViolations(),
         private ?BulkLoadOptions $bulkLoad = null,
+        private ?WriteControlEvaluator $controlEvaluator = null,
     ) {}
 
     /**
@@ -107,5 +108,13 @@ final readonly class WriteContext
     public function bulkLoadOptions(): ?BulkLoadOptions
     {
         return $this->bulkLoad;
+    }
+
+    /**
+     * Present when the write's controls are evaluated under its lock, as for a client request or a replayed record.
+     */
+    public function controlEvaluator(): ?WriteControlEvaluator
+    {
+        return $this->controlEvaluator;
     }
 }

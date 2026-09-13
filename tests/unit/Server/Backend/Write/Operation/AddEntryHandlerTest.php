@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
@@ -75,6 +76,27 @@ final class AddEntryHandlerTest extends TestCase
             ['über'],
             $this->find('cn=Über,dc=example,dc=com')?->get('cn')?->getValues(),
         );
+    }
+
+    public function test_the_added_entry_is_kept_for_a_post_read(): void
+    {
+        $context = $this->controlledContext(new PostReadControl('cn'));
+
+        $this->adds()->handle(
+            new AddCommand(new Entry(
+                new Dn('cn=New,dc=example,dc=com'),
+                new Attribute('cn', 'New'),
+            )),
+            $context,
+        );
+
+        $postRead = $context->controlEvaluator()?->postReadEntry();
+        self::assertNotNull($postRead);
+        self::assertSame(
+            ['New'],
+            $postRead->get('cn')?->getValues(),
+        );
+        self::assertNotNull($postRead->get('entryUUID'));
     }
 
     public function test_it_refuses_an_entry_that_already_exists(): void
