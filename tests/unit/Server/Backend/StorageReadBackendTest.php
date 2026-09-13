@@ -560,10 +560,35 @@ final class StorageReadBackendTest extends TestCase
         }
     }
 
+    public function test_it_gets_an_entry_that_exists_or_fails(): void
+    {
+        self::assertSame(
+            'cn=Alice,dc=example,dc=com',
+            $this->subject->getOrFail(new Dn('cn=Alice,dc=example,dc=com'))->getDn()->toString(),
+        );
+    }
+
+    public function test_getting_a_missing_entry_answers_no_such_object_carrying_the_matched_dn(): void
+    {
+        try {
+            $this->subject->getOrFail(new Dn('cn=Nobody,dc=example,dc=com'));
+            self::fail('Expected OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::NO_SUCH_OBJECT,
+                $e->getCode(),
+            );
+            self::assertSame(
+                'dc=example,dc=com',
+                $e->getMatchedDn()?->toString(),
+            );
+        }
+    }
+
     public function test_compare_answers_true_for_a_matching_value(): void
     {
         self::assertTrue($this->subject->compare(
-            new Dn('cn=Alice,dc=example,dc=com'),
+            $this->alice,
             new EqualityFilter('cn', 'Alice'),
         ));
     }
@@ -571,7 +596,7 @@ final class StorageReadBackendTest extends TestCase
     public function test_compare_answers_false_for_a_differing_value(): void
     {
         self::assertFalse($this->subject->compare(
-            new Dn('cn=Alice,dc=example,dc=com'),
+            $this->alice,
             new EqualityFilter('cn', 'Nobody'),
         ));
     }
@@ -582,7 +607,7 @@ final class StorageReadBackendTest extends TestCase
     public function test_compare_answers_false_when_the_entry_lacks_the_attribute(): void
     {
         self::assertFalse($this->subject->compare(
-            new Dn('cn=Alice,dc=example,dc=com'),
+            $this->alice,
             new EqualityFilter('description', 'anything'),
         ));
     }
@@ -593,7 +618,7 @@ final class StorageReadBackendTest extends TestCase
         $this->expectExceptionCode(ResultCode::UNDEFINED_ATTRIBUTE_TYPE);
 
         $this->subject->compare(
-            new Dn('cn=Alice,dc=example,dc=com'),
+            $this->alice,
             new EqualityFilter('shoeSize', '9'),
         );
     }
@@ -607,39 +632,9 @@ final class StorageReadBackendTest extends TestCase
         $this->expectExceptionCode(ResultCode::INVALID_ATTRIBUTE_SYNTAX);
 
         $this->subject->compare(
-            new Dn('cn=Alice,dc=example,dc=com'),
+            $this->alice,
             new EqualityFilter('c', 'UnitedStates'),
         );
-    }
-
-    /**
-     * The entry is located first, so a missing entry outranks anything the assertion itself is wrong about.
-     */
-    public function test_compare_reports_a_missing_entry_before_an_undefined_assertion(): void
-    {
-        $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
-
-        $this->subject->compare(
-            new Dn('cn=Nobody,dc=example,dc=com'),
-            new EqualityFilter('shoeSize', '9'),
-        );
-    }
-
-    public function test_no_such_object_on_compare_carries_matched_dn(): void
-    {
-        try {
-            $this->subject->compare(
-                new Dn('cn=Nobody,dc=example,dc=com'),
-                new EqualityFilter('cn', 'Nobody'),
-            );
-            self::fail('Expected OperationException was not thrown.');
-        } catch (OperationException $e) {
-            self::assertSame(
-                'dc=example,dc=com',
-                $e->getMatchedDn()?->toString(),
-            );
-        }
     }
 
     public function test_no_such_object_with_no_existing_ancestor_has_null_matched_dn(): void

@@ -16,6 +16,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Protocol\ServerProtocolHandler;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadControl;
 use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
+use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
@@ -58,19 +59,22 @@ final class ServerDispatchHandlerTest extends TestCase
 
     private AccessControlInterface&MockObject $mockAccessControl;
 
+    private FilterEvaluatorInterface&MockObject $mockFilterEvaluator;
+
     protected function setUp(): void
     {
         $this->mockToken = $this->createMock(TokenInterface::class);
         $this->mockBackend = $this->createMock(ReadBackendInterface::class);
         $this->mockWriteHandler = $this->createMock(WriteHandlerInterface::class);
         $this->mockAccessControl = $this->createMock(AccessControlInterface::class);
+        $this->mockFilterEvaluator = $this->createMock(FilterEvaluatorInterface::class);
 
         $this->subject = new ServerDispatchHandler(
             backend: $this->mockBackend,
             router: new WriteRequestRouter($this->mockWriteHandler),
             accessControl: $this->mockAccessControl,
             assertions: new AssertionEvaluator(
-                $this->createMock(FilterEvaluatorInterface::class),
+                $this->mockFilterEvaluator,
                 $this->mockBackend,
                 $this->mockAccessControl,
             ),
@@ -150,20 +154,30 @@ final class ServerDispatchHandlerTest extends TestCase
         $this->subject->handleRequest($add, $this->mockToken);
     }
 
-    public function test_it_delegates_compare_to_the_backend(): void
+    public function test_it_compares_the_entry_it_reads_once(): void
     {
-        $filter = Filters::equal('foo', 'bar');
-        $compare = new LdapMessageRequest(1, new CompareRequest('cn=foo,dc=bar', $filter));
+        $entry = Entry::fromArray(
+            'cn=foo,dc=bar',
+            ['foo' => ['bar']],
+        );
+        $compare = new LdapMessageRequest(1, new CompareRequest('cn=foo,dc=bar', Filters::equal('foo', 'bar')));
 
         $this->mockWriteHandler
             ->expects(self::never())
             ->method('handle');
-
+        $this->mockBackend
+            ->expects(self::never())
+            ->method('get');
+        $this->mockBackend
+            ->expects(self::once())
+            ->method('getOrFail')
+            ->with(self::isInstanceOf(Dn::class))
+            ->willReturn($entry);
         $this->mockBackend
             ->expects(self::once())
             ->method('compare')
             ->with(
-                self::isInstanceOf(Dn::class),
+                $entry,
                 self::isInstanceOf(EqualityFilter::class),
             )
             ->willReturn(true);
@@ -173,19 +187,56 @@ final class ServerDispatchHandlerTest extends TestCase
         self::assertInstanceOf(CompareOperationResult::class, $outcome);
     }
 
-    public function test_it_lets_operation_exceptions_from_backend_compare_bubble(): void
+    public function test_a_missing_compare_target_answers_before_its_assertion(): void
     {
-        $compare = new LdapMessageRequest(1, new CompareRequest('cn=foo,dc=bar', Filters::equal('foo', 'bar')));
+        $compare = new LdapMessageRequest(
+            1,
+            new CompareRequest('cn=foo,dc=bar', Filters::equal('foo', 'bar')),
+            Controls::assertion(Filters::equal('foo', 'nope')),
+        );
 
         $this->mockBackend
-            ->method('compare')
+            ->method('getOrFail')
             ->willThrowException(new OperationException(
                 'No such object: cn=foo,dc=bar',
                 ResultCode::NO_SUCH_OBJECT,
             ));
+        $this->mockFilterEvaluator
+            ->expects(self::never())
+            ->method('evaluate');
 
         $this->expectException(OperationException::class);
         $this->expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
+
+        $this->subject->handleRequest($compare, $this->mockToken);
+    }
+
+    public function test_a_failing_assertion_refuses_the_compare_before_it_is_evaluated(): void
+    {
+        $compare = new LdapMessageRequest(
+            1,
+            new CompareRequest('cn=foo,dc=bar', Filters::equal('foo', 'bar')),
+            Controls::assertion(Filters::equal('foo', 'nope')),
+        );
+
+        $this->mockBackend
+            ->method('getOrFail')
+            ->willReturn(Entry::fromArray(
+                'cn=foo,dc=bar',
+                ['foo' => ['bar']],
+            ));
+        $this->mockAccessControl
+            ->method('stripUnreadableAttributes')
+            ->willReturnArgument(1);
+        $this->mockFilterEvaluator
+            ->method('evaluate')
+            ->willReturn(false);
+        $this->mockBackend
+            ->expects(self::never())
+            ->method('compare');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ASSERTION_FAILED);
 
         $this->subject->handleRequest($compare, $this->mockToken);
     }

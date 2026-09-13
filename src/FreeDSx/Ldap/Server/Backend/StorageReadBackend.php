@@ -63,15 +63,18 @@ final readonly class StorageReadBackend implements ReadBackendInterface, Resetta
     /**
      * @throws OperationException
      */
+    public function getOrFail(Dn $dn): Entry
+    {
+        return $this->get($dn) ?? $this->locator->throwNoSuchObject($dn);
+    }
+
+    /**
+     * @throws OperationException
+     */
     public function compare(
-        Dn $dn,
+        Entry $entry,
         EqualityFilter $filter,
     ): bool {
-        $entry = $this->get($dn);
-
-        if ($entry === null) {
-            $this->locator->throwNoSuchObject($dn);
-        }
         // RFC 4511 4.10: only compareTrue and compareFalse may report a match, so Undefined needs its own code.
         $this->assertComparable($filter);
 

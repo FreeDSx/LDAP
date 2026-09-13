@@ -518,6 +518,229 @@ trait ControlTestsTrait
         );
     }
 
+    public function testAnAssertionMatchingTheSearchBaseLetsTheSearchRun(): void
+    {
+        $this->authenticateUser();
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'),
+            Controls::assertion(Filters::equal('dc', 'foo')),
+        );
+
+        self::assertGreaterThan(
+            0,
+            $entries->count(),
+        );
+    }
+
+    public function testAnAssertionNotMatchingTheSearchBaseFailsTheSearch(): void
+    {
+        $this->authenticateUser();
+
+        try {
+            $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'),
+                Controls::assertion(Filters::equal('dc', 'nope')),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+
+        // The rejection ends only the operation, not the connection.
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'))->base('dc=foo,dc=bar'),
+        );
+        self::assertGreaterThan(
+            0,
+            $entries->count(),
+        );
+    }
+
+    public function testAnAssertionMatchingTheEntryLetsTheCompareAnswer(): void
+    {
+        $this->authenticateUser();
+
+        self::assertTrue($this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'sn',
+            'Smith',
+            Controls::assertion(Filters::equal('cn', 'alice')),
+        ));
+    }
+
+    public function testAnAssertionNotMatchingTheEntryFailsTheCompare(): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ASSERTION_FAILED);
+
+        $this->ldapClient()->compare(
+            'cn=alice,ou=people,dc=foo,dc=bar',
+            'sn',
+            'Smith',
+            Controls::assertion(Filters::equal('cn', 'nobody')),
+        );
+    }
+
+    public function testACompareOfAMissingEntryAnswersBeforeItsAssertion(): void
+    {
+        $this->authenticateUser();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::NO_SUCH_OBJECT);
+
+        $this->ldapClient()->compare(
+            'cn=nobody,ou=people,dc=foo,dc=bar',
+            'sn',
+            'Smith',
+            Controls::assertion(Filters::equal('cn', 'nobody')),
+        );
+    }
+
+    public function testAnAssertionMatchingTheAddedEntryLetsTheAddRun(): void
+    {
+        $this->authenticateAdmin();
+        $entry = $this->assertionTarget('assert-add-ok');
+
+        $this->ldapClient()->send(
+            Operations::add($entry),
+            Controls::assertion(Filters::equal('sn', 'Smith')),
+        );
+        $added = $this->ldapClient()->read($entry->getDn()->toString());
+        $this->ldapClient()->delete($entry->getDn()->toString());
+
+        self::assertSame(
+            ['Smith'],
+            $added?->get('sn')?->getValues(),
+        );
+    }
+
+    public function testAnAssertionNotMatchingTheAddedEntryFailsTheAdd(): void
+    {
+        $this->authenticateAdmin();
+        $entry = $this->assertionTarget('assert-add-no');
+
+        try {
+            $this->ldapClient()->send(
+                Operations::add($entry),
+                Controls::assertion(Filters::equal('sn', 'doesnotmatch')),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNull($this->ldapClient()->read($entry->getDn()->toString()));
+    }
+
+    public function testAnAssertionMatchingTheEntryLetsTheModifyRun(): void
+    {
+        $this->authenticateAdmin();
+        $dn = $this->createAssertionTarget('assert-modify-ok');
+
+        $this->ldapClient()->send(
+            Operations::modify(
+                $dn,
+                Change::replace('sn', 'Jones'),
+            ),
+            Controls::assertion(Filters::equal('sn', 'Smith')),
+        );
+        $modified = $this->ldapClient()->read($dn);
+        $this->ldapClient()->delete($dn);
+
+        self::assertSame(
+            ['Jones'],
+            $modified?->get('sn')?->getValues(),
+        );
+    }
+
+    public function testAnAssertionNotMatchingTheEntryFailsTheModify(): void
+    {
+        $this->authenticateAdmin();
+        $dn = $this->createAssertionTarget('assert-modify-no');
+
+        try {
+            $this->ldapClient()->send(
+                Operations::modify(
+                    $dn,
+                    Change::replace('sn', 'Jones'),
+                ),
+                Controls::assertion(Filters::equal('sn', 'Nope')),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+        $unchanged = $this->ldapClient()->read($dn);
+        $this->ldapClient()->delete($dn);
+
+        self::assertSame(
+            ['Smith'],
+            $unchanged?->get('sn')?->getValues(),
+        );
+    }
+
+    public function testAnAssertionNotMatchingTheEntryFailsTheDelete(): void
+    {
+        $this->authenticateAdmin();
+        $dn = $this->createAssertionTarget('assert-delete-no');
+
+        try {
+            $this->ldapClient()->send(
+                Operations::delete($dn),
+                Controls::assertion(Filters::equal('sn', 'Nope')),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+        $kept = $this->ldapClient()->read($dn);
+        $this->ldapClient()->delete($dn);
+
+        self::assertNotNull($kept);
+    }
+
+    public function testAnAssertionNotMatchingTheEntryFailsTheModifyDn(): void
+    {
+        $this->authenticateAdmin();
+        $dn = $this->createAssertionTarget('assert-rename-no');
+
+        try {
+            $this->ldapClient()->send(
+                Operations::rename(
+                    $dn,
+                    'cn=assert-renamed',
+                ),
+                Controls::assertion(Filters::equal('sn', 'Nope')),
+            );
+            self::fail('Expected an OperationException was not thrown.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::ASSERTION_FAILED,
+                $e->getCode(),
+            );
+        }
+        $kept = $this->ldapClient()->read($dn);
+        $this->ldapClient()->delete($dn);
+
+        self::assertNotNull($kept);
+        self::assertNull($this->ldapClient()->read('cn=assert-renamed,ou=people,dc=foo,dc=bar'));
+    }
+
     public function testACriticalSortThatCannotBePerformedFailsAPagedSearch(): void
     {
         $this->authenticateUser();
@@ -817,6 +1040,32 @@ trait ControlTestsTrait
         // More than one seed entry lacks 'sn', so assert the ordering rather than which of them sorts first.
         self::assertNull($entries[0]->get('sn'));
         self::assertNotNull($entries[count($entries) - 1]->get('sn'));
+    }
+
+    /**
+     * An entry under ou=people for a write carrying an assertion to act on.
+     */
+    private function assertionTarget(string $cn): Entry
+    {
+        return Entry::fromArray(
+            "cn={$cn},ou=people,dc=foo,dc=bar",
+            [
+                'objectClass' => ['inetOrgPerson'],
+                'cn' => [$cn],
+                'sn' => ['Smith'],
+            ],
+        );
+    }
+
+    /**
+     * Creates the entry a write carrying an assertion acts on, which the test removes again.
+     */
+    private function createAssertionTarget(string $cn): string
+    {
+        $entry = $this->assertionTarget($cn);
+        $this->ldapClient()->create($entry);
+
+        return $entry->getDn()->toString();
     }
 
     /**

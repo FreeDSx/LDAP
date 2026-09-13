@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Server\Middleware;
 use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
@@ -25,9 +24,9 @@ use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 
 /**
- * Rejects a search or compare whose RFC 4528 assertion control does not match its target entry, before dispatch.
+ * Rejects a search whose RFC 4528 assertion control does not match its base entry, before the search runs.
  *
- * Writes evaluate their assertion under the lock it takes on the entry so the two are one atomic action.
+ * A compare or a write evaluates its assertion against the entry it reads itself, so the two are one atomic action.
  *
  * @internal
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
@@ -53,11 +52,9 @@ final readonly class AssertionMiddleware implements MiddlewareInterface
             return $next->handle($context);
         }
 
-        $target = match (true) {
-            $request instanceof SearchRequest => $request->getBaseDn(),
-            $request instanceof CompareRequest => $request->getDn(),
-            default => null,
-        };
+        $target = $request instanceof SearchRequest
+            ? $request->getBaseDn()
+            : null;
 
         if ($target !== null) {
             $this->evaluator->assertSatisfied(

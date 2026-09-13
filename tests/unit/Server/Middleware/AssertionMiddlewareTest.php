@@ -18,12 +18,11 @@ use FreeDSx\Ldap\Control\PagingControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\DeleteRequest;
-use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Search\Filters;
@@ -31,7 +30,6 @@ use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
-use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -39,6 +37,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Middleware\CallLog;
 use Tests\Support\FreeDSx\Ldap\Middleware\RecordingMiddlewareHandler;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class AssertionMiddlewareTest extends TestCase
 {
@@ -71,7 +70,7 @@ final class AssertionMiddlewareTest extends TestCase
     public function test_it_delegates_when_no_assertion_control_is_present(): void
     {
         $this->subject->process(
-            $this->contextFor($this->compare()),
+            $this->contextFor($this->search()),
             $this->next,
         );
 
@@ -82,7 +81,7 @@ final class AssertionMiddlewareTest extends TestCase
     {
         $this->subject->process(
             $this->contextFor(
-                $this->compare(),
+                $this->search(),
                 Controls::assertion(Filters::equal('cn', 'foo')),
             ),
             $this->next,
@@ -91,12 +90,12 @@ final class AssertionMiddlewareTest extends TestCase
         self::assertNotNull($this->next->received);
     }
 
-    public function test_it_throws_and_stops_the_chain_when_the_assertion_does_not_match(): void
+    public function test_it_throws_and_stops_the_chain_when_the_assertion_does_not_match_the_search_base(): void
     {
         try {
             $this->subject->process(
                 $this->contextFor(
-                    $this->compare(),
+                    $this->search(),
                     Controls::assertion(Filters::equal('cn', 'nope')),
                 ),
                 $this->next,
@@ -115,30 +114,11 @@ final class AssertionMiddlewareTest extends TestCase
         );
     }
 
-    public function test_it_resolves_the_search_base_as_the_target(): void
-    {
-        $search = (new SearchRequest(Filters::equal('cn', 'foo')))
-            ->base('cn=foo,dc=bar');
-
-        $this->expectException(OperationException::class);
-
-        $this->subject->process(
-            $this->contextFor(
-                $search,
-                Controls::assertion(Filters::equal('cn', 'nope')),
-            ),
-            $this->next,
-        );
-    }
-
     public function test_it_skips_assertion_on_a_paging_continuation(): void
     {
-        $search = (new SearchRequest(Filters::equal('cn', 'foo')))
-            ->base('cn=foo,dc=bar');
-
         $this->subject->process(
             $this->contextFor(
-                $search,
+                $this->search(),
                 Controls::assertion(Filters::equal('cn', 'nope')),
                 new PagingControl(10, 'continuation-cookie'),
             ),
@@ -149,6 +129,23 @@ final class AssertionMiddlewareTest extends TestCase
             $this->next->received,
             'A non-matching assertion on a continuation page is not re-evaluated, so the chain proceeds.',
         );
+    }
+
+    public function test_a_compare_is_passed_on_to_be_evaluated_against_the_entry_it_reads(): void
+    {
+        $this->subject->process(
+            $this->contextFor(
+                Operations::compare(
+                    'cn=foo,dc=bar',
+                    'cn',
+                    'foo',
+                ),
+                Controls::assertion(Filters::equal('cn', 'nope')),
+            ),
+            $this->next,
+        );
+
+        self::assertNotNull($this->next->received);
     }
 
     public function test_a_write_is_passed_on_for_its_handler_to_evaluate_under_the_lock(): void
@@ -164,13 +161,10 @@ final class AssertionMiddlewareTest extends TestCase
         self::assertNotNull($this->next->received);
     }
 
-    private function compare(): CompareRequest
+    private function search(): SearchRequest
     {
-        return Operations::compare(
-            'cn=foo,dc=bar',
-            'cn',
-            'foo',
-        );
+        return (new SearchRequest(Filters::equal('cn', 'foo')))
+            ->base('cn=foo,dc=bar');
     }
 
     private function contextFor(
