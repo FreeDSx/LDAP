@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\RdnAttributeValues;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
 use FreeDSx\Ldap\Server\Backend\Write\OperationalAttributeGenerator;
@@ -35,6 +36,7 @@ readonly class AddEntryHandler
         private EntryPlacementGuard $placement,
         private SchemaViolationGate $schemaGate,
         private OperationalAttributeGenerator $operationalAttrs,
+        private RdnAttributeValues $rdnValues,
         private ?ChangeRecorder $changeRecorder = null,
     ) {}
 
@@ -49,7 +51,7 @@ readonly class AddEntryHandler
             // Worked on a copy, so a retried attempt never sees what an earlier one merged or stamped.
             $entry = $command->entry->makeCopy();
             // Merged before validation, so the values naming the entry count toward what its object classes require.
-            $entry->mergeRdnAttributes();
+            $this->rdnValues->merge($entry);
 
             $bulkLoad = $context->bulkLoadOptions();
 

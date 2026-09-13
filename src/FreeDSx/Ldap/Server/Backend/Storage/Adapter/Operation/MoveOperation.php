@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 
 /**
@@ -23,47 +22,34 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class MoveOperation
+final readonly class MoveOperation
 {
+    public function __construct(
+        private RdnAttributeValues $rdnValues,
+    ) {}
+
     public function execute(
         Entry $entry,
         MoveCommand $command,
     ): Entry {
-        $newDn = Dn::fromRdn(
-            $command->newRdn,
-            $command->newParent ?? $command->dn->getParent(),
+        // The request may spell the entry's DN differently, so the old RDN and parent come from the stored one.
+        $storedDn = $entry->getDn();
+        $newEntry = new Entry(
+            Dn::fromRdn(
+                $command->newRdn,
+                $command->newParent ?? $storedDn->getParent(),
+            ),
+            ...$entry->getAttributes(),
         );
-        $newEntry = new Entry($newDn, ...$entry->getAttributes());
 
         if ($command->deleteOldRdn) {
-            $this->removeOldRdnValues(
+            $this->rdnValues->remove(
                 $newEntry,
-                $command->dn->getRdn(),
+                $storedDn->getRdn(),
             );
         }
+        $this->rdnValues->merge($newEntry);
 
-        return $newEntry->mergeRdnAttributes();
-    }
-
-    /**
-     * An attribute cannot remain on an entry with no values.
-     */
-    private function removeOldRdnValues(
-        Entry $entry,
-        Rdn $oldRdn,
-    ): void {
-        foreach ($oldRdn->getAll() as $component) {
-            $existing = $entry->get($component->getName());
-            if ($existing === null) {
-                continue;
-            }
-            $existing->removeValues(
-                [Rdn::unescape($component->getValue())],
-                caseSensitive: false,
-            );
-            if ($existing->getValues() === []) {
-                $entry->reset($existing);
-            }
-        }
+        return $newEntry;
     }
 }

@@ -1167,6 +1167,78 @@ trait WriteTestsTrait
         $this->ldapClient()->delete('cn=kept,dc=foo,dc=bar');
     }
 
+    public function testAddAcceptsANamingValueTheEntryHoldsUnderAnEquivalentSpelling(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=Über,dc=foo,dc=bar',
+            ['cn' => 'über', 'sn' => 'Uber', 'objectClass' => 'inetOrgPerson'],
+        ));
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'cn')
+                ->base('cn=Über,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+        self::assertSame(
+            ['über'],
+            $found->first()?->get('cn')?->getValues(),
+        );
+
+        $this->ldapClient()->delete('cn=Über,dc=foo,dc=bar');
+    }
+
+    public function testRenameThroughARespelledDnRemovesTheStoredNamingValue(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=École,dc=foo,dc=bar',
+            ['cn' => 'École', 'sn' => 'Ecole', 'objectClass' => 'inetOrgPerson'],
+        ));
+
+        $this->ldapClient()->rename('cn=école,dc=foo,dc=bar', 'cn=ecole2', true);
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'cn')
+                ->base('cn=ecole2,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+        self::assertSame(
+            ['ecole2'],
+            $found->first()?->get('cn')?->getValues(),
+        );
+
+        $this->ldapClient()->delete('cn=ecole2,dc=foo,dc=bar');
+    }
+
+    public function testRenameKeepsCaseVariantsOfACaseExactNamingValue(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'labeledURI=Xyz,dc=foo,dc=bar',
+            [
+                'cn' => 'variants',
+                'sn' => 'Variants',
+                'labeledURI' => ['Xyz', 'xyz', 'XYZ'],
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        $this->ldapClient()->rename('labeledURI=Xyz,dc=foo,dc=bar', 'cn=variants', true);
+
+        $found = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'), 'labeledURI')
+                ->base('cn=variants,dc=foo,dc=bar')
+                ->useBaseScope(),
+        );
+        self::assertSame(
+            ['xyz', 'XYZ'],
+            $found->first()?->get('labeledURI')?->getValues(),
+        );
+
+        $this->ldapClient()->delete('cn=variants,dc=foo,dc=bar');
+    }
+
     public function testRenameCanRespellTheRdnInADifferentCase(): void
     {
         $this->authenticateAdmin();

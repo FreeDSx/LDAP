@@ -59,6 +59,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionSweeper;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\RdnAttributeValues;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\WriteEntryOperationHandler;
 use FreeDSx\Ldap\Server\Backend\Write\OperationalAttributeGenerator;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\SearchStreamBuilder;
@@ -152,8 +153,12 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             SchemaViolationGate::class => static fn(Container $c): SchemaViolationGate => new SchemaViolationGate(
                 $c->get(SchemaValidator::class),
             ),
+            RdnAttributeValues::class => static fn(Container $c): RdnAttributeValues => new RdnAttributeValues(
+                $c->get(EqualityComparatorResolver::class),
+            ),
             WriteEntryOperationHandler::class => static fn(Container $c): WriteEntryOperationHandler => new WriteEntryOperationHandler(
                 $c->get(EqualityComparatorResolver::class),
+                $c->get(RdnAttributeValues::class),
             ),
             EntryPlacementGuard::class => static fn(Container $c): EntryPlacementGuard => new EntryPlacementGuard(
                 $c->get(EntryStorageInterface::class),
@@ -337,6 +342,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             placement: $container->get(EntryPlacementGuard::class),
             schemaGate: $container->get(SchemaViolationGate::class),
             operationalAttrs: $container->get(OperationalAttributeGenerator::class),
+            rdnValues: $container->get(RdnAttributeValues::class),
             changeRecorder: $this->changeRecorderFor($container),
         );
     }

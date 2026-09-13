@@ -25,15 +25,18 @@ use LogicException;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class WriteEntryOperationHandler
+final readonly class WriteEntryOperationHandler
 {
-    private readonly UpdateOperation $update;
+    private UpdateOperation $update;
+
+    private MoveOperation $move;
 
     public function __construct(
         EqualityComparatorResolver $equalityResolver,
-        private readonly MoveOperation $move = new MoveOperation(),
+        RdnAttributeValues $rdnValues,
     ) {
         $this->update = new UpdateOperation($equalityResolver);
+        $this->move = new MoveOperation($rdnValues);
     }
 
     public function apply(
