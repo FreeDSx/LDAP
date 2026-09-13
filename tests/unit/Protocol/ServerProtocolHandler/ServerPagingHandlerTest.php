@@ -211,6 +211,153 @@ class ServerPagingHandlerTest extends TestCase
         );
     }
 
+    public function test_a_page_filled_before_the_lookthrough_runs_out_is_answered_rather_than_refused(): void
+    {
+        $entries = [];
+        for ($i = 1; $i <= 12; $i++) {
+            $entries[] = Entry::create("cn=$i,dc=foo,dc=bar", ['cn' => (string) $i]);
+        }
+
+        // Only the tenth candidate is visible, so filling the page spends the whole lookthrough.
+        $mockAccessControl = $this->createMock(AccessControlInterface::class);
+        $mockAccessControl
+            ->method('filterEntry')
+            ->willReturnCallback(
+                static fn(TokenInterface $token, Entry $entry): ?Entry => $entry === $entries[9]
+                    ? $entry
+                    : null,
+            );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback($this->sliceAware(...$entries));
+
+        $subject = $this->makeHandler(
+            $mockAccessControl,
+            new SearchLimits(
+                maxSearchPageSize: 1000,
+                maxSearchPagedLookthrough: 10,
+            ),
+        );
+
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(size: 1),
+        );
+
+        $done = $this->doneMessage()->getResponse();
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $done,
+        );
+        self::assertSame(
+            ResultCode::SUCCESS,
+            $done->getResultCode(),
+        );
+        self::assertEquals(
+            [new LdapMessageResponse(2, new SearchResultEntry($entries[9]))],
+            $this->entryMessages(),
+        );
+    }
+
+    public function test_a_page_still_short_of_its_limit_is_refused_when_the_lookthrough_runs_out(): void
+    {
+        $entries = [];
+        for ($i = 1; $i <= 12; $i++) {
+            $entries[] = Entry::create("cn=$i,dc=foo,dc=bar", ['cn' => (string) $i]);
+        }
+
+        // The page wants two, but the only visible entry is the tenth candidate.
+        $mockAccessControl = $this->createMock(AccessControlInterface::class);
+        $mockAccessControl
+            ->method('filterEntry')
+            ->willReturnCallback(
+                static fn(TokenInterface $token, Entry $entry): ?Entry => $entry === $entries[9]
+                    ? $entry
+                    : null,
+            );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback($this->sliceAware(...$entries));
+
+        $subject = $this->makeHandler(
+            $mockAccessControl,
+            new SearchLimits(
+                maxSearchPageSize: 1000,
+                maxSearchPagedLookthrough: 10,
+            ),
+        );
+
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(size: 2),
+        );
+
+        $done = $this->doneMessage()->getResponse();
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $done,
+        );
+        self::assertSame(
+            ResultCode::ADMIN_LIMIT_EXCEEDED,
+            $done->getResultCode(),
+        );
+        self::assertSame(
+            [],
+            $this->entryMessages(),
+        );
+    }
+
+    public function test_a_size_limit_probe_that_runs_out_of_lookthrough_is_refused(): void
+    {
+        $entries = [];
+        for ($i = 1; $i <= 6; $i++) {
+            $entries[] = Entry::create("cn=$i,dc=foo,dc=bar", ['cn' => (string) $i]);
+        }
+
+        // The first two fill the page, so only the probe for a further match meets the hidden rest.
+        $mockAccessControl = $this->createMock(AccessControlInterface::class);
+        $mockAccessControl
+            ->method('filterEntry')
+            ->willReturnCallback(
+                static fn(TokenInterface $token, Entry $entry): ?Entry => in_array(
+                    $entry,
+                    [$entries[0], $entries[1]],
+                    true,
+                )
+                    ? $entry
+                    : null,
+            );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturnCallback($this->sliceAware(...$entries));
+
+        $subject = $this->makeHandler(
+            $mockAccessControl,
+            new SearchLimits(maxSearchPagedLookthrough: 3),
+        );
+
+        $this->drive(
+            $subject,
+            $this->makeSearchMessage(
+                size: 2,
+                searchRequest: $this->makeSearchRequest()->sizeLimit(2),
+            ),
+        );
+
+        $done = $this->doneMessage()->getResponse();
+        self::assertInstanceOf(
+            SearchResultDone::class,
+            $done,
+        );
+        self::assertSame(
+            ResultCode::ADMIN_LIMIT_EXCEEDED,
+            $done->getResultCode(),
+        );
+    }
+
     public function test_it_should_call_the_backend_search_on_paging_start_and_return_entries(): void
     {
         $message = $this->makeSearchMessage(size: 10);
@@ -1181,19 +1328,26 @@ class ServerPagingHandlerTest extends TestCase
                 $args,
                 static fn(mixed $arg): bool => $arg instanceof PageSlice,
             ))[0] ?? null,
+            array_values(array_filter(
+                $args,
+                static fn(mixed $arg): bool => $arg instanceof SearchLimits,
+            ))[0] ?? null,
         ));
     }
 
     /**
      * @param list<Entry> $entries
      * @return Generator<int, FetchedEntry, mixed, FetchedBatch>
+     * @throws OperationException
      */
     private function sliceOf(
         array $entries,
         ?PageSlice $slice,
+        ?SearchLimits $limits = null,
     ): Generator {
         $after = $slice?->after->position ?? 0;
         $cursor = $slice?->after;
+        $lookthrough = $limits?->maxSearchLookthrough() ?? 0;
         $taken = 0;
         $hasMore = false;
 
@@ -1208,6 +1362,14 @@ class ServerPagingHandlerTest extends TestCase
                 $hasMore = true;
 
                 break;
+            }
+
+            // Storage refuses a candidate past the lookthrough rather than handing it over.
+            if ($lookthrough > 0 && $taken >= $lookthrough) {
+                throw new OperationException(
+                    'Administrative limit exceeded.',
+                    ResultCode::ADMIN_LIMIT_EXCEEDED,
+                );
             }
 
             $taken++;
