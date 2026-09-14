@@ -13,6 +13,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Middleware;
 
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\Sorting\SortingControl;
+use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Operation\Request\RequestInterface;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
@@ -23,6 +26,7 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\WithheldFilterRewriter;
+use FreeDSx\Ldap\Server\AccessControl\WithheldSortKeyFilter;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Middleware\WithheldAttributeMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
@@ -46,12 +50,14 @@ final class WithheldAttributeMiddlewareTest extends TestCase
     {
         $this->next = $this->createMock(MiddlewareHandlerInterface::class);
         $this->token = BindToken::fromDn('cn=user,dc=foo,dc=bar');
-        $this->subject = new WithheldAttributeMiddleware(new WithheldFilterRewriter(
-            new WithheldAttributePolicy(
-                new RuleBasedAccessControl(AclRules::fromEmpty()),
-                SchemaResource::Core->load(),
-            ),
-        ));
+        $policy = new WithheldAttributePolicy(
+            new RuleBasedAccessControl(AclRules::fromEmpty()),
+            SchemaResource::Core->load(),
+        );
+        $this->subject = new WithheldAttributeMiddleware(
+            new WithheldFilterRewriter($policy),
+            new WithheldSortKeyFilter($policy),
+        );
     }
 
     public function test_a_search_on_a_withheld_attribute_succeeds_with_no_entries(): void
@@ -184,11 +190,73 @@ final class WithheldAttributeMiddlewareTest extends TestCase
         );
     }
 
+    public function test_a_sort_key_on_a_withheld_attribute_is_dropped(): void
+    {
+        $sort = new SortingControl(
+            SortKey::ascending('userPassword'),
+            SortKey::ascending('cn'),
+        );
+        $this->next
+            ->method('handle')
+            ->willReturn(ResponseStream::of([], OperationOutcomeResult::succeeded()));
+
+        $this->subject->process(
+            $this->contextWith(
+                Operations::search(Filters::present('cn'))->base('dc=foo,dc=bar'),
+                $sort,
+            ),
+            $this->next,
+        );
+
+        $kept = $sort->getSortKeys();
+        self::assertCount(
+            1,
+            $kept,
+        );
+        self::assertSame(
+            'cn',
+            $kept[0]->getAttribute(),
+        );
+    }
+
+    public function test_a_sort_of_only_withheld_keys_is_left_empty_and_still_passed_on(): void
+    {
+        $sort = new SortingControl(SortKey::ascending('userPassword'));
+        $this->next
+            ->expects(self::once())
+            ->method('handle')
+            ->willReturn(ResponseStream::of([], OperationOutcomeResult::succeeded()));
+
+        $this->subject->process(
+            $this->contextWith(
+                Operations::search(Filters::present('cn'))->base('dc=foo,dc=bar'),
+                $sort,
+            ),
+            $this->next,
+        );
+
+        self::assertSame(
+            [],
+            $sort->getSortKeys(),
+        );
+    }
+
     private function context(RequestInterface $request): ServerRequestContext
     {
         return (new ServerRequestContext(new LdapMessageRequest(
             1,
             $request,
+        )))->withToken($this->token);
+    }
+
+    private function contextWith(
+        RequestInterface $request,
+        Control ...$controls,
+    ): ServerRequestContext {
+        return (new ServerRequestContext(new LdapMessageRequest(
+            1,
+            $request,
+            ...$controls,
         )))->withToken($this->token);
     }
 }

@@ -861,6 +861,57 @@ trait ControlTestsTrait
         );
     }
 
+    public function testASortKeyOnAWithheldAttributeDoesNotOrderByItsHiddenValue(): void
+    {
+        $this->authenticateAdmin();
+        // Distinct passwords, created in an order unrelated to how their hashes sort.
+        $passwords = ['sort-leak-1' => 'mango', 'sort-leak-2' => 'apple', 'sort-leak-3' => 'cherry'];
+        foreach ($passwords as $cn => $password) {
+            $this->ldapClient()->create(Entry::fromArray("cn={$cn},ou=people,dc=foo,dc=bar", [
+                'objectClass' => ['inetOrgPerson'],
+                'cn' => [$cn],
+                'sn' => ['SortLeakProbe'],
+                'userPassword' => ['{SHA}' . base64_encode(sha1($password, true))],
+            ]));
+        }
+
+        $this->authenticateUser();
+        $order = function (bool $descending): array {
+            $entries = $this->ldapClient()->search(
+                Operations::search(Filters::equal('sn', 'SortLeakProbe'), 'cn', 'userPassword')
+                    ->base('ou=people,dc=foo,dc=bar')
+                    ->useSubtreeScope(),
+                new SortingControl(new SortKey('userPassword', $descending)),
+            );
+            $cns = [];
+            $visible = 0;
+            foreach ($entries as $entry) {
+                $cns[] = $entry->get('cn')?->firstValue();
+                $visible += $entry->get('userPassword') === null ? 0 : 1;
+            }
+
+            return ['cns' => $cns, 'visible' => $visible];
+        };
+
+        $ascending = $order(false);
+        $descending = $order(true);
+
+        $this->authenticateAdmin();
+        foreach (array_keys($passwords) as $cn) {
+            $this->ldapClient()->delete("cn={$cn},ou=people,dc=foo,dc=bar");
+        }
+
+        // The withheld key has no effect, so reversing it cannot reorder the result.
+        self::assertSame(
+            $ascending['cns'],
+            $descending['cns'],
+        );
+        self::assertSame(
+            0,
+            $ascending['visible'],
+        );
+    }
+
     public function testSortControlAscendingOrdersResults(): void
     {
         $this->authenticateUser();

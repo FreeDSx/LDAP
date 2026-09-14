@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\WithheldFilterRewriter;
+use FreeDSx\Ldap\Server\AccessControl\WithheldSortKeyFilter;
 use FreeDSx\Ldap\Server\Middleware\AliasDereferenceMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AttributeTypeCanonicalizationMiddleware;
@@ -167,12 +168,15 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
 
     private function makeWithheldAttributeMiddleware(Container $container): WithheldAttributeMiddleware
     {
-        return new WithheldAttributeMiddleware(new WithheldFilterRewriter(
-            new WithheldAttributePolicy(
-                $container->get(AccessControlInterface::class),
-                $container->get(ServerOptions::class)->getSchema(),
-            ),
-        ));
+        $policy = new WithheldAttributePolicy(
+            $container->get(AccessControlInterface::class),
+            $container->get(ServerOptions::class)->getSchema(),
+        );
+
+        return new WithheldAttributeMiddleware(
+            new WithheldFilterRewriter($policy),
+            new WithheldSortKeyFilter($policy),
+        );
     }
 
     private function makeAssertionMiddleware(Container $container): AssertionMiddleware
