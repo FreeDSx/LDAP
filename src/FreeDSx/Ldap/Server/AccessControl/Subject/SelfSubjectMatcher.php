@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\AccessControl\Subject;
 
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
@@ -24,15 +23,15 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 final class SelfSubjectMatcher implements TargetDependentSubjectInterface
 {
+    use MatchesBoundIdentity;
+
     public function matches(
         TokenInterface $token,
         ?Dn $targetDn,
     ): bool {
-        // Without a target there is nothing to be the same as, so this can never be a self match.
-        if ($targetDn === null || !$token instanceof AuthenticatedTokenInterface) {
-            return false;
-        }
-
-        return $token->getResolvedDn()->normalize()->toString() === $targetDn->normalize()->toString();
+        return $this->isBoundIdentity(
+            $token,
+            $targetDn,
+        );
     }
 }
