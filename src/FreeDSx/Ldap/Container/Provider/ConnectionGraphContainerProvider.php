@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\WithheldFilterRewriter;
 use FreeDSx\Ldap\Server\AccessControl\WithheldSortKeyFilter;
+use FreeDSx\Ldap\Server\AccessControl\WithheldValueModifyGuard;
 use FreeDSx\Ldap\Server\Middleware\AliasDereferenceMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\AttributeTypeCanonicalizationMiddleware;
@@ -176,6 +177,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
         return new WithheldAttributeMiddleware(
             new WithheldFilterRewriter($policy),
             new WithheldSortKeyFilter($policy),
+            new WithheldValueModifyGuard($policy),
         );
     }
 

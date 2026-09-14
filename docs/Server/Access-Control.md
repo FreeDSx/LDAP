@@ -449,7 +449,8 @@ A denied assertion is folded away before the query runs, so the attribute behave
 ```
 
 This is what stops a value being recovered a guess at a time. Reads are unaffected: denying the filter does not strip
-the value, and denying the read does not stop the filter. Pair the two to get both.
+the value, and denying the read does not stop the filter. Pair the two to get both. A value-level modify on a
+filter-denied attribute is gated the same way; see [Value-Level Modify](#value-level-modify).
 
 An extensible match that names no attribute type is refused with `inappropriateMatching`, since it asserts against
 every attribute at once and it's not possible to make attribute level ACL decisions against it.
@@ -502,9 +503,23 @@ Four things to keep in mind:
 - A grant is required in addition to read access. A permissive `AttributeRule` cannot re-expose a confidential
   attribute.
 - Administrators are locked out too until granted. Only the break-glass manager bypasses this.
-- Writes are unaffected, which is what keeps `userPassword` settable by its owner while unreadable.
+- Setting the value is unaffected. A whole-attribute replace overwrites unconditionally, so an owner can still set
+  `userPassword` while unable to read it.
 - A custom schema must carry the extension. Supplying your own `userPassword` definition through
   a schema source without it silently drops the protection.
+
+### Value-Level Modify
+
+A modify that names a specific value, an `add` or a `delete` of one value, is answered from the entry's current values:
+adding a value already present, or deleting one that is absent, fails with its own result code. That lets an identity
+that may write but not read an attribute confirm a value one guess at a time. Deleting the whole attribute is the same,
+revealing whether any value is present at all.
+
+So on an attribute withheld from filters, whether by `X-CONFIDENTIAL` or a [Filter Rule](#filter-rules), a value-level
+`add` or `delete` of another entry is refused with `insufficientAccessRights`. Use a whole-attribute replace, which
+overwrites unconditionally and reveals nothing about the prior value; a replace with no values still removes the
+attribute. The identity's own entry is exempt, so a self password change that supplies the old value (delete the old,
+add the new) still works.
 
 Replication is not affected. A content sync ships every visible entry whole, so a replica receives confidential
 attributes without a grant for them. See [Replication](Replication.md#access-control).

@@ -13,11 +13,15 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
+use FreeDSx\Ldap\Entry\Change;
+use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 
 /**
- * Behavior enforced by the shipped default ACL, across the search and paging paths.
+ * Behavior enforced by the shipped default ACL, across the search, paging and write paths.
  */
 trait DefaultAclTestsTrait
 {
@@ -140,6 +144,79 @@ trait DefaultAclTestsTrait
         self::assertSame(
             0,
             $found,
+        );
+    }
+
+    public function testAValueLevelModifyOfAWithheldAttributeOnAnotherEntryIsRefused(): void
+    {
+        $this->authenticateAdmin();
+        // The admin may write userPassword but not read it, so a value assertion must not confirm a value.
+        $dn = 'cn=vp-target,ou=people,dc=foo,dc=bar';
+        $stored = '{SHA}' . base64_encode(sha1('known', true));
+        $this->ldapClient()->create(Entry::fromArray($dn, [
+            'objectClass' => ['inetOrgPerson'],
+            'cn' => ['vp-target'],
+            'sn' => ['ValueProbe'],
+            'userPassword' => [$stored],
+        ]));
+
+        $addExisting = null;
+        $deleteMissing = null;
+        try {
+            try {
+                $this->ldapClient()->send(Operations::modify(
+                    $dn,
+                    Change::add('userPassword', $stored),
+                ));
+            } catch (OperationException $e) {
+                $addExisting = $e->getCode();
+            }
+            try {
+                $this->ldapClient()->send(Operations::modify(
+                    $dn,
+                    Change::delete('userPassword', '{SHA}bogusvaluenotpresent='),
+                ));
+            } catch (OperationException $e) {
+                $deleteMissing = $e->getCode();
+            }
+            // A whole-attribute replace asserts nothing about the hidden value, so it must still succeed.
+            $this->ldapClient()->send(Operations::modify(
+                $dn,
+                Change::replace('userPassword', '{SHA}' . base64_encode(sha1('reset', true))),
+            ));
+        } finally {
+            $this->ldapClient()->delete($dn);
+        }
+
+        self::assertSame(
+            ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+            $addExisting,
+        );
+        self::assertSame(
+            ResultCode::INSUFFICIENT_ACCESS_RIGHTS,
+            $deleteMissing,
+        );
+    }
+
+    public function testSelfMayMakeAValueLevelModifyOfItsOwnWithheldAttribute(): void
+    {
+        // cn=user can write but not read its own userPassword; a value assertion on its own entry is allowed
+        // through to the ordinary value check rather than refused, so a self password change by delete-old works.
+        $this->authenticateUser();
+
+        $code = null;
+        try {
+            $this->ldapClient()->send(Operations::modify(
+                'cn=user,dc=foo,dc=bar',
+                Change::delete('userPassword', '{SHA}notthestoredvalue='),
+            ));
+        } catch (OperationException $e) {
+            $code = $e->getCode();
+        }
+
+        self::assertSame(
+            ResultCode::NO_SUCH_ATTRIBUTE,
+            $code,
         );
     }
 }

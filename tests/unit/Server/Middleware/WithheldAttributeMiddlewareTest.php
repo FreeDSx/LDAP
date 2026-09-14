@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\WithheldFilterRewriter;
 use FreeDSx\Ldap\Server\AccessControl\WithheldSortKeyFilter;
+use FreeDSx\Ldap\Server\AccessControl\WithheldValueModifyGuard;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Middleware\WithheldAttributeMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
@@ -57,6 +58,7 @@ final class WithheldAttributeMiddlewareTest extends TestCase
         $this->subject = new WithheldAttributeMiddleware(
             new WithheldFilterRewriter($policy),
             new WithheldSortKeyFilter($policy),
+            new WithheldValueModifyGuard($policy),
         );
     }
 
