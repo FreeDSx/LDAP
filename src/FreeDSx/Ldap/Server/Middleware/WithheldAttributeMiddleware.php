@@ -13,11 +13,14 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Middleware;
 
+use FreeDSx\Ldap\Control\Control;
+use FreeDSx\Ldap\Control\Sorting\SortingControl;
 use FreeDSx\Ldap\Operation\Request\CompareRequest;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Protocol\Factory\ResponseFactory;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Server\AccessControl\WithheldFilterRewriter;
+use FreeDSx\Ldap\Server\AccessControl\WithheldSortKeyFilter;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareHandlerInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\MiddlewareInterface;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
@@ -25,7 +28,7 @@ use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
 use FreeDSx\Ldap\Server\Operation\OperationOutcomeResult;
 
 /**
- * Withholds attributes from assertions before the request reaches storage.
+ * Withholds attributes from search and compare assertions, and from sort keys, before the request reaches storage.
  *
  * @internal
  *
@@ -35,6 +38,7 @@ final readonly class WithheldAttributeMiddleware implements MiddlewareInterface
 {
     public function __construct(
         private WithheldFilterRewriter $rewriter,
+        private WithheldSortKeyFilter $sortKeys,
         private ResponseFactory $responseFactory = new ResponseFactory(),
     ) {}
 
@@ -60,9 +64,18 @@ final readonly class WithheldAttributeMiddleware implements MiddlewareInterface
         MiddlewareHandlerInterface $next,
         SearchRequest $request,
     ): ResponseStream {
+        $token = $context->tokenOrFail();
+
+        $sort = $context->message->controls()->get(Control::OID_SORTING);
+        if ($sort instanceof SortingControl) {
+            $this->sortKeys->stripWithheld(
+                $sort,
+                $token,
+            );
+        }
         $rewritten = $this->rewriter->rewrite(
             $request->getFilter(),
-            $context->tokenOrFail(),
+            $token,
         );
 
         if ($this->rewriter->isAbsoluteFalse($rewritten)) {
