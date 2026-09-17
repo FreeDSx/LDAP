@@ -14,14 +14,14 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
+use FreeDSx\Ldap\Schema\Matching\CanonicalIndexKeyInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 
 /**
  * DN equality comparator (distinguishedNameMatch): normalizes both sides before comparing.
  */
-final class DistinguishedNameComparator implements MatchingRuleComparatorInterface, IndexableComparatorInterface
+final class DistinguishedNameComparator implements MatchingRuleComparatorInterface, CanonicalIndexKeyInterface
 {
     public function equals(
         string $a,

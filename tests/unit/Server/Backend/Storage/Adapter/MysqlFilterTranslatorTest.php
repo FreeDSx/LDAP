@@ -61,6 +61,50 @@ final class MysqlFilterTranslatorTest extends TestCase
         );
     }
 
+    public function test_equality_on_a_dn_valued_attribute_is_exact(): void
+    {
+        $result = $this->subject->translate(new EqualityFilter(
+            'member',
+            'cn=Alice,dc=example,dc=com',
+        ));
+
+        self::assertNotNull($result);
+        self::assertTrue($result->isExact);
+    }
+
+    public function test_equality_on_an_octet_string_attribute_is_inexact(): void
+    {
+        $result = $this->subject->translate(new EqualityFilter(
+            'userPassword',
+            'secret',
+        ));
+
+        self::assertNotNull($result);
+        self::assertFalse($result->isExact);
+    }
+
+    public function test_equality_on_a_generalized_time_attribute_is_inexact(): void
+    {
+        $result = $this->subject->translate(new EqualityFilter(
+            'createTimestamp',
+            '20260916000000Z',
+        ));
+
+        self::assertNotNull($result);
+        self::assertFalse($result->isExact);
+    }
+
+    public function test_equality_on_a_name_and_optional_uid_attribute_is_inexact(): void
+    {
+        $result = $this->subject->translate(new EqualityFilter(
+            'uniqueMember',
+            'cn=Alice,dc=example,dc=com',
+        ));
+
+        self::assertNotNull($result);
+        self::assertFalse($result->isExact);
+    }
+
     public function test_present_filter_returns_sidecar_presence_exists(): void
     {
         $result = $this->subject->translate(new PresentFilter('cn'));

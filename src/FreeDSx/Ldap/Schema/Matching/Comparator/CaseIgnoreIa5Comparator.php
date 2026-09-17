@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
-use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
+use FreeDSx\Ldap\Schema\Matching\CanonicalIndexKeyInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 
@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
  * Case-insensitive IA5 (ASCII) string comparator (caseIgnoreIA5Match / caseIgnoreIA5SubstringsMatch).
  * Behaviorally identical to CaseIgnoreComparator since IA5 is a subset of ASCII.
  */
-final readonly class CaseIgnoreIa5Comparator implements MatchingRuleComparatorInterface, IndexableComparatorInterface
+final readonly class CaseIgnoreIa5Comparator implements MatchingRuleComparatorInterface, CanonicalIndexKeyInterface
 {
     private CaseIgnoreComparator $inner;
 

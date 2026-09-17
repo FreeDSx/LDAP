@@ -317,7 +317,7 @@ trait SqlFilterTranslatorTrait
             $this->buildValueExists($attribute, $condition),
             [SqlFilterUtility::truncate($key)],
             isExact: $this->isExactEquality($key)
-                && $this->matchesCaseFolded($attribute)
+                && $this->indexForms->hasCanonicalEqualityKey($rawAttribute)
                 && !$this->attributeHasOption($rawAttribute),
             sidecarCondition: $this->sidecarCondition(
                 $attribute,
