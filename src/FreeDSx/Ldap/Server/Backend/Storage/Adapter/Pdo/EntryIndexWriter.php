@@ -27,6 +27,11 @@ use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
  */
 final readonly class EntryIndexWriter
 {
+    /**
+     * Rows per sidecar statement. Four placeholders each, inside the 999 bound SQLite builds before 3.32 compile in.
+     */
+    private const SIDECAR_ROWS_PER_STATEMENT = 200;
+
     public function __construct(
         private PdoEntryDialectInterface $dialect,
         private PdoStatementPool $statements,
@@ -50,27 +55,29 @@ final readonly class EntryIndexWriter
     }
 
     /**
-     * Touch only the index rows of attributes whose values differ from those of the currently stored entry.
+     * Touch only the index rows whose values differ from those of the currently stored entry.
      */
     public function update(
         int $entryId,
         Entry $entry,
         Entry $current,
     ): void {
-        $changed = $this->changedNames($entry, $current);
+        $next = $this->valuesByName($entry);
+        $previous = $this->valuesByName($current);
+        $changed = $this->changedNames($next, $previous);
+
         if ($changed === []) {
             return;
         }
 
-        $this->statements->execute(
-            $this->dialect->querySidecarDeleteNames(count($changed)),
-            [$entryId, ...$changed],
-        );
-        $this->insertRows(
-            $entryId,
-            $entry,
-            array_fill_keys($changed, true),
-        );
+        foreach ($changed as $name) {
+            $this->applyValueDelta(
+                $entryId,
+                $name,
+                $next[$name] ?? [],
+                $previous[$name] ?? [],
+            );
+        }
 
         // A substring index keys off its own attribute set, so it only needs redoing when one of those changed.
         if (!$this->indexCovers($changed)) {
@@ -81,17 +88,78 @@ final readonly class EntryIndexWriter
     }
 
     /**
+     * Writes one attribute's difference, so a single added value costs one row rather than a full rewrite.
+     *
+     * @param list<string> $next
+     * @param list<string> $previous
+     */
+    private function applyValueDelta(
+        int $entryId,
+        string $attrNameLower,
+        array $next,
+        array $previous,
+    ): void {
+        // Diffed on the stored row, not the raw value, so a difference the index key folds away cannot strand a row.
+        $wanted = $this->rowsByKey($attrNameLower, $next);
+        $held = $this->rowsByKey($attrNameLower, $previous);
+
+        $removed = array_keys(array_diff_key($held, $wanted));
+        $added = array_values(array_diff_key($wanted, $held));
+
+        foreach (array_chunk($removed, self::SIDECAR_ROWS_PER_STATEMENT) as $chunk) {
+            $this->statements->execute(
+                $this->dialect->querySidecarDeleteValues(count($chunk)),
+                [
+                    $entryId,
+                    $attrNameLower,
+                    ...$chunk,
+                ],
+            );
+        }
+
+        $this->insertRowsFor(
+            $entryId,
+            $attrNameLower,
+            $added,
+        );
+    }
+
+    /**
+     * One attribute's values in their stored form, keyed by the index key the sidecar row carries.
+     *
+     * @param list<string> $values
+     *
+     * @return array<string, array{string, string}> value_lower => [value_lower, value_original]
+     */
+    private function rowsByKey(
+        string $attrNameLower,
+        array $values,
+    ): array {
+        $rows = [];
+
+        foreach ($values as $value) {
+            $key = $this->valueLower($attrNameLower, $value);
+            $rows[$key] = [
+                $key,
+                $this->valueOriginal($attrNameLower, $value),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
      * Lowercased names whose value set differs between the two entries, in either direction.
+     *
+     * @param array<string, list<string>> $next
+     * @param array<string, list<string>> $previous
      *
      * @return list<string>
      */
     private function changedNames(
-        Entry $entry,
-        Entry $current,
+        array $next,
+        array $previous,
     ): array {
-        $next = $this->valuesByName($entry);
-        $previous = $this->valuesByName($current);
-
         $changed = [];
         foreach ($next as $name => $values) {
             if (($previous[$name] ?? null) !== $values) {
@@ -179,27 +247,58 @@ final readonly class EntryIndexWriter
         Entry $entry,
         ?array $only = null,
     ): void {
-        $rows = $this->buildRows($entryId, $entry, $only);
-        if ($rows === []) {
-            return;
+        $this->insert($this->buildRows($entryId, $entry, $only));
+    }
+
+    /**
+     * The rows for one attribute's added values, already reduced to their stored form by the delta.
+     *
+     * @param list<array{string, string}> $values [value_lower, value_original] pairs
+     */
+    private function insertRowsFor(
+        int $entryId,
+        string $attrNameLower,
+        array $values,
+    ): void {
+        $rows = [];
+
+        foreach ($values as [$valueLower, $valueOriginal]) {
+            $rows[] = [
+                $entryId,
+                $attrNameLower,
+                $valueLower,
+                $valueOriginal,
+            ];
         }
 
-        $placeholders = SqlFilterUtility::markers(
-            count($rows),
-            '(?, ?, ?, ?)',
-        );
-        $params = [];
-        foreach ($rows as $row) {
-            $params[] = $row[0];
-            $params[] = $row[1];
-            $params[] = $row[2];
-            $params[] = $row[3];
-        }
+        $this->insert($rows);
+    }
 
-        $this->statements->execute(
-            $this->dialect->querySidecarInsertPrefix() . $placeholders,
-            $params,
-        );
+    /**
+     * Chunked so the placeholder count stays inside the bound SQLite builds before 3.32 compile in.
+     *
+     * @param list<array{int, string, string, string}> $rows
+     */
+    private function insert(array $rows): void
+    {
+        foreach (array_chunk($rows, self::SIDECAR_ROWS_PER_STATEMENT) as $chunk) {
+            $placeholders = SqlFilterUtility::markers(
+                count($chunk),
+                '(?, ?, ?, ?)',
+            );
+            $params = [];
+            foreach ($chunk as $row) {
+                $params[] = $row[0];
+                $params[] = $row[1];
+                $params[] = $row[2];
+                $params[] = $row[3];
+            }
+
+            $this->statements->execute(
+                $this->dialect->querySidecarInsertPrefix() . $placeholders,
+                $params,
+            );
+        }
     }
 
     /**

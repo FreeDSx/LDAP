@@ -47,6 +47,11 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
      */
     private const UNCOVERED = "\x01";
 
+    /**
+     * Rows per insert. Three placeholders each, inside the 999 bound SQLite builds before 3.32 compile in.
+     */
+    private const ROWS_PER_STATEMENT = 300;
+
     private const DELETE_SQL = <<<SQL
         DELETE FROM entry_attribute_trigrams
         WHERE owner_entry_id = ?
@@ -121,13 +126,15 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
             return;
         }
 
-        $execute(
-            sprintf(
-                self::INSERT_SQL,
-                $this->placeholders(count($rows)),
-            ),
-            $this->flatten($rows),
-        );
+        foreach (array_chunk($rows, self::ROWS_PER_STATEMENT) as $chunk) {
+            $execute(
+                sprintf(
+                    self::INSERT_SQL,
+                    $this->placeholders(count($chunk)),
+                ),
+                $this->flatten($chunk),
+            );
+        }
     }
 
     public function buildSubstringPredicate(
