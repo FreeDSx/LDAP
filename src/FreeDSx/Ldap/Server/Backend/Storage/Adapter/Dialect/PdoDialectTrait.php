@@ -252,13 +252,15 @@ trait PdoDialectTrait
 
     public function querySidecarDeleteValues(int $count): string
     {
-        $markers = SqlFilterUtility::markers($count);
+        $markers = SqlFilterUtility::markers(
+            $count,
+            '(?, ?)',
+        );
 
         return <<<SQL
             DELETE FROM entry_attribute_values
             WHERE owner_entry_id = ?
-              AND attr_name_lower = ?
-              AND value_lower IN ($markers)
+              AND (attr_name_lower, value_lower) IN ($markers)
         SQL;
     }
 
