@@ -339,7 +339,7 @@ final class PdoStorageTest extends TestCase
 
         self::assertCount(
             1,
-            $pdo->preparedMatching('AND value_lower IN'),
+            $pdo->preparedMatching('(attr_name_lower, value_lower) IN'),
         );
         self::assertCount(
             0,

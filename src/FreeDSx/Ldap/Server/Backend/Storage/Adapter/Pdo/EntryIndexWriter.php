@@ -69,15 +69,32 @@ final readonly class EntryIndexWriter
         if ($changed === []) {
             return;
         }
+        $removed = [];
+        $added = [];
 
+        // Gathered across every changed attribute first: a statement per attribute takes index locks in an
+        // order that differs between writers, which concurrent writers deadlock on.
         foreach ($changed as $name) {
-            $this->applyValueDelta(
-                $entryId,
-                $name,
-                $next[$name] ?? [],
-                $previous[$name] ?? [],
-            );
+            // Diffed on the stored row, not the raw value, so a difference the index key folds away cannot strand a row.
+            $wanted = $this->rowsByKey($name, $next[$name] ?? []);
+            $held = $this->rowsByKey($name, $previous[$name] ?? []);
+
+            foreach (array_keys(array_diff_key($held, $wanted)) as $valueLower) {
+                $removed[] = [$name, $valueLower];
+            }
+
+            foreach (array_diff_key($wanted, $held) as [$valueLower, $valueOriginal]) {
+                $added[] = [
+                    $entryId,
+                    $name,
+                    $valueLower,
+                    $valueOriginal,
+                ];
+            }
         }
+
+        $this->deleteValues($entryId, $removed);
+        $this->insert($added);
 
         // A substring index keys off its own attribute set, so it only needs redoing when one of those changed.
         if (!$this->indexCovers($changed)) {
@@ -88,40 +105,27 @@ final readonly class EntryIndexWriter
     }
 
     /**
-     * Writes one attribute's difference, so a single added value costs one row rather than a full rewrite.
+     * Removes the named rows in one statement per chunk, in the order every writer builds them.
      *
-     * @param list<string> $next
-     * @param list<string> $previous
+     * @param list<array{string, string}> $values [attr_name_lower, value_lower] pairs
      */
-    private function applyValueDelta(
+    private function deleteValues(
         int $entryId,
-        string $attrNameLower,
-        array $next,
-        array $previous,
+        array $values,
     ): void {
-        // Diffed on the stored row, not the raw value, so a difference the index key folds away cannot strand a row.
-        $wanted = $this->rowsByKey($attrNameLower, $next);
-        $held = $this->rowsByKey($attrNameLower, $previous);
+        foreach (array_chunk($values, self::SIDECAR_ROWS_PER_STATEMENT) as $chunk) {
+            $params = [$entryId];
 
-        $removed = array_keys(array_diff_key($held, $wanted));
-        $added = array_values(array_diff_key($wanted, $held));
+            foreach ($chunk as [$attrNameLower, $valueLower]) {
+                $params[] = $attrNameLower;
+                $params[] = $valueLower;
+            }
 
-        foreach (array_chunk($removed, self::SIDECAR_ROWS_PER_STATEMENT) as $chunk) {
             $this->statements->execute(
                 $this->dialect->querySidecarDeleteValues(count($chunk)),
-                [
-                    $entryId,
-                    $attrNameLower,
-                    ...$chunk,
-                ],
+                $params,
             );
         }
-
-        $this->insertRowsFor(
-            $entryId,
-            $attrNameLower,
-            $added,
-        );
     }
 
     /**
@@ -172,6 +176,9 @@ final readonly class EntryIndexWriter
                 $changed[] = $name;
             }
         }
+
+        // Sorted, so concurrent writers take the sidecar's index locks in one order.
+        sort($changed);
 
         return $changed;
     }
@@ -248,30 +255,6 @@ final readonly class EntryIndexWriter
         ?array $only = null,
     ): void {
         $this->insert($this->buildRows($entryId, $entry, $only));
-    }
-
-    /**
-     * The rows for one attribute's added values, already reduced to their stored form by the delta.
-     *
-     * @param list<array{string, string}> $values [value_lower, value_original] pairs
-     */
-    private function insertRowsFor(
-        int $entryId,
-        string $attrNameLower,
-        array $values,
-    ): void {
-        $rows = [];
-
-        foreach ($values as [$valueLower, $valueOriginal]) {
-            $rows[] = [
-                $entryId,
-                $attrNameLower,
-                $valueLower,
-                $valueOriginal,
-            ];
-        }
-
-        $this->insert($rows);
     }
 
     /**

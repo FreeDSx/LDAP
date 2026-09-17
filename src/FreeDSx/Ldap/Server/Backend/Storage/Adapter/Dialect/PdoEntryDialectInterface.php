@@ -180,7 +180,7 @@ interface PdoEntryDialectInterface
     public function querySidecarDelete(): string;
 
     /**
-     * The same restricted to $count values of one attribute. Parameters: [owner_entry_id, attr_name_lower, value_lower, ...]
+     * The same restricted to $count named values. Parameters: [owner_entry_id, then attr_name_lower, value_lower per pair]
      */
     public function querySidecarDeleteValues(int $count): string;
 
