@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
-use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
+use FreeDSx\Ldap\Schema\Matching\CanonicalIndexKeyInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\StringPrep;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 /**
  * String comparator that applies an RFC 4518 preparation profile, then matches byte-exact.
  */
-final readonly class PreparedStringComparator implements MatchingRuleComparatorInterface, IndexableComparatorInterface
+final readonly class PreparedStringComparator implements MatchingRuleComparatorInterface, CanonicalIndexKeyInterface
 {
     private OctetStringComparator $matcher;
 

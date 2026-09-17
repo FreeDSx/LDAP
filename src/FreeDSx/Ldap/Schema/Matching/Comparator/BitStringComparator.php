@@ -13,14 +13,14 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Matching\Comparator;
 
-use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
+use FreeDSx\Ldap\Schema\Matching\CanonicalIndexKeyInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\SubstringAssertion;
 
 /**
  * Bit string comparator matching the bits within the 'nnnn'B form (RFC 4517 section 4.2.1).
  */
-final class BitStringComparator implements MatchingRuleComparatorInterface, IndexableComparatorInterface
+final class BitStringComparator implements MatchingRuleComparatorInterface, CanonicalIndexKeyInterface
 {
     public function equals(
         string $a,

@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Schema;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
+use FreeDSx\Ldap\Schema\Matching\CanonicalIndexKeyInterface;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
 use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
@@ -58,6 +59,14 @@ readonly class AttributeIndexForms
         return $comparator instanceof IndexableComparatorInterface
             ? $comparator->indexKey($value)
             : null;
+    }
+
+    /**
+     * Whether values sharing a stored key are equal under the rule, letting a store settle equality on its own.
+     */
+    public function hasCanonicalEqualityKey(string $attribute): bool
+    {
+        return $this->equality->for($attribute) instanceof CanonicalIndexKeyInterface;
     }
 
     /**
