@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
-use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
+use FreeDSx\Ldap\Schema\Matching\EquivalentValues;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
@@ -106,7 +106,11 @@ final class SchemaValidator
         if (!$isSystem) {
             $this->checkNoUserModificationInChanges($command->changes);
         }
-        $this->checkNoEquivalentValues($result);
+        // Only what the change touched, since the rest was already checked when it was written.
+        $this->checkNoEquivalentValues(
+            $result,
+            self::namesChangedBy($command->changes),
+        );
         $this->checkStructuralClassUnchanged($result);
         $this->validateStructure($result);
     }
@@ -267,11 +271,18 @@ final class SchemaValidator
     /**
      * RFC 4511 §4.1.7: no two of an attribute's values may be equivalent.
      *
+     * @param ?array<string, true> $only Lowercased attribute names to check, or null for every attribute.
      * @throws OperationException
      */
-    private function checkNoEquivalentValues(Entry $entry): void
-    {
+    private function checkNoEquivalentValues(
+        Entry $entry,
+        ?array $only = null,
+    ): void {
         foreach ($entry->getAttributes() as $attr) {
+            if ($only !== null && !isset($only[Attribute::normalizeName($attr->getDescription())])) {
+                continue;
+            }
+
             if (!$this->hasEquivalentValues($attr)) {
                 continue;
             }
@@ -284,39 +295,31 @@ final class SchemaValidator
     }
 
     /**
-     * Equivalence is the type's equality rule rather than a normalized key, so each value is put to the ones before it.
+     * The attribute types a change list touches, normalized the way every other type lookup normalizes.
+     *
+     * @param Change[] $changes
+     * @return array<string, true>
      */
-    private function hasEquivalentValues(Attribute $attr): bool
+    private static function namesChangedBy(array $changes): array
     {
-        $comparator = $this->equalityResolver->for($attr->getName());
-        $seen = [];
+        $names = [];
 
-        foreach ($attr->getValues() as $value) {
-            if ($this->equalsAny($comparator, $seen, $value)) {
-                return true;
-            }
-
-            $seen[] = $value;
+        foreach ($changes as $change) {
+            $names[Attribute::normalizeName($change->getAttribute()->getDescription())] = true;
         }
 
-        return false;
+        return $names;
     }
 
     /**
-     * @param list<string> $values
+     * Grouped by the rule's index key, so equality is only asked of values that could answer it.
      */
-    private function equalsAny(
-        MatchingRuleComparatorInterface $comparator,
-        array $values,
-        string $candidate,
-    ): bool {
-        foreach ($values as $value) {
-            if ($comparator->equals($value, $candidate)) {
-                return true;
-            }
-        }
-
-        return false;
+    private function hasEquivalentValues(Attribute $attr): bool
+    {
+        return EquivalentValues::firstDuplicate(
+            $this->equalityResolver->for($attr->getName()),
+            $attr->getValues(),
+        ) !== null;
     }
 
     /**

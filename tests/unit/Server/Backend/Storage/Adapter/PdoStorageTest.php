@@ -240,6 +240,192 @@ final class PdoStorageTest extends TestCase
         self::assertFalse($this->storage->exists(new Dn('cn=b1200,dc=example,dc=com')));
     }
 
+    public function test_an_attribute_wider_than_one_statement_writes_every_index_row(): void
+    {
+        $pdo = new RecordingPdo('sqlite::memory:');
+        PdoStorage::initialize(
+            $pdo,
+            new SqliteDialect(),
+        );
+        $storage = $this->storageOver($pdo);
+        $values = [];
+        foreach (range(1, 1000) as $i) {
+            $values[] = "wide value {$i}";
+        }
+
+        $storage->store(new Entry(
+            new Dn('cn=wide,dc=example,dc=com'),
+            new Attribute('cn', 'wide'),
+            new Attribute('description', ...$values),
+        ));
+
+        self::assertSame(
+            200,
+            $this->widestSidecarInsert($pdo),
+        );
+        self::assertCount(
+            1,
+            iterator_to_array($storage->list(new StorageListOptions(
+                baseDn: new Dn('dc=example,dc=com'),
+                subtree: true,
+                filter: Filters::equal('description', 'wide value 999'),
+            ))->entries()),
+        );
+    }
+
+    public function test_adding_one_value_writes_one_index_row_rather_than_the_whole_attribute(): void
+    {
+        $pdo = new RecordingPdo('sqlite::memory:');
+        PdoStorage::initialize(
+            $pdo,
+            new SqliteDialect(),
+        );
+        $storage = $this->storageOver($pdo);
+        $dn = new Dn('cn=growing,dc=example,dc=com');
+        $values = [];
+        foreach (range(1, 300) as $i) {
+            $values[] = "growing value {$i}";
+        }
+        $storage->store(new Entry(
+            $dn,
+            new Attribute('cn', 'growing'),
+            new Attribute('description', ...$values),
+        ));
+        $pdo->prepared = [];
+
+        $values[] = 'growing value 301';
+        $storage->store(new Entry(
+            $dn,
+            new Attribute('cn', 'growing'),
+            new Attribute('description', ...$values),
+        ));
+
+        self::assertSame(
+            1,
+            $this->widestSidecarInsert($pdo),
+        );
+        self::assertCount(
+            0,
+            $pdo->preparedMatching('DELETE FROM entry_attribute_values'),
+        );
+    }
+
+    public function test_removing_one_value_deletes_one_index_row_and_inserts_nothing(): void
+    {
+        $pdo = new RecordingPdo('sqlite::memory:');
+        PdoStorage::initialize(
+            $pdo,
+            new SqliteDialect(),
+        );
+        $storage = $this->storageOver($pdo);
+        $dn = new Dn('cn=shrinking,dc=example,dc=com');
+        $values = [];
+        foreach (range(1, 300) as $i) {
+            $values[] = "shrinking value {$i}";
+        }
+        $storage->store(new Entry(
+            $dn,
+            new Attribute('cn', 'shrinking'),
+            new Attribute('description', ...$values),
+        ));
+        $pdo->prepared = [];
+
+        array_pop($values);
+        $storage->store(new Entry(
+            $dn,
+            new Attribute('cn', 'shrinking'),
+            new Attribute('description', ...$values),
+        ));
+
+        self::assertCount(
+            1,
+            $pdo->preparedMatching('AND value_lower IN'),
+        );
+        self::assertCount(
+            0,
+            $pdo->preparedMatching('INSERT INTO entry_attribute_values'),
+        );
+    }
+
+    public function test_a_modify_of_another_attribute_leaves_a_wide_attributes_index_untouched(): void
+    {
+        $pdo = new RecordingPdo('sqlite::memory:');
+        PdoStorage::initialize(
+            $pdo,
+            new SqliteDialect(),
+        );
+        $storage = $this->storageOver($pdo);
+        $dn = new Dn('cn=stable,dc=example,dc=com');
+        $values = [];
+        foreach (range(1, 300) as $i) {
+            $values[] = "stable value {$i}";
+        }
+        $storage->store(new Entry(
+            $dn,
+            new Attribute('cn', 'stable'),
+            new Attribute('title', 'before'),
+            new Attribute('description', ...$values),
+        ));
+        $pdo->prepared = [];
+
+        $storage->store(new Entry(
+            $dn,
+            new Attribute('cn', 'stable'),
+            new Attribute('title', 'after'),
+            new Attribute('description', ...$values),
+        ));
+
+        self::assertSame(
+            1,
+            $this->widestSidecarInsert($pdo),
+        );
+        self::assertCount(
+            1,
+            iterator_to_array($storage->list(new StorageListOptions(
+                baseDn: new Dn('dc=example,dc=com'),
+                subtree: true,
+                filter: Filters::equal('description', 'stable value 300'),
+            ))->entries()),
+        );
+    }
+
+    public function test_a_swapped_value_leaves_the_index_matching_the_survivors_and_the_new_value(): void
+    {
+        $dn = new Dn('cn=swapped,dc=example,dc=com');
+        $this->storage->store(new Entry(
+            $dn,
+            new Attribute('cn', 'swapped'),
+            new Attribute('description', 'kept value', 'old value'),
+        ));
+
+        $this->storage->store(new Entry(
+            $dn,
+            new Attribute('cn', 'swapped'),
+            new Attribute('description', 'kept value', 'new value'),
+        ));
+
+        foreach (['kept value', 'new value'] as $value) {
+            self::assertCount(
+                1,
+                iterator_to_array($this->storage->list(new StorageListOptions(
+                    baseDn: new Dn('dc=example,dc=com'),
+                    subtree: true,
+                    filter: Filters::equal('description', $value),
+                ))->entries()),
+                $value,
+            );
+        }
+
+        self::assertCount(
+            0,
+            iterator_to_array($this->storage->list(new StorageListOptions(
+                baseDn: new Dn('dc=example,dc=com'),
+                subtree: true,
+                filter: Filters::equal('description', 'old value'),
+            ))->entries()),
+        );
+    }
+
     public function test_a_modified_value_stops_matching_its_old_value_and_starts_matching_the_new(): void
     {
         $dn = new Dn('cn=drift,dc=example,dc=com');
@@ -1702,6 +1888,23 @@ final class PdoStorageTest extends TestCase
         ksort($found);
 
         return $found;
+    }
+
+    /**
+     * Tuples in the largest sidecar insert prepared so far, or zero when none was, which bounds the placeholder count.
+     */
+    private function widestSidecarInsert(RecordingPdo $pdo): int
+    {
+        $widest = 0;
+
+        foreach ($pdo->preparedMatching('INSERT INTO entry_attribute_values') as $sql) {
+            $widest = max(
+                $widest,
+                substr_count($sql, '(?, ?, ?, ?)'),
+            );
+        }
+
+        return $widest;
     }
 
     /**

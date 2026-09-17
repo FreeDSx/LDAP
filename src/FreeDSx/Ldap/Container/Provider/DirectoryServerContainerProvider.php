@@ -479,6 +479,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         return new SchemaValidator(
             $options->getSchema(),
             $options->getSchemaValidationMode(),
+            equalityResolver: $container->get(EqualityComparatorResolver::class),
         );
     }
 

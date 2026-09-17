@@ -21,15 +21,21 @@ use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
+use FreeDSx\Ldap\Schema\Definition\MatchingRule;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
+use FreeDSx\Ldap\Schema\Matching\Comparator\CaseIgnoreComparator;
+use FreeDSx\Ldap\Schema\Matching\IndexableComparatorInterface;
+use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Rule\InvocationOrder;
 use PHPUnit\Framework\TestCase;
 
 final class SchemaValidatorTest extends TestCase
@@ -301,6 +307,72 @@ final class SchemaValidatorTest extends TestCase
 
         $this->expectNotToPerformAssertions();
         $this->subject->validateAdd($entry);
+    }
+
+    public function test_add_asks_no_equality_of_values_that_cannot_match(): void
+    {
+        $values = [];
+        foreach (range(1, 200) as $i) {
+            $values[] = "value {$i}";
+        }
+
+        $this->widgetValidator(self::never())->validateAdd(new Entry(
+            new Dn('cn=counted,dc=example,dc=com'),
+            new Attribute('objectClass', 'widget'),
+            new Attribute('widgetLabel', ...$values),
+        ));
+    }
+
+    public function test_add_asks_equality_only_of_values_sharing_an_index_key(): void
+    {
+        $values = [];
+        foreach (range(1, 199) as $i) {
+            $values[] = "value {$i}";
+        }
+        $values[] = 'VALUE 199';
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::ATTRIBUTE_OR_VALUE_EXISTS);
+
+        $this->widgetValidator(self::once())->validateAdd(new Entry(
+            new Dn('cn=counted,dc=example,dc=com'),
+            new Attribute('objectClass', 'widget'),
+            new Attribute('widgetLabel', ...$values),
+        ));
+    }
+
+    public function test_modify_rejects_a_duplicate_the_change_introduces(): void
+    {
+        $command = new UpdateCommand(
+            new Dn('cn=counted,dc=example,dc=com'),
+            [Change::add(new Attribute('widgetLabel', 'SAME'))],
+        );
+        $result = new Entry(
+            new Dn('cn=counted,dc=example,dc=com'),
+            new Attribute('objectClass', 'widget'),
+            new Attribute('widgetLabel', 'same', 'SAME'),
+        );
+
+        self::expectException(OperationException::class);
+        self::expectExceptionCode(ResultCode::ATTRIBUTE_OR_VALUE_EXISTS);
+
+        $this->widgetValidator(self::once())->validateModify($command, $result);
+    }
+
+    public function test_modify_leaves_an_attribute_the_change_does_not_touch_unchecked(): void
+    {
+        $command = new UpdateCommand(
+            new Dn('cn=counted,dc=example,dc=com'),
+            [Change::replace(new Attribute('widgetNote', 'after'))],
+        );
+        $result = new Entry(
+            new Dn('cn=counted,dc=example,dc=com'),
+            new Attribute('objectClass', 'widget'),
+            new Attribute('widgetNote', 'after'),
+            new Attribute('widgetLabel', 'same', 'SAME'),
+        );
+
+        $this->widgetValidator(self::never())->validateModify($command, $result);
     }
 
     public function test_valid_modify_passes(): void
@@ -638,6 +710,71 @@ final class SchemaValidatorTest extends TestCase
                 ObjectClassType::StructuralClass,
                 must: ['objectClass'],
                 may: ['widgetCount', 'widgetOwner', 'widgetSeenAt', 'widgetActive'],
+            ));
+
+        return new SchemaValidator(
+            $schema,
+            SchemaValidationMode::Strict,
+        );
+    }
+
+    /**
+     * A caseIgnore rule expecting a given number of equality questions from the validator.
+     */
+    private function comparatorExpecting(
+        InvocationOrder $equalityCalls,
+    ): MatchingRuleComparatorInterface&IndexableComparatorInterface {
+        $inner = new CaseIgnoreComparator();
+
+        /** @var MatchingRuleComparatorInterface&IndexableComparatorInterface&MockObject $comparator */
+        $comparator = $this->createMockForIntersectionOfInterfaces([
+            MatchingRuleComparatorInterface::class,
+            IndexableComparatorInterface::class,
+        ]);
+        $comparator->expects($equalityCalls)
+            ->method('equals')
+            ->willReturnCallback($inner->equals(...));
+        $comparator->method('indexKey')
+            ->willReturnCallback($inner->indexKey(...));
+
+        return $comparator;
+    }
+
+    /**
+     * A schema whose widget attributes carry a rule the test can bound the equality cost of.
+     */
+    private function widgetValidator(InvocationOrder $equalityCalls): SchemaValidator
+    {
+        $schema = (new Schema())
+            ->addMatchingRule(new MatchingRule(
+                '1.900',
+                ['widgetMatch'],
+                SyntaxOid::OID_DIRECTORY_STRING,
+                $this->comparatorExpecting($equalityCalls),
+            ))
+            ->addAttributeType(new AttributeType(
+                '1.5',
+                ['objectClass'],
+                syntaxOid: SyntaxOid::OID_OID,
+            ))
+            ->addAttributeType(new AttributeType(
+                '1.20',
+                ['widgetLabel'],
+                equalityOid: '1.900',
+                syntaxOid: SyntaxOid::OID_DIRECTORY_STRING,
+            ))
+            ->addAttributeType(new AttributeType(
+                '1.21',
+                ['widgetNote'],
+                equalityOid: '1.900',
+                syntaxOid: SyntaxOid::OID_DIRECTORY_STRING,
+            ))
+            ->addObjectClass(new ObjectClass(
+                '2.20',
+                ['widget'],
+                ObjectClassType::StructuralClass,
+                must: ['objectClass'],
+                may: ['widgetLabel', 'widgetNote'],
             ));
 
         return new SchemaValidator(

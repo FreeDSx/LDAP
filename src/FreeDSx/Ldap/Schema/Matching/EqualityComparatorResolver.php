@@ -22,11 +22,16 @@ use FreeDSx\Ldap\Schema\Schema;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class EqualityComparatorResolver
+final class EqualityComparatorResolver
 {
+    /**
+     * @var array<string, MatchingRuleComparatorInterface> Memoized per type, since resolving walks the SUP chain.
+     */
+    private array $resolved = [];
+
     public function __construct(
-        private Schema $schema,
-        private MatchingRuleComparatorInterface $default = new CaseIgnoreComparator(),
+        private readonly Schema $schema,
+        private readonly MatchingRuleComparatorInterface $default = new CaseIgnoreComparator(),
     ) {}
 
     /**
@@ -34,8 +39,14 @@ final readonly class EqualityComparatorResolver
      */
     public function for(string $attributeName): MatchingRuleComparatorInterface
     {
-        // Options are not part of the type, so they are dropped before asking the schema about it.
-        $equalityOid = $this->schema->getEqualityRuleOid(Attribute::normalizeName($attributeName));
+        $type = Attribute::normalizeName($attributeName);
+
+        return $this->resolved[$type] ??= $this->resolve($type);
+    }
+
+    private function resolve(string $type): MatchingRuleComparatorInterface
+    {
+        $equalityOid = $this->schema->getEqualityRuleOid($type);
         $comparator = $equalityOid !== null
             ? $this->schema->getComparator($equalityOid)
             : null;

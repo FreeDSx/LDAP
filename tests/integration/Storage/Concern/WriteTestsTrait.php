@@ -1424,6 +1424,78 @@ trait WriteTestsTrait
         $this->ldapClient()->delete('cn=oversized,dc=foo,dc=bar');
     }
 
+    public function testAddStoresAnAttributeWiderThanOneIndexStatement(): void
+    {
+        $this->authenticateAdmin();
+        $values = [];
+        foreach (range(1, 300) as $i) {
+            $values[] = "wide value {$i}";
+        }
+
+        $this->ldapClient()->create(new Entry(
+            'cn=wideattr,dc=foo,dc=bar',
+            new Attribute('objectClass', 'top', 'inetOrgPerson'),
+            new Attribute('cn', 'wideattr'),
+            new Attribute('sn', 'Wide'),
+            new Attribute('description', ...$values),
+        ));
+
+        try {
+            self::assertCount(
+                300,
+                $this->ldapClient()->read('cn=wideattr,dc=foo,dc=bar')?->get('description')?->getValues() ?? [],
+            );
+            self::assertCount(
+                1,
+                $this->ldapClient()->search(
+                    Operations::search(Filters::equal('description', 'wide value 300'), 'cn')
+                        ->base('dc=foo,dc=bar')
+                        ->useSubtreeScope(),
+                )->toArray(),
+            );
+        } finally {
+            $this->ldapClient()->delete('cn=wideattr,dc=foo,dc=bar');
+        }
+    }
+
+    public function testModifyOfAWideAttributeKeepsEveryOtherValueSearchable(): void
+    {
+        $this->authenticateAdmin();
+        $values = [];
+        foreach (range(1, 300) as $i) {
+            $values[] = "growing value {$i}";
+        }
+
+        $this->ldapClient()->create(new Entry(
+            'cn=growingattr,dc=foo,dc=bar',
+            new Attribute('objectClass', 'top', 'inetOrgPerson'),
+            new Attribute('cn', 'growingattr'),
+            new Attribute('sn', 'Growing'),
+            new Attribute('description', ...$values),
+        ));
+
+        try {
+            $this->ldapClient()->send(Operations::modify(
+                'cn=growingattr,dc=foo,dc=bar',
+                Change::add(new Attribute('description', 'growing value 301')),
+            ));
+
+            foreach (['growing value 1', 'growing value 301'] as $value) {
+                self::assertCount(
+                    1,
+                    $this->ldapClient()->search(
+                        Operations::search(Filters::equal('description', $value), 'cn')
+                            ->base('dc=foo,dc=bar')
+                            ->useSubtreeScope(),
+                    )->toArray(),
+                    $value,
+                );
+            }
+        } finally {
+            $this->ldapClient()->delete('cn=growingattr,dc=foo,dc=bar');
+        }
+    }
+
     public function testAnAttributeTypeWithinTheStorageBoundIsStored(): void
     {
         $this->authenticateAdmin();
