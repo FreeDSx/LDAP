@@ -19,8 +19,8 @@ use IteratorAggregate;
 use Stringable;
 use Traversable;
 
+use function array_count_values;
 use function array_keys;
-use function array_search;
 use function array_shift;
 use function array_values;
 use function count;
@@ -156,22 +156,13 @@ class Attribute implements IteratorAggregate, Countable, Stringable
         array $values,
         bool $caseSensitive = true,
     ): self {
-        foreach ($values as $value) {
-            if ($caseSensitive) {
-                if (($i = array_search($value, $this->values, true)) !== false) {
-                    unset($this->values[$i]);
-                }
-
-                continue;
-            }
-
-            foreach ($this->values as $i => $existing) {
-                if (strcasecmp($existing, $value) === 0) {
-                    unset($this->values[$i]);
-                }
-            }
+        if ($values === []) {
+            return $this;
         }
-        $this->values = array_values($this->values);
+
+        $this->values = $caseSensitive
+            ? $this->withoutOneOfEach($values)
+            : $this->withoutAnyCaseOf($values);
 
         return $this;
     }
@@ -378,5 +369,55 @@ class Attribute implements IteratorAggregate, Countable, Stringable
         $this->options = new Options(...$options);
 
         return $this->options;
+    }
+
+    /**
+     * Drops one held value for each value listed, leaving any further occurrences in place.
+     *
+     * @param string[] $values
+     * @return list<string>
+     */
+    private function withoutOneOfEach(array $values): array
+    {
+        $remaining = array_count_values($values);
+        $kept = [];
+
+        foreach ($this->values as $value) {
+            if (($remaining[$value] ?? 0) > 0) {
+                $remaining[$value]--;
+
+                continue;
+            }
+
+            $kept[] = $value;
+        }
+
+        return $kept;
+    }
+
+    /**
+     * Drops every held value matching a listed value, ignoring ASCII case as strcasecmp does.
+     *
+     * @param string[] $values
+     * @return list<string>
+     */
+    private function withoutAnyCaseOf(array $values): array
+    {
+        $removed = [];
+
+        foreach ($values as $value) {
+            $removed[strtolower($value)] = true;
+        }
+        $kept = [];
+
+        foreach ($this->values as $value) {
+            if (isset($removed[strtolower($value)])) {
+                continue;
+            }
+
+            $kept[] = $value;
+        }
+
+        return $kept;
     }
 }

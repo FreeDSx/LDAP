@@ -160,6 +160,61 @@ class AttributeTest extends TestCase
         );
     }
 
+    public function test_removing_a_value_removes_one_occurrence_per_listed_value(): void
+    {
+        $subject = new Attribute(
+            'cn',
+            'foo',
+            'foo',
+            'bar',
+        );
+
+        $subject->removeValues(['foo']);
+
+        self::assertSame(
+            ['foo', 'bar'],
+            $subject->getValues(),
+        );
+    }
+
+    public function test_removing_values_case_insensitively_removes_every_match(): void
+    {
+        $subject = new Attribute(
+            'cn',
+            'FOO',
+            'foo',
+            'bar',
+        );
+
+        $subject->removeValues(
+            ['foo'],
+            false,
+        );
+
+        self::assertSame(
+            ['bar'],
+            $subject->getValues(),
+        );
+    }
+
+    public function test_removing_values_case_insensitively_leaves_high_byte_values_untouched(): void
+    {
+        $subject = new Attribute(
+            'cn',
+            "\xc3\x89cole",
+        );
+
+        $subject->removeValues(
+            ["\xc3\xa9cole"],
+            false,
+        );
+
+        self::assertSame(
+            ["\xc3\x89cole"],
+            $subject->getValues(),
+        );
+    }
+
     public function test_it_should_set_values(): void
     {
         $this->subject->set('foo');
