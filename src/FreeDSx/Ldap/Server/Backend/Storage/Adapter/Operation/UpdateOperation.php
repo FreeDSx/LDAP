@@ -20,7 +20,7 @@ use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
-use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
+use FreeDSx\Ldap\Schema\Matching\EquivalentValues;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 
 /**
@@ -76,10 +76,13 @@ final readonly class UpdateOperation
             $entry->add($attribute);
             return;
         }
-        $comparator = $this->equalityResolver->for($attribute->getName());
+        $held = EquivalentValues::of(
+            $this->equalityResolver->for($attribute->getName()),
+            $existing->getValues(),
+        );
 
         foreach ($attribute->getValues() as $value) {
-            if ($this->matchesAny($comparator, $existing->getValues(), $value)) {
+            if ($held->containsEquivalentOf($value)) {
                 throw new OperationException(
                     sprintf('Attribute "%s" already contains the given value.', $attribute->getName()),
                     ResultCode::ATTRIBUTE_OR_VALUE_EXISTS,
@@ -156,9 +159,13 @@ final readonly class UpdateOperation
             $attribute->getName(),
         );
         $comparator = $this->equalityResolver->for($attribute->getName());
+        $held = EquivalentValues::of($comparator, $existing->getValues());
+        $matched = [];
 
         foreach ($values as $value) {
-            if (!$this->matchesAny($comparator, $existing->getValues(), $value)) {
+            $matches = $held->matching($value);
+
+            if ($matches === []) {
                 throw new OperationException(
                     sprintf('The given value does not exist in attribute "%s".', $attribute->getName()),
                     ResultCode::NO_SUCH_ATTRIBUTE,
@@ -174,58 +181,17 @@ final readonly class UpdateOperation
                     ResultCode::NOT_ALLOWED_ON_RDN,
                 );
             }
+
+            // Keyed by position: two requested values naming one stored value remove it once.
+            $matched += $matches;
         }
 
-        $existing->removeValues($this->valuesMatching(
-            $comparator,
-            $existing->getValues(),
-            $values,
-        ));
+        $existing->removeValues(array_values($matched));
 
         // RFC 4511 §4.6: listing every value an attribute currently holds removes the attribute itself.
         if ($existing->getValues() === []) {
             $entry->reset($existing);
         }
-    }
-
-    /**
-     * The stored values a delete names, resolved by the type's equality rule rather than by their spelling.
-     *
-     * @param string[] $stored
-     * @param string[] $requested
-     * @return list<string>
-     */
-    private function valuesMatching(
-        MatchingRuleComparatorInterface $comparator,
-        array $stored,
-        array $requested,
-    ): array {
-        $matched = [];
-
-        foreach ($stored as $value) {
-            if ($this->matchesAny($comparator, $requested, $value)) {
-                $matched[] = $value;
-            }
-        }
-
-        return $matched;
-    }
-
-    /**
-     * @param string[] $values
-     */
-    private function matchesAny(
-        MatchingRuleComparatorInterface $comparator,
-        array $values,
-        string $candidate,
-    ): bool {
-        foreach ($values as $value) {
-            if ($comparator->equals($value, $candidate)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**
@@ -246,19 +212,44 @@ final readonly class UpdateOperation
         }
 
         $rdnValue = $this->getRdnValueForAttribute($entry, $attribute->getName());
-        $comparator = $this->equalityResolver->for($attribute->getName());
 
-        if ($rdnValue !== null && !$this->matchesAny($comparator, $values, $rdnValue)) {
-            throw new OperationException(
-                sprintf(
-                    'Replacing attribute "%s" must retain its RDN value.',
-                    $attribute->getName(),
-                ),
-                ResultCode::NOT_ALLOWED_ON_RDN,
+        if ($rdnValue !== null) {
+            $this->checkRetainsRdnValue(
+                $attribute,
+                $values,
+                $rdnValue,
             );
         }
 
         $entry->set($attribute);
+    }
+
+    /**
+     * @param string[] $values
+     *
+     * @throws OperationException
+     */
+    private function checkRetainsRdnValue(
+        Attribute $attribute,
+        array $values,
+        string $rdnValue,
+    ): void {
+        $replacement = EquivalentValues::of(
+            $this->equalityResolver->for($attribute->getName()),
+            $values,
+        );
+
+        if ($replacement->containsEquivalentOf($rdnValue)) {
+            return;
+        }
+
+        throw new OperationException(
+            sprintf(
+                'Replacing attribute "%s" must retain its RDN value.',
+                $attribute->getName(),
+            ),
+            ResultCode::NOT_ALLOWED_ON_RDN,
+        );
     }
 
     /**

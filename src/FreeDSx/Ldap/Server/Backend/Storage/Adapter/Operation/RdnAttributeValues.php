@@ -17,8 +17,8 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
+use FreeDSx\Ldap\Schema\Matching\EquivalentValues;
 
-use function array_filter;
 use function array_values;
 
 /**
@@ -94,14 +94,11 @@ readonly class RdnAttributeValues
         Attribute $attribute,
         string $value,
     ): array {
-        $comparator = $this->equalityResolver->for($attribute->getName());
-
-        return array_values(array_filter(
+        $held = EquivalentValues::of(
+            $this->equalityResolver->for($attribute->getName()),
             $attribute->getValues(),
-            static fn(string $stored): bool => $comparator->equals(
-                $stored,
-                $value,
-            ),
-        ));
+        );
+
+        return array_values($held->matching($value));
     }
 }
