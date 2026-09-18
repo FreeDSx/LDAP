@@ -89,7 +89,7 @@ trait PdoDialectTrait
     public function queryFetchEntry(): string
     {
         return <<<SQL
-            SELECT dn, attributes
+            SELECT entry_id, dn, attributes
             FROM entries
             WHERE lc_dn = ?
         SQL;
@@ -264,6 +264,28 @@ trait PdoDialectTrait
         SQL;
     }
 
+    public function queryLinksForEntry(): string
+    {
+        return <<<SQL
+            SELECT l.owner_entry_id, l.attr_name_lower, l.target_uid, e.dn
+            FROM entry_attribute_links l
+            JOIN entries e ON e.entry_id = l.target_entry_id
+            WHERE l.owner_entry_id = ?
+            ORDER BY l.attr_name_lower, l.target_entry_id
+        SQL;
+    }
+
+    public function queryLinksForRange(): string
+    {
+        return <<<SQL
+            SELECT l.owner_entry_id, l.attr_name_lower, l.target_uid, e.dn
+            FROM entry_attribute_links l
+            JOIN entries e ON e.entry_id = l.target_entry_id
+            WHERE l.owner_entry_id BETWEEN ? AND ?
+            ORDER BY l.owner_entry_id, l.attr_name_lower, l.target_entry_id
+        SQL;
+    }
+
     public function querySidecarInsertPrefix(): string
     {
         return 'INSERT INTO entry_attribute_values (owner_entry_id, attr_name_lower, value_lower, value_original) VALUES ';
@@ -298,8 +320,8 @@ trait PdoDialectTrait
         $projection = implode(",\n", $projections);
         $order = implode(', ', $orderTerms);
         $sql = <<<SQL
-            SELECT dn, attributes FROM (
-                SELECT __base.dn, __base.attributes,
+            SELECT entry_id, dn, attributes FROM (
+                SELECT __base.entry_id, __base.dn, __base.attributes,
                 {$projection}
                 FROM ({$baseSql}) __base
             ) __keyed

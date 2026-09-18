@@ -34,6 +34,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoJournalGeneration;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\SerializingReplicaPasswordStateStore;
@@ -64,6 +65,7 @@ final readonly class PdoStorageFactory
         private ReplicaId $origin,
         private SleeperInterface $sleeper,
         private ?ChangeJournalConfig $journalConfig,
+        private ?LinkedAttributes $linked = null,
     ) {}
 
     public function sharedProvider(): SharedPdoConnectionProvider
@@ -135,6 +137,11 @@ final readonly class PdoStorageFactory
                     $this->origin,
                 ),
                 $this->journalConfig,
+            ),
+            $this->linked === null ? null : new EntryLinks(
+                $this->dialect,
+                $statements,
+                $this->linked,
             ),
         );
     }

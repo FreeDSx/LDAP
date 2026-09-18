@@ -988,6 +988,204 @@ final class PdoStorageTest extends TestCase
         self::assertNull($this->storage->find(new Dn('cn=alice,dc=example,dc=com')));
     }
 
+    public function test_find_surfaces_a_linked_attribute_as_the_targets_current_dn(): void
+    {
+        $pdo = new PDO('sqlite::memory:');
+        PdoStorage::initialize(
+            $pdo,
+            new SqliteDialect(),
+        );
+        $storage = $this->storageOver($pdo);
+        $storage->store(new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('cn', 'Bob'),
+        ));
+        $storage->store(new Entry(
+            new Dn('cn=Admins,dc=example,dc=com'),
+            new Attribute('cn', 'Admins'),
+        ));
+        $this->linkTogether(
+            $pdo,
+            'cn=admins,dc=example,dc=com',
+            'cn=bob,dc=example,dc=com',
+        );
+
+        self::assertSame(
+            ['cn=Bob,dc=example,dc=com'],
+            $storage->find(new Dn('cn=admins,dc=example,dc=com'))
+                ?->get('member')
+                ?->getValues(),
+        );
+    }
+
+    public function test_a_linked_value_follows_the_target_through_a_rename(): void
+    {
+        $pdo = new PDO('sqlite::memory:');
+        PdoStorage::initialize(
+            $pdo,
+            new SqliteDialect(),
+        );
+        $storage = $this->storageOver($pdo);
+        $storage->store(new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('cn', 'Bob'),
+        ));
+        $storage->store(new Entry(
+            new Dn('cn=Admins,dc=example,dc=com'),
+            new Attribute('cn', 'Admins'),
+        ));
+        $this->linkTogether(
+            $pdo,
+            'cn=admins,dc=example,dc=com',
+            'cn=bob,dc=example,dc=com',
+        );
+
+        $storage->renameSubtree(
+            new Dn('cn=bob,dc=example,dc=com'),
+            new Dn('cn=Robert,dc=example,dc=com'),
+        );
+
+        self::assertSame(
+            ['cn=Robert,dc=example,dc=com'],
+            $storage->find(new Dn('cn=admins,dc=example,dc=com'))
+                ?->get('member')
+                ?->getValues(),
+        );
+    }
+
+    public function test_deleting_the_target_removes_it_from_the_linked_attribute(): void
+    {
+        $pdo = new PDO('sqlite::memory:');
+        PdoStorage::initialize(
+            $pdo,
+            new SqliteDialect(),
+        );
+        $storage = $this->storageOver($pdo);
+        $storage->store(new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('cn', 'Bob'),
+        ));
+        $storage->store(new Entry(
+            new Dn('cn=Admins,dc=example,dc=com'),
+            new Attribute('cn', 'Admins'),
+        ));
+        $this->linkTogether(
+            $pdo,
+            'cn=admins,dc=example,dc=com',
+            'cn=bob,dc=example,dc=com',
+        );
+
+        $storage->remove(new Dn('cn=bob,dc=example,dc=com'));
+
+        self::assertNull(
+            $storage->find(new Dn('cn=admins,dc=example,dc=com'))
+                ?->get('member'),
+        );
+    }
+
+    public function test_a_listed_entry_carries_its_linked_values(): void
+    {
+        $pdo = new PDO('sqlite::memory:');
+        PdoStorage::initialize(
+            $pdo,
+            new SqliteDialect(),
+        );
+        $storage = $this->storageOver($pdo);
+        $storage->store(new Entry(
+            new Dn('dc=example,dc=com'),
+            new Attribute('dc', 'example'),
+        ));
+        $storage->store(new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('cn', 'Bob'),
+        ));
+        $storage->store(new Entry(
+            new Dn('cn=Admins,dc=example,dc=com'),
+            new Attribute('cn', 'Admins'),
+        ));
+        $this->linkTogether(
+            $pdo,
+            'cn=admins,dc=example,dc=com',
+            'cn=bob,dc=example,dc=com',
+        );
+
+        $listed = $this->firstByDn(
+            $storage->list(new StorageListOptions(
+                baseDn: new Dn('dc=example,dc=com'),
+                subtree: true,
+                filter: Filters::present('cn'),
+            ))->entries(),
+            'cn=Admins,dc=example,dc=com',
+        );
+
+        self::assertSame(
+            ['cn=Bob,dc=example,dc=com'],
+            $listed?->get('member')?->getValues(),
+        );
+    }
+
+    public function test_a_read_materializing_nothing_asks_for_no_links(): void
+    {
+        $pdo = new RecordingPdo('sqlite::memory:');
+        PdoStorage::initialize(
+            $pdo,
+            new SqliteDialect(),
+        );
+        $storage = $this->storageOver($pdo);
+        $storage->store(new Entry(
+            new Dn('dc=example,dc=com'),
+            new Attribute('dc', 'example'),
+        ));
+        $storage->store(new Entry(
+            new Dn('cn=Admins,dc=example,dc=com'),
+            new Attribute('cn', 'Admins'),
+        ));
+        $pdo->prepared = [];
+
+        iterator_to_array($storage->list(new StorageListOptions(
+            baseDn: new Dn('dc=example,dc=com'),
+            subtree: true,
+            filter: Filters::present('cn'),
+            attributes: [],
+        ))->entries());
+
+        self::assertCount(
+            0,
+            $pdo->preparedMatching('entry_attribute_links'),
+        );
+    }
+
+    public function test_a_projection_naming_no_linked_type_asks_for_no_links(): void
+    {
+        $pdo = new RecordingPdo('sqlite::memory:');
+        PdoStorage::initialize(
+            $pdo,
+            new SqliteDialect(),
+        );
+        $storage = $this->storageOver($pdo);
+        $storage->store(new Entry(
+            new Dn('dc=example,dc=com'),
+            new Attribute('dc', 'example'),
+        ));
+        $storage->store(new Entry(
+            new Dn('cn=Admins,dc=example,dc=com'),
+            new Attribute('cn', 'Admins'),
+        ));
+        $pdo->prepared = [];
+
+        iterator_to_array($storage->list(new StorageListOptions(
+            baseDn: new Dn('dc=example,dc=com'),
+            subtree: true,
+            filter: Filters::present('cn'),
+            attributes: ['cn'],
+        ))->entries());
+
+        self::assertCount(
+            0,
+            $pdo->preparedMatching('entry_attribute_links'),
+        );
+    }
+
     public function test_list_single_level_returns_direct_children_only(): void
     {
         $grandchild = new Entry(new Dn('cn=Sub,cn=Alice,dc=example,dc=com'), new Attribute('cn', 'Sub'));
@@ -2026,6 +2224,26 @@ final class PdoStorageTest extends TestCase
     private function seed(Entry ...$entries): void
     {
         $this->importer->importEntries($entries);
+    }
+
+    /**
+     * Writes a member link straight into the table, since the write path does not divert values into it yet.
+     */
+    private function linkTogether(
+        PDO $pdo,
+        string $ownerLcDn,
+        string $targetLcDn,
+    ): void {
+        $pdo->prepare(
+            'INSERT INTO entry_attribute_links (owner_entry_id, attr_name_lower, target_entry_id, target_uid)
+             SELECT o.entry_id, ?, t.entry_id, \'\'
+             FROM entries o, entries t
+             WHERE o.lc_dn = ? AND t.lc_dn = ?',
+        )->execute([
+            'member',
+            $ownerLcDn,
+            $targetLcDn,
+        ]);
     }
 
     /**

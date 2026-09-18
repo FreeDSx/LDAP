@@ -88,7 +88,7 @@ interface PdoEntryDialectInterface
     public function queryExists(): string;
 
     /**
-     * `SELECT dn, attributes FROM entries WHERE lc_dn = ?`. Parameters: [lc_dn]
+     * `SELECT entry_id, dn, attributes FROM entries WHERE lc_dn = ?`. Parameters: [lc_dn]
      */
     public function queryFetchEntry(): string;
 
@@ -183,6 +183,16 @@ interface PdoEntryDialectInterface
      * The same restricted to $count named values. Parameters: [owner_entry_id, then attr_name_lower, value_lower per pair]
      */
     public function querySidecarDeleteValues(int $count): string;
+
+    /**
+     * One entry's links with their targets' current DNs. Parameters: [owner_entry_id]
+     */
+    public function queryLinksForEntry(): string;
+
+    /**
+     * The same over a contiguous span of owners, which is the shape a keyset page has. Parameters: [first, last]
+     */
+    public function queryLinksForRange(): string;
 
     /**
      * INSERT prefix for the sidecar; caller appends `(?, ?, ?, ?)` tuples for (owner_entry_id, attr_name_lower, value_lower, value_original).
