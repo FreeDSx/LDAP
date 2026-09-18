@@ -39,6 +39,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\StorageListOptionsFactory;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
@@ -59,6 +60,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
         return [
             AttributeContextInterface::class => $this->makeAttributeContext(...),
             AttributeIndexForms::class => $this->makeAttributeIndexForms(...),
+            LinkedAttributes::class => $this->makeLinkedAttributes(...),
             SortKeyComparator::class => $this->makeSortKeyComparator(...),
             StorageListOptionsFactory::class => $this->makeStorageListOptionsFactory(...),
             EntryStorageInterface::class => $this->makeStorage(...),
@@ -85,6 +87,14 @@ final class StorageContainerProvider implements ContainerProviderInterface
             $schema,
             new AttributeSyntaxResolver($schema),
         );
+    }
+
+    /**
+     * The types the schema declares as links, shared by hydration, the write path and the filter translators.
+     */
+    private function makeLinkedAttributes(Container $container): LinkedAttributes
+    {
+        return new LinkedAttributes($container->get(ServerOptions::class)->getSchema());
     }
 
     /**
@@ -178,6 +188,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
             $this->journalOrigin($container),
             $container->get(SleeperInterface::class),
             $this->journalConfig($container),
+            $container->get(LinkedAttributes::class),
         );
     }
 

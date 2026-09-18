@@ -35,6 +35,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\BatchedRows;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
@@ -44,7 +46,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInt
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedEntry;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
@@ -99,6 +100,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
      * @param ?PdoStatementPool $statements Must draw from $provider; defaults to a pool of its own over that connection.
      * @param ?PdoTransactor $transactor Must draw from $provider; defaults to one of its own over that connection.
      * @param ?ChangeJournalInterface $journal Must share $transactor so an append joins the write it belongs to.
+     * @param ?EntryLinks $links Resolves linked values; without it no entry carries links and reads are unchanged.
      */
     public function __construct(
         private readonly PdoConnectionProviderInterface $provider,
@@ -109,6 +111,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         ?PdoStatementPool $statements = null,
         ?PdoTransactor $transactor = null,
         ?ChangeJournalInterface $journal = null,
+        private readonly ?EntryLinks $links = null,
     ) {
         if (!extension_loaded('mbstring')) {
             throw new RuntimeException(
@@ -174,9 +177,15 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         );
         $row = $stmt->fetch();
 
-        return $row !== false
-            ? $this->rowToEntry($row)
-            : null;
+        if ($row === false) {
+            return null;
+        }
+
+        return $this->rowToEntry(
+            $row,
+            null,
+            $this->linksForEntry($row),
+        );
     }
 
     public function exists(Dn $dn): bool
@@ -429,6 +438,24 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     }
 
     /**
+     * One entry's links, keyed by attribute name, or none when nothing is declared or the row carries no key.
+     *
+     * @return array<string, list<string>>
+     */
+    private function linksForEntry(mixed $row): array
+    {
+        if ($this->links === null || !$this->links->hydrates(null) || !is_array($row)) {
+            return [];
+        }
+
+        $entryId = $row['entry_id'] ?? null;
+
+        return is_int($entryId) || is_string($entryId)
+            ? $this->links->forEntry((int) $entryId)
+            : [];
+    }
+
+    /**
      * Runs a write, turning the driver failures the dialect recognises into the directory conditions they mean.
      *
      * @param Closure(): void $write
@@ -677,31 +704,26 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         ?int $yieldCap = null,
         ?int $deliveredBefore = null,
     ): Generator {
-        $stmt = $this->statements->execute(
-            $query->sql,
-            $query->params,
+        $rows = new BatchedRows(
+            $this->statements->execute(
+                $query->sql,
+                $query->params,
+            ),
+            $deadline,
+            $yieldCap,
         );
-        $rows = 0;
+
+        // Reading runs ahead of handing over, so the cursor comes from the row being yielded, not the one just read.
         $cursor = null;
-        $hasMore = false;
+        $delivered = 0;
 
-        while (($row = $stmt->fetch()) !== false) {
-            if ($deadline !== null && microtime(true) >= $deadline) {
-                throw new TimeLimitExceededException();
-            }
-
-            // Read but not handed over: its only job is to prove the result did not end here.
-            if ($yieldCap !== null && $rows >= $yieldCap) {
-                $hasMore = true;
-
-                break;
-            }
-
-            $rows++;
+        foreach ($this->pairedWithLinks($rows, $allowed) as [$row, $links]) {
+            $delivered++;
             $cursor = $this->cursorForRow($row) ?? $cursor;
             $entry = $this->rowToEntry(
                 $row,
                 $allowed,
+                $links,
             );
 
             if ($entry !== null) {
@@ -709,16 +731,38 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
                     $entry,
                     $deliveredBefore === null
                         ? $cursor
-                        : PageCursor::afterSorted($deliveredBefore + $rows),
+                        : PageCursor::afterSorted($deliveredBefore + $delivered),
                 );
             }
         }
 
         return new FetchedBatch(
-            $rows,
+            $rows->read(),
             $cursor,
-            $hasMore,
+            $rows->hasMore(),
         );
+    }
+
+    /**
+     * Each row with the links it carries, or with none when this read does not pay for them.
+     *
+     * @param iterable<int, mixed> $rows
+     * @param array<string, true>|null $allowed
+     * @return Generator<int, array{mixed, array<string, list<string>>}>
+     */
+    private function pairedWithLinks(
+        iterable $rows,
+        ?array $allowed,
+    ): Generator {
+        if ($this->links !== null && $this->links->hydrates($allowed)) {
+            yield from $this->links->hydrating($rows);
+
+            return;
+        }
+
+        foreach ($rows as $row) {
+            yield [$row, []];
+        }
     }
 
     /**
@@ -836,10 +880,12 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     /**
      * @param array<string, true>|null $allowed Base names to materialize, or null for all.
+     * @param array<string, list<string>> $links Already fetched link values, keyed by lowercased attribute name.
      */
     private function rowToEntry(
         mixed $row,
         ?array $allowed = null,
+        array $links = [],
     ): ?Entry {
         if (!is_array($row)) {
             return null;
@@ -875,6 +921,17 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
         foreach ($raw as $name => $values) {
             if ($allowed !== null && !isset($allowed[Attribute::normalizeName($name)])) {
+                continue;
+            }
+
+            $attributes[] = Attribute::fromArray(
+                $name,
+                $values,
+            );
+        }
+
+        foreach ($links as $name => $values) {
+            if ($allowed !== null && !isset($allowed[$name])) {
                 continue;
             }
 
