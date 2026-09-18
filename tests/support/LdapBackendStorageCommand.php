@@ -485,6 +485,7 @@ final class LdapBackendStorageCommand extends Command
         $cleanup->exec('DROP TABLE IF EXISTS ldap_replica_pwpolicy_state');
         $cleanup->exec('DROP TABLE IF EXISTS entry_attribute_trigrams');
         $cleanup->exec('DROP TABLE IF EXISTS entry_attribute_values');
+        $cleanup->exec('DROP TABLE IF EXISTS entry_attribute_links');
         $cleanup->exec('DROP TABLE IF EXISTS entries');
         $cleanup->exec('DROP TABLE IF EXISTS ldap_change_journal');
         $cleanup->exec('DROP TABLE IF EXISTS ldap_change_journal_seq');

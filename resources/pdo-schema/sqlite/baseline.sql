@@ -22,6 +22,22 @@ CREATE INDEX IF NOT EXISTS idx_eav_attr_value ON entry_attribute_values (attr_na
 -- Covering (owner_entry_id leads): entry-scoped lookups plus index-only sort MIN() and correlated EXISTS.
 CREATE INDEX IF NOT EXISTS idx_eav_entry ON entry_attribute_values (owner_entry_id, attr_name_lower, value_lower);
 
+-- Values of a linked attribute: a reference to the target entry.
+CREATE TABLE IF NOT EXISTS entry_attribute_links (
+    owner_entry_id   INTEGER NOT NULL,
+    attr_name_lower  TEXT NOT NULL,
+    target_entry_id  INTEGER NOT NULL,
+    target_uid       TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (owner_entry_id)  REFERENCES entries(entry_id) ON DELETE CASCADE,
+    FOREIGN KEY (target_entry_id) REFERENCES entries(entry_id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_link ON entry_attribute_links (owner_entry_id, attr_name_lower, target_entry_id, target_uid);
+
+CREATE INDEX IF NOT EXISTS idx_link_owner ON entry_attribute_links (owner_entry_id, attr_name_lower, target_entry_id);
+
+CREATE INDEX IF NOT EXISTS idx_link_target ON entry_attribute_links (target_entry_id, attr_name_lower);
+
 CREATE TABLE IF NOT EXISTS ldap_change_journal (
     seq          INTEGER NOT NULL PRIMARY KEY,
     origin       TEXT NOT NULL,
