@@ -26,6 +26,11 @@ final readonly class AttributeType
     public const EXTENSION_CONFIDENTIAL = 'X-CONFIDENTIAL';
 
     /**
+     * Marks values as references to entries, stored as links to their IDs.
+     */
+    public const EXTENSION_LINKED = 'X-LINKED';
+
+    /**
      * The value an extension carries when it is set; extension values are qdstrings, not booleans.
      */
     public const EXTENSION_ENABLED_VALUE = 'TRUE';
@@ -59,6 +64,18 @@ final readonly class AttributeType
         return in_array(
             self::EXTENSION_ENABLED_VALUE,
             $this->extensions[self::EXTENSION_CONFIDENTIAL] ?? [],
+            true,
+        );
+    }
+
+    /**
+     * Whether values name entries, which the backend stores as links and resolves to their current DNs.
+     */
+    public function isLinked(): bool
+    {
+        return in_array(
+            self::EXTENSION_ENABLED_VALUE,
+            $this->extensions[self::EXTENSION_LINKED] ?? [],
             true,
         );
     }

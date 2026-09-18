@@ -22,6 +22,21 @@ CREATE TABLE IF NOT EXISTS entry_attribute_values (
         REFERENCES entries(entry_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
+-- Values of a linked attribute: a reference to the target entry.
+CREATE TABLE IF NOT EXISTS entry_attribute_links (
+    owner_entry_id   BIGINT NOT NULL,
+    attr_name_lower  VARCHAR(512) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    target_entry_id  BIGINT NOT NULL,
+    target_uid       VARCHAR(255) NOT NULL DEFAULT '',
+    UNIQUE KEY uq_link (owner_entry_id, attr_name_lower, target_entry_id, target_uid),
+    INDEX idx_link_owner (owner_entry_id, attr_name_lower, target_entry_id),
+    INDEX idx_link_target (target_entry_id, attr_name_lower),
+    CONSTRAINT fk_link_owner FOREIGN KEY (owner_entry_id)
+        REFERENCES entries(entry_id) ON DELETE CASCADE,
+    CONSTRAINT fk_link_target FOREIGN KEY (target_entry_id)
+        REFERENCES entries(entry_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
 CREATE TABLE IF NOT EXISTS ldap_change_journal (
     seq          BIGINT NOT NULL,
     origin       VARCHAR(255) NOT NULL,

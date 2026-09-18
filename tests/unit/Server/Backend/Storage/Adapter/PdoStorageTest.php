@@ -576,6 +576,7 @@ final class PdoStorageTest extends TestCase
         self::assertSame(
             [
                 'entries',
+                'entry_attribute_links',
                 'entry_attribute_values',
                 'ldap_change_journal',
                 'ldap_change_journal_seq',
