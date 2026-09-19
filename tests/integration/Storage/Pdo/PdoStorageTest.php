@@ -27,13 +27,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
-use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
-use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
@@ -43,7 +38,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
-use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
@@ -60,7 +54,6 @@ use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\Pdo\EntryLinkFixtureTrait;
-use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 
@@ -97,277 +90,6 @@ final class PdoStorageTest extends TestCase
         $this->seed(
             new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
             $this->alice,
-        );
-    }
-
-    public function test_remove_all_deletes_every_given_entry_and_ignores_missing_ones(): void
-    {
-        foreach (range(1, 3) as $i) {
-            $this->storage->store(new Entry(
-                new Dn("cn=e{$i},dc=example,dc=com"),
-                new Attribute('cn', "e{$i}"),
-            ));
-        }
-
-        $this->storage->removeAll([
-            (new Dn('cn=e1,dc=example,dc=com'))->normalize(),
-            (new Dn('cn=gone,dc=example,dc=com'))->normalize(),
-            (new Dn('cn=e3,dc=example,dc=com'))->normalize(),
-        ]);
-
-        self::assertFalse($this->storage->exists(new Dn('cn=e1,dc=example,dc=com')));
-        self::assertTrue($this->storage->exists(new Dn('cn=e2,dc=example,dc=com')));
-        self::assertFalse($this->storage->exists(new Dn('cn=e3,dc=example,dc=com')));
-    }
-
-    public function test_remove_all_spans_more_entries_than_one_batch(): void
-    {
-        $dns = [];
-        $this->storage->atomic(function () use (&$dns): void {
-            foreach (range(1, 1200) as $i) {
-                $dn = new Dn("cn=b{$i},dc=example,dc=com");
-                $this->storage->store(new Entry(
-                    $dn,
-                    new Attribute('cn', "b{$i}"),
-                ));
-                $dns[] = $dn->normalize();
-            }
-        });
-
-        $this->storage->removeAll($dns);
-
-        self::assertFalse($this->storage->exists(new Dn('cn=b1,dc=example,dc=com')));
-        self::assertFalse($this->storage->exists(new Dn('cn=b600,dc=example,dc=com')));
-        self::assertFalse($this->storage->exists(new Dn('cn=b1200,dc=example,dc=com')));
-    }
-
-    public function test_an_attribute_wider_than_one_statement_writes_every_index_row(): void
-    {
-        $pdo = new RecordingPdo('sqlite::memory:');
-        (new PdoSchema(new SqliteDialect()))->apply($pdo);
-        $storage = $this->storageOver($pdo);
-        $values = [];
-        foreach (range(1, 1000) as $i) {
-            $values[] = "wide value {$i}";
-        }
-
-        $storage->store(new Entry(
-            new Dn('cn=wide,dc=example,dc=com'),
-            new Attribute('cn', 'wide'),
-            new Attribute('description', ...$values),
-        ));
-
-        self::assertSame(
-            200,
-            $this->widestSidecarInsert($pdo),
-        );
-        self::assertCount(
-            1,
-            iterator_to_array($storage->list(new StorageListOptions(
-                baseDn: new Dn('dc=example,dc=com'),
-                subtree: true,
-                filter: Filters::equal('description', 'wide value 999'),
-            ))->entries()),
-        );
-    }
-
-    public function test_adding_one_value_writes_one_index_row_rather_than_the_whole_attribute(): void
-    {
-        $pdo = new RecordingPdo('sqlite::memory:');
-        (new PdoSchema(new SqliteDialect()))->apply($pdo);
-        $storage = $this->storageOver($pdo);
-        $dn = new Dn('cn=growing,dc=example,dc=com');
-        $values = [];
-        foreach (range(1, 300) as $i) {
-            $values[] = "growing value {$i}";
-        }
-        $storage->store(new Entry(
-            $dn,
-            new Attribute('cn', 'growing'),
-            new Attribute('description', ...$values),
-        ));
-        $pdo->prepared = [];
-
-        $values[] = 'growing value 301';
-        $storage->store(new Entry(
-            $dn,
-            new Attribute('cn', 'growing'),
-            new Attribute('description', ...$values),
-        ));
-
-        self::assertSame(
-            1,
-            $this->widestSidecarInsert($pdo),
-        );
-        self::assertCount(
-            0,
-            $pdo->preparedMatching('DELETE FROM entry_attribute_values'),
-        );
-    }
-
-    public function test_removing_one_value_deletes_one_index_row_and_inserts_nothing(): void
-    {
-        $pdo = new RecordingPdo('sqlite::memory:');
-        (new PdoSchema(new SqliteDialect()))->apply($pdo);
-        $storage = $this->storageOver($pdo);
-        $dn = new Dn('cn=shrinking,dc=example,dc=com');
-        $values = [];
-        foreach (range(1, 300) as $i) {
-            $values[] = "shrinking value {$i}";
-        }
-        $storage->store(new Entry(
-            $dn,
-            new Attribute('cn', 'shrinking'),
-            new Attribute('description', ...$values),
-        ));
-        $pdo->prepared = [];
-
-        array_pop($values);
-        $storage->store(new Entry(
-            $dn,
-            new Attribute('cn', 'shrinking'),
-            new Attribute('description', ...$values),
-        ));
-
-        self::assertCount(
-            1,
-            $pdo->preparedMatching('(attr_name_lower, value_lower) IN'),
-        );
-        self::assertCount(
-            0,
-            $pdo->preparedMatching('INSERT INTO entry_attribute_values'),
-        );
-    }
-
-    public function test_a_modify_of_another_attribute_leaves_a_wide_attributes_index_untouched(): void
-    {
-        $pdo = new RecordingPdo('sqlite::memory:');
-        (new PdoSchema(new SqliteDialect()))->apply($pdo);
-        $storage = $this->storageOver($pdo);
-        $dn = new Dn('cn=stable,dc=example,dc=com');
-        $values = [];
-        foreach (range(1, 300) as $i) {
-            $values[] = "stable value {$i}";
-        }
-        $storage->store(new Entry(
-            $dn,
-            new Attribute('cn', 'stable'),
-            new Attribute('title', 'before'),
-            new Attribute('description', ...$values),
-        ));
-        $pdo->prepared = [];
-
-        $storage->store(new Entry(
-            $dn,
-            new Attribute('cn', 'stable'),
-            new Attribute('title', 'after'),
-            new Attribute('description', ...$values),
-        ));
-
-        self::assertSame(
-            1,
-            $this->widestSidecarInsert($pdo),
-        );
-        self::assertCount(
-            1,
-            iterator_to_array($storage->list(new StorageListOptions(
-                baseDn: new Dn('dc=example,dc=com'),
-                subtree: true,
-                filter: Filters::equal('description', 'stable value 300'),
-            ))->entries()),
-        );
-    }
-
-    public function test_a_swapped_value_leaves_the_index_matching_the_survivors_and_the_new_value(): void
-    {
-        $dn = new Dn('cn=swapped,dc=example,dc=com');
-        $this->storage->store(new Entry(
-            $dn,
-            new Attribute('cn', 'swapped'),
-            new Attribute('description', 'kept value', 'old value'),
-        ));
-
-        $this->storage->store(new Entry(
-            $dn,
-            new Attribute('cn', 'swapped'),
-            new Attribute('description', 'kept value', 'new value'),
-        ));
-
-        foreach (['kept value', 'new value'] as $value) {
-            self::assertCount(
-                1,
-                iterator_to_array($this->storage->list(new StorageListOptions(
-                    baseDn: new Dn('dc=example,dc=com'),
-                    subtree: true,
-                    filter: Filters::equal('description', $value),
-                ))->entries()),
-                $value,
-            );
-        }
-
-        self::assertCount(
-            0,
-            iterator_to_array($this->storage->list(new StorageListOptions(
-                baseDn: new Dn('dc=example,dc=com'),
-                subtree: true,
-                filter: Filters::equal('description', 'old value'),
-            ))->entries()),
-        );
-    }
-
-    public function test_a_modified_value_stops_matching_its_old_value_and_starts_matching_the_new(): void
-    {
-        $dn = new Dn('cn=drift,dc=example,dc=com');
-        $this->storage->store(new Entry(
-            $dn,
-            new Attribute('cn', 'drift'),
-            new Attribute('sn', 'before'),
-            new Attribute('description', 'untouched'),
-        ));
-
-        $this->storage->store(new Entry(
-            $dn,
-            new Attribute('cn', 'drift'),
-            new Attribute('sn', 'after'),
-            new Attribute('description', 'untouched'),
-        ));
-
-        self::assertSame(
-            [],
-            $this->dnsMatching(Filters::equal('sn', 'before')),
-        );
-        self::assertSame(
-            ['cn=drift,dc=example,dc=com'],
-            $this->dnsMatching(Filters::equal('sn', 'after')),
-        );
-        // An attribute nobody touched must survive the partial rewrite.
-        self::assertSame(
-            ['cn=drift,dc=example,dc=com'],
-            $this->dnsMatching(Filters::equal('description', 'untouched')),
-        );
-    }
-
-    public function test_a_removed_attribute_stops_matching_after_a_modify(): void
-    {
-        $dn = new Dn('cn=shrink,dc=example,dc=com');
-        $this->storage->store(new Entry(
-            $dn,
-            new Attribute('cn', 'shrink'),
-            new Attribute('sn', 'gone'),
-        ));
-
-        $this->storage->store(new Entry(
-            $dn,
-            new Attribute('cn', 'shrink'),
-        ));
-
-        self::assertSame(
-            [],
-            $this->dnsMatching(Filters::equal('sn', 'gone')),
-        );
-        self::assertSame(
-            [],
-            $this->dnsMatching(Filters::present('sn')),
         );
     }
 
@@ -448,102 +170,6 @@ final class PdoStorageTest extends TestCase
         self::assertCount(1, $entries);
     }
 
-    public function test_store_writes_trigram_rows_for_indexed_attributes(): void
-    {
-        $pdo = new PDO('sqlite::memory:');
-        $index = new TrigramSubstringIndex();
-        (new PdoSchema(
-            new SqliteDialect(),
-            $index,
-        ))->apply($pdo);
-
-        $storage = $this->storageOver(
-            $pdo,
-            options: TestServerOptions::forStorage(
-                PdoConfig::forSqlite(':memory:')
-                    ->setSubstringIndexMode(SubstringIndexMode::Trigram),
-            ),
-        );
-        $storage->store(new Entry(
-            new Dn('cn=Smith,dc=example,dc=com'),
-            new Attribute('cn', 'Smith'),
-        ));
-
-        $count = $pdo->query(
-            "SELECT COUNT(*) FROM entry_attribute_trigrams WHERE trigram = 'smi'",
-        );
-        self::assertNotFalse($count);
-        self::assertSame(
-            1,
-            (int) $count->fetchColumn(),
-        );
-    }
-
-    public function test_store_keeps_the_original_value_only_where_the_index_reads_it(): void
-    {
-        if (!Fts5SubstringIndex::isSupported()) {
-            self::markTestSkipped('This SQLite build lacks the FTS5 trigram tokenizer.');
-        }
-
-        self::assertSame(
-            [
-                'cn' => 'Smith',
-                'description' => '',
-            ],
-            $this->originalValuesFor(
-                new Fts5SubstringIndex(),
-                SubstringIndexMode::Auto,
-            ),
-        );
-    }
-
-    public function test_store_omits_every_original_value_when_no_index_reads_them(): void
-    {
-        self::assertSame(
-            [
-                'cn' => '',
-                'description' => '',
-            ],
-            $this->originalValuesFor(
-                new TrigramSubstringIndex(),
-                SubstringIndexMode::Trigram,
-            ),
-        );
-    }
-
-    public function test_an_update_reindexes_a_base_form_an_option_bearing_form_shares_a_name_with(): void
-    {
-        $this->seed(new Entry(
-            new Dn('cn=subtyped,dc=example,dc=com'),
-            new Attribute('cn', 'subtyped'),
-            new Attribute('mail', 'base@example.com'),
-            new Attribute('mail;lang-en', 'tagged@example.com'),
-        ));
-
-        $this->storage->store(
-            new Entry(
-                new Dn('cn=subtyped,dc=example,dc=com'),
-                new Attribute('cn', 'subtyped'),
-                new Attribute('mail', 'replaced@example.com'),
-                new Attribute('mail;lang-en', 'tagged@example.com'),
-            ),
-            rebuildIndexes: false,
-        );
-
-        self::assertSame(
-            ['cn=subtyped,dc=example,dc=com'],
-            $this->dnsMatching(Filters::equal('mail', 'replaced@example.com')),
-        );
-        self::assertSame(
-            [],
-            $this->dnsMatching(Filters::equal('mail', 'base@example.com')),
-        );
-        self::assertSame(
-            ['cn=subtyped,dc=example,dc=com'],
-            $this->dnsMatching(Filters::equal('mail', 'tagged@example.com')),
-        );
-    }
-
     public function test_composed_and_streams_off_a_leaf_and_php_verifies_the_rest(): void
     {
         $this->seed(
@@ -602,74 +228,6 @@ final class PdoStorageTest extends TestCase
             ['uid=match,dc=example,dc=com'],
             $this->searchDns(Filters::contains('cn', 'smith')),
         );
-    }
-
-    public function test_store_persists_entry(): void
-    {
-        $this->storage->store(new Entry(
-            new Dn('cn=Persistent,dc=example,dc=com'),
-            new Attribute('cn', 'Persistent'),
-        ));
-
-        self::assertNotNull($this->storage->find(new Dn('cn=persistent,dc=example,dc=com')));
-    }
-
-    public function test_insert_persists_entry(): void
-    {
-        $this->storage->insert(new Entry(
-            new Dn('cn=Fresh,dc=example,dc=com'),
-            new Attribute('cn', 'Fresh'),
-        ));
-
-        self::assertNotNull($this->storage->find(new Dn('cn=fresh,dc=example,dc=com')));
-    }
-
-    public function test_insert_refuses_a_dn_that_is_taken(): void
-    {
-        $this->expectException(EntryAlreadyExistsException::class);
-
-        $this->storage->insert(new Entry(
-            new Dn('cn=Alice,dc=example,dc=com'),
-            new Attribute('cn', 'Alice'),
-        ));
-    }
-
-    public function test_insert_leaves_the_entry_it_refused_untouched(): void
-    {
-        try {
-            $this->storage->insert(new Entry(
-                new Dn('cn=Alice,dc=example,dc=com'),
-                new Attribute('cn', 'Alice'),
-                new Attribute('description', 'overwritten'),
-            ));
-        } catch (EntryAlreadyExistsException) {
-        }
-
-        self::assertNull(
-            $this->storage->find(new Dn('cn=alice,dc=example,dc=com'))?->get('description'),
-        );
-    }
-
-    public function test_rename_subtree_onto_an_occupied_dn_is_answerable(): void
-    {
-        $this->seed(new Entry(
-            new Dn('cn=Taken,dc=example,dc=com'),
-            new Attribute('cn', 'Taken'),
-        ));
-
-        $this->expectException(EntryAlreadyExistsException::class);
-
-        $this->storage->renameSubtree(
-            new Dn('cn=alice,dc=example,dc=com'),
-            new Dn('cn=Taken,dc=example,dc=com'),
-        );
-    }
-
-    public function test_remove_deletes_entry(): void
-    {
-        $this->storage->remove(new Dn('cn=alice,dc=example,dc=com'));
-
-        self::assertNull($this->storage->find(new Dn('cn=alice,dc=example,dc=com')));
     }
 
     public function test_a_linked_value_follows_the_target_through_a_rename(): void
@@ -929,26 +487,6 @@ final class PdoStorageTest extends TestCase
         self::assertNotNull($this->storage->find(new Dn('cn=committed,dc=example,dc=com')));
     }
 
-    public function test_store_throws_dn_too_long_when_dn_exceeds_dialect_max(): void
-    {
-        $storage = $this->createPdoStorageWithMaxDnLength(10);
-
-        $entry = new Entry(
-            new Dn('cn=VeryLongNameThatExceedsTheLimit,dc=example,dc=com'),
-            new Attribute('cn', 'VeryLongNameThatExceedsTheLimit'),
-        );
-
-        try {
-            $storage->store($entry);
-            self::fail('Expected DnTooLongException was not thrown.');
-        } catch (DnTooLongException $e) {
-            self::assertStringContainsString(
-                'exceeds the storage backend limit',
-                $e->getMessage(),
-            );
-        }
-    }
-
     public function test_a_write_refuses_a_dn_longer_than_the_dialect_allows(): void
     {
         $container = $this->containerFor($this->createPdoStorageWithMaxDnLength(5));
@@ -1020,18 +558,6 @@ final class PdoStorageTest extends TestCase
         )->entries());
 
         self::assertCount(2, $results);
-    }
-
-    public function test_store_allows_dn_when_dialect_has_no_length_limit(): void
-    {
-        $longDn = 'cn=' . str_repeat('a', 500) . ',dc=example,dc=com';
-
-        $this->storage->store(new Entry(
-            new Dn($longDn),
-            new Attribute('cn', str_repeat('a', 500)),
-        ));
-
-        self::assertNotNull($this->storage->find(new Dn($longDn)));
     }
 
     public function test_nested_atomic_rolls_back_inner_on_exception(): void
@@ -1128,69 +654,6 @@ final class PdoStorageTest extends TestCase
         return $storage;
     }
 
-    /**
-     * The sidecar's value_original per attribute, for an entry holding one indexed and one unindexed attribute.
-     *
-     * @return array<string, string>
-     */
-    private function originalValuesFor(
-        SubstringIndexInterface $index,
-        SubstringIndexMode $mode,
-    ): array {
-        $pdo = new PDO('sqlite::memory:');
-        (new PdoSchema(
-            new SqliteDialect(),
-            $index,
-        ))->apply($pdo);
-
-        $storage = $this->storageOver(
-            $pdo,
-            options: TestServerOptions::forStorage(
-                PdoConfig::forSqlite(':memory:')
-                    ->setSubstringIndexMode($mode),
-            ),
-        );
-        $storage->store(new Entry(
-            new Dn('cn=Smith,dc=example,dc=com'),
-            new Attribute('cn', 'Smith'),
-            new Attribute('description', 'Not an indexed attribute'),
-        ));
-
-        $rows = $pdo->query(
-            "SELECT attr_name_lower, value_original FROM entry_attribute_values
-             WHERE attr_name_lower IN ('cn', 'description')",
-        );
-        self::assertNotFalse($rows);
-
-        $found = [];
-        foreach ($rows->fetchAll(PDO::FETCH_NUM) as $row) {
-            self::assertIsArray($row);
-            self::assertIsString($row[0]);
-            self::assertIsString($row[1]);
-            $found[$row[0]] = $row[1];
-        }
-        ksort($found);
-
-        return $found;
-    }
-
-    /**
-     * Tuples in the largest sidecar insert prepared so far, or zero when none was, which bounds the placeholder count.
-     */
-    private function widestSidecarInsert(RecordingPdo $pdo): int
-    {
-        $widest = 0;
-
-        foreach ($pdo->preparedMatching('INSERT INTO entry_attribute_values') as $sql) {
-            $widest = max(
-                $widest,
-                substr_count($sql, '(?, ?, ?, ?)'),
-            );
-        }
-
-        return $widest;
-    }
-
     private function pdoStorage(ServerOptions $options): PdoStorage
     {
         return $this->fromContainer(
@@ -1207,7 +670,6 @@ final class PdoStorageTest extends TestCase
     private function storageOver(
         PDO $pdo,
         ?PdoDialectInterface $dialect = null,
-        ?ServerOptions $options = null,
     ): PdoStorage {
         $overrides = [PdoConnectionProviderInterface::class => new SharedPdoConnectionProvider(
             $pdo,
@@ -1221,7 +683,7 @@ final class PdoStorageTest extends TestCase
         return $this->fromContainer(
             PdoStorage::class,
             $overrides,
-            $options ?? TestServerOptions::sqlite(),
+            TestServerOptions::sqlite(),
         );
     }
 

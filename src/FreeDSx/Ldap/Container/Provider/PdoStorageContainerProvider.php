@@ -26,7 +26,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnector;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\RoutingPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryIndexWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
@@ -89,6 +90,7 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
                 $container->get(PdoDialectInterface::class),
             ),
             EntryLister::class => $this->makeLister(...),
+            EntryWriter::class => $this->makeWriter(...),
             PdoChangeJournal::class => $this->makeChangeJournal(...),
             PdoStorage::class => $this->makeStorage(...),
             WriteSerializingStorage::class => $this->makeWriteSerializingStorage(...),
@@ -286,15 +288,31 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
         );
     }
 
+    /**
+     * @throws RuntimeException when the mbstring extension, which renames slice DNs with, is not loaded
+     */
+    private function makeWriter(Container $container): EntryWriter
+    {
+        if (!extension_loaded('mbstring')) {
+            throw new RuntimeException('The PDO storage backend requires the "mbstring" extension.');
+        }
+
+        return new EntryWriter(
+            $container->get(PdoConnection::class),
+            $container->get(PdoDialectInterface::class),
+            $container->get(EntryReader::class),
+            $container->get(EntryIndexWriter::class),
+            $container->get(EntryRowCodec::class),
+        );
+    }
+
     private function makeStorage(Container $container): PdoStorage
     {
         return new PdoStorage(
             $container->get(PdoConnection::class),
             $container->get(EntryReader::class),
             $container->get(EntryLister::class),
-            $container->get(PdoDialectInterface::class),
-            $container->get(EntryIndexWriter::class),
-            $container->get(EntryRowCodec::class),
+            $container->get(EntryWriter::class),
             $container->get(ServerOptions::class)->getChangeJournalConfig() === null
                 ? null
                 : $container->get(ChangeJournalInterface::class),
