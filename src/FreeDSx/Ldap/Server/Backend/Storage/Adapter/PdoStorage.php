@@ -23,9 +23,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingTrait;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
@@ -35,22 +32,14 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class PdoStorage implements EntryStorageInterface, ResettableInterface, ChangeJournalingInterface, RowLockableInterface
+final readonly class PdoStorage implements EntryStorageInterface, ResettableInterface, RowLockableInterface
 {
-    use ChangeJournalingTrait;
-
-    /**
-     * @param ?ChangeJournalInterface $journal Must share $connection so an append joins the write it belongs to.
-     */
     public function __construct(
-        private readonly PdoConnection $connection,
-        private readonly EntryReader $reader,
-        private readonly EntryLister $lister,
-        private readonly EntryWriter $writer,
-        ?ChangeJournalInterface $journal = null,
-    ) {
-        $this->journal = $journal;
-    }
+        private PdoConnection $connection,
+        private EntryReader $reader,
+        private EntryLister $lister,
+        private EntryWriter $writer,
+    ) {}
 
     public function reset(): void
     {

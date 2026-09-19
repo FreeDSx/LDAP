@@ -21,9 +21,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SubtreeRename;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingTrait;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use Throwable;
 
@@ -34,10 +31,9 @@ use Throwable;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingInterface
+final class InMemoryStorage implements EntryStorageInterface
 {
     use ArrayEntryStorageTrait;
-    use ChangeJournalingTrait;
 
     /**
      * @var array<string, Entry> keyed by normalised DN string
@@ -60,11 +56,9 @@ final class InMemoryStorage implements EntryStorageInterface, ChangeJournalingIn
      */
     public function __construct(
         array $entries = [],
-        ?ChangeJournalInterface $journal = null,
         SortKeyComparator $sortKeyComparator = new SortKeyComparator(),
     ) {
         $this->sortKeyComparator = $sortKeyComparator;
-        $this->journal = $journal;
 
         foreach ($entries as $entry) {
             $this->store($entry);

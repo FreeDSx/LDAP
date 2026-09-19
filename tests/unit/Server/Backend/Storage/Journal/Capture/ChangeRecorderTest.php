@@ -18,8 +18,6 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
@@ -35,18 +33,12 @@ final class ChangeRecorderTest extends TestCase
 
     private InMemoryChangeJournal $journal;
 
-    private InMemoryStorage $storage;
-
     private WriteContext $context;
 
     protected function setUp(): void
     {
         $this->journal = new InMemoryChangeJournal();
-        $this->storage = new InMemoryStorage(
-            [],
-            $this->journal,
-        );
-        $this->subject = new ChangeRecorder($this->storage);
+        $this->subject = new ChangeRecorder($this->journal);
         $this->context = new WriteContext(
             BindToken::fromDn('cn=admin,dc=example,dc=com'),
             new ControlBag(),
@@ -134,7 +126,7 @@ final class ChangeRecorderTest extends TestCase
         $logger->expects(self::once())
             ->method('warning');
         $recorder = new ChangeRecorder(
-            $this->storage,
+            $this->journal,
             $logger,
         );
 
@@ -143,21 +135,6 @@ final class ChangeRecorderTest extends TestCase
                 new Dn('cn=a,dc=example,dc=com'),
                 new Attribute('cn', 'a'),
             ),
-            $this->context,
-        );
-
-        self::assertSame(
-            0,
-            $this->journal->latestSeq(),
-        );
-    }
-
-    public function test_it_is_a_no_op_for_non_journaling_storage(): void
-    {
-        $recorder = new ChangeRecorder($this->createMock(EntryStorageInterface::class));
-
-        $recorder->recordAdd(
-            $this->entry('cn=a,dc=example,dc=com'),
             $this->context,
         );
 

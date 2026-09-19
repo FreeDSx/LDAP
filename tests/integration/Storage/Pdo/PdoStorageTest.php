@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Pdo;
 
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
@@ -31,7 +32,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProv
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
@@ -54,7 +54,6 @@ use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\Pdo\EntryLinkFixtureTrait;
-use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 
 final class PdoStorageTest extends TestCase
@@ -62,8 +61,6 @@ final class PdoStorageTest extends TestCase
     use ServerContainerTrait;
 
     use EntryLinkFixtureTrait;
-
-    use JournalingStorageContractTests;
 
     use SubtreeRenameStorageContractTests;
 
@@ -590,16 +587,16 @@ final class PdoStorageTest extends TestCase
 
     public function test_a_journal_append_rolls_back_with_the_enclosing_write_transaction(): void
     {
-        $storage = $this->pdoStorage(
+        $container = Container::forServer(
             TestServerOptions::sqlite()
                 ->setChangeJournalConfig(new ChangeJournalConfig()),
         );
-
-        $journal = $storage->changeJournal() ?? self::fail('Expected the storage to have a journal.');
+        $storage = $container->get(PdoStorage::class);
+        $journal = $container->get(ChangeJournalInterface::class);
 
         try {
-            $storage->atomic(function () use ($storage): void {
-                $storage->appendChange(new PendingChange(
+            $storage->atomic(function () use ($journal): void {
+                $journal->append(new PendingChange(
                     changeType: ChangeType::Add,
                     dn: new Dn('cn=a,dc=example,dc=com'),
                     entryUuid: '11111111-1111-4111-8111-111111111111',
@@ -627,20 +624,6 @@ final class PdoStorageTest extends TestCase
     protected function makeServerOptions(): ServerOptions
     {
         return TestServerOptions::unvalidatedCore();
-    }
-
-    protected function makeJournalingStorage(?ChangeJournalInterface $journal = null): ChangeJournalingInterface
-    {
-        if ($journal === null) {
-            return $this->pdoStorage(TestServerOptions::sqlite());
-        }
-
-        return $this->fromContainer(
-            PdoStorage::class,
-            [ChangeJournalInterface::class => $journal],
-            TestServerOptions::sqlite()
-                ->setChangeJournalConfig(new ChangeJournalConfig()),
-        );
     }
 
     protected function makeRenameStorage(Entry ...$entries): EntryStorageInterface

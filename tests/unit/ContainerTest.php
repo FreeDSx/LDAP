@@ -43,6 +43,8 @@ use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
+use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\RetentionPolicy;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
 use FreeDSx\Ldap\Server\Backend\Write\OperationalAttributeGenerator;
@@ -183,6 +185,29 @@ class ContainerTest extends TestCase
         self::assertSame(
             $this->subject->get($class),
             $this->subject->get($class),
+        );
+    }
+
+    public function test_a_reload_keeps_the_change_journal_so_in_memory_records_survive(): void
+    {
+        $container = Container::forServer(
+            (new ServerOptions(InMemoryStorageConfig::withEntries()))
+                ->setChangeJournalConfig(new ChangeJournalConfig()),
+        );
+
+        self::assertSame(
+            $container->get(ChangeJournalInterface::class),
+            $container->get(ListenerContributorInterface::class)->reloadInstances()[ChangeJournalInterface::class] ?? null,
+        );
+    }
+
+    public function test_a_reload_carries_no_change_journal_when_journaling_is_off(): void
+    {
+        $container = Container::forServer(new ServerOptions(InMemoryStorageConfig::withEntries()));
+
+        self::assertArrayNotHasKey(
+            ChangeJournalInterface::class,
+            $container->get(ListenerContributorInterface::class)->reloadInstances(),
         );
     }
 

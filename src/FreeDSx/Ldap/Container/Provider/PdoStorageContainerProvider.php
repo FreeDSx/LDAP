@@ -49,7 +49,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SwooleWriterQueue;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriterQueueInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoJournalGeneration;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
@@ -313,9 +312,6 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             $container->get(EntryReader::class),
             $container->get(EntryLister::class),
             $container->get(EntryWriter::class),
-            $container->get(ServerOptions::class)->getChangeJournalConfig() === null
-                ? null
-                : $container->get(ChangeJournalInterface::class),
         );
     }
 

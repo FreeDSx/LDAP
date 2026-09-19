@@ -39,7 +39,6 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
@@ -290,14 +289,10 @@ final class HandlerContainerProvider implements ContainerProviderInterface
             ->getReplicationConfig()
             ->isProvider();
 
-        if (!$isProvider) {
+        if (!$isProvider || $container->get(ServerOptions::class)->getChangeJournalConfig() === null) {
             return null;
         }
 
-        $storage = $container->get(EntryStorageInterface::class);
-
-        return $storage instanceof ChangeJournalingInterface
-            ? $storage->changeJournal()
-            : null;
+        return $container->get(ChangeJournalInterface::class);
     }
 }
