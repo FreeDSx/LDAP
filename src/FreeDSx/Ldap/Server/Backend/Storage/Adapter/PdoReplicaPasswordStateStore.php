@@ -15,7 +15,8 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoEntryDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryWriteDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoRowLockDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
@@ -43,7 +44,7 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
 
     public function __construct(
         private PdoConnection $connection,
-        private PdoEntryDialectInterface $dialect,
+        private PdoEntryWriteDialectInterface&PdoRowLockDialectInterface $dialect,
     ) {}
 
     public function load(Dn $dn): ReplicaPasswordState

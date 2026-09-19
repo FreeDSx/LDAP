@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
+namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract;
 
 /**
  * Database-specific SQL for the change-journal tables.

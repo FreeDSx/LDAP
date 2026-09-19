@@ -13,29 +13,28 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryListDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryReadDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryWriteDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoJournalDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoRowLockDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoSchemaDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoSidecarDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoTransactionDialectInterface;
+
 /**
  * The full database-specific SQL a PdoStorage needs.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-interface PdoDialectInterface extends PdoEntryDialectInterface, PdoLinkDialectInterface, PdoJournalDialectInterface
-{
-    /**
-     * The full schema (all tables) as a runnable SQL script.
-     */
-    public function schemaSql(): string;
-
-    /**
-     * The schema script split into individual executable statements.
-     *
-     * @return list<string>
-     */
-    public function schemaStatements(): array;
-
-    /**
-     * The statements of a named auxiliary schema (e.g. an optional substring index), for strategies to apply their own DDL.
-     *
-     * @return list<string>
-     */
-    public function schemaStatementsNamed(string $name): array;
-}
+interface PdoDialectInterface extends
+    PdoEntryListDialectInterface,
+    PdoEntryReadDialectInterface,
+    PdoEntryWriteDialectInterface,
+    PdoJournalDialectInterface,
+    PdoLinkDialectInterface,
+    PdoRowLockDialectInterface,
+    PdoSchemaDialectInterface,
+    PdoSidecarDialectInterface,
+    PdoTransactionDialectInterface {}

@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer;
 
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoEntryDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoSidecarDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
@@ -34,7 +34,7 @@ final readonly class EntryIndexWriter
     private const SIDECAR_ROWS_PER_STATEMENT = 200;
 
     public function __construct(
-        private PdoEntryDialectInterface $dialect,
+        private PdoSidecarDialectInterface $dialect,
         private PdoConnection $connection,
         private AttributeIndexForms $indexForms,
         private SubstringIndexInterface $substringIndex = new NoSubstringIndex(),
@@ -262,10 +262,6 @@ final readonly class EntryIndexWriter
     private function insert(array $rows): void
     {
         foreach (array_chunk($rows, self::SIDECAR_ROWS_PER_STATEMENT) as $chunk) {
-            $placeholders = SqlFilterUtility::markers(
-                count($chunk),
-                '(?, ?, ?, ?)',
-            );
             $params = [];
             foreach ($chunk as $row) {
                 $params[] = $row[0];
@@ -275,7 +271,7 @@ final readonly class EntryIndexWriter
             }
 
             $this->connection->execute(
-                $this->dialect->querySidecarInsertPrefix() . $placeholders,
+                $this->dialect->querySidecarInsert(count($chunk)),
                 $params,
             );
         }

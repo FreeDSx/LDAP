@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryListDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
@@ -31,7 +31,7 @@ use function implode;
 final readonly class PdoListQueryBuilder
 {
     public function __construct(
-        private PdoDialectInterface $dialect,
+        private PdoEntryListDialectInterface $dialect,
     ) {}
 
     public function build(ListQuerySpec $spec): SqlQuery

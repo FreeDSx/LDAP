@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Text;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoSchemaDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use PDO;
 use Throwable;
@@ -119,7 +119,7 @@ final class Fts5SubstringIndex implements SubstringIndexInterface
         }
     }
 
-    public function schemaStatements(PdoDialectInterface $dialect): array
+    public function schemaStatements(PdoSchemaDialectInterface $dialect): array
     {
         if ($this->attributes === []) {
             return [];

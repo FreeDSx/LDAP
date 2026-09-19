@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection;
 
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoTransactionDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageBusyException;
@@ -29,7 +29,7 @@ use Tests\Support\FreeDSx\Ldap\Server\Clock\RecordingSleeper;
 
 final class PdoTransactorTest extends TestCase
 {
-    private PdoDialectInterface&MockObject $dialect;
+    private PdoTransactionDialectInterface&MockObject $dialect;
 
     private SharedPdoConnectionProvider $provider;
 
@@ -39,7 +39,7 @@ final class PdoTransactorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->dialect = $this->createMock(PdoDialectInterface::class);
+        $this->dialect = $this->createMock(PdoTransactionDialectInterface::class);
         $this->provider = new SharedPdoConnectionProvider(new PDO('sqlite::memory:'));
         $this->sleeper = new RecordingSleeper();
         $this->subject = new PdoTransactor(

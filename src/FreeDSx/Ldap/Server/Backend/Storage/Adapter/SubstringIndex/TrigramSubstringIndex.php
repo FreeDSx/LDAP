@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex;
 
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoSchemaDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 
@@ -93,7 +93,7 @@ final class TrigramSubstringIndex implements SubstringIndexInterface
         $this->attributes = $set;
     }
 
-    public function schemaStatements(PdoDialectInterface $dialect): array
+    public function schemaStatements(PdoSchemaDialectInterface $dialect): array
     {
         return $dialect->schemaStatementsNamed(self::SCHEMA_NAME);
     }

@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
@@ -33,7 +33,7 @@ readonly class EntryReader
 {
     public function __construct(
         private PdoConnection $connection,
-        private PdoDialectInterface $dialect,
+        private PdoEntryReadDialectInterface $dialect,
         private EntryRowCodec $codec,
         private EntryLinks $links,
     ) {}

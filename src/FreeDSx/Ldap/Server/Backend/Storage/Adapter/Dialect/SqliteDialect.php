@@ -13,6 +13,15 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoEntryListDialectTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoEntryReadDialectTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoEntryWriteDialectTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoJournalDialectTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoLinkDialectTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoRowLockDialectTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoSchemaTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoSidecarDialectTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoTransactionDialectTrait;
 use PDO;
 use PDOException;
 
@@ -23,10 +32,15 @@ use PDOException;
  */
 final class SqliteDialect implements PdoDialectInterface
 {
-    use PdoDialectTrait;
+    use PdoEntryListDialectTrait;
+    use PdoEntryReadDialectTrait;
+    use PdoEntryWriteDialectTrait;
     use PdoJournalDialectTrait;
     use PdoLinkDialectTrait;
+    use PdoRowLockDialectTrait;
     use PdoSchemaTrait;
+    use PdoSidecarDialectTrait;
+    use PdoTransactionDialectTrait;
 
     /**
      * The database file is locked by another writer.
