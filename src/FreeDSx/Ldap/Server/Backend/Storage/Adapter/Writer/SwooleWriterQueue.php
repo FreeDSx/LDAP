@@ -39,17 +39,15 @@ final class SwooleWriterQueue implements WriterQueueInterface
 
     private bool $started = false;
 
-    private readonly WriteScope $scope;
-
     /**
      * @param Closure(Closure(): void): void|null $batchWrapper Wraps a batch of jobs in an outer transaction.
+     * @param WriteScope $scope Shared with anything that routes by whether the caller is the writer.
      */
     public function __construct(
         private readonly int $capacity = 1024,
         private readonly ?Closure $batchWrapper = null,
-    ) {
-        $this->scope = new WriteScope();
-    }
+        private readonly WriteScope $scope = new WriteScope(),
+    ) {}
 
     public function __destruct()
     {

@@ -27,9 +27,7 @@ final class SerializingReplicaPasswordStateStoreTest extends TestCase
 {
     private const DN = 'cn=foo,dc=example,dc=com';
 
-    private ReplicaPasswordStateStoreInterface&MockObject $reads;
-
-    private ReplicaPasswordStateStoreInterface&MockObject $writes;
+    private ReplicaPasswordStateStoreInterface&MockObject $store;
 
     private RecordingWriterQueue $queue;
 
@@ -37,13 +35,11 @@ final class SerializingReplicaPasswordStateStoreTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->reads = $this->createMock(ReplicaPasswordStateStoreInterface::class);
-        $this->writes = $this->createMock(ReplicaPasswordStateStoreInterface::class);
+        $this->store = $this->createMock(ReplicaPasswordStateStoreInterface::class);
         $this->queue = new RecordingWriterQueue();
 
         $this->subject = new SerializingReplicaPasswordStateStore(
-            $this->reads,
-            $this->writes,
+            $this->store,
             $this->queue,
         );
     }
@@ -51,10 +47,9 @@ final class SerializingReplicaPasswordStateStoreTest extends TestCase
     public function test_load_reads_directly_without_the_queue(): void
     {
         $state = ReplicaPasswordState::empty();
-        $this->reads
+        $this->store
             ->method('load')
             ->willReturn($state);
-        $this->writes->expects(self::never())->method('load');
 
         self::assertSame(
             $state,
@@ -68,7 +63,7 @@ final class SerializingReplicaPasswordStateStoreTest extends TestCase
 
     public function test_list_unforwarded_reads_directly_without_the_queue(): void
     {
-        $this->reads
+        $this->store
             ->method('listUnforwarded')
             ->with(25)
             ->willReturn([]);
@@ -83,10 +78,10 @@ final class SerializingReplicaPasswordStateStoreTest extends TestCase
         );
     }
 
-    public function test_atomic_mutate_runs_through_the_queue_against_the_writer(): void
+    public function test_atomic_mutate_runs_through_the_queue(): void
     {
         $merge = static fn(ReplicaPasswordState $state): OperationalChanges => OperationalChanges::none();
-        $this->writes
+        $this->store
             ->expects(self::once())
             ->method('atomicMutate')
             ->with(
@@ -105,9 +100,9 @@ final class SerializingReplicaPasswordStateStoreTest extends TestCase
         );
     }
 
-    public function test_mark_forwarded_runs_through_the_queue_against_the_writer(): void
+    public function test_mark_forwarded_runs_through_the_queue(): void
     {
-        $this->writes
+        $this->store
             ->expects(self::once())
             ->method('markForwarded')
             ->with(
@@ -126,10 +121,10 @@ final class SerializingReplicaPasswordStateStoreTest extends TestCase
         );
     }
 
-    public function test_discard_if_superseded_runs_through_the_queue_against_the_writer(): void
+    public function test_discard_if_superseded_runs_through_the_queue(): void
     {
         $authoritative = new UserPasswordState();
-        $this->writes
+        $this->store
             ->expects(self::once())
             ->method('discardIfSuperseded')
             ->with(
@@ -148,9 +143,9 @@ final class SerializingReplicaPasswordStateStoreTest extends TestCase
         );
     }
 
-    public function test_discard_runs_through_the_queue_against_the_writer(): void
+    public function test_discard_runs_through_the_queue(): void
     {
-        $this->writes
+        $this->store
             ->expects(self::once())
             ->method('discard')
             ->with(new Dn(self::DN));

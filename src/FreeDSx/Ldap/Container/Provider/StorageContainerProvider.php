@@ -16,41 +16,27 @@ namespace FreeDSx\Ldap\Container\Provider;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\EntryIndexReindexer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackend;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\MysqlFilterTranslator;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\StorageListOptionsFactory;
-use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
-use FreeDSx\Ldap\Server\Config\Storage\PdoDriver;
-use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
 use FreeDSx\Ldap\ServerOptions;
 
 /**
- * Builds the storage adapter selected by the StorageConfigInterface, plus the PDO primitives it is assembled from.
+ * Builds the storage adapter selected by the StorageConfigInterface, plus the schema answers every adapter shares.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -66,11 +52,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
             StorageListOptionsFactory::class => $this->makeStorageListOptionsFactory(...),
             EntryStorageInterface::class => $this->makeStorage(...),
             EntryIndexReindexer::class => $this->makeEntryIndexReindexer(...),
-            PdoDialectInterface::class => $this->makePdoDialect(...),
-            SubstringIndexInterface::class => $this->makeSubstringIndex(...),
-            FilterTranslatorInterface::class => $this->makePdoFilterTranslator(...),
-            PdoStorageFactory::class => $this->makePdoStorageFactory(...),
-            PdoBackend::class => $this->makePdoBackend(...),
+            ChangeJournalInterface::class => $this->makeChangeJournal(...),
         ];
     }
 
@@ -133,18 +115,16 @@ final class StorageContainerProvider implements ContainerProviderInterface
      */
     private function makeStorage(Container $container): EntryStorageInterface
     {
-        $config = $container->get(ServerOptions::class)->getStorageConfig();
-        $journalConfig = $this->journalConfig($container);
-        $origin = $this->journalOrigin($container);
+        $options = $container->get(ServerOptions::class);
+        $config = $options->getStorageConfig();
 
         return match (true) {
-            $config instanceof PdoConfig => $container->get(PdoBackend::class)->storage,
+            $config instanceof PdoConfig => $container->get(WriteSerializingStorage::class),
             $config instanceof InMemoryStorageConfig => new InMemoryStorage(
                 $config->entries(),
-                $journalConfig === null ? null : AuditingChangeJournal::wrap(
-                    new InMemoryChangeJournal($origin),
-                    $journalConfig,
-                ),
+                $options->getChangeJournalConfig() === null
+                    ? null
+                    : $container->get(ChangeJournalInterface::class),
                 $container->get(SortKeyComparator::class),
             ),
             default => throw new RuntimeException(sprintf(
@@ -155,109 +135,21 @@ final class StorageContainerProvider implements ContainerProviderInterface
     }
 
     /**
-     * The PDO backend assembly (storage + replica password-state store on shared connections).
+     * The journal the configured storage records its changes in; only resolvable while journaling is enabled.
+     *
+     * @throws RuntimeException when no change journal is configured
      */
-    private function makePdoBackend(Container $container): PdoBackend
+    private function makeChangeJournal(Container $container): ChangeJournalInterface
     {
         $options = $container->get(ServerOptions::class);
+        $journalConfig = $options->getChangeJournalConfig()
+            ?? throw new RuntimeException('No change journal is configured.');
 
-        return $container->get(PdoStorageFactory::class)->assemble(
-            $options->getRunnerConfig()->getMode(),
-            $this->requirePdoConfig($container)->getSerializeSwooleWrites(),
+        return AuditingChangeJournal::wrap(
+            $options->getStorageConfig() instanceof PdoConfig
+                ? $container->get(PdoChangeJournal::class)
+                : new InMemoryChangeJournal($options->getReplicationConfig()->getId()),
+            $journalConfig,
         );
-    }
-
-    /**
-     * The connection and storage primitives the PDO backend is assembled from.
-     */
-    private function makePdoStorageFactory(Container $container): PdoStorageFactory
-    {
-        return new PdoStorageFactory(
-            $this->requirePdoConfig($container),
-            $container->get(PdoDialectInterface::class),
-            $container->get(FilterTranslatorInterface::class),
-            $container->get(AttributeContextInterface::class),
-            $container->get(AttributeIndexForms::class),
-            $container->get(SubstringIndexInterface::class),
-            $this->journalOrigin($container),
-            $container->get(SleeperInterface::class),
-            $this->journalConfig($container),
-            $container->get(LinkedAttributes::class),
-        );
-    }
-
-    private function makePdoDialect(Container $container): PdoDialectInterface
-    {
-        return match ($this->requirePdoConfig($container)->getDriver()) {
-            PdoDriver::Sqlite => new SqliteDialect(),
-            PdoDriver::Mysql => new MysqlDialect(),
-        };
-    }
-
-    private function makePdoFilterTranslator(Container $container): FilterTranslatorInterface
-    {
-        $attributeContext = $container->get(AttributeContextInterface::class);
-        $indexForms = $container->get(AttributeIndexForms::class);
-        $substringIndex = $container->get(SubstringIndexInterface::class);
-
-        return match ($this->requirePdoConfig($container)->getDriver()) {
-            PdoDriver::Sqlite => new SqliteFilterTranslator(
-                $attributeContext,
-                $indexForms,
-                $substringIndex,
-            ),
-            PdoDriver::Mysql => new MysqlFilterTranslator(
-                $attributeContext,
-                $indexForms,
-                $substringIndex,
-            ),
-        };
-    }
-
-    /**
-     * Auto resolves to the best index the driver supports, so a build without FTS5 still gets trigram narrowing.
-     */
-    private function makeSubstringIndex(Container $container): SubstringIndexInterface
-    {
-        $config = $this->requirePdoConfig($container);
-
-        return match ($config->getSubstringIndexMode()) {
-            SubstringIndexMode::None => new NoSubstringIndex(),
-            SubstringIndexMode::Trigram => new TrigramSubstringIndex(),
-            SubstringIndexMode::Auto => $config->getDriver() === PdoDriver::Sqlite
-                && Fts5SubstringIndex::isSupported()
-                    ? new Fts5SubstringIndex()
-                    : new TrigramSubstringIndex(),
-        };
-    }
-
-    private function requirePdoConfig(Container $container): PdoConfig
-    {
-        $config = $container->get(ServerOptions::class)->getStorageConfig();
-
-        if (!$config instanceof PdoConfig) {
-            throw new RuntimeException('The PDO storage backend requires a PdoConfig storage config.');
-        }
-
-        return $config;
-    }
-
-    /**
-     * The journal settings to build storage against, or null when nothing is recorded.
-     */
-    private function journalConfig(Container $container): ?ChangeJournalConfig
-    {
-        return $container->get(ServerOptions::class)
-            ->getChangeJournalConfig();
-    }
-
-    /**
-     * The identity stamped on changes this server authors.
-     */
-    private function journalOrigin(Container $container): ReplicaId
-    {
-        return $container->get(ServerOptions::class)
-            ->getReplicationConfig()
-            ->getId();
     }
 }

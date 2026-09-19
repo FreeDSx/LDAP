@@ -28,9 +28,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
- * Routes reads to a per-coroutine read storage and serializes writes through a single writer coroutine.
- *
- * Callers already running inside the writer bypass both, since its transaction is open on the write storage.
+ * Serializes writes through a single writer coroutine; reads run in place, on whichever connection the caller holds.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -42,8 +40,7 @@ final readonly class WriteSerializingStorage implements
     RowLockableInterface
 {
     public function __construct(
-        private EntryStorageInterface $reads,
-        private EntryStorageInterface $writes,
+        private EntryStorageInterface $storage,
         private WriterQueueInterface $queue,
     ) {}
 
@@ -54,34 +51,34 @@ final readonly class WriteSerializingStorage implements
 
     public function find(Dn $dn): ?Entry
     {
-        return $this->readStorage()->find($dn);
+        return $this->storage->find($dn);
     }
 
     public function exists(Dn $dn): bool
     {
-        return $this->readStorage()->exists($dn);
+        return $this->storage->exists($dn);
     }
 
     public function hasChildren(Dn $dn): bool
     {
-        return $this->readStorage()->hasChildren($dn);
+        return $this->storage->hasChildren($dn);
     }
 
     public function list(StorageListOptions $options): EntryStream
     {
-        return $this->readStorage()->list($options);
+        return $this->storage->list($options);
     }
 
     public function insert(Entry $entry): void
     {
-        $this->submit(fn() => $this->writes->insert($entry));
+        $this->submit(fn() => $this->storage->insert($entry));
     }
 
     public function store(
         Entry $entry,
         bool $rebuildIndexes = false,
     ): void {
-        $this->submit(fn() => $this->writes->store(
+        $this->submit(fn() => $this->storage->store(
             $entry,
             $rebuildIndexes,
         ));
@@ -91,7 +88,7 @@ final readonly class WriteSerializingStorage implements
         Dn $from,
         Dn $to,
     ): void {
-        $this->submit(fn() => $this->writes->renameSubtree(
+        $this->submit(fn() => $this->storage->renameSubtree(
             $from,
             $to,
         ));
@@ -99,25 +96,25 @@ final readonly class WriteSerializingStorage implements
 
     public function remove(Dn $dn): void
     {
-        $this->submit(fn() => $this->writes->remove($dn));
+        $this->submit(fn() => $this->storage->remove($dn));
     }
 
     public function removeAll(array $dns): void
     {
-        $this->submit(fn() => $this->writes->removeAll($dns));
+        $this->submit(fn() => $this->storage->removeAll($dns));
     }
 
     public function atomic(callable $operation): void
     {
-        $this->submit(fn() => $this->writes->atomic($operation));
+        $this->submit(fn() => $this->storage->atomic($operation));
     }
 
     /**
-     * Only meaningful inside an atomic block, where the transaction holding the lock is open on the write storage.
+     * Only meaningful inside an atomic block, where the transaction holding the lock is open on the writer.
      */
     public function lockForWrite(Dn $dn): void
     {
-        $this->rowLockable($this->writes)->lockForWrite($dn);
+        $this->rowLockable()->lockForWrite($dn);
     }
 
     /**
@@ -125,51 +122,29 @@ final readonly class WriteSerializingStorage implements
      */
     public function lockForReference(Dn $dn): bool
     {
-        return $this->rowLockable($this->writes)->lockForReference($dn);
+        return $this->rowLockable()->lockForReference($dn);
     }
 
     public function namingContexts(): array
     {
-        return $this->readStorage()->namingContexts();
+        return $this->storage->namingContexts();
     }
 
     public function reset(): void
     {
-        if ($this->reads instanceof ResettableInterface) {
-            $this->reads->reset();
-        }
-
-        if ($this->writes instanceof ResettableInterface) {
-            $this->writes->reset();
+        if ($this->storage instanceof ResettableInterface) {
+            $this->storage->reset();
         }
     }
 
-    /**
-     * Defensive delegate.
-     *
-     * The journal appends actually run on the write storage.
-     */
     public function appendChange(PendingChange $change): void
     {
-        $this->journaling($this->writes)->appendChange($change);
+        $this->journaling()->appendChange($change);
     }
 
-    /**
-     * Reads through the per-coroutine storage so sync polls never contend with the serialized writer.
-     */
     public function changeJournal(): ?ChangeJournalInterface
     {
-        return $this->journaling($this->reads)->changeJournal();
-    }
-
-    /**
-     * The write storage while its transaction is open, since the read storage cannot see uncommitted changes.
-     */
-    private function readStorage(): EntryStorageInterface
-    {
-        return $this->queue->isWriter()
-            ? $this->writes
-            : $this->reads;
+        return $this->journaling()->changeJournal();
     }
 
     /**
@@ -188,21 +163,21 @@ final readonly class WriteSerializingStorage implements
         $this->queue->run($write);
     }
 
-    private function rowLockable(EntryStorageInterface $storage): RowLockableInterface
+    private function rowLockable(): RowLockableInterface
     {
-        if (!$storage instanceof RowLockableInterface) {
+        if (!$this->storage instanceof RowLockableInterface) {
             throw new InvalidArgumentException('The underlying storage does not support row locking.');
         }
 
-        return $storage;
+        return $this->storage;
     }
 
-    private function journaling(EntryStorageInterface $storage): ChangeJournalingInterface
+    private function journaling(): ChangeJournalingInterface
     {
-        if (!$storage instanceof ChangeJournalingInterface) {
+        if (!$this->storage instanceof ChangeJournalingInterface) {
             throw new InvalidArgumentException('The underlying storage does not support change journaling.');
         }
 
-        return $storage;
+        return $this->storage;
     }
 }

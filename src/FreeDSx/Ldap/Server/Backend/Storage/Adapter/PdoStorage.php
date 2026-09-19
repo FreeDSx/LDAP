@@ -92,7 +92,6 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     /**
      * @param EntryIndexWriter $indexes Must share $connection, so the two see one connection and one cache.
      * @param ?ChangeJournalInterface $journal Must share $connection so an append joins the write it belongs to.
-     * @param ?EntryLinks $links Resolves linked values; without it no entry carries links and reads are unchanged.
      */
     public function __construct(
         private readonly PdoConnection $connection,
@@ -100,8 +99,8 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         private readonly PdoDialectInterface $dialect,
         private readonly AttributeContextInterface $attributeContext,
         private readonly EntryIndexWriter $indexes,
+        private readonly EntryLinks $links,
         ?ChangeJournalInterface $journal = null,
-        private readonly ?EntryLinks $links = null,
     ) {
         if (!extension_loaded('mbstring')) {
             throw new RuntimeException(
@@ -427,7 +426,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
      */
     private function linksForEntry(mixed $row): array
     {
-        if ($this->links === null || !$this->links->hydrates(null) || !is_array($row)) {
+        if (!$this->links->hydrates(null) || !is_array($row)) {
             return [];
         }
 
@@ -737,7 +736,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         iterable $rows,
         ?array $allowed,
     ): Generator {
-        if ($this->links !== null && $this->links->hydrates($allowed)) {
+        if ($this->links->hydrates($allowed)) {
             yield from $this->links->hydrating($rows);
 
             return;

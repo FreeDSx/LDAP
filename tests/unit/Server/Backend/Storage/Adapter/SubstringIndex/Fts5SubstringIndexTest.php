@@ -18,8 +18,8 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
@@ -95,18 +95,18 @@ final class Fts5SubstringIndexTest extends TestCase
             $index,
         );
 
-        $provider = new SharedPdoConnectionProvider(
-            $pdo,
-            fn(): PDO => $pdo,
-        );
         // Auto resolves to FTS5 on a build that has it, which the skip above has already established.
         $storage = $this->fromContainer(
-            PdoStorageFactory::class,
-            options: TestServerOptions::forStorage(
+            PdoStorage::class,
+            [PdoConnectionProviderInterface::class => new SharedPdoConnectionProvider(
+                $pdo,
+                fn(): PDO => $pdo,
+            )],
+            TestServerOptions::forStorage(
                 PdoConfig::forSqlite(':memory:')
                     ->setSubstringIndexMode(SubstringIndexMode::Auto),
             ),
-        )->storageOn($provider);
+        );
 
         $storage->store(new Entry(
             new Dn('cn=blacksmith,dc=example,dc=com'),
