@@ -42,6 +42,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
@@ -138,7 +139,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     public static function initialize(
         PDO $pdo,
         PdoDialectInterface $dialect,
-        ?SubstringIndexInterface $substringIndex = null,
+        SubstringIndexInterface $substringIndex = new NoSubstringIndex(),
     ): void {
         $pdo->setAttribute(
             PDO::ATTR_ERRMODE,
@@ -151,7 +152,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
         $statements = [
             ...$dialect->schemaStatements(),
-            ...($substringIndex?->schemaStatements($dialect) ?? []),
+            ...$substringIndex->schemaStatements($dialect),
         ];
 
         foreach ($statements as $statement) {

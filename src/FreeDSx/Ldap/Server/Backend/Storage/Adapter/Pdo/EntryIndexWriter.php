@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoEntryDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 
@@ -36,7 +37,7 @@ final readonly class EntryIndexWriter
         private PdoEntryDialectInterface $dialect,
         private PdoStatementPool $statements,
         private AttributeIndexForms $indexForms,
-        private ?SubstringIndexInterface $substringIndex = null,
+        private SubstringIndexInterface $substringIndex = new NoSubstringIndex(),
     ) {}
 
     /**
@@ -217,10 +218,6 @@ final readonly class EntryIndexWriter
      */
     private function indexCovers(array $changed): bool
     {
-        if ($this->substringIndex === null) {
-            return false;
-        }
-
         foreach ($changed as $name) {
             if ($this->substringIndex->indexes($name)) {
                 return true;
@@ -234,7 +231,7 @@ final readonly class EntryIndexWriter
         int $entryId,
         Entry $entry,
     ): void {
-        $this->substringIndex?->maintain(
+        $this->substringIndex->maintain(
             $entryId,
             $entry,
             function (string $sql, array $params): void {
@@ -322,7 +319,7 @@ final readonly class EntryIndexWriter
         string $attribute,
         string $value,
     ): string {
-        return $this->substringIndex?->readsOriginalValue($attribute) === true
+        return $this->substringIndex->readsOriginalValue($attribute)
             ? $value
             : '';
     }

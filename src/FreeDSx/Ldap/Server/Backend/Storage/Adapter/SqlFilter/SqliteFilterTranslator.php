@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
@@ -29,7 +30,7 @@ final class SqliteFilterTranslator implements FilterTranslatorInterface
     public function __construct(
         AttributeContextInterface $attributeContext,
         AttributeIndexForms $indexForms,
-        ?SubstringIndexInterface $substringIndex = null,
+        SubstringIndexInterface $substringIndex = new NoSubstringIndex(),
     ) {
         $this->attributeContext = $attributeContext;
         $this->indexForms = $indexForms;

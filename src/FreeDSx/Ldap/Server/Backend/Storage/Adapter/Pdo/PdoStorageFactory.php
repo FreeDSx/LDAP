@@ -51,7 +51,6 @@ use PDO;
 final readonly class PdoStorageFactory
 {
     /**
-     * @param ?SubstringIndexInterface $substringIndex Shared by the translator, the index writer and schema setup.
      * @param ReplicaId $origin Stamped on the changes this server authors.
      * @param ?ChangeJournalConfig $journalConfig Attaches a journal on each connection when journaling is enabled.
      */
@@ -61,7 +60,7 @@ final readonly class PdoStorageFactory
         private FilterTranslatorInterface $translator,
         private AttributeContextInterface $attributeContext,
         private AttributeIndexForms $indexForms,
-        private ?SubstringIndexInterface $substringIndex,
+        private SubstringIndexInterface $substringIndex,
         private ReplicaId $origin,
         private SleeperInterface $sleeper,
         private ?ChangeJournalConfig $journalConfig,
