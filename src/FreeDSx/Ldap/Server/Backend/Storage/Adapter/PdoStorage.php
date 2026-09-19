@@ -13,11 +13,9 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
-use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
@@ -33,11 +31,11 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterfac
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\BatchedRows;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
-use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
@@ -90,6 +88,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         private readonly AttributeContextInterface $attributeContext,
         private readonly EntryIndexWriter $indexes,
         private readonly EntryLinks $links,
+        private readonly EntryRowCodec $codec,
         ?ChangeJournalInterface $journal = null,
     ) {
         if (!extension_loaded('mbstring')) {
@@ -115,11 +114,11 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         );
         $row = $stmt->fetch();
 
-        if ($row === false) {
+        if (!is_array($row)) {
             return null;
         }
 
-        return $this->rowToEntry(
+        return $this->codec->decode(
             $row,
             null,
             $this->linksForEntry($row),
@@ -198,7 +197,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
                         $lcDn,
                         $dnString,
                         $normDn->getParent()?->toString() ?? '',
-                        $this->encodeAttributes($entry),
+                        $this->codec->encode($entry),
                     ]);
                 },
                 $normDn,
@@ -234,7 +233,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
                 $lcDn,
                 $dnString,
                 $normDn->getParent()?->toString() ?? '',
-                $this->encodeAttributes($entry),
+                $this->codec->encode($entry),
             ]);
 
             // Neither dialect reports the key from an upsert, so it is read back before the index rows are written.
@@ -378,11 +377,12 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     /**
      * One entry's links, keyed by attribute name, or none when nothing is declared or the row carries no key.
      *
+     * @param array<array-key, mixed> $row
      * @return array<string, list<string>>
      */
-    private function linksForEntry(mixed $row): array
+    private function linksForEntry(array $row): array
     {
-        if (!$this->links->hydrates(null) || !is_array($row)) {
+        if (!$this->links->hydrates(null)) {
             return [];
         }
 
@@ -645,20 +645,21 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         foreach ($this->pairedWithLinks($rows, $allowed) as [$row, $links]) {
             $delivered++;
             $cursor = $this->cursorForRow($row) ?? $cursor;
-            $entry = $this->rowToEntry(
-                $row,
-                $allowed,
-                $links,
-            );
 
-            if ($entry !== null) {
-                yield new FetchedEntry(
-                    $entry,
-                    $deliveredBefore === null
-                        ? $cursor
-                        : PageCursor::afterSorted($deliveredBefore + $delivered),
-                );
+            if (!is_array($row)) {
+                continue;
             }
+
+            yield new FetchedEntry(
+                $this->codec->decode(
+                    $row,
+                    $allowed,
+                    $links,
+                ),
+                $deliveredBefore === null
+                    ? $cursor
+                    : PageCursor::afterSorted($deliveredBefore + $delivered),
+            );
         }
 
         return new FetchedBatch(
@@ -789,94 +790,6 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
                 $length,
                 $max,
             ),
-        );
-    }
-
-    private function encodeAttributes(Entry $entry): string
-    {
-        $attributes = [];
-
-        foreach ($entry->getAttributes() as $attribute) {
-            $attributes[$attribute->getDescription()] = array_values($attribute->getValues());
-        }
-
-        return serialize($attributes);
-    }
-
-    /**
-     * @param array<string, true>|null $allowed Base names to materialize, or null for all.
-     * @param array<string, list<string>> $links Already fetched link values, keyed by lowercased attribute name.
-     */
-    private function rowToEntry(
-        mixed $row,
-        ?array $allowed = null,
-        array $links = [],
-    ): ?Entry {
-        if (!is_array($row)) {
-            return null;
-        }
-
-        $dn = isset($row['dn']) && is_string($row['dn'])
-            ? $row['dn']
-            : '';
-
-        // A projection that materializes nothing, such as a 1.1 request, never reads the blob.
-        if ($allowed === []) {
-            return Entry::raw(
-                new Dn($dn),
-                [],
-            );
-        }
-
-        $attributesBlob = isset($row['attributes']) && is_string($row['attributes'])
-            ? $row['attributes']
-            : 'a:0:{}';
-
-        /** @var array<string, list<string>>|false $raw Trusted: written by encodeAttributes() from Attribute::getValues(): string[]. */
-        $raw = @unserialize(
-            $attributesBlob,
-            ['allowed_classes' => false],
-        );
-
-        if (!is_array($raw)) {
-            throw new StorageIoException('Failed to decode entry attributes; storage row is corrupted.');
-        }
-
-        $attributes = [];
-
-        foreach ($raw as $name => $values) {
-            if ($allowed !== null && !isset($allowed[Attribute::normalizeName($name)])) {
-                continue;
-            }
-
-            $attributes[] = Attribute::fromArray(
-                $name,
-                $values,
-            );
-        }
-
-        foreach ($links as $name => $values) {
-            if ($allowed !== null && !isset($allowed[$name])) {
-                continue;
-            }
-
-            $attributes[] = Attribute::fromArray(
-                $name,
-                $values,
-            );
-        }
-
-        // Present only when the query projected it, which is what spares the resolver a query per entry.
-        if (isset($row['has_children'])) {
-            $attributes[] = new Attribute(
-                AttributeTypeOid::NAME_HAS_SUBORDINATES,
-                $row['has_children'] ? 'TRUE' : 'FALSE',
-            );
-        }
-
-        return Entry::raw(
-            new Dn($dn),
-            $attributes,
         );
     }
 }
