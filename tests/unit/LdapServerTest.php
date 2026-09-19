@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
+use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedOptions;
@@ -108,6 +109,32 @@ class LdapServerTest extends TestCase
             ->method('run');
 
         $this->subject->run();
+    }
+
+    public function test_the_schema_ddl_includes_the_substring_index_the_server_is_configured_with(): void
+    {
+        $server = new LdapServer(new ServerOptions(
+            PdoConfig::forSqlite(':memory:')
+                ->setSubstringIndexMode(SubstringIndexMode::Trigram),
+        ));
+
+        $ddl = $server->schemaDdl();
+
+        self::assertStringContainsString(
+            'CREATE TABLE IF NOT EXISTS entries',
+            $ddl,
+        );
+        self::assertStringContainsString(
+            'entry_attribute_trigrams',
+            $ddl,
+        );
+    }
+
+    public function test_the_schema_ddl_is_refused_for_storage_without_a_sql_schema(): void
+    {
+        $this->expectException(RuntimeException::class);
+
+        $this->subject->schemaDdl();
     }
 
     /**

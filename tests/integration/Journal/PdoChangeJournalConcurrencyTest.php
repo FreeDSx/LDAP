@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoJournalGeneration;
@@ -52,7 +52,7 @@ final class PdoChangeJournalConcurrencyTest extends JournalConcurrencyTestCase
 
         // Create the schema once, up front, then drop the connection before forking so no handle is inherited.
         $pdo = $this->connect();
-        PdoStorage::initialize($pdo, new SqliteDialect());
+        (new PdoSchema(new SqliteDialect()))->apply($pdo);
         unset($pdo);
     }
 

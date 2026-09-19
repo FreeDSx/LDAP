@@ -25,8 +25,8 @@ use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
@@ -137,10 +137,7 @@ final class PdoStorageTest extends TestCase
     public function test_searches_differing_only_in_size_limit_share_one_prepared_statement(): void
     {
         $pdo = new RecordingPdo('sqlite::memory:');
-        PdoStorage::initialize(
-            $pdo,
-            new SqliteDialect(),
-        );
+        (new PdoSchema(new SqliteDialect()))->apply($pdo);
         $storage = $this->storageOver($pdo);
         foreach (range(1, 3) as $i) {
             $storage->store(new Entry(
@@ -238,10 +235,7 @@ final class PdoStorageTest extends TestCase
     public function test_an_attribute_wider_than_one_statement_writes_every_index_row(): void
     {
         $pdo = new RecordingPdo('sqlite::memory:');
-        PdoStorage::initialize(
-            $pdo,
-            new SqliteDialect(),
-        );
+        (new PdoSchema(new SqliteDialect()))->apply($pdo);
         $storage = $this->storageOver($pdo);
         $values = [];
         foreach (range(1, 1000) as $i) {
@@ -271,10 +265,7 @@ final class PdoStorageTest extends TestCase
     public function test_adding_one_value_writes_one_index_row_rather_than_the_whole_attribute(): void
     {
         $pdo = new RecordingPdo('sqlite::memory:');
-        PdoStorage::initialize(
-            $pdo,
-            new SqliteDialect(),
-        );
+        (new PdoSchema(new SqliteDialect()))->apply($pdo);
         $storage = $this->storageOver($pdo);
         $dn = new Dn('cn=growing,dc=example,dc=com');
         $values = [];
@@ -308,10 +299,7 @@ final class PdoStorageTest extends TestCase
     public function test_removing_one_value_deletes_one_index_row_and_inserts_nothing(): void
     {
         $pdo = new RecordingPdo('sqlite::memory:');
-        PdoStorage::initialize(
-            $pdo,
-            new SqliteDialect(),
-        );
+        (new PdoSchema(new SqliteDialect()))->apply($pdo);
         $storage = $this->storageOver($pdo);
         $dn = new Dn('cn=shrinking,dc=example,dc=com');
         $values = [];
@@ -345,10 +333,7 @@ final class PdoStorageTest extends TestCase
     public function test_a_modify_of_another_attribute_leaves_a_wide_attributes_index_untouched(): void
     {
         $pdo = new RecordingPdo('sqlite::memory:');
-        PdoStorage::initialize(
-            $pdo,
-            new SqliteDialect(),
-        );
+        (new PdoSchema(new SqliteDialect()))->apply($pdo);
         $storage = $this->storageOver($pdo);
         $dn = new Dn('cn=stable,dc=example,dc=com');
         $values = [];
@@ -554,87 +539,14 @@ final class PdoStorageTest extends TestCase
         self::assertCount(1, $entries);
     }
 
-    public function test_initialize_creates_the_baseline_schema(): void
-    {
-        $pdo = new PDO('sqlite::memory:');
-
-        PdoStorage::initialize(
-            $pdo,
-            new SqliteDialect(),
-        );
-        // Re-running must be a no-op (the baseline is idempotent).
-        PdoStorage::initialize(
-            $pdo,
-            new SqliteDialect(),
-        );
-
-        self::assertSame(
-            [
-                'entries',
-                'entry_attribute_links',
-                'entry_attribute_values',
-                'ldap_change_journal',
-                'ldap_change_journal_seq',
-                'ldap_replica_pwpolicy_state',
-                'ldap_schema_version',
-            ],
-            $this->tableNames($pdo),
-        );
-    }
-
-    public function test_schema_ddl_exports_the_sqlite_baseline(): void
-    {
-        $ddl = PdoStorage::schemaDdl(new SqliteDialect());
-
-        self::assertStringContainsString(
-            'CREATE TABLE IF NOT EXISTS entries',
-            $ddl,
-        );
-        self::assertStringContainsString(
-            'ldap_change_journal',
-            $ddl,
-        );
-    }
-
-    public function test_schema_ddl_exports_the_mysql_baseline(): void
-    {
-        $ddl = PdoStorage::schemaDdl(new MysqlDialect());
-
-        self::assertStringContainsString(
-            'CREATE TABLE IF NOT EXISTS entries',
-            $ddl,
-        );
-        self::assertStringContainsString(
-            'ENGINE=InnoDB',
-            $ddl,
-        );
-    }
-
-    public function test_initialize_with_a_substring_index_creates_its_table(): void
-    {
-        $pdo = new PDO('sqlite::memory:');
-
-        PdoStorage::initialize(
-            $pdo,
-            new SqliteDialect(),
-            new TrigramSubstringIndex(),
-        );
-
-        self::assertContains(
-            'entry_attribute_trigrams',
-            $this->tableNames($pdo),
-        );
-    }
-
     public function test_store_writes_trigram_rows_for_indexed_attributes(): void
     {
         $pdo = new PDO('sqlite::memory:');
         $index = new TrigramSubstringIndex();
-        PdoStorage::initialize(
-            $pdo,
+        (new PdoSchema(
             new SqliteDialect(),
             $index,
-        );
+        ))->apply($pdo);
 
         $storage = $this->storageOver(
             $pdo,
@@ -847,39 +759,6 @@ final class PdoStorageTest extends TestCase
         );
     }
 
-    public function test_disabling_initialize_skips_schema_creation(): void
-    {
-        // A named shared-cache in-memory database, so a probe connection sees the same schema.
-        $dsn = 'file:freedsx_init_off?mode=memory&cache=shared';
-
-        // Hold the storage's connection open so the shared in-memory database survives the probe read.
-        $storage = $this->pdoStorage(TestServerOptions::forStorage(
-            PdoConfig::forSqlite($dsn)
-                ->setInitializeSchema(false),
-        ));
-
-        $probe = new PDO(
-            'sqlite:' . $dsn,
-            null,
-            null,
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
-        );
-
-        self::assertNotContains(
-            'entries',
-            $this->tableNames($probe),
-        );
-        unset($storage);
-    }
-
-    public function test_schema_version_is_a_positive_integer(): void
-    {
-        self::assertGreaterThanOrEqual(
-            1,
-            PdoStorage::SCHEMA_VERSION,
-        );
-    }
-
     public function test_get_returns_entry_by_dn(): void
     {
         $entry = $this->subject->get(new Dn('cn=Alice,dc=example,dc=com'));
@@ -982,10 +861,7 @@ final class PdoStorageTest extends TestCase
     public function test_find_surfaces_a_linked_attribute_as_the_targets_current_dn(): void
     {
         $pdo = new PDO('sqlite::memory:');
-        PdoStorage::initialize(
-            $pdo,
-            new SqliteDialect(),
-        );
+        (new PdoSchema(new SqliteDialect()))->apply($pdo);
         $storage = $this->storageOver($pdo);
         $storage->store(new Entry(
             new Dn('cn=Bob,dc=example,dc=com'),
@@ -1012,10 +888,7 @@ final class PdoStorageTest extends TestCase
     public function test_a_linked_value_follows_the_target_through_a_rename(): void
     {
         $pdo = new PDO('sqlite::memory:');
-        PdoStorage::initialize(
-            $pdo,
-            new SqliteDialect(),
-        );
+        (new PdoSchema(new SqliteDialect()))->apply($pdo);
         $storage = $this->storageOver($pdo);
         $storage->store(new Entry(
             new Dn('cn=Bob,dc=example,dc=com'),
@@ -1047,10 +920,7 @@ final class PdoStorageTest extends TestCase
     public function test_deleting_the_target_removes_it_from_the_linked_attribute(): void
     {
         $pdo = new PDO('sqlite::memory:');
-        PdoStorage::initialize(
-            $pdo,
-            new SqliteDialect(),
-        );
+        (new PdoSchema(new SqliteDialect()))->apply($pdo);
         $storage = $this->storageOver($pdo);
         $storage->store(new Entry(
             new Dn('cn=Bob,dc=example,dc=com'),
@@ -1077,10 +947,7 @@ final class PdoStorageTest extends TestCase
     public function test_a_listed_entry_carries_its_linked_values(): void
     {
         $pdo = new PDO('sqlite::memory:');
-        PdoStorage::initialize(
-            $pdo,
-            new SqliteDialect(),
-        );
+        (new PdoSchema(new SqliteDialect()))->apply($pdo);
         $storage = $this->storageOver($pdo);
         $storage->store(new Entry(
             new Dn('dc=example,dc=com'),
@@ -1118,10 +985,7 @@ final class PdoStorageTest extends TestCase
     public function test_a_read_materializing_nothing_asks_for_no_links(): void
     {
         $pdo = new RecordingPdo('sqlite::memory:');
-        PdoStorage::initialize(
-            $pdo,
-            new SqliteDialect(),
-        );
+        (new PdoSchema(new SqliteDialect()))->apply($pdo);
         $storage = $this->storageOver($pdo);
         $storage->store(new Entry(
             new Dn('dc=example,dc=com'),
@@ -1149,10 +1013,7 @@ final class PdoStorageTest extends TestCase
     public function test_a_projection_naming_no_linked_type_asks_for_no_links(): void
     {
         $pdo = new RecordingPdo('sqlite::memory:');
-        PdoStorage::initialize(
-            $pdo,
-            new SqliteDialect(),
-        );
+        (new PdoSchema(new SqliteDialect()))->apply($pdo);
         $storage = $this->storageOver($pdo);
         $storage->store(new Entry(
             new Dn('dc=example,dc=com'),
@@ -1726,7 +1587,7 @@ final class PdoStorageTest extends TestCase
     {
         $pdo = new PDO('sqlite::memory:');
         $dialect = new SqliteDialect();
-        PdoStorage::initialize($pdo, $dialect);
+        (new PdoSchema($dialect))->apply($pdo);
         $pdo->exec(
             "INSERT INTO entries (lc_dn, dn, lc_parent_dn, attributes) VALUES "
             . "('cn=corrupt,dc=example,dc=com', 'cn=Corrupt,dc=example,dc=com', 'dc=example,dc=com', 'NOT_VALID_BLOB')",
@@ -1743,7 +1604,7 @@ final class PdoStorageTest extends TestCase
     {
         $pdo = new PDO('sqlite::memory:');
         $dialect = new SqliteDialect();
-        PdoStorage::initialize($pdo, $dialect);
+        (new PdoSchema($dialect))->apply($pdo);
         $validBlob = serialize(['cn' => ['Valid']]);
         $pdo->exec(
             "INSERT INTO entries (lc_dn, dn, lc_parent_dn, attributes) VALUES "
@@ -1994,11 +1855,10 @@ final class PdoStorageTest extends TestCase
     private function trigramStorage(): PdoStorage
     {
         $pdo = new PDO('sqlite::memory:');
-        PdoStorage::initialize(
-            $pdo,
+        (new PdoSchema(
             new SqliteDialect(),
             new TrigramSubstringIndex(),
-        );
+        ))->apply($pdo);
 
         return $this->storageOver(
             $pdo,
@@ -2019,11 +1879,10 @@ final class PdoStorageTest extends TestCase
         SubstringIndexMode $mode,
     ): array {
         $pdo = new PDO('sqlite::memory:');
-        PdoStorage::initialize(
-            $pdo,
+        (new PdoSchema(
             new SqliteDialect(),
             $index,
-        );
+        ))->apply($pdo);
 
         $storage = $this->storageOver(
             $pdo,
@@ -2145,29 +2004,6 @@ final class PdoStorageTest extends TestCase
     /**
      * @return list<string>
      */
-    private function tableNames(PDO $pdo): array
-    {
-        $stmt = $pdo->query(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
-        );
-
-        if ($stmt === false) {
-            return [];
-        }
-
-        $names = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $name) {
-            if (is_string($name)) {
-                $names[] = $name;
-            }
-        }
-
-        return $names;
-    }
-
-    /**
-     * @return list<string>
-     */
     private function searchDns(FilterInterface $filter): array
     {
         $request = (new SearchRequest($filter))
@@ -2274,7 +2110,7 @@ final class PdoStorageTest extends TestCase
         $dialect->method('maxDnLength')
             ->willReturn($max);
 
-        PdoStorage::initialize($pdo, $dialect);
+        (new PdoSchema($dialect))->apply($pdo);
 
         return $this->storageOver(
             $pdo,

@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
@@ -296,7 +296,7 @@ final class PdoChangeJournalTest extends TestCase
     {
         $pdo = new RecordingPdo('sqlite::memory:');
         $dialect = new SqliteDialect();
-        PdoStorage::initialize($pdo, $dialect);
+        (new PdoSchema($dialect))->apply($pdo);
         $connection = $this->connectionOn(
             $pdo,
             $dialect,
@@ -364,7 +364,7 @@ final class PdoChangeJournalTest extends TestCase
     private function journalOn(PDO $pdo): PdoChangeJournal
     {
         $dialect = new SqliteDialect();
-        PdoStorage::initialize($pdo, $dialect);
+        (new PdoSchema($dialect))->apply($pdo);
         $connection = $this->connectionOn(
             $pdo,
             $dialect,

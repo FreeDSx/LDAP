@@ -14,9 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use PDO;
 
@@ -31,9 +29,24 @@ readonly class PdoConnector
 {
     public function __construct(
         private PdoConfig $config,
-        private PdoDialectInterface $dialect,
-        private SubstringIndexInterface $substringIndex,
+        private PdoSchema $schema,
     ) {}
+
+    /**
+     * The first connection, with the schema applied when the configuration asks for it; call once, at startup.
+     *
+     * @throws RuntimeException when the driver's extension is not loaded
+     */
+    public function bootstrap(): PDO
+    {
+        $pdo = $this->open();
+
+        if ($this->config->getInitializeSchema()) {
+            $this->schema->apply($pdo);
+        }
+
+        return $pdo;
+    }
 
     /**
      * @throws RuntimeException when the driver's extension is not loaded
@@ -56,16 +69,18 @@ readonly class PdoConnector
             $this->config->getPdoOptions(),
         );
 
+        // The storage depends on both, so neither is left to the configurable driver options.
+        $pdo->setAttribute(
+            PDO::ATTR_ERRMODE,
+            PDO::ERRMODE_EXCEPTION,
+        );
+        $pdo->setAttribute(
+            PDO::ATTR_DEFAULT_FETCH_MODE,
+            PDO::FETCH_ASSOC,
+        );
+
         foreach ($this->config->getSessionStatements() as $statement) {
             $pdo->exec($statement);
-        }
-
-        if ($this->config->getInitializeSchema()) {
-            PdoStorage::initialize(
-                $pdo,
-                $this->dialect,
-                $this->substringIndex,
-            );
         }
 
         return $pdo;
