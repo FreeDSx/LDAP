@@ -21,13 +21,10 @@ use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\ListQuerySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\PdoListQueryBuilder;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
-use FreeDSx\Ldap\Server\Clock\Sleeper\BlockingSleeper;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\SqlQuery;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SidecarLeaf;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SubtreeRename;
@@ -92,25 +89,17 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     private readonly PdoListQueryBuilder $queryBuilder;
 
-    private readonly PdoTransactor $transactor;
-
-    private readonly PdoStatementPool $statements;
-
     /**
-     * @param EntryIndexWriter $indexes Must share $statements, so the two see one connection and one cache.
-     * @param ?PdoStatementPool $statements Must draw from $provider; defaults to a pool of its own over that connection.
-     * @param ?PdoTransactor $transactor Must draw from $provider; defaults to one of its own over that connection.
-     * @param ?ChangeJournalInterface $journal Must share $transactor so an append joins the write it belongs to.
+     * @param EntryIndexWriter $indexes Must share $connection, so the two see one connection and one cache.
+     * @param ?ChangeJournalInterface $journal Must share $connection so an append joins the write it belongs to.
      * @param ?EntryLinks $links Resolves linked values; without it no entry carries links and reads are unchanged.
      */
     public function __construct(
-        private readonly PdoConnectionProviderInterface $provider,
+        private readonly PdoConnection $connection,
         private readonly FilterTranslatorInterface $translator,
         private readonly PdoDialectInterface $dialect,
         private readonly AttributeContextInterface $attributeContext,
         private readonly EntryIndexWriter $indexes,
-        ?PdoStatementPool $statements = null,
-        ?PdoTransactor $transactor = null,
         ?ChangeJournalInterface $journal = null,
         private readonly ?EntryLinks $links = null,
     ) {
@@ -121,19 +110,12 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         }
 
         $this->queryBuilder = new PdoListQueryBuilder($dialect);
-        $this->transactor = $transactor ?? new PdoTransactor(
-            $provider,
-            $dialect,
-            new BlockingSleeper(),
-        );
-        $this->statements = $statements ?? new PdoStatementPool($provider);
         $this->journal = $journal;
     }
 
     public function reset(): void
     {
-        $this->provider->reset();
-        $this->statements->reset();
+        $this->connection->reset();
     }
 
     public static function initialize(
@@ -172,7 +154,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function find(Dn $dn): ?Entry
     {
-        $stmt = $this->statements->execute(
+        $stmt = $this->connection->execute(
             $this->dialect->queryFetchEntry(),
             [$dn->normalize()->toString()],
         );
@@ -191,7 +173,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function exists(Dn $dn): bool
     {
-        $stmt = $this->statements->execute(
+        $stmt = $this->connection->execute(
             $this->dialect->queryExists(),
             [$dn->normalize()->toString()],
         );
@@ -257,7 +239,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             // The unique key on lc_dn is the arbiter, since a row lock on a DN that holds no row locks only the gap.
             $this->translatingRefusal(
                 function () use ($lcDn, $dnString, $normDn, $entry): void {
-                    $this->statements->execute($this->dialect->queryInsert(), [
+                    $this->connection->execute($this->dialect->queryInsert(), [
                         $lcDn,
                         $dnString,
                         $normDn->getParent()?->toString() ?? '',
@@ -293,7 +275,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
                 ? null
                 : $this->lockedEntry($normDn);
 
-            $this->statements->execute($this->dialect->queryUpsert(), [
+            $this->connection->execute($this->dialect->queryUpsert(), [
                 $lcDn,
                 $dnString,
                 $normDn->getParent()?->toString() ?? '',
@@ -342,7 +324,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             );
 
             $this->translatingRefusal(function () use ($rename): void {
-                $this->statements->execute(
+                $this->connection->execute(
                     $this->dialect->queryRenameDescendants(),
                     $this->renameDescendantParams($rename),
                 );
@@ -350,7 +332,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
             $this->translatingRefusal(
                 function () use ($rename, $to): void {
-                    $this->statements->execute($this->dialect->queryRenameEntry(), [
+                    $this->connection->execute($this->dialect->queryRenameEntry(), [
                         $rename->toDisplay,
                         $rename->lcTo,
                         $to->normalize()->getParent()?->toString() ?? '',
@@ -364,7 +346,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function remove(Dn $dn): void
     {
-        $this->statements->execute(
+        $this->connection->execute(
             $this->dialect->queryDelete(),
             [$dn->normalize()->toString()],
         );
@@ -375,9 +357,9 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
      */
     public function removeAll(array $dns): void
     {
-        $this->transactor->joinAtomic(function () use ($dns): void {
+        $this->connection->joinAtomic(function () use ($dns): void {
             foreach (array_chunk($dns, self::DELETE_BATCH_SIZE) as $chunk) {
-                $this->statements->execute(
+                $this->connection->execute(
                     $this->dialect->queryDeleteIn(count($chunk)),
                     array_map(
                         static fn(Dn $dn): string => $dn->normalize()->toString(),
@@ -390,7 +372,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function hasChildren(Dn $dn): bool
     {
-        $stmt = $this->statements->execute(
+        $stmt = $this->connection->execute(
             $this->dialect->queryHasChildren(),
             [$dn->normalize()->toString()],
         );
@@ -400,7 +382,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function namingContexts(): array
     {
-        $stmt = $this->statements->execute($this->dialect->queryNamingContexts());
+        $stmt = $this->connection->execute($this->dialect->queryNamingContexts());
 
         $contexts = [];
         while (($row = $stmt->fetch()) !== false) {
@@ -415,13 +397,13 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function atomic(callable $operation): void
     {
-        $this->transactor->atomic($operation);
+        $this->connection->atomic($operation);
     }
 
     public function lockForWrite(Dn $dn): void
     {
         $this->dialect->lockRowForWrite(
-            $this->transactor->pdo(),
+            $this->connection->pdo(),
             'entries',
             'lc_dn',
             $dn->normalize()->toString(),
@@ -431,7 +413,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     public function lockForReference(Dn $dn): bool
     {
         return $this->dialect->lockRowForReference(
-            $this->transactor->pdo(),
+            $this->connection->pdo(),
             'entries',
             'lc_dn',
             $dn->normalize()->toString(),
@@ -600,7 +582,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             ) probe
             SQL;
 
-        $row = $this->statements->execute($sql, $leaf->params)->fetch();
+        $row = $this->connection->execute($sql, $leaf->params)->fetch();
         $count = is_array($row)
             ? ($row['c'] ?? 0)
             : 0;
@@ -706,7 +688,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         ?int $deliveredBefore = null,
     ): Generator {
         $rows = new BatchedRows(
-            $this->statements->execute(
+            $this->connection->execute(
                 $query->sql,
                 $query->params,
             ),
@@ -788,7 +770,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     private function lockedEntry(Dn $normDn): ?Entry
     {
         $this->dialect->lockRowForWrite(
-            $this->transactor->pdo(),
+            $this->connection->pdo(),
             'entries',
             'lc_dn',
             $normDn->toString(),
@@ -827,7 +809,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
      */
     private function entryIdFor(Dn $normDn): int
     {
-        $row = $this->statements
+        $row = $this->connection
             ->execute(
                 $this->dialect->queryEntryId(),
                 [$normDn->toString()],

@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
@@ -296,25 +297,22 @@ final class PdoChangeJournalTest extends TestCase
         $pdo = new RecordingPdo('sqlite::memory:');
         $dialect = new SqliteDialect();
         PdoStorage::initialize($pdo, $dialect);
-        $provider = new SharedPdoConnectionProvider($pdo);
-        $transactor = new PdoTransactor(
-            $provider,
+        $connection = $this->connectionOn(
+            $pdo,
             $dialect,
         );
-        $statements = new PdoStatementPool($provider);
         $journal = new PdoChangeJournal(
-            $transactor,
+            $connection,
             $dialect,
-            $statements,
             new PdoJournalGeneration(
                 $dialect,
-                $statements,
+                $connection,
             ),
             new ReplicaId('node-a'),
             $this->clock,
         );
 
-        $transactor->atomic(static function () use ($journal): void {
+        $connection->atomic(static function () use ($journal): void {
             $journal->append(new PendingChange(
                 changeType: ChangeType::Add,
                 dn: new Dn('cn=a,dc=example,dc=com'),
@@ -367,22 +365,36 @@ final class PdoChangeJournalTest extends TestCase
     {
         $dialect = new SqliteDialect();
         PdoStorage::initialize($pdo, $dialect);
-        $provider = new SharedPdoConnectionProvider($pdo);
-        $statements = new PdoStatementPool($provider);
+        $connection = $this->connectionOn(
+            $pdo,
+            $dialect,
+        );
 
         return new PdoChangeJournal(
+            $connection,
+            $dialect,
+            new PdoJournalGeneration(
+                $dialect,
+                $connection,
+            ),
+            new ReplicaId('node-a'),
+            $this->clock,
+        );
+    }
+
+    private function connectionOn(
+        PDO $pdo,
+        SqliteDialect $dialect,
+    ): PdoConnection {
+        $provider = new SharedPdoConnectionProvider($pdo);
+
+        return new PdoConnection(
+            $provider,
+            new PdoStatementPool($provider),
             new PdoTransactor(
                 $provider,
                 $dialect,
             ),
-            $dialect,
-            $statements,
-            new PdoJournalGeneration(
-                $dialect,
-                $statements,
-            ),
-            new ReplicaId('node-a'),
-            $this->clock,
         );
     }
 

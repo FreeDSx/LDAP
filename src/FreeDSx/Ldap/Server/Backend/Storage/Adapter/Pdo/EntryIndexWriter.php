@@ -15,7 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoEntryDialectInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
@@ -35,7 +35,7 @@ final readonly class EntryIndexWriter
 
     public function __construct(
         private PdoEntryDialectInterface $dialect,
-        private PdoStatementPool $statements,
+        private PdoConnection $connection,
         private AttributeIndexForms $indexForms,
         private SubstringIndexInterface $substringIndex = new NoSubstringIndex(),
     ) {}
@@ -47,7 +47,7 @@ final readonly class EntryIndexWriter
         int $entryId,
         Entry $entry,
     ): void {
-        $this->statements->execute(
+        $this->connection->execute(
             $this->dialect->querySidecarDelete(),
             [$entryId],
         );
@@ -122,7 +122,7 @@ final readonly class EntryIndexWriter
                 $params[] = $valueLower;
             }
 
-            $this->statements->execute(
+            $this->connection->execute(
                 $this->dialect->querySidecarDeleteValues(count($chunk)),
                 $params,
             );
@@ -235,7 +235,7 @@ final readonly class EntryIndexWriter
             $entryId,
             $entry,
             function (string $sql, array $params): void {
-                $this->statements->execute(
+                $this->connection->execute(
                     $sql,
                     $params,
                 );
@@ -274,7 +274,7 @@ final readonly class EntryIndexWriter
                 $params[] = $row[3];
             }
 
-            $this->statements->execute(
+            $this->connection->execute(
                 $this->dialect->querySidecarInsertPrefix() . $placeholders,
                 $params,
             );

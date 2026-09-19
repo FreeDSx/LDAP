@@ -17,6 +17,7 @@ use Closure;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\CoroutinePdoConnectionProvider;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
@@ -102,36 +103,45 @@ final readonly class PdoStorageFactory
 
     public function storageOn(PdoConnectionProviderInterface $provider): PdoStorage
     {
-        // Storage and its index writer share one statement pool, so both draw from the same connection and cache.
-        $statements = new PdoStatementPool($provider);
-        // The journal shares the transactor so an append joins the write transaction it belongs to.
-        $transactor = new PdoTransactor(
-            $provider,
-            $this->dialect,
-            $this->sleeper,
-        );
+        return $this->storageWith($this->connectionOn($provider));
+    }
 
-        return new PdoStorage(
+    /**
+     * Everything on one connection shares its statement pool and transactor, so a journal append joins the write.
+     */
+    private function connectionOn(PdoConnectionProviderInterface $provider): PdoConnection
+    {
+        return new PdoConnection(
             $provider,
+            new PdoStatementPool($provider),
+            new PdoTransactor(
+                $provider,
+                $this->dialect,
+                $this->sleeper,
+            ),
+        );
+    }
+
+    private function storageWith(PdoConnection $connection): PdoStorage
+    {
+        return new PdoStorage(
+            $connection,
             $this->translator,
             $this->dialect,
             $this->attributeContext,
             new EntryIndexWriter(
                 $this->dialect,
-                $statements,
+                $connection,
                 $this->indexForms,
                 $this->substringIndex,
             ),
-            $statements,
-            $transactor,
             $this->journalConfig === null ? null : AuditingChangeJournal::wrap(
                 new PdoChangeJournal(
-                    $transactor,
+                    $connection,
                     $this->dialect,
-                    $statements,
                     new PdoJournalGeneration(
                         $this->dialect,
-                        $statements,
+                        $connection,
                     ),
                     $this->origin,
                 ),
@@ -139,22 +149,17 @@ final readonly class PdoStorageFactory
             ),
             $this->linked === null ? null : new EntryLinks(
                 $this->dialect,
-                $statements,
+                $connection,
                 $this->linked,
             ),
         );
     }
 
-    public function replicaStoreOn(PdoConnectionProviderInterface $provider): PdoReplicaPasswordStateStore
+    private function replicaStoreWith(PdoConnection $connection): PdoReplicaPasswordStateStore
     {
         return new PdoReplicaPasswordStateStore(
-            new PdoTransactor(
-                $provider,
-                $this->dialect,
-                $this->sleeper,
-            ),
+            $connection,
             $this->dialect,
-            new PdoStatementPool($provider),
         );
     }
 
@@ -163,9 +168,11 @@ final readonly class PdoStorageFactory
      */
     private function assembleOnSingleProvider(PdoConnectionProviderInterface $provider): PdoBackend
     {
+        $connection = $this->connectionOn($provider);
+
         return new PdoBackend(
-            $this->storageOn($provider),
-            $this->replicaStoreOn($provider),
+            $this->storageWith($connection),
+            $this->replicaStoreWith($connection),
         );
     }
 
@@ -174,11 +181,11 @@ final readonly class PdoStorageFactory
      */
     private function assembleSerializedSwoole(): PdoBackend
     {
-        $reads = $this->coroutineProvider();
-        $writes = $this->sharedProvider();
+        $reads = $this->connectionOn($this->coroutineProvider());
+        $writes = $this->connectionOn($this->sharedProvider());
         // Each side journals on its own connection: the writer captures changes, the reader serves sync polls.
-        $writeStorage = $this->storageOn($writes);
-        $readStorage = $this->storageOn($reads);
+        $writeStorage = $this->storageWith($writes);
+        $readStorage = $this->storageWith($reads);
         $queue = new SwooleWriterQueue(
             batchWrapper: static fn(Closure $cb) => $writeStorage->atomic(static fn() => $cb()),
         );
@@ -190,8 +197,8 @@ final readonly class PdoStorageFactory
                 queue: $queue,
             ),
             new SerializingReplicaPasswordStateStore(
-                reads: $this->replicaStoreOn($reads),
-                writes: $this->replicaStoreOn($writes),
+                reads: $this->replicaStoreWith($reads),
+                writes: $this->replicaStoreWith($writes),
                 queue: $queue,
             ),
         );
