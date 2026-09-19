@@ -20,11 +20,14 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Pdo\EntryLinkFixtureTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class EntryReaderTest extends TestCase
 {
+    use EntryLinkFixtureTrait;
+
     use ServerContainerTrait;
 
     private EntryReader $subject;
@@ -64,6 +67,7 @@ final class EntryReaderTest extends TestCase
         $this->store('cn=Bob,dc=example,dc=com');
         $this->store('cn=Admins,dc=example,dc=com');
         $this->linkTogether(
+            $this->fromContainer(PdoConnection::class)->pdo(),
             'cn=admins,dc=example,dc=com',
             'cn=bob,dc=example,dc=com',
         );
@@ -137,27 +141,5 @@ final class EntryReaderTest extends TestCase
     private function store(string $dn): void
     {
         $this->storage->store(new Entry(new Dn($dn)));
-    }
-
-    /**
-     * Writes a member link straight into the table, since the write path does not divert values into it yet.
-     */
-    private function linkTogether(
-        string $ownerLcDn,
-        string $targetLcDn,
-    ): void {
-        $this->fromContainer(PdoConnection::class)
-            ->pdo()
-            ->prepare(
-                'INSERT INTO entry_attribute_links (owner_entry_id, attr_name_lower, target_entry_id, target_uid)
-                 SELECT o.entry_id, ?, t.entry_id, \'\'
-                 FROM entries o, entries t
-                 WHERE o.lc_dn = ? AND t.lc_dn = ?',
-            )
-            ->execute([
-                'member',
-                $ownerLcDn,
-                $targetLcDn,
-            ]);
     }
 }
