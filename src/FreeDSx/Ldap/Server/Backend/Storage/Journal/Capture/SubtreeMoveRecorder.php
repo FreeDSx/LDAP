@@ -75,7 +75,7 @@ final readonly class SubtreeMoveRecorder
         Dn $normOld,
         Dn $normNew,
     ): Dn {
-        $lcDn = $movedDn->normalize()->toString();
+        $lcDn = $movedDn->normalizedString();
 
         return Dn::fromCanonical(
             substr(

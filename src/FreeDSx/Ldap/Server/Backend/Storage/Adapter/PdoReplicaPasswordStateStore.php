@@ -259,7 +259,7 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
         $row = $this->connection
             ->execute(
                 $this->dialect->queryEntryId(),
-                [$dn->normalize()->toString()],
+                [$dn->normalizedString()],
             )
             ->fetch();
 

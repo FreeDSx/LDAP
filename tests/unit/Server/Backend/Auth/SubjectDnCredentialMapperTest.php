@@ -81,8 +81,8 @@ final class SubjectDnCredentialMapperTest extends TestCase
         self::assertNotNull($authzId);
         self::assertTrue($authzId->isType(AuthzIdType::Dn));
         self::assertSame(
-            (new Dn('cn=foo,o=acme,c=us'))->normalize()->toString(),
-            (new Dn($authzId->getValue()))->normalize()->toString(),
+            (new Dn('cn=foo,o=acme,c=us'))->normalizedString(),
+            (new Dn($authzId->getValue()))->normalizedString(),
         );
     }
 
@@ -92,8 +92,8 @@ final class SubjectDnCredentialMapperTest extends TestCase
 
         self::assertNotNull($authzId);
         self::assertSame(
-            (new Dn('cn=bar,dc=example,dc=com'))->normalize()->toString(),
-            (new Dn($authzId->getValue()))->normalize()->toString(),
+            (new Dn('cn=bar,dc=example,dc=com'))->normalizedString(),
+            (new Dn($authzId->getValue()))->normalizedString(),
         );
     }
 

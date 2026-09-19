@@ -251,6 +251,14 @@ class DnTest extends TestCase
         );
     }
 
+    public function test_normalized_string_is_the_canonical_form_as_a_string(): void
+    {
+        self::assertSame(
+            'cn=alice,dc=example,dc=com',
+            (new Dn('CN=Alice, DC=Example,DC=Com'))->normalizedString(),
+        );
+    }
+
     public function test_is_child_of_returns_true_for_direct_child(): void
     {
         $child = new Dn('cn=alice,dc=example,dc=com');

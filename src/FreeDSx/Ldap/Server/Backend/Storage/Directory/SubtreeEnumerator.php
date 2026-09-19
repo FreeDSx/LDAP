@@ -68,7 +68,7 @@ final readonly class SubtreeEnumerator
         );
 
         foreach ($this->storage->list($options)->entries() as $entry) {
-            if ($entry->getDn()->normalize()->toString() !== $base->toString()) {
+            if ($entry->getDn()->normalizedString() !== $base->toString()) {
                 $descendants[] = $entry;
             }
         }

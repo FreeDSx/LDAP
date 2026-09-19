@@ -67,12 +67,12 @@ final class InMemoryStorage implements EntryStorageInterface
 
     public function find(Dn $dn): ?Entry
     {
-        return $this->entries[$dn->normalize()->toString()] ?? null;
+        return $this->entries[$dn->normalizedString()] ?? null;
     }
 
     public function exists(Dn $dn): bool
     {
-        return isset($this->entries[$dn->normalize()->toString()]);
+        return isset($this->entries[$dn->normalizedString()]);
     }
 
     public function list(StorageListOptions $options): EntryStream
@@ -86,7 +86,7 @@ final class InMemoryStorage implements EntryStorageInterface
 
     public function insert(Entry $entry): void
     {
-        $lcDn = $entry->getDn()->normalize()->toString();
+        $lcDn = $entry->getDn()->normalizedString();
 
         if (isset($this->entries[$lcDn])) {
             throw new EntryAlreadyExistsException(
@@ -101,7 +101,7 @@ final class InMemoryStorage implements EntryStorageInterface
         Entry $entry,
         bool $rebuildIndexes = false,
     ): void {
-        $lcDn = $entry->getDn()->normalize()->toString();
+        $lcDn = $entry->getDn()->normalizedString();
 
         // Overwriting an entry keeps its key, matching the upsert the database adapters do.
         $this->keys[$lcDn] ??= $this->nextKey++;
@@ -140,7 +140,7 @@ final class InMemoryStorage implements EntryStorageInterface
 
     public function remove(Dn $dn): void
     {
-        $lcDn = $dn->normalize()->toString();
+        $lcDn = $dn->normalizedString();
 
         unset($this->entries[$lcDn], $this->keys[$lcDn]);
     }

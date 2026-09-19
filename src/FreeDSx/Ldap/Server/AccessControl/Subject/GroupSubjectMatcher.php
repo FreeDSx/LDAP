@@ -89,10 +89,10 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
             return false;
         }
 
-        $resolvedDn = $token->getResolvedDn()->normalize()->toString();
+        $resolvedDn = $token->getResolvedDn()->normalizedString();
 
         foreach ($memberAttr->getValues() as $value) {
-            if ((new Dn($value))->normalize()->toString() === $resolvedDn) {
+            if ((new Dn($value))->normalizedString() === $resolvedDn) {
                 return true;
             }
         }

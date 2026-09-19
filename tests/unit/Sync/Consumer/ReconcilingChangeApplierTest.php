@@ -97,7 +97,7 @@ final class ReconcilingChangeApplierTest extends TestCase
             ->expects(self::once())
             ->method('discardIfSuperseded')
             ->with(
-                self::callback(static fn(Dn $dn): bool => $dn->toString() === (new Dn(self::DN))->normalize()->toString()),
+                self::callback(static fn(Dn $dn): bool => $dn->toString() === (new Dn(self::DN))->normalizedString()),
                 self::callback(static fn(UserPasswordState $state): bool => $state->isLocked()),
             );
 
@@ -151,7 +151,7 @@ final class ReconcilingChangeApplierTest extends TestCase
         $this->passwordStateStore
             ->expects(self::once())
             ->method('discard')
-            ->with(self::callback(static fn(Dn $dn): bool => $dn->toString() === (new Dn(self::DN))->normalize()->toString()));
+            ->with(self::callback(static fn(Dn $dn): bool => $dn->toString() === (new Dn(self::DN))->normalizedString()));
 
         $this->subject->apply(
             $this->syncResult(
