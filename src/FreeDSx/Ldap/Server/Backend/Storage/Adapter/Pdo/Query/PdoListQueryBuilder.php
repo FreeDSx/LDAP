@@ -42,8 +42,9 @@ final readonly class PdoListQueryBuilder
             return $streamed;
         }
 
+        $base = $spec->base();
         $subentryCondition = $this->subentryCondition(
-            $spec->subentries,
+            $spec->scope->subentries,
             'entry_id',
         );
         // Resuming an unsorted list seeks on the key directly; a sorted one seeks on the projected key, which only
@@ -56,21 +57,21 @@ final readonly class PdoListQueryBuilder
             : null;
 
         $query = match (true) {
-            !$spec->subtree => $this->buildChildQuery(
-                $spec->base,
+            !$spec->scope->subtree => $this->buildChildQuery(
+                $base,
                 $spec->filter,
                 $subentryCondition,
                 $seek,
                 $spec->withChildFlag,
             ),
-            $spec->base === '' => $this->buildRootQuery(
+            $base === '' => $this->buildRootQuery(
                 $spec->filter,
                 $subentryCondition,
                 $seek,
                 $spec->withChildFlag,
             ),
             default => $this->buildSubtreeQuery(
-                $spec->base,
+                $base,
                 $spec->filter,
                 $subentryCondition,
                 $seek,
@@ -115,7 +116,7 @@ final readonly class PdoListQueryBuilder
     ): SqlQuery {
         $fetchAll = $this->dialect->queryFetchAll($spec->withChildFlag);
         $params = $filterParams;
-        $base = $spec->base;
+        $base = $spec->base();
         $after = $spec->after;
 
         // This shape exists to bound the candidate scan, so it is only ever built with a bound to spend.
@@ -125,7 +126,7 @@ final readonly class PdoListQueryBuilder
 
         // Applied inside the candidate select, since the limit below it would otherwise be spent on excluded rows.
         $subentryCondition = $this->subentryCondition(
-            $spec->subentries,
+            $spec->scope->subentries,
             's.owner_entry_id',
         );
         $subentryClause = $subentryCondition !== null
@@ -183,7 +184,7 @@ final readonly class PdoListQueryBuilder
      */
     private function tryBuildStreamingQuery(ListQuerySpec $spec): ?SqlQuery
     {
-        if (!$spec->subtree || $spec->limit === null || $spec->sortKeys !== []) {
+        if (!$spec->scope->subtree || $spec->limit === null || $spec->sortKeys !== []) {
             return null;
         }
 

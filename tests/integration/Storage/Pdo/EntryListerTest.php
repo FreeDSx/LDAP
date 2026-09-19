@@ -26,6 +26,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryLister;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ReadBounds;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
@@ -83,11 +85,22 @@ final class EntryListerTest extends TestCase
         self::assertSame(
             ['cn=spaced, dc=example,dc=com', 'cn=plain,dc=example,dc=com'],
             $this->dns(new StorageListOptions(
-                baseDn: new Dn(self::BASE),
-                subtree: true,
+                scope: $this->subtreeScope(),
                 filter: Filters::present('sn'),
                 sortKeys: [new SortKey('sn')],
             )),
+        );
+    }
+
+    public function test_first_child_reads_one_entry_when_several_are_below_the_base(): void
+    {
+        $this->store('cn=Alice,dc=example,dc=com');
+        $this->store('cn=Bob,dc=example,dc=com');
+        $this->store('cn=Carol,dc=example,dc=com');
+
+        self::assertSame(
+            ['cn=Alice,dc=example,dc=com'],
+            $this->dns(StorageListOptions::firstChild(new Dn(self::BASE))),
         );
     }
 
@@ -100,12 +113,11 @@ final class EntryListerTest extends TestCase
             );
         }
 
-        foreach ([1, 2, 3] as $maxEntries) {
+        foreach ([1, 2, 3] as $lookthroughLimit) {
             $this->dns(new StorageListOptions(
-                baseDn: new Dn(self::BASE),
-                subtree: true,
+                scope: $this->subtreeScope(),
                 filter: Filters::equal('sn', 'x'),
-                maxEntries: $maxEntries,
+                bounds: new ReadBounds(lookthroughLimit: $lookthroughLimit),
             ));
         }
 
@@ -126,8 +138,7 @@ final class EntryListerTest extends TestCase
         );
 
         $entries = iterator_to_array($this->subject->list(new StorageListOptions(
-            baseDn: new Dn(self::BASE),
-            subtree: true,
+            scope: $this->subtreeScope(),
             filter: Filters::equal('sn', 'x'),
             projection: new EntryProjection([]),
         ))->entries());
@@ -379,8 +390,7 @@ final class EntryListerTest extends TestCase
     private function linkedValuesByDn(int $cap): array
     {
         $options = new StorageListOptions(
-            baseDn: new Dn(self::BASE),
-            subtree: true,
+            scope: $this->subtreeScope(),
             filter: Filters::present('cn'),
             projection: new EntryProjection(linkCap: $cap),
         );
@@ -403,10 +413,17 @@ final class EntryListerTest extends TestCase
     private function allWithCn(?array $attributes = null): StorageListOptions
     {
         return new StorageListOptions(
-            baseDn: new Dn(self::BASE),
-            subtree: true,
+            scope: $this->subtreeScope(),
             filter: Filters::present('cn'),
             projection: new EntryProjection($attributes),
+        );
+    }
+
+    private function subtreeScope(): ListScope
+    {
+        return new ListScope(
+            baseDn: new Dn(self::BASE),
+            subtree: true,
         );
     }
 
@@ -431,7 +448,12 @@ final class EntryListerTest extends TestCase
         FilterInterface $filter,
     ): array {
         $dns = [];
-        foreach ($lister->list(new StorageListOptions(new Dn(self::BASE), true, $filter))->entries() as $entry) {
+        $options = new StorageListOptions(
+            scope: $this->subtreeScope(),
+            filter: $filter,
+        );
+
+        foreach ($lister->list($options)->entries() as $entry) {
             $dns[] = $entry->getDn()->toString();
         }
 

@@ -14,12 +14,14 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
 use FreeDSx\Ldap\Control\Sorting\SortKey;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\ListQuerySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\PdoListQueryBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterResult;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
 use PHPUnit\Framework\TestCase;
 
 final class PdoListQueryBuilderTest extends TestCase
@@ -391,8 +393,10 @@ final class PdoListQueryBuilderTest extends TestCase
         array $sortKeys = [],
     ): ListQuerySpec {
         return new ListQuerySpec(
-            base: $base,
-            subtree: $subtree,
+            scope: new ListScope(
+                baseDn: new Dn($base),
+                subtree: $subtree,
+            ),
             filter: $filter,
             limit: $limit,
             sortKeys: $sortKeys,

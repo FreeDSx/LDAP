@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnecti
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
@@ -118,8 +119,10 @@ final class Fts5SubstringIndexTest extends TestCase
         ));
 
         $stream = $storage->list(new StorageListOptions(
-            baseDn: new Dn('dc=example,dc=com'),
-            subtree: true,
+            scope: new ListScope(
+                baseDn: new Dn('dc=example,dc=com'),
+                subtree: true,
+            ),
             filter: Filters::contains('cn', 'smith'),
         ));
 

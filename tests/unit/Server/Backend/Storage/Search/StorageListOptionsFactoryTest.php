@@ -13,11 +13,16 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Search;
 
+use FreeDSx\Ldap\Control\ControlBag;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Search\Filters;
+use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\StorageListOptionsFactory;
+use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\SearchLimits;
+use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
@@ -78,6 +83,101 @@ final class StorageListOptionsFactoryTest extends TestCase
                 'sn',
             ],
             $this->subject->projectionFor($request)->attributes,
+        );
+    }
+
+    public function test_the_projection_asks_for_has_subordinates_when_the_request_names_it(): void
+    {
+        $request = $this->request->setAttributes('hasSubordinates');
+
+        self::assertTrue($this->subject->projectionFor($request)->withHasSubordinates);
+    }
+
+    public function test_the_projection_does_not_ask_for_has_subordinates_when_the_request_omits_it(): void
+    {
+        self::assertFalse($this->subject->projectionFor($this->request)->withHasSubordinates);
+    }
+
+    public function test_the_scope_carries_the_base_depth_and_subentry_visibility(): void
+    {
+        $scope = $this->make(
+            $this->request->useSubtreeScope(),
+            subentries: SubentryVisibility::Hide,
+        )->scope;
+
+        self::assertSame(
+            'dc=foo,dc=bar',
+            $scope->baseDn->toString(),
+        );
+        self::assertTrue($scope->subtree);
+        self::assertSame(
+            SubentryVisibility::Hide,
+            $scope->subentries,
+        );
+    }
+
+    public function test_a_slice_deadline_bounds_the_read_over_the_time_limit(): void
+    {
+        $deadline = microtime(true) + 5.0;
+
+        self::assertSame(
+            $deadline,
+            $this->make(
+                $this->request->timeLimit(60),
+                slice: new PageSlice(
+                    limit: 10,
+                    deadline: $deadline,
+                ),
+            )->bounds->deadline,
+        );
+    }
+
+    public function test_a_slice_without_a_deadline_falls_back_to_the_time_limit(): void
+    {
+        $before = microtime(true);
+        $deadline = $this->make(
+            $this->request->timeLimit(60),
+            slice: new PageSlice(limit: 10),
+        )->bounds->deadline;
+
+        self::assertNotNull($deadline);
+        self::assertGreaterThanOrEqual(
+            $before + 60,
+            $deadline,
+        );
+    }
+
+    public function test_the_bounds_carry_the_lookthrough_limit_and_slice(): void
+    {
+        $bounds = $this->make(
+            $this->request,
+            limits: new SearchLimits(maxSearchLookthrough: 42),
+            slice: new PageSlice(limit: 7),
+        )->bounds;
+
+        self::assertSame(
+            42,
+            $bounds->lookthroughLimit,
+        );
+        self::assertSame(
+            7,
+            $bounds->limit(),
+        );
+    }
+
+    private function make(
+        SearchRequest $request,
+        SubentryVisibility $subentries = SubentryVisibility::All,
+        ?SearchLimits $limits = null,
+        ?PageSlice $slice = null,
+    ): StorageListOptions {
+        return $this->subject->make(
+            $request,
+            new Dn('dc=foo,dc=bar'),
+            new ControlBag(),
+            $subentries,
+            $limits,
+            $slice,
         );
     }
 }

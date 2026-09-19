@@ -47,7 +47,7 @@ trait ArrayEntryStorageTrait
     ): EntryStream {
         $scoped = $this->yieldByScope($options, $entries);
 
-        if ($options->withHasSubordinates) {
+        if ($options->projection->withHasSubordinates) {
             $scoped = $this->withChildFlag(
                 $scoped,
                 $this->parentDnsIn($entries),
@@ -126,9 +126,9 @@ trait ArrayEntryStorageTrait
         array $keys,
         StorageListOptions $options,
     ): Generator {
-        $after = $options->resumeAfter()?->position;
-        $cursor = $options->resumeAfter();
-        $limit = $options->limit();
+        $after = $options->bounds->resumeAfter()?->position;
+        $cursor = $options->bounds->resumeAfter();
+        $limit = $options->bounds->limit();
         $taken = 0;
         $hasMore = false;
 
@@ -180,8 +180,8 @@ trait ArrayEntryStorageTrait
         iterable $entries,
         StorageListOptions $options,
     ): Generator {
-        $delivered = $options->resumeAfter()->position ?? 0;
-        $limit = $options->limit();
+        $delivered = $options->bounds->resumeAfter()->position ?? 0;
+        $limit = $options->bounds->limit();
         $skipped = 0;
         $taken = 0;
         $hasMore = false;
@@ -243,7 +243,8 @@ trait ArrayEntryStorageTrait
         StorageListOptions $options,
         array $entries,
     ): Generator {
-        $deadline = $options->deadline;
+        $deadline = $options->bounds->deadline;
+        $scope = $options->scope;
 
         foreach ($entries as $normDn => $entry) {
             if ($deadline !== null && microtime(true) >= $deadline) {
@@ -252,11 +253,11 @@ trait ArrayEntryStorageTrait
 
             $entryDn = Dn::fromCanonical((string) $normDn);
 
-            $inScope = $options->subtree
-                ? $entryDn->isDescendantOf($options->baseDn)
-                : $entryDn->isChildOf($options->baseDn);
+            $inScope = $scope->subtree
+                ? $entryDn->isDescendantOf($scope->baseDn)
+                : $entryDn->isChildOf($scope->baseDn);
 
-            if ($inScope && SubentryDetector::isVisibleUnder($entry, $options->subentries)) {
+            if ($inScope && SubentryDetector::isVisibleUnder($entry, $scope->subentries)) {
                 yield $entry;
             }
         }

@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -295,8 +296,15 @@ final class PdoStorageTest extends TestCase
         PdoStorage $storage,
         FilterInterface $filter,
     ): array {
+        $options = new StorageListOptions(
+            scope: new ListScope(
+                baseDn: new Dn('dc=example,dc=com'),
+                subtree: true,
+            ),
+            filter: $filter,
+        );
         $dns = [];
-        foreach ($storage->list(new StorageListOptions(new Dn('dc=example,dc=com'), true, $filter))->entries() as $entry) {
+        foreach ($storage->list($options)->entries() as $entry) {
             $dns[] = $entry->getDn()->toString();
         }
 

@@ -17,13 +17,14 @@ use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ReadBounds;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 
 /**
- * DTO for EntryStorageInterface::list(), decoupled from LDAP protocol objects.
+ * What EntryStorageInterface::list() reads: its scope, filter, per-entry shape, order and bounds.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -31,40 +32,14 @@ final readonly class StorageListOptions
 {
     /**
      * @param SortKey[] $sortKeys
-     * @param ?float $deadline When the read must stop, established by the caller that knows the operation it serves.
-     * @param int $maxEntries A hard row cap for internal callers that want a bounded read; never the client's size
-     *                        limit, which access control can shrink after the read and so cannot bound it here.
-     * @param ?PageSlice $slice Where to resume and how many candidates to examine, for a caller reading a page.
      */
     public function __construct(
-        public Dn $baseDn,
-        public bool $subtree,
+        public ListScope $scope,
         public FilterInterface $filter,
-        public ?float $deadline = null,
-        public int $maxEntries = 0,
-        public array $sortKeys = [],
-        public int $lookthroughLimit = 0,
         public EntryProjection $projection = new EntryProjection(),
-        public SubentryVisibility $subentries = SubentryVisibility::All,
-        private ?PageSlice $slice = null,
-        public bool $withHasSubordinates = false,
+        public array $sortKeys = [],
+        public ReadBounds $bounds = new ReadBounds(),
     ) {}
-
-    /**
-     * Candidates this read may examine, or null when it is not bounded to a page.
-     */
-    public function limit(): ?int
-    {
-        return $this->slice?->limit;
-    }
-
-    /**
-     * Where to resume, or null to start from the beginning.
-     */
-    public function resumeAfter(): ?PageCursor
-    {
-        return $this->slice?->after;
-    }
 
     /**
      * Every entry in scope, for internal callers that have no requested filter to apply.
@@ -76,11 +51,13 @@ final readonly class StorageListOptions
         EntryProjection $projection = new EntryProjection(),
     ): self {
         return new self(
-            baseDn: $baseDn,
-            subtree: $subtree,
+            scope: new ListScope(
+                baseDn: $baseDn,
+                subtree: $subtree,
+            ),
             filter: new AndFilter(),
-            deadline: $deadline,
             projection: $projection,
+            bounds: new ReadBounds(deadline: $deadline),
         );
     }
 
@@ -92,11 +69,13 @@ final readonly class StorageListOptions
         SubentryVisibility $subentries = SubentryVisibility::All,
     ): self {
         return new self(
-            baseDn: $baseDn,
-            subtree: false,
+            scope: new ListScope(
+                baseDn: $baseDn,
+                subtree: false,
+                subentries: $subentries,
+            ),
             filter: new AndFilter(),
-            maxEntries: 1,
-            subentries: $subentries,
+            bounds: new ReadBounds(slice: new PageSlice(1)),
         );
     }
 }

@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringInde
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\PartialValuesException;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
@@ -491,8 +492,15 @@ final class EntryWriterTest extends TestCase
      */
     private function dnsMatching(FilterInterface $filter): array
     {
+        $options = new StorageListOptions(
+            scope: new ListScope(
+                baseDn: new Dn(self::BASE),
+                subtree: true,
+            ),
+            filter: $filter,
+        );
         $dns = [];
-        foreach ($this->lister->list(new StorageListOptions(new Dn(self::BASE), true, $filter))->entries() as $entry) {
+        foreach ($this->lister->list($options)->entries() as $entry) {
             $dns[] = $entry->getDn()->toString();
         }
 

@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
@@ -43,8 +44,10 @@ final readonly class EntryUuidLocator
             $uuid,
         );
         $stream = $this->storage->list(new StorageListOptions(
-            baseDn: new Dn(''),
-            subtree: true,
+            scope: new ListScope(
+                baseDn: new Dn(''),
+                subtree: true,
+            ),
             filter: $filter,
         ));
 
