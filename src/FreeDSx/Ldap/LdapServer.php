@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Ldif\Loader\LdifLoaderInterface;
 use FreeDSx\Ldap\Ldif\Output\LdifOutputInterface;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\EntryIndexReindexer;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\DrainableWritesInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
@@ -168,6 +169,16 @@ class LdapServer
         $this->container->get(EntryIndexReindexer::class)->reindex();
 
         return $this;
+    }
+
+    /**
+     * The full SQL schema this server's PDO storage runs on as a runnable script.
+     *
+     * @throws RuntimeException when the configured storage is not PDO storage
+     */
+    public function schemaDdl(): string
+    {
+        return $this->container->get(PdoSchema::class)->ddl();
     }
 
     /**

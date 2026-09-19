@@ -510,7 +510,7 @@ MySQL handles concurrent writers itself, so serializing it only costs throughput
 
 ##### setInitializeSchema
 
-Whether the storage issues its DDL on first connect. Turn it off to manage the tables yourself, covered in
+Whether the storage issues its DDL once at startup. Turn it off to manage the tables yourself, covered in
 [Database Schema](Database-Schema.md).
 
 **Default**: `true`.

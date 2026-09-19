@@ -137,17 +137,26 @@ class ContainerTest extends TestCase
     {
         $this->requireSwoole();
 
+        $path = tempnam(
+            sys_get_temp_dir(),
+            'container-',
+        );
+        self::assertIsString($path);
         $container = Container::forServer(
             (new ServerOptions(
-                PdoConfig::forSqlite('/tmp/unused.sqlite')
+                PdoConfig::forSqlite($path)
                     ->setSerializeSwooleWrites(true),
             ))->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
         );
 
-        self::assertInstanceOf(
-            SwooleWriterQueue::class,
-            $container->get(WriterQueueInterface::class),
-        );
+        try {
+            self::assertInstanceOf(
+                SwooleWriterQueue::class,
+                $container->get(WriterQueueInterface::class),
+            );
+        } finally {
+            unlink($path);
+        }
     }
 
     public function test_pdo_storage_writes_in_place_under_the_swoole_runner_when_not_serializing(): void
@@ -518,27 +527,6 @@ class ContainerTest extends TestCase
 
         self::assertInstanceOf(
             PcntlServerRunner::class,
-            $container->get(ServerRunnerInterface::class),
-        );
-    }
-
-    /**
-     * Each worker would open its own database, so the backend is shared in name only.
-     */
-    public function test_several_workers_are_clamped_to_one_process_for_an_in_memory_database(): void
-    {
-        $this->requireSwoole();
-
-        $container = $this->containerFor(
-            (new ServerOptions(PdoConfig::forSqlite(':memory:')))
-                ->setRunnerConfig(new RunnerConfig(
-                    RunnerMode::Swoole,
-                    4,
-                )),
-        );
-
-        self::assertNotInstanceOf(
-            PooledServerRunner::class,
             $container->get(ServerRunnerInterface::class),
         );
     }

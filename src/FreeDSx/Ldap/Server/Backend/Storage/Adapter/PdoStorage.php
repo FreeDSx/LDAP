@@ -39,8 +39,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -51,13 +49,10 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use Closure;
 use Generator;
-use PDO;
 use PDOException;
 
 /**
  * PDO-backed storage; the container builds it from a PdoConfig set via ServerOptions::setStorageConfig().
- *
- * When injecting a pre-built PDO, wrap it in SharedPdoConnectionProvider and call PdoStorage::initialize($pdo, $dialect) first.
  *
  * @internal
  *
@@ -66,11 +61,6 @@ use PDOException;
 final class PdoStorage implements EntryStorageInterface, ResettableInterface, ChangeJournalingInterface, RowLockableInterface
 {
     use ChangeJournalingTrait;
-
-    /**
-     * The current schema revision shipped in resources/pdo-schema.
-     */
-    public const SCHEMA_VERSION = 1;
 
     /**
      * Match ceiling for a composed AND's drivable leaf: below it the leaf is a cheap, complete driver via a near-free probe.
@@ -115,40 +105,6 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
     public function reset(): void
     {
         $this->connection->reset();
-    }
-
-    public static function initialize(
-        PDO $pdo,
-        PdoDialectInterface $dialect,
-        SubstringIndexInterface $substringIndex = new NoSubstringIndex(),
-    ): void {
-        $pdo->setAttribute(
-            PDO::ATTR_ERRMODE,
-            PDO::ERRMODE_EXCEPTION,
-        );
-        $pdo->setAttribute(
-            PDO::ATTR_DEFAULT_FETCH_MODE,
-            PDO::FETCH_ASSOC,
-        );
-
-        $statements = [
-            ...$dialect->schemaStatements(),
-            ...$substringIndex->schemaStatements($dialect),
-        ];
-
-        foreach ($statements as $statement) {
-            $pdo->exec($statement);
-        }
-
-        self::stampSchemaVersion($pdo);
-    }
-
-    /**
-     * The full schema for a dialect as a runnable SQL script, to export to a file or feed to a migration tool.
-     */
-    public static function schemaDdl(PdoDialectInterface $dialect): string
-    {
-        return $dialect->schemaSql();
     }
 
     public function find(Dn $dn): ?Entry
@@ -494,19 +450,6 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
         return $ceiling === null
             ? $sliceRead
             : min($ceiling, $sliceRead);
-    }
-
-    /**
-     * Records the schema the tables were created from, so a database states which revision it holds.
-     */
-    private static function stampSchemaVersion(PDO $pdo): void
-    {
-        $statement = $pdo->prepare(<<<SQL
-            INSERT INTO ldap_schema_version (id, version)
-            SELECT 1, ?
-            WHERE NOT EXISTS (SELECT 1 FROM ldap_schema_version WHERE id = 1)
-            SQL);
-        $statement->execute([self::SCHEMA_VERSION]);
     }
 
     /**

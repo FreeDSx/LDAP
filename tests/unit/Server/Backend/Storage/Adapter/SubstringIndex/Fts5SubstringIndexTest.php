@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
@@ -89,11 +90,10 @@ final class Fts5SubstringIndexTest extends TestCase
 
         $pdo = new PDO('sqlite::memory:');
         $index = new Fts5SubstringIndex();
-        PdoStorage::initialize(
-            $pdo,
+        (new PdoSchema(
             new SqliteDialect(),
             $index,
-        );
+        ))->apply($pdo);
 
         // Auto resolves to FTS5 on a build that has it, which the skip above has already established.
         $storage = $this->fromContainer(

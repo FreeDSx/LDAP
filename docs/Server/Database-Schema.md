@@ -13,12 +13,11 @@ how to manage it yourself.
 
 ## Automatic Setup
 
-By default the SQLite and MySQL adapters create their tables the first time they connect, using
-`CREATE TABLE IF NOT EXISTS`, so a fresh database just works. Re-connecting is a no-op. This is convenient for testing
-and development use.
+By default the SQLite and MySQL adapters create their tables once at startup, using `CREATE TABLE IF NOT EXISTS`, so a
+fresh database just works and a restart is a no-op. This is convenient for testing and development use.
 
-This applies the baseline schema only. The library never runs migration deltas, so automatic setup does not upgrade an
-existing database to a newer schema; it only brings a fresh one up to the current baseline.
+Automatic setup never runs migration deltas, so it does not upgrade an existing database to a newer schema; it only
+brings a fresh one up to the current baseline.
 
 ## The Schema Files
 
@@ -29,8 +28,12 @@ The schema ships in the package under `resources/pdo-schema`:
 * `resources/pdo-schema/<dialect>/migrations/` holds versioned delta files, named `V<n>__<description>.sql`, added when the
   schema changes.
 
-Point your migration tool at these files, or copy them into your project. If you would rather get the baseline as a
-string in code, `PdoStorage::schemaDdl(new SqliteDialect())` and `PdoStorage::schemaDdl(new MysqlDialect())` return the same content.
+Point your migration tool at these files, or copy them into your project. To get the exact schema your server would
+create, including any substring index tables, as one script:
+
+```php
+file_put_contents('schema.sql', $server->schemaDdl());
+```
 
 ## Managing the Schema Yourself
 
@@ -45,14 +48,14 @@ $storageConfig = PdoConfig::forSqlite('/var/lib/freedsx/directory.sqlite')
     ->setInitializeSchema(false);
 ```
 
-With it off, the adapter never runs any DDL on connect. Creating and updating the tables is entirely up to you, using
+With it off, the adapter never runs any DDL. Creating and updating the tables is entirely up to you, using
 the schema files above. The library does not migrate your database; it ships the schema, and you decide when and how to
 apply it.
 
 ## Versioning
 
-`PdoStorage::SCHEMA_VERSION` is the current schema revision. Each release notes any schema change in the CHANGELOG, so
-you can tell whether an upgrade needs a migration and which delta to apply. A fresh database applies the baseline; an
+A database records the schema revision it was created from in the `ldap_schema_version` table. Each release notes any
+schema change in the CHANGELOG, so you can tell whether an upgrade needs a migration and which delta to apply. A fresh database applies the baseline; an
 existing database applies the delta files newer than its current version, with your own migration tool.
 
 ## Rebuilding the Indexes

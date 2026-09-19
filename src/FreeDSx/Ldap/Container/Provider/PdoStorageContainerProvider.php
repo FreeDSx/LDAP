@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\RoutingPdoConnect
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
@@ -70,6 +71,7 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             PdoDialectInterface::class => $this->makeDialect(...),
             SubstringIndexInterface::class => $this->makeSubstringIndex(...),
             FilterTranslatorInterface::class => $this->makeFilterTranslator(...),
+            PdoSchema::class => $this->makeSchema(...),
             PdoConnector::class => $this->makeConnector(...),
             WriteScope::class => static fn(): WriteScope => new WriteScope(),
             PdoConnectionProviderInterface::class => $this->makeConnectionProvider(...),
@@ -130,25 +132,44 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
         };
     }
 
-    private function makeConnector(Container $container): PdoConnector
+    private function makeSchema(Container $container): PdoSchema
     {
-        return new PdoConnector(
-            $this->requirePdoConfig($container),
+        return new PdoSchema(
             $container->get(PdoDialectInterface::class),
             $container->get(SubstringIndexInterface::class),
         );
     }
 
+    private function makeConnector(Container $container): PdoConnector
+    {
+        return new PdoConnector(
+            $this->requirePdoConfig($container),
+            $container->get(PdoSchema::class),
+        );
+    }
+
     /**
      * The serialized writer gets a connection of its own, opened only once a write actually reaches it.
+     *
+     * @throws RuntimeException when the Swoole runner is paired with a database private to one connection
      */
     private function makeConnectionProvider(Container $container): PdoConnectionProviderInterface
     {
-        $open = $container->get(PdoConnector::class)->open(...);
-        $reads = $container->get(ServerOptions::class)->isRunnerMode(RunnerMode::Swoole)
+        $isSwoole = $container->get(ServerOptions::class)->isRunnerMode(RunnerMode::Swoole);
+
+        if ($isSwoole && !$this->requirePdoConfig($container)->isMultiProcessSafe()) {
+            throw new RuntimeException(
+                'The Swoole runner opens a connection per coroutine, so an in-memory SQLite database is not supported.',
+            );
+        }
+
+        $connector = $container->get(PdoConnector::class);
+        $initial = $connector->bootstrap();
+        $open = $connector->open(...);
+        $reads = $isSwoole
             ? new CoroutinePdoConnectionProvider($open)
             : new SharedPdoConnectionProvider(
-                $open(),
+                $initial,
                 $open,
             );
 
