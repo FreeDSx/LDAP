@@ -756,37 +756,6 @@ final class PdoStorageTest extends TestCase
         );
     }
 
-    public function test_get_returns_entry_by_dn(): void
-    {
-        $entry = $this->subject->get(new Dn('cn=Alice,dc=example,dc=com'));
-
-        self::assertNotNull($entry);
-        self::assertSame(
-            'cn=Alice,dc=example,dc=com',
-            $entry->getDn()->toString(),
-        );
-    }
-
-    public function test_get_is_case_insensitive(): void
-    {
-        $entry = $this->subject->get(new Dn('CN=ALICE,DC=EXAMPLE,DC=COM'));
-
-        self::assertNotNull($entry);
-    }
-
-    public function test_get_returns_null_for_missing_dn(): void
-    {
-        self::assertNull($this->subject->get(new Dn('cn=Charlie,dc=example,dc=com')));
-    }
-
-    public function test_get_on_empty_database_returns_null(): void
-    {
-        $storage = $this->pdoStorage(TestServerOptions::sqlite());
-        $backend = $this->backendFor($storage);
-
-        self::assertNull($backend->get(new Dn('cn=Alice,dc=example,dc=com')));
-    }
-
     public function test_store_persists_entry(): void
     {
         $this->storage->store(new Entry(
@@ -853,33 +822,6 @@ final class PdoStorageTest extends TestCase
         $this->storage->remove(new Dn('cn=alice,dc=example,dc=com'));
 
         self::assertNull($this->storage->find(new Dn('cn=alice,dc=example,dc=com')));
-    }
-
-    public function test_find_surfaces_a_linked_attribute_as_the_targets_current_dn(): void
-    {
-        $pdo = new PDO('sqlite::memory:');
-        (new PdoSchema(new SqliteDialect()))->apply($pdo);
-        $storage = $this->storageOver($pdo);
-        $storage->store(new Entry(
-            new Dn('cn=Bob,dc=example,dc=com'),
-            new Attribute('cn', 'Bob'),
-        ));
-        $storage->store(new Entry(
-            new Dn('cn=Admins,dc=example,dc=com'),
-            new Attribute('cn', 'Admins'),
-        ));
-        $this->linkTogether(
-            $pdo,
-            'cn=admins,dc=example,dc=com',
-            'cn=bob,dc=example,dc=com',
-        );
-
-        self::assertSame(
-            ['cn=Bob,dc=example,dc=com'],
-            $storage->find(new Dn('cn=admins,dc=example,dc=com'))
-                ?->get('member')
-                ?->getValues(),
-        );
     }
 
     public function test_a_linked_value_follows_the_target_through_a_rename(): void
@@ -1129,16 +1071,6 @@ final class PdoStorageTest extends TestCase
         self::assertCount(4, $inner);
         // Outer yielded 1 entry before the inner list; the remaining 3 must still come through.
         self::assertCount(3, $remaining);
-    }
-
-    public function test_has_children_returns_true_when_children_exist(): void
-    {
-        self::assertTrue($this->storage->hasChildren(new Dn('dc=example,dc=com')));
-    }
-
-    public function test_has_children_returns_false_for_leaf_entry(): void
-    {
-        self::assertFalse($this->storage->hasChildren(new Dn('cn=alice,dc=example,dc=com')));
     }
 
     public function test_option_bearing_equality_filter_matches_only_the_subtype(): void
@@ -1414,35 +1346,6 @@ final class PdoStorageTest extends TestCase
         self::assertTrue($threw);
         self::assertNotNull($this->storage->find(new Dn('cn=outer,dc=example,dc=com')));
         self::assertNull($this->storage->find(new Dn('cn=inner,dc=example,dc=com')));
-    }
-
-    public function test_naming_contexts_returns_entries_whose_parent_is_missing_in_storage(): void
-    {
-        $this->storage->store(new Entry(
-            new Dn('dc=other,dc=org'),
-            new Attribute('dc', 'other'),
-        ));
-
-        $contexts = array_map(
-            fn(Dn $dn): string => $dn->toString(),
-            $this->storage->namingContexts(),
-        );
-
-        sort($contexts);
-        self::assertSame(
-            ['dc=example,dc=com', 'dc=other,dc=org'],
-            $contexts,
-        );
-    }
-
-    public function test_naming_contexts_is_empty_when_storage_is_empty(): void
-    {
-        $emptyStorage = $this->pdoStorage(TestServerOptions::sqlite());
-
-        self::assertSame(
-            [],
-            $emptyStorage->namingContexts(),
-        );
     }
 
     public function test_a_journal_append_rolls_back_with_the_enclosing_write_transaction(): void

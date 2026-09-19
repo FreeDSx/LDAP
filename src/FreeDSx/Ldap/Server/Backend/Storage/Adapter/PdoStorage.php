@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SortKeySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\ListQuerySpec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\PdoListQueryBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\SqlQuery;
@@ -83,6 +84,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
      */
     public function __construct(
         private readonly PdoConnection $connection,
+        private readonly EntryReader $reader,
         private readonly FilterTranslatorInterface $translator,
         private readonly PdoDialectInterface $dialect,
         private readonly AttributeContextInterface $attributeContext,
@@ -108,31 +110,12 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function find(Dn $dn): ?Entry
     {
-        $stmt = $this->connection->execute(
-            $this->dialect->queryFetchEntry(),
-            [$dn->normalize()->toString()],
-        );
-        $row = $stmt->fetch();
-
-        if (!is_array($row)) {
-            return null;
-        }
-
-        return $this->codec->decode(
-            $row,
-            null,
-            $this->linksForEntry($row),
-        );
+        return $this->reader->find($dn);
     }
 
     public function exists(Dn $dn): bool
     {
-        $stmt = $this->connection->execute(
-            $this->dialect->queryExists(),
-            [$dn->normalize()->toString()],
-        );
-
-        return $stmt->fetch() !== false;
+        return $this->reader->exists($dn);
     }
 
     public function list(StorageListOptions $options): EntryStream
@@ -326,27 +309,12 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
 
     public function hasChildren(Dn $dn): bool
     {
-        $stmt = $this->connection->execute(
-            $this->dialect->queryHasChildren(),
-            [$dn->normalize()->toString()],
-        );
-
-        return $stmt->fetch() !== false;
+        return $this->reader->hasChildren($dn);
     }
 
     public function namingContexts(): array
     {
-        $stmt = $this->connection->execute($this->dialect->queryNamingContexts());
-
-        $contexts = [];
-        while (($row = $stmt->fetch()) !== false) {
-            if (!is_array($row) || !isset($row['dn']) || !is_string($row['dn'])) {
-                continue;
-            }
-            $contexts[] = (new Dn($row['dn']))->normalize();
-        }
-
-        return $contexts;
+        return $this->reader->namingContexts();
     }
 
     public function atomic(callable $operation): void
@@ -372,25 +340,6 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             'lc_dn',
             $dn->normalize()->toString(),
         );
-    }
-
-    /**
-     * One entry's links, keyed by attribute name, or none when nothing is declared or the row carries no key.
-     *
-     * @param array<array-key, mixed> $row
-     * @return array<string, list<string>>
-     */
-    private function linksForEntry(array $row): array
-    {
-        if (!$this->links->hydrates(null)) {
-            return [];
-        }
-
-        $entryId = $row['entry_id'] ?? null;
-
-        return is_int($entryId) || is_string($entryId)
-            ? $this->links->forEntry((int) $entryId)
-            : [];
     }
 
     /**
@@ -719,7 +668,7 @@ final class PdoStorage implements EntryStorageInterface, ResettableInterface, Ch
             $normDn->toString(),
         );
 
-        return $this->find($normDn);
+        return $this->reader->find($normDn);
     }
 
     /**
