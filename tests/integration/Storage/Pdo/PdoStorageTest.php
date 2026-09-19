@@ -28,19 +28,12 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\MysqlDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
-use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
@@ -643,17 +636,13 @@ final class PdoStorageTest extends TestCase
             $index,
         );
 
-        $provider = new SharedPdoConnectionProvider(
+        $storage = $this->storageOver(
             $pdo,
-            fn(): PDO => $pdo,
-        );
-        $storage = $this->fromContainer(
-            PdoStorageFactory::class,
             options: TestServerOptions::forStorage(
                 PdoConfig::forSqlite(':memory:')
                     ->setSubstringIndexMode(SubstringIndexMode::Trigram),
             ),
-        )->storageOn($provider);
+        );
         $storage->store(new Entry(
             new Dn('cn=Smith,dc=example,dc=com'),
             new Attribute('cn', 'Smith'),
@@ -1979,39 +1968,15 @@ final class PdoStorageTest extends TestCase
 
     protected function makeJournalingStorage(?ChangeJournalInterface $journal = null): ChangeJournalingInterface
     {
-        // Built by hand only because the contract injects the journal, which the factory derives from config instead.
-        $factory = $this->fromContainer(
-            PdoStorageFactory::class,
-            options: TestServerOptions::sqlite(),
-        );
-        $provider = $factory->sharedProvider();
-        $dialect = $this->fromContainer(
-            PdoDialectInterface::class,
-            options: TestServerOptions::sqlite(),
-        );
-        $connection = new PdoConnection(
-            $provider,
-            new PdoStatementPool($provider),
-            new PdoTransactor(
-                $provider,
-                $dialect,
-            ),
-        );
+        if ($journal === null) {
+            return $this->pdoStorage(TestServerOptions::sqlite());
+        }
 
-        return new PdoStorage(
-            $connection,
-            new SqliteFilterTranslator(
-                $this->fromContainer(AttributeContextInterface::class),
-                $this->fromContainer(AttributeIndexForms::class),
-            ),
-            $dialect,
-            $this->fromContainer(AttributeContextInterface::class),
-            new EntryIndexWriter(
-                $dialect,
-                $connection,
-                $this->fromContainer(AttributeIndexForms::class),
-            ),
-            journal: $journal,
+        return $this->fromContainer(
+            PdoStorage::class,
+            [ChangeJournalInterface::class => $journal],
+            TestServerOptions::sqlite()
+                ->setChangeJournalConfig(new ChangeJournalConfig()),
         );
     }
 
@@ -2035,16 +2000,13 @@ final class PdoStorageTest extends TestCase
             new TrigramSubstringIndex(),
         );
 
-        return $this->fromContainer(
-            PdoStorageFactory::class,
+        return $this->storageOver(
+            $pdo,
             options: TestServerOptions::forStorage(
                 PdoConfig::forSqlite(':memory:')
                     ->setSubstringIndexMode(SubstringIndexMode::Trigram),
             ),
-        )->storageOn(new SharedPdoConnectionProvider(
-            $pdo,
-            fn(): PDO => $pdo,
-        ));
+        );
     }
 
     /**
@@ -2063,16 +2025,13 @@ final class PdoStorageTest extends TestCase
             $index,
         );
 
-        $storage = $this->fromContainer(
-            PdoStorageFactory::class,
+        $storage = $this->storageOver(
+            $pdo,
             options: TestServerOptions::forStorage(
                 PdoConfig::forSqlite(':memory:')
                     ->setSubstringIndexMode($mode),
             ),
-        )->storageOn(new SharedPdoConnectionProvider(
-            $pdo,
-            fn(): PDO => $pdo,
-        ));
+        );
         $storage->store(new Entry(
             new Dn('cn=Smith,dc=example,dc=com'),
             new Attribute('cn', 'Smith'),
@@ -2114,17 +2073,12 @@ final class PdoStorageTest extends TestCase
         return $widest;
     }
 
-    /**
-     * The container vends the storage interface, while this file asserts on the PDO adapter specifically.
-     */
     private function pdoStorage(ServerOptions $options): PdoStorage
     {
-        $storage = $this->storageFor($options);
-
-        // Narrowed without asserting, since setUp runs this and some tests expect to perform no assertions.
-        return $storage instanceof PdoStorage
-            ? $storage
-            : self::fail('Expected a PDO configuration to build PDO storage.');
+        return $this->fromContainer(
+            PdoStorage::class,
+            options: $options,
+        );
     }
 
     /**
@@ -2135,12 +2089,22 @@ final class PdoStorageTest extends TestCase
     private function storageOver(
         PDO $pdo,
         ?PdoDialectInterface $dialect = null,
+        ?ServerOptions $options = null,
     ): PdoStorage {
+        $overrides = [PdoConnectionProviderInterface::class => new SharedPdoConnectionProvider(
+            $pdo,
+            fn(): PDO => $pdo,
+        )];
+
+        if ($dialect !== null) {
+            $overrides[PdoDialectInterface::class] = $dialect;
+        }
+
         return $this->fromContainer(
-            PdoStorageFactory::class,
-            $dialect === null ? [] : [PdoDialectInterface::class => $dialect],
-            TestServerOptions::sqlite(),
-        )->storageOn(new SharedPdoConnectionProvider($pdo));
+            PdoStorage::class,
+            $overrides,
+            $options ?? TestServerOptions::sqlite(),
+        );
     }
 
     /**

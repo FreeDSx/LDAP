@@ -20,23 +20,20 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 
 /**
- * Serializes replica password-state writes through the storage's single writer coroutine while reading per-coroutine.
- *
- * Callers already running on that writer bypass both, since its transaction is open on the write store.
+ * Serializes replica password-state writes through the storage's single writer coroutine; reads run in place.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final readonly class SerializingReplicaPasswordStateStore implements ReplicaPasswordStateStoreInterface
 {
     public function __construct(
-        private ReplicaPasswordStateStoreInterface $reads,
-        private ReplicaPasswordStateStoreInterface $writes,
+        private ReplicaPasswordStateStoreInterface $store,
         private WriterQueueInterface $queue,
     ) {}
 
     public function load(Dn $dn): ReplicaPasswordState
     {
-        return $this->readStore()->load($dn);
+        return $this->store->load($dn);
     }
 
     /**
@@ -46,7 +43,7 @@ final readonly class SerializingReplicaPasswordStateStore implements ReplicaPass
         Dn $dn,
         callable $merge,
     ): void {
-        $this->submit(fn() => $this->writes->atomicMutate(
+        $this->submit(fn() => $this->store->atomicMutate(
             $dn,
             $merge,
         ));
@@ -54,14 +51,14 @@ final readonly class SerializingReplicaPasswordStateStore implements ReplicaPass
 
     public function listUnforwarded(int $limit = 100): array
     {
-        return $this->readStore()->listUnforwarded($limit);
+        return $this->store->listUnforwarded($limit);
     }
 
     public function markForwarded(
         Dn $dn,
         int $sequence,
     ): void {
-        $this->submit(fn() => $this->writes->markForwarded(
+        $this->submit(fn() => $this->store->markForwarded(
             $dn,
             $sequence,
         ));
@@ -71,7 +68,7 @@ final readonly class SerializingReplicaPasswordStateStore implements ReplicaPass
         Dn $dn,
         UserPasswordState $authoritative,
     ): void {
-        $this->submit(fn() => $this->writes->discardIfSuperseded(
+        $this->submit(fn() => $this->store->discardIfSuperseded(
             $dn,
             $authoritative,
         ));
@@ -79,17 +76,7 @@ final readonly class SerializingReplicaPasswordStateStore implements ReplicaPass
 
     public function discard(Dn $dn): void
     {
-        $this->submit(fn() => $this->writes->discard($dn));
-    }
-
-    /**
-     * The write store while the writer is executing, since the read store cannot see its uncommitted changes.
-     */
-    private function readStore(): ReplicaPasswordStateStoreInterface
-    {
-        return $this->queue->isWriter()
-            ? $this->writes
-            : $this->reads;
+        $this->submit(fn() => $this->store->discard($dn));
     }
 
     /**

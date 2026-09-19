@@ -32,8 +32,11 @@ use FreeDSx\Ldap\Protocol\Queue\Response\MetricsResponseInterceptor;
 use FreeDSx\Ldap\Protocol\ServerAuthorization;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoReplicaPasswordStateStore;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\ImmediateWriterQueue;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SwooleWriterQueue;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriterQueueInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
+use FreeDSx\Ldap\Server\PasswordPolicy\Replica\SerializingReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
@@ -113,8 +116,52 @@ class ContainerTest extends TestCase
         );
 
         self::assertInstanceOf(
-            PdoStorage::class,
+            WriteSerializingStorage::class,
             $container->get(EntryStorageInterface::class),
+        );
+    }
+
+    public function test_pdo_storage_writes_in_place_outside_the_swoole_runner(): void
+    {
+        $container = Container::forServer(
+            new ServerOptions(PdoConfig::forSqlite(':memory:')),
+        );
+
+        self::assertInstanceOf(
+            ImmediateWriterQueue::class,
+            $container->get(WriterQueueInterface::class),
+        );
+    }
+
+    public function test_pdo_storage_serializes_writes_under_the_swoole_runner_when_configured(): void
+    {
+        $this->requireSwoole();
+
+        $container = Container::forServer(
+            (new ServerOptions(
+                PdoConfig::forSqlite('/tmp/unused.sqlite')
+                    ->setSerializeSwooleWrites(true),
+            ))->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
+        );
+
+        self::assertInstanceOf(
+            SwooleWriterQueue::class,
+            $container->get(WriterQueueInterface::class),
+        );
+    }
+
+    public function test_pdo_storage_writes_in_place_under_the_swoole_runner_when_not_serializing(): void
+    {
+        $container = Container::forServer(
+            (new ServerOptions(
+                PdoConfig::forSqlite('/tmp/unused.sqlite')
+                    ->setSerializeSwooleWrites(false),
+            ))->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
+        );
+
+        self::assertInstanceOf(
+            ImmediateWriterQueue::class,
+            $container->get(WriterQueueInterface::class),
         );
     }
 
@@ -150,7 +197,7 @@ class ContainerTest extends TestCase
         );
 
         self::assertInstanceOf(
-            PdoReplicaPasswordStateStore::class,
+            SerializingReplicaPasswordStateStore::class,
             $container->get(ReplicaPasswordStateStoreInterface::class),
         );
     }

@@ -29,7 +29,8 @@ use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributeAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoBackend;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriterQueueInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
@@ -596,9 +597,10 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             EntryStorageInterface::class => $container->get(EntryStorageInterface::class),
         ];
 
-        // On the PDO path, share the builder so the reloaded replica store stays on the storage's connection.
+        // On the PDO path, share the connection and writer so a reloaded generation never opens or starts another.
         if ($container->get(ServerOptions::class)->getStorageConfig() instanceof PdoConfig) {
-            $instances[PdoBackend::class] = $container->get(PdoBackend::class);
+            $instances[PdoConnection::class] = $container->get(PdoConnection::class);
+            $instances[WriterQueueInterface::class] = $container->get(WriterQueueInterface::class);
         }
 
         return new DirectoryListenerContributor(

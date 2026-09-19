@@ -80,17 +80,6 @@ trait ServerContainerTrait
     }
 
     /**
-     * The storage adapter the providers build for the given configuration.
-     */
-    private function storageFor(ServerOptions $options): EntryStorageInterface
-    {
-        return $this->fromContainer(
-            EntryStorageInterface::class,
-            options: $options,
-        );
-    }
-
-    /**
      * The backend the providers build over the given storage, which is the collaborator these tests vary.
      */
     private function backendFor(
