@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SubtreeRename;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use Throwable;
@@ -65,8 +66,13 @@ final class InMemoryStorage implements EntryStorageInterface
         }
     }
 
-    public function find(Dn $dn): ?Entry
-    {
+    /**
+     * Entries are held whole, so the projection bounds nothing here.
+     */
+    public function find(
+        Dn $dn,
+        EntryProjection $projection = new EntryProjection(),
+    ): ?Entry {
         return $this->entries[$dn->normalizedString()] ?? null;
     }
 

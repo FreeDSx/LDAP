@@ -25,6 +25,7 @@ final readonly class SearchLimits
         private ?int $maxSearchLookthrough = null,
         private ?int $maxSearchPagedLookthrough = null,
         private ?int $maxPagingSessions = null,
+        private ?int $maxLinkedValues = null,
     ) {}
 
     /**
@@ -39,6 +40,7 @@ final readonly class SearchLimits
             maxSearchLookthrough: $this->maxSearchLookthrough ?? $default->maxSearchLookthrough,
             maxSearchPagedLookthrough: $this->maxSearchPagedLookthrough ?? $default->maxSearchPagedLookthrough,
             maxPagingSessions: $this->maxPagingSessions ?? $default->maxPagingSessions,
+            maxLinkedValues: $this->maxLinkedValues ?? $default->maxLinkedValues,
         );
     }
 
@@ -65,6 +67,14 @@ final readonly class SearchLimits
     public function maxPagingSessions(): ?int
     {
         return $this->maxPagingSessions;
+    }
+
+    /**
+     * Values of a linked attribute returned per entry: null when unset, so the storage default applies, and zero for all.
+     */
+    public function maxLinkedValues(): ?int
+    {
+        return $this->maxLinkedValues;
     }
 
     /**

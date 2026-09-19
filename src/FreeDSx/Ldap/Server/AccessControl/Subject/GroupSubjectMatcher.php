@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\SubjectEvaluationException;
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
 use FreeDSx\Ldap\Server\Clock\SystemClock;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
@@ -100,20 +101,34 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
         return false;
     }
 
+    /**
+     * @todo Unbounded on every uncached match: ask storage whether the group links to the identity so this can be bounded.
+     */
     private function groupEntry(): ?Entry
     {
         if ($this->cacheTtl <= 0) {
-            return $this->backend()->get($this->groupDn);
+            return $this->readGroup();
         }
 
         $now = $this->clock->now();
 
         if ($this->isCacheExpired($now)) {
-            $this->cached = $this->backend()->get($this->groupDn);
+            $this->cached = $this->readGroup();
             $this->cachedAt = $now;
         }
 
         return $this->cached;
+    }
+
+    /**
+     * Every member, since a bounded read would silently drop the identities past the bound from the group.
+     */
+    private function readGroup(): ?Entry
+    {
+        return $this->backend()->get(
+            $this->groupDn,
+            EntryProjection::unbounded(),
+        );
     }
 
     private function isCacheExpired(DateTimeImmutable $now): bool

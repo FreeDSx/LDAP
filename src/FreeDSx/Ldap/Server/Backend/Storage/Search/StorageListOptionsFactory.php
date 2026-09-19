@@ -78,10 +78,34 @@ final readonly class StorageListOptionsFactory
                 ? $sortingControl->getSortKeys()
                 : [],
             lookthroughLimit: $limits->maxSearchLookthrough(),
-            attributes: $this->materializedAttributes($request),
+            projection: $this->projectionFor(
+                $request,
+                $limits,
+            ),
             subentries: $subentries,
             slice: $slice,
             withHasSubordinates: $this->wantsHasSubordinates($request),
+        );
+    }
+
+    /**
+     * What each entry the request reads materializes, which a base object read needs without the rest of the options.
+     *
+     * @param ?SearchLimits $effectiveLimits Per-request limits, or null for the ones this factory was configured with.
+     */
+    public function projectionFor(
+        SearchRequest $request,
+        ?SearchLimits $effectiveLimits = null,
+    ): EntryProjection {
+        $linkCap = ($effectiveLimits ?? $this->limits)->maxLinkedValues();
+
+        return new EntryProjection(
+            $this->materializedAttributes($request),
+            match ($linkCap) {
+                null => EntryProjection::DEFAULT_LINK_CAP,
+                0 => null,
+                default => $linkCap,
+            },
         );
     }
 

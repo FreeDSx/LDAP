@@ -45,7 +45,7 @@ readonly class EntryRowCodec
     /**
      * @param array<array-key, mixed> $row
      * @param array<string, true>|null $allowed Base names to materialize, or null for all.
-     * @param array<string, list<string>> $links Already fetched link values, keyed by lowercased attribute name.
+     * @param array<string, list<string>> $links Already fetched link values, keyed by the lowercased name each is returned under.
      *
      * @throws StorageIoException when the row's attribute blob cannot be decoded
      */
@@ -145,7 +145,7 @@ readonly class EntryRowCodec
         $attributes = [];
 
         foreach ($links as $name => $values) {
-            if ($allowed !== null && !isset($allowed[$name])) {
+            if ($allowed !== null && !isset($allowed[Attribute::normalizeName($name)])) {
                 continue;
             }
 

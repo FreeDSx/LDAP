@@ -24,6 +24,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SubtreeRename;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\PartialValuesException;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use PDOException;
 
 /**
@@ -51,6 +53,7 @@ readonly class EntryWriter
     /**
      * @throws EntryAlreadyExistsException when the DN is already taken
      * @throws DnTooLongException when the DN exceeds what the database can store
+     * @throws PartialValuesException when an attribute holds only a range of its values
      */
     public function insert(Entry $entry): void
     {
@@ -60,6 +63,7 @@ readonly class EntryWriter
 
         $this->assertDnFits($dnString);
         $this->assertDnFits($lcDn);
+        $this->assertWhole($entry);
 
         $this->connection->atomic(function () use ($entry, $lcDn, $dnString, $normDn): void {
             // The unique key on lc_dn is the arbiter, since a row lock on a DN that holds no row locks only the gap.
@@ -84,6 +88,7 @@ readonly class EntryWriter
 
     /**
      * @throws DnTooLongException when the DN exceeds what the database can store
+     * @throws PartialValuesException when an attribute holds only a range of its values
      */
     public function store(
         Entry $entry,
@@ -96,6 +101,7 @@ readonly class EntryWriter
         // Both are stored, and normalising re-escapes, so the canonical form is not always the shorter of the two.
         $this->assertDnFits($dnString);
         $this->assertDnFits($lcDn);
+        $this->assertWhole($entry);
 
         $this->connection->atomic(function () use ($entry, $lcDn, $dnString, $normDn, $rebuildIndexes): void {
             // Read the row we are about to overwrite under its write lock, so the diff is against what is actually
@@ -266,7 +272,24 @@ readonly class EntryWriter
     {
         $this->lockForWrite($normDn);
 
-        return $this->reader->find($normDn);
+        return $this->reader->find(
+            $normDn,
+            EntryProjection::unbounded(),
+        );
+    }
+
+    /**
+     * @throws PartialValuesException
+     */
+    private function assertWhole(Entry $entry): void
+    {
+        foreach ($entry->getAttributes() as $attribute) {
+            foreach ($attribute->getOptions() as $option) {
+                if ($option->isRange()) {
+                    throw new PartialValuesException($attribute->getName());
+                }
+            }
+        }
     }
 
     /**

@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use Generator;
@@ -189,7 +190,11 @@ final readonly class SyncPersistStreamer
         PendingChange $change,
         TokenInterface $token,
     ): ?SyncResult {
-        $entry = $this->backend->get($change->dn);
+        // @todo Only visibility is judged here, so read without linked attributes once linked filter leaves are answered in storage.
+        $entry = $this->backend->get(
+            $change->dn,
+            EntryProjection::unbounded(),
+        );
         if ($entry === null) {
             return null;
         }
@@ -206,7 +211,11 @@ final readonly class SyncPersistStreamer
         SearchRequest $request,
         TokenInterface $token,
     ): ?SyncResult {
-        $entry = $this->backend->get($change->dn);
+        // @todo A replica needs every value, sent as one message; offer ranged values to consumers that can complete them.
+        $entry = $this->backend->get(
+            $change->dn,
+            EntryProjection::unbounded(),
+        );
 
         if ($entry === null) {
             return null;

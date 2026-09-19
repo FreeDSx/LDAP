@@ -225,6 +225,7 @@ final readonly class PageFiller
             new SearchLimits(
                 maxSearchTimeLimit: $this->limits->maxSearchTimeLimit(),
                 maxSearchLookthrough: $lookthrough,
+                maxLinkedValues: $this->limits->maxLinkedValues(),
             ),
             $slice,
         );

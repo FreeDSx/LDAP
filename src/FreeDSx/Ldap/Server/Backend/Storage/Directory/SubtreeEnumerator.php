@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Directory;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 use function usort;
@@ -39,7 +40,7 @@ final readonly class SubtreeEnumerator
         $options = StorageListOptions::matchAll(
             $base,
             subtree: true,
-            attributes: [],
+            projection: new EntryProjection([]),
         );
 
         $dnList = [];
@@ -85,7 +86,11 @@ final readonly class SubtreeEnumerator
     {
         $entries = [];
         foreach ($dnList as $dn) {
-            $entry = $this->storage->find($dn);
+            // @todo Unbounded because the journal judges a consumer's filter against it; journal it without linked attributes instead.
+            $entry = $this->storage->find(
+                $dn,
+                EntryProjection::unbounded(),
+            );
             if ($entry !== null) {
                 $entries[] = $entry;
             }

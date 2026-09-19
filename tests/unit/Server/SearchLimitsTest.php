@@ -31,6 +31,26 @@ final class SearchLimitsTest extends TestCase
         );
     }
 
+    public function test_a_rule_naming_no_linked_value_limit_keeps_the_default_one(): void
+    {
+        $merged = (new SearchLimits(maxSearchSize: 10))->mergedOver(new SearchLimits(maxLinkedValues: 500));
+
+        self::assertSame(
+            500,
+            $merged->maxLinkedValues(),
+        );
+    }
+
+    public function test_a_rule_naming_a_linked_value_limit_overrides_the_default_one(): void
+    {
+        $merged = (new SearchLimits(maxLinkedValues: 0))->mergedOver(new SearchLimits(maxLinkedValues: 500));
+
+        self::assertSame(
+            0,
+            $merged->maxLinkedValues(),
+        );
+    }
+
     public function test_effective_paged_lookthrough_falls_back_to_the_regular_value(): void
     {
         $limits = new SearchLimits(

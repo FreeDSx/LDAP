@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
@@ -60,7 +61,11 @@ final readonly class AssertionEvaluator
             return;
         }
 
-        $entry = $this->backend->get($targetDn);
+        // @todo Unbounded and client triggered: answer linked leaves in storage instead, so this read can be bounded.
+        $entry = $this->backend->get(
+            $targetDn,
+            EntryProjection::unbounded(),
+        );
         if ($entry === null) {
             return;
         }

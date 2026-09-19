@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\DefaultHasChildrenTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 
 /**
  * Raw persistence contract; LDAP semantics live in the read backend and write handlers above it. Dn parameters are always normalised (lowercased).
@@ -29,9 +30,12 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 interface EntryStorageInterface
 {
     /**
-     * Return the entry for the given normalised DN, or null if not found.
+     * Return the entry for the given normalised DN, or null if not found; linked values are bounded unless asked otherwise.
      */
-    public function find(Dn $dn): ?Entry;
+    public function find(
+        Dn $dn,
+        EntryProjection $projection = new EntryProjection(),
+    ): ?Entry;
 
     /**
      * Return true if an entry with the given normalised DN exists.

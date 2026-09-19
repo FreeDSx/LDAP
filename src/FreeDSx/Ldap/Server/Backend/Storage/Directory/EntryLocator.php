@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 
 use function sprintf;
 
@@ -34,9 +35,14 @@ final readonly class EntryLocator
     /**
      * @throws OperationException
      */
-    public function findOrFail(Dn $dn): Entry
-    {
-        $entry = $this->storage->find($dn);
+    public function findOrFail(
+        Dn $dn,
+        EntryProjection $projection = new EntryProjection(),
+    ): Entry {
+        $entry = $this->storage->find(
+            $dn,
+            $projection,
+        );
 
         if ($entry === null) {
             $this->throwNoSuchObject($dn);

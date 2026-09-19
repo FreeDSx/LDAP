@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
@@ -46,9 +47,14 @@ final readonly class PdoStorage implements EntryStorageInterface, ResettableInte
         $this->connection->reset();
     }
 
-    public function find(Dn $dn): ?Entry
-    {
-        return $this->reader->find($dn);
+    public function find(
+        Dn $dn,
+        EntryProjection $projection = new EntryProjection(),
+    ): ?Entry {
+        return $this->reader->find(
+            $dn,
+            $projection,
+        );
     }
 
     public function exists(Dn $dn): bool

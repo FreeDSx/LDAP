@@ -22,6 +22,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\DrainableWritesInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
@@ -45,9 +46,14 @@ final readonly class WriteSerializingStorage implements
         $this->queue->drain();
     }
 
-    public function find(Dn $dn): ?Entry
-    {
-        return $this->storage->find($dn);
+    public function find(
+        Dn $dn,
+        EntryProjection $projection = new EntryProjection(),
+    ): ?Entry {
+        return $this->storage->find(
+            $dn,
+            $projection,
+        );
     }
 
     public function exists(Dn $dn): bool
