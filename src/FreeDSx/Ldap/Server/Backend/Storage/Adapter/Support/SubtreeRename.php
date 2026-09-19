@@ -52,8 +52,8 @@ final readonly class SubtreeRename
         public Dn $to,
         public string $fromDisplay,
     ) {
-        $this->lcFrom = $from->normalize()->toString();
-        $this->lcTo = $to->normalize()->toString();
+        $this->lcFrom = $from->normalizedString();
+        $this->lcTo = $to->normalizedString();
         $this->toDisplay = $to->toString();
 
         if ($this->lcFrom === '' || $this->lcTo === '') {
@@ -130,7 +130,7 @@ final readonly class SubtreeRename
      */
     public function storedFor(Dn $storedDn): Dn
     {
-        $lcDn = $storedDn->normalize()->toString();
+        $lcDn = $storedDn->normalizedString();
         if ($lcDn === $this->lcFrom) {
             return $this->to;
         }

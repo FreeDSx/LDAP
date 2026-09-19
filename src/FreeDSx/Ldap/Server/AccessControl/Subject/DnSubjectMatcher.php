@@ -28,7 +28,7 @@ final class DnSubjectMatcher implements SubjectMatcherInterface
 
     public function __construct(string $dn)
     {
-        $this->normalizedDn = (new Dn($dn))->normalize()->toString();
+        $this->normalizedDn = (new Dn($dn))->normalizedString();
     }
 
     public function matches(
@@ -39,6 +39,6 @@ final class DnSubjectMatcher implements SubjectMatcherInterface
             return false;
         }
 
-        return $token->getResolvedDn()->normalize()->toString() === $this->normalizedDn;
+        return $token->getResolvedDn()->normalizedString() === $this->normalizedDn;
     }
 }

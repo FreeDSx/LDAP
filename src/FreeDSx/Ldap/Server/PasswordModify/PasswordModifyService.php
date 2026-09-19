@@ -133,7 +133,7 @@ final readonly class PasswordModifyService
         AuthenticatedTokenInterface $token,
         Dn $targetDn,
     ): bool {
-        return $token->getResolvedDn()->normalize()->toString() === $targetDn->normalize()->toString();
+        return $token->getResolvedDn()->normalizedString() === $targetDn->normalizedString();
     }
 
     /**

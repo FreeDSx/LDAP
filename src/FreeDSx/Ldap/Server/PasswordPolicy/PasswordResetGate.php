@@ -67,7 +67,7 @@ final class PasswordResetGate
         if ($changes === []) {
             return false;
         }
-        if ($request->getDn()->normalize()->toString() !== $token->getResolvedDn()->normalize()->toString()) {
+        if ($request->getDn()->normalizedString() !== $token->getResolvedDn()->normalizedString()) {
             return false;
         }
 

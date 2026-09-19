@@ -26,11 +26,11 @@ final class DnTargetMatcher implements TargetMatcherInterface
 
     public function __construct(string $dn)
     {
-        $this->normalizedDn = (new Dn($dn))->normalize()->toString();
+        $this->normalizedDn = (new Dn($dn))->normalizedString();
     }
 
     public function matches(Dn $dn): bool
     {
-        return $dn->normalize()->toString() === $this->normalizedDn;
+        return $dn->normalizedString() === $this->normalizedDn;
     }
 }

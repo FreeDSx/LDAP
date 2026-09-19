@@ -37,6 +37,6 @@ trait MatchesBoundIdentity
     ): bool {
         return $target !== null
             && $token instanceof AuthenticatedTokenInterface
-            && $token->getResolvedDn()->normalize()->toString() === $target->normalize()->toString();
+            && $token->getResolvedDn()->normalizedString() === $target->normalizedString();
     }
 }

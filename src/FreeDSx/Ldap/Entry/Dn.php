@@ -188,11 +188,19 @@ class Dn implements IteratorAggregate, Countable, Stringable
     }
 
     /**
+     * The canonical (RFC 4518 caseIgnore) form of this DN as a string.
+     */
+    public function normalizedString(): string
+    {
+        return $this->normalize()->toString();
+    }
+
+    /**
      * Whether the canonical form is UTF-8. Parsing does not settle this since a hexpair un-escapes to any octet.
      */
     public function hasUtf8CanonicalForm(): bool
     {
-        return preg_match('//u', $this->normalize()->toString()) === 1;
+        return preg_match('//u', $this->normalizedString()) === 1;
     }
 
     /**
@@ -202,7 +210,7 @@ class Dn implements IteratorAggregate, Countable, Stringable
      */
     public function equals(Dn $other): bool
     {
-        return $this->normalize()->toString() === $other->normalize()->toString();
+        return $this->normalizedString() === $other->normalizedString();
     }
 
     /**
@@ -212,13 +220,13 @@ class Dn implements IteratorAggregate, Countable, Stringable
      */
     public function isChildOf(Dn $parent): bool
     {
-        $thisDn = $this->normalize()->toString();
+        $thisDn = $this->normalizedString();
 
         if ($thisDn === '') {
             return false;
         }
 
-        return self::canonicalParent($thisDn) === $parent->normalize()->toString();
+        return self::canonicalParent($thisDn) === $parent->normalizedString();
     }
 
     /**
@@ -228,8 +236,8 @@ class Dn implements IteratorAggregate, Countable, Stringable
      */
     public function isDescendantOf(Dn $base): bool
     {
-        $baseDn = $base->normalize()->toString();
-        $thisDn = $this->normalize()->toString();
+        $baseDn = $base->normalizedString();
+        $thisDn = $this->normalizedString();
 
         if ($baseDn === '') {
             return $thisDn !== '';

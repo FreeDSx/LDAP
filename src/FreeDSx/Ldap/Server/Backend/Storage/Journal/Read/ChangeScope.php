@@ -54,7 +54,7 @@ final readonly class ChangeScope
     public function contains(Dn $dn): bool
     {
         return match ($this->type) {
-            ScopeType::BaseObject => $dn->normalize()->toString() === $this->baseDn->normalize()->toString(),
+            ScopeType::BaseObject => $dn->normalizedString() === $this->baseDn->normalizedString(),
             ScopeType::OneLevel => $dn->isChildOf($this->baseDn),
             ScopeType::WholeSubtree => $dn->isDescendantOf($this->baseDn),
         };

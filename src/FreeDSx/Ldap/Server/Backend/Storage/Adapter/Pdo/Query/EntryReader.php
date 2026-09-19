@@ -47,7 +47,7 @@ readonly class EntryReader
         $row = $this->connection
             ->execute(
                 $this->dialect->queryFetchEntry(),
-                [$dn->normalize()->toString()],
+                [$dn->normalizedString()],
             )
             ->fetch();
 
@@ -67,7 +67,7 @@ readonly class EntryReader
         return $this->connection
             ->execute(
                 $this->dialect->queryExists(),
-                [$dn->normalize()->toString()],
+                [$dn->normalizedString()],
             )
             ->fetch() !== false;
     }
@@ -77,7 +77,7 @@ readonly class EntryReader
         return $this->connection
             ->execute(
                 $this->dialect->queryHasChildren(),
-                [$dn->normalize()->toString()],
+                [$dn->normalizedString()],
             )
             ->fetch() !== false;
     }

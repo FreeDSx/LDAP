@@ -243,6 +243,6 @@ final readonly class PasswordPolicyWriteHandler implements WriteHandlerInterface
         $boundDn = $context->getBoundDn();
 
         return $boundDn !== null
-            && (new Dn($boundDn))->normalize()->toString() === $targetDn->normalize()->toString();
+            && (new Dn($boundDn))->normalizedString() === $targetDn->normalizedString();
     }
 }

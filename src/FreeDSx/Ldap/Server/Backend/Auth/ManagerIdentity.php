@@ -39,6 +39,6 @@ final readonly class ManagerIdentity
 
     public function matches(Dn $dn): bool
     {
-        return $this->dn->normalize()->toString() === $dn->normalize()->toString();
+        return $this->dn->normalizedString() === $dn->normalizedString();
     }
 }

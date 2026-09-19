@@ -190,12 +190,12 @@ final readonly class AuthzIdResolver
         Dn $resolvedDn,
     ): bool {
         try {
-            $normalized = $this->spelling->dn(new Dn($candidate))->normalize()->toString();
+            $normalized = $this->spelling->dn(new Dn($candidate))->normalizedString();
         } catch (InvalidArgumentException|UnexpectedValueException) {
             return false;
         }
 
-        return $normalized === $resolvedDn->normalize()->toString();
+        return $normalized === $resolvedDn->normalizedString();
     }
 
     /**

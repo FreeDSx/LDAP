@@ -139,7 +139,7 @@ readonly class EntryWriter
         Dn $to,
     ): void {
         $this->assertDnFits($to->toString());
-        $this->assertDnFits($to->normalize()->toString());
+        $this->assertDnFits($to->normalizedString());
 
         $this->connection->atomic(function () use ($from, $to): void {
             // Locked before the walk reads it, so a concurrent rename of the same base cannot interleave with this one.
@@ -180,7 +180,7 @@ readonly class EntryWriter
     {
         $this->connection->execute(
             $this->dialect->queryDelete(),
-            [$dn->normalize()->toString()],
+            [$dn->normalizedString()],
         );
     }
 
@@ -196,7 +196,7 @@ readonly class EntryWriter
                 $this->connection->execute(
                     $this->dialect->queryDeleteIn(count($chunk)),
                     array_map(
-                        static fn(Dn $dn): string => $dn->normalize()->toString(),
+                        static fn(Dn $dn): string => $dn->normalizedString(),
                         $chunk,
                     ),
                 );
@@ -210,7 +210,7 @@ readonly class EntryWriter
             $this->connection->pdo(),
             'entries',
             'lc_dn',
-            $dn->normalize()->toString(),
+            $dn->normalizedString(),
         );
     }
 
@@ -220,7 +220,7 @@ readonly class EntryWriter
             $this->connection->pdo(),
             'entries',
             'lc_dn',
-            $dn->normalize()->toString(),
+            $dn->normalizedString(),
         );
     }
 

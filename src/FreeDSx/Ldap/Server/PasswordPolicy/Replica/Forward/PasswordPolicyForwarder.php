@@ -125,9 +125,7 @@ class PasswordPolicyForwarder
      */
     private static function keyFor(ReplicaForwardState $pending): string
     {
-        return $pending->dn
-            ->normalize()
-            ->toString();
+        return $pending->dn->normalizedString();
     }
 
     /**

@@ -51,7 +51,7 @@ final readonly class ListQuerySpec
         array $sortKeys,
     ): self {
         return new self(
-            base: $options->baseDn->normalize()->toString(),
+            base: $options->baseDn->normalizedString(),
             subtree: $options->subtree,
             filter: $filter,
             limit: $limit,

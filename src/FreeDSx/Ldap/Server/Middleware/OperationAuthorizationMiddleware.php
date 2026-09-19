@@ -398,7 +398,7 @@ final readonly class OperationAuthorizationMiddleware implements MiddlewareInter
         if ($oldParentDn === null) {
             return;
         }
-        if ($oldParentDn->normalize()->toString() === $newParentDn->normalize()->toString()) {
+        if ($oldParentDn->normalizedString() === $newParentDn->normalizedString()) {
             return;
         }
 

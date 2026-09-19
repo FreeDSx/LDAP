@@ -84,8 +84,7 @@ trait ArrayEntryStorageTrait
         foreach ($entries as $entry) {
             $parent = $entry->getDn()
                 ->getParent()
-                ?->normalize()
-                ->toString();
+                ?->normalizedString();
 
             if ($parent !== null) {
                 $parents[$parent] = true;
@@ -108,7 +107,7 @@ trait ArrayEntryStorageTrait
             $flagged = $entry->makeCopy();
             $flagged->set(
                 AttributeTypeOid::NAME_HAS_SUBORDINATES,
-                isset($parents[$entry->getDn()->normalize()->toString()]) ? 'TRUE' : 'FALSE',
+                isset($parents[$entry->getDn()->normalizedString()]) ? 'TRUE' : 'FALSE',
             );
 
             yield $flagged;
@@ -134,7 +133,7 @@ trait ArrayEntryStorageTrait
         $hasMore = false;
 
         foreach ($entries as $entry) {
-            $key = $keys[$entry->getDn()->normalize()->toString()] ?? null;
+            $key = $keys[$entry->getDn()->normalizedString()] ?? null;
 
             if ($after !== null && $key !== null && $key <= $after) {
                 continue;
