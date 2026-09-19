@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\RoutingPdoConnect
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryIndexWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoReplicaPasswordStateStore;
@@ -79,6 +80,7 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             WriterQueueInterface::class => $this->makeWriterQueue(...),
             EntryIndexWriter::class => $this->makeEntryIndexWriter(...),
             EntryLinks::class => $this->makeEntryLinks(...),
+            EntryRowCodec::class => static fn(): EntryRowCodec => new EntryRowCodec(),
             PdoChangeJournal::class => $this->makeChangeJournal(...),
             PdoStorage::class => $this->makeStorage(...),
             WriteSerializingStorage::class => $this->makeWriteSerializingStorage(...),
@@ -263,6 +265,7 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             $container->get(AttributeContextInterface::class),
             $container->get(EntryIndexWriter::class),
             $container->get(EntryLinks::class),
+            $container->get(EntryRowCodec::class),
             $container->get(ServerOptions::class)->getChangeJournalConfig() === null
                 ? null
                 : $container->get(ChangeJournalInterface::class),

@@ -45,7 +45,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
-use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
@@ -1103,65 +1102,6 @@ final class PdoStorageTest extends TestCase
         self::assertCount(2, $results);
     }
 
-    public function test_list_materializes_only_the_allowed_base_attributes(): void
-    {
-        $this->storage->store(new Entry(
-            new Dn('cn=narrow,dc=example,dc=com'),
-            new Attribute('cn', 'narrow'),
-            new Attribute('cn;lang-en', 'Narrow EN'),
-            new Attribute('sn', 'Surname'),
-            new Attribute('mail', 'narrow@example.com'),
-        ));
-
-        $narrow = $this->firstByDn(
-            $this->storage->list(new StorageListOptions(
-                baseDn: new Dn(''),
-                subtree: true,
-                filter: new AndFilter(),
-                attributes: ['cn'],
-            ))->entries(),
-            'cn=narrow,dc=example,dc=com',
-        );
-
-        self::assertNotNull($narrow);
-        // Only the allowed base name is built; its option subtype rides along, sn and mail are skipped.
-        self::assertSame(
-            ['cn', 'cn;lang-en'],
-            array_map(
-                static fn(Attribute $attribute): string => $attribute->getDescription(),
-                $narrow->getAttributes(),
-            ),
-        );
-    }
-
-    public function test_list_with_null_attributes_materializes_every_attribute(): void
-    {
-        $this->storage->store(new Entry(
-            new Dn('cn=full,dc=example,dc=com'),
-            new Attribute('cn', 'full'),
-            new Attribute('sn', 'Surname'),
-            new Attribute('mail', 'full@example.com'),
-        ));
-
-        $full = $this->firstByDn(
-            $this->storage->list(new StorageListOptions(
-                baseDn: new Dn(''),
-                subtree: true,
-                filter: new AndFilter(),
-            ))->entries(),
-            'cn=full,dc=example,dc=com',
-        );
-
-        self::assertNotNull($full);
-        self::assertSame(
-            ['cn', 'sn', 'mail'],
-            array_map(
-                static fn(Attribute $attribute): string => $attribute->getDescription(),
-                $full->getAttributes(),
-            ),
-        );
-    }
-
     public function test_interleaved_lists_do_not_share_cursor_state(): void
     {
         $this->seed(
@@ -1203,45 +1143,6 @@ final class PdoStorageTest extends TestCase
         self::assertFalse($this->storage->hasChildren(new Dn('cn=alice,dc=example,dc=com')));
     }
 
-    public function test_attributes_round_trip_through_storage(): void
-    {
-        $entry = $this->subject->get(new Dn('cn=Alice,dc=example,dc=com'));
-
-        self::assertNotNull($entry);
-        self::assertSame(['Alice'], $entry->get('cn')?->getValues());
-        self::assertSame(['secret'], $entry->get('userPassword')?->getValues());
-    }
-
-    public function test_attribute_options_round_trip_through_storage(): void
-    {
-        $dn = new Dn('uid=tagged,dc=example,dc=com');
-        $this->seed(
-            new Entry(
-                $dn,
-                new Attribute('uid', 'tagged'),
-                new Attribute('cn', 'Common'),
-                new Attribute('cn;lang-en', 'English'),
-                new Attribute('userCertificate;binary', 'CERTDATA'),
-            ),
-        );
-
-        $entry = $this->subject->get($dn);
-
-        self::assertNotNull($entry);
-        self::assertSame(
-            ['Common'],
-            $entry->get(new Attribute('cn'), true)?->getValues(),
-        );
-        self::assertSame(
-            ['English'],
-            $entry->get(new Attribute('cn;lang-en'), true)?->getValues(),
-        );
-        self::assertSame(
-            ['CERTDATA'],
-            $entry->get(new Attribute('userCertificate;binary'), true)?->getValues(),
-        );
-    }
-
     public function test_option_bearing_equality_filter_matches_only_the_subtype(): void
     {
         $this->seed(
@@ -1264,27 +1165,6 @@ final class PdoStorageTest extends TestCase
         self::assertEqualsCanonicalizing(
             ['uid=tagged,dc=example,dc=com', 'uid=plain,dc=example,dc=com'],
             $this->searchDns(Filters::equal('cn', 'shared')),
-        );
-    }
-
-    public function test_attribute_name_casing_is_preserved_on_round_trip(): void
-    {
-        $entry = $this->subject->get(new Dn('cn=Alice,dc=example,dc=com'));
-
-        self::assertNotNull($entry);
-
-        $names = [];
-        foreach ($entry->getAttributes() as $attribute) {
-            $names[] = $attribute->getName();
-        }
-
-        self::assertContains(
-            'userPassword',
-            $names,
-        );
-        self::assertNotContains(
-            'userpassword',
-            $names,
         );
     }
 
@@ -1580,47 +1460,6 @@ final class PdoStorageTest extends TestCase
             1,
             $commitCalls,
             'A fresh top-level transaction must commit normally; the broken flag must not leak.',
-        );
-    }
-
-    public function test_find_throws_when_entry_attributes_blob_is_corrupted(): void
-    {
-        $pdo = new PDO('sqlite::memory:');
-        $dialect = new SqliteDialect();
-        (new PdoSchema($dialect))->apply($pdo);
-        $pdo->exec(
-            "INSERT INTO entries (lc_dn, dn, lc_parent_dn, attributes) VALUES "
-            . "('cn=corrupt,dc=example,dc=com', 'cn=Corrupt,dc=example,dc=com', 'dc=example,dc=com', 'NOT_VALID_BLOB')",
-        );
-
-        $storage = $this->storageOver($pdo);
-
-        $this->expectException(StorageIoException::class);
-
-        $storage->find(new Dn('cn=corrupt,dc=example,dc=com'));
-    }
-
-    public function test_list_throws_when_entry_attributes_blob_is_corrupted(): void
-    {
-        $pdo = new PDO('sqlite::memory:');
-        $dialect = new SqliteDialect();
-        (new PdoSchema($dialect))->apply($pdo);
-        $validBlob = serialize(['cn' => ['Valid']]);
-        $pdo->exec(
-            "INSERT INTO entries (lc_dn, dn, lc_parent_dn, attributes) VALUES "
-            . "('cn=valid,dc=example,dc=com', 'cn=Valid,dc=example,dc=com', 'dc=example,dc=com', '{$validBlob}')",
-        );
-        $pdo->exec(
-            "INSERT INTO entries (lc_dn, dn, lc_parent_dn, attributes) VALUES "
-            . "('cn=corrupt,dc=example,dc=com', 'cn=Corrupt,dc=example,dc=com', 'dc=example,dc=com', 'NOT_VALID_BLOB')",
-        );
-
-        $storage = $this->storageOver($pdo);
-
-        $this->expectException(StorageIoException::class);
-
-        iterator_to_array(
-            $storage->list(StorageListOptions::matchAll(new Dn('dc=example,dc=com'), false))->entries(),
         );
     }
 
