@@ -15,7 +15,6 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage\Pdo;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Control\Sorting\SortKey;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
@@ -60,6 +59,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use RuntimeException;
+use Tests\Support\FreeDSx\Ldap\Pdo\EntryLinkFixtureTrait;
 use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
@@ -67,6 +67,8 @@ use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 final class PdoStorageTest extends TestCase
 {
     use ServerContainerTrait;
+
+    use EntryLinkFixtureTrait;
 
     use JournalingStorageContractTests;
 
@@ -95,96 +97,6 @@ final class PdoStorageTest extends TestCase
         $this->seed(
             new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
             $this->alice,
-        );
-    }
-
-    /**
-     * Canonicalizing drops the space in "cn=spaced, dc=..." where LOWER() keeps it, so keying the sort off the
-     * lowercased DN rather than lc_dn misses this entry's sidecar rows and sorts it as if the attribute were unset.
-     */
-    public function test_sorting_keys_off_a_dn_whose_canonical_form_differs_from_its_literal_case(): void
-    {
-        $this->storage->store(new Entry(
-            new Dn('cn=spaced, dc=example,dc=com'),
-            new Attribute('cn', 'spaced'),
-            new Attribute('sn', 'aaa'),
-        ));
-        $this->storage->store(new Entry(
-            new Dn('cn=plain,dc=example,dc=com'),
-            new Attribute('cn', 'plain'),
-            new Attribute('sn', 'bbb'),
-        ));
-
-        $entries = iterator_to_array($this->storage->list(new StorageListOptions(
-            baseDn: new Dn('dc=example,dc=com'),
-            subtree: true,
-            filter: Filters::present('sn'),
-            sortKeys: [new SortKey('sn')],
-        ))->entries());
-
-        self::assertSame(
-            ['cn=spaced, dc=example,dc=com', 'cn=plain,dc=example,dc=com'],
-            array_map(
-                static fn(Entry $entry): string => $entry->getDn()->toString(),
-                $entries,
-            ),
-        );
-    }
-
-    public function test_searches_differing_only_in_size_limit_share_one_prepared_statement(): void
-    {
-        $pdo = new RecordingPdo('sqlite::memory:');
-        (new PdoSchema(new SqliteDialect()))->apply($pdo);
-        $storage = $this->storageOver($pdo);
-        foreach (range(1, 3) as $i) {
-            $storage->store(new Entry(
-                new Dn("cn=e{$i},dc=example,dc=com"),
-                new Attribute('cn', "e{$i}"),
-                new Attribute('sn', 'x'),
-            ));
-        }
-
-        foreach ([1, 2, 3] as $maxEntries) {
-            iterator_count($storage->list(new StorageListOptions(
-                baseDn: new Dn('dc=example,dc=com'),
-                subtree: true,
-                filter: Filters::equal('sn', 'x'),
-                maxEntries: $maxEntries,
-            ))->entries());
-        }
-
-        self::assertCount(
-            1,
-            $pdo->preparedMatching('LIMIT ?'),
-        );
-    }
-
-    public function test_a_projection_that_materializes_nothing_still_yields_the_dns(): void
-    {
-        $this->storage->store(new Entry(
-            new Dn('cn=bob,dc=example,dc=com'),
-            new Attribute('cn', 'bob'),
-            new Attribute('sn', 'x'),
-        ));
-
-        $entries = iterator_to_array($this->storage->list(new StorageListOptions(
-            baseDn: new Dn('dc=example,dc=com'),
-            subtree: true,
-            filter: Filters::equal('sn', 'x'),
-            attributes: [],
-        ))->entries());
-
-        self::assertCount(
-            1,
-            $entries,
-        );
-        self::assertSame(
-            'cn=bob,dc=example,dc=com',
-            $entries[0]->getDn()->toString(),
-        );
-        self::assertSame(
-            [],
-            $entries[0]->toArray(),
         );
     }
 
@@ -567,70 +479,6 @@ final class PdoStorageTest extends TestCase
         );
     }
 
-    /**
-     * The trigram predicate only narrows, so excluding a true match cannot be undone by the caller's re-check.
-     */
-    public function test_a_substring_match_past_the_indexed_window_is_still_a_candidate(): void
-    {
-        $storage = $this->trigramStorage();
-        $storage->store(new Entry(
-            new Dn('dc=example,dc=com'),
-            new Attribute('dc', 'example'),
-        ));
-        $storage->store(new Entry(
-            new Dn('cn=late,dc=example,dc=com'),
-            new Attribute('cn', 'late'),
-            new Attribute('sn', str_repeat('x', 300) . 'needle'),
-        ));
-
-        $found = iterator_to_array($storage->list(new StorageListOptions(
-            baseDn: new Dn('dc=example,dc=com'),
-            subtree: true,
-            filter: Filters::contains('sn', 'needle'),
-        ))->entries());
-
-        self::assertSame(
-            ['cn=late,dc=example,dc=com'],
-            array_map(
-                static fn(Entry $entry): string => $entry->getDn()->toString(),
-                $found,
-            ),
-        );
-    }
-
-    public function test_a_substring_inside_the_indexed_window_still_narrows(): void
-    {
-        $storage = $this->trigramStorage();
-        $storage->store(new Entry(
-            new Dn('dc=example,dc=com'),
-            new Attribute('dc', 'example'),
-        ));
-        $storage->store(new Entry(
-            new Dn('cn=hit,dc=example,dc=com'),
-            new Attribute('cn', 'hit'),
-            new Attribute('sn', 'haystack-needle'),
-        ));
-        $storage->store(new Entry(
-            new Dn('cn=miss,dc=example,dc=com'),
-            new Attribute('cn', 'miss'),
-            new Attribute('sn', 'nothing-here'),
-        ));
-
-        $found = iterator_to_array($storage->list(new StorageListOptions(
-            baseDn: new Dn('dc=example,dc=com'),
-            subtree: true,
-            filter: Filters::contains('sn', 'needle'),
-        ))->entries());
-
-        self::assertSame(
-            ['cn=hit,dc=example,dc=com'],
-            array_map(
-                static fn(Entry $entry): string => $entry->getDn()->toString(),
-                $found,
-            ),
-        );
-    }
-
     public function test_store_keeps_the_original_value_only_where_the_index_reads_it(): void
     {
         if (!Fts5SubstringIndex::isSupported()) {
@@ -883,100 +731,6 @@ final class PdoStorageTest extends TestCase
         );
     }
 
-    public function test_a_listed_entry_carries_its_linked_values(): void
-    {
-        $pdo = new PDO('sqlite::memory:');
-        (new PdoSchema(new SqliteDialect()))->apply($pdo);
-        $storage = $this->storageOver($pdo);
-        $storage->store(new Entry(
-            new Dn('dc=example,dc=com'),
-            new Attribute('dc', 'example'),
-        ));
-        $storage->store(new Entry(
-            new Dn('cn=Bob,dc=example,dc=com'),
-            new Attribute('cn', 'Bob'),
-        ));
-        $storage->store(new Entry(
-            new Dn('cn=Admins,dc=example,dc=com'),
-            new Attribute('cn', 'Admins'),
-        ));
-        $this->linkTogether(
-            $pdo,
-            'cn=admins,dc=example,dc=com',
-            'cn=bob,dc=example,dc=com',
-        );
-
-        $listed = $this->firstByDn(
-            $storage->list(new StorageListOptions(
-                baseDn: new Dn('dc=example,dc=com'),
-                subtree: true,
-                filter: Filters::present('cn'),
-            ))->entries(),
-            'cn=Admins,dc=example,dc=com',
-        );
-
-        self::assertSame(
-            ['cn=Bob,dc=example,dc=com'],
-            $listed?->get('member')?->getValues(),
-        );
-    }
-
-    public function test_a_read_materializing_nothing_asks_for_no_links(): void
-    {
-        $pdo = new RecordingPdo('sqlite::memory:');
-        (new PdoSchema(new SqliteDialect()))->apply($pdo);
-        $storage = $this->storageOver($pdo);
-        $storage->store(new Entry(
-            new Dn('dc=example,dc=com'),
-            new Attribute('dc', 'example'),
-        ));
-        $storage->store(new Entry(
-            new Dn('cn=Admins,dc=example,dc=com'),
-            new Attribute('cn', 'Admins'),
-        ));
-        $pdo->prepared = [];
-
-        iterator_to_array($storage->list(new StorageListOptions(
-            baseDn: new Dn('dc=example,dc=com'),
-            subtree: true,
-            filter: Filters::present('cn'),
-            attributes: [],
-        ))->entries());
-
-        self::assertCount(
-            0,
-            $pdo->preparedMatching('entry_attribute_links'),
-        );
-    }
-
-    public function test_a_projection_naming_no_linked_type_asks_for_no_links(): void
-    {
-        $pdo = new RecordingPdo('sqlite::memory:');
-        (new PdoSchema(new SqliteDialect()))->apply($pdo);
-        $storage = $this->storageOver($pdo);
-        $storage->store(new Entry(
-            new Dn('dc=example,dc=com'),
-            new Attribute('dc', 'example'),
-        ));
-        $storage->store(new Entry(
-            new Dn('cn=Admins,dc=example,dc=com'),
-            new Attribute('cn', 'Admins'),
-        ));
-        $pdo->prepared = [];
-
-        iterator_to_array($storage->list(new StorageListOptions(
-            baseDn: new Dn('dc=example,dc=com'),
-            subtree: true,
-            filter: Filters::present('cn'),
-            attributes: ['cn'],
-        ))->entries());
-
-        self::assertCount(
-            0,
-            $pdo->preparedMatching('entry_attribute_links'),
-        );
-    }
-
     public function test_list_single_level_returns_direct_children_only(): void
     {
         $grandchild = new Entry(new Dn('cn=Sub,cn=Alice,dc=example,dc=com'), new Attribute('cn', 'Sub'));
@@ -1031,46 +785,6 @@ final class PdoStorageTest extends TestCase
             3,
             $results,
         );
-    }
-
-    public function test_list_from_root_returns_all_entries(): void
-    {
-        // Test the storage interface directly with an empty base DN (root listing).
-        // StorageReadBackend requires the base DN to exist, so bypass it here.
-        $results = iterator_to_array($this->storage->list(StorageListOptions::matchAll(new Dn(''), true))->entries());
-
-        self::assertCount(2, $results);
-    }
-
-    public function test_interleaved_lists_do_not_share_cursor_state(): void
-    {
-        $this->seed(
-            new Entry(new Dn('cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Bob')),
-            new Entry(new Dn('cn=Carol,dc=example,dc=com'), new Attribute('cn', 'Carol')),
-        );
-
-        $outerIterator = $this->storage->list(StorageListOptions::matchAll(
-            new Dn('dc=example,dc=com'),
-            true,
-        ))->entries();
-
-        $outerIterator->current();
-        $outerIterator->next();
-
-        $inner = iterator_to_array($this->storage->list(StorageListOptions::matchAll(
-            new Dn('dc=example,dc=com'),
-            true,
-        ))->entries());
-
-        $remaining = [];
-        while ($outerIterator->valid()) {
-            $remaining[] = $outerIterator->current();
-            $outerIterator->next();
-        }
-
-        self::assertCount(4, $inner);
-        // Outer yielded 1 entry before the inner list; the remaining 3 must still come through.
-        self::assertCount(3, $remaining);
     }
 
     public function test_option_bearing_equality_filter_matches_only_the_subtype(): void
@@ -1414,23 +1128,6 @@ final class PdoStorageTest extends TestCase
         return $storage;
     }
 
-    private function trigramStorage(): PdoStorage
-    {
-        $pdo = new PDO('sqlite::memory:');
-        (new PdoSchema(
-            new SqliteDialect(),
-            new TrigramSubstringIndex(),
-        ))->apply($pdo);
-
-        return $this->storageOver(
-            $pdo,
-            options: TestServerOptions::forStorage(
-                PdoConfig::forSqlite(':memory:')
-                    ->setSubstringIndexMode(SubstringIndexMode::Trigram),
-            ),
-        );
-    }
-
     /**
      * The sidecar's value_original per attribute, for an entry holding one indexed and one unindexed attribute.
      *
@@ -1529,22 +1226,6 @@ final class PdoStorageTest extends TestCase
     }
 
     /**
-     * @param iterable<Entry> $entries
-     */
-    private function firstByDn(
-        iterable $entries,
-        string $dn,
-    ): ?Entry {
-        foreach ($entries as $entry) {
-            if ($entry->getDn()->toString() === $dn) {
-                return $entry;
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * @return list<string>
      */
     private function dnsMatching(FilterInterface $filter): array
@@ -1594,26 +1275,6 @@ final class PdoStorageTest extends TestCase
     private function seed(Entry ...$entries): void
     {
         $this->importer->importEntries($entries);
-    }
-
-    /**
-     * Writes a member link straight into the table, since the write path does not divert values into it yet.
-     */
-    private function linkTogether(
-        PDO $pdo,
-        string $ownerLcDn,
-        string $targetLcDn,
-    ): void {
-        $pdo->prepare(
-            'INSERT INTO entry_attribute_links (owner_entry_id, attr_name_lower, target_entry_id, target_uid)
-             SELECT o.entry_id, ?, t.entry_id, \'\'
-             FROM entries o, entries t
-             WHERE o.lc_dn = ? AND t.lc_dn = ?',
-        )->execute([
-            'member',
-            $ownerLcDn,
-            $targetLcDn,
-        ]);
     }
 
     /**
