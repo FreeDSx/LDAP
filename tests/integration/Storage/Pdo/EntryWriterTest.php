@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\PartialValuesException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
@@ -66,6 +67,16 @@ final class EntryWriterTest extends TestCase
         $this->subject = $container->get(EntryWriter::class);
         $this->reader = $container->get(EntryReader::class);
         $this->lister = $container->get(EntryLister::class);
+    }
+
+    public function test_storing_a_range_of_an_attributes_values_is_refused(): void
+    {
+        $this->expectException(PartialValuesException::class);
+
+        $this->subject->store(new Entry(
+            new Dn('cn=Admins,dc=example,dc=com'),
+            new Attribute('member;range=0-2', 'cn=Bob,dc=example,dc=com'),
+        ));
     }
 
     public function test_store_persists_the_entry(): void

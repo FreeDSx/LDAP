@@ -264,28 +264,6 @@ trait PdoDialectTrait
         SQL;
     }
 
-    public function queryLinksForEntry(): string
-    {
-        return <<<SQL
-            SELECT l.owner_entry_id, l.attr_name_lower, l.target_uid, e.dn
-            FROM entry_attribute_links l
-            JOIN entries e ON e.entry_id = l.target_entry_id
-            WHERE l.owner_entry_id = ?
-            ORDER BY l.attr_name_lower, l.target_entry_id
-        SQL;
-    }
-
-    public function queryLinksForRange(): string
-    {
-        return <<<SQL
-            SELECT l.owner_entry_id, l.attr_name_lower, l.target_uid, e.dn
-            FROM entry_attribute_links l
-            JOIN entries e ON e.entry_id = l.target_entry_id
-            WHERE l.owner_entry_id BETWEEN ? AND ?
-            ORDER BY l.owner_entry_id, l.attr_name_lower, l.target_entry_id
-        SQL;
-    }
-
     public function querySidecarInsertPrefix(): string
     {
         return 'INSERT INTO entry_attribute_values (owner_entry_id, attr_name_lower, value_lower, value_original) VALUES ';

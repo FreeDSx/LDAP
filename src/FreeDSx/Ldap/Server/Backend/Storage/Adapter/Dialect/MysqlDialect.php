@@ -25,6 +25,7 @@ final class MysqlDialect implements PdoDialectInterface
 {
     use PdoDialectTrait;
     use PdoJournalDialectTrait;
+    use PdoLinkDialectTrait;
     use PdoSchemaTrait;
 
     /**

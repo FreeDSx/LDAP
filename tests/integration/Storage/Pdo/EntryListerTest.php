@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnecti
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryLister;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
@@ -110,7 +111,10 @@ final class EntryListerTest extends TestCase
 
         self::assertCount(
             1,
-            $this->pdo->preparedMatching('LIMIT ?'),
+            array_filter(
+                $this->pdo->preparedMatching('LIMIT ?'),
+                static fn(string $query): bool => !str_contains($query, 'entry_attribute_links'),
+            ),
         );
     }
 
@@ -125,7 +129,7 @@ final class EntryListerTest extends TestCase
             baseDn: new Dn(self::BASE),
             subtree: true,
             filter: Filters::equal('sn', 'x'),
-            attributes: [],
+            projection: new EntryProjection([]),
         ))->entries());
 
         self::assertCount(
@@ -261,6 +265,48 @@ final class EntryListerTest extends TestCase
         );
     }
 
+    public function test_a_listed_group_over_the_cap_is_bounded_while_a_smaller_one_stays_whole(): void
+    {
+        $this->groupOf('Big', 5);
+        $this->groupOf('Small', 2);
+
+        $members = $this->linkedValuesByDn(3);
+
+        self::assertSame(
+            ['member;range=0-2'],
+            array_keys($members['cn=Big,dc=example,dc=com']),
+        );
+        self::assertCount(
+            3,
+            $members['cn=Big,dc=example,dc=com']['member;range=0-2'],
+        );
+        self::assertSame(
+            ['member'],
+            array_keys($members['cn=Small,dc=example,dc=com']),
+        );
+        self::assertCount(
+            2,
+            $members['cn=Small,dc=example,dc=com']['member'],
+        );
+    }
+
+    public function test_links_totalling_more_than_the_cap_across_entries_are_each_returned_whole(): void
+    {
+        $this->groupOf('First', 2);
+        $this->groupOf('Second', 2);
+
+        $members = $this->linkedValuesByDn(3);
+
+        self::assertCount(
+            2,
+            $members['cn=First,dc=example,dc=com']['member'] ?? [],
+        );
+        self::assertCount(
+            2,
+            $members['cn=Second,dc=example,dc=com']['member'] ?? [],
+        );
+    }
+
     public function test_a_list_materializing_nothing_asks_for_no_links(): void
     {
         $this->store(
@@ -303,6 +349,54 @@ final class EntryListerTest extends TestCase
         ));
     }
 
+    private function groupOf(
+        string $name,
+        int $members,
+    ): void {
+        $this->store(
+            sprintf('cn=%s,dc=example,dc=com', $name),
+            new Attribute('cn', $name),
+        );
+
+        for ($i = 0; $i < $members; $i++) {
+            $this->store(
+                sprintf('cn=%s%d,dc=example,dc=com', $name, $i),
+                new Attribute('cn', $name . $i),
+            );
+            $this->linkTogether(
+                $this->pdo,
+                strtolower(sprintf('cn=%s,dc=example,dc=com', $name)),
+                strtolower(sprintf('cn=%s%d,dc=example,dc=com', $name, $i)),
+            );
+        }
+    }
+
+    /**
+     * The linked attributes of every listed entry holding one, keyed by DN and then by returned name.
+     *
+     * @return array<string, array<string, list<string>>>
+     */
+    private function linkedValuesByDn(int $cap): array
+    {
+        $options = new StorageListOptions(
+            baseDn: new Dn(self::BASE),
+            subtree: true,
+            filter: Filters::present('cn'),
+            projection: new EntryProjection(linkCap: $cap),
+        );
+        $linked = [];
+
+        foreach ($this->subject->list($options)->entries() as $entry) {
+            foreach ($entry->getAttributes() as $attribute) {
+                if ($attribute->getName() === 'member') {
+                    $linked[$entry->getDn()->toString()][$attribute->getDescription()] = array_values($attribute->getValues());
+                }
+            }
+        }
+
+        return $linked;
+    }
+
     /**
      * @param list<string>|null $attributes
      */
@@ -312,7 +406,7 @@ final class EntryListerTest extends TestCase
             baseDn: new Dn(self::BASE),
             subtree: true,
             filter: Filters::present('cn'),
-            attributes: $attributes,
+            projection: new EntryProjection($attributes),
         );
     }
 

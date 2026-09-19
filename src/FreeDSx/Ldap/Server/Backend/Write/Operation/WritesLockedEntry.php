@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
 /**
@@ -55,7 +56,11 @@ trait WritesLockedEntry
         $this->writeLocked(
             $dn,
             function () use ($dn, $context, $body): void {
-                $current = $this->locator->findOrFail($dn);
+                // @todo Unbounded because the whole derived entry is stored back; leave linked attributes out once writes apply them as deltas.
+                $current = $this->locator->findOrFail(
+                    $dn,
+                    EntryProjection::unbounded(),
+                );
                 $context->controlEvaluator()?->evaluateTarget($current);
                 $body($current);
             },

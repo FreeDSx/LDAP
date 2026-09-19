@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
@@ -39,7 +40,11 @@ final readonly class EntryIndexReindexer
 
         $this->storage->atomic(function () use ($dns): void {
             foreach ($dns as $dn) {
-                $entry = $this->storage->find($dn);
+                // @todo Unbounded because the whole entry is stored back; links hold ids, so skip them once a store can leave them untouched.
+                $entry = $this->storage->find(
+                    $dn,
+                    EntryProjection::unbounded(),
+                );
                 if ($entry === null) {
                     continue;
                 }
@@ -64,6 +69,7 @@ final readonly class EntryIndexReindexer
             $stream = $this->storage->list(StorageListOptions::matchAll(
                 $namingContext,
                 subtree: true,
+                projection: new EntryProjection([]),
             ));
 
             foreach ($stream->entries() as $entry) {

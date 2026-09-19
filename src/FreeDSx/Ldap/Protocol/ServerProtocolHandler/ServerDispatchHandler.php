@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Backend\Write\WriteControlEvaluator;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Operation\CompareOperationResult;
 use FreeDSx\Ldap\Server\Operation\WriteOperationResult;
@@ -91,7 +92,11 @@ readonly class ServerDispatchHandler implements ServerProtocolHandlerInterface
         TokenInterface $token,
     ): ResponseStream {
         // The assertion and the comparison are answered from one read of the entry (RFC 4528 §3).
-        $entry = $this->backend->getOrFail($request->getDn());
+        // @todo Unbounded and client triggered: answer linked leaves in storage instead, so this read can be bounded.
+        $entry = $this->backend->getOrFail(
+            $request->getDn(),
+            EntryProjection::unbounded(),
+        );
         $this->assertions->assertSatisfiedBy(
             $entry,
             $message->controls(),

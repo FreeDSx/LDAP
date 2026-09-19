@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Write\Command\ComputeUpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
@@ -51,7 +52,11 @@ readonly class ComputeUpdateHandler
         $this->writeLocked(
             $dn,
             function () use ($command, $context, $dn): void {
-                $entry = $this->storage->find($dn);
+                // @todo Unbounded because the whole derived entry is stored back; leave linked attributes out once writes apply them as deltas.
+                $entry = $this->storage->find(
+                    $dn,
+                    EntryProjection::unbounded(),
+                );
                 if ($entry === null) {
                     return;
                 }

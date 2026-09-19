@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Pdo\EntryLinkFixtureTrait;
@@ -77,6 +78,53 @@ final class EntryReaderTest extends TestCase
             $this->subject->find(new Dn('cn=admins,dc=example,dc=com'))
                 ?->get('member')
                 ?->getValues(),
+        );
+    }
+
+    public function test_find_bounds_a_linked_attribute_over_the_cap_under_the_range_it_holds(): void
+    {
+        $this->groupOf(5);
+
+        $group = $this->subject->find(
+            new Dn('cn=admins,dc=example,dc=com'),
+            new EntryProjection(linkCap: 3),
+        );
+
+        self::assertSame(
+            [
+                'member;range=0-2' => [
+                    'cn=User0,dc=example,dc=com',
+                    'cn=User1,dc=example,dc=com',
+                    'cn=User2,dc=example,dc=com',
+                ],
+            ],
+            $this->linkedValuesOf($group),
+        );
+    }
+
+    public function test_find_returns_a_linked_attribute_within_the_cap_under_its_own_name(): void
+    {
+        $this->groupOf(3);
+
+        self::assertCount(
+            3,
+            $this->subject->find(
+                new Dn('cn=admins,dc=example,dc=com'),
+                new EntryProjection(linkCap: 3),
+            )?->get('member')?->getValues() ?? [],
+        );
+    }
+
+    public function test_find_returns_every_linked_value_when_unbounded(): void
+    {
+        $this->groupOf(5);
+
+        self::assertCount(
+            5,
+            $this->subject->find(
+                new Dn('cn=admins,dc=example,dc=com'),
+                EntryProjection::unbounded(),
+            )?->get('member')?->getValues() ?? [],
         );
     }
 
@@ -141,5 +189,33 @@ final class EntryReaderTest extends TestCase
     private function store(string $dn): void
     {
         $this->storage->store(new Entry(new Dn($dn)));
+    }
+
+    private function groupOf(int $members): void
+    {
+        $this->store('cn=Admins,dc=example,dc=com');
+
+        for ($i = 0; $i < $members; $i++) {
+            $this->store(sprintf('cn=User%d,dc=example,dc=com', $i));
+            $this->linkTogether(
+                $this->fromContainer(PdoConnection::class)->pdo(),
+                'cn=admins,dc=example,dc=com',
+                sprintf('cn=user%d,dc=example,dc=com', $i),
+            );
+        }
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function linkedValuesOf(?Entry $entry): array
+    {
+        $values = [];
+
+        foreach ($entry?->getAttributes() ?? [] as $attribute) {
+            $values[$attribute->getDescription()] = array_values($attribute->getValues());
+        }
+
+        return $values;
     }
 }

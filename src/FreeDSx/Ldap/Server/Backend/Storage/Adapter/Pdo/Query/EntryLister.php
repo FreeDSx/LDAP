@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedEntry;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use Generator;
 
@@ -253,7 +254,7 @@ readonly class EntryLister
         $batch = yield from $this->generateBatch(
             $query,
             $options->deadline,
-            $this->allowedFor($options),
+            $options->projection,
             $options->limit(),
         );
 
@@ -276,7 +277,6 @@ readonly class EntryLister
         ListQuerySpec $spec,
         ?int $maxRows,
     ): Generator {
-        $allowed = $this->allowedFor($options);
         $cursor = $options->resumeAfter();
         $read = 0;
 
@@ -294,7 +294,7 @@ readonly class EntryLister
             $batch = yield from $this->generateBatch(
                 $query,
                 $options->deadline,
-                $allowed,
+                $options->projection,
                 $remaining,
                 $isSorted
                     ? $delivered
@@ -323,31 +323,15 @@ readonly class EntryLister
     }
 
     /**
-     * The base names to materialize, or null for every attribute.
-     *
-     * @return array<string, true>|null
-     */
-    private function allowedFor(StorageListOptions $options): ?array
-    {
-        return $options->attributes === null
-            ? null
-            : array_fill_keys(
-                $options->attributes,
-                true,
-            );
-    }
-
-    /**
      * One statement's worth of rows, released as this returns so only one is ever open.
      *
-     * @param array<string, true>|null $allowed
      * @param ?int $deliveredBefore Rows handed over prior to this batch.
      * @return Generator<int, FetchedEntry, mixed, FetchedBatch>
      */
     private function generateBatch(
         SqlQuery $query,
         ?float $deadline,
-        ?array $allowed,
+        EntryProjection $projection,
         ?int $yieldCap = null,
         ?int $deliveredBefore = null,
     ): Generator {
@@ -359,12 +343,13 @@ readonly class EntryLister
             $deadline,
             $yieldCap,
         );
+        $allowed = $projection->allowed();
 
         // Reading runs ahead of handing over, so the cursor comes from the row being yielded, not the one just read.
         $cursor = null;
         $delivered = 0;
 
-        foreach ($this->pairedWithLinks($rows, $allowed) as [$row, $links]) {
+        foreach ($this->pairedWithLinks($rows, $projection) as [$row, $links]) {
             $delivered++;
             $cursor = $this->cursorForRow($row) ?? $cursor;
 
@@ -395,15 +380,17 @@ readonly class EntryLister
      * Each row with the links it carries, or with none when this read does not pay for them.
      *
      * @param iterable<int, mixed> $rows
-     * @param array<string, true>|null $allowed
      * @return Generator<int, array{mixed, array<string, list<string>>}>
      */
     private function pairedWithLinks(
         iterable $rows,
-        ?array $allowed,
+        EntryProjection $projection,
     ): Generator {
-        if ($this->links->hydrates($allowed)) {
-            yield from $this->links->hydrating($rows);
+        if ($this->links->hydrates($projection)) {
+            yield from $this->links->hydrating(
+                $rows,
+                $projection,
+            );
 
             return;
         }

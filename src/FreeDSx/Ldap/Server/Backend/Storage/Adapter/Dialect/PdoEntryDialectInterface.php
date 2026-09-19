@@ -185,16 +185,6 @@ interface PdoEntryDialectInterface
     public function querySidecarDeleteValues(int $count): string;
 
     /**
-     * One entry's links with their targets' current DNs. Parameters: [owner_entry_id]
-     */
-    public function queryLinksForEntry(): string;
-
-    /**
-     * The same over a contiguous span of owners, which is the shape a keyset page has. Parameters: [first, last]
-     */
-    public function queryLinksForRange(): string;
-
-    /**
      * INSERT prefix for the sidecar; caller appends `(?, ?, ?, ?)` tuples for (owner_entry_id, attr_name_lower, value_lower, value_original).
      */
     public function querySidecarInsertPrefix(): string;

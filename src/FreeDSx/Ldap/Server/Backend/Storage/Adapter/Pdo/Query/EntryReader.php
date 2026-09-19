@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 
 /**
  * Reads single entries, and the facts about one.
@@ -38,12 +39,14 @@ readonly class EntryReader
     ) {}
 
     /**
-     * The stored entry with its linked values resolved, or null when there is none.
+     * The stored entry with its linked values resolved as far as the projection allows, or null when there is none.
      *
      * @throws StorageIoException when the stored row cannot be decoded
      */
-    public function find(Dn $dn): ?Entry
-    {
+    public function find(
+        Dn $dn,
+        EntryProjection $projection = new EntryProjection(),
+    ): ?Entry {
         $row = $this->connection
             ->execute(
                 $this->dialect->queryFetchEntry(),
@@ -57,8 +60,11 @@ readonly class EntryReader
 
         return $this->codec->decode(
             $row,
-            null,
-            $this->linksFor($row),
+            $projection->allowed(),
+            $this->linksFor(
+                $row,
+                $projection,
+            ),
         );
     }
 
@@ -108,16 +114,21 @@ readonly class EntryReader
      * @param array<array-key, mixed> $row
      * @return array<string, list<string>>
      */
-    private function linksFor(array $row): array
-    {
-        if (!$this->links->hydrates(null)) {
+    private function linksFor(
+        array $row,
+        EntryProjection $projection,
+    ): array {
+        if (!$this->links->hydrates($projection)) {
             return [];
         }
 
         $entryId = $row['entry_id'] ?? null;
 
         return is_int($entryId) || is_string($entryId)
-            ? $this->links->forEntry((int) $entryId)
+            ? $this->links->forEntry(
+                (int) $entryId,
+                $projection,
+            )
             : [];
     }
 }

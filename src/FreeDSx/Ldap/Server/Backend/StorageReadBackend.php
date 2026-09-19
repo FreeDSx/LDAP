@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\UndefinedCause;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\SearchStreamBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\StorageListOptionsFactory;
 use FreeDSx\Ldap\Server\SearchLimits;
@@ -55,17 +56,27 @@ final readonly class StorageReadBackend implements ReadBackendInterface, Resetta
         }
     }
 
-    public function get(Dn $dn): ?Entry
-    {
-        return $this->storage->find($dn->normalize());
+    public function get(
+        Dn $dn,
+        EntryProjection $projection = new EntryProjection(),
+    ): ?Entry {
+        return $this->storage->find(
+            $dn->normalize(),
+            $projection,
+        );
     }
 
     /**
      * @throws OperationException
      */
-    public function getOrFail(Dn $dn): Entry
-    {
-        return $this->get($dn) ?? $this->locator->throwNoSuchObject($dn);
+    public function getOrFail(
+        Dn $dn,
+        EntryProjection $projection = new EntryProjection(),
+    ): Entry {
+        return $this->get(
+            $dn,
+            $projection,
+        ) ?? $this->locator->throwNoSuchObject($dn);
     }
 
     /**
@@ -103,6 +114,7 @@ final readonly class StorageReadBackend implements ReadBackendInterface, Resetta
                 $normBase,
                 $baseDn,
                 $request,
+                $effectiveLimits,
             );
         }
 
@@ -169,8 +181,15 @@ final readonly class StorageReadBackend implements ReadBackendInterface, Resetta
         Dn $normBase,
         Dn $baseDn,
         SearchRequest $request,
+        ?SearchLimits $effectiveLimits,
     ): EntryStream {
-        $entry = $this->storage->find($normBase);
+        $entry = $this->storage->find(
+            $normBase,
+            $this->listOptions->projectionFor(
+                $request,
+                $effectiveLimits,
+            ),
+        );
 
         if ($entry === null) {
             $this->locator->throwNoSuchObject($baseDn);

@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 
@@ -45,16 +46,22 @@ interface ReadBackendInterface
     ): EntryStream;
 
     /**
-     * Fetch a single entry by DN, or return null if it does not exist.
+     * Fetch a single entry by DN, or return null if it does not exist; linked values are bounded unless asked otherwise.
      */
-    public function get(Dn $dn): ?Entry;
+    public function get(
+        Dn $dn,
+        EntryProjection $projection = new EntryProjection(),
+    ): ?Entry;
 
     /**
      * Fetch a single entry by DN, or answer NO_SUCH_OBJECT carrying the deepest ancestor that exists.
      *
      * @throws OperationException
      */
-    public function getOrFail(Dn $dn): Entry;
+    public function getOrFail(
+        Dn $dn,
+        EntryProjection $projection = new EntryProjection(),
+    ): Entry;
 
     /**
      * Evaluate a compare assertion against an entry already read.

@@ -18,7 +18,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-interface PdoDialectInterface extends PdoEntryDialectInterface, PdoJournalDialectInterface
+interface PdoDialectInterface extends PdoEntryDialectInterface, PdoLinkDialectInterface, PdoJournalDialectInterface
 {
     /**
      * The full schema (all tables) as a runnable SQL script.
