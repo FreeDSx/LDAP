@@ -16,22 +16,22 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 /**
- * Builds journal records for committed writes and appends them to journaling-capable storage.
+ * Builds journal records for committed writes and appends them to the change journal.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final readonly class ChangeRecorder
 {
     public function __construct(
-        private EntryStorageInterface $storage,
+        private ChangeJournalInterface $journal,
         private LoggerInterface $logger = new NullLogger(),
     ) {}
 
@@ -89,10 +89,6 @@ final readonly class ChangeRecorder
         ?Dn $previousDn = null,
         ?Entry $preImage = null,
     ): void {
-        if (!$this->storage instanceof ChangeAppenderInterface) {
-            return;
-        }
-
         $uuid = $entry->get(AttributeTypeOid::NAME_ENTRY_UUID)?->firstValue();
 
         // entryUUID is stamped on every write.
@@ -110,7 +106,7 @@ final readonly class ChangeRecorder
             return;
         }
 
-        $this->storage->appendChange(new PendingChange(
+        $this->journal->append(new PendingChange(
             changeType: $type,
             dn: $entry->getDn(),
             entryUuid: $uuid,

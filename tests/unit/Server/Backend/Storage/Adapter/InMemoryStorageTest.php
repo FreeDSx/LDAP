@@ -18,20 +18,13 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
-use Tests\Support\FreeDSx\Ldap\Journal\JournalingStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 
 final class InMemoryStorageTest extends TestCase
 {
-    use JournalingStorageContractTests;
-
     use SubtreeRenameStorageContractTests;
 
     private InMemoryStorage $subject;
@@ -375,24 +368,6 @@ final class InMemoryStorageTest extends TestCase
         self::assertSame(
             ['cn=alice,dc=example,dc=com'],
             $contexts,
-        );
-    }
-
-    public function test_the_injected_journal_keeps_the_origin_it_was_built_with(): void
-    {
-        $storage = new InMemoryStorage(
-            [],
-            new InMemoryChangeJournal(new ReplicaId('node-x')),
-        );
-
-        self::assertTrue($storage->changeJournal()?->origin()->equals(new ReplicaId('node-x')));
-    }
-
-    protected function makeJournalingStorage(?ChangeJournalInterface $journal = null): ChangeJournalingInterface
-    {
-        return new InMemoryStorage(
-            [],
-            $journal,
         );
     }
 

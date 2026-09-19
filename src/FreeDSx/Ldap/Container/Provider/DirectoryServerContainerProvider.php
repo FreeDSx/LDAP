@@ -37,7 +37,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Write\Replay\WriteRequestReplayer;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
@@ -327,15 +326,13 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     }
 
     /**
-     * The journal the storage was built with, or null when it has none.
+     * The configured change journal, or null when journaling is off.
      */
     private function changeJournal(Container $container): ?ChangeJournalInterface
     {
-        $storage = $container->get(EntryStorageInterface::class);
-
-        return $storage instanceof ChangeJournalingInterface
-            ? $storage->changeJournal()
-            : null;
+        return $container->get(ServerOptions::class)->getChangeJournalConfig() === null
+            ? null
+            : $container->get(ChangeJournalInterface::class);
     }
 
     private function makeBackend(Container $container): StorageReadBackend
@@ -485,20 +482,19 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     }
 
     /**
-     * A recorder when sync is enabled and the storage was built with a journal to append to.
+     * A recorder when a change journal is configured to append to.
      */
     private function changeRecorderFor(Container $container): ?ChangeRecorder
     {
-        $options = $container->get(ServerOptions::class);
-        $storage = $container->get(EntryStorageInterface::class);
+        $journal = $this->changeJournal($container);
 
-        if ($options->getChangeJournalConfig() === null || !$storage instanceof ChangeJournalingInterface) {
+        if ($journal === null) {
             return null;
         }
 
         return new ChangeRecorder(
-            $storage,
-            $options->getLogger() ?? new NullLogger(),
+            $journal,
+            $container->get(ServerOptions::class)->getLogger() ?? new NullLogger(),
         );
     }
 
@@ -601,6 +597,12 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         if ($container->get(ServerOptions::class)->getStorageConfig() instanceof PdoConfig) {
             $instances[PdoConnection::class] = $container->get(PdoConnection::class);
             $instances[WriterQueueInterface::class] = $container->get(WriterQueueInterface::class);
+        }
+
+        // An in-memory journal lives only in this instance, so a reloaded generation must keep it or lose its records.
+        $journal = $this->changeJournal($container);
+        if ($journal !== null) {
+            $instances[ChangeJournalInterface::class] = $journal;
         }
 
         return new DirectoryListenerContributor(

@@ -31,6 +31,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
@@ -385,12 +386,10 @@ final class MoveEntryHandlerTest extends TestCase
 
         // Seeded directly so only the operation under test is journaled.
         $this->writeGraph(
-            new InMemoryStorage(
-                [new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))],
-                $journal,
-            ),
+            new InMemoryStorage([new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))]),
             TestServerOptions::unvalidatedCore()
                 ->setChangeJournalConfig(new ChangeJournalConfig()),
+            [ChangeJournalInterface::class => $journal],
         );
 
         return $journal;

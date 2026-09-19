@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolationDisposition;
@@ -489,10 +490,10 @@ final class AddEntryHandlerTest extends TestCase
     public function test_nothing_is_journaled_without_a_recorder(): void
     {
         $journal = new InMemoryChangeJournal();
-        $this->writeGraph(new InMemoryStorage(
-            [new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))],
-            $journal,
-        ));
+        $this->writeGraph(
+            new InMemoryStorage([new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))]),
+            sharedInstances: [ChangeJournalInterface::class => $journal],
+        );
 
         $this->adds()->handle(
             new AddCommand(new Entry(
@@ -530,12 +531,10 @@ final class AddEntryHandlerTest extends TestCase
 
         // Seeded directly so only the operation under test is journaled.
         $this->writeGraph(
-            new InMemoryStorage(
-                [new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))],
-                $journal,
-            ),
+            new InMemoryStorage([new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))]),
             TestServerOptions::unvalidatedCore()
                 ->setChangeJournalConfig(new ChangeJournalConfig()),
+            [ChangeJournalInterface::class => $journal],
         );
 
         return $journal;

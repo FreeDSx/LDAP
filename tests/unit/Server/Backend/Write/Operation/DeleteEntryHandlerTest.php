@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
@@ -221,12 +222,10 @@ final class DeleteEntryHandlerTest extends TestCase
 
         // Seeded directly so only the operations under test are journaled.
         $this->writeGraph(
-            new InMemoryStorage(
-                [new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))],
-                $journal,
-            ),
+            new InMemoryStorage([new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))]),
             TestServerOptions::unvalidatedCore()
                 ->setChangeJournalConfig(new ChangeJournalConfig()),
+            [ChangeJournalInterface::class => $journal],
         );
 
         return $journal;

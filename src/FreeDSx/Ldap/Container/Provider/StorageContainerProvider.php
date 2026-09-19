@@ -122,9 +122,6 @@ final class StorageContainerProvider implements ContainerProviderInterface
             $config instanceof PdoConfig => $container->get(WriteSerializingStorage::class),
             $config instanceof InMemoryStorageConfig => new InMemoryStorage(
                 $config->entries(),
-                $options->getChangeJournalConfig() === null
-                    ? null
-                    : $container->get(ChangeJournalInterface::class),
                 $container->get(SortKeyComparator::class),
             ),
             default => throw new RuntimeException(sprintf(

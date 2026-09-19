@@ -22,9 +22,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\DrainableWritesInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeJournalingInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
@@ -35,7 +32,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 final readonly class WriteSerializingStorage implements
     EntryStorageInterface,
     ResettableInterface,
-    ChangeJournalingInterface,
     DrainableWritesInterface,
     RowLockableInterface
 {
@@ -137,16 +133,6 @@ final readonly class WriteSerializingStorage implements
         }
     }
 
-    public function appendChange(PendingChange $change): void
-    {
-        $this->journaling()->appendChange($change);
-    }
-
-    public function changeJournal(): ?ChangeJournalInterface
-    {
-        return $this->journaling()->changeJournal();
-    }
-
     /**
      * Runs directly when the writer is already executing, since submitting there would block the writer on itself.
      *
@@ -167,15 +153,6 @@ final readonly class WriteSerializingStorage implements
     {
         if (!$this->storage instanceof RowLockableInterface) {
             throw new InvalidArgumentException('The underlying storage does not support row locking.');
-        }
-
-        return $this->storage;
-    }
-
-    private function journaling(): ChangeJournalingInterface
-    {
-        if (!$this->storage instanceof ChangeJournalingInterface) {
-            throw new InvalidArgumentException('The underlying storage does not support change journaling.');
         }
 
         return $this->storage;
