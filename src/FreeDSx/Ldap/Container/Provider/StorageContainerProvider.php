@@ -29,6 +29,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterf
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\MysqlFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -66,6 +67,8 @@ final class StorageContainerProvider implements ContainerProviderInterface
             EntryStorageInterface::class => $this->makeStorage(...),
             EntryIndexReindexer::class => $this->makeEntryIndexReindexer(...),
             PdoDialectInterface::class => $this->makePdoDialect(...),
+            SubstringIndexInterface::class => $this->makeSubstringIndex(...),
+            FilterTranslatorInterface::class => $this->makePdoFilterTranslator(...),
             PdoStorageFactory::class => $this->makePdoStorageFactory(...),
             PdoBackend::class => $this->makePdoBackend(...),
         ];
@@ -169,22 +172,13 @@ final class StorageContainerProvider implements ContainerProviderInterface
      */
     private function makePdoStorageFactory(Container $container): PdoStorageFactory
     {
-        $config = $this->requirePdoConfig($container);
-        // One index instance is shared by the translator, the index writer and schema setup.
-        $substringIndex = $this->makeSubstringIndex($config);
-
         return new PdoStorageFactory(
-            $config,
+            $this->requirePdoConfig($container),
             $container->get(PdoDialectInterface::class),
-            $this->makePdoFilterTranslator(
-                $config,
-                $container->get(AttributeContextInterface::class),
-                $container->get(AttributeIndexForms::class),
-                $substringIndex,
-            ),
+            $container->get(FilterTranslatorInterface::class),
             $container->get(AttributeContextInterface::class),
             $container->get(AttributeIndexForms::class),
-            $substringIndex,
+            $container->get(SubstringIndexInterface::class),
             $this->journalOrigin($container),
             $container->get(SleeperInterface::class),
             $this->journalConfig($container),
@@ -200,13 +194,13 @@ final class StorageContainerProvider implements ContainerProviderInterface
         };
     }
 
-    private function makePdoFilterTranslator(
-        PdoConfig $config,
-        AttributeContextInterface $attributeContext,
-        AttributeIndexForms $indexForms,
-        ?SubstringIndexInterface $substringIndex,
-    ): FilterTranslatorInterface {
-        return match ($config->getDriver()) {
+    private function makePdoFilterTranslator(Container $container): FilterTranslatorInterface
+    {
+        $attributeContext = $container->get(AttributeContextInterface::class);
+        $indexForms = $container->get(AttributeIndexForms::class);
+        $substringIndex = $container->get(SubstringIndexInterface::class);
+
+        return match ($this->requirePdoConfig($container)->getDriver()) {
             PdoDriver::Sqlite => new SqliteFilterTranslator(
                 $attributeContext,
                 $indexForms,
@@ -223,10 +217,12 @@ final class StorageContainerProvider implements ContainerProviderInterface
     /**
      * Auto resolves to the best index the driver supports, so a build without FTS5 still gets trigram narrowing.
      */
-    private function makeSubstringIndex(PdoConfig $config): ?SubstringIndexInterface
+    private function makeSubstringIndex(Container $container): SubstringIndexInterface
     {
+        $config = $this->requirePdoConfig($container);
+
         return match ($config->getSubstringIndexMode()) {
-            SubstringIndexMode::None => null,
+            SubstringIndexMode::None => new NoSubstringIndex(),
             SubstringIndexMode::Trigram => new TrigramSubstringIndex(),
             SubstringIndexMode::Auto => $config->getDriver() === PdoDriver::Sqlite
                 && Fts5SubstringIndex::isSupported()

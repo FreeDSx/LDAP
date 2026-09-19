@@ -44,7 +44,7 @@ trait SqlFilterTranslatorTrait
 {
     use DerivedAttributeTrait;
 
-    private ?SubstringIndexInterface $substringIndex = null;
+    private SubstringIndexInterface $substringIndex;
 
     private AttributeContextInterface $attributeContext;
 
@@ -485,7 +485,7 @@ trait SqlFilterTranslatorTrait
         array $contains,
         ?string $endsWith,
     ): ?SqlFilterResult {
-        if ($startsWith !== null || $this->substringIndex === null) {
+        if ($startsWith !== null) {
             return null;
         }
 

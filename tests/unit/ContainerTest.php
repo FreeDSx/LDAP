@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
+use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
 use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\ClientOptions;
@@ -33,6 +34,8 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
@@ -124,6 +127,19 @@ class ContainerTest extends TestCase
         self::assertSame(
             $this->subject->get($class),
             $this->subject->get($class),
+        );
+    }
+
+    public function test_a_pdo_config_without_substring_indexing_resolves_the_null_index(): void
+    {
+        $container = Container::forServer(new ServerOptions(
+            PdoConfig::forSqlite(':memory:')
+                ->setSubstringIndexMode(SubstringIndexMode::None),
+        ));
+
+        self::assertInstanceOf(
+            NoSubstringIndex::class,
+            $container->get(SubstringIndexInterface::class),
         );
     }
 
