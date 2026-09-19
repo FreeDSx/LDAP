@@ -401,14 +401,14 @@ final class StorageReadBackendTest extends TestCase
         iterator_to_array($subject->search($request, SubentryVisibility::All)->entries());
         $after = microtime(true);
 
-        self::assertNotNull($capturedOptions?->deadline);
+        self::assertNotNull($capturedOptions?->bounds->deadline);
         self::assertGreaterThanOrEqual(
             $before + $expectedLimit,
-            $capturedOptions->deadline,
+            $capturedOptions->bounds->deadline,
         );
         self::assertLessThanOrEqual(
             $after + $expectedLimit,
-            $capturedOptions->deadline,
+            $capturedOptions->bounds->deadline,
         );
     }
 

@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\FetchedEntry;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ReadBounds;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use Generator;
 
@@ -90,7 +91,7 @@ readonly class EntryLister
         StorageListOptions $options,
         ?SqlFilterResult $filterResult,
     ): EntryStream {
-        $maxRows = $this->maxRowsFor($options);
+        $maxRows = $this->maxRowsFor($options->bounds);
         $batchSize = $maxRows === null
             ? self::FETCH_BATCH_SIZE
             : min($maxRows, self::FETCH_BATCH_SIZE);
@@ -116,15 +117,13 @@ readonly class EntryLister
     /**
      * Rows worth reading at all, or null to walk the whole result.
      */
-    private function maxRowsFor(StorageListOptions $options): ?int
+    private function maxRowsFor(ReadBounds $bounds): ?int
     {
-        $ceiling = match (true) {
-            $options->maxEntries > 0 => $options->maxEntries,
-            $options->lookthroughLimit > 0 => $options->lookthroughLimit + 1,
-            default => null,
-        };
+        $ceiling = $bounds->lookthroughLimit > 0
+            ? $bounds->lookthroughLimit + 1
+            : null;
 
-        $limit = $options->limit();
+        $limit = $bounds->limit();
         if ($limit === null) {
             return $ceiling;
         }
@@ -148,7 +147,7 @@ readonly class EntryLister
             return null;
         }
 
-        if (!$options->subtree || $options->sortKeys !== []) {
+        if (!$options->scope->subtree || $options->sortKeys !== []) {
             return null;
         }
 
@@ -253,14 +252,14 @@ readonly class EntryLister
     ): Generator {
         $batch = yield from $this->generateBatch(
             $query,
-            $options->deadline,
+            $options->bounds->deadline,
             $options->projection,
-            $options->limit(),
+            $options->bounds->limit(),
         );
 
         return new FetchedBatch(
             $batch->rows,
-            $batch->cursor ?? $options->resumeAfter(),
+            $batch->cursor ?? $options->bounds->resumeAfter(),
             $batch->hasMore,
         );
     }
@@ -277,23 +276,24 @@ readonly class EntryLister
         ListQuerySpec $spec,
         ?int $maxRows,
     ): Generator {
-        $cursor = $options->resumeAfter();
+        $bounds = $options->bounds;
+        $cursor = $bounds->resumeAfter();
         $read = 0;
 
         // A sort orders by something the key says nothing about, so its walk resumes by count rather than by key.
         $isSorted = $options->sortKeys !== [];
         $delivered = $isSorted
-            ? $options->resumeAfter()->position ?? 0
+            ? $bounds->resumeAfter()->position ?? 0
             : 0;
 
         while (true) {
-            $limit = $options->limit();
+            $limit = $bounds->limit();
             $remaining = $limit === null
                 ? null
                 : $limit - $read;
             $batch = yield from $this->generateBatch(
                 $query,
-                $options->deadline,
+                $bounds->deadline,
                 $options->projection,
                 $remaining,
                 $isSorted

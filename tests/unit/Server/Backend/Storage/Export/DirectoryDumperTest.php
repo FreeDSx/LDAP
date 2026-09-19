@@ -224,7 +224,7 @@ final class DirectoryDumperTest extends TestCase
             ->method('list')
             ->with(self::callback(
                 fn(StorageListOptions $opts): bool
-                    => $opts->subtree === true && $opts->baseDn->toString() === 'dc=foo,dc=bar',
+                    => $opts->scope->subtree === true && $opts->scope->baseDn->toString() === 'dc=foo,dc=bar',
             ))
             ->willReturn(EntryStream::of(
                 entries: (function (): Generator {

@@ -20,6 +20,7 @@ use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
@@ -125,8 +126,10 @@ abstract class LdapReindexTestCase extends TestCase
         FilterInterface $filter,
     ): array {
         $entries = $storage->list(new StorageListOptions(
-            baseDn: new Dn('dc=foo,dc=bar'),
-            subtree: true,
+            scope: new ListScope(
+                baseDn: new Dn('dc=foo,dc=bar'),
+                subtree: true,
+            ),
             filter: $filter,
         ))->entries();
 

@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use Generator;
 
@@ -91,8 +92,10 @@ final readonly class DirectoryDumper
     ): Generator {
         // @todo An export needs every value, but each is held at once; stream linked values in chunks as they are written.
         $listOptions = new StorageListOptions(
-            baseDn: $base,
-            subtree: true,
+            scope: new ListScope(
+                baseDn: $base,
+                subtree: true,
+            ),
             filter: $filter ?? new AndFilter(),
             projection: EntryProjection::unbounded(),
         );

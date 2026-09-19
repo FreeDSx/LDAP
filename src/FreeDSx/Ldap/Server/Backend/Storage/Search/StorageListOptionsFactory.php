@@ -24,6 +24,8 @@ use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Search\Filter\FilterAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ReadBounds;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
@@ -68,23 +70,26 @@ final readonly class StorageListOptionsFactory
         );
 
         return new StorageListOptions(
-            baseDn: $baseDn,
-            subtree: $request->getScope() === SearchRequest::SCOPE_WHOLE_SUBTREE,
+            scope: new ListScope(
+                baseDn: $baseDn,
+                subtree: $request->getScope() === SearchRequest::SCOPE_WHOLE_SUBTREE,
+                subentries: $subentries,
+            ),
             filter: $request->getFilter(),
-            deadline: $slice->deadline ?? ($timeLimit > 0
-                ? microtime(true) + $timeLimit
-                : null),
-            sortKeys: $sortingControl instanceof SortingControl
-                ? $sortingControl->getSortKeys()
-                : [],
-            lookthroughLimit: $limits->maxSearchLookthrough(),
             projection: $this->projectionFor(
                 $request,
                 $limits,
             ),
-            subentries: $subentries,
-            slice: $slice,
-            withHasSubordinates: $this->wantsHasSubordinates($request),
+            sortKeys: $sortingControl instanceof SortingControl
+                ? $sortingControl->getSortKeys()
+                : [],
+            bounds: new ReadBounds(
+                deadline: $slice->deadline ?? ($timeLimit > 0
+                    ? microtime(true) + $timeLimit
+                    : null),
+                lookthroughLimit: $limits->maxSearchLookthrough(),
+                slice: $slice,
+            ),
         );
     }
 
@@ -100,12 +105,13 @@ final readonly class StorageListOptionsFactory
         $linkCap = ($effectiveLimits ?? $this->limits)->maxLinkedValues();
 
         return new EntryProjection(
-            $this->materializedAttributes($request),
-            match ($linkCap) {
+            attributes: $this->materializedAttributes($request),
+            linkCap: match ($linkCap) {
                 null => EntryProjection::DEFAULT_LINK_CAP,
                 0 => null,
                 default => $linkCap,
             },
+            withHasSubordinates: $this->wantsHasSubordinates($request),
         );
     }
 

@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Search;
 use function array_fill_keys;
 
 /**
- * What a read materializes: which attributes, and how many values of a linked attribute.
+ * What a read materializes: which attributes, how many values of a linked attribute, and whether it has children.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -30,10 +30,12 @@ final readonly class EntryProjection
     /**
      * @param list<string>|null $attributes Lowercase base attribute names to materialize, or null for all.
      * @param ?int $linkCap Values read per linked attribute, or null for every value.
+     * @param bool $withHasSubordinates Whether a read able to answer hasSubordinates alongside the row should.
      */
     public function __construct(
         public ?array $attributes = null,
         public ?int $linkCap = self::DEFAULT_LINK_CAP,
+        public bool $withHasSubordinates = false,
     ) {}
 
     /**
