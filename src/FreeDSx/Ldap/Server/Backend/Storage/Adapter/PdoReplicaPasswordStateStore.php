@@ -16,9 +16,8 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoEntryDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaForwardState;
@@ -43,9 +42,8 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
     private const TABLE = 'ldap_replica_pwpolicy_state';
 
     public function __construct(
-        private PdoTransactor $transactor,
+        private PdoConnection $connection,
         private PdoEntryDialectInterface $dialect,
-        private PdoStatementPool $statements,
     ) {}
 
     public function load(Dn $dn): ReplicaPasswordState
@@ -60,7 +58,7 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
         Dn $dn,
         callable $merge,
     ): void {
-        $this->transactor->atomic(function () use ($dn, $merge): void {
+        $this->connection->atomic(function () use ($dn, $merge): void {
             $this->lockStateRow($dn);
 
             $record = $this->loadRecord($dn);
@@ -81,7 +79,7 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
     public function listUnforwarded(int $limit = 100): array
     {
         $table = self::TABLE;
-        $statement = $this->statements->execute(
+        $statement = $this->connection->execute(
             <<<SQL
                 SELECT e.lc_dn, s.state, s.seq, s.forwarded_seq
                 FROM $table s
@@ -121,7 +119,7 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
         }
 
         $table = self::TABLE;
-        $this->statements->execute(
+        $this->connection->execute(
             <<<SQL
                 UPDATE $table
                 SET forwarded_seq = ?
@@ -143,7 +141,7 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
         Dn $dn,
         UserPasswordState $authoritative,
     ): void {
-        $this->transactor->atomic(function () use ($dn, $authoritative): void {
+        $this->connection->atomic(function () use ($dn, $authoritative): void {
             $this->lockStateRow($dn);
 
             $local = $this->loadRecord($dn)
@@ -170,7 +168,7 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
         }
 
         $table = self::TABLE;
-        $this->statements->execute(
+        $this->connection->execute(
             <<<SQL
                 DELETE FROM $table
                 WHERE entry_id = ?
@@ -187,7 +185,7 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
         }
 
         $table = self::TABLE;
-        $row = $this->statements
+        $row = $this->connection
             ->execute(
                 <<<SQL
                     SELECT state, seq, forwarded_seq
@@ -221,7 +219,7 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
 
         $this->deleteRow($record->dn);
         $table = self::TABLE;
-        $this->statements->execute(
+        $this->connection->execute(
             <<<SQL
                 INSERT INTO $table (entry_id, state, seq, forwarded_seq)
                 VALUES (?, ?, ?, ?)
@@ -246,7 +244,7 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
         }
 
         $this->dialect->lockRowForWrite(
-            $this->transactor->pdo(),
+            $this->connection->pdo(),
             self::TABLE,
             'entry_id',
             $entryId,
@@ -258,7 +256,7 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
      */
     private function entryId(Dn $dn): ?int
     {
-        $row = $this->statements
+        $row = $this->connection
             ->execute(
                 $this->dialect->queryEntryId(),
                 [$dn->normalize()->toString()],

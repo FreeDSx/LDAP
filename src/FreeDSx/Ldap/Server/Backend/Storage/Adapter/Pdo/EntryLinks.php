@@ -14,8 +14,8 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoEntryDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use Generator;
@@ -41,7 +41,7 @@ final readonly class EntryLinks
 
     public function __construct(
         private PdoEntryDialectInterface $dialect,
-        private PdoStatementPool $statements,
+        private PdoConnection $connection,
         private LinkedAttributes $declared,
     ) {}
 
@@ -75,7 +75,7 @@ final readonly class EntryLinks
      */
     public function forEntry(int $entryId): array
     {
-        $stmt = $this->statements->execute(
+        $stmt = $this->connection->execute(
             $this->dialect->queryLinksForEntry(),
             [$entryId],
         );
@@ -151,7 +151,7 @@ final readonly class EntryLinks
         if ($ids === []) {
             return [];
         }
-        $stmt = $this->statements->execute(
+        $stmt = $this->connection->execute(
             $this->dialect->queryLinksForRange(),
             [
                 min($ids),

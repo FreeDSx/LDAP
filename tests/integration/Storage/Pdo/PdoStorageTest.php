@@ -38,6 +38,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoStorageFactory;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\ServerOptions;
@@ -1983,14 +1985,21 @@ final class PdoStorageTest extends TestCase
             options: TestServerOptions::sqlite(),
         );
         $provider = $factory->sharedProvider();
-        $statements = new PdoStatementPool($provider);
         $dialect = $this->fromContainer(
             PdoDialectInterface::class,
             options: TestServerOptions::sqlite(),
         );
+        $connection = new PdoConnection(
+            $provider,
+            new PdoStatementPool($provider),
+            new PdoTransactor(
+                $provider,
+                $dialect,
+            ),
+        );
 
         return new PdoStorage(
-            $provider,
+            $connection,
             new SqliteFilterTranslator(
                 $this->fromContainer(AttributeContextInterface::class),
                 $this->fromContainer(AttributeIndexForms::class),
@@ -1999,10 +2008,9 @@ final class PdoStorageTest extends TestCase
             $this->fromContainer(AttributeContextInterface::class),
             new EntryIndexWriter(
                 $dialect,
-                $statements,
+                $connection,
                 $this->fromContainer(AttributeIndexForms::class),
             ),
-            $statements,
             journal: $journal,
         );
     }

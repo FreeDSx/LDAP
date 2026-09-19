@@ -41,11 +41,6 @@ final readonly class PdoTransactor
         ),
     ) {}
 
-    public function pdo(): PDO
-    {
-        return $this->provider->get();
-    }
-
     /**
      * Runs within the caller's open transaction, starting one only when none is active.
      *

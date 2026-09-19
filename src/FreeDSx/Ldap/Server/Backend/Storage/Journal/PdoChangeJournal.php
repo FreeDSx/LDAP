@@ -18,8 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\Authorization\AuthzId;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoJournalDialectInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
@@ -37,9 +36,8 @@ use Generator;
 final readonly class PdoChangeJournal implements ChangeJournalInterface
 {
     public function __construct(
-        private PdoTransactor $transactor,
+        private PdoConnection $connection,
         private PdoJournalDialectInterface $dialect,
-        private PdoStatementPool $statements,
         private PdoJournalGeneration $generation,
         private ReplicaId $origin = new ReplicaId(),
         private ClockInterface $clock = new SystemClock(),
@@ -52,13 +50,13 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
         $createdAt = null;
 
         // Joins the write transaction that a journaled change already runs in, rather than nesting a savepoint in it.
-        $this->transactor->joinAtomic(function () use ($change, $normDn, &$createdAt, &$seq): void {
-            $this->statements->execute($this->dialect->queryJournalSeqBump());
+        $this->connection->joinAtomic(function () use ($change, $normDn, &$createdAt, &$seq): void {
+            $this->connection->execute($this->dialect->queryJournalSeqBump());
             $seq = $this->latestSeq();
             // Stamped under the sequence row lock that orders the seq.
             $createdAt = $this->clock->now();
 
-            $this->statements->execute($this->dialect->queryJournalInsert(), [
+            $this->connection->execute($this->dialect->queryJournalInsert(), [
                 $seq,
                 (string) $this->origin,
                 EpochMicroseconds::fromDateTime($createdAt),
@@ -83,7 +81,7 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
 
     public function read(int $afterSeq = 0): iterable
     {
-        return $this->streamRecords($this->statements->execute(
+        return $this->streamRecords($this->connection->execute(
             $this->dialect->queryJournalReadSince(),
             [$afterSeq],
         ));
@@ -91,14 +89,14 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
 
     public function latestSeq(): int
     {
-        return $this->statements
+        return $this->connection
             ->execute($this->dialect->queryJournalSeqRead())
             ->fetchIntColumn() ?? 0;
     }
 
     public function retainsSince(int $afterSeq): bool
     {
-        $minSeq = $this->statements
+        $minSeq = $this->connection
             ->execute($this->dialect->queryJournalMinSeq())
             ->fetchIntColumn();
 
@@ -114,7 +112,7 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
     {
         $removed = 0;
 
-        $this->transactor->atomic(function () use ($policy, &$removed): void {
+        $this->connection->atomic(function () use ($policy, &$removed): void {
             if ($policy->maxRecords !== null) {
                 $removed += $this->pruneToRecordCap($policy->maxRecords);
             }
@@ -144,7 +142,7 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
 
     private function pruneToRecordCap(int $maxRecords): int
     {
-        $keepFrom = $this->statements
+        $keepFrom = $this->connection
             ->execute(
                 $this->dialect->queryJournalKeepFloor(),
                 [$maxRecords - 1],
@@ -155,7 +153,7 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
             return 0;
         }
 
-        return $this->statements
+        return $this->connection
             ->execute(
                 $this->dialect->queryJournalDeleteBelow(),
                 [$keepFrom],
@@ -169,14 +167,14 @@ final readonly class PdoChangeJournal implements ChangeJournalInterface
     private function pruneToAgeWindow(int $maxAgeSeconds): int
     {
         $cutoff = EpochMicroseconds::fromSeconds($this->clock->now()->getTimestamp() - $maxAgeSeconds);
-        $keepFrom = $this->statements
+        $keepFrom = $this->connection
             ->execute(
                 $this->dialect->queryJournalAgeKeepFloor(),
                 [$cutoff],
             )
             ->fetchIntColumn();
 
-        return $this->statements
+        return $this->connection
             ->execute(
                 $this->dialect->queryJournalDeleteBelow(),
                 [$keepFrom ?? $this->latestSeq() + 1],

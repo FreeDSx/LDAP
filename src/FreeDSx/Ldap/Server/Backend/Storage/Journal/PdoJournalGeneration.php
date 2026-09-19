@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Journal;
 
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoJournalDialectInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Utility\Uuid;
 
 /**
@@ -31,7 +31,7 @@ class PdoJournalGeneration
 
     public function __construct(
         private readonly PdoJournalDialectInterface $dialect,
-        private readonly PdoStatementPool $statements,
+        private readonly PdoConnection $connection,
     ) {}
 
     public function value(): string
@@ -46,7 +46,7 @@ class PdoJournalGeneration
             return $existing;
         }
 
-        $this->statements->execute(
+        $this->connection->execute(
             $this->dialect->queryJournalGenerationClaim(),
             [Uuid::v4()],
         );
@@ -57,7 +57,7 @@ class PdoJournalGeneration
 
     private function read(): string
     {
-        return $this->statements
+        return $this->connection
             ->execute($this->dialect->queryJournalGenerationRead())
             ->fetchStringColumn() ?? '';
     }
