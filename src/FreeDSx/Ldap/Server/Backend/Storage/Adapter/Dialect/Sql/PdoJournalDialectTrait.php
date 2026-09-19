@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
+namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql;
 
 /**
  * Cross-platform change-journal SQL shared by every PdoJournalDialectInterface implementation.

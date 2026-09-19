@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoSchemaDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use PDO;
@@ -33,7 +33,7 @@ readonly class PdoSchema
     public const VERSION = 1;
 
     public function __construct(
-        private PdoDialectInterface $dialect,
+        private PdoSchemaDialectInterface $dialect,
         private SubstringIndexInterface $substringIndex = new NoSubstringIndex(),
     ) {}
 

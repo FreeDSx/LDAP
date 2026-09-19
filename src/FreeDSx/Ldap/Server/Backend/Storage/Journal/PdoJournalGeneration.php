@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Journal;
 
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoJournalDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoJournalDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Utility\Uuid;
 

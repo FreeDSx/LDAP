@@ -17,7 +17,8 @@ use Closure;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryWriteDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoRowLockDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
@@ -44,7 +45,7 @@ readonly class EntryWriter
 
     public function __construct(
         private PdoConnection $connection,
-        private PdoDialectInterface $dialect,
+        private PdoEntryWriteDialectInterface&PdoRowLockDialectInterface $dialect,
         private EntryReader $reader,
         private EntryIndexWriter $indexes,
         private EntryRowCodec $codec,

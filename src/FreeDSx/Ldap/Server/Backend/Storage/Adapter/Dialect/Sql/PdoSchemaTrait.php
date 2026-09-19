@@ -11,9 +11,10 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect;
+namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql;
 
 use FreeDSx\Ldap\Resources;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SchemaFile;
 
 /**
  * Loads a dialect's baseline schema from its shipped .sql resource file.
