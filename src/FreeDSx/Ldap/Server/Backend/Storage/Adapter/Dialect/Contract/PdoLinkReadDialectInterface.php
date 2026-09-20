@@ -44,4 +44,18 @@ interface PdoLinkReadDialectInterface
      * One owner's links for one attribute, at most limit rows. Parameters: [owner_entry_id, attr_name_lower, limit]
      */
     public function queryLinksForAttribute(): string;
+
+    /**
+     * Which of $count named DNs an owner links under one attribute.
+     *
+     * Parameters: [owner lc_dn, attr_name_lower, then target lc_dn per name]
+     */
+    public function queryHeldLinkValues(int $count): string;
+
+    /**
+     * Any one DN an owner links under an attribute, for answering whether it holds the attribute at all.
+     *
+     * Parameters: [owner lc_dn, attr_name_lower]
+     */
+    public function queryAnyLinkValue(): string;
 }

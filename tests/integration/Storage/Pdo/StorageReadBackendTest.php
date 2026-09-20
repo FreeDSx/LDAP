@@ -24,6 +24,7 @@ use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use FreeDSx\Ldap\ServerOptions;
@@ -267,6 +268,72 @@ final class StorageReadBackendTest extends TestCase
             'cn=Doe\,John,dc=example,dc=com',
             $this->searchDns(new AndFilter()),
         );
+    }
+
+    public function test_a_compare_matches_a_linked_value_the_read_stopped_short_of(): void
+    {
+        self::assertTrue($this->subject->compare(
+            $this->boundedGroup(),
+            Filters::equal('member', 'cn=Third,dc=example,dc=com'),
+        ));
+    }
+
+    public function test_a_compare_matches_a_value_past_the_bound_spelled_differently(): void
+    {
+        self::assertTrue($this->subject->compare(
+            $this->boundedGroup(),
+            Filters::equal('member', 'CN=Third, DC=Example, DC=Com'),
+        ));
+    }
+
+    public function test_a_compare_does_not_match_a_linked_value_the_group_does_not_hold(): void
+    {
+        self::assertFalse($this->subject->compare(
+            $this->boundedGroup(),
+            Filters::equal('member', 'cn=Alice,dc=example,dc=com'),
+        ));
+    }
+
+    /**
+     * A group read under a bound that leaves all but one of its members unread.
+     */
+    private function boundedGroup(): Entry
+    {
+        $members = [];
+        foreach (['First', 'Second', 'Third'] as $name) {
+            $members[] = new Entry(
+                new Dn("cn={$name},dc=example,dc=com"),
+                new Attribute('cn', $name),
+            );
+        }
+
+        $this->seed(
+            ...$members,
+            ...[new Entry(
+                new Dn('cn=Admins,dc=example,dc=com'),
+                new Attribute('cn', 'Admins'),
+                new Attribute('objectClass', 'groupOfNames'),
+                new Attribute(
+                    'member',
+                    ...array_map(
+                        static fn(Entry $entry): string => $entry->getDn()->toString(),
+                        $members,
+                    ),
+                ),
+            )],
+        );
+
+        $group = $this->subject->getOrFail(
+            new Dn('cn=Admins,dc=example,dc=com'),
+            new EntryProjection(linkCap: 1),
+        );
+
+        self::assertCount(
+            1,
+            $group->get('member')?->getValues() ?? [],
+        );
+
+        return $group;
     }
 
     /**

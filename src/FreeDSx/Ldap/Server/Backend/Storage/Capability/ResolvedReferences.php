@@ -22,11 +22,17 @@ use FreeDSx\Ldap\Entry\Dn;
  */
 final readonly class ResolvedReferences implements ReferenceIntegrityInterface
 {
+    /**
+     * Never any, since a value kept as written names whatever it says.
+     */
     public function unresolvedReferences(Dn $owner): array
     {
         return [];
     }
 
+    /**
+     * Never any, since a value kept as written names whatever it says.
+     */
     public function hasUnresolvedReferences(): bool
     {
         return false;

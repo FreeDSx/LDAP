@@ -46,6 +46,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Write\Replay\WriteRequestReplayer;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
@@ -362,6 +363,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             listOptions: $container->get(StorageListOptionsFactory::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
             locator: $container->get(EntryLocator::class),
+            linkedLeaves: $container->get(LinkedLeafWitness::class),
         );
     }
 
@@ -442,6 +444,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             $options->makeSearchLimits(),
             $container->get(FilterEvaluatorInterface::class),
             $container->get(DerivedResolver::class),
+            $container->get(LinkedLeafWitness::class),
         );
     }
 

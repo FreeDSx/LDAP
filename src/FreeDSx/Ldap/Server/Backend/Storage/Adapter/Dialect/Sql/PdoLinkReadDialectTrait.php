@@ -66,6 +66,31 @@ trait PdoLinkReadDialectTrait
         SQL;
     }
 
+    public function queryHeldLinkValues(int $count): string
+    {
+        $markers = SqlFilterUtility::markers($count);
+
+        return <<<SQL
+            SELECT t.lc_dn
+            FROM entry_attribute_links l
+            JOIN entries o ON o.entry_id = l.owner_entry_id
+            JOIN entries t ON t.entry_id = l.target_entry_id
+            WHERE o.lc_dn = ? AND l.attr_name_lower = ? AND t.lc_dn IN ($markers)
+        SQL;
+    }
+
+    public function queryAnyLinkValue(): string
+    {
+        return <<<SQL
+            SELECT t.dn
+            FROM entry_attribute_links l
+            JOIN entries o ON o.entry_id = l.owner_entry_id
+            JOIN entries t ON t.entry_id = l.target_entry_id
+            WHERE o.lc_dn = ? AND l.attr_name_lower = ?
+            LIMIT 1
+        SQL;
+    }
+
     public function queryLinksForAttribute(): string
     {
         return <<<SQL

@@ -173,6 +173,18 @@ class Dn implements IteratorAggregate, Countable, Stringable
     }
 
     /**
+     * The canonical (RFC 4518 caseIgnore) form of a value, or null when the value is not a DN.
+     */
+    public static function normalizedOrNull(Stringable|string $dn): ?string
+    {
+        try {
+            return (new self((string) $dn))->normalizedString();
+        } catch (UnexpectedValueException|InvalidArgumentException) {
+            return null;
+        }
+    }
+
+    /**
      * Return the canonical (RFC 4518 caseIgnore) copy of this DN.
      */
     public function normalize(): Dn

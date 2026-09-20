@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter;
 
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Text;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
@@ -34,6 +35,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 
 /**
  * Translates LDAP filters to SQL against the `entry_attribute_values` sidecar index.
@@ -49,6 +51,8 @@ trait SqlFilterTranslatorTrait
     private AttributeContextInterface $attributeContext;
 
     private AttributeIndexForms $indexForms;
+
+    private LinkedAttributes $linked;
 
     public function translate(FilterInterface $filter): ?SqlFilterResult
     {
@@ -151,6 +155,80 @@ trait SqlFilterTranslatorTrait
     }
 
     /**
+     * Whether the store keeps this description's values as references to the entries they name.
+     */
+    private function linksValuesOf(string $attributeDescription): bool
+    {
+        return $this->linked->links(new Attribute($attributeDescription));
+    }
+
+    /**
+     * Equality on a linked attribute, resolving the asserted DN through the unique key the entry table holds it under.
+     *
+     * @param string $attribute Pre-validated; safe to embed in SQL.
+     */
+    private function translateLinkedEquality(
+        string $attribute,
+        string $value,
+    ): SqlFilterResult {
+        $target = Dn::normalizedOrNull($value);
+
+        // An assertion that is not a DN names no entry, and no stored value can match it.
+        if ($target === null) {
+            return new SqlFilterResult(
+                '1 = 0',
+                [],
+                isExact: false,
+            );
+        }
+
+        return $this->linkedResult(
+            $attribute,
+            't.lc_dn = ?',
+            [$target],
+        );
+    }
+
+    /**
+     * A leaf answered from the link table. It carries no sidecar condition, which keeps it out of the sidecar-only
+     * streaming paths.
+     *
+     * @param string $attribute Pre-validated; safe to embed in SQL.
+     * @param list<string> $params
+     */
+    private function linkedResult(
+        string $attribute,
+        ?string $target,
+        array $params,
+    ): SqlFilterResult {
+        $join = $target === null
+            ? ''
+            : "JOIN entries t ON t.entry_id = l.target_entry_id";
+        $match = $target === null
+            ? ''
+            : " AND $target";
+
+        return new SqlFilterResult(
+            <<<SQL
+                entry_id IN (
+                    SELECT l.owner_entry_id
+                    FROM entry_attribute_links l
+                    $join
+                    WHERE l.attr_name_lower = '$attribute'$match)
+                SQL,
+            $params,
+            correlatedSql: <<<SQL
+                EXISTS (
+                    SELECT 1
+                    FROM entry_attribute_links l
+                    $join
+                    WHERE l.owner_entry_id = entry_id
+                      AND l.attr_name_lower = '$attribute'$match)
+                SQL,
+        );
+    }
+
+    /**
      * Whether the item asserts on hasSubordinates, which is computed rather than stored so no sidecar row answers it.
      */
     private function isSubordinateCheck(string $attributeDescription): bool
@@ -204,6 +282,15 @@ trait SqlFilterTranslatorTrait
 
         $attribute = $this->validateAttribute($filter->getAttribute());
 
+        // Values kept as links are not in the sidecar.
+        if ($this->linksValuesOf($filter->getAttribute())) {
+            return $this->linkedResult(
+                $attribute,
+                null,
+                [],
+            );
+        }
+
         return new SqlFilterResult(
             $this->buildPresenceCheck($attribute),
             [],
@@ -222,6 +309,13 @@ trait SqlFilterTranslatorTrait
         }
 
         $attribute = $this->validateAttribute($filter->getAttribute());
+
+        if ($this->linksValuesOf($filter->getAttribute())) {
+            return $this->translateLinkedEquality(
+                $attribute,
+                $filter->getValue(),
+            );
+        }
 
         $alias = $this->valueAlias();
         $value = $filter->getValue();

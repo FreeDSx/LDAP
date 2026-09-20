@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoSidecarDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
@@ -20,6 +21,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 
 /**
  * Keeps an entry's secondary indexes, the attribute-value sidecar and any substring index, in step with its row.
@@ -37,6 +39,7 @@ final readonly class EntryIndexWriter
         private PdoSidecarDialectInterface $dialect,
         private PdoConnection $connection,
         private AttributeIndexForms $indexForms,
+        private LinkedAttributes $linked,
         private SubstringIndexInterface $substringIndex = new NoSubstringIndex(),
     ) {}
 
@@ -196,7 +199,11 @@ final readonly class EntryIndexWriter
         $byName = [];
 
         foreach ($entry->getAttributes() as $attribute) {
-            $name = strtolower($attribute->getName());
+            // Linked values are answered from the table holding them.
+            if ($this->linked->links($attribute)) {
+                continue;
+            }
+            $name = Attribute::normalizeName($attribute->getName());
             $byName[$name] = [
                 ...$byName[$name] ?? [],
                 ...array_values($attribute->getValues()),
@@ -290,7 +297,12 @@ final readonly class EntryIndexWriter
         $rows = [];
 
         foreach ($entry->getAttributes() as $attribute) {
-            $attrNameLower = strtolower($attribute->getName());
+            // Linked values are answered from the table holding them.
+            if ($this->linked->links($attribute)) {
+                continue;
+            }
+            $attrNameLower = Attribute::normalizeName($attribute->getName());
+
             if ($only !== null && !isset($only[$attrNameLower])) {
                 continue;
             }

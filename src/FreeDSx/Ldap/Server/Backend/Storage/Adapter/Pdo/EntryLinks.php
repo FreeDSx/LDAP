@@ -13,14 +13,19 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
+use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use Generator;
 
+use function array_chunk;
+use function array_keys;
 use function array_map;
 use function array_slice;
 use function count;
@@ -35,7 +40,7 @@ use function sprintf;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class EntryLinks
+final readonly class EntryLinks implements LinkedValueLookupInterface
 {
     use PdoColumnCastTrait;
 
@@ -49,6 +54,62 @@ final readonly class EntryLinks
         private PdoConnection $connection,
         private LinkedAttributes $declared,
     ) {}
+
+    /**
+     * Which of the named values the entry links, answered without reading the rest of what it links.
+     */
+    public function heldLinkValues(
+        Dn $owner,
+        string $attribute,
+        array $values,
+    ): array {
+        $asked = [];
+
+        foreach ($values as $value) {
+            $normalized = Dn::normalizedOrNull($value);
+
+            if ($normalized !== null) {
+                $asked[$normalized] = $value;
+            }
+        }
+
+        if ($asked === []) {
+            return [];
+        }
+        $held = [];
+
+        foreach ($this->heldRows($owner, $attribute, array_keys($asked)) as $row) {
+            $normalized = $this->stringColumn($row['lc_dn'] ?? null);
+
+            if (isset($asked[$normalized])) {
+                $held[] = $asked[$normalized];
+            }
+        }
+
+        return $held;
+    }
+
+    /**
+     * One value the entry links, which is all that answering whether it holds the attribute takes.
+     */
+    public function anyLinkValue(
+        Dn $owner,
+        string $attribute,
+    ): ?string {
+        $row = $this->connection
+            ->execute(
+                $this->dialect->queryAnyLinkValue(),
+                [
+                    $owner->normalizedString(),
+                    Attribute::normalizeName($attribute),
+                ],
+            )
+            ->fetch();
+
+        return is_array($row)
+            ? $this->stringColumn($row['dn'] ?? null)
+            : null;
+    }
 
     /**
      * Whether a read pays for links: not when none are declared, nor when the projection names none of them.
@@ -341,6 +402,30 @@ final readonly class EntryLinks
         }
 
         return $bounded;
+    }
+
+    /**
+     * @param list<string> $normalized
+     *
+     * @return Generator<int, array<array-key, mixed>>
+     */
+    private function heldRows(
+        Dn $owner,
+        string $attribute,
+        array $normalized,
+    ): Generator {
+        foreach (array_chunk($normalized, self::ENTRIES_PER_FETCH) as $chunk) {
+            $params = [
+                $owner->normalizedString(),
+                Attribute::normalizeName($attribute),
+                ...$chunk,
+            ];
+
+            yield from $this->rowsOf($this->connection->execute(
+                $this->dialect->queryHeldLinkValues(count($chunk)),
+                $params,
+            ));
+        }
     }
 
     /**

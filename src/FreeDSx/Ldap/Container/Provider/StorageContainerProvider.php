@@ -24,10 +24,14 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SerializedEntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryLinkWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoLinkedValues;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\ReferenceIntegrityInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\ResolvedReferences;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\UnlockedRows;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
@@ -67,6 +71,8 @@ final class StorageContainerProvider implements ContainerProviderInterface
             TransactionalWriteInterface::class => $this->makeTransaction(...),
             RowLockableInterface::class => $this->makeRowLocks(...),
             ReferenceIntegrityInterface::class => $this->makeReferenceIntegrity(...),
+            LinkedValueLookupInterface::class => $this->makeLinkedValueLookup(...),
+            LinkedLeafWitness::class => $this->makeLinkedLeafWitness(...),
             EntryIndexReindexer::class => $this->makeEntryIndexReindexer(...),
             ChangeJournalInterface::class => $this->makeChangeJournal(...),
         ];
@@ -126,6 +132,21 @@ final class StorageContainerProvider implements ContainerProviderInterface
             : new ResolvedReferences();
     }
 
+    private function makeLinkedValueLookup(Container $container): LinkedValueLookupInterface
+    {
+        return $this->isPdo($container)
+            ? $container->get(EntryLinks::class)
+            : new NoLinkedValues();
+    }
+
+    private function makeLinkedLeafWitness(Container $container): LinkedLeafWitness
+    {
+        return new LinkedLeafWitness(
+            $container->get(LinkedValueLookupInterface::class),
+            $container->get(LinkedAttributes::class),
+        );
+    }
+
     private function makeEntryIndexReindexer(Container $container): EntryIndexReindexer
     {
         return new EntryIndexReindexer(
@@ -154,7 +175,10 @@ final class StorageContainerProvider implements ContainerProviderInterface
      */
     private function makeLinkedAttributes(Container $container): LinkedAttributes
     {
-        return new LinkedAttributes($container->get(ServerOptions::class)->getSchema());
+        $linked = new LinkedAttributes($container->get(ServerOptions::class)->getSchema());
+        $linked->assertNoneRequired();
+
+        return $linked;
     }
 
     /**

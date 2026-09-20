@@ -124,6 +124,20 @@ final class SchemaValidatorTest extends TestCase
         );
     }
 
+    /**
+     * A group is allowed to hold no members, so that one can be created before its members and survive their removal.
+     */
+    public function test_add_accepts_a_group_holding_no_members(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->subject->validateAdd(new Entry(
+            new Dn('cn=empty,dc=example,dc=com'),
+            new Attribute('objectClass', 'groupOfNames'),
+            new Attribute('cn', 'empty'),
+        ));
+    }
+
     public function test_add_missing_structural_class_throws_object_class_violation(): void
     {
         $entry = new Entry(

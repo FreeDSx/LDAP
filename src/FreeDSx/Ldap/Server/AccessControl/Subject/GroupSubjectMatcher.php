@@ -14,9 +14,12 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\AccessControl\Subject;
 
 use DateTimeImmutable;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\SubjectEvaluationException;
+use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\BackendAwareInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
@@ -84,26 +87,40 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
             ));
         }
 
-        // The group exists and simply has no members, which is an answer rather than a failure.
-        $memberAttr = $entry->get($this->memberAttribute);
-        if ($memberAttr === null) {
-            return false;
-        }
-
-        $resolvedDn = $token->getResolvedDn()->normalizedString();
-
-        foreach ($memberAttr->getValues() as $value) {
-            if ((new Dn($value))->normalizedString() === $resolvedDn) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->holdsMember(
+            $entry,
+            $token->getResolvedDn(),
+        );
     }
 
     /**
-     * @todo Unbounded on every uncached match: ask storage whether the group links to the identity so this can be bounded.
+     * The membership question answered the way a filter would answer it, which is what reaches past a bounded read.
+     *
+     * @throws SubjectEvaluationException when the member attribute has no equality rule to decide it by
      */
+    private function holdsMember(
+        Entry $entry,
+        Dn $memberDn,
+    ): bool {
+        try {
+            return $this->backend()->compare(
+                $entry,
+                Filters::equal(
+                    $this->memberAttribute,
+                    $memberDn->toString(),
+                ),
+            );
+        } catch (OperationException $e) {
+            throw new SubjectEvaluationException(
+                sprintf(
+                    'Membership of the group "%s" could not be decided.',
+                    $this->groupDn->toString(),
+                ),
+                previous: $e,
+            );
+        }
+    }
+
     private function groupEntry(): ?Entry
     {
         if ($this->cacheTtl <= 0) {
@@ -121,13 +138,13 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
     }
 
     /**
-     * Every member, since a bounded read would silently drop the identities past the bound from the group.
+     * Only the member attribute, since membership is decided against the group rather than read out of it.
      */
     private function readGroup(): ?Entry
     {
         return $this->backend()->get(
             $this->groupDn,
-            EntryProjection::unbounded(),
+            new EntryProjection([Attribute::normalizeName($this->memberAttribute)]),
         );
     }
 

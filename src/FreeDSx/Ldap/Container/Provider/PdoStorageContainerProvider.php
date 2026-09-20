@@ -127,17 +127,20 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
     {
         $attributeContext = $container->get(AttributeContextInterface::class);
         $indexForms = $container->get(AttributeIndexForms::class);
+        $linked = $container->get(LinkedAttributes::class);
         $substringIndex = $container->get(SubstringIndexInterface::class);
 
         return match ($this->requirePdoConfig($container)->getDriver()) {
             PdoDriver::Sqlite => new SqliteFilterTranslator(
                 $attributeContext,
                 $indexForms,
+                $linked,
                 $substringIndex,
             ),
             PdoDriver::Mysql => new MysqlFilterTranslator(
                 $attributeContext,
                 $indexForms,
+                $linked,
                 $substringIndex,
             ),
         };
@@ -239,6 +242,7 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             $container->get(PdoDialectInterface::class),
             $container->get(PdoConnection::class),
             $container->get(AttributeIndexForms::class),
+            $container->get(LinkedAttributes::class),
             $container->get(SubstringIndexInterface::class),
         );
     }

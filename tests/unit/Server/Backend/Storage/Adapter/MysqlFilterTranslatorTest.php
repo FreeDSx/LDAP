@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContext;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -43,6 +44,8 @@ final class MysqlFilterTranslatorTest extends TestCase
     private AttributeIndexForms $indexForms;
 
     private AttributeContext $schemaContext;
+
+    private LinkedAttributes $linked;
 
     protected function setUp(): void
     {
@@ -55,9 +58,11 @@ final class MysqlFilterTranslatorTest extends TestCase
             $schema,
             new EqualityComparatorResolver($schema),
         );
+        $this->linked = new LinkedAttributes($schema);
         $this->subject = new MysqlFilterTranslator(
             $this->attributeContext(),
             $this->indexForms,
+            $this->linked,
         );
     }
 
@@ -277,6 +282,7 @@ final class MysqlFilterTranslatorTest extends TestCase
         $translator = new MysqlFilterTranslator(
             $this->attributeContext(integerOrdered: true),
             $this->indexForms,
+            $this->linked,
         );
 
         $result = $translator->translate(new GreaterThanOrEqualFilter('uidNumber', '30'));

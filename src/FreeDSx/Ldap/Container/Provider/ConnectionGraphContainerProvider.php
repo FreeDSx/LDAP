@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\AliasResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
 use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
@@ -118,6 +119,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
             $container->get(FilterEvaluatorInterface::class),
             $container->get(ReadBackendInterface::class),
             $container->get(AccessControlInterface::class),
+            $container->get(LinkedLeafWitness::class),
         );
     }
 
