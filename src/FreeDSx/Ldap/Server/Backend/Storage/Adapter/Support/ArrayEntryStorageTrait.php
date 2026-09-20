@@ -21,6 +21,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedEntry;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Subentry\SubentryDetector;
 use Generator;
@@ -46,6 +47,9 @@ trait ArrayEntryStorageTrait
         array $keys = [],
     ): EntryStream {
         $scoped = $this->yieldByScope($options, $entries);
+        if ($options->projection->windows !== []) {
+            $scoped = $this->slicing($scoped, $options->projection);
+        }
 
         if ($options->projection->withHasSubordinates) {
             $scoped = $this->withChildFlag(
@@ -69,6 +73,56 @@ trait ArrayEntryStorageTrait
             $this->sortKeyComparator->sort($collected, $options->sortKeys),
             $options,
         ));
+    }
+
+    /**
+     * @param iterable<Entry> $entries
+     * @return Generator<int, Entry>
+     */
+    private function slicing(
+        iterable $entries,
+        EntryProjection $projection,
+    ): Generator {
+        foreach ($entries as $entry) {
+            yield $this->sliced($entry, $projection);
+        }
+    }
+
+    /**
+     * The entry with each attribute a slice was asked of cut down to it and named for what that left.
+     */
+    private function sliced(
+        Entry $entry,
+        EntryProjection $projection,
+    ): Entry {
+        $cap = $projection->linkCap ?? EntryProjection::DEFAULT_LINK_CAP;
+        $sliced = $entry->makeCopy();
+
+        foreach ($projection->windows as $name => $window) {
+            $held = $sliced->get($name, true);
+
+            if ($held === null) {
+                continue;
+            }
+            $values = array_values($held->getValues());
+            $slice = array_slice($values, $window->first, $window->size($cap));
+            $sliced->reset($name);
+
+            if ($slice === []) {
+                continue;
+            }
+
+            $sliced->set(
+                $window->nameFor(
+                    $name,
+                    count($slice),
+                    count($values) > $window->first + count($slice),
+                ),
+                ...$slice,
+            );
+        }
+
+        return $sliced;
     }
 
     /**

@@ -18,6 +18,8 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
+use FreeDSx\Ldap\Entry\Option;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkWindow;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
@@ -178,12 +180,91 @@ final class EntryReaderTest extends TestCase
         );
     }
 
+    public function test_a_slice_reads_the_values_it_names(): void
+    {
+        $this->groupOf(10);
+
+        self::assertSame(
+            ['member;range=4-6'],
+            array_keys($this->slice('4-6', cap: 5)),
+        );
+        self::assertSame(
+            [
+                'cn=User4,dc=example,dc=com',
+                'cn=User5,dc=example,dc=com',
+                'cn=User6,dc=example,dc=com',
+            ],
+            $this->slice('4-6', cap: 5)['member;range=4-6'],
+        );
+    }
+
+    public function test_a_slice_naming_one_position_reads_that_value_alone(): void
+    {
+        $this->groupOf(10);
+
+        self::assertSame(
+            ['member;range=1-1' => ['cn=User1,dc=example,dc=com']],
+            $this->slice('1-1', cap: 5),
+        );
+    }
+
+    public function test_a_slice_reaching_the_end_is_named_to_the_end(): void
+    {
+        $this->groupOf(10);
+
+        self::assertSame(
+            ['member;range=8-*'],
+            array_keys($this->slice('8-*', cap: 5)),
+        );
+    }
+
+    public function test_an_open_ended_slice_stops_at_the_cap(): void
+    {
+        $this->groupOf(10);
+        $sliced = $this->slice('2-*', cap: 3);
+
+        self::assertSame(
+            ['member;range=2-4'],
+            array_keys($sliced),
+        );
+        self::assertCount(3, $sliced['member;range=2-4']);
+    }
+
+    public function test_a_slice_past_everything_held_reads_nothing(): void
+    {
+        $this->groupOf(10);
+
+        self::assertSame(
+            [],
+            $this->slice('50-*', cap: 5),
+        );
+    }
+
     /**
      * The subject is the adapter rather than schema enforcement, so its fixtures are not held to one.
      */
     protected function makeServerOptions(): ServerOptions
     {
         return TestServerOptions::sqlite();
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function slice(
+        string $range,
+        int $cap,
+    ): array {
+        $window = LinkWindow::fromOption(new Option("range={$range}"));
+        self::assertNotNull($window);
+
+        return $this->linkedValuesOf($this->subject->find(
+            new Dn('cn=admins,dc=example,dc=com'),
+            new EntryProjection(
+                linkCap: $cap,
+                windows: ['member' => $window],
+            ),
+        ));
     }
 
     private function store(string $dn): void

@@ -102,4 +102,9 @@ trait PdoLinkReadDialectTrait
             LIMIT ?
         SQL;
     }
+
+    public function queryLinksForAttributeFrom(): string
+    {
+        return $this->queryLinksForAttribute() . ' OFFSET ?';
+    }
 }

@@ -21,8 +21,12 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Schema;
+use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Search\Filter\FilterAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
+use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkWindow;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ReadBounds;
@@ -48,6 +52,7 @@ final readonly class StorageListOptionsFactory
     public function __construct(
         private Schema $schema,
         private SearchLimits $limits = new SearchLimits(),
+        private LinkedAttributes $linked = new LinkedAttributes(new Schema()),
     ) {}
 
     /**
@@ -112,7 +117,43 @@ final readonly class StorageListOptionsFactory
                 default => $linkCap,
             },
             withHasSubordinates: $this->wantsHasSubordinates($request),
+            windows: $this->linkWindows($request),
         );
+    }
+
+    /**
+     * The slices the request asks for.
+     *
+     * @return array<string, LinkWindow>
+     *
+     * @throws OperationException when a range names a slice that cannot be served
+     */
+    private function linkWindows(SearchRequest $request): array
+    {
+        $windows = [];
+
+        foreach ($request->getAttributes() as $attribute) {
+            foreach ($attribute->getOptions() as $option) {
+                $window = LinkWindow::fromOption($option);
+
+                if ($window === null) {
+                    continue;
+                }
+                $name = Attribute::normalizeName($attribute->getName());
+
+                // Only values held apart from the entry can be handed over a slice at a time.
+                if (!$this->linked->links(new Attribute($name))) {
+                    throw new OperationException(
+                        sprintf('The attribute "%s" is not one this server ranges.', $name),
+                        ResultCode::UNWILLING_TO_PERFORM,
+                    );
+                }
+
+                $windows[$name] = $window;
+            }
+        }
+
+        return $windows;
     }
 
     /**

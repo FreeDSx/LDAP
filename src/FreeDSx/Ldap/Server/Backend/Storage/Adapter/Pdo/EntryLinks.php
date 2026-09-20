@@ -143,11 +143,15 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
         int $entryId,
         EntryProjection $projection,
     ): array {
-        return $this->forSpan(
+        $links = $this->forSpan(
             $entryId,
             $entryId,
             $projection->linkCap,
         )[$entryId] ?? [];
+
+        return $projection->windows === []
+            ? $links
+            : $this->sliced($entryId, $projection, $links);
     }
 
     /**
@@ -170,7 +174,7 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
             }
             yield from $this->paired(
                 $chunk,
-                $projection->linkCap,
+                $projection,
             );
 
             $chunk = [];
@@ -178,8 +182,96 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
 
         yield from $this->paired(
             $chunk,
-            $projection->linkCap,
+            $projection,
         );
+    }
+
+    /**
+     * The attributes a slice was asked of, read again for the values it names rather than the ones held first.
+     *
+     * @param array<string, list<string>> $links
+     *
+     * @return array<string, list<string>>
+     */
+    private function sliced(
+        int $entryId,
+        EntryProjection $projection,
+        array $links,
+    ): array {
+        // A slice is bounded even where the read itself is not, so nothing asks for a page and receives everything.
+        $cap = $projection->linkCap ?? EntryProjection::DEFAULT_LINK_CAP;
+
+        foreach ($projection->windows as $name => $window) {
+            // Whatever the capped read returned for it stands for a different slice than the one asked for.
+            $held = $this->rangedNames($links, $name);
+            unset($links[$name], $links[$held]);
+            $size = $window->size($cap);
+            $values = $this->valuesOfSlice(
+                $entryId,
+                $name,
+                $window->first,
+                $size,
+            );
+            $more = count($values) > $size;
+
+            if ($more) {
+                $values = array_slice($values, 0, $size);
+            }
+
+            if ($values === []) {
+                continue;
+            }
+
+            $links[$window->nameFor($name, count($values), $more)] = $values;
+        }
+
+        return $links;
+    }
+
+    /**
+     * @param array<string, list<string>> $links
+     */
+    private function rangedNames(
+        array $links,
+        string $name,
+    ): string {
+        foreach (array_keys($links) as $held) {
+            if (Attribute::normalizeName($held) === $name) {
+                return $held;
+            }
+        }
+
+        return $name;
+    }
+
+    /**
+     * One attribute's values from where a slice starts, read one past it to tell whether more are held.
+     *
+     * @return list<string>
+     */
+    private function valuesOfSlice(
+        int $entryId,
+        string $name,
+        int $first,
+        int $size,
+    ): array {
+        $values = [];
+        $rows = $this->rowsOf($this->connection->execute(
+            $this->dialect->queryLinksForAttributeFrom(),
+            [
+                $entryId,
+                $name,
+                // One past the slice, which is what tells the naming whether more are held behind it.
+                $size + 1,
+                $first,
+            ],
+        ));
+
+        foreach ($rows as $row) {
+            $values[] = $this->stringColumn($row['dn'] ?? null);
+        }
+
+        return $values;
     }
 
     /**
@@ -188,20 +280,26 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
      */
     private function paired(
         array $chunk,
-        ?int $cap,
+        EntryProjection $projection,
     ): Generator {
         if ($chunk === []) {
             return;
         }
         $links = $this->forChunk(
             $chunk,
-            $cap,
+            $projection->linkCap,
         );
 
         foreach ($chunk as $row) {
+            $entryId = $this->entryIdOf($row);
+            $held = $links[$entryId] ?? [];
+
             yield [
                 $row,
-                $links[$this->entryIdOf($row)] ?? [],
+                // An entry linking nothing at all has no slice to take, which is most of what a subtree walks.
+                $projection->windows === [] || $held === []
+                    ? $held
+                    : $this->sliced($entryId, $projection, $held),
             ];
         }
     }

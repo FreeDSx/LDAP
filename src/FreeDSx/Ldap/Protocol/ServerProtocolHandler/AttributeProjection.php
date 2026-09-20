@@ -142,6 +142,10 @@ final class AttributeProjection
             return true;
         }
 
+        if ($this->isNamedSlice($attribute)) {
+            return true;
+        }
+
         return $this->isOperational($attribute)
             ? $this->wantsOperational
             : $this->wantsUser;
@@ -159,6 +163,35 @@ final class AttributeProjection
 
         foreach ($this->names as $name) {
             if ($this->schema->isDescriptionSubtypeOf($description, $name)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether a requested slice of a type is answered by this one.
+     */
+    private function isNamedSlice(Attribute $attribute): bool
+    {
+        $held = Attribute::normalizeName($attribute->getName());
+
+        foreach ($this->names as $name) {
+            $wanted = new Attribute($name);
+
+            if (self::namesRange($wanted) && Attribute::normalizeName($wanted->getName()) === $held) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function namesRange(Attribute $attribute): bool
+    {
+        foreach ($attribute->getOptions() as $option) {
+            if ($option->isRange()) {
                 return true;
             }
         }

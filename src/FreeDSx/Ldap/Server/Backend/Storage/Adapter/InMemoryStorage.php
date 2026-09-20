@@ -76,14 +76,15 @@ final class InMemoryStorage implements
         }
     }
 
-    /**
-     * Entries are held whole, so the projection bounds nothing here.
-     */
     public function find(
         Dn $dn,
         EntryProjection $projection = new EntryProjection(),
     ): ?Entry {
-        return $this->entries[$dn->normalizedString()] ?? null;
+        $entry = $this->entries[$dn->normalizedString()] ?? null;
+
+        return $entry === null || $projection->windows === []
+            ? $entry
+            : $this->sliced($entry, $projection);
     }
 
     public function exists(Dn $dn): bool

@@ -221,6 +221,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
         return new StorageListOptionsFactory(
             $options->getSchema(),
             $options->makeSearchLimits(),
+            $container->get(LinkedAttributes::class),
         );
     }
 
