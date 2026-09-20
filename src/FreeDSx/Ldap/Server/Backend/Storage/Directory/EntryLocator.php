@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 
 use function sprintf;
@@ -30,7 +30,7 @@ use function sprintf;
  */
 final readonly class EntryLocator
 {
-    public function __construct(private EntryStorageInterface $storage) {}
+    public function __construct(private ReadEntryInterface $storage) {}
 
     /**
      * @throws OperationException

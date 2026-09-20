@@ -19,7 +19,8 @@ use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\AtomicWriteInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteSubtreeCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
@@ -39,7 +40,7 @@ readonly class DeleteSubtreeHandler
     private const BATCH_SIZE = 1000;
 
     public function __construct(
-        private EntryStorageInterface $storage,
+        private WriteEntryInterface&AtomicWriteInterface $storage,
         private EntryLocator $locator,
         private EntryPlacementGuard $placement,
         private SubtreeEnumerator $subtree,

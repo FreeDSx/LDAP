@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Ldif\LdifWriter;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filter\AndFilter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
@@ -36,7 +36,7 @@ final readonly class DirectoryDumper
      * @param list<Dn> $namingContexts dump roots when DumpOptions::baseDn is not set
      */
     public function __construct(
-        private EntryStorageInterface $storage,
+        private ListEntryInterface $storage,
         private array $namingContexts,
         private FilterEvaluatorInterface $filterEvaluator,
         private LdifWriter $writer = new LdifWriter(),

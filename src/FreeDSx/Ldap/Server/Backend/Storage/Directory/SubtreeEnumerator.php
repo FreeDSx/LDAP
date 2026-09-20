@@ -15,7 +15,8 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Directory;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
@@ -28,7 +29,7 @@ use function usort;
  */
 final readonly class SubtreeEnumerator
 {
-    public function __construct(private EntryStorageInterface $storage) {}
+    public function __construct(private ReadEntryInterface&ListEntryInterface $storage) {}
 
     /**
      * Deepest first, so a chunked delete never removes a parent before its children.

@@ -13,12 +13,10 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage;
 
-use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\DefaultHasChildrenTrait;
-use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
-use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\AtomicWriteInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 
 /**
  * Raw persistence contract; LDAP semantics live in the read backend and write handlers above it. Dn parameters are always normalised (lowercased).
@@ -27,82 +25,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-interface EntryStorageInterface
-{
-    /**
-     * Return the entry for the given normalised DN, or null if not found; linked values are bounded unless asked otherwise.
-     */
-    public function find(
-        Dn $dn,
-        EntryProjection $projection = new EntryProjection(),
-    ): ?Entry;
-
-    /**
-     * Return true if an entry with the given normalised DN exists.
-     */
-    public function exists(Dn $dn): bool;
-
-    /**
-     * Return true if the DN has any direct children; {@see DefaultHasChildrenTrait} supplies a list()-based default.
-     */
-    public function hasChildren(Dn $dn): bool;
-
-    /**
-     * Lazily yield entries per $options scope: direct children when subtree is false; the base entry AND all descendants when true (RFC 4511 §4.5.1.2); empty baseDn lists from the tree root.
-     */
-    public function list(StorageListOptions $options): EntryStream;
-
-    /**
-     * Persist the entry keyed by its normalised DN, replacing any existing entry at the same DN.
-     *
-     * @param bool $rebuildIndexes Rewrite every secondary-index row rather than only those whose values changed.
-     */
-    public function store(
-        Entry $entry,
-        bool $rebuildIndexes = false,
-    ): void;
-
-    /**
-     * Persist the entry only if its normalised DN is free (handles concurrency races).
-     *
-     * @throws EntryAlreadyExistsException when the DN is taken.
-     */
-    public function insert(Entry $entry): void;
-
-    /**
-     * Re-key the entry at $from and every descendant under $to, leaving attributes and secondary-index rows untouched.
-     *
-     * $to must be free, its parent must exist, and $to may not sit at or under $from.
-     */
-    public function renameSubtree(
-        Dn $from,
-        Dn $to,
-    ): void;
-
-    /**
-     * Remove the entry for the given normalised DN. A no-op if the entry does not exist.
-     */
-    public function remove(Dn $dn): void;
-
-    /**
-     * Remove every given entry, ignoring any that are already gone.
-     *
-     * @param list<Dn> $dns
-     */
-    public function removeAll(array $dns): void;
-
-    /**
-     * Execute $operation as an atomic read-modify-write cycle; implementations must hold an exclusive lock or transaction.
-     *
-     * @param callable(): void $operation Calls back onto this instance, which routes itself into the open transaction.
-     * @throws AnswerableExceptionInterface
-     */
-    public function atomic(callable $operation): void;
-
-    /**
-     * Normalised DNs of entries whose parent is not in storage. Advertised by the server as RootDSE namingContexts.
-     *
-     * @return list<Dn>
-     */
-    public function namingContexts(): array;
-}
+interface EntryStorageInterface extends
+    ReadEntryInterface,
+    ListEntryInterface,
+    WriteEntryInterface,
+    AtomicWriteInterface {}

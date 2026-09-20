@@ -19,7 +19,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\Server\Subentry\SubentryPlacementGuard;
 
@@ -33,7 +33,7 @@ use function sprintf;
 readonly class EntryPlacementGuard
 {
     public function __construct(
-        private EntryStorageInterface $storage,
+        private ReadEntryInterface $storage,
         private EntryLocator $locator,
         private SubentryPlacementGuard $subentries,
     ) {}

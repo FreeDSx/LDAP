@@ -22,7 +22,8 @@ use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\AtomicWriteInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Write\BulkLoadOptions;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
@@ -41,7 +42,7 @@ use function sprintf;
 final readonly class LdapImporter
 {
     public function __construct(
-        private EntryStorageInterface $storage,
+        private ReadEntryInterface&AtomicWriteInterface $storage,
         private WriteRequestRouter $router,
         private AttributeTypeSpelling $spelling,
         private EventLogger $eventLogger = new EventLogger(null),

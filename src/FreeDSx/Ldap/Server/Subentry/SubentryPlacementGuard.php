@@ -18,7 +18,8 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
@@ -28,7 +29,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
  */
 final readonly class SubentryPlacementGuard
 {
-    public function __construct(private EntryStorageInterface $storage) {}
+    public function __construct(private ReadEntryInterface&ListEntryInterface $storage) {}
 
     /**
      * @throws OperationException

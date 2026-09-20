@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
@@ -30,7 +30,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 final readonly class EntryUuidLocator
 {
     public function __construct(
-        private EntryStorageInterface $storage,
+        private ListEntryInterface $storage,
         private FilterEvaluatorInterface $filterEvaluator,
     ) {}
 

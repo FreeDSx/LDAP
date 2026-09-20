@@ -20,7 +20,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassOid;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 
 /**
  * Follows an alias to the entry it names, including aliases naming further aliases (RFC 4511 4.5.1.3).
@@ -34,7 +34,7 @@ final readonly class AliasResolver
      */
     private const MAX_HOPS = 10;
 
-    public function __construct(private EntryStorageInterface $storage) {}
+    public function __construct(private ReadEntryInterface $storage) {}
 
     /**
      * The entry an alias chain ends at, or null when the name is absent or names no alias, since neither needs

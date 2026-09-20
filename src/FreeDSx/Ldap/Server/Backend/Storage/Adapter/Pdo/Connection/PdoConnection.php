@@ -26,16 +26,16 @@ use PDO;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-class PdoConnection
+readonly class PdoConnection
 {
     /**
      * @param PdoStatementPool $statements Must draw from $provider.
      * @param PdoTransactor $transactor Must draw from $provider.
      */
     public function __construct(
-        private readonly PdoConnectionProviderInterface $provider,
-        private readonly PdoStatementPool $statements,
-        private readonly PdoTransactor $transactor,
+        private PdoConnectionProviderInterface $provider,
+        private PdoStatementPool $statements,
+        private PdoTransactor $transactor,
     ) {}
 
     /**
