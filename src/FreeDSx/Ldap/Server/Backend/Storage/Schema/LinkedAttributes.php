@@ -15,10 +15,12 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Schema;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Schema\Schema;
 
 use function array_keys;
 use function array_values;
+use function sprintf;
 
 /**
  * The attribute types whose values name entries, which a store keeps as links rather than in the entry itself.
@@ -54,6 +56,29 @@ final class LinkedAttributes
     public function names(): array
     {
         return array_keys($this->resolved());
+    }
+
+    /**
+     * Refuses a schema no store could keep: removing an entry removes every link naming it, which would leave an
+     * object class without an attribute it requires.
+     *
+     * @throws RuntimeException when an object class requires a linked attribute
+     */
+    public function assertNoneRequired(): void
+    {
+        foreach ($this->schema->getObjectClasses() as $objectClass) {
+            foreach ($objectClass->must as $name) {
+                if (!$this->links(new Attribute($name))) {
+                    continue;
+                }
+
+                throw new RuntimeException(sprintf(
+                    'The object class "%s" requires "%s", which is stored as links and can be emptied by a removal.',
+                    $objectClass->names[0] ?? $objectClass->oid,
+                    $name,
+                ));
+            }
+        }
     }
 
     /**

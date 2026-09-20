@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 
 /**
  * MySQL/MariaDB SQL WHERE translator for LDAP filters; targets the `entry_attribute_values` sidecar index.
@@ -30,10 +31,12 @@ final class MysqlFilterTranslator implements FilterTranslatorInterface
     public function __construct(
         AttributeContextInterface $attributeContext,
         AttributeIndexForms $indexForms,
+        LinkedAttributes $linked,
         SubstringIndexInterface $substringIndex = new NoSubstringIndex(),
     ) {
         $this->attributeContext = $attributeContext;
         $this->indexForms = $indexForms;
+        $this->linked = $linked;
         $this->substringIndex = $substringIndex;
     }
 

@@ -462,6 +462,34 @@ final class EntryWriterTest extends TestCase
         );
     }
 
+    public function test_a_linked_value_is_kept_only_as_a_link(): void
+    {
+        $this->subject->store(new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'Alice'),
+        ));
+        $this->subject->store(new Entry(
+            new Dn('cn=Admins,dc=example,dc=com'),
+            new Attribute('cn', 'Admins'),
+            new Attribute('member', 'cn=Alice,dc=example,dc=com'),
+        ));
+
+        self::assertSame(
+            1,
+            $this->intQuery(
+                $this->pdo,
+                "SELECT COUNT(*) FROM entry_attribute_links WHERE attr_name_lower = 'member'",
+            ),
+        );
+        self::assertSame(
+            0,
+            $this->intQuery(
+                $this->pdo,
+                "SELECT COUNT(*) FROM entry_attribute_values WHERE attr_name_lower = 'member'",
+            ),
+        );
+    }
+
     /**
      * The SQL predicate has to answer the attribute's own EQUALITY rule, not a case-folded comparison.
      *
@@ -473,6 +501,11 @@ final class EntryWriterTest extends TestCase
         string $stored,
         string $asserted,
     ): void {
+        // A value naming an entry is kept as a reference to it, which only a stored entry can be.
+        $this->subject->store(new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'Alice'),
+        ));
         $this->subject->store(new Entry(
             new Dn('cn=spelling,dc=example,dc=com'),
             new Attribute('cn', 'spelling'),

@@ -19,14 +19,18 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\SubjectEvaluationException;
 use FreeDSx\Ldap\Server\AccessControl\Subject\GroupSubjectMatcher;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class GroupSubjectMatcherTest extends TestCase
 {
+    use ServerContainerTrait;
+
     private ReadBackendInterface&MockObject $mockBackend;
 
     private Dn $targetDn;
@@ -35,6 +39,13 @@ final class GroupSubjectMatcherTest extends TestCase
     {
         $this->mockBackend = $this->createMock(ReadBackendInterface::class);
         $this->targetDn = new Dn('dc=foo,dc=bar');
+
+        // Only the group read is stood in for; membership is decided by the real comparison.
+        $comparing = $this->backendFor(new InMemoryStorage());
+
+        $this->mockBackend
+            ->method('compare')
+            ->willReturnCallback($comparing->compare(...));
     }
 
     public function test_it_should_match_when_bound_dn_is_a_group_member(): void

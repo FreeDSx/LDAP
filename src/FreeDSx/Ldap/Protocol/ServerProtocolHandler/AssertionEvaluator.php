@@ -22,8 +22,8 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 
 /**
@@ -45,6 +45,7 @@ final readonly class AssertionEvaluator
         private FilterEvaluatorInterface $filterEvaluator,
         private ReadBackendInterface $backend,
         private AccessControlInterface $accessControl,
+        private LinkedLeafWitness $linkedLeaves,
     ) {}
 
     /**
@@ -61,11 +62,7 @@ final readonly class AssertionEvaluator
             return;
         }
 
-        // @todo Unbounded and client triggered: answer linked leaves in storage instead, so this read can be bounded.
-        $entry = $this->backend->get(
-            $targetDn,
-            EntryProjection::unbounded(),
-        );
+        $entry = $this->backend->get($targetDn);
         if ($entry === null) {
             return;
         }
@@ -94,7 +91,10 @@ final readonly class AssertionEvaluator
 
         $readable = $this->accessControl->stripUnreadableAttributes(
             $token,
-            $entry,
+            $this->linkedLeaves->witness(
+                $entry,
+                $control->getFilter(),
+            ),
         );
 
         if ($this->filterEvaluator->evaluate($readable, $control->getFilter())) {

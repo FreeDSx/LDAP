@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\AccessControl\Subject\Subject;
 use FreeDSx\Ldap\Server\AccessControl\Target\Target;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -47,6 +48,7 @@ final class AssertionEvaluatorTest extends TestCase
             $this->fromContainer(FilterEvaluatorInterface::class),
             $this->backend,
             new RuleBasedAccessControl(AclRules::fromEmpty()),
+            $this->fromContainer(LinkedLeafWitness::class),
         );
     }
 
@@ -191,6 +193,7 @@ final class AssertionEvaluatorTest extends TestCase
                     'userPassword',
                 )->forRead(),
             ])),
+            $this->fromContainer(LinkedLeafWitness::class),
         );
     }
 }

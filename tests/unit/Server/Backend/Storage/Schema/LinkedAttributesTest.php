@@ -14,7 +14,9 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Schema;
 
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
+use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
@@ -87,6 +89,32 @@ final class LinkedAttributesTest extends TestCase
             'pwdpolicysubentry',
             $this->subject->names(),
         );
+    }
+
+    public function test_the_shipped_schema_requires_no_linked_attribute(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->subject->assertNoneRequired();
+    }
+
+    /**
+     * A removal takes every link naming the entry with it, which no object class requiring one could survive.
+     */
+    public function test_an_object_class_requiring_a_linked_attribute_is_refused(): void
+    {
+        $subject = new LinkedAttributes(
+            SchemaResource::Core->load()->addObjectClass(new ObjectClass(
+                '1.200',
+                ['strictGroup'],
+                must: ['member'],
+            )),
+        );
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('strictGroup');
+
+        $subject->assertNoneRequired();
     }
 
     public function test_a_schema_declaring_none_is_empty(): void

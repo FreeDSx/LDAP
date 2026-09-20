@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Middleware\AssertionMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
@@ -63,6 +64,7 @@ final class AssertionMiddlewareTest extends TestCase
             $this->fromContainer(FilterEvaluatorInterface::class),
             $this->backend,
             new RuleBasedAccessControl(AclRules::fromEmpty()),
+            $this->fromContainer(LinkedLeafWitness::class),
         ));
         $this->next = new RecordingMiddlewareHandler(new CallLog());
     }

@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedEntry;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\SearchLimits;
 use Generator;
 
@@ -44,6 +45,7 @@ final readonly class SearchStreamBuilder
         private SearchLimits $limits,
         private FilterEvaluatorInterface $filterEvaluator,
         private DerivedResolver $derivedResolver,
+        private LinkedLeafWitness $linkedLeaves,
     ) {}
 
     /**
@@ -157,7 +159,12 @@ final readonly class SearchStreamBuilder
         FilterInterface $filter,
     ): Generator {
         foreach ($generator as $fetched) {
-            if ($this->filterEvaluator->evaluate($fetched->entry, $filter)) {
+            $judged = $this->linkedLeaves->witness(
+                $fetched->entry,
+                $filter,
+            );
+
+            if ($this->filterEvaluator->evaluate($judged, $filter)) {
                 yield $fetched;
             }
         }

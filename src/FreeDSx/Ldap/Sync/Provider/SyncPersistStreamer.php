@@ -190,11 +190,8 @@ final readonly class SyncPersistStreamer
         PendingChange $change,
         TokenInterface $token,
     ): ?SyncResult {
-        // @todo Only visibility is judged here, so read without linked attributes once linked filter leaves are answered in storage.
-        $entry = $this->backend->get(
-            $change->dn,
-            EntryProjection::unbounded(),
-        );
+        $entry = $this->backend->get($change->dn);
+
         if ($entry === null) {
             return null;
         }

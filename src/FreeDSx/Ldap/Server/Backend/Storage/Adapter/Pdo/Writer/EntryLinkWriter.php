@@ -15,7 +15,6 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkWriteDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoPendingLinkDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
@@ -127,6 +126,9 @@ final readonly class EntryLinkWriter implements ReferenceIntegrityInterface
         return $names;
     }
 
+    /**
+     * Whether anything at all was parked, which is what a batch asks once rather than per entry.
+     */
     public function hasUnresolvedReferences(): bool
     {
         return $this->connection
@@ -147,7 +149,7 @@ final readonly class EntryLinkWriter implements ReferenceIntegrityInterface
 
         foreach ($values as $attributeValues) {
             foreach ($attributeValues as $value) {
-                $normalized = $this->normalize($value);
+                $normalized = Dn::normalizedOrNull($value);
 
                 if ($normalized !== null) {
                     $wanted[$normalized] = true;
@@ -185,7 +187,7 @@ final readonly class EntryLinkWriter implements ReferenceIntegrityInterface
 
         foreach ($values as $name => $attributeValues) {
             foreach ($attributeValues as $value) {
-                $normalized = $this->normalize($value);
+                $normalized = Dn::normalizedOrNull($value);
                 $targetId = $normalized === null
                     ? null
                     : $resolved[$normalized] ?? null;
@@ -300,7 +302,7 @@ final readonly class EntryLinkWriter implements ReferenceIntegrityInterface
 
         foreach ($values as $name => $attributeValues) {
             foreach ($attributeValues as $value) {
-                $normalized = $this->normalize($value);
+                $normalized = Dn::normalizedOrNull($value);
 
                 if ($normalized !== null && isset($resolved[$normalized])) {
                     continue;
@@ -346,18 +348,6 @@ final readonly class EntryLinkWriter implements ReferenceIntegrityInterface
         }
 
         return null;
-    }
-
-    /**
-     * The value's canonical form, or null when it does not parse as a DN and so can never name an entry.
-     */
-    private function normalize(string $value): ?string
-    {
-        try {
-            return (new Dn($value))->normalizedString();
-        } catch (InvalidArgumentException) {
-            return null;
-        }
     }
 
     private function keyOf(

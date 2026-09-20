@@ -19,7 +19,10 @@ use FreeDSx\Ldap\Control\ReadEntry\PostReadResponseControl;
 use FreeDSx\Ldap\Controls;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoLinkedValues;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
@@ -77,6 +80,10 @@ final class ServerDispatchHandlerTest extends TestCase
                 $this->mockFilterEvaluator,
                 $this->mockBackend,
                 $this->mockAccessControl,
+                new LinkedLeafWitness(
+                    new NoLinkedValues(),
+                    new LinkedAttributes(new Schema()),
+                ),
             ),
             schema: new Schema(),
         );

@@ -149,6 +149,19 @@ Schema is written in RFC 4512 description strings, which is the form every direc
 `.schema` and `.ldif` schema files use. Load those directly rather than transcribing them. Building definitions in
 PHP is for adding a handful of your own.
 
+#### One deliberate divergence from RFC 4519
+
+`groupOfNames` and `groupOfUniqueNames` list their membership attribute as MAY rather than MUST. A group may
+therefore hold no members. RFC 4519 makes them mandatory.
+
+The reason is referential integrity. Linked attribute values are kept as references. Removing an entry removes
+every membership naming it. The last member leaving would otherwise strand the group in a state no modify could
+correct.
+
+This holds for any schema, not just the shipped one. An object class that requires a linked attribute is refused
+when the server starts, naming the class and the attribute. Restating either class with MUST therefore stops the
+server rather than producing entries that violate their own object class.
+
 ### Adding a Schema
 
 `addSource()` appends to the shipped set, so it does not have to be restated:

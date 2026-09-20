@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Write\WriteControlEvaluator;
 use FreeDSx\Ldap\Server\Token\BindToken;
 use PHPUnit\Framework\TestCase;
@@ -46,6 +47,7 @@ final class WriteControlEvaluatorTest extends TestCase
             $this->fromContainer(FilterEvaluatorInterface::class),
             $this->createMock(ReadBackendInterface::class),
             new RuleBasedAccessControl(AclRules::fromEmpty()),
+            $this->fromContainer(LinkedLeafWitness::class),
         );
         $this->entry = Entry::fromArray(
             'cn=foo,dc=ex,dc=com',

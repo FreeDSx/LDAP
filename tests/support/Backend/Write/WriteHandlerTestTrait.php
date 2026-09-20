@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\AddEntryHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\DeleteEntryHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\MoveEntryHandler;
@@ -151,6 +152,7 @@ trait WriteHandlerTestTrait
                     $this->graph->get(FilterEvaluatorInterface::class),
                     $this->graph->get(ReadBackendInterface::class),
                     new RuleBasedAccessControl(AclRules::fromEmpty()),
+                    $this->graph->get(LinkedLeafWitness::class),
                 ),
                 $token,
                 $controlBag,

@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\UndefinedCause;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageSlice;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
@@ -49,6 +50,7 @@ final readonly class StorageReadBackend implements ReadBackendInterface
         private StorageListOptionsFactory $listOptions,
         private FilterEvaluatorInterface $filterEvaluator,
         private EntryLocator $locator,
+        private LinkedLeafWitness $linkedLeaves,
     ) {}
 
     public function get(
@@ -86,7 +88,10 @@ final readonly class StorageReadBackend implements ReadBackendInterface
 
         // A comparison is an equality assertion, so it answers through the same evaluation a filter would get.
         return $this->filterEvaluator->evaluate(
-            $entry,
+            $this->linkedLeaves->witness(
+                $entry,
+                $filter,
+            ),
             $filter,
         );
     }

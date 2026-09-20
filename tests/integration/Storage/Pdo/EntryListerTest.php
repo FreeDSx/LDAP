@@ -350,6 +350,50 @@ final class EntryListerTest extends TestCase
         );
     }
 
+    public function test_a_linked_attribute_matches_an_assertion_spelled_differently(): void
+    {
+        $this->groupOf('Admins', 1);
+
+        self::assertSame(
+            ['cn=Admins,dc=example,dc=com'],
+            $this->dns($this->matching(Filters::equal('member', 'CN=Admins0, DC=Example, DC=Com'))),
+        );
+    }
+
+    public function test_a_linked_attribute_matches_nothing_for_an_assertion_that_is_not_a_dn(): void
+    {
+        $this->groupOf('Admins', 1);
+
+        self::assertSame(
+            [],
+            $this->dns($this->matching(Filters::equal('member', 'not a dn'))),
+        );
+    }
+
+    public function test_a_linked_attribute_is_present_only_on_the_entries_holding_one(): void
+    {
+        $this->groupOf('Admins', 1);
+
+        self::assertSame(
+            ['cn=Admins,dc=example,dc=com'],
+            $this->dns($this->matching(Filters::present('member'))),
+        );
+    }
+
+    public function test_a_linked_value_dropped_from_an_entry_stops_matching(): void
+    {
+        $this->groupOf('Admins', 1);
+        $this->store(
+            'cn=Admins,dc=example,dc=com',
+            new Attribute('cn', 'Admins'),
+        );
+
+        self::assertSame(
+            [],
+            $this->dns($this->matching(Filters::present('member'))),
+        );
+    }
+
     private function store(
         string $dn,
         Attribute ...$attributes,
@@ -358,6 +402,17 @@ final class EntryListerTest extends TestCase
             new Dn($dn),
             ...$attributes,
         ));
+    }
+
+    private function matching(FilterInterface $filter): StorageListOptions
+    {
+        return new StorageListOptions(
+            scope: new ListScope(
+                baseDn: new Dn(self::BASE),
+                subtree: true,
+            ),
+            filter: $filter,
+        );
     }
 
     private function groupOf(
