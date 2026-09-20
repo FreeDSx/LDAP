@@ -29,7 +29,7 @@ use FreeDSx\Ldap\Server\Clock\SystemClock;
 use Generator;
 
 /**
- * Change journal persisting records to the same database and transaction as its PdoStorage.
+ * Change journal persisting records to the same database and transaction as the PDO storage.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

@@ -13,9 +13,9 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Concern;
 
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use PDO;
 
 /**
@@ -28,23 +28,23 @@ trait SqliteReindexTestsTrait
      */
     public function test_reindex_restores_matching_for_keys_written_in_an_older_form(): void
     {
-        $this->withServer(function (LdapServer $server, EntryStorageInterface $storage): void {
+        $this->withServer(function (LdapServer $server, Container $container): void {
             $assertion = Filters::equal('member', 'cn=admin,dc=foo,dc=bar');
             self::assertCount(
                 1,
-                $this->dnsMatching($storage, $assertion),
+                $this->dnsMatching($container, $assertion),
             );
 
             $this->writeStaleKey();
             self::assertCount(
                 0,
-                $this->dnsMatching($storage, $assertion),
+                $this->dnsMatching($container, $assertion),
             );
 
             $server->reindex();
             self::assertCount(
                 1,
-                $this->dnsMatching($storage, $assertion),
+                $this->dnsMatching($container, $assertion),
             );
         });
     }

@@ -26,7 +26,7 @@ use PDO;
 use PDOException;
 
 /**
- * MySQL/MariaDB SQL for PdoStorage; requires MySQL 8.0+ or MariaDB 10.6+.
+ * MySQL/MariaDB SQL for the PDO storage; requires MySQL 8.0+ or MariaDB 10.6+.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

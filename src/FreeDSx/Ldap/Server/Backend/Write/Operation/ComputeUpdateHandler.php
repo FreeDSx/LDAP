@@ -35,7 +35,9 @@ readonly class ComputeUpdateHandler
     use WritesLockedEntry;
 
     public function __construct(
-        private ReadEntryInterface&WriteEntryInterface&TransactionalWriteInterface $storage,
+        private ReadEntryInterface $reader,
+        private WriteEntryInterface $storage,
+        private TransactionalWriteInterface $transaction,
         private EntryLocator $locator,
         private EntryMutation $mutation,
         private EntryPlacementGuard $placement,
@@ -55,7 +57,7 @@ readonly class ComputeUpdateHandler
             $dn,
             function () use ($command, $context, $dn): void {
                 // @todo Unbounded because the whole derived entry is stored back; leave linked attributes out once writes apply them as deltas.
-                $entry = $this->storage->find(
+                $entry = $this->reader->find(
                     $dn,
                     EntryProjection::unbounded(),
                 );

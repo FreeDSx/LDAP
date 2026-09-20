@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace Tests\Support\FreeDSx\Ldap;
 
 use FreeDSx\Ldap\Container;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\ServerOptions;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
@@ -81,14 +81,16 @@ trait ServerContainerTrait
 
     /**
      * The backend the providers build over the given storage, which is the collaborator these tests vary.
+     *
+     * Pass narrow storage contracts through $sharedInstances on fromContainer() to fake only one of them.
      */
     private function backendFor(
-        EntryStorageInterface $storage,
+        InMemoryStorage $storage,
         ?ServerOptions $options = null,
     ): StorageReadBackend {
         return $this->fromContainer(
             StorageReadBackend::class,
-            [EntryStorageInterface::class => $storage],
+            [InMemoryStorage::class => $storage],
             $options,
         );
     }
@@ -96,16 +98,18 @@ trait ServerContainerTrait
     /**
      * A container over the given storage, for pulling several collaborators that must share one graph.
      *
+     * The concrete key, since every storage contract resolves through this instance.
+     *
      * @param array<class-string, object> $sharedInstances
      */
     private function containerFor(
-        EntryStorageInterface $storage,
+        InMemoryStorage $storage,
         ?ServerOptions $options = null,
         array $sharedInstances = [],
     ): Container {
         return Container::forServer(
             $options ?? $this->serverOptions(),
-            [EntryStorageInterface::class => $storage] + $sharedInstances,
+            [InMemoryStorage::class => $storage] + $sharedInstances,
         );
     }
 

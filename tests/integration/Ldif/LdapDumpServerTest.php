@@ -20,7 +20,7 @@ use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use FreeDSx\Ldap\Ldif\LdifChanges;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Support\FreeDSx\Ldap\TestWorker;
 
@@ -117,7 +117,7 @@ final class LdapDumpServerTest extends ServerTestCase
             $options,
             $container,
         ))->seed(new StringLdifLoader((string) file_get_contents(self::$dumpPath)));
-        $storage = $container->get(EntryStorageInterface::class);
+        $storage = $container->get(ReadEntryInterface::class);
 
         $alice = $storage->find(new Dn('cn=alice,dc=foo,dc=bar'));
         self::assertNotNull($alice);

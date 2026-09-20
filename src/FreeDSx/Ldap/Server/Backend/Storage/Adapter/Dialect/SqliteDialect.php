@@ -26,7 +26,7 @@ use PDO;
 use PDOException;
 
 /**
- * SQLite-specific SQL for PdoStorage.
+ * SQLite-specific SQL for the PDO storage.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

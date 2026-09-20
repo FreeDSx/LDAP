@@ -28,7 +28,6 @@ use FreeDSx\Ldap\Server\SearchLimits;
 use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedOptions;
 use FreeDSx\Ldap\Server\Config\ConfidentialityRequirement;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
@@ -377,9 +376,6 @@ final class LdapServerCommand extends Command
             $options,
             $container,
         );
-        // Raw import (no schema validation) so tests can seed synthetic fixtures such as the paging `foo` attribute.
-        $storage = $container->get(EntryStorageInterface::class);
-
         if ($sasl) {
             $options->setSaslMechanisms(
                 ServerOptions::SASL_PLAIN,

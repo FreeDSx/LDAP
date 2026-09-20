@@ -40,7 +40,8 @@ readonly class DeleteSubtreeHandler
     private const BATCH_SIZE = 1000;
 
     public function __construct(
-        private WriteEntryInterface&TransactionalWriteInterface $storage,
+        private WriteEntryInterface $storage,
+        private TransactionalWriteInterface $transaction,
         private EntryLocator $locator,
         private EntryPlacementGuard $placement,
         private SubtreeEnumerator $subtree,
@@ -68,7 +69,7 @@ readonly class DeleteSubtreeHandler
         }
 
         foreach (array_chunk($dnList, self::BATCH_SIZE) as $batch) {
-            $this->storage->atomic(function () use ($batch, $context): void {
+            $this->transaction->atomic(function () use ($batch, $context): void {
                 $preImages = $this->changeRecorder === null
                     ? []
                     : $this->subtree->entriesAt($batch);

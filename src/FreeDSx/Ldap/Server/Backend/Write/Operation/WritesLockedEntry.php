@@ -36,7 +36,7 @@ trait WritesLockedEntry
         Dn $dn,
         Closure $body,
     ): void {
-        $this->storage->atomic(function () use ($dn, $body): void {
+        $this->transaction->atomic(function () use ($dn, $body): void {
             $this->lockForWrite($dn);
             $body();
         });

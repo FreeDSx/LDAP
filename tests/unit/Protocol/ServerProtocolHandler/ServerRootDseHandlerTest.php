@@ -28,7 +28,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerRootDseHandler;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use FreeDSx\Ldap\Server\Token\TokenInterface;
 use FreeDSx\Ldap\ServerOptions;
@@ -46,7 +46,7 @@ final class ServerRootDseHandlerTest extends TestCase
 
     private ServerOptions $options;
 
-    private EntryStorageInterface&MockObject $mockStorage;
+    private ReadEntryInterface&MockObject $mockStorage;
 
     protected function setUp(): void
     {
@@ -359,7 +359,7 @@ final class ServerRootDseHandlerTest extends TestCase
      */
     private function withStorageNamingContexts(array $dns): void
     {
-        $this->mockStorage = $this->createMock(EntryStorageInterface::class);
+        $this->mockStorage = $this->createMock(ReadEntryInterface::class);
         $this->mockStorage
             ->method('namingContexts')
             ->willReturn(array_map(

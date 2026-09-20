@@ -52,6 +52,7 @@ final class VerbatimStorageApplierTest extends TestCase
         $this->storage = new InMemoryStorage();
         $this->subject = new VerbatimStorageApplier(
             $this->storage,
+            $this->storage,
             new EntryUuidLocator(
                 $this->storage,
                 $this->fromContainer(FilterEvaluatorInterface::class),

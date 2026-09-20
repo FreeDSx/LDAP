@@ -23,6 +23,8 @@ final class TestSynchronousWriterQueue implements WriterQueueInterface
 {
     public int $ranCount = 0;
 
+    public int $drainedCount = 0;
+
     /**
      * Jobs run on the caller here, so being inside one is all there is to being the writer.
      */
@@ -47,7 +49,10 @@ final class TestSynchronousWriterQueue implements WriterQueueInterface
     }
 
     /**
-     * Nothing is kept between jobs here, so there is nothing to release.
+     * Nothing is kept between jobs here, so this only records that the release was asked for.
      */
-    public function drain(): void {}
+    public function drain(): void
+    {
+        $this->drainedCount++;
+    }
 }

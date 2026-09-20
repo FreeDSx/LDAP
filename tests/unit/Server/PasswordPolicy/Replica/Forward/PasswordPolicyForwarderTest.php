@@ -27,7 +27,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\ForwardStateSenderInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\PasswordPolicyForwarder;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\ServerOptions;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
@@ -61,7 +61,7 @@ final class PasswordPolicyForwarderTest extends TestCase
     protected function setUp(): void
     {
         // Both resolve from the memoised container, so the state store shares the storage holding the subjects.
-        $storage = $this->fromContainer(EntryStorageInterface::class);
+        $storage = $this->fromContainer(WriteEntryInterface::class);
         $subjects = [
             self::DN => self::UUID,
             'cn=a,dc=example,dc=com' => self::UUID_A,
@@ -246,7 +246,7 @@ final class PasswordPolicyForwarderTest extends TestCase
     {
         $this->recordSends();
         $dn = 'cn=nouuid,dc=example,dc=com';
-        $this->fromContainer(EntryStorageInterface::class)->store(new Entry(
+        $this->fromContainer(WriteEntryInterface::class)->store(new Entry(
             $dn,
             new Attribute('cn', 'nouuid'),
         ));

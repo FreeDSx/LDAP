@@ -22,7 +22,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
@@ -32,7 +32,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteCommand;
 use FreeDSx\Ldap\ServerOptions;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Backend\Write\WriteHandlerTestTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
@@ -170,11 +169,10 @@ final class DeleteEntryHandlerTest extends TestCase
 
     public function test_a_storage_failure_propagates_carrying_its_result_code(): void
     {
-        /** @var EntryStorageInterface&MockObject $storage */
-        $storage = $this->createMock(EntryStorageInterface::class);
-        $storage->method('atomic')
+        $transaction = $this->createMock(TransactionalWriteInterface::class);
+        $transaction->method('atomic')
             ->willThrowException(new StorageIoException('Unable to acquire exclusive lock on the storage backend.'));
-        $this->writeGraph($storage);
+        $this->writeGraph(sharedInstances: [TransactionalWriteInterface::class => $transaction]);
 
         self::expectException(StorageIoException::class);
         self::expectExceptionCode(ResultCode::UNAVAILABLE);

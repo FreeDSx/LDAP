@@ -19,7 +19,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
@@ -34,7 +34,7 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
 
     private const DN = 'cn=foo,dc=example,dc=com';
 
-    private EntryStorageInterface $storage;
+    private WriteEntryInterface $storage;
 
     private ReplicaPasswordStateStoreInterface $subject;
 
@@ -45,7 +45,7 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
      */
     protected function setUp(): void
     {
-        $this->storage = $this->fromContainer(EntryStorageInterface::class);
+        $this->storage = $this->fromContainer(WriteEntryInterface::class);
         $this->subject = $this->fromContainer(ReplicaPasswordStateStoreInterface::class);
 
         $this->storage->store(new Entry(

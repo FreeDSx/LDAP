@@ -36,7 +36,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\PdoListQueryBuilder;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoReplicaPasswordStateStore;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\FilterTranslatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\MysqlFilterTranslator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqliteFilterTranslator;
@@ -47,8 +46,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\TrigramSubstringI
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\ImmediateWriterQueue;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SwooleWriterQueue;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriterQueueInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SerializedEntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteScope;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\PdoJournalGeneration;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
@@ -91,8 +90,7 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             EntryLister::class => $this->makeLister(...),
             EntryWriter::class => $this->makeWriter(...),
             PdoChangeJournal::class => $this->makeChangeJournal(...),
-            PdoStorage::class => $this->makeStorage(...),
-            WriteSerializingStorage::class => $this->makeWriteSerializingStorage(...),
+            SerializedEntryWriter::class => $this->makeSerializedEntryWriter(...),
             PdoReplicaPasswordStateStore::class => $this->makeReplicaPasswordStateStore(...),
             SerializingReplicaPasswordStateStore::class => $this->makeSerializingReplicaPasswordStateStore(...),
         ];
@@ -305,20 +303,11 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
         );
     }
 
-    private function makeStorage(Container $container): PdoStorage
+    private function makeSerializedEntryWriter(Container $container): SerializedEntryWriter
     {
-        return new PdoStorage(
-            $container->get(PdoConnection::class),
-            $container->get(EntryReader::class),
-            $container->get(EntryLister::class),
+        return new SerializedEntryWriter(
             $container->get(EntryWriter::class),
-        );
-    }
-
-    private function makeWriteSerializingStorage(Container $container): WriteSerializingStorage
-    {
-        return new WriteSerializingStorage(
-            $container->get(PdoStorage::class),
+            $container->get(PdoConnection::class),
             $container->get(WriterQueueInterface::class),
         );
     }

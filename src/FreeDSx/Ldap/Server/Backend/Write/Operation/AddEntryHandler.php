@@ -33,7 +33,8 @@ readonly class AddEntryHandler
     use AppliesSystemChanges;
 
     public function __construct(
-        private WriteEntryInterface&TransactionalWriteInterface $storage,
+        private WriteEntryInterface $storage,
+        private TransactionalWriteInterface $transaction,
         private EntryPlacementGuard $placement,
         private SchemaViolationGate $schemaGate,
         private OperationalAttributeGenerator $operationalAttrs,
@@ -48,7 +49,7 @@ readonly class AddEntryHandler
         AddCommand $command,
         WriteContext $context,
     ): void {
-        $this->storage->atomic(function () use ($command, $context): void {
+        $this->transaction->atomic(function () use ($command, $context): void {
             // Worked on a copy, so a retried attempt never sees what an earlier one merged or stamped.
             $entry = $command->entry->makeCopy();
             // Merged before validation, so the values naming the entry count toward what its object classes require.

@@ -158,7 +158,7 @@ final class Fts5SubstringIndex implements SubstringIndexInterface
         Entry $entry,
         callable $execute,
     ): void {
-        // The sync triggers index/de-index off the sidecar rows PdoStorage already writes; nothing to do per entry.
+        // The sync triggers index/de-index off the sidecar rows the entry writer already writes; nothing to do per entry.
     }
 
     public function buildSubstringPredicate(

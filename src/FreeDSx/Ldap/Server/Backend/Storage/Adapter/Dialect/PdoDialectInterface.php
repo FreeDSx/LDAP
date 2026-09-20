@@ -24,7 +24,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoSidecarDiale
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoTransactionDialectInterface;
 
 /**
- * The full database-specific SQL a PdoStorage needs.
+ * The full database-specific SQL the PDO storage needs.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

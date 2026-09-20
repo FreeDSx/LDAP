@@ -42,7 +42,8 @@ use function sprintf;
 final readonly class LdapImporter
 {
     public function __construct(
-        private ReadEntryInterface&TransactionalWriteInterface $storage,
+        private ReadEntryInterface $storage,
+        private TransactionalWriteInterface $transaction,
         private WriteRequestRouter $router,
         private AttributeTypeSpelling $spelling,
         private EventLogger $eventLogger = new EventLogger(null),
@@ -71,7 +72,7 @@ final readonly class LdapImporter
         $result = new ImportResult();
 
         try {
-            $this->storage->atomic(fn() => $this->load(
+            $this->transaction->atomic(fn() => $this->load(
                 $entries,
                 $creatorDn,
                 $ignoreValidation,

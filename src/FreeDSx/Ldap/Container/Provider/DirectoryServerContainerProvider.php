@@ -30,11 +30,18 @@ use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryLister;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SerializedEntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriterQueueInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Write\Replay\WriteRequestReplayer;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
@@ -150,17 +157,19 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             LdapImporter::class => $this->makeLdapImporter(...),
             LdifParser::class => static fn(): LdifParser => new LdifParser(),
             EntryLocator::class => static fn(Container $c): EntryLocator => new EntryLocator(
-                $c->get(EntryStorageInterface::class),
+                $c->get(ReadEntryInterface::class),
             ),
             EntryUuidLocator::class => static fn(Container $c): EntryUuidLocator => new EntryUuidLocator(
-                $c->get(EntryStorageInterface::class),
+                $c->get(ListEntryInterface::class),
                 $c->get(FilterEvaluatorInterface::class),
             ),
             SubtreeEnumerator::class => static fn(Container $c): SubtreeEnumerator => new SubtreeEnumerator(
-                $c->get(EntryStorageInterface::class),
+                $c->get(ReadEntryInterface::class),
+                $c->get(ListEntryInterface::class),
             ),
             SubentryPlacementGuard::class => static fn(Container $c): SubentryPlacementGuard => new SubentryPlacementGuard(
-                $c->get(EntryStorageInterface::class),
+                $c->get(ReadEntryInterface::class),
+                $c->get(ListEntryInterface::class),
             ),
             SchemaViolationGate::class => static fn(Container $c): SchemaViolationGate => new SchemaViolationGate(
                 $c->get(SchemaValidator::class),
@@ -173,7 +182,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                 $c->get(RdnAttributeValues::class),
             ),
             EntryPlacementGuard::class => static fn(Container $c): EntryPlacementGuard => new EntryPlacementGuard(
-                $c->get(EntryStorageInterface::class),
+                $c->get(ReadEntryInterface::class),
                 $c->get(RowLockableInterface::class),
                 $c->get(EntryLocator::class),
                 $c->get(SubentryPlacementGuard::class),
@@ -285,7 +294,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeDerivedResolver(Container $container): DerivedResolver
     {
-        return new DerivedResolver($container->get(EntryStorageInterface::class));
+        return new DerivedResolver($container->get(ReadEntryInterface::class));
     }
 
     /**
@@ -319,11 +328,9 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeDirectoryDumper(Container $container): DirectoryDumper
     {
-        $storage = $container->get(EntryStorageInterface::class);
-
         return new DirectoryDumper(
-            $storage,
-            $storage->namingContexts(),
+            $container->get(ListEntryInterface::class),
+            $container->get(ReadEntryInterface::class)->namingContexts(),
             $container->get(FilterEvaluatorInterface::class),
         );
     }
@@ -341,7 +348,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeBackend(Container $container): StorageReadBackend
     {
         return new StorageReadBackend(
-            storage: $container->get(EntryStorageInterface::class),
+            reader: $container->get(ReadEntryInterface::class),
+            lister: $container->get(ListEntryInterface::class),
             searchStream: $container->get(SearchStreamBuilder::class),
             listOptions: $container->get(StorageListOptionsFactory::class),
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
@@ -352,7 +360,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeAddEntryHandler(Container $container): AddEntryHandler
     {
         return new AddEntryHandler(
-            storage: $container->get(EntryStorageInterface::class),
+            storage: $container->get(WriteEntryInterface::class),
+            transaction: $container->get(TransactionalWriteInterface::class),
             placement: $container->get(EntryPlacementGuard::class),
             schemaGate: $container->get(SchemaViolationGate::class),
             operationalAttrs: $container->get(OperationalAttributeGenerator::class),
@@ -364,7 +373,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeDeleteEntryHandler(Container $container): DeleteEntryHandler
     {
         return new DeleteEntryHandler(
-            storage: $container->get(EntryStorageInterface::class),
+            storage: $container->get(WriteEntryInterface::class),
+            transaction: $container->get(TransactionalWriteInterface::class),
             locator: $container->get(EntryLocator::class),
             placement: $container->get(EntryPlacementGuard::class),
             changeRecorder: $this->changeRecorderFor($container),
@@ -374,7 +384,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeDeleteSubtreeHandler(Container $container): DeleteSubtreeHandler
     {
         return new DeleteSubtreeHandler(
-            storage: $container->get(EntryStorageInterface::class),
+            storage: $container->get(WriteEntryInterface::class),
+            transaction: $container->get(TransactionalWriteInterface::class),
             locator: $container->get(EntryLocator::class),
             placement: $container->get(EntryPlacementGuard::class),
             subtree: $container->get(SubtreeEnumerator::class),
@@ -386,7 +397,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeUpdateEntryHandler(Container $container): UpdateEntryHandler
     {
         return new UpdateEntryHandler(
-            storage: $container->get(EntryStorageInterface::class),
+            storage: $container->get(WriteEntryInterface::class),
+            transaction: $container->get(TransactionalWriteInterface::class),
             locator: $container->get(EntryLocator::class),
             mutation: $container->get(EntryMutation::class),
             placement: $container->get(EntryPlacementGuard::class),
@@ -397,7 +409,9 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeComputeUpdateHandler(Container $container): ComputeUpdateHandler
     {
         return new ComputeUpdateHandler(
-            storage: $container->get(EntryStorageInterface::class),
+            reader: $container->get(ReadEntryInterface::class),
+            storage: $container->get(WriteEntryInterface::class),
+            transaction: $container->get(TransactionalWriteInterface::class),
             locator: $container->get(EntryLocator::class),
             mutation: $container->get(EntryMutation::class),
             placement: $container->get(EntryPlacementGuard::class),
@@ -410,7 +424,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         $recorder = $this->changeRecorderFor($container);
 
         return new MoveEntryHandler(
-            storage: $container->get(EntryStorageInterface::class),
+            storage: $container->get(WriteEntryInterface::class),
+            transaction: $container->get(TransactionalWriteInterface::class),
             locator: $container->get(EntryLocator::class),
             mutation: $container->get(EntryMutation::class),
             placement: $container->get(EntryPlacementGuard::class),
@@ -446,7 +461,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         $this->refuseBulkImportOnReplica($options);
 
         return new LdapImporter(
-            $container->get(EntryStorageInterface::class),
+            $container->get(ReadEntryInterface::class),
+            $container->get(TransactionalWriteInterface::class),
             new WriteRequestRouter($container->get(WriteOperationDispatcher::class)),
             $container->get(AttributeTypeSpelling::class),
             new EventLogger(
@@ -588,9 +604,9 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeListenerContributor(Container $container): ListenerContributorInterface
     {
+        // The concrete keys, since the reloaded generation resolves its interface aliases through these instances.
         $instances = [
             StorageReadBackend::class => $container->get(StorageReadBackend::class),
-            EntryStorageInterface::class => $container->get(EntryStorageInterface::class),
         ];
 
         // Only a connection is held across a fork; in-memory storage lives in the process either way.
@@ -601,6 +617,12 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             $resettable = $container->get(PdoConnection::class);
             $instances[PdoConnection::class] = $resettable;
             $instances[WriterQueueInterface::class] = $container->get(WriterQueueInterface::class);
+            $instances[EntryReader::class] = $container->get(EntryReader::class);
+            $instances[EntryLister::class] = $container->get(EntryLister::class);
+            $instances[SerializedEntryWriter::class] = $container->get(SerializedEntryWriter::class);
+        } else {
+            // The entries live in this instance, so a reloaded generation must keep it or lose them.
+            $instances[InMemoryStorage::class] = $container->get(InMemoryStorage::class);
         }
 
         // An in-memory journal lives only in this instance, so a reloaded generation must keep it or lose its records.
@@ -806,7 +828,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             ->setTimeoutRead(-1);
 
         $applier = new VerbatimStorageApplier(
-            $container->get(EntryStorageInterface::class),
+            $container->get(ListEntryInterface::class),
+            $container->get(WriteEntryInterface::class),
             $container->get(EntryUuidLocator::class),
         );
 

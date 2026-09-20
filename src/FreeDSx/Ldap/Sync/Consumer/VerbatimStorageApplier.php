@@ -47,7 +47,8 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
     private array $presentUuids = [];
 
     public function __construct(
-        private readonly ListEntryInterface&WriteEntryInterface $storage,
+        private readonly ListEntryInterface $lister,
+        private readonly WriteEntryInterface $writer,
         private readonly EntryUuidLocator $locator,
     ) {}
 
@@ -66,7 +67,7 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
             ->normalize();
 
         if ($result->isDelete()) {
-            $this->storage->remove($dn);
+            $this->writer->remove($dn);
 
             return;
         }
@@ -85,10 +86,10 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         $heldAt = $this->dnHolding($uuid);
 
         if ($heldAt !== null && $heldAt->toString() !== $dn->toString()) {
-            $this->storage->remove($heldAt);
+            $this->writer->remove($heldAt);
         }
 
-        $this->storage->store($this->identified($entry, $uuid));
+        $this->writer->store($this->identified($entry, $uuid));
     }
 
     public function applyIdSet(
@@ -121,7 +122,7 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         );
 
         $stale = [];
-        foreach ($this->storage->list($options)->entries() as $entry) {
+        foreach ($this->lister->list($options)->entries() as $entry) {
             $dn = $entry->getDn()
                 ->normalize();
 
@@ -131,7 +132,7 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         }
 
         foreach ($stale as $dn) {
-            $this->storage->remove($dn);
+            $this->writer->remove($dn);
         }
 
         $this->presentDns = [];
@@ -158,7 +159,7 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
             $removed[] = $dn;
         }
 
-        $this->storage->removeAll($removed);
+        $this->writer->removeAll($removed);
 
         return $removed;
     }

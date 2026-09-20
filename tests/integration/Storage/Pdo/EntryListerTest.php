@@ -24,7 +24,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProv
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryLister;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ReadBounds;
@@ -47,7 +47,7 @@ final class EntryListerTest extends TestCase
 
     private EntryLister $subject;
 
-    private PdoStorage $storage;
+    private EntryWriter $storage;
 
     protected function setUp(): void
     {
@@ -59,7 +59,7 @@ final class EntryListerTest extends TestCase
             [PdoConnectionProviderInterface::class => new SharedPdoConnectionProvider($this->pdo)],
         );
         $this->subject = $container->get(EntryLister::class);
-        $this->storage = $container->get(PdoStorage::class);
+        $this->storage = $container->get(EntryWriter::class);
 
         $this->storage->store(new Entry(
             new Dn(self::BASE),
@@ -463,7 +463,7 @@ final class EntryListerTest extends TestCase
     /**
      * A lister and storage over a fresh database set up with the trigram substring index.
      *
-     * @return array{EntryLister, PdoStorage}
+     * @return array{EntryLister, EntryWriter}
      */
     private function trigramIndexed(): array
     {
@@ -471,7 +471,7 @@ final class EntryListerTest extends TestCase
             PdoConfig::forSqlite(':memory:')
                 ->setSubstringIndexMode(SubstringIndexMode::Trigram),
         ));
-        $storage = $container->get(PdoStorage::class);
+        $storage = $container->get(EntryWriter::class);
         $storage->store(new Entry(
             new Dn(self::BASE),
             new Attribute('dc', 'example'),

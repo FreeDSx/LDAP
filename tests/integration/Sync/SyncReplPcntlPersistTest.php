@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Sync;
 
 /**
- * refreshAndPersist under the PCNTL runner, with the SQLite-backed PdoStorage supplying the cross-process journal.
+ * refreshAndPersist under the PCNTL runner, with the SQLite-backed PDO storage supplying the cross-process journal.
  */
 final class SyncReplPcntlPersistTest extends SyncReplPersistTestCase
 {

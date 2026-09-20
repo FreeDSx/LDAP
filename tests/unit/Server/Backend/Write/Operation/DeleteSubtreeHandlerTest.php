@@ -21,7 +21,6 @@ use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
@@ -219,7 +218,7 @@ final class DeleteSubtreeHandlerTest extends TestCase
         );
     }
 
-    private function subtreeGraph(?EntryStorageInterface $storage = null): void
+    private function subtreeGraph(?InMemoryStorage $storage = null): void
     {
         $this->accessControl = $this->createMock(AccessControlInterface::class);
         $this->writeGraph(

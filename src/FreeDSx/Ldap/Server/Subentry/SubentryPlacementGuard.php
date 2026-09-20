@@ -29,7 +29,10 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
  */
 final readonly class SubentryPlacementGuard
 {
-    public function __construct(private ReadEntryInterface&ListEntryInterface $storage) {}
+    public function __construct(
+        private ReadEntryInterface $reader,
+        private ListEntryInterface $lister,
+    ) {}
 
     /**
      * @throws OperationException
@@ -53,7 +56,7 @@ final readonly class SubentryPlacementGuard
             );
         }
 
-        $parentEntry = $this->storage->find($parent);
+        $parentEntry = $this->reader->find($parent);
 
         // A missing parent is reported by the parent-exists check, which resolves the matched DN.
         if ($parentEntry === null || $this->isAdministrativePoint($parentEntry)) {
@@ -97,7 +100,7 @@ final readonly class SubentryPlacementGuard
 
     private function hasSubentryChildren(Dn $dn): bool
     {
-        $stream = $this->storage->list(StorageListOptions::firstChild(
+        $stream = $this->lister->list(StorageListOptions::firstChild(
             $dn,
             SubentryVisibility::Only,
         ));

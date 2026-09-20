@@ -33,7 +33,8 @@ readonly class UpdateEntryHandler
     use WritesLockedEntry;
 
     public function __construct(
-        private WriteEntryInterface&TransactionalWriteInterface $storage,
+        private WriteEntryInterface $storage,
+        private TransactionalWriteInterface $transaction,
         private EntryLocator $locator,
         private EntryMutation $mutation,
         private EntryPlacementGuard $placement,

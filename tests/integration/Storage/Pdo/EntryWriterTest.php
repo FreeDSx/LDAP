@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\PdoDialectInterface;
@@ -38,12 +39,18 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
 use PDO;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Pdo\EntryLinkFixtureTrait;
 use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 
 final class EntryWriterTest extends TestCase
 {
+    use EntryLinkFixtureTrait;
+    use SubtreeRenameStorageContractTests;
+
     private const BASE = 'dc=example,dc=com';
 
     private const ALICE = 'cn=Alice,dc=example,dc=com';
@@ -55,6 +62,8 @@ final class EntryWriterTest extends TestCase
     private EntryReader $reader;
 
     private EntryLister $lister;
+
+    private PdoConnection $connection;
 
     protected function setUp(): void
     {
@@ -68,6 +77,7 @@ final class EntryWriterTest extends TestCase
         $this->subject = $container->get(EntryWriter::class);
         $this->reader = $container->get(EntryReader::class);
         $this->lister = $container->get(EntryLister::class);
+        $this->connection = $container->get(PdoConnection::class);
     }
 
     public function test_storing_a_range_of_an_attributes_values_is_refused(): void
@@ -452,6 +462,148 @@ final class EntryWriterTest extends TestCase
         );
     }
 
+    /**
+     * The SQL predicate has to answer the attribute's own EQUALITY rule, not a case-folded comparison.
+     *
+     * @param non-empty-string $attribute
+     */
+    #[DataProvider('rewrittenSpellingProvider')]
+    public function test_a_value_matches_an_assertion_spelled_differently_under_its_matching_rule(
+        string $attribute,
+        string $stored,
+        string $asserted,
+    ): void {
+        $this->subject->store(new Entry(
+            new Dn('cn=spelling,dc=example,dc=com'),
+            new Attribute('cn', 'spelling'),
+            new Attribute($attribute, $stored),
+        ));
+
+        self::assertContains(
+            'cn=spelling,dc=example,dc=com',
+            $this->dnsMatching(Filters::equal($attribute, $asserted)),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function rewrittenSpellingProvider(): iterable
+    {
+        yield 'distinguishedNameMatch ignores RDN spacing and case' => [
+            'member',
+            'CN=Alice, DC=Example, DC=Com',
+            'cn=alice,dc=example,dc=com',
+        ];
+        yield 'uniqueMemberMatch ignores RDN spacing and case' => [
+            'uniqueMember',
+            'CN=Alice, DC=Example, DC=Com',
+            'cn=alice,dc=example,dc=com',
+        ];
+        yield 'telephoneNumberMatch ignores hyphens and spaces' => [
+            'telephoneNumber',
+            '+1-408-555-1212',
+            '+1 408 555 1212',
+        ];
+        yield 'numericStringMatch ignores spaces' => [
+            'x121Address',
+            '1111 2222',
+            '11112222',
+        ];
+    }
+
+    /**
+     * Its only stored attribute type lives in the password policy schema, so this one needs both sources merged.
+     */
+    public function test_a_generalized_time_value_matches_an_assertion_naming_the_same_instant(): void
+    {
+        // The policy schema is added for pwdChangedTime, whose syntax decides how the value is indexed.
+        $options = TestServerOptions::sqlite();
+        $options->getSchemaConfig()
+            ->addSource(SchemaResource::PasswordPolicy);
+
+        $pdo = new RecordingPdo('sqlite::memory:');
+        (new PdoSchema(new SqliteDialect()))->apply($pdo);
+        $container = Container::forServer(
+            $options,
+            [PdoConnectionProviderInterface::class => new SharedPdoConnectionProvider($pdo)],
+        );
+
+        $container->get(EntryWriter::class)->store(new Entry(
+            new Dn('cn=stamped,dc=example,dc=com'),
+            new Attribute('cn', 'stamped'),
+            new Attribute('pwdChangedTime', '20260101070000-0500'),
+        ));
+
+        self::assertSame(
+            ['cn=stamped,dc=example,dc=com'],
+            $this->dnsMatchingWith(
+                $container->get(EntryLister::class),
+                Filters::equal('pwdChangedTime', '20260101120000Z'),
+            ),
+        );
+    }
+
+    public function test_a_linked_value_follows_the_target_through_a_rename(): void
+    {
+        $this->linkAdminsToBob();
+
+        $this->subject->renameSubtree(
+            new Dn('cn=bob,dc=example,dc=com'),
+            new Dn('cn=Robert,dc=example,dc=com'),
+        );
+
+        self::assertSame(
+            ['cn=Robert,dc=example,dc=com'],
+            $this->reader->find(new Dn('cn=admins,dc=example,dc=com'))
+                ?->get('member')
+                ?->getValues(),
+        );
+    }
+
+    public function test_deleting_the_target_removes_it_from_the_linked_attribute(): void
+    {
+        $this->linkAdminsToBob();
+
+        $this->subject->remove(new Dn('cn=bob,dc=example,dc=com'));
+
+        self::assertNull(
+            $this->reader->find(new Dn('cn=admins,dc=example,dc=com'))?->get('member'),
+        );
+    }
+
+    protected function makeRenameContainer(Entry ...$entries): Container
+    {
+        $pdo = new RecordingPdo('sqlite::memory:');
+        (new PdoSchema(new SqliteDialect()))->apply($pdo);
+
+        $container = Container::forServer(
+            TestServerOptions::sqlite(),
+            [PdoConnectionProviderInterface::class => new SharedPdoConnectionProvider($pdo)],
+        );
+        $writer = $container->get(EntryWriter::class);
+
+        foreach ($entries as $entry) {
+            $writer->store($entry);
+        }
+
+        return $container;
+    }
+
+    /**
+     * cn=Admins holding cn=Bob as a linked member.
+     */
+    private function linkAdminsToBob(): void
+    {
+        $this->storeNamed('Bob');
+        $this->storeNamed('Admins');
+        $this->linkTogether(
+            $this->connection->pdo(),
+            'cn=admins,dc=example,dc=com',
+            'cn=bob,dc=example,dc=com',
+        );
+    }
+
     private function storeNamed(string $cn): Dn
     {
         $dn = new Dn("cn={$cn},dc=example,dc=com");
@@ -492,6 +644,19 @@ final class EntryWriterTest extends TestCase
      */
     private function dnsMatching(FilterInterface $filter): array
     {
+        return $this->dnsMatchingWith(
+            $this->lister,
+            $filter,
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function dnsMatchingWith(
+        EntryLister $lister,
+        FilterInterface $filter,
+    ): array {
         $options = new StorageListOptions(
             scope: new ListScope(
                 baseDn: new Dn(self::BASE),
@@ -500,7 +665,7 @@ final class EntryWriterTest extends TestCase
             filter: $filter,
         );
         $dns = [];
-        foreach ($this->lister->list($options)->entries() as $entry) {
+        foreach ($lister->list($options)->entries() as $entry) {
             $dns[] = $entry->getDn()->toString();
         }
 

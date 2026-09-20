@@ -19,11 +19,16 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\EntryIndexReindexer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryLister;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SerializedEntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\UnlockedRows;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
@@ -52,11 +57,49 @@ final class StorageContainerProvider implements ContainerProviderInterface
             LinkedAttributes::class => $this->makeLinkedAttributes(...),
             SortKeyComparator::class => $this->makeSortKeyComparator(...),
             StorageListOptionsFactory::class => $this->makeStorageListOptionsFactory(...),
-            EntryStorageInterface::class => $this->makeStorage(...),
+            InMemoryStorage::class => $this->makeInMemoryStorage(...),
+            ReadEntryInterface::class => $this->makeReads(...),
+            ListEntryInterface::class => $this->makeLists(...),
+            WriteEntryInterface::class => $this->makeWrites(...),
+            TransactionalWriteInterface::class => $this->makeTransaction(...),
             RowLockableInterface::class => $this->makeRowLocks(...),
             EntryIndexReindexer::class => $this->makeEntryIndexReindexer(...),
             ChangeJournalInterface::class => $this->makeChangeJournal(...),
         ];
+    }
+
+    private function makeReads(Container $container): ReadEntryInterface
+    {
+        return $this->isPdo($container)
+            ? $container->get(EntryReader::class)
+            : $container->get(InMemoryStorage::class);
+    }
+
+    private function makeLists(Container $container): ListEntryInterface
+    {
+        return $this->isPdo($container)
+            ? $container->get(EntryLister::class)
+            : $container->get(InMemoryStorage::class);
+    }
+
+    /**
+     * Writes reach PDO through the serializing writer, which is what keeps them on a single connection.
+     */
+    private function makeWrites(Container $container): WriteEntryInterface
+    {
+        return $this->isPdo($container)
+            ? $container->get(SerializedEntryWriter::class)
+            : $container->get(InMemoryStorage::class);
+    }
+
+    /**
+     * The same writer answers this, so a transaction opens on the connection its writes are already routed to.
+     */
+    private function makeTransaction(Container $container): TransactionalWriteInterface
+    {
+        return $this->isPdo($container)
+            ? $container->get(SerializedEntryWriter::class)
+            : $container->get(InMemoryStorage::class);
     }
 
     /**
@@ -64,16 +107,19 @@ final class StorageContainerProvider implements ContainerProviderInterface
      */
     private function makeRowLocks(Container $container): RowLockableInterface
     {
-        $config = $container->get(ServerOptions::class)->getStorageConfig();
-
-        return $config instanceof PdoConfig
-            ? $container->get(WriteSerializingStorage::class)
-            : new UnlockedRows($container->get(EntryStorageInterface::class));
+        return $this->isPdo($container)
+            ? $container->get(SerializedEntryWriter::class)
+            : new UnlockedRows($container->get(ReadEntryInterface::class));
     }
 
     private function makeEntryIndexReindexer(Container $container): EntryIndexReindexer
     {
-        return new EntryIndexReindexer($container->get(EntryStorageInterface::class));
+        return new EntryIndexReindexer(
+            $container->get(ReadEntryInterface::class),
+            $container->get(ListEntryInterface::class),
+            $container->get(WriteEntryInterface::class),
+            $container->get(TransactionalWriteInterface::class),
+        );
     }
 
     /**
@@ -126,24 +172,30 @@ final class StorageContainerProvider implements ContainerProviderInterface
     }
 
     /**
-     * Build the runner-appropriate storage backend from the configured StorageConfigInterface.
+     * One instance answers every storage contract, so the entries it holds are not split across several stores.
+     *
+     * @throws RuntimeException when the configured storage is not one this builds
      */
-    private function makeStorage(Container $container): EntryStorageInterface
+    private function makeInMemoryStorage(Container $container): InMemoryStorage
     {
-        $options = $container->get(ServerOptions::class);
-        $config = $options->getStorageConfig();
+        $config = $container->get(ServerOptions::class)->getStorageConfig();
 
-        return match (true) {
-            $config instanceof PdoConfig => $container->get(WriteSerializingStorage::class),
-            $config instanceof InMemoryStorageConfig => new InMemoryStorage(
-                $config->entries(),
-                $container->get(SortKeyComparator::class),
-            ),
-            default => throw new RuntimeException(sprintf(
+        if (!$config instanceof InMemoryStorageConfig) {
+            throw new RuntimeException(sprintf(
                 'Unsupported storage config "%s".',
                 $config::class,
-            )),
-        };
+            ));
+        }
+
+        return new InMemoryStorage(
+            $config->entries(),
+            $container->get(SortKeyComparator::class),
+        );
+    }
+
+    private function isPdo(Container $container): bool
+    {
+        return $container->get(ServerOptions::class)->getStorageConfig() instanceof PdoConfig;
     }
 
     /**

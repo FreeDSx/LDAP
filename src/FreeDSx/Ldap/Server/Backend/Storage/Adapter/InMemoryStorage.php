@@ -18,8 +18,11 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\ArrayEntryStorageTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SubtreeRename;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
@@ -32,7 +35,11 @@ use Throwable;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final class InMemoryStorage implements EntryStorageInterface
+final class InMemoryStorage implements
+    ReadEntryInterface,
+    ListEntryInterface,
+    WriteEntryInterface,
+    TransactionalWriteInterface
 {
     use ArrayEntryStorageTrait;
 

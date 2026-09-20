@@ -29,7 +29,7 @@ use FreeDSx\Ldap\Operation\Request\AddRequest;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\EntryIndexReindexer;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\DrainableWritesInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
@@ -188,10 +188,10 @@ class LdapServer
      */
     private function drainWrites(): void
     {
-        $storage = $this->container->get(EntryStorageInterface::class);
+        $writes = $this->container->get(WriteEntryInterface::class);
 
-        if ($storage instanceof DrainableWritesInterface) {
-            $storage->drainWrites();
+        if ($writes instanceof DrainableWritesInterface) {
+            $writes->drainWrites();
         }
     }
 

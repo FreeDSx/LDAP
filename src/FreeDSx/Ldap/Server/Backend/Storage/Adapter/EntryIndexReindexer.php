@@ -14,7 +14,10 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
@@ -28,7 +31,10 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 final readonly class EntryIndexReindexer
 {
     public function __construct(
-        private EntryStorageInterface $storage,
+        private ReadEntryInterface $reader,
+        private ListEntryInterface $lister,
+        private WriteEntryInterface $writer,
+        private TransactionalWriteInterface $transaction,
     ) {}
 
     /**
@@ -38,10 +44,10 @@ final readonly class EntryIndexReindexer
     {
         $dns = $this->collectDns();
 
-        $this->storage->atomic(function () use ($dns): void {
+        $this->transaction->atomic(function () use ($dns): void {
             foreach ($dns as $dn) {
                 // @todo Unbounded because the whole entry is stored back; links hold ids, so skip them once a store can leave them untouched.
-                $entry = $this->storage->find(
+                $entry = $this->reader->find(
                     $dn,
                     EntryProjection::unbounded(),
                 );
@@ -49,7 +55,7 @@ final readonly class EntryIndexReindexer
                     continue;
                 }
 
-                $this->storage->store(
+                $this->writer->store(
                     $entry,
                     rebuildIndexes: true,
                 );
@@ -65,8 +71,8 @@ final readonly class EntryIndexReindexer
     private function collectDns(): array
     {
         $dns = [];
-        foreach ($this->storage->namingContexts() as $namingContext) {
-            $stream = $this->storage->list(StorageListOptions::matchAll(
+        foreach ($this->reader->namingContexts() as $namingContext) {
+            $stream = $this->lister->list(StorageListOptions::matchAll(
                 $namingContext,
                 subtree: true,
                 projection: new EntryProjection([]),
