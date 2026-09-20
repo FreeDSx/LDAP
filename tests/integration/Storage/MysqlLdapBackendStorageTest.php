@@ -15,18 +15,15 @@ namespace Tests\Integration\FreeDSx\Ldap\Storage;
 
 use PDO;
 use PDOException;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\LinkedReferenceTestsTrait;
 
 /**
- * Re-runs the backend storage suite against real MySQL. Gated on MYSQL_DSN — tests are skipped
- * when the env var is absent or the server is unreachable, so the suite is a no-op on dev boxes
- * without MySQL but exercised in CI.
- *
- * Every test restarts the shared server so the bootstrap's DROP + re-import runs fresh. The
- * parent's destructive tests rely on pcntl fork isolation for reset, which does not apply to a
- * persistent backend.
+ * Re-runs the backend storage suite against real MySQL. Gated on MYSQL_DSN.
  */
 final class MysqlLdapBackendStorageTest extends LdapBackendStorageTestCase
 {
+    use LinkedReferenceTestsTrait;
+
     public static function setUpBeforeClass(): void
     {
         if (!extension_loaded('pcntl') || !self::isMysqlAvailable()) {

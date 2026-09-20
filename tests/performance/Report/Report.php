@@ -179,7 +179,7 @@ final class Report
             $parts[] = "{$pair} ({$count})";
         }
 
-        return 'Substituted (write op converted when worker had no owned DNs): ' . implode(', ', $parts);
+        return 'Substituted (write op converted when the worker had nothing to draw from): ' . implode(', ', $parts);
     }
 
     private function renderJson(): string

@@ -99,6 +99,20 @@ final class BenchCompareCommand extends Command
                 '5000',
             )
             ->addOption(
+                'seed-groups',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Groups to seed for the group ops; each client works against its own (0 = none)',
+                '0',
+            )
+            ->addOption(
+                'seed-group-size',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Members seeded into each group, drawn from the seeded entries',
+                '0',
+            )
+            ->addOption(
                 'rng-seed',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -353,7 +367,7 @@ final class BenchCompareCommand extends Command
     }
 
     /**
-     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSizeLimit: int, searchValue: string, driverProcesses: int} $params
+     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, seedGroups: int, seedGroupSize: int, jit: bool, searchSizeLimit: int, searchValue: string, driverProcesses: int} $params
      * @param list<TargetBench> $benches
      */
     private function runSide(
@@ -371,6 +385,8 @@ final class BenchCompareCommand extends Command
             $side,
             $bench,
             $params['seedEntries'],
+            $params['seedGroups'],
+            $params['seedGroupSize'],
         );
 
         $config = $this->buildConfig(
@@ -408,6 +424,8 @@ final class BenchCompareCommand extends Command
         BenchSide $side,
         TargetBench $bench,
         int $seedEntries,
+        int $seedGroups,
+        int $seedGroupSize,
     ): void {
         $progress->writeln(sprintf(
             'Seeding %s bench subtree %s with %d entries (+ cn=alice)...',
@@ -417,7 +435,11 @@ final class BenchCompareCommand extends Command
         ));
 
         $start = microtime(true);
-        $bench->seed($seedEntries);
+        $bench->seed(
+            $seedEntries,
+            $seedGroups,
+            $seedGroupSize,
+        );
         $elapsed = microtime(true) - $start;
 
         $progress->writeln(sprintf(
@@ -428,7 +450,7 @@ final class BenchCompareCommand extends Command
     }
 
     /**
-     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSizeLimit: int, searchValue: string, driverProcesses: int} $params
+     * @param array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, seedGroups: int, seedGroupSize: int, jit: bool, searchSizeLimit: int, searchValue: string, driverProcesses: int} $params
      */
     private function buildConfig(
         BenchSide $side,
@@ -452,6 +474,8 @@ final class BenchCompareCommand extends Command
             output: 'text',
             // External mode never seeds, so this only tells the workload how many fixtures its filters may target.
             seedEntries: $params['seedEntries'],
+            seedGroups: $params['seedGroups'],
+            seedGroupSize: $params['seedGroupSize'],
             bindDn: $side->bindDn,
             bindPassword: $side->bindPassword,
             baseDn: $bench->benchBaseDn,
@@ -501,7 +525,7 @@ final class BenchCompareCommand extends Command
     }
 
     /**
-     * @return array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, jit: bool, searchSizeLimit: int, searchValue: string, driverProcesses: int}
+     * @return array{duration: ?int, ops: ?int, mix: string, clients: int, warmup: int, rngSeed: ?int, seedEntries: int, seedGroups: int, seedGroupSize: int, jit: bool, searchSizeLimit: int, searchValue: string, driverProcesses: int}
      */
     private function resolveParams(InputInterface $input): array
     {
@@ -530,6 +554,8 @@ final class BenchCompareCommand extends Command
             'warmup' => $this->requireInt($input, 'warmup'),
             'rngSeed' => $this->parseInt($input->getOption('rng-seed'), 'rng-seed'),
             'seedEntries' => $this->requireInt($input, 'seed-entries'),
+            'seedGroups' => $this->requireInt($input, 'seed-groups'),
+            'seedGroupSize' => $this->requireInt($input, 'seed-group-size'),
             'jit' => !(bool) $input->getOption('no-jit'),
             'searchSizeLimit' => $this->requireInt($input, 'search-size-limit'),
             'searchValue' => $this->requireString($input, 'search-value'),

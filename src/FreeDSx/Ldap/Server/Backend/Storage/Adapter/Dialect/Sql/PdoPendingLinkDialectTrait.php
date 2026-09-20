@@ -88,10 +88,14 @@ trait PdoPendingLinkDialectTrait
         SQL;
     }
 
-    public function queryAnyPending(): string
+    public function queryAnyPending(bool $byDn = false): string
     {
+        $limit = $byDn
+            ? 'WHERE target_lc_dn = ?'
+            : '';
+
         return <<<SQL
-            SELECT 1 FROM entry_link_pending LIMIT 1
+            SELECT 1 FROM entry_link_pending $limit LIMIT 1
         SQL;
     }
 }

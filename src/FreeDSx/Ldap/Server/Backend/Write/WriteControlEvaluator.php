@@ -29,6 +29,17 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
  */
 class WriteControlEvaluator
 {
+    /**
+     * The controls that read the entry a write targets.
+     *
+     * @var list<string>
+     */
+    private const ENTRY_READING_OIDS = [
+        Control::OID_ASSERTION,
+        Control::OID_PRE_READ,
+        Control::OID_POST_READ,
+    ];
+
     private ?Entry $preReadEntry = null;
 
     private ?Entry $postReadEntry = null;
@@ -81,6 +92,20 @@ class WriteControlEvaluator
             Control::OID_POST_READ,
             $result,
         );
+    }
+
+    /**
+     * Whether a control the write carries reads the entry.
+     */
+    public function inspectsEntry(): bool
+    {
+        foreach (self::ENTRY_READING_OIDS as $oid) {
+            if ($this->controls->has($oid)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function preReadEntry(): ?Entry

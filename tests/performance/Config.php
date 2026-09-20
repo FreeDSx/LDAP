@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Performance\FreeDSx\Ldap;
 
 use InvalidArgumentException;
+use Tests\Performance\FreeDSx\Ldap\Workload\WorkloadMix;
 
 /**
  * Immutable configuration for the load-test driver; built by LoadTestCommand from CLI input.
@@ -110,6 +111,8 @@ final class Config
         public readonly bool $journal = false,
         public readonly int $swooleWorkers = 0,
         public readonly int $workerIdOffset = 0,
+        public readonly int $seedGroups = 0,
+        public readonly int $seedGroupSize = 0,
     ) {
         $this->assertEnum('backend', $backend, self::BACKENDS);
         $this->assertEnum('runner', $runner, self::RUNNERS);
@@ -125,6 +128,9 @@ final class Config
         $this->assertNonNegative('max-search-lookthrough', $maxSearchLookthrough);
         $this->assertNonNegative('swoole-workers', $swooleWorkers);
         $this->assertNonNegative('worker-id-offset', $workerIdOffset);
+        $this->assertNonNegative('seed-groups', $seedGroups);
+        $this->assertNonNegative('seed-group-size', $seedGroupSize);
+        $this->assertGroupsSeeded($mix, $seedGroups);
 
         if ($duration !== null) {
             $this->assertPositive('duration', $duration);
@@ -139,6 +145,27 @@ final class Config
             throw new InvalidArgumentException(
                 'InMemoryStorage requires the Swoole runner: pcntl fork children each hold their own copy '
                 . 'of the seed entries, so writes never propagate between connections.',
+            );
+        }
+    }
+
+    private function assertGroupsSeeded(string $mix, int $seedGroups): void
+    {
+        if (!(new WorkloadMix($mix))->drawsAny(WorkloadMix::GROUP_OPS)) {
+            return;
+        }
+
+        if ($seedGroups < 1) {
+            throw new InvalidArgumentException(sprintf(
+                'The mix draws a group op. Set --seed-groups to at least 1. Group ops: %s.',
+                implode(', ', WorkloadMix::GROUP_OPS),
+            ));
+        }
+
+        // Members are drawn from the seeded entries the groups were not seeded holding.
+        if ($this->seedGroupSize >= $this->seedEntries) {
+            throw new InvalidArgumentException(
+                '--seed-entries must exceed --seed-group-size, or no member is left to add.',
             );
         }
     }

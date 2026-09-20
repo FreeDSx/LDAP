@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\RoutingPdoConnect
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryIndexWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryLinkWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\PendingLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
@@ -84,6 +85,7 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             EntryIndexWriter::class => $this->makeEntryIndexWriter(...),
             EntryLinks::class => $this->makeEntryLinks(...),
             EntryLinkWriter::class => $this->makeEntryLinkWriter(...),
+            PendingLinkWriter::class => $this->makePendingLinkWriter(...),
             EntryRowCodec::class => $this->makeEntryRowCodec(...),
             EntryReader::class => $this->makeReader(...),
             PdoListQueryBuilder::class => static fn(Container $container): PdoListQueryBuilder => new PdoListQueryBuilder(
@@ -253,6 +255,15 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             $container->get(PdoDialectInterface::class),
             $container->get(PdoConnection::class),
             $container->get(LinkedAttributes::class),
+            $container->get(PendingLinkWriter::class),
+        );
+    }
+
+    private function makePendingLinkWriter(Container $container): PendingLinkWriter
+    {
+        return new PendingLinkWriter(
+            $container->get(PdoDialectInterface::class),
+            $container->get(PdoConnection::class),
         );
     }
 
@@ -320,6 +331,7 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             $container->get(EntryReader::class),
             $container->get(EntryIndexWriter::class),
             $container->get(EntryLinkWriter::class),
+            $container->get(PendingLinkWriter::class),
             $container->get(EntryRowCodec::class),
         );
     }

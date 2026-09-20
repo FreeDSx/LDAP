@@ -71,6 +71,7 @@ use FreeDSx\Ldap\Server\Backend\Write\Operation\DeleteSubtreeHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\EntryMutation;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\EntryPlacementGuard;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\MoveEntryHandler;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\LinkedChanges;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\UpdateEntryHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolationGate;
 use FreeDSx\Ldap\Server\Subentry\SubentryPlacementGuard;
@@ -405,6 +406,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             writes: $container->get(TransactionalEntryWrite::class),
             mutation: $container->get(EntryMutation::class),
             placement: $container->get(EntryPlacementGuard::class),
+            linkedChanges: $container->get(LinkedChanges::class),
         );
     }
 

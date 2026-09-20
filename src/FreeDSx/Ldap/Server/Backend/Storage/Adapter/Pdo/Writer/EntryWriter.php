@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\PartialValuesException;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use PDOException;
@@ -51,6 +52,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
         private ReadEntryInterface $reader,
         private EntryIndexWriter $indexes,
         private EntryLinkWriter $links,
+        private PendingLinkWriter $pending,
         private EntryRowCodec $codec,
     ) {}
 
@@ -61,40 +63,37 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
      */
     public function insert(Entry $entry): void
     {
-        $normDn = $entry->getDn()->normalize();
-        $dnString = $entry->getDn()->toString();
-        $lcDn = $normDn->toString();
+        $stored = StoredDn::of($entry->getDn());
 
-        $this->assertDnFits($dnString);
-        $this->assertDnFits($lcDn);
+        $this->assertDnFits($stored);
         $this->assertWhole($entry);
 
-        $this->connection->atomic(function () use ($entry, $lcDn, $dnString, $normDn): void {
+        $this->connection->atomic(function () use ($entry, $stored): void {
             // The unique key on lc_dn is the arbiter, since a row lock on a DN that holds no row locks only the gap.
             $this->translatingRefusal(
-                function () use ($lcDn, $dnString, $normDn, $entry): void {
+                function () use ($stored, $entry): void {
                     $this->connection->execute($this->dialect->queryInsert(), [
-                        $lcDn,
-                        $dnString,
-                        $normDn->getParent()?->toString() ?? '',
+                        $stored->lcDn,
+                        $stored->dn,
+                        $stored->parentLcDn,
                         $this->codec->encode($entry),
                     ]);
                 },
-                $normDn,
+                $stored->normalized,
             );
 
-            $entryId = $this->entryIdFor($normDn);
+            $entryId = $this->entryIdFor($stored->normalized);
             $this->indexes->rewrite(
                 $entryId,
                 $entry,
             );
-            $this->links->write(
+            $this->links->writeNew(
                 $entryId,
                 $entry,
             );
 
             // The entry may be the one other entries were waiting on to resolve their own values.
-            $this->links->promote($normDn);
+            $this->pending->promote($stored->normalized);
         });
     }
 
@@ -105,32 +104,29 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
     public function store(
         Entry $entry,
         bool $rebuildIndexes = false,
+        LinkDelta $links = new LinkDelta(),
     ): void {
-        $normDn = $entry->getDn()->normalize();
-        $dnString = $entry->getDn()->toString();
-        $lcDn = $normDn->toString();
+        $stored = StoredDn::of($entry->getDn());
 
-        // Both are stored, and normalising re-escapes, so the canonical form is not always the shorter of the two.
-        $this->assertDnFits($dnString);
-        $this->assertDnFits($lcDn);
+        $this->assertDnFits($stored);
         $this->assertWhole($entry);
 
-        $this->connection->atomic(function () use ($entry, $lcDn, $dnString, $normDn, $rebuildIndexes): void {
+        $this->connection->atomic(function () use ($entry, $stored, $rebuildIndexes, $links): void {
             // Read the row we are about to overwrite under its write lock, so the diff is against what is actually
             // stored; a second writer then repairs whatever the first left behind instead of drifting from it.
             $current = $rebuildIndexes
                 ? null
-                : $this->lockedEntry($normDn);
+                : $this->lockedEntry($stored->normalized);
 
             $this->connection->execute($this->dialect->queryUpsert(), [
-                $lcDn,
-                $dnString,
-                $normDn->getParent()?->toString() ?? '',
+                $stored->lcDn,
+                $stored->dn,
+                $stored->parentLcDn,
                 $this->codec->encode($entry),
             ]);
 
             // Neither dialect reports the key from an upsert, so it is read back before the index rows are written.
-            $entryId = $this->entryIdFor($normDn);
+            $entryId = $this->entryIdFor($stored->normalized);
 
             if ($current === null) {
                 $this->indexes->rewrite($entryId, $entry);
@@ -142,13 +138,15 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
                 );
             }
 
-            $this->links->write(
+            $this->storeLinks(
                 $entryId,
                 $entry,
+                $links,
+                isNew: !$rebuildIndexes && $current === null,
             );
 
             // An upsert may be what puts the entry there, so it can settle what others were waiting on.
-            $this->links->promote($normDn);
+            $this->pending->promote($stored->normalized);
         });
     }
 
@@ -162,8 +160,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
         Dn $from,
         Dn $to,
     ): void {
-        $this->assertDnFits($to->toString());
-        $this->assertDnFits($to->normalizedString());
+        $this->assertDnFits(StoredDn::of($to));
 
         $this->connection->atomic(function () use ($from, $to): void {
             // Locked before the walk reads it, so a concurrent rename of the same base cannot interleave with this one.
@@ -199,7 +196,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
             );
 
             // A moved subtree can put many DNs in place at once, so nothing narrows which parked values may settle.
-            $this->links->promote();
+            $this->pending->promote();
         });
     }
 
@@ -293,9 +290,10 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
     {
         $this->lockForWrite($normDn);
 
+        // Only the sidecar index is diffed against this, and no linked value is ever indexed there.
         return $this->reader->find(
             $normDn,
-            EntryProjection::unbounded(),
+            new EntryProjection(linkCap: 0),
         );
     }
 
@@ -361,26 +359,52 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
     }
 
     /**
-     * @throws DnTooLongException when the DN exceeds the dialect's maximum supported length
+     * A delta names the values to change, since an entry carrying one no longer holds the attribute it changes.
+     *
+     * @param bool $isNew Whether the write is what put the entry there, which leaves it holding no links to diff.
      */
-    private function assertDnFits(string $dn): void
+    private function storeLinks(
+        int $entryId,
+        Entry $entry,
+        LinkDelta $links,
+        bool $isNew,
+    ): void {
+        if (!$links->isEmpty()) {
+            $this->links->apply($entryId, $links);
+
+            return;
+        }
+
+        $isNew
+            ? $this->links->writeNew($entryId, $entry)
+            : $this->links->write($entryId, $entry);
+    }
+
+    /**
+     * Both forms are stored, and normalising re-escapes, so the canonical form is not always the shorter of the two.
+     *
+     * @throws DnTooLongException when either stored form exceeds the dialect's maximum supported length
+     */
+    private function assertDnFits(StoredDn $stored): void
     {
         $max = $this->dialect->maxDnLength();
         if ($max === null) {
             return;
         }
 
-        $length = strlen($dn);
-        if ($length <= $max) {
-            return;
-        }
+        foreach ([$stored->dn, $stored->lcDn] as $dn) {
+            $length = strlen($dn);
+            if ($length <= $max) {
+                continue;
+            }
 
-        throw new DnTooLongException(
-            sprintf(
-                'DN length %d exceeds the storage backend limit of %d bytes.',
-                $length,
-                $max,
-            ),
-        );
+            throw new DnTooLongException(
+                sprintf(
+                    'DN length %d exceeds the storage backend limit of %d bytes.',
+                    $length,
+                    $max,
+                ),
+            );
+        }
     }
 }

@@ -50,6 +50,8 @@ final class UpdateEntryHandlerTest extends TestCase
 
     private const ALICE = 'cn=Alice,dc=example,dc=com';
 
+    private const ADMINS = 'cn=Admins,dc=example,dc=com';
+
     protected function setUp(): void
     {
         $this->writeGraph();
@@ -62,6 +64,60 @@ final class UpdateEntryHandlerTest extends TestCase
         $entry = $this->find(self::ALICE);
         self::assertNotNull($entry);
         self::assertTrue($entry->get('mail')?->has('alice@example.com'));
+    }
+
+    public function test_it_adds_a_linked_value_without_restating_the_others(): void
+    {
+        $this->seedAdmins();
+
+        $this->modifyAdmins(new Change(Change::TYPE_ADD, 'member', self::ALICE));
+
+        self::assertEqualsCanonicalizing(
+            ['cn=Bob,ou=People,dc=example,dc=com', self::ALICE],
+            $this->find(self::ADMINS)?->get('member')?->getValues(),
+        );
+    }
+
+    public function test_it_removes_only_the_linked_value_it_names(): void
+    {
+        $this->seedAdmins(self::ALICE);
+
+        $this->modifyAdmins(new Change(Change::TYPE_DELETE, 'member', self::ALICE));
+
+        self::assertSame(
+            ['cn=Bob,ou=People,dc=example,dc=com'],
+            $this->find(self::ADMINS)?->get('member')?->getValues(),
+        );
+    }
+
+    public function test_it_replaces_a_linked_attribute_through_the_whole_entry(): void
+    {
+        $this->seedAdmins(self::ALICE);
+
+        $this->modifyAdmins(new Change(Change::TYPE_REPLACE, 'member', self::ALICE));
+
+        self::assertSame(
+            [self::ALICE],
+            $this->find(self::ADMINS)?->get('member')?->getValues(),
+        );
+    }
+
+    public function test_it_adds_a_linked_value_when_a_control_reads_the_entry(): void
+    {
+        $this->seedAdmins();
+
+        $this->updates()->handle(
+            new UpdateCommand(
+                new Dn(self::ADMINS),
+                [new Change(Change::TYPE_ADD, 'member', self::ALICE)],
+            ),
+            $this->controlledContext(Controls::preRead('member')),
+        );
+
+        self::assertEqualsCanonicalizing(
+            ['cn=Bob,ou=People,dc=example,dc=com', self::ALICE],
+            $this->find(self::ADMINS)?->get('member')?->getValues(),
+        );
     }
 
     public function test_it_adds_a_value_to_an_existing_attribute(): void
@@ -343,6 +399,27 @@ final class UpdateEntryHandlerTest extends TestCase
     protected function makeServerOptions(): ServerOptions
     {
         return TestServerOptions::unvalidatedCore();
+    }
+
+    private function seedAdmins(string ...$members): void
+    {
+        $this->storage->store(new Entry(
+            new Dn(self::ADMINS),
+            new Attribute('objectClass', 'groupOfNames'),
+            new Attribute('cn', 'Admins'),
+            new Attribute('member', 'cn=Bob,ou=People,dc=example,dc=com', ...$members),
+        ));
+    }
+
+    private function modifyAdmins(Change ...$changes): void
+    {
+        $this->updates()->handle(
+            new UpdateCommand(
+                new Dn(self::ADMINS),
+                $changes,
+            ),
+            $this->context(),
+        );
     }
 
     private function modify(Change ...$changes): void

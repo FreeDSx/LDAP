@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filter\ApproximateFilter;
 use FreeDSx\Ldap\Search\Filters;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\LinkedReferenceTestsTrait;
 
 /**
  * Runs the full LdapBackendStorageTestCase suite against the SQLite-backed PDO storage,
@@ -30,6 +31,8 @@ use FreeDSx\Ldap\Search\Filters;
  */
 final class LdapBackendSqliteStorageTest extends LdapBackendStorageTestCase
 {
+    use LinkedReferenceTestsTrait;
+
     /**
      * Tests that mutate the database and would pollute subsequent tests.
      */

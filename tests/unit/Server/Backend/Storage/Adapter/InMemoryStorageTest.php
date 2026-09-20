@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -105,6 +106,47 @@ final class InMemoryStorageTest extends TestCase
         });
 
         self::assertNotNull($this->subject->find(new Dn('cn=Bob,dc=example,dc=com')));
+    }
+
+    public function test_a_delta_applies_against_the_members_already_stored(): void
+    {
+        $this->subject->store(Entry::fromArray(
+            'cn=admins,dc=ex,dc=com',
+            ['cn' => ['admins'], 'member' => ['cn=bob,dc=ex,dc=com', 'cn=carol,dc=ex,dc=com']],
+        ));
+
+        // The entry a delta write carries no longer holds the attribute the delta changes.
+        $this->subject->store(
+            Entry::fromArray('cn=admins,dc=ex,dc=com', ['cn' => ['admins']]),
+            links: new LinkDelta(
+                added: ['member' => ['cn=dan,dc=ex,dc=com']],
+                removed: ['member' => ['cn=bob,dc=ex,dc=com']],
+            ),
+        );
+
+        self::assertSame(
+            ['cn=carol,dc=ex,dc=com', 'cn=dan,dc=ex,dc=com'],
+            $this->subject->find(new Dn('cn=admins,dc=ex,dc=com'))
+                ?->get('member')
+                ?->getValues(),
+        );
+    }
+
+    public function test_a_delta_emptying_an_attribute_drops_it(): void
+    {
+        $this->subject->store(Entry::fromArray(
+            'cn=admins,dc=ex,dc=com',
+            ['cn' => ['admins'], 'member' => ['cn=bob,dc=ex,dc=com']],
+        ));
+
+        $this->subject->store(
+            Entry::fromArray('cn=admins,dc=ex,dc=com', ['cn' => ['admins']]),
+            links: new LinkDelta(removed: ['member' => ['cn=bob,dc=ex,dc=com']]),
+        );
+
+        self::assertNull(
+            $this->subject->find(new Dn('cn=admins,dc=ex,dc=com'))?->get('member'),
+        );
     }
 
     public function test_find_returns_null_for_unknown_norm_dn(): void
