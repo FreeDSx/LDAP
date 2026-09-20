@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
-use FreeDSx\Ldap\Server\Backend\Storage\Contract\AtomicWriteInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\SubtreeMoveRecorder;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
@@ -34,7 +34,7 @@ readonly class MoveEntryHandler
     use WritesLockedEntry;
 
     public function __construct(
-        private WriteEntryInterface&AtomicWriteInterface $storage,
+        private WriteEntryInterface&TransactionalWriteInterface $storage,
         private EntryLocator $locator,
         private EntryMutation $mutation,
         private EntryPlacementGuard $placement,

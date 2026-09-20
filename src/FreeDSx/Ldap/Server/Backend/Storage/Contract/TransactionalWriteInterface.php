@@ -22,12 +22,12 @@ use FreeDSx\Ldap\Exception\AnswerableExceptionInterface;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-interface AtomicWriteInterface
+interface TransactionalWriteInterface
 {
     /**
      * Execute $operation as an atomic read-modify-write cycle; implementations must hold an exclusive lock or transaction.
      *
-     * @param callable(): void $operation Calls back onto this instance, which routes itself into the open transaction.
+     * @param callable(): void $operation Reads and writes issued from it join the transaction this opens.
      * @throws AnswerableExceptionInterface
      */
     public function atomic(callable $operation): void;

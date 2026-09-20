@@ -40,6 +40,8 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Replica\SerializingReplicaPasswordStateSt
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
+use FreeDSx\Ldap\Server\Backend\NonResettable;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
@@ -208,6 +210,30 @@ class ContainerTest extends TestCase
         self::assertArrayNotHasKey(
             ChangeJournalInterface::class,
             $container->get(ListenerContributorInterface::class)->reloadInstances(),
+        );
+    }
+
+    public function test_a_fork_resets_the_pdo_connection_so_no_child_keeps_one_opened_before_it(): void
+    {
+        $container = Container::forServer(
+            new ServerOptions(PdoConfig::forSqlite(':memory:')),
+        );
+
+        self::assertSame(
+            $container->get(PdoConnection::class),
+            $container->get(ListenerContributorInterface::class)->forkResettable(),
+        );
+    }
+
+    public function test_a_fork_resets_nothing_for_in_memory_storage(): void
+    {
+        $container = Container::forServer(
+            new ServerOptions(InMemoryStorageConfig::withEntries()),
+        );
+
+        self::assertInstanceOf(
+            NonResettable::class,
+            $container->get(ListenerContributorInterface::class)->forkResettable(),
         );
     }
 

@@ -15,8 +15,8 @@ namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
-use FreeDSx\Ldap\Server\Backend\Storage\Contract\AtomicWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
@@ -35,7 +35,7 @@ readonly class ComputeUpdateHandler
     use WritesLockedEntry;
 
     public function __construct(
-        private ReadEntryInterface&WriteEntryInterface&AtomicWriteInterface $storage,
+        private ReadEntryInterface&WriteEntryInterface&TransactionalWriteInterface $storage,
         private EntryLocator $locator,
         private EntryMutation $mutation,
         private EntryPlacementGuard $placement,

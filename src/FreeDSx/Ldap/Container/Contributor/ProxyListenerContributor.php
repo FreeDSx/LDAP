@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Container\Contributor;
 
+use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 
 /**
@@ -22,9 +23,9 @@ use FreeDSx\Ldap\Server\Backend\ResettableInterface;
  */
 final class ProxyListenerContributor implements ListenerContributorInterface
 {
-    public function forkResettable(): ?ResettableInterface
+    public function forkResettable(): ResettableInterface
     {
-        return null;
+        return new NonResettable();
     }
 
     /**

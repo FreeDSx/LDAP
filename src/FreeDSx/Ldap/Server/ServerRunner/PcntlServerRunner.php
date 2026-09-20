@@ -17,6 +17,7 @@ use FreeDSx\Asn1\Exception\EncoderException;
 use FreeDSx\Ldap\Exception\MetricsSnapshotException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler;
+use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\Logging\ConnectionContext;
 use FreeDSx\Ldap\Server\Metrics\File\SnapshotPublisher;
@@ -100,7 +101,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         private readonly MetricsRecorderInterface $metricsRecorder = new NullMetricsRecorder(),
         private readonly ?SnapshotPublisher $snapshotPublisher = null,
         private readonly ?OperationRollupCoordinator $operationRollup = null,
-        private readonly ?ResettableInterface $resettable = null,
+        private readonly ResettableInterface $resettable = new NonResettable(),
         BackgroundTasksInterface $backgroundTasks = new PcntlBackgroundTasks(
             periodicTasks: [],
             longLivedTasks: [],
@@ -596,7 +597,7 @@ class PcntlServerRunner implements ServerRunnerInterface
         $context = ['pid' => $pid];
         $this->isMainProcess = false;
 
-        $this->resettable?->reset();
+        $this->resettable->reset();
 
         if (!$this->encryptConnectionIfDeferred($socket, $context)) {
             $socket->close();
@@ -658,7 +659,7 @@ class PcntlServerRunner implements ServerRunnerInterface
             SIG_IGN,
         );
 
-        $this->resettable?->reset();
+        $this->resettable->reset();
     }
 
     /**

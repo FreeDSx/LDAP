@@ -13,9 +13,9 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage;
 
-use FreeDSx\Ldap\Server\Backend\Storage\Contract\AtomicWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 
 /**
@@ -29,4 +29,4 @@ interface EntryStorageInterface extends
     ReadEntryInterface,
     ListEntryInterface,
     WriteEntryInterface,
-    AtomicWriteInterface {}
+    TransactionalWriteInterface {}

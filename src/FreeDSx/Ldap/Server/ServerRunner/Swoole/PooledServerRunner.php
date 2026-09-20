@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\ServerRunner\Swoole;
 
 use FreeDSx\Ldap\Exception\RuntimeException;
+use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\ServerRunner\CoroutineServerRunnerInterface;
 use Swoole\Process;
@@ -36,12 +37,12 @@ class PooledServerRunner implements CoroutineServerRunnerInterface
     private const OWNER_WORKER_ID = 0;
 
     /**
-     * @param ?ResettableInterface $resettable Dropped in each worker, so none keeps a connection made before the fork.
+     * @param ResettableInterface $resettable Dropped in each worker, so none keeps a connection made before the fork.
      */
     public function __construct(
         private readonly WorkerFactory $workerFactory,
         private readonly int $workers,
-        private readonly ?ResettableInterface $resettable = null,
+        private readonly ResettableInterface $resettable = new NonResettable(),
     ) {
         if (!extension_loaded('swoole')) {
             throw new RuntimeException('The Swoole extension is required to use the Swoole PooledServerRunner.');
@@ -73,7 +74,7 @@ class PooledServerRunner implements CoroutineServerRunnerInterface
 
     private function runWorker(int $workerId): null
     {
-        $this->resettable?->reset();
+        $this->resettable->reset();
 
         $this->workerFactory
             ->make($workerId === self::OWNER_WORKER_ID)

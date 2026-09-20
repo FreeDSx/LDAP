@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryReadDia
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 
@@ -29,7 +30,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class EntryReader
+readonly class EntryReader implements ReadEntryInterface
 {
     public function __construct(
         private PdoConnection $connection,

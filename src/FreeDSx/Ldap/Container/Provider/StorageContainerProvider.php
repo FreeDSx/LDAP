@@ -21,6 +21,8 @@ use FreeDSx\Ldap\Schema\Matching\EqualityComparatorResolver;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\UnlockedRows;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Audit\AuditingChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
@@ -51,9 +53,22 @@ final class StorageContainerProvider implements ContainerProviderInterface
             SortKeyComparator::class => $this->makeSortKeyComparator(...),
             StorageListOptionsFactory::class => $this->makeStorageListOptionsFactory(...),
             EntryStorageInterface::class => $this->makeStorage(...),
+            RowLockableInterface::class => $this->makeRowLocks(...),
             EntryIndexReindexer::class => $this->makeEntryIndexReindexer(...),
             ChangeJournalInterface::class => $this->makeChangeJournal(...),
         ];
+    }
+
+    /**
+     * The per-entry lock a write takes, or a stand-in for storage whose writes never run concurrently.
+     */
+    private function makeRowLocks(Container $container): RowLockableInterface
+    {
+        $config = $container->get(ServerOptions::class)->getStorageConfig();
+
+        return $config instanceof PdoConfig
+            ? $container->get(WriteSerializingStorage::class)
+            : new UnlockedRows($container->get(EntryStorageInterface::class));
     }
 
     private function makeEntryIndexReindexer(Container $container): EntryIndexReindexer

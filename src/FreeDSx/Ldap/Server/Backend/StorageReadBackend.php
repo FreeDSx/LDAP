@@ -40,7 +40,7 @@ use Generator;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class StorageReadBackend implements ReadBackendInterface, ResettableInterface
+final readonly class StorageReadBackend implements ReadBackendInterface
 {
     public function __construct(
         private ReadEntryInterface&ListEntryInterface $storage,
@@ -49,13 +49,6 @@ final readonly class StorageReadBackend implements ReadBackendInterface, Resetta
         private FilterEvaluatorInterface $filterEvaluator,
         private EntryLocator $locator,
     ) {}
-
-    public function reset(): void
-    {
-        if ($this->storage instanceof ResettableInterface) {
-            $this->storage->reset();
-        }
-    }
 
     public function get(
         Dn $dn,

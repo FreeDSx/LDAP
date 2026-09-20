@@ -21,8 +21,10 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryWriteDi
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoRowLockDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SubtreeRename;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\PartialValuesException;
@@ -36,7 +38,7 @@ use PDOException;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class EntryWriter
+readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
 {
     /**
      * DNs per batched delete, well inside the placeholder limits of every supported driver.
@@ -46,7 +48,7 @@ readonly class EntryWriter
     public function __construct(
         private PdoConnection $connection,
         private PdoEntryWriteDialectInterface&PdoRowLockDialectInterface $dialect,
-        private EntryReader $reader,
+        private ReadEntryInterface $reader,
         private EntryIndexWriter $indexes,
         private EntryRowCodec $codec,
     ) {}

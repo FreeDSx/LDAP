@@ -34,6 +34,7 @@ readonly class EntryPlacementGuard
 {
     public function __construct(
         private ReadEntryInterface $storage,
+        private RowLockableInterface $locks,
         private EntryLocator $locator,
         private SubentryPlacementGuard $subentries,
     ) {}
@@ -144,7 +145,7 @@ readonly class EntryPlacementGuard
     ): void {
         $parent = $dn->getParent();
 
-        if ($parent !== null && $this->holdAgainstDeletion($parent)) {
+        if ($parent !== null && $this->locks->lockForReference($parent)) {
             return;
         }
         // A system write may create a naming-context root, but not a hole partway down an existing tree.
@@ -167,21 +168,9 @@ readonly class EntryPlacementGuard
         if ($newParent === null || $newParent->isRootDse()) {
             return;
         }
-        if (!$this->holdAgainstDeletion($newParent->normalize())) {
+        if (!$this->locks->lockForReference($newParent->normalize())) {
             $this->locator->throwNoSuchObject($newParent);
         }
-    }
-
-    /**
-     * Whether the entry is there, held so a concurrent delete of it cannot commit before this write does.
-     */
-    private function holdAgainstDeletion(Dn $dn): bool
-    {
-        if (!$this->storage instanceof RowLockableInterface) {
-            return $this->storage->exists($dn);
-        }
-
-        return $this->storage->lockForReference($dn);
     }
 
     /**
