@@ -15,7 +15,8 @@ namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\RdnAttributeValues;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\AtomicWriteInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
 use FreeDSx\Ldap\Server\Backend\Write\OperationalAttributeGenerator;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
@@ -32,7 +33,7 @@ readonly class AddEntryHandler
     use AppliesSystemChanges;
 
     public function __construct(
-        private EntryStorageInterface $storage,
+        private WriteEntryInterface&AtomicWriteInterface $storage,
         private EntryPlacementGuard $placement,
         private SchemaViolationGate $schemaGate,
         private OperationalAttributeGenerator $operationalAttrs,

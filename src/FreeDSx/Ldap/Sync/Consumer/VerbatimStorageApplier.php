@@ -17,7 +17,8 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
@@ -46,7 +47,7 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
     private array $presentUuids = [];
 
     public function __construct(
-        private readonly EntryStorageInterface $storage,
+        private readonly ListEntryInterface&WriteEntryInterface $storage,
         private readonly EntryUuidLocator $locator,
     ) {}
 

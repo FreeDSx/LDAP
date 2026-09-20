@@ -21,7 +21,8 @@ use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
@@ -42,7 +43,7 @@ use Generator;
 final readonly class StorageReadBackend implements ReadBackendInterface, ResettableInterface
 {
     public function __construct(
-        private EntryStorageInterface $storage,
+        private ReadEntryInterface&ListEntryInterface $storage,
         private SearchStreamBuilder $searchStream,
         private StorageListOptionsFactory $listOptions,
         private FilterEvaluatorInterface $filterEvaluator,

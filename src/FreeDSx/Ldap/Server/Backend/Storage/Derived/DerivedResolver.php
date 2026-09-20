@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Derived;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\GeneratedEntry;
 
 /**
@@ -26,7 +26,7 @@ use FreeDSx\Ldap\Server\GeneratedEntry;
  */
 final readonly class DerivedResolver
 {
-    public function __construct(private EntryStorageInterface $storage) {}
+    public function __construct(private ReadEntryInterface $storage) {}
 
     /**
      * @param string $name A canonical type name, which callers get from {@see DerivedAttributeTrait}.
