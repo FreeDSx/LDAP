@@ -24,9 +24,15 @@ use Throwable;
 interface WriterQueueInterface
 {
     /**
+     * @template TResult
+     *
+     * @param Closure(): TResult $job
+     *
+     * @return TResult what the job produced, so the caller it blocked can answer with it
+     *
      * @throws Throwable
      */
-    public function run(Closure $job): void;
+    public function run(Closure $job): mixed;
 
     /**
      * True while the caller is executing one of this queue's jobs, so it must not submit another and block on itself.

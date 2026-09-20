@@ -19,9 +19,9 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
 /**
- * The modify every update shares, however its changes were arrived at.
+ * The entry a modify leaves behind, however its changes were arrived at.
  *
- * Used by handlers holding a storage, locator, mutation, placement guard and optional change recorder.
+ * Used by handlers holding a mutation and a placement guard.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -30,16 +30,15 @@ trait AppliesEntryUpdate
     use AppliesSystemChanges;
 
     /**
-     * Runs within an already-open write; the caller owns the transaction.
+     * The entry the modify leaves behind, before anything stores it.
      *
      * @throws OperationException
      */
-    private function applyUpdate(
+    private function updated(
         UpdateCommand $command,
         WriteContext $context,
         Entry $current,
-    ): void {
-        $dn = $command->dn->normalize();
+    ): Entry {
         $updated = $this->mutation->forUpdate(
             $current,
             $command,
@@ -47,7 +46,7 @@ trait AppliesEntryUpdate
         );
         $this->placement->assertUpdatePlacement(
             $updated,
-            $dn,
+            $command->dn->normalize(),
             $context->isSystem(),
         );
         $this->applySystemChanges(
@@ -56,10 +55,6 @@ trait AppliesEntryUpdate
         );
         $context->controlEvaluator()?->captureResult($updated);
 
-        $this->storage->store($updated);
-        $this->changeRecorder?->recordModify(
-            $updated,
-            $context,
-        );
+        return $updated;
     }
 }

@@ -44,36 +44,40 @@ final readonly class PdoTransactor
     /**
      * Runs within the caller's open transaction, starting one only when none is active.
      *
-     * @param callable(): void $operation
+     * @template TResult
+     *
+     * @param callable(): TResult $operation
+     *
+     * @return TResult
      */
-    public function joinAtomic(callable $operation): void
+    public function joinAtomic(callable $operation): mixed
     {
         if ($this->provider->txState()->depth === 0) {
-            $this->atomic($operation);
-
-            return;
+            return $this->atomic($operation);
         }
 
-        $operation();
+        return $operation();
     }
 
     /**
      * Runs the operation in a transaction, reissuing it when the database rejects it as a transient conflict.
      *
-     * @param callable(): void $operation
+     * @template TResult
+     *
+     * @param callable(): TResult $operation
+     *
+     * @return TResult what the operation produced, once it has committed
      *
      * @throws StorageBusyException when the conflict outlasts the retry budget
      * @throws PDOException when the failure is not a transient conflict, or the transaction is nested
      */
-    public function atomic(callable $operation): void
+    public function atomic(callable $operation): mixed
     {
         $attempt = 0;
 
         while (true) {
             try {
-                $this->runAtomic($operation);
-
-                return;
+                return $this->runAtomic($operation);
             } catch (PDOException $e) {
                 if (!$this->isReissuable($e)) {
                     throw $e;
@@ -103,9 +107,13 @@ final readonly class PdoTransactor
     }
 
     /**
-     * @param callable(): void $operation
+     * @template TResult
+     *
+     * @param callable(): TResult $operation
+     *
+     * @return TResult
      */
-    private function runAtomic(callable $operation): void
+    private function runAtomic(callable $operation): mixed
     {
         $pdo = $this->provider->get();
         $txState = $this->provider->txState();
@@ -121,7 +129,7 @@ final readonly class PdoTransactor
             );
             $began = true;
 
-            $operation();
+            $produced = $operation();
 
             $discarded = $this->finish(
                 $pdo,
@@ -149,6 +157,8 @@ final readonly class PdoTransactor
         if ($discarded !== null) {
             throw $discarded;
         }
+
+        return $produced;
     }
 
     /**

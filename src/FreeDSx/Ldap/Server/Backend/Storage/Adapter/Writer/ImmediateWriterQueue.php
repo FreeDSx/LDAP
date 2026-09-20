@@ -22,9 +22,9 @@ use Closure;
  */
 final class ImmediateWriterQueue implements WriterQueueInterface
 {
-    public function run(Closure $job): void
+    public function run(Closure $job): mixed
     {
-        $job();
+        return $job();
     }
 
     public function isWriter(): bool

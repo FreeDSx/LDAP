@@ -184,24 +184,24 @@ final class SwooleWriterQueueTest extends TestCase
         Coroutine\run(function () use ($batchWrapper, &$results): void {
             $replies = [new Channel(1), new Channel(1), new Channel(1)];
             $batch = [
-                [static fn() => null, $replies[0]],
+                [static fn(): string => 'a', $replies[0]],
                 [static function (): void {
                     throw new LogicException('b failed');
                 }, $replies[1]],
-                [static fn() => null, $replies[2]],
+                [static fn(): string => 'c', $replies[2]],
             ];
 
             SwooleWriterQueue::executeBatch($batch, $batchWrapper);
 
-            $results[0] = $replies[0]->pop();
-            $results[1] = $replies[1]->pop();
-            $results[2] = $replies[2]->pop();
+            $results[0] = self::answer($replies[0]);
+            $results[1] = self::answer($replies[1]);
+            $results[2] = self::answer($replies[2]);
         });
 
-        self::assertTrue($results[0]);
+        self::assertSame('a', $results[0]);
         self::assertInstanceOf(LogicException::class, $results[1]);
         self::assertSame('b failed', $results[1]->getMessage());
-        self::assertTrue($results[2]);
+        self::assertSame('c', $results[2]);
     }
 
     public function test_executeBatch_broadcasts_wrapper_failure_to_all_callers(): void
@@ -221,9 +221,9 @@ final class SwooleWriterQueueTest extends TestCase
 
             SwooleWriterQueue::executeBatch($batch, $batchWrapper);
 
-            $results[0] = $replies[0]->pop();
-            $results[1] = $replies[1]->pop();
-            $results[2] = $replies[2]->pop();
+            $results[0] = self::answer($replies[0]);
+            $results[1] = self::answer($replies[1]);
+            $results[2] = self::answer($replies[2]);
         });
 
         foreach ($results as $result) {
@@ -252,9 +252,9 @@ final class SwooleWriterQueueTest extends TestCase
 
             SwooleWriterQueue::executeBatch($batch, $batchWrapper);
 
-            $results[0] = $replies[0]->pop();
-            $results[1] = $replies[1]->pop();
-            $results[2] = $replies[2]->pop();
+            $results[0] = self::answer($replies[0]);
+            $results[1] = self::answer($replies[1]);
+            $results[2] = self::answer($replies[2]);
         });
 
         foreach ($results as $result) {
@@ -279,24 +279,27 @@ final class SwooleWriterQueueTest extends TestCase
         Coroutine\run(function () use ($batchWrapper, &$attempts, &$results): void {
             $replies = [new Channel(1), new Channel(1)];
             $batch = [
-                [static fn() => null, $replies[0]],
-                [static function () use (&$attempts): void {
+                [static fn(): string => 'a', $replies[0]],
+                [static function () use (&$attempts): string {
                     $attempts++;
 
                     if ($attempts === 1) {
                         throw new LogicException('conflicted on the first attempt');
                     }
+
+                    return 'b';
                 }, $replies[1]],
             ];
 
             SwooleWriterQueue::executeBatch($batch, $batchWrapper);
 
-            $results[0] = $replies[0]->pop();
-            $results[1] = $replies[1]->pop();
+            $results[0] = self::answer($replies[0]);
+            $results[1] = self::answer($replies[1]);
         });
 
-        self::assertTrue($results[0]);
-        self::assertTrue(
+        self::assertSame('a', $results[0]);
+        self::assertSame(
+            'b',
             $results[1],
             'A job that succeeded on the reissued attempt must not report the earlier attempt failure.',
         );
@@ -316,8 +319,8 @@ final class SwooleWriterQueueTest extends TestCase
 
             SwooleWriterQueue::executeBatch($batch, $batchWrapper);
 
-            $results[0] = $replies[0]->pop();
-            $results[1] = $replies[1]->pop();
+            $results[0] = self::answer($replies[0]);
+            $results[1] = self::answer($replies[1]);
         });
 
         foreach ($results as $result) {
@@ -353,7 +356,6 @@ final class SwooleWriterQueueTest extends TestCase
                     $queue->run(static function (): void {
                         throw new LogicException('job b failed');
                     });
-                    $results['b'] = true;
                 } catch (Throwable $e) {
                     $results['b'] = $e;
                 }
@@ -381,5 +383,17 @@ final class SwooleWriterQueueTest extends TestCase
             $results['b']->getMessage(),
         );
         self::assertTrue($results['c']);
+    }
+
+    /**
+     * @param Channel<mixed> $reply
+     */
+    private static function answer(Channel $reply): mixed
+    {
+        $result = $reply->pop();
+
+        return is_array($result)
+            ? $result[0]
+            : $result;
     }
 }

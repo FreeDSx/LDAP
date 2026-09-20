@@ -14,11 +14,11 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract;
 
 /**
- * Database-specific SQL for the table linked attribute values are kept in.
+ * Database-specific SQL for reading the table linked attribute values are kept in.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-interface PdoLinkDialectInterface
+interface PdoLinkReadDialectInterface
 {
     /**
      * Links of a contiguous span of owners with their targets' current DNs. Parameters: [first, last]

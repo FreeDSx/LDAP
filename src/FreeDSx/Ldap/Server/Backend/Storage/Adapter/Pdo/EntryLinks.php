@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
@@ -45,7 +45,7 @@ final readonly class EntryLinks
     private const ENTRIES_PER_FETCH = 100;
 
     public function __construct(
-        private PdoLinkDialectInterface $dialect,
+        private PdoLinkReadDialectInterface $dialect,
         private PdoConnection $connection,
         private LinkedAttributes $declared,
     ) {}

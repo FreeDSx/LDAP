@@ -16,8 +16,10 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use PHPUnit\Framework\TestCase;
 
 final class EntryRowCodecTest extends TestCase
@@ -28,7 +30,7 @@ final class EntryRowCodecTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new EntryRowCodec();
+        $this->subject = new EntryRowCodec(new LinkedAttributes(SchemaResource::Core->load()));
     }
 
     public function test_attribute_values_round_trip(): void

@@ -29,7 +29,7 @@ use function substr;
 final readonly class SubtreeMoveRecorder
 {
     public function __construct(
-        private ChangeRecorder $recorder,
+        private ChangeRecorderInterface $recorder,
         private SubtreeEnumerator $subtree,
     ) {}
 

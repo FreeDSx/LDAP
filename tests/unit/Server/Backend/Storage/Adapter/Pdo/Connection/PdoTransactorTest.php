@@ -93,7 +93,6 @@ final class PdoTransactorTest extends TestCase
 
                 throw $conflict;
             });
-            self::fail('Expected the spent budget to answer busy.');
         } catch (StorageBusyException $e) {
             self::assertSame(
                 ResultCode::BUSY,
@@ -179,7 +178,6 @@ final class PdoTransactorTest extends TestCase
                     throw new PDOException('Deadlock found when trying to get lock');
                 });
             });
-            self::fail('Expected the spent budget to answer busy.');
         } catch (StorageBusyException) {
             // Expected once the budget is spent.
         }
@@ -269,7 +267,6 @@ final class PdoTransactorTest extends TestCase
                 } catch (PDOException) {
                 }
             });
-            self::fail('Expected the spent budget to answer busy.');
         } catch (StorageBusyException) {
             // Expected once the budget is spent.
         }

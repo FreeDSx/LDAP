@@ -78,9 +78,9 @@ final readonly class SerializedEntryWriter implements
         $this->submit(fn() => $this->writes->removeAll($dns));
     }
 
-    public function atomic(callable $operation): void
+    public function atomic(callable $operation): mixed
     {
-        $this->submit(fn() => $this->transaction->atomic($operation));
+        return $this->submit(fn(): mixed => $this->transaction->atomic($operation));
     }
 
     /**
@@ -102,16 +102,18 @@ final readonly class SerializedEntryWriter implements
     /**
      * Runs directly when the writer is already executing, since submitting there would block the writer on itself.
      *
-     * @param Closure(): void $write
+     * @template TResult
+     *
+     * @param Closure(): TResult $write
+     *
+     * @return TResult
      */
-    private function submit(Closure $write): void
+    private function submit(Closure $write): mixed
     {
         if ($this->queue->isWriter()) {
-            $write();
-
-            return;
+            return $write();
         }
 
-        $this->queue->run($write);
+        return $this->queue->run($write);
     }
 }

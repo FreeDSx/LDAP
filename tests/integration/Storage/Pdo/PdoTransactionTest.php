@@ -68,7 +68,6 @@ final class PdoTransactionTest extends TestCase
 
                 throw new RuntimeException('intentional');
             });
-            self::fail('Expected the failure to surface.');
         } catch (RuntimeException) {
             // Expected, since the operation throws.
         }

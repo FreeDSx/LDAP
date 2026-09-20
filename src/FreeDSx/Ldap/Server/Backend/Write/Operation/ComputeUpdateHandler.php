@@ -13,13 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
-use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
-use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Write\Command\ComputeUpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
@@ -32,16 +27,11 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 readonly class ComputeUpdateHandler
 {
     use AppliesEntryUpdate;
-    use WritesLockedEntry;
 
     public function __construct(
-        private ReadEntryInterface $reader,
-        private WriteEntryInterface $storage,
-        private TransactionalWriteInterface $transaction,
-        private EntryLocator $locator,
+        private TransactionalEntryWrite $writes,
         private EntryMutation $mutation,
         private EntryPlacementGuard $placement,
-        private ?ChangeRecorder $changeRecorder = null,
     ) {}
 
     /**
@@ -51,35 +41,40 @@ readonly class ComputeUpdateHandler
         ComputeUpdateCommand $command,
         WriteContext $context,
     ): void {
-        $dn = $command->dn->normalize();
+        $this->writes->updateIfPresent(
+            $command->dn->normalize(),
+            $context,
+            fn(Entry $current): ?Entry => $this->computed(
+                $command,
+                $context,
+                $current,
+            ),
+        );
+    }
 
-        $this->writeLocked(
-            $dn,
-            function () use ($command, $context, $dn): void {
-                // @todo Unbounded because the whole derived entry is stored back; leave linked attributes out once writes apply them as deltas.
-                $entry = $this->reader->find(
-                    $dn,
-                    EntryProjection::unbounded(),
-                );
-                if ($entry === null) {
-                    return;
-                }
+    /**
+     * The entry the computed changes leave behind, or null when they turn out to be none.
+     *
+     * @throws OperationException
+     */
+    private function computed(
+        ComputeUpdateCommand $command,
+        WriteContext $context,
+        Entry $current,
+    ): ?Entry {
+        $changes = ($command->compute)($current);
 
-                $changes = ($command->compute)($entry);
-                if ($changes === []) {
-                    return;
-                }
+        if ($changes === []) {
+            return null;
+        }
 
-                // Applied inline, since going back through the dispatcher would open a second transaction around this one.
-                $this->applyUpdate(
-                    new UpdateCommand(
-                        $command->dn,
-                        $changes,
-                    ),
-                    $context,
-                    $entry,
-                );
-            },
+        return $this->updated(
+            new UpdateCommand(
+                $command->dn,
+                $changes,
+            ),
+            $context,
+            $current,
         );
     }
 }

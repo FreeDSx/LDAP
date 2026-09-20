@@ -49,7 +49,13 @@ use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\ReferenceIntegrityInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorderInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\UnrecordedChanges;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\LockedEntryAccess;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\ReferenceGuard;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\TransactionalEntryWrite;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\SubtreeMoveRecorder;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\AddEntryHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
@@ -192,6 +198,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
                 $c->get(SchemaViolationGate::class),
                 $c->get(OperationalAttributeGenerator::class),
             ),
+            LockedEntryAccess::class => $this->makeLockedEntryAccess(...),
+            TransactionalEntryWrite::class => $this->makeTransactionalEntryWrite(...),
             AddEntryHandler::class => $this->makeAddEntryHandler(...),
             DeleteEntryHandler::class => $this->makeDeleteEntryHandler(...),
             DeleteSubtreeHandler::class => $this->makeDeleteSubtreeHandler(...),
@@ -360,24 +368,19 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeAddEntryHandler(Container $container): AddEntryHandler
     {
         return new AddEntryHandler(
-            storage: $container->get(WriteEntryInterface::class),
-            transaction: $container->get(TransactionalWriteInterface::class),
+            writes: $container->get(TransactionalEntryWrite::class),
             placement: $container->get(EntryPlacementGuard::class),
             schemaGate: $container->get(SchemaViolationGate::class),
             operationalAttrs: $container->get(OperationalAttributeGenerator::class),
             rdnValues: $container->get(RdnAttributeValues::class),
-            changeRecorder: $this->changeRecorderFor($container),
         );
     }
 
     private function makeDeleteEntryHandler(Container $container): DeleteEntryHandler
     {
         return new DeleteEntryHandler(
-            storage: $container->get(WriteEntryInterface::class),
-            transaction: $container->get(TransactionalWriteInterface::class),
-            locator: $container->get(EntryLocator::class),
+            writes: $container->get(TransactionalEntryWrite::class),
             placement: $container->get(EntryPlacementGuard::class),
-            changeRecorder: $this->changeRecorderFor($container),
         );
     }
 
@@ -397,25 +400,18 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     private function makeUpdateEntryHandler(Container $container): UpdateEntryHandler
     {
         return new UpdateEntryHandler(
-            storage: $container->get(WriteEntryInterface::class),
-            transaction: $container->get(TransactionalWriteInterface::class),
-            locator: $container->get(EntryLocator::class),
+            writes: $container->get(TransactionalEntryWrite::class),
             mutation: $container->get(EntryMutation::class),
             placement: $container->get(EntryPlacementGuard::class),
-            changeRecorder: $this->changeRecorderFor($container),
         );
     }
 
     private function makeComputeUpdateHandler(Container $container): ComputeUpdateHandler
     {
         return new ComputeUpdateHandler(
-            reader: $container->get(ReadEntryInterface::class),
-            storage: $container->get(WriteEntryInterface::class),
-            transaction: $container->get(TransactionalWriteInterface::class),
-            locator: $container->get(EntryLocator::class),
+            writes: $container->get(TransactionalEntryWrite::class),
             mutation: $container->get(EntryMutation::class),
             placement: $container->get(EntryPlacementGuard::class),
-            changeRecorder: $this->changeRecorderFor($container),
         );
     }
 
@@ -425,16 +421,13 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
         return new MoveEntryHandler(
             storage: $container->get(WriteEntryInterface::class),
-            transaction: $container->get(TransactionalWriteInterface::class),
-            locator: $container->get(EntryLocator::class),
+            locked: $container->get(LockedEntryAccess::class),
             mutation: $container->get(EntryMutation::class),
             placement: $container->get(EntryPlacementGuard::class),
-            moveRecorder: $recorder === null
-                ? null
-                : new SubtreeMoveRecorder(
-                    $recorder,
-                    $container->get(SubtreeEnumerator::class),
-                ),
+            moveRecorder: new SubtreeMoveRecorder(
+                $recorder,
+                $container->get(SubtreeEnumerator::class),
+            ),
         );
     }
 
@@ -465,6 +458,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             $container->get(TransactionalWriteInterface::class),
             new WriteRequestRouter($container->get(WriteOperationDispatcher::class)),
             $container->get(AttributeTypeSpelling::class),
+            new ReferenceGuard($container->get(ReferenceIntegrityInterface::class)),
             new EventLogger(
                 $options->getLogger(),
                 $options->getEventLogPolicy(),
@@ -501,19 +495,40 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
     }
 
     /**
-     * A recorder when a change journal is configured to append to.
+     * A recorder that keeps nothing when no change journal is configured to append to.
      */
-    private function changeRecorderFor(Container $container): ?ChangeRecorder
+    private function changeRecorderFor(Container $container): ChangeRecorderInterface
     {
         $journal = $this->changeJournal($container);
 
         if ($journal === null) {
-            return null;
+            return new UnrecordedChanges();
         }
 
         return new ChangeRecorder(
             $journal,
             $container->get(ServerOptions::class)->getLogger() ?? new NullLogger(),
+        );
+    }
+
+    private function makeLockedEntryAccess(Container $container): LockedEntryAccess
+    {
+        return new LockedEntryAccess(
+            transaction: $container->get(TransactionalWriteInterface::class),
+            locks: $container->get(RowLockableInterface::class),
+            locator: $container->get(EntryLocator::class),
+            reader: $container->get(ReadEntryInterface::class),
+        );
+    }
+
+    private function makeTransactionalEntryWrite(Container $container): TransactionalEntryWrite
+    {
+        return new TransactionalEntryWrite(
+            writes: $container->get(WriteEntryInterface::class),
+            transaction: $container->get(TransactionalWriteInterface::class),
+            locked: $container->get(LockedEntryAccess::class),
+            references: new ReferenceGuard($container->get(ReferenceIntegrityInterface::class)),
+            changeRecorder: $this->changeRecorderFor($container),
         );
     }
 

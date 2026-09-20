@@ -17,7 +17,9 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoEntryListDialectT
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoEntryReadDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoEntryWriteDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoJournalDialectTrait;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoLinkDialectTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoLinkReadDialectTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoLinkWriteDialectTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoPendingLinkDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoRowLockDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoSchemaTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoSidecarDialectTrait;
@@ -36,7 +38,9 @@ final class SqliteDialect implements PdoDialectInterface
     use PdoEntryReadDialectTrait;
     use PdoEntryWriteDialectTrait;
     use PdoJournalDialectTrait;
-    use PdoLinkDialectTrait;
+    use PdoLinkReadDialectTrait;
+    use PdoLinkWriteDialectTrait;
+    use PdoPendingLinkDialectTrait;
     use PdoRowLockDialectTrait;
     use PdoSchemaTrait;
     use PdoSidecarDialectTrait;

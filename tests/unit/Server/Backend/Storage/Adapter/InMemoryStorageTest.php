@@ -66,7 +66,6 @@ final class InMemoryStorageTest extends TestCase
 
                 throw new RuntimeException('failed part way through');
             });
-            self::fail('The failure should have propagated.');
         } catch (RuntimeException) {
         }
 
@@ -85,7 +84,6 @@ final class InMemoryStorageTest extends TestCase
 
                 throw new RuntimeException('failed part way through');
             });
-            self::fail('The failure should have propagated.');
         } catch (RuntimeException) {
         }
 

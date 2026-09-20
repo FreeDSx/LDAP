@@ -27,8 +27,13 @@ interface TransactionalWriteInterface
     /**
      * Execute $operation as an atomic read-modify-write cycle; implementations must hold an exclusive lock or transaction.
      *
-     * @param callable(): void $operation Reads and writes issued from it join the transaction this opens.
+     * @template TResult
+     *
+     * @param callable(): TResult $operation Reads and writes issued from it join the transaction this opens.
+     *
+     * @return TResult what the operation produced, so a caller needs no reference to reach out of it
+     *
      * @throws AnswerableExceptionInterface
      */
-    public function atomic(callable $operation): void;
+    public function atomic(callable $operation): mixed;
 }

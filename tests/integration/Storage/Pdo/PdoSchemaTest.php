@@ -29,6 +29,7 @@ final class PdoSchemaTest extends TestCase
         'entries',
         'entry_attribute_links',
         'entry_attribute_values',
+        'entry_link_pending',
         'ldap_change_journal',
         'ldap_change_journal_seq',
         'ldap_replica_pwpolicy_state',

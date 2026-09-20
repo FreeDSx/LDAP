@@ -28,12 +28,17 @@ use Psr\Log\NullLogger;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class ChangeRecorder
+final readonly class ChangeRecorder implements ChangeRecorderInterface
 {
     public function __construct(
         private ChangeJournalInterface $journal,
         private LoggerInterface $logger = new NullLogger(),
     ) {}
+
+    public function records(): bool
+    {
+        return true;
+    }
 
     public function recordAdd(
         Entry $entry,

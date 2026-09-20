@@ -16,11 +16,11 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SqlFilter\SqlFilterUtility;
 
 /**
- * Cross-platform link SQL shared by every PdoLinkDialectInterface implementation.
+ * Cross-platform link read SQL shared by every PdoLinkReadDialectInterface implementation.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-trait PdoLinkDialectTrait
+trait PdoLinkReadDialectTrait
 {
     public function queryLinksForRange(): string
     {

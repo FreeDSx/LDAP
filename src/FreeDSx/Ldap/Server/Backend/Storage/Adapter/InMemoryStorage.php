@@ -168,19 +168,17 @@ final class InMemoryStorage implements
     /**
      * Makes and restores copies for failures since in-memory mutates in place.
      */
-    public function atomic(callable $operation): void
+    public function atomic(callable $operation): mixed
     {
         // Only the outermost call snapshots...
         if ($this->atomicDepth > 0) {
             $this->atomicDepth++;
 
             try {
-                $operation();
+                return $operation();
             } finally {
                 $this->atomicDepth--;
             }
-
-            return;
         }
 
         $entries = array_map(
@@ -192,7 +190,7 @@ final class InMemoryStorage implements
         $this->atomicDepth = 1;
 
         try {
-            $operation();
+            return $operation();
         } catch (Throwable $e) {
             $this->entries = $entries;
             $this->keys = $keys;

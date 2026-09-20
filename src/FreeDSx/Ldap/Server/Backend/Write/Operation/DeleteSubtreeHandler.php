@@ -21,7 +21,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorderInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\UnrecordedChanges;
 use FreeDSx\Ldap\Server\Backend\Write\Command\DeleteSubtreeCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
@@ -46,7 +47,7 @@ readonly class DeleteSubtreeHandler
         private EntryPlacementGuard $placement,
         private SubtreeEnumerator $subtree,
         private AccessControlInterface $accessControl,
-        private ?ChangeRecorder $changeRecorder = null,
+        private ChangeRecorderInterface $changeRecorder = new UnrecordedChanges(),
     ) {}
 
     /**
@@ -70,13 +71,13 @@ readonly class DeleteSubtreeHandler
 
         foreach (array_chunk($dnList, self::BATCH_SIZE) as $batch) {
             $this->transaction->atomic(function () use ($batch, $context): void {
-                $preImages = $this->changeRecorder === null
-                    ? []
-                    : $this->subtree->entriesAt($batch);
+                $preImages = $this->changeRecorder->records()
+                    ? $this->subtree->entriesAt($batch)
+                    : [];
                 $this->storage->removeAll($batch);
 
                 foreach ($preImages as $entry) {
-                    $this->changeRecorder?->recordDelete(
+                    $this->changeRecorder->recordDelete(
                         $entry,
                         $context,
                     );

@@ -29,7 +29,8 @@ trait SqliteReindexTestsTrait
     public function test_reindex_restores_matching_for_keys_written_in_an_older_form(): void
     {
         $this->withServer(function (LdapServer $server, Container $container): void {
-            $assertion = Filters::equal('member', 'cn=admin,dc=foo,dc=bar');
+            // Equality folds the repeated spaces away, so the stored key is not what a plain case fold would write.
+            $assertion = Filters::equal('description', 'Group Of Admins');
             self::assertCount(
                 1,
                 $this->dnsMatching($container, $assertion),
@@ -76,8 +77,8 @@ trait SqliteReindexTestsTrait
         $this->pdo()
             ->prepare('UPDATE entry_attribute_values SET value_lower = ? WHERE attr_name_lower = ?')
             ->execute([
-                'cn=admin, dc=foo, dc=bar',
-                'member',
+                'group  of  admins',
+                'description',
             ]);
     }
 
