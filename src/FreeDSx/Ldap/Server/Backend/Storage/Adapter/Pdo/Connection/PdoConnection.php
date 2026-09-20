@@ -13,8 +13,10 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection;
 
+use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoStatementPool;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageBusyException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use PDO;
@@ -26,7 +28,7 @@ use PDO;
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-readonly class PdoConnection
+readonly class PdoConnection implements TransactionalWriteInterface, ResettableInterface
 {
     /**
      * @param PdoStatementPool $statements Must draw from $provider.

@@ -29,8 +29,10 @@ use FreeDSx\Ldap\Server\AccessControl\ConfidentialAttributeAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\WithheldAttributePolicy;
 use FreeDSx\Ldap\Server\AccessControl\PrivilegedBypassAccessControl;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
+use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriterQueueInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
@@ -172,6 +174,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             ),
             EntryPlacementGuard::class => static fn(Container $c): EntryPlacementGuard => new EntryPlacementGuard(
                 $c->get(EntryStorageInterface::class),
+                $c->get(RowLockableInterface::class),
                 $c->get(EntryLocator::class),
                 $c->get(SubentryPlacementGuard::class),
             ),
@@ -585,17 +588,18 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
 
     private function makeListenerContributor(Container $container): ListenerContributorInterface
     {
-        // The concrete key, since the reloaded generation resolves its interface alias through this instance.
-        $backend = $container->get(StorageReadBackend::class);
-
         $instances = [
-            StorageReadBackend::class => $backend,
+            StorageReadBackend::class => $container->get(StorageReadBackend::class),
             EntryStorageInterface::class => $container->get(EntryStorageInterface::class),
         ];
 
+        // Only a connection is held across a fork; in-memory storage lives in the process either way.
+        $resettable = new NonResettable();
+
         // On the PDO path, share the connection and writer so a reloaded generation never opens or starts another.
         if ($container->get(ServerOptions::class)->getStorageConfig() instanceof PdoConfig) {
-            $instances[PdoConnection::class] = $container->get(PdoConnection::class);
+            $resettable = $container->get(PdoConnection::class);
+            $instances[PdoConnection::class] = $resettable;
             $instances[WriterQueueInterface::class] = $container->get(WriterQueueInterface::class);
         }
 
@@ -606,7 +610,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         }
 
         return new DirectoryListenerContributor(
-            $backend,
+            $resettable,
             $instances,
             $container->get(ServerOptions::class)->getStorageConfig(),
         );

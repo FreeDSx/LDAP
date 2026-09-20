@@ -14,28 +14,28 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Container\Contributor;
 
 use FreeDSx\Ldap\Server\Backend\ResettableInterface;
-use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 
 /**
- * A directory server's contribution: its backend is reset per fork and carried, with its storage, across a reload.
+ * A directory server's contribution: whatever it holds open is dropped per fork and carried across a reload.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final readonly class DirectoryListenerContributor implements ListenerContributorInterface
 {
     /**
+     * @param ResettableInterface $resettable Dropped per fork, so no child keeps a connection opened before it.
      * @param array<class-string, object> $reloadInstances
      */
     public function __construct(
-        private StorageReadBackend $backend,
+        private ResettableInterface $resettable,
         private array $reloadInstances,
         private StorageConfigInterface $storageConfig,
     ) {}
 
     public function forkResettable(): ResettableInterface
     {
-        return $this->backend;
+        return $this->resettable;
     }
 
     public function supportsMultipleWorkers(): bool

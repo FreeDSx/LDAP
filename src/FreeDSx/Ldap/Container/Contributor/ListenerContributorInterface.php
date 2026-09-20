@@ -24,9 +24,9 @@ use FreeDSx\Ldap\Server\Backend\ResettableInterface;
 interface ListenerContributorInterface
 {
     /**
-     * The service the forking runner resets in each child, or null when the server type has nothing to reset.
+     * The service the forking runner resets in each child; a server type with nothing to reset answers with a no-op.
      */
-    public function forkResettable(): ?ResettableInterface;
+    public function forkResettable(): ResettableInterface;
 
     /**
      * Whether this server keeps no state in the process, so several workers can serve it at once.
