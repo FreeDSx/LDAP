@@ -20,6 +20,8 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorderInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\UnrecordedChanges;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
@@ -77,6 +79,7 @@ final readonly class TransactionalEntryWrite
     /**
      * Stores the entry a modify leaves behind, with the target locked and loaded for the producer to work from.
      *
+     * @param LinkDelta $links Linked values the modify changes, which its entry is then left without.
      * @param Closure(Entry): ?Entry $produce Answers null when the change turns out to be nothing to write.
      *
      * @return ?Entry what was stored, or null when the producer had nothing to write
@@ -85,6 +88,7 @@ final readonly class TransactionalEntryWrite
      */
     public function update(
         Dn $dn,
+        LinkDelta $links,
         WriteContext $context,
         Closure $produce,
     ): ?Entry {
@@ -93,8 +97,13 @@ final readonly class TransactionalEntryWrite
             $context,
             fn(Entry $current): ?Entry => $this->stored(
                 $produce($current),
+                $links,
                 $context,
             ),
+            // A delta names what it changes, so the entry is read without the values it leaves alone.
+            $links->isEmpty()
+                ? EntryProjection::unbounded()
+                : new EntryProjection(linkCap: 0),
         );
     }
 
@@ -114,6 +123,7 @@ final readonly class TransactionalEntryWrite
             $dn,
             fn(Entry $current): ?Entry => $this->stored(
                 $produce($current),
+                new LinkDelta(),
                 $context,
             ),
         );
@@ -151,13 +161,17 @@ final readonly class TransactionalEntryWrite
      */
     private function stored(
         ?Entry $entry,
+        LinkDelta $links,
         WriteContext $context,
     ): ?Entry {
         if ($entry === null) {
             return null;
         }
 
-        $this->writes->store($entry);
+        $this->writes->store(
+            $entry,
+            links: $links,
+        );
         $this->resolved(
             $entry,
             $context,

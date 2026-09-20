@@ -53,12 +53,12 @@ final readonly class LockedEntryAccess
         Dn $dn,
         WriteContext $context,
         Closure $body,
+        EntryProjection $projection = new EntryProjection(linkCap: null),
     ): mixed {
-        return $this->locked($dn, function () use ($dn, $context, $body): mixed {
-            // @todo Unbounded because the whole derived entry is stored back; leave linked attributes out once writes apply them as deltas.
+        return $this->locked($dn, function () use ($dn, $context, $body, $projection): mixed {
             $current = $this->locator->findOrFail(
                 $dn,
-                EntryProjection::unbounded(),
+                $projection,
             );
             $context->controlEvaluator()?->evaluateTarget($current);
 

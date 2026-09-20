@@ -31,6 +31,7 @@ readonly class UpdateEntryHandler
         private TransactionalEntryWrite $writes,
         private EntryMutation $mutation,
         private EntryPlacementGuard $placement,
+        private LinkedChanges $linkedChanges,
     ) {}
 
     /**
@@ -40,14 +41,25 @@ readonly class UpdateEntryHandler
         UpdateCommand $command,
         WriteContext $context,
     ): void {
+        $links = $this->linkedChanges->delta($command, $context);
+        $remaining = $this->linkedChanges->remaining($command, $links);
+
         $this->writes->update(
             $command->dn->normalize(),
+            $links,
             $context,
-            fn(Entry $current): Entry => $this->updated(
-                $command,
-                $context,
-                $current,
-            ),
+            function (Entry $current) use ($remaining, $links, $context): Entry {
+                $this->linkedChanges->assertApplicable(
+                    $links,
+                    $current->getDn(),
+                );
+
+                return $this->updated(
+                    $remaining,
+                    $context,
+                    $current,
+                );
+            },
         );
     }
 }

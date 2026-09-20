@@ -142,6 +142,33 @@ final class SchemaValidator
     }
 
     /**
+     * Holds an attribute's values to its type's syntax.
+     *
+     * @throws OperationException when a value does not conform
+     */
+    public function validateValues(Attribute $attribute): void
+    {
+        if ($this->mode === SchemaValidationMode::Off) {
+            return;
+        }
+        $attrType = $this->schema->getAttributeType($attribute->getName());
+
+        if ($attrType === null) {
+            return;
+        }
+        $validator = $this->syntaxResolver->validatorFor($attrType);
+
+        if ($validator === null) {
+            return;
+        }
+
+        $this->checkValuesConform(
+            $attribute,
+            $validator,
+        );
+    }
+
+    /**
      * The new RDN is client-supplied, so the values it puts on the entry face the same restriction as a modify.
      *
      * @throws OperationException
@@ -547,26 +574,10 @@ final class SchemaValidator
         }
     }
 
-    /**
-     * @throws OperationException
-     */
     private function checkAttributeSyntaxes(Entry $entry): void
     {
         foreach ($entry->getAttributes() as $attr) {
-            $attrType = $this->schema->getAttributeType($attr->getName());
-            if ($attrType === null) {
-                continue;
-            }
-
-            $validator = $this->syntaxResolver->validatorFor($attrType);
-            if ($validator === null) {
-                continue;
-            }
-
-            $this->checkValuesConform(
-                $attr,
-                $validator,
-            );
+            $this->validateValues($attr);
         }
     }
 

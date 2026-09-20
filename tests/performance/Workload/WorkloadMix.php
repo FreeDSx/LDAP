@@ -37,6 +37,20 @@ final class WorkloadMix
         'add',
         'modify',
         'delete',
+        'group-add-member',
+        'group-del-member',
+        'group-reset',
+    ];
+
+    /**
+     * Ops that need a seeded group to work against.
+     *
+     * @var list<string>
+     */
+    public const GROUP_OPS = [
+        'group-add-member',
+        'group-del-member',
+        'group-reset',
     ];
 
     /**
@@ -118,6 +132,22 @@ final class WorkloadMix
     public function weights(): array
     {
         return $this->weights;
+    }
+
+    /**
+     * Whether the mix draws any of the given ops.
+     *
+     * @param list<string> $ops
+     */
+    public function drawsAny(array $ops): bool
+    {
+        foreach ($ops as $op) {
+            if (isset($this->weights[$op])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function describe(): string

@@ -150,6 +150,20 @@ final class LdapBackendStorageCommand extends Command
                 '0',
             )
             ->addOption(
+                'seed-groups',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Number of groups to generate for the group ops (0 = none)',
+                '0',
+            )
+            ->addOption(
+                'seed-group-size',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Members seeded into each generated group',
+                '0',
+            )
+            ->addOption(
                 'validation-mode',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -264,6 +278,8 @@ final class LdapBackendStorageCommand extends Command
         $port = (int) $this->getStringOption($input, 'port');
         $seedEntries = (int) $this->getStringOption($input, 'seed-entries');
         $seedAttributes = (int) $this->getStringOption($input, 'seed-attributes');
+        $seedGroups = (int) $this->getStringOption($input, 'seed-groups');
+        $seedGroupSize = (int) $this->getStringOption($input, 'seed-group-size');
 
         if (!in_array($storage, ['memory', 'sqlite', 'mysql'], true)) {
             $io->error("Invalid --storage value: {$storage}. Expected one of: memory, sqlite, mysql.");
@@ -279,6 +295,18 @@ final class LdapBackendStorageCommand extends Command
 
         if ($seedEntries < 0) {
             $io->error("Invalid --seed-entries value: {$seedEntries}. Must be zero or greater.");
+
+            return Command::FAILURE;
+        }
+
+        if ($seedGroups < 0 || $seedGroupSize < 0) {
+            $io->error('Invalid --seed-groups or --seed-group-size value. Must be zero or greater.');
+
+            return Command::FAILURE;
+        }
+
+        if ($seedGroupSize > $seedEntries) {
+            $io->error("Invalid --seed-group-size value: {$seedGroupSize}. Cannot exceed --seed-entries ({$seedEntries}).");
 
             return Command::FAILURE;
         }
@@ -322,6 +350,27 @@ final class LdapBackendStorageCommand extends Command
             $entries[] = new Entry(
                 new Dn("cn=seed-{$i},ou=people,dc=foo,dc=bar"),
                 ...$attributes,
+            );
+        }
+
+        $members = [];
+        for ($i = 1; $i <= $seedGroupSize; $i++) {
+            $members[] = "cn=seed-{$i},ou=people,dc=foo,dc=bar";
+        }
+
+        for ($g = 0; $g < $seedGroups; $g++) {
+            $groupAttributes = [
+                new Attribute('cn', "load-group-{$g}"),
+                new Attribute('objectClass', 'groupOfNames'),
+            ];
+
+            if ($members !== []) {
+                $groupAttributes[] = new Attribute('member', ...$members);
+            }
+
+            $entries[] = new Entry(
+                new Dn("cn=load-group-{$g},ou=people,dc=foo,dc=bar"),
+                ...$groupAttributes,
             );
         }
 

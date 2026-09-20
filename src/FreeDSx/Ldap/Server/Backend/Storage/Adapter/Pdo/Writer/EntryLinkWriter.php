@@ -13,13 +13,15 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer;
 
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkWriteDialectInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoPendingLinkDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
-use FreeDSx\Ldap\Server\Backend\Storage\Capability\ReferenceIntegrityInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use Generator;
 
@@ -27,14 +29,13 @@ use function array_chunk;
 use function count;
 use function is_array;
 use function ksort;
-use function strtolower;
 
 /**
- * Keeps an entry's linked values in the table they are stored in, and parks the ones naming an entry that is not there.
+ * Keeps an entry's linked values in the table they are stored in, and answers what it links there.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
-final readonly class EntryLinkWriter implements ReferenceIntegrityInterface
+final readonly class EntryLinkWriter implements LinkedValueLookupInterface
 {
     use PdoColumnCastTrait;
 
@@ -49,9 +50,10 @@ final readonly class EntryLinkWriter implements ReferenceIntegrityInterface
     private const DNS_PER_STATEMENT = 500;
 
     public function __construct(
-        private PdoLinkWriteDialectInterface&PdoPendingLinkDialectInterface $dialect,
+        private PdoLinkWriteDialectInterface&PdoLinkReadDialectInterface $dialect,
         private PdoConnection $connection,
         private LinkedAttributes $linked,
+        private PendingLinkWriter $pending,
     ) {}
 
     /**
@@ -61,11 +63,10 @@ final readonly class EntryLinkWriter implements ReferenceIntegrityInterface
         int $ownerId,
         Entry $entry,
     ): void {
-        $values = $this->linked->valuesOf($entry);
-
-        if ($values === [] && $this->linked->isEmpty()) {
+        if ($this->linked->isEmpty()) {
             return;
         }
+        $values = $this->linked->valuesOf($entry);
         $resolved = $this->resolve($values);
         $wanted = $this->wantedLinks($values, $resolved);
         $held = $this->heldLinks($ownerId);
@@ -78,7 +79,8 @@ final readonly class EntryLinkWriter implements ReferenceIntegrityInterface
             $ownerId,
             array_diff_key($wanted, $held),
         );
-        $this->parkUnresolved(
+        $this->pending->clearFor($ownerId);
+        $this->pending->park(
             $ownerId,
             $values,
             $resolved,
@@ -86,54 +88,174 @@ final readonly class EntryLinkWriter implements ReferenceIntegrityInterface
     }
 
     /**
-     * Links whatever was parked for a DN that now exists, or for every DN when none is named.
+     * The links of an entry that was just created, which holds nothing yet to diff against or clear.
      */
-    public function promote(?Dn $landed = null): void
-    {
-        $byDn = $landed !== null;
-        $params = $byDn
-            ? [$landed->normalizedString()]
-            : [];
+    public function writeNew(
+        int $ownerId,
+        Entry $entry,
+    ): void {
+        if ($this->linked->isEmpty()) {
+            return;
+        }
+        $values = $this->linked->valuesOf($entry);
 
-        $this->connection->execute(
-            $this->dialect->queryPromotePending($byDn),
-            $params,
+        if ($values === []) {
+            return;
+        }
+        $resolved = $this->resolve($values);
+
+        $this->insertLinks(
+            $ownerId,
+            $this->wantedLinks($values, $resolved),
         );
-        $this->connection->execute(
-            $this->dialect->queryDeletePromotedPending($byDn),
-            $params,
+        $this->pending->park(
+            $ownerId,
+            $values,
+            $resolved,
         );
     }
 
     /**
-     * The attribute names holding a value that named an entry which is not stored.
-     *
-     * @return list<string>
+     * Applies only the values the delta names, leaving whatever else the attribute links untouched.
      */
-    public function unresolvedReferences(Dn $owner): array
-    {
-        $ownerId = $this->idOf($owner);
+    public function apply(
+        int $ownerId,
+        LinkDelta $delta,
+    ): void {
+        $values = [];
 
-        if ($ownerId === null) {
+        foreach ($delta->names() as $name) {
+            $values[$name] = [
+                ...$delta->added($name),
+                ...$delta->removed($name),
+            ];
+        }
+        $resolved = $this->resolve($values);
+        $remove = [];
+        $add = [];
+
+        // Gathered across every attribute first, since a statement per attribute takes index locks in an order that
+        // differs between writers, which concurrent writers deadlock on.
+        foreach ($delta->names() as $name) {
+            $remove += $this->linksFor($name, $delta->removed($name), $resolved);
+            $add += $this->linksFor($name, $delta->added($name), $resolved);
+        }
+
+        $this->deleteLinks($ownerId, $remove);
+        $this->insertLinks($ownerId, $add);
+        $this->pending->park(
+            $ownerId,
+            $this->unresolvedOf($delta, $resolved),
+            $resolved,
+        );
+    }
+
+    /**
+     * Which of the named values the owner links, answered on the connection its own write runs on.
+     */
+    public function heldLinkValues(
+        Dn $owner,
+        string $attribute,
+        array $values,
+    ): array {
+        $asked = [];
+
+        foreach ($values as $value) {
+            $normalized = Dn::normalizedOrNull($value);
+
+            if ($normalized !== null) {
+                $asked[$normalized] = $value;
+            }
+        }
+
+        if ($asked === []) {
             return [];
         }
-        $names = [];
+        $held = [];
+        $params = [
+            $owner->normalizedString(),
+            Attribute::normalizeName($attribute),
+            ...array_keys($asked),
+        ];
 
-        foreach ($this->rowsOf($this->dialect->queryPendingNamesForOwner(), [$ownerId]) as $row) {
-            $names[] = $this->stringColumn($row['attr_name_lower'] ?? null);
+        foreach ($this->rowsOf($this->dialect->queryHeldLinkValues(count($asked)), $params) as $row) {
+            $held[] = $asked[$this->stringColumn($row['lc_dn'] ?? null)] ?? null;
         }
 
-        return $names;
+        return array_values(array_filter($held));
     }
 
     /**
-     * Whether anything at all was parked, which is what a batch asks once rather than per entry.
+     * One value the owner links, which is all that answering whether it holds the attribute takes.
      */
-    public function hasUnresolvedReferences(): bool
-    {
-        return $this->connection
-            ->execute($this->dialect->queryAnyPending())
-            ->fetch() !== false;
+    public function anyLinkValue(
+        Dn $owner,
+        string $attribute,
+    ): ?string {
+        $row = $this->connection
+            ->execute(
+                $this->dialect->queryAnyLinkValue(),
+                [
+                    $owner->normalizedString(),
+                    Attribute::normalizeName($attribute),
+                ],
+            )
+            ->fetch();
+
+        return is_array($row)
+            ? $this->stringColumn($row['dn'] ?? null)
+            : null;
+    }
+
+    /**
+     * The links the named values stand for, skipping any naming an entry that is not stored.
+     *
+     * @param list<string> $values
+     * @param array<string, int> $resolved
+     *
+     * @return array<string, array{string, int, string}>
+     */
+    private function linksFor(
+        string $name,
+        array $values,
+        array $resolved,
+    ): array {
+        return $this->wantedLinks(
+            [$name => $values],
+            $resolved,
+        );
+    }
+
+    /**
+     * The added values naming an entry that is not stored, which are parked rather than refused.
+     *
+     * @param array<string, int> $resolved
+     *
+     * @return array<string, list<string>>
+     */
+    private function unresolvedOf(
+        LinkDelta $delta,
+        array $resolved,
+    ): array {
+        $pending = [];
+
+        foreach ($delta->names() as $name) {
+            $unresolved = [];
+
+            foreach ($delta->added($name) as $value) {
+                $normalized = Dn::normalizedOrNull($value);
+
+                if ($normalized === null || !isset($resolved[$normalized])) {
+                    $unresolved[] = $value;
+                }
+            }
+
+            if ($unresolved !== []) {
+                $pending[$name] = $unresolved;
+            }
+        }
+
+        return $pending;
     }
 
     /**
@@ -281,73 +403,6 @@ final readonly class EntryLinkWriter implements ReferenceIntegrityInterface
                 $params,
             );
         }
-    }
-
-    /**
-     * Parks the values naming an entry that is not stored, replacing whatever the owner had parked before.
-     *
-     * @param array<string, list<string>> $values
-     * @param array<string, int> $resolved
-     */
-    private function parkUnresolved(
-        int $ownerId,
-        array $values,
-        array $resolved,
-    ): void {
-        $this->connection->execute(
-            $this->dialect->queryDeletePendingForOwner(),
-            [$ownerId],
-        );
-        $pending = [];
-
-        foreach ($values as $name => $attributeValues) {
-            foreach ($attributeValues as $value) {
-                $normalized = Dn::normalizedOrNull($value);
-
-                if ($normalized !== null && isset($resolved[$normalized])) {
-                    continue;
-                }
-
-                $pending[] = [
-                    $name,
-                    $normalized ?? strtolower($value),
-                    $value,
-                ];
-            }
-        }
-
-        if ($pending === []) {
-            return;
-        }
-
-        foreach (array_chunk($pending, self::LINKS_PER_STATEMENT) as $chunk) {
-            $params = [];
-
-            foreach ($chunk as [$name, $targetLcDn, $targetValue]) {
-                $params[] = $ownerId;
-                $params[] = $name;
-                $params[] = $targetLcDn;
-                $params[] = $targetValue;
-                $params[] = '';
-            }
-
-            $this->connection->execute(
-                $this->dialect->queryInsertPending(count($chunk)),
-                $params,
-            );
-        }
-    }
-
-    /**
-     * The id the DN is stored under, or null when nothing is stored there.
-     */
-    private function idOf(Dn $owner): ?int
-    {
-        foreach ($this->rowsOf($this->dialect->queryResolveDns(1), [$owner->normalizedString()]) as $row) {
-            return $this->intColumn($row['entry_id'] ?? null);
-        }
-
-        return null;
     }
 
     private function keyOf(

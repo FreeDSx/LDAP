@@ -83,8 +83,11 @@ final class TargetBench
         $this->bindIfNeeded();
     }
 
-    public function seed(int $seedEntries): void
-    {
+    public function seed(
+        int $seedEntries,
+        int $seedGroups = 0,
+        int $seedGroupSize = 0,
+    ): void {
         $this->bindIfNeeded();
 
         $mailDomain = $this->mailDomain();
@@ -115,6 +118,8 @@ final class TargetBench
                 (string) $i,
             );
         }
+
+        $this->ensureGroups($seedGroups, $seedGroupSize);
     }
 
     public function cleanup(): void
@@ -149,6 +154,32 @@ final class TargetBench
         }
 
         $this->bound = false;
+    }
+
+    /**
+     * Groups the group ops work against, seeded after the entries they name.
+     */
+    private function ensureGroups(
+        int $seedGroups,
+        int $seedGroupSize,
+    ): void {
+        if ($seedGroups < 1) {
+            return;
+        }
+        $members = [];
+
+        for ($i = 1; $i <= $seedGroupSize; $i++) {
+            $members[] = "cn=seed-{$i},{$this->writeBaseDn}";
+        }
+
+        for ($g = 0; $g < $seedGroups; $g++) {
+            $this->createOrIgnoreExists(new Entry(
+                "cn=load-group-{$g},{$this->writeBaseDn}",
+                new Attribute('objectClass', 'groupOfNames'),
+                new Attribute('cn', "load-group-{$g}"),
+                new Attribute('member', ...$members),
+            ));
+        }
     }
 
     /**

@@ -60,9 +60,11 @@ interface PdoPendingLinkDialectInterface
     public function queryPendingNamesForOwner(): string;
 
     /**
-     * Returns a row when anything at all is parked.
+     * Returns a row when anything is parked, which is what promotion checks before doing any work.
      *
-     * No parameters.
+     * Parameters: [target_lc_dn] when true, none otherwise.
+     *
+     * @param bool $byDn Limit to one stored DN.
      */
-    public function queryAnyPending(): string;
+    public function queryAnyPending(bool $byDn = false): string;
 }

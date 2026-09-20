@@ -50,6 +50,11 @@ for arg in "$@"; do
     esac
 done
 
+if [[ "$RUNNER" == "pcntl" ]]; then
+    echo "pcntl forks per connection and the sampler cannot unwind the children; stacks come back truncated. Use --runner=swoole." >&2
+    exit 2
+fi
+
 OUT_DIR="tests/profile/out"
 mkdir -p "$OUT_DIR"
 
@@ -63,7 +68,7 @@ echo "==> stopping any prior server in the container"
 docker exec "$CONTAINER" bash -lc "pkill -f 'ldap-backend-storage\.php' || true"
 sleep 1
 
-SERVER_CMD="php tests/bin/ldap-backend-storage.php tcp --storage=$STORAGE --runner=$RUNNER --port=$PORT"
+SERVER_CMD="php tests/bin/ldap-backend-storage.php --transport=tcp --storage=$STORAGE --runner=$RUNNER --port=$PORT"
 if [[ "$SEED_ENTRIES" -gt 0 ]]; then
     SERVER_CMD="$SERVER_CMD --seed-entries=$SEED_ENTRIES"
 fi

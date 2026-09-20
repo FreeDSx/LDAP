@@ -255,6 +255,20 @@ final class LoadTestCommand extends Command
                 '0',
             )
             ->addOption(
+                'seed-groups',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Groups to seed for the group ops; each client works against its own (0 = none).',
+                '0',
+            )
+            ->addOption(
+                'seed-group-size',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Members seeded into each group, drawn from the seeded entries.',
+                '0',
+            )
+            ->addOption(
                 'max-search-lookthrough',
                 null,
                 InputOption::VALUE_REQUIRED,
@@ -481,6 +495,8 @@ final class LoadTestCommand extends Command
             maxSearchLookthrough: $this->requireInt($input, 'max-search-lookthrough'),
             journal: (bool) $input->getOption('journal'),
             swooleWorkers: $this->requireInt($input, 'swoole-workers'),
+            seedGroups: $this->requireInt($input, 'seed-groups'),
+            seedGroupSize: $this->requireInt($input, 'seed-group-size'),
         );
     }
 

@@ -32,9 +32,8 @@ use LogicException;
 /**
  * Matches when the bound DN is a member of the given LDAP group entry.
  *
- * The group entry is read through a short-lived cache, since membership is re-checked for every entry a search
- * returns. Dropping a member therefore takes effect within the cache lifetime rather than at once; nothing can be
- * invalidated across processes, so time is the only bound that holds on every runner.
+ * The read and the membership it decides are both held for a short lifetime. A dropped member keeps matching until
+ * that passes.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -47,6 +46,11 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
     private ?Entry $cached = null;
 
     private ?DateTimeImmutable $cachedAt = null;
+
+    /**
+     * @var array<string, bool> Membership already decided this lifetime, keyed by the subject's normalized DN.
+     */
+    private array $decided = [];
 
     /**
      * @param int $cacheTtl Seconds a membership read is reused for; zero reads the group entry every time.
@@ -86,10 +90,13 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
                 $this->groupDn->toString(),
             ));
         }
+        $memberDn = $token->getResolvedDn();
+        $key = $memberDn->normalizedString();
 
-        return $this->holdsMember(
+        // Deciding membership asks storage, which is too much to repeat for every entry a search returns.
+        return $this->decided[$key] ??= $this->holdsMember(
             $entry,
-            $token->getResolvedDn(),
+            $memberDn,
         );
     }
 
@@ -124,12 +131,16 @@ final class GroupSubjectMatcher implements SubjectMatcherInterface, BackendAware
     private function groupEntry(): ?Entry
     {
         if ($this->cacheTtl <= 0) {
+            $this->decided = [];
+
             return $this->readGroup();
         }
 
         $now = $this->clock->now();
 
         if ($this->isCacheExpired($now)) {
+            // Decided the same lifetime as the read it was decided from, so a membership change lands with it.
+            $this->decided = [];
             $this->cached = $this->readGroup();
             $this->cachedAt = $now;
         }

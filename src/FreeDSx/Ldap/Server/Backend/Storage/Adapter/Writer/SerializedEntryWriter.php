@@ -20,6 +20,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Capability\DrainableWritesInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 
 /**
  * Serializes writes through a single writer coroutine; reads run in place, on whichever connection the caller holds.
@@ -51,10 +52,12 @@ final readonly class SerializedEntryWriter implements
     public function store(
         Entry $entry,
         bool $rebuildIndexes = false,
+        LinkDelta $links = new LinkDelta(),
     ): void {
         $this->submit(fn() => $this->writes->store(
             $entry,
             $rebuildIndexes,
+            $links,
         ));
     }
 

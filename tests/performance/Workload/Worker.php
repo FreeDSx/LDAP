@@ -50,6 +50,21 @@ final class Worker
      */
     private array $ownedDns = [];
 
+    /**
+     * The group this worker owns; each worker gets its own, so one worker's members never collide with another's.
+     */
+    private readonly string $groupDn;
+
+    /**
+     * @var list<string> Seeded DNs not currently in the group; group-add-member draws from here.
+     */
+    private array $spareMembers;
+
+    /**
+     * @var list<string> DNs this worker put in the group; group-del-member draws from here.
+     */
+    private array $addedMembers = [];
+
     private int $addSeq = 0;
 
     /**
@@ -66,6 +81,14 @@ final class Worker
     ) {
         $this->compareDn = 'cn=alice,' . $this->config->writeBase;
         $this->mailDomain = $this->deriveMailDomain($this->config->baseDn);
+        $this->groupDn = $this->config->seedGroups > 0
+            ? sprintf(
+                'cn=load-group-%d,%s',
+                $this->workerId % $this->config->seedGroups,
+                $this->config->writeBase,
+            )
+            : '';
+        $this->spareMembers = $this->buildSpareMembers();
         $this->fixedReadDns = [
             $this->config->baseDn,
             $this->config->writeBase,
@@ -170,7 +193,32 @@ final class Worker
             return 'add';
         }
 
+        $substitute = $this->groupSubstitute($op);
+
+        if ($substitute !== null) {
+            $this->stats->recordSubstitution($op, $substitute);
+
+            return $substitute;
+        }
+
         return $op;
+    }
+
+    private function groupSubstitute(string $op): ?string
+    {
+        if ($op === 'group-add-member' && $this->spareMembers === []) {
+            return $this->addedMembers === []
+                ? 'group-reset'
+                : 'group-del-member';
+        }
+
+        if ($op === 'group-del-member' && $this->addedMembers === []) {
+            return $this->spareMembers === []
+                ? 'group-reset'
+                : 'group-add-member';
+        }
+
+        return null;
     }
 
     private function dispatch(LdapClient $client, string $op): void
@@ -192,6 +240,9 @@ final class Worker
             'add' => $this->doAdd($client),
             'modify' => $this->doModify($client),
             'delete' => $this->doDelete($client),
+            'group-add-member' => $this->doGroupAddMember($client),
+            'group-del-member' => $this->doGroupDelMember($client),
+            'group-reset' => $this->doGroupReset($client),
             default => throw new LogicException("Unknown load-test op: {$op}"),
         };
     }
@@ -469,6 +520,86 @@ final class Worker
         );
 
         $client->send($request);
+    }
+
+    private function doGroupAddMember(LdapClient $client): void
+    {
+        $dn = $this->drawMember($this->spareMembers);
+
+        $client->send(Operations::modify(
+            $this->groupDn,
+            Change::add('member', $dn),
+        ));
+
+        $this->addedMembers[] = $dn;
+    }
+
+    private function doGroupDelMember(LdapClient $client): void
+    {
+        $dn = $this->drawMember($this->addedMembers);
+
+        $client->send(Operations::modify(
+            $this->groupDn,
+            Change::delete('member', $dn),
+        ));
+
+        $this->spareMembers[] = $dn;
+    }
+
+    private function doGroupReset(LdapClient $client): void
+    {
+        $client->send(Operations::modify(
+            $this->groupDn,
+            Change::replace('member', ...$this->seededMembers()),
+        ));
+
+        $this->spareMembers = $this->buildSpareMembers();
+        $this->addedMembers = [];
+    }
+
+    /**
+     * @param list<string> $pool
+     */
+    private function drawMember(array &$pool): string
+    {
+        $dn = array_pop($pool);
+
+        if ($dn === null) {
+            throw new LogicException('A group op drew from an empty member pool.');
+        }
+
+        return $dn;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function buildSpareMembers(): array
+    {
+        $clients = max($this->config->clients, 1);
+        $spare = [];
+
+        for ($i = $this->config->seedGroupSize + 1; $i <= $this->config->seedEntries; $i++) {
+            if ($i % $clients === $this->workerId % $clients) {
+                $spare[] = "cn=seed-{$i}," . $this->config->writeBase;
+            }
+        }
+
+        return $spare;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function seededMembers(): array
+    {
+        $members = [];
+
+        for ($i = 1; $i <= $this->config->seedGroupSize; $i++) {
+            $members[] = "cn=seed-{$i}," . $this->config->writeBase;
+        }
+
+        return $members;
     }
 
     private function doDelete(LdapClient $client): void

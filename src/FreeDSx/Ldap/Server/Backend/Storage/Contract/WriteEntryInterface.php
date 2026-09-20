@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Contract;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 
 /**
  * Persists entries. Dn parameters are always normalised (lowercased).
@@ -30,10 +31,12 @@ interface WriteEntryInterface
      * Persist the entry keyed by its normalised DN, replacing any existing entry at the same DN.
      *
      * @param bool $rebuildIndexes Rewrite every secondary-index row rather than only those whose values changed.
+     * @param LinkDelta $links Linked values to add and remove, for an attribute the entry no longer carries whole.
      */
     public function store(
         Entry $entry,
         bool $rebuildIndexes = false,
+        LinkDelta $links = new LinkDelta(),
     ): void;
 
     /**

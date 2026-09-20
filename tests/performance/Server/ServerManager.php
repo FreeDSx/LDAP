@@ -60,6 +60,8 @@ final class ServerManager
         $command[] = '--port=' . $this->config->port;
         $command[] = '--seed-entries=' . $this->config->seedEntries;
         $command[] = '--seed-attributes=' . $this->config->seedAttributes;
+        $command[] = '--seed-groups=' . $this->config->seedGroups;
+        $command[] = '--seed-group-size=' . $this->config->seedGroupSize;
         $command[] = '--max-search-lookthrough=' . $this->config->maxSearchLookthrough;
 
         if ($this->config->monitor) {

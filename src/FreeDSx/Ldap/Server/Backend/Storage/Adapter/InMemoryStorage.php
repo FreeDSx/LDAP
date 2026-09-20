@@ -22,7 +22,9 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
@@ -39,7 +41,8 @@ final class InMemoryStorage implements
     ReadEntryInterface,
     ListEntryInterface,
     WriteEntryInterface,
-    TransactionalWriteInterface
+    TransactionalWriteInterface,
+    LinkedValueLookupInterface
 {
     use ArrayEntryStorageTrait;
 
@@ -113,12 +116,17 @@ final class InMemoryStorage implements
     public function store(
         Entry $entry,
         bool $rebuildIndexes = false,
+        LinkDelta $links = new LinkDelta(),
     ): void {
         $lcDn = $entry->getDn()->normalizedString();
 
         // Overwriting an entry keeps its key, matching the upsert the database adapters do.
         $this->keys[$lcDn] ??= $this->nextKey++;
-        $this->entries[$lcDn] = $entry;
+        $this->entries[$lcDn] = $this->withLinks(
+            $entry,
+            $links,
+            $this->entries[$lcDn] ?? null,
+        );
     }
 
     public function renameSubtree(
@@ -205,5 +213,85 @@ final class InMemoryStorage implements
     public function namingContexts(): array
     {
         return $this->namingContextsFromArray($this->entries);
+    }
+
+    /**
+     * Which of the named values the entry holds, matched as DNs since that is what a linked value is.
+     */
+    public function heldLinkValues(
+        Dn $owner,
+        string $attribute,
+        array $values,
+    ): array {
+        $held = $this->linkedValuesOf($owner, $attribute);
+
+        if ($held === []) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $values,
+            static fn(string $value): bool => in_array(
+                Dn::normalizedOrNull($value),
+                $held,
+                true,
+            ),
+        ));
+    }
+
+    public function anyLinkValue(
+        Dn $owner,
+        string $attribute,
+    ): ?string {
+        return $this->find($owner)
+            ?->get($attribute, true)
+            ?->getValues()[0] ?? null;
+    }
+
+    /**
+     * @return list<string> the normalised form of every value the entry holds for the attribute
+     */
+    private function linkedValuesOf(
+        Dn $owner,
+        string $attribute,
+    ): array {
+        $values = $this->find($owner)
+            ?->get($attribute, true)
+            ?->getValues() ?? [];
+
+        return array_values(array_filter(array_map(
+            static fn(string $value): ?string => Dn::normalizedOrNull($value),
+            $values,
+        )));
+    }
+
+    /**
+     * A delta names only what changes, and the entry carrying it no longer holds the attribute it changes.
+     */
+    private function withLinks(
+        Entry $entry,
+        LinkDelta $links,
+        ?Entry $previous,
+    ): Entry {
+        if ($links->isEmpty()) {
+            return $entry;
+        }
+        $updated = $entry->makeCopy();
+
+        foreach ($links->names() as $name) {
+            $values = array_merge(
+                array_diff(
+                    $previous?->get($name, true)?->getValues() ?? [],
+                    $links->removed($name),
+                ),
+                $links->added($name),
+            );
+
+            $values === []
+                ? $updated->reset($name)
+                : $updated->set($name, ...$values);
+        }
+
+        return $updated;
     }
 }

@@ -118,7 +118,7 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
     {
         $allowed = $projection->allowed();
 
-        if ($this->declared->isEmpty() || $allowed === []) {
+        if ($this->declared->isEmpty() || $allowed === [] || $projection->linkCap === 0) {
             return false;
         }
         if ($allowed === null) {

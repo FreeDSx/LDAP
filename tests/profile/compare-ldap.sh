@@ -6,7 +6,7 @@
 # Usage (from the repo root):
 #
 #   composer compare-ldap -- [--source=freedsx|openldap|opendj|389ds] [--target=freedsx|openldap|opendj|389ds]
-#       [--seed-entries=2000] [--cpus=4] [--storage=sqlite] [--runner=pcntl] [--mix=default]
+#       [--seed-entries=2000] [--seed-groups=0] [--seed-group-size=0] [--cpus=4] [--storage=sqlite] [--runner=pcntl] [--mix=default]
 #       [--search-value=seed-1] [--duration=15] [--warmup=3] [--clients=8] [--driver-processes=1] [--keep-up]
 #       [--swoole-workers=0] [--server-cpuset=0-3] [--driver-cpuset=4-7] [--jit=function]
 #
@@ -33,6 +33,8 @@ COMPOSE="tests/profile/docker-compose.yml"
 SOURCE=freedsx
 TARGET=openldap
 SEED=2000
+SEED_GROUPS=0
+SEED_GROUP_SIZE=0
 CPUS=4
 STORAGE=sqlite
 RUNNER=pcntl
@@ -53,6 +55,8 @@ for arg in "$@"; do
         --source=*)           SOURCE="${arg#*=}" ;;
         --target=*)           TARGET="${arg#*=}" ;;
         --seed-entries=*)     SEED="${arg#*=}" ;;
+        --seed-groups=*)      SEED_GROUPS="${arg#*=}" ;;
+        --seed-group-size=*)  SEED_GROUP_SIZE="${arg#*=}" ;;
         --cpus=*)             CPUS="${arg#*=}" ;;
         --storage=*)          STORAGE="${arg#*=}" ;;
         --runner=*)           RUNNER="${arg#*=}" ;;
@@ -190,7 +194,8 @@ docker run --rm --network "$NET" --cpuset-cpus="$DRIVER_CPUSET" -v "$PWD":/app -
     tests/bin/ldap-bench-compare.php \
     --source-host="$SRC_SVC" --source-port="$SRC_PORT" --source-bind-dn="$SRC_BIND" --source-bind-password="$SRC_PW" --source-base-dn="$SRC_BASE" --source-label="$SRC_LABEL" \
     --target-host="$TGT_SVC" --target-port="$TGT_PORT" --target-bind-dn="$TGT_BIND" --target-bind-password="$TGT_PW" --target-base-dn="$TGT_BASE" --target-label="$TGT_LABEL" \
-    --seed-entries="$SEED" --mix="$MIX" --search-value="$SEARCHVAL" --duration="$DURATION" --warmup="$WARMUP" \
+    --seed-entries="$SEED" --seed-groups="$SEED_GROUPS" --seed-group-size="$SEED_GROUP_SIZE" \
+    --mix="$MIX" --search-value="$SEARCHVAL" --duration="$DURATION" --warmup="$WARMUP" \
     --clients="$CLIENTS" --driver-processes="$DRIVER_PROCS"
 
 if [[ "$KEEP_UP" -eq 0 ]]; then

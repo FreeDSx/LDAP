@@ -29,6 +29,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnecti
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryLister;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\PendingLinkWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
@@ -65,6 +67,8 @@ final class EntryWriterTest extends TestCase
 
     private PdoConnection $connection;
 
+    private PendingLinkWriter $links;
+
     protected function setUp(): void
     {
         $this->pdo = new RecordingPdo('sqlite::memory:');
@@ -78,6 +82,7 @@ final class EntryWriterTest extends TestCase
         $this->reader = $container->get(EntryReader::class);
         $this->lister = $container->get(EntryLister::class);
         $this->connection = $container->get(PdoConnection::class);
+        $this->links = $container->get(PendingLinkWriter::class);
     }
 
     public function test_storing_a_range_of_an_attributes_values_is_refused(): void
@@ -577,6 +582,121 @@ final class EntryWriterTest extends TestCase
         );
     }
 
+    public function test_a_value_naming_a_missing_entry_is_parked_rather_than_refused(): void
+    {
+        $this->storeAdminsNaming('cn=Ghost,dc=example,dc=com');
+
+        self::assertSame(
+            ['member'],
+            $this->links->unresolvedReferences(new Dn('cn=Admins,dc=example,dc=com')),
+        );
+        self::assertNull(
+            $this->reader->find(new Dn('cn=admins,dc=example,dc=com'))?->get('member'),
+        );
+    }
+
+    public function test_a_delta_adds_a_member_without_the_entry_carrying_the_attribute(): void
+    {
+        $this->storeNamed('Bob');
+        $this->storeNamed('Carol');
+        $this->storeAdminsNaming('cn=Bob,dc=example,dc=com');
+
+        $this->subject->store(
+            $this->admins(),
+            links: new LinkDelta(added: ['member' => ['cn=Carol,dc=example,dc=com']]),
+        );
+
+        self::assertEqualsCanonicalizing(
+            ['cn=Bob,dc=example,dc=com', 'cn=Carol,dc=example,dc=com'],
+            $this->reader->find(new Dn('cn=admins,dc=example,dc=com'))
+                ?->get('member')
+                ?->getValues(),
+        );
+    }
+
+    public function test_a_delta_removes_only_the_member_it_names(): void
+    {
+        $this->storeNamed('Bob');
+        $this->storeNamed('Carol');
+        $this->storeAdminsNaming(
+            'cn=Bob,dc=example,dc=com',
+            'cn=Carol,dc=example,dc=com',
+        );
+
+        $this->subject->store(
+            $this->admins(),
+            links: new LinkDelta(removed: ['member' => ['cn=Bob,dc=example,dc=com']]),
+        );
+
+        self::assertSame(
+            ['cn=Carol,dc=example,dc=com'],
+            $this->reader->find(new Dn('cn=admins,dc=example,dc=com'))
+                ?->get('member')
+                ?->getValues(),
+        );
+    }
+
+    public function test_a_delta_adding_a_missing_entry_parks_it_rather_than_linking_it(): void
+    {
+        $this->storeNamed('Bob');
+        $this->storeAdminsNaming('cn=Bob,dc=example,dc=com');
+
+        $this->subject->store(
+            $this->admins(),
+            links: new LinkDelta(added: ['member' => ['cn=Ghost,dc=example,dc=com']]),
+        );
+
+        self::assertSame(
+            ['member'],
+            $this->links->unresolvedReferences(new Dn('cn=Admins,dc=example,dc=com')),
+        );
+        self::assertSame(
+            ['cn=Bob,dc=example,dc=com'],
+            $this->reader->find(new Dn('cn=admins,dc=example,dc=com'))
+                ?->get('member')
+                ?->getValues(),
+        );
+    }
+
+    public function test_a_parked_value_is_linked_once_its_target_is_added(): void
+    {
+        $this->storeAdminsNaming('cn=Ghost,dc=example,dc=com');
+
+        $this->subject->insert(new Entry(
+            new Dn('cn=Ghost,dc=example,dc=com'),
+            new Attribute('cn', 'Ghost'),
+        ));
+
+        self::assertSame(
+            ['cn=Ghost,dc=example,dc=com'],
+            $this->reader->find(new Dn('cn=admins,dc=example,dc=com'))
+                ?->get('member')
+                ?->getValues(),
+        );
+        self::assertSame(
+            [],
+            $this->links->unresolvedReferences(new Dn('cn=Admins,dc=example,dc=com')),
+        );
+    }
+
+    public function test_a_parked_value_is_linked_once_a_rename_puts_its_target_there(): void
+    {
+        $this->storeNamed('Ghoul');
+        $this->storeAdminsNaming('cn=Ghost,dc=example,dc=com');
+
+        $this->subject->renameSubtree(
+            new Dn('cn=Ghoul,dc=example,dc=com'),
+            new Dn('cn=Ghost,dc=example,dc=com'),
+        );
+
+        self::assertSame(
+            ['cn=Ghost,dc=example,dc=com'],
+            $this->reader->find(new Dn('cn=admins,dc=example,dc=com'))
+                ?->get('member')
+                ?->getValues(),
+        );
+    }
+
     public function test_a_linked_value_follows_the_target_through_a_rename(): void
     {
         $this->linkAdminsToBob();
@@ -621,6 +741,25 @@ final class EntryWriterTest extends TestCase
         }
 
         return $container;
+    }
+
+    private function storeAdminsNaming(string ...$members): void
+    {
+        $group = $this->admins();
+        $group->set('member', ...$members);
+
+        $this->subject->store($group);
+    }
+
+    /**
+     * The group as a delta write carries it: without the attribute the delta changes.
+     */
+    private function admins(): Entry
+    {
+        return new Entry(
+            new Dn('cn=Admins,dc=example,dc=com'),
+            new Attribute('cn', 'Admins'),
+        );
     }
 
     /**

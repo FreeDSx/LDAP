@@ -17,6 +17,7 @@ use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\BindTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\ControlTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\DefaultAclTestsTrait;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\LinkedAttributeTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\QueryTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\SubtreeMoveTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\WriteTestsTrait;
@@ -35,6 +36,7 @@ abstract class LdapBackendStorageTestCase extends ServerTestCase
     use QueryTestsTrait;
     use DefaultAclTestsTrait;
     use WriteTestsTrait;
+    use LinkedAttributeTestsTrait;
     use SubtreeMoveTestsTrait;
     use ControlTestsTrait;
 

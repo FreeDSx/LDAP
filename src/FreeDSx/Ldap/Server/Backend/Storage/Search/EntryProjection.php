@@ -29,7 +29,7 @@ final readonly class EntryProjection
 
     /**
      * @param list<string>|null $attributes Lowercase base attribute names to materialize, or null for all.
-     * @param ?int $linkCap Values read per linked attribute, or null for every value.
+     * @param ?int $linkCap Values read per linked attribute: null for every value, zero for none of them.
      * @param bool $withHasSubordinates Whether a read able to answer hasSubordinates alongside the row should.
      */
     public function __construct(

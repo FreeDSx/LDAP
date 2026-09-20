@@ -13,11 +13,15 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Storage;
 
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\LinkedReferenceTestsTrait;
+
 /**
  * Runs the storage suite against SQLite on the Swoole runner.
  */
 final class LdapBackendSqliteSwooleStorageTest extends LdapBackendStorageTestCase
 {
+    use LinkedReferenceTestsTrait;
+
     /**
      * Tests that mutate the database and would pollute subsequent tests.
      */
