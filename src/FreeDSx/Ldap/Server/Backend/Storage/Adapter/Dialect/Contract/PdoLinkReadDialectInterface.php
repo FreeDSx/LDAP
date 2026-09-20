@@ -46,6 +46,18 @@ interface PdoLinkReadDialectInterface
     public function queryLinksForAttribute(): string;
 
     /**
+     * The same, starting past the values a slice leaves behind.
+     *
+     * The offset is deliberate. A range names a position rather than a cursor and there is no id to seek from
+     * without keeping the state a stateless range mechanism exists to avoid.
+     *
+     * Ordered by the target's id, so appending a value never disturbs a slice already read.
+     *
+     * Parameters: [owner_entry_id, attr_name_lower, limit, offset]
+     */
+    public function queryLinksForAttributeFrom(): string;
+
+    /**
      * Which of $count named DNs an owner links under one attribute.
      *
      * Parameters: [owner lc_dn, attr_name_lower, then target lc_dn per name]

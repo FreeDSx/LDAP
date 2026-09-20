@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Search;
 
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkWindow;
+
 use function array_fill_keys;
 
 /**
@@ -31,11 +33,13 @@ final readonly class EntryProjection
      * @param list<string>|null $attributes Lowercase base attribute names to materialize, or null for all.
      * @param ?int $linkCap Values read per linked attribute: null for every value, zero for none of them.
      * @param bool $withHasSubordinates Whether a read able to answer hasSubordinates alongside the row should.
+     * @param array<string, LinkWindow> $windows The slice asked for, by lowercased linked attribute name.
      */
     public function __construct(
         public ?array $attributes = null,
         public ?int $linkCap = self::DEFAULT_LINK_CAP,
         public bool $withHasSubordinates = false,
+        public array $windows = [],
     ) {}
 
     /**

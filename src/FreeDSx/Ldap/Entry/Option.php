@@ -28,7 +28,12 @@ use function strtolower;
  */
 class Option implements Stringable
 {
-    private const MATCH_RANGE = '/range=(\d+)-(.*)/';
+    /**
+     * Case insensitive, since an option is (RFC 4512 2.5.2) and the draft defining this one spells it "Range=".
+     *
+     * The low end takes no digits at all, which draft-kashi-incremental permits and means the first value.
+     */
+    private const MATCH_RANGE = '/range=(\d*)-(.*)/i';
 
     private ?string $lcOption = null;
 
