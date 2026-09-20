@@ -19,7 +19,7 @@ use FreeDSx\Ldap\Protocol\Queue\Response\MetricsResponseInterceptor;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AssertionEvaluator;
 use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\AliasResolver;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Metrics\MetricsRecorderInterface;
@@ -162,7 +162,7 @@ final class ConnectionGraphContainerProvider implements ContainerProviderInterfa
     private function makeAliasDereferenceMiddleware(Container $container): AliasDereferenceMiddleware
     {
         return new AliasDereferenceMiddleware(
-            new AliasResolver($container->get(EntryStorageInterface::class)),
+            new AliasResolver($container->get(ReadEntryInterface::class)),
             $container->get(AccessControlInterface::class),
         );
     }

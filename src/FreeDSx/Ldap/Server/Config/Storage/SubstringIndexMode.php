@@ -14,7 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Config\Storage;
 
 /**
- * The index a PdoStorage maintains to narrow substring filters; the container resolves it to an implementation.
+ * The index the PDO storage maintains to narrow substring filters; the container resolves it to an implementation.
  *
  * @api
  *

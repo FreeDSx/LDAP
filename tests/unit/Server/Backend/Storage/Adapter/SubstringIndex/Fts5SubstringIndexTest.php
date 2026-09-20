@@ -21,7 +21,9 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\SqliteDialect;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnectionProviderInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Container;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\Fts5SubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
@@ -97,28 +99,28 @@ final class Fts5SubstringIndexTest extends TestCase
         ))->apply($pdo);
 
         // Auto resolves to FTS5 on a build that has it, which the skip above has already established.
-        $storage = $this->fromContainer(
-            PdoStorage::class,
-            [PdoConnectionProviderInterface::class => new SharedPdoConnectionProvider(
-                $pdo,
-                fn(): PDO => $pdo,
-            )],
+        $container = Container::forServer(
             TestServerOptions::forStorage(
                 PdoConfig::forSqlite(':memory:')
                     ->setSubstringIndexMode(SubstringIndexMode::Auto),
             ),
+            [PdoConnectionProviderInterface::class => new SharedPdoConnectionProvider(
+                $pdo,
+                fn(): PDO => $pdo,
+            )],
         );
+        $writer = $container->get(WriteEntryInterface::class);
 
-        $storage->store(new Entry(
+        $writer->store(new Entry(
             new Dn('cn=blacksmith,dc=example,dc=com'),
             new Attribute('cn', 'blacksmith'),
         ));
-        $storage->store(new Entry(
+        $writer->store(new Entry(
             new Dn('cn=scatter,dc=example,dc=com'),
             new Attribute('cn', 'smi mit ith'),
         ));
 
-        $stream = $storage->list(new StorageListOptions(
+        $stream = $container->get(ListEntryInterface::class)->list(new StorageListOptions(
             scope: new ListScope(
                 baseDn: new Dn('dc=example,dc=com'),
                 subtree: true,

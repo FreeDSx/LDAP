@@ -24,7 +24,6 @@ use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Server\AccessControl\RuleBasedAccessControl;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\AddEntryHandler;
 use FreeDSx\Ldap\Server\Backend\Write\Operation\DeleteEntryHandler;
@@ -45,7 +44,7 @@ trait WriteHandlerTestTrait
 
     private Container $graph;
 
-    private EntryStorageInterface $storage;
+    private InMemoryStorage $storage;
 
     private Entry $alice;
 
@@ -54,10 +53,12 @@ trait WriteHandlerTestTrait
     private Entry $base;
 
     /**
+     * Storage is real; pass a narrow contract through $sharedInstances to fake only that part of the write path.
+     *
      * @param array<class-string, object> $sharedInstances
      */
     private function writeGraph(
-        ?EntryStorageInterface $storage = null,
+        ?InMemoryStorage $storage = null,
         ?ServerOptions $options = null,
         array $sharedInstances = [],
     ): void {

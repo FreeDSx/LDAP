@@ -37,7 +37,7 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerUnsupportedExtendedHandler
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerWhoAmIHandler;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
@@ -155,7 +155,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
     {
         return new ServerRootDseHandler(
             options: $container->get(ServerOptions::class),
-            storage: $container->get(EntryStorageInterface::class),
+            storage: $container->get(ReadEntryInterface::class),
             responder: $this->makeGeneratedEntryResponder($container),
             supportsSync: $this->syncJournalFor($container) !== null,
         );

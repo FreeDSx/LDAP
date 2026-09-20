@@ -29,7 +29,10 @@ use function usort;
  */
 final readonly class SubtreeEnumerator
 {
-    public function __construct(private ReadEntryInterface&ListEntryInterface $storage) {}
+    public function __construct(
+        private ReadEntryInterface $reader,
+        private ListEntryInterface $lister,
+    ) {}
 
     /**
      * Deepest first, so a chunked delete never removes a parent before its children.
@@ -45,7 +48,7 @@ final readonly class SubtreeEnumerator
         );
 
         $dnList = [];
-        foreach ($this->storage->list($options)->entries() as $entry) {
+        foreach ($this->lister->list($options)->entries() as $entry) {
             $dnList[] = $entry->getDn()->normalize();
         }
         usort(
@@ -69,7 +72,7 @@ final readonly class SubtreeEnumerator
             subtree: true,
         );
 
-        foreach ($this->storage->list($options)->entries() as $entry) {
+        foreach ($this->lister->list($options)->entries() as $entry) {
             if ($entry->getDn()->normalizedString() !== $base->toString()) {
                 $descendants[] = $entry;
             }
@@ -88,7 +91,7 @@ final readonly class SubtreeEnumerator
         $entries = [];
         foreach ($dnList as $dn) {
             // @todo Unbounded because the journal judges a consumer's filter against it; journal it without linked attributes instead.
-            $entry = $this->storage->find(
+            $entry = $this->reader->find(
                 $dn,
                 EntryProjection::unbounded(),
             );

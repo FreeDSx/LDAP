@@ -20,7 +20,7 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedOptions;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
@@ -42,7 +42,7 @@ final class LdapSeedServerTest extends TestCase
 
     private LdapServer $subject;
 
-    private EntryStorageInterface $storage;
+    private ReadEntryInterface $storage;
 
     protected function setUp(): void
     {
@@ -53,7 +53,7 @@ final class LdapSeedServerTest extends TestCase
             $options,
             $container,
         );
-        $this->storage = $container->get(EntryStorageInterface::class);
+        $this->storage = $container->get(ReadEntryInterface::class);
     }
 
     public function test_it_seeds_the_content_records(): void

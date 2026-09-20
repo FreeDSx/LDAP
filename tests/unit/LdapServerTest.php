@@ -28,7 +28,7 @@ use FreeDSx\Ldap\Server\Config\Storage\InMemoryStorageConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\Config\Storage\StorageConfigInterface;
 use FreeDSx\Ldap\Server\Config\Storage\SubstringIndexMode;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedOptions;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
@@ -493,7 +493,7 @@ class LdapServerTest extends TestCase
             $restoreContainer,
         ))->seed(new StringLdifLoader($output->getLdif()));
 
-        $restoredFoo = $restoreContainer->get(EntryStorageInterface::class)
+        $restoredFoo = $restoreContainer->get(ReadEntryInterface::class)
             ->find(new Dn('cn=foo,dc=example,dc=com'));
         self::assertNotNull($restoredFoo);
         self::assertSame(
@@ -531,8 +531,8 @@ class LdapServerTest extends TestCase
     /**
      * The container-built storage the server operates on.
      */
-    private function storage(): EntryStorageInterface
+    private function storage(): ReadEntryInterface
     {
-        return $this->container->get(EntryStorageInterface::class);
+        return $this->container->get(ReadEntryInterface::class);
     }
 }

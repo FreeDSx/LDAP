@@ -21,7 +21,7 @@ use FreeDSx\Ldap\Ldif\LdifWriter;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DumpOptions;
@@ -153,7 +153,7 @@ final class DirectoryDumperTest extends TestCase
             'cn=bob,dc=foo,dc=bar',
             ['cn' => 'bob'],
         );
-        $storage = $this->createMock(EntryStorageInterface::class);
+        $storage = $this->createMock(ListEntryInterface::class);
         $storage->method('list')->willReturn(EntryStream::of(
             entries: (function () use ($alice, $bob): Generator {
                 yield $alice;
@@ -193,7 +193,7 @@ final class DirectoryDumperTest extends TestCase
     public function test_it_does_not_re_evaluate_the_filter_when_the_stream_is_preFiltered(): void
     {
         $alice = Entry::create('cn=alice,dc=foo,dc=bar', ['cn' => 'alice']);
-        $storage = $this->createMock(EntryStorageInterface::class);
+        $storage = $this->createMock(ListEntryInterface::class);
         $storage->method('list')->willReturn(EntryStream::of(
             entries: (function () use ($alice): Generator {
                 yield $alice;
@@ -219,7 +219,7 @@ final class DirectoryDumperTest extends TestCase
 
     public function test_it_passes_match_all_to_storage_when_no_filter_is_set(): void
     {
-        $storage = $this->createMock(EntryStorageInterface::class);
+        $storage = $this->createMock(ListEntryInterface::class);
         $storage->expects(self::once())
             ->method('list')
             ->with(self::callback(
@@ -246,7 +246,7 @@ final class DirectoryDumperTest extends TestCase
      * The subject, with only the collaborator a test cares about supplied.
      */
     private function makeDumper(
-        ?EntryStorageInterface $storage = null,
+        ?ListEntryInterface $storage = null,
         ?FilterEvaluatorInterface $filterEvaluator = null,
         ?LdifWriter $writer = null,
     ): DirectoryDumper {

@@ -16,117 +16,52 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
-use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
-use Generator;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SerializedEntryWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
-use Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\TestResettableEntryStorage;
-use Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\TestRowLockableEntryStorage;
 use Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\TestSynchronousWriterQueue;
 
-final class WriteSerializingStorageTest extends TestCase
+final class SerializedEntryWriterTest extends TestCase
 {
-    private EntryStorageInterface&MockObject $storage;
+    private EntryWriter&MockObject $writes;
+
+    private TransactionalWriteInterface&MockObject $transaction;
 
     private TestSynchronousWriterQueue $queue;
 
-    private WriteSerializingStorage $subject;
+    private SerializedEntryWriter $subject;
 
     protected function setUp(): void
     {
-        $this->storage = $this->createMock(EntryStorageInterface::class);
+        $this->writes = $this->createMock(EntryWriter::class);
+        $this->transaction = $this->createMock(TransactionalWriteInterface::class);
         $this->queue = new TestSynchronousWriterQueue();
-        $this->subject = new WriteSerializingStorage(
-            $this->storage,
+        $this->subject = new SerializedEntryWriter(
+            $this->writes,
+            $this->transaction,
             $this->queue,
         );
     }
 
-    public function test_find_runs_in_place(): void
+    public function test_insert_runs_through_the_queue(): void
     {
-        $dn = new Dn('cn=alice,dc=example,dc=com');
-        $entry = new Entry($dn, new Attribute('cn', 'Alice'));
+        $entry = new Entry(
+            new Dn('cn=carol,dc=example,dc=com'),
+            new Attribute('cn', 'Carol'),
+        );
 
-        $this->storage
+        $this->writes
             ->expects(self::once())
-            ->method('find')
-            ->with($dn)
-            ->willReturn($entry);
+            ->method('insert')
+            ->with($entry);
+
+        $this->subject->insert($entry);
 
         self::assertSame(
-            $entry,
-            $this->subject->find($dn),
-        );
-        self::assertSame(
-            0,
-            $this->queue->ranCount,
-        );
-    }
-
-    public function test_exists_runs_in_place(): void
-    {
-        $dn = new Dn('cn=bob,dc=example,dc=com');
-
-        $this->storage
-            ->expects(self::once())
-            ->method('exists')
-            ->with($dn)
-            ->willReturn(true);
-
-        self::assertTrue($this->subject->exists($dn));
-        self::assertSame(
-            0,
-            $this->queue->ranCount,
-        );
-    }
-
-    public function test_has_children_runs_in_place(): void
-    {
-        $dn = new Dn('ou=people,dc=example,dc=com');
-
-        $this->storage
-            ->expects(self::once())
-            ->method('hasChildren')
-            ->with($dn)
-            ->willReturn(true);
-
-        self::assertTrue($this->subject->hasChildren($dn));
-        self::assertSame(
-            0,
-            $this->queue->ranCount,
-        );
-    }
-
-    public function test_list_runs_in_place(): void
-    {
-        $options = StorageListOptions::matchAll(
-            baseDn: new Dn('dc=example,dc=com'),
-            subtree: true,
-        );
-        $stream = EntryStream::of(
-            (function (): Generator {
-                yield from [];
-
-                return null;
-            })(),
-        );
-
-        $this->storage
-            ->expects(self::once())
-            ->method('list')
-            ->with($options)
-            ->willReturn($stream);
-
-        self::assertSame(
-            $stream,
-            $this->subject->list($options),
-        );
-        self::assertSame(
-            0,
+            1,
             $this->queue->ranCount,
         );
     }
@@ -138,7 +73,7 @@ final class WriteSerializingStorageTest extends TestCase
             new Attribute('cn', 'Carol'),
         );
 
-        $this->storage
+        $this->writes
             ->expects(self::once())
             ->method('store')
             ->with($entry);
@@ -155,7 +90,7 @@ final class WriteSerializingStorageTest extends TestCase
     {
         $dn = new Dn('cn=carol,dc=example,dc=com');
 
-        $this->storage
+        $this->writes
             ->expects(self::once())
             ->method('remove')
             ->with($dn);
@@ -168,12 +103,29 @@ final class WriteSerializingStorageTest extends TestCase
         );
     }
 
+    public function test_remove_all_runs_through_the_queue(): void
+    {
+        $dns = [new Dn('cn=carol,dc=example,dc=com')];
+
+        $this->writes
+            ->expects(self::once())
+            ->method('removeAll')
+            ->with($dns);
+
+        $this->subject->removeAll($dns);
+
+        self::assertSame(
+            1,
+            $this->queue->ranCount,
+        );
+    }
+
     public function test_rename_subtree_runs_through_the_queue(): void
     {
         $from = new Dn('ou=people,dc=example,dc=com');
         $to = new Dn('ou=staff,dc=example,dc=com');
 
-        $this->storage
+        $this->writes
             ->expects(self::once())
             ->method('renameSubtree')
             ->with($from, $to);
@@ -193,7 +145,7 @@ final class WriteSerializingStorageTest extends TestCase
     {
         $callable = static function (): void {};
 
-        $this->storage
+        $this->transaction
             ->expects(self::once())
             ->method('atomic')
             ->with($callable);
@@ -214,7 +166,7 @@ final class WriteSerializingStorageTest extends TestCase
         );
 
         $this->passAtomicThrough();
-        $this->storage
+        $this->writes
             ->expects(self::once())
             ->method('store')
             ->with($entry);
@@ -233,7 +185,7 @@ final class WriteSerializingStorageTest extends TestCase
     public function test_a_nested_atomic_block_does_not_queue_again(): void
     {
         $opened = 0;
-        $this->storage
+        $this->transaction
             ->method('atomic')
             ->willReturnCallback(static function (callable $operation) use (&$opened): void {
                 $opened++;
@@ -254,22 +206,48 @@ final class WriteSerializingStorageTest extends TestCase
         );
     }
 
-    public function test_lock_for_write_delegates_to_the_storage(): void
+    public function test_lock_for_write_delegates_without_queueing(): void
     {
         $dn = new Dn('cn=alice,dc=example,dc=com');
-        $storage = $this->createMock(TestRowLockableEntryStorage::class);
 
-        $storage
+        $this->writes
             ->expects(self::once())
             ->method('lockForWrite')
             ->with($dn);
 
-        $subject = new WriteSerializingStorage(
-            $storage,
-            $this->queue,
-        );
+        $this->subject->lockForWrite($dn);
 
-        $subject->lockForWrite($dn);
+        self::assertSame(
+            0,
+            $this->queue->ranCount,
+        );
+    }
+
+    public function test_lock_for_reference_delegates_without_queueing(): void
+    {
+        $dn = new Dn('cn=alice,dc=example,dc=com');
+
+        $this->writes
+            ->expects(self::once())
+            ->method('lockForReference')
+            ->with($dn)
+            ->willReturn(true);
+
+        self::assertTrue($this->subject->lockForReference($dn));
+        self::assertSame(
+            0,
+            $this->queue->ranCount,
+        );
+    }
+
+    public function test_draining_releases_the_queue(): void
+    {
+        $this->subject->drainWrites();
+
+        self::assertSame(
+            1,
+            $this->queue->drainedCount,
+        );
     }
 
     public function test_write_exceptions_propagate(): void
@@ -279,7 +257,7 @@ final class WriteSerializingStorageTest extends TestCase
             new Attribute('cn', 'Carol'),
         );
 
-        $this->storage
+        $this->writes
             ->method('store')
             ->willThrowException(new RuntimeException('boom'));
 
@@ -289,37 +267,12 @@ final class WriteSerializingStorageTest extends TestCase
         $this->subject->store($entry);
     }
 
-    public function test_reset_resets_a_resettable_storage(): void
-    {
-        $storage = $this->createMock(TestResettableEntryStorage::class);
-
-        $storage
-            ->expects(self::once())
-            ->method('reset');
-
-        $subject = new WriteSerializingStorage(
-            $storage,
-            $this->queue,
-        );
-
-        $subject->reset();
-    }
-
-    public function test_reset_skips_a_non_resettable_storage(): void
-    {
-        $this->storage
-            ->expects(self::never())
-            ->method(self::anything());
-
-        $this->subject->reset();
-    }
-
     /**
      * Stands in for a real transaction, which invokes the operation rather than merely accepting it.
      */
     private function passAtomicThrough(): void
     {
-        $this->storage
+        $this->transaction
             ->method('atomic')
             ->willReturnCallback(static function (callable $operation): void {
                 $operation();

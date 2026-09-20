@@ -13,15 +13,18 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap\Storage;
 
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
- * Shared EntryStorageInterface::renameSubtree() contract, so every adapter moves a subtree the same way.
+ * Shared renameSubtree() contract, so every adapter moves a subtree the same way.
  *
  * @mixin \PHPUnit\Framework\TestCase
  */
@@ -29,20 +32,20 @@ trait SubtreeRenameStorageContractTests
 {
     public function test_renaming_a_subtree_moves_the_base_entry(): void
     {
-        $storage = $this->renameStorage();
-        $this->renamePeopleToStaff($storage);
+        $container = $this->renameContainer();
+        $this->renamePeopleToStaff($container);
 
-        self::assertNull($storage->find(new Dn('ou=people,dc=foo,dc=bar')));
+        self::assertNull($this->storedEntry($container, 'ou=people,dc=foo,dc=bar'));
         self::assertSame(
             'ou=Staff,dc=foo,dc=bar',
-            $storage->find(new Dn('ou=staff,dc=foo,dc=bar'))?->getDn()->toString(),
+            $this->storedEntry($container, 'ou=staff,dc=foo,dc=bar')?->getDn()->toString(),
         );
     }
 
     public function test_renaming_a_subtree_moves_every_child(): void
     {
-        $storage = $this->renameStorage();
-        $this->renamePeopleToStaff($storage);
+        $container = $this->renameContainer();
+        $this->renamePeopleToStaff($container);
 
         self::assertSame(
             [
@@ -51,7 +54,7 @@ trait SubtreeRenameStorageContractTests
                 'cn=dave,ou=staff,dc=foo,dc=bar',
             ],
             $this->storedDnsUnder(
-                $storage,
+                $container,
                 'ou=staff,dc=foo,dc=bar',
             ),
         );
@@ -59,96 +62,98 @@ trait SubtreeRenameStorageContractTests
 
     public function test_renaming_a_subtree_moves_a_descendant_nested_below_a_child(): void
     {
-        $storage = $this->renameStorage();
-        $this->renamePeopleToStaff($storage);
+        $container = $this->renameContainer();
+        $this->renamePeopleToStaff($container);
 
         self::assertSame(
             'cn=Laptop,cn=Alice,ou=Staff,dc=foo,dc=bar',
-            $storage->find(new Dn('cn=laptop,cn=alice,ou=staff,dc=foo,dc=bar'))?->getDn()->toString(),
+            $this->storedEntry($container, 'cn=laptop,cn=alice,ou=staff,dc=foo,dc=bar')?->getDn()->toString(),
         );
     }
 
     public function test_renaming_a_subtree_reparents_the_children_it_moves(): void
     {
-        $storage = $this->renameStorage();
-        $this->renamePeopleToStaff($storage);
+        $container = $this->renameContainer();
+        $this->renamePeopleToStaff($container);
 
-        self::assertTrue($storage->hasChildren(new Dn('ou=staff,dc=foo,dc=bar')));
-        self::assertFalse($storage->hasChildren(new Dn('ou=people,dc=foo,dc=bar')));
+        $reader = $container->get(ReadEntryInterface::class);
+
+        self::assertTrue($reader->hasChildren(new Dn('ou=staff,dc=foo,dc=bar')));
+        self::assertFalse($reader->hasChildren(new Dn('ou=people,dc=foo,dc=bar')));
     }
 
     public function test_renaming_a_subtree_leaves_entries_outside_it_alone(): void
     {
-        $storage = $this->renameStorage();
-        $this->renamePeopleToStaff($storage);
+        $container = $this->renameContainer();
+        $this->renamePeopleToStaff($container);
 
         self::assertSame(
             'cn=Carol,ou=Groups,dc=foo,dc=bar',
-            $storage->find(new Dn('cn=carol,ou=groups,dc=foo,dc=bar'))?->getDn()->toString(),
+            $this->storedEntry($container, 'cn=carol,ou=groups,dc=foo,dc=bar')?->getDn()->toString(),
         );
     }
 
     public function test_renaming_a_subtree_keeps_the_attributes_of_a_moved_entry(): void
     {
-        $storage = $this->renameStorage();
-        $this->renamePeopleToStaff($storage);
+        $container = $this->renameContainer();
+        $this->renamePeopleToStaff($container);
 
         self::assertSame(
             ['Alice'],
-            $storage->find(new Dn('cn=alice,ou=staff,dc=foo,dc=bar'))?->get('cn')?->getValues(),
+            $this->storedEntry($container, 'cn=alice,ou=staff,dc=foo,dc=bar')?->get('cn')?->getValues(),
         );
     }
 
     public function test_renaming_a_subtree_canonicalizes_a_descendant_that_spells_the_source_differently(): void
     {
-        $storage = $this->renameStorage();
-        $this->renamePeopleToStaff($storage);
+        $container = $this->renameContainer();
+        $this->renamePeopleToStaff($container);
 
         self::assertSame(
             'cn=dave,ou=staff,dc=foo,dc=bar',
-            $storage->find(new Dn('cn=dave,ou=staff,dc=foo,dc=bar'))?->getDn()->toString(),
+            $this->storedEntry($container, 'cn=dave,ou=staff,dc=foo,dc=bar')?->getDn()->toString(),
         );
     }
 
     public function test_renaming_a_subtree_slices_multibyte_dns_on_character_boundaries(): void
     {
-        $storage = $this->makeRenameStorage(
+        $container = $this->makeRenameContainer(
             new Entry(new Dn('dc=foo,dc=bar')),
             new Entry(new Dn('ou=Москва,dc=foo,dc=bar')),
             new Entry(new Dn('cn=Zoë,ou=Москва,dc=foo,dc=bar')),
         );
 
-        $storage->renameSubtree(
+        $container->get(WriteEntryInterface::class)->renameSubtree(
             new Dn('ou=москва,dc=foo,dc=bar'),
             new Dn('ou=Ω,dc=foo,dc=bar'),
         );
 
         self::assertSame(
             'cn=Zoë,ou=Ω,dc=foo,dc=bar',
-            $storage->find(new Dn('cn=zoë,ou=ω,dc=foo,dc=bar'))?->getDn()->toString(),
+            $this->storedEntry($container, 'cn=zoë,ou=ω,dc=foo,dc=bar')?->getDn()->toString(),
         );
     }
 
     public function test_renaming_a_subtree_that_does_not_exist_changes_nothing(): void
     {
-        $storage = $this->renameStorage();
+        $container = $this->renameContainer();
 
-        $storage->renameSubtree(
+        $container->get(WriteEntryInterface::class)->renameSubtree(
             new Dn('ou=missing,dc=foo,dc=bar'),
             new Dn('ou=Staff,dc=foo,dc=bar'),
         );
 
-        self::assertNull($storage->find(new Dn('ou=staff,dc=foo,dc=bar')));
-        self::assertNotNull($storage->find(new Dn('cn=alice,ou=people,dc=foo,dc=bar')));
+        self::assertNull($this->storedEntry($container, 'ou=staff,dc=foo,dc=bar'));
+        self::assertNotNull($this->storedEntry($container, 'cn=alice,ou=people,dc=foo,dc=bar'));
     }
 
     public function test_renaming_a_subtree_into_its_own_subtree_is_refused(): void
     {
-        $storage = $this->renameStorage();
+        $container = $this->renameContainer();
 
         $this->expectException(InvalidArgumentException::class);
 
-        $storage->renameSubtree(
+        $container->get(WriteEntryInterface::class)->renameSubtree(
             new Dn('ou=people,dc=foo,dc=bar'),
             new Dn('ou=Staff,ou=people,dc=foo,dc=bar'),
         );
@@ -156,12 +161,13 @@ trait SubtreeRenameStorageContractTests
 
     /**
      * @param Entry ...$entries Seeded before the rename runs.
+     * @return Container the graph holding the seeded entries, which every storage contract resolves from
      */
-    abstract protected function makeRenameStorage(Entry ...$entries): EntryStorageInterface;
+    abstract protected function makeRenameContainer(Entry ...$entries): Container;
 
-    private function renameStorage(): EntryStorageInterface
+    private function renameContainer(): Container
     {
-        return $this->makeRenameStorage(
+        return $this->makeRenameContainer(
             new Entry(new Dn('dc=foo,dc=bar')),
             new Entry(new Dn('ou=People,dc=foo,dc=bar')),
             new Entry(new Dn('ou=Groups,dc=foo,dc=bar')),
@@ -177,24 +183,33 @@ trait SubtreeRenameStorageContractTests
         );
     }
 
-    private function renamePeopleToStaff(EntryStorageInterface $storage): void
+    private function renamePeopleToStaff(Container $container): void
     {
-        $storage->renameSubtree(
+        $container->get(WriteEntryInterface::class)->renameSubtree(
             new Dn('ou=people,dc=foo,dc=bar'),
             new Dn('ou=Staff,dc=foo,dc=bar'),
         );
+    }
+
+    private function storedEntry(
+        Container $container,
+        string $dn,
+    ): ?Entry {
+        return $container->get(ReadEntryInterface::class)
+            ->find(new Dn($dn));
     }
 
     /**
      * @return list<string>
      */
     private function storedDnsUnder(
-        EntryStorageInterface $storage,
+        Container $container,
         string $baseDn,
     ): array {
         $dns = [];
 
-        $stream = $storage->list(StorageListOptions::matchAll(new Dn($baseDn), false));
+        $stream = $container->get(ListEntryInterface::class)
+            ->list(StorageListOptions::matchAll(new Dn($baseDn), false));
         foreach ($stream->entries() as $entry) {
             $dns[] = $entry->getDn()->toString();
         }

@@ -24,7 +24,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ReadBounds;
 use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 
 /**
- * What EntryStorageInterface::list() reads: its scope, filter, per-entry shape, order and bounds.
+ * What ListEntryInterface::list() reads: its scope, filter, per-entry shape, order and bounds.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
@@ -33,12 +33,12 @@ final class EntryReaderTest extends TestCase
 
     private EntryReader $subject;
 
-    private PdoStorage $storage;
+    private EntryWriter $storage;
 
     protected function setUp(): void
     {
         $this->subject = $this->fromContainer(EntryReader::class);
-        $this->storage = $this->fromContainer(PdoStorage::class);
+        $this->storage = $this->fromContainer(EntryWriter::class);
     }
 
     public function test_find_returns_the_entry_under_its_stored_dn(): void

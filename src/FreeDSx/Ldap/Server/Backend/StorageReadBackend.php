@@ -36,14 +36,15 @@ use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use Generator;
 
 /**
- * Answers reads over a pluggable EntryStorageInterface, applying the LDAP semantics storage knows nothing about.
+ * Answers reads over the storage contracts, applying the LDAP semantics storage knows nothing about.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final readonly class StorageReadBackend implements ReadBackendInterface
 {
     public function __construct(
-        private ReadEntryInterface&ListEntryInterface $storage,
+        private ReadEntryInterface $reader,
+        private ListEntryInterface $lister,
         private SearchStreamBuilder $searchStream,
         private StorageListOptionsFactory $listOptions,
         private FilterEvaluatorInterface $filterEvaluator,
@@ -54,7 +55,7 @@ final readonly class StorageReadBackend implements ReadBackendInterface
         Dn $dn,
         EntryProjection $projection = new EntryProjection(),
     ): ?Entry {
-        return $this->storage->find(
+        return $this->reader->find(
             $dn->normalize(),
             $projection,
         );
@@ -127,7 +128,7 @@ final readonly class StorageReadBackend implements ReadBackendInterface
         );
 
         try {
-            $stream = $this->storage->list($options);
+            $stream = $this->lister->list($options);
         } catch (InvalidAttributeException) {
             # RFC 4511 §4.5.1.7: unrecognized attribute descriptions evaluate to Undefined; yield zero entries.
             return EntryStream::of((static function (): Generator {
@@ -177,7 +178,7 @@ final readonly class StorageReadBackend implements ReadBackendInterface
         SearchRequest $request,
         ?SearchLimits $effectiveLimits,
     ): EntryStream {
-        $entry = $this->storage->find(
+        $entry = $this->reader->find(
             $normBase,
             $this->listOptions->projectionFor(
                 $request,
@@ -208,7 +209,7 @@ final readonly class StorageReadBackend implements ReadBackendInterface
             return;
         }
 
-        if (!$this->storage->exists($normBase)) {
+        if (!$this->reader->exists($normBase)) {
             $this->locator->throwNoSuchObject($baseDn);
         }
     }

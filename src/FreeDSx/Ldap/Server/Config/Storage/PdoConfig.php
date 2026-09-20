@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Server\Config\Storage;
 use SensitiveParameter;
 
 /**
- * Full connection + options for a PdoStorage; build one with forSqlite()/forMysql() and tune it with the setters.
+ * Full connection + options for the PDO storage; build one with forSqlite()/forMysql() and tune it with the setters.
  *
  * @api
  *

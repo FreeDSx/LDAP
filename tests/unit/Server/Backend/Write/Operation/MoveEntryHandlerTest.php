@@ -24,10 +24,8 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
-use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
@@ -36,8 +34,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
 use FreeDSx\Ldap\ServerOptions;
-use Generator;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Backend\Write\WriteHandlerTestTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
@@ -278,23 +274,10 @@ final class MoveEntryHandlerTest extends TestCase
 
     public function test_a_storage_failure_propagates_carrying_its_result_code(): void
     {
-        $alice = new Entry(
-            new Dn(self::ALICE),
-            new Attribute('objectClass', 'person'),
-            new Attribute('cn', 'Alice'),
-        );
-
-        /** @var EntryStorageInterface&MockObject $storage */
-        $storage = $this->createMock(EntryStorageInterface::class);
-        $storage->method('find')
-            ->willReturn($alice);
-        $storage->method('exists')
-            ->willReturn(true);
-        $storage->method('list')
-            ->willReturn(EntryStream::of($this->oneEntry($alice)));
-        $storage->method('atomic')
+        $transaction = $this->createMock(TransactionalWriteInterface::class);
+        $transaction->method('atomic')
             ->willThrowException(new StorageIoException('Unable to publish the storage update.'));
-        $this->writeGraph($storage);
+        $this->writeGraph(sharedInstances: [TransactionalWriteInterface::class => $transaction]);
 
         self::expectException(StorageIoException::class);
         self::expectExceptionCode(ResultCode::UNAVAILABLE);
@@ -393,15 +376,5 @@ final class MoveEntryHandlerTest extends TestCase
         );
 
         return $journal;
-    }
-
-    /**
-     * @return Generator<int, Entry, mixed, ?FetchedBatch>
-     */
-    private function oneEntry(Entry $entry): Generator
-    {
-        yield $entry;
-
-        return null;
     }
 }

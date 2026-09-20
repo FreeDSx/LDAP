@@ -13,9 +13,11 @@ declare(strict_types=1);
 
 namespace Tests\Integration\FreeDSx\Ldap\Storage\Pdo;
 
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\PdoStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
 use FreeDSx\Ldap\Server\Config\Storage\PdoConfig;
 use FreeDSx\Ldap\Server\ServerRunner\RunnerMode;
@@ -52,15 +54,16 @@ final class PdoStorageContainerProviderTest extends TestCase
 
     public function test_a_reconnect_does_not_apply_the_schema_again(): void
     {
-        $storage = $this->fromContainer(
-            PdoStorage::class,
-            options: TestServerOptions::forStorage(PdoConfig::forSqlite($this->path)),
+        $container = Container::forServer(
+            TestServerOptions::forStorage(PdoConfig::forSqlite($this->path)),
         );
+        $connection = $container->get(PdoConnection::class);
         $probe = new PDO('sqlite:' . $this->path);
         $probe->exec('DROP TABLE ldap_schema_version');
 
-        $storage->reset();
-        $storage->exists(new Dn('dc=example,dc=com'));
+        $connection->reset();
+        $container->get(ReadEntryInterface::class)
+            ->exists(new Dn('dc=example,dc=com'));
 
         self::assertNotContains(
             'ldap_schema_version',
@@ -70,8 +73,8 @@ final class PdoStorageContainerProviderTest extends TestCase
 
     public function test_disabling_schema_setup_leaves_the_database_empty(): void
     {
-        $storage = $this->fromContainer(
-            PdoStorage::class,
+        $connection = $this->fromContainer(
+            PdoConnection::class,
             options: TestServerOptions::forStorage(
                 PdoConfig::forSqlite($this->path)
                     ->setInitializeSchema(false),
@@ -82,7 +85,7 @@ final class PdoStorageContainerProviderTest extends TestCase
             [],
             $this->tableNames(new PDO('sqlite:' . $this->path)),
         );
-        unset($storage);
+        unset($connection);
     }
 
     public function test_the_swoole_runner_refuses_an_in_memory_database(): void
@@ -91,7 +94,7 @@ final class PdoStorageContainerProviderTest extends TestCase
         $this->expectExceptionMessage('an in-memory SQLite database is not supported');
 
         $this->fromContainer(
-            PdoStorage::class,
+            PdoConnection::class,
             options: TestServerOptions::sqlite()
                 ->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole)),
         );

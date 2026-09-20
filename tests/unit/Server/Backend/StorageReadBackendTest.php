@@ -22,7 +22,7 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filter\EqualityFilter;
 use FreeDSx\Ldap\Search\Filter\PresentFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\InvalidAttributeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
@@ -33,7 +33,6 @@ use FreeDSx\Ldap\Server\Subentry\SubentryVisibility;
 use FreeDSx\Ldap\ServerOptions;
 use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
@@ -199,14 +198,12 @@ final class StorageReadBackendTest extends TestCase
 
     public function test_search_converts_time_limit_exception_to_operation_exception(): void
     {
-        /** @var EntryStorageInterface&MockObject $storage */
-        $storage = $this->createMock(EntryStorageInterface::class);
-        $storage->method('exists')->willReturn(true);
-        $storage->method('list')->willReturn(
+        $lister = $this->createMock(ListEntryInterface::class);
+        $lister->method('list')->willReturn(
             EntryStream::of($this->makeTimeLimitStream()),
         );
 
-        $subject = $this->backendFor($storage);
+        $subject = $this->backendOver($lister);
 
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::TIME_LIMIT_EXCEEDED);
@@ -344,16 +341,13 @@ final class StorageReadBackendTest extends TestCase
 
     public function test_search_returns_empty_stream_when_storage_rejects_filter_attribute(): void
     {
-        /** @var EntryStorageInterface&MockObject $storage */
-        $storage = $this->createMock(EntryStorageInterface::class);
-        $storage->method('exists')
-            ->willReturn(true);
-        $storage->method('list')
+        $lister = $this->createMock(ListEntryInterface::class);
+        $lister->method('list')
             ->willThrowException(new InvalidAttributeException(
                 'Attribute description "bogus attr" is not a valid RFC 4512 attribute description.',
             ));
 
-        $subject = $this->backendFor($storage);
+        $subject = $this->backendOver($lister);
 
         $request = (new SearchRequest(new EqualityFilter('bogus attr', 'x')))
             ->base('dc=example,dc=com')
@@ -375,10 +369,8 @@ final class StorageReadBackendTest extends TestCase
     ): void {
         $capturedOptions = null;
 
-        /** @var EntryStorageInterface&MockObject $storage */
-        $storage = $this->createMock(EntryStorageInterface::class);
-        $storage->method('exists')->willReturn(true);
-        $storage
+        $lister = $this->createMock(ListEntryInterface::class);
+        $lister
             ->method('list')
             ->willReturnCallback(function (StorageListOptions $opts) use (&$capturedOptions): EntryStream {
                 $capturedOptions = $opts;
@@ -386,8 +378,8 @@ final class StorageReadBackendTest extends TestCase
                 return EntryStream::of($this->makeGenerator());
             });
 
-        $subject = $this->backendFor(
-            $storage,
+        $subject = $this->backendOver(
+            $lister,
             TestServerOptions::unvalidatedCore()
                 ->setMaxSearchTimeLimit($serverMax),
         );
@@ -659,6 +651,23 @@ final class StorageReadBackendTest extends TestCase
     protected function makeServerOptions(): ServerOptions
     {
         return TestServerOptions::unvalidatedCore();
+    }
+
+    /**
+     * A backend whose listing is faked but whose reads are real, so only the streaming under test is stubbed.
+     */
+    private function backendOver(
+        ListEntryInterface $lister,
+        ?ServerOptions $options = null,
+    ): StorageReadBackend {
+        return $this->fromContainer(
+            StorageReadBackend::class,
+            [
+                InMemoryStorage::class => new InMemoryStorage([$this->base]),
+                ListEntryInterface::class => $lister,
+            ],
+            $options,
+        );
     }
 
     private function aliasBackend(): StorageReadBackend

@@ -32,7 +32,7 @@ use function json_encode;
 use function max;
 
 /**
- * Replica-local password-policy state persisted as a JSON row per subject, sharing a PdoStorage connection.
+ * Replica-local password-policy state persisted as a JSON row per subject, sharing the PDO storage connection.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

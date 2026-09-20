@@ -19,7 +19,8 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Ldif\Loader\StringLdifLoader;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\Options\ListScope;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
@@ -70,14 +71,15 @@ abstract class LdapReindexTestCase extends TestCase
 
     public function test_reindex_preserves_entry_attributes(): void
     {
-        $this->withServer(function (LdapServer $server, EntryStorageInterface $storage): void {
+        $this->withServer(function (LdapServer $server, Container $container): void {
+            $reader = $container->get(ReadEntryInterface::class);
             $dn = new Dn('cn=admins,dc=foo,dc=bar');
-            $before = $storage->find($dn);
+            $before = $reader->find($dn);
             self::assertNotNull($before);
 
             $server->reindex();
 
-            $after = $storage->find($dn);
+            $after = $reader->find($dn);
             self::assertNotNull($after);
             self::assertEquals(
                 $before->toArray(),
@@ -96,9 +98,9 @@ abstract class LdapReindexTestCase extends TestCase
     abstract protected function runnerMode(): RunnerMode;
 
     /**
-     * Seeds a server and hands the body that server plus the storage it was built on.
+     * Seeds a server and hands the body that server plus the graph it was built on.
      *
-     * @param Closure(LdapServer, EntryStorageInterface): void $body
+     * @param Closure(LdapServer, Container): void $body
      */
     protected function withServer(Closure $body): void
     {
@@ -113,7 +115,7 @@ abstract class LdapReindexTestCase extends TestCase
 
             $body(
                 $server,
-                $container->get(EntryStorageInterface::class),
+                $container,
             );
         });
     }
@@ -122,10 +124,10 @@ abstract class LdapReindexTestCase extends TestCase
      * @return list<string>
      */
     protected function dnsMatching(
-        EntryStorageInterface $storage,
+        Container $container,
         FilterInterface $filter,
     ): array {
-        $entries = $storage->list(new StorageListOptions(
+        $entries = $container->get(ListEntryInterface::class)->list(new StorageListOptions(
             scope: new ListScope(
                 baseDn: new Dn('dc=foo,dc=bar'),
                 subtree: true,

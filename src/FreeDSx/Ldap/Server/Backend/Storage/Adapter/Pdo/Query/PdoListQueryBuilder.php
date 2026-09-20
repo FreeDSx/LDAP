@@ -24,7 +24,7 @@ use function array_merge;
 use function implode;
 
 /**
- * Builds the SQL query for PdoStorage::list().
+ * Builds the SQL query for EntryLister::list().
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */

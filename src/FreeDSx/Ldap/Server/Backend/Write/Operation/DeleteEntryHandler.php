@@ -32,7 +32,8 @@ readonly class DeleteEntryHandler
     use WritesLockedEntry;
 
     public function __construct(
-        private WriteEntryInterface&TransactionalWriteInterface $storage,
+        private WriteEntryInterface $storage,
+        private TransactionalWriteInterface $transaction,
         private EntryLocator $locator,
         private EntryPlacementGuard $placement,
         private ?ChangeRecorder $changeRecorder = null,

@@ -13,18 +13,20 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
+use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 
 final class InMemoryStorageTest extends TestCase
 {
+    use ServerContainerTrait;
     use SubtreeRenameStorageContractTests;
 
     private InMemoryStorage $subject;
@@ -371,8 +373,8 @@ final class InMemoryStorageTest extends TestCase
         );
     }
 
-    protected function makeRenameStorage(Entry ...$entries): EntryStorageInterface
+    protected function makeRenameContainer(Entry ...$entries): Container
     {
-        return new InMemoryStorage($entries);
+        return $this->containerFor(new InMemoryStorage($entries));
     }
 }

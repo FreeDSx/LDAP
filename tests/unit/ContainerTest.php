@@ -35,7 +35,9 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\ImmediateWriterQueue;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SwooleWriterQueue;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriterQueueInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriteSerializingStorage;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryLister;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SerializedEntryWriter;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\SerializingReplicaPasswordStateStore;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\NoSubstringIndex;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
@@ -43,7 +45,10 @@ use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\NonResettable;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Container\Contributor\ListenerContributorInterface;
@@ -101,27 +106,52 @@ class ContainerTest extends TestCase
         $this->subject = Container::forServer(TestServerOptions::defaults());
     }
 
-    public function test_it_builds_in_memory_storage_from_an_in_memory_config(): void
+    public function test_every_storage_contract_resolves_to_one_in_memory_store(): void
     {
         $container = Container::forServer(
             new ServerOptions(InMemoryStorageConfig::withEntries()),
         );
+        $storage = $container->get(InMemoryStorage::class);
 
-        self::assertInstanceOf(
-            InMemoryStorage::class,
-            $container->get(EntryStorageInterface::class),
+        self::assertSame(
+            $storage,
+            $container->get(ReadEntryInterface::class),
+        );
+        self::assertSame(
+            $storage,
+            $container->get(ListEntryInterface::class),
+        );
+        self::assertSame(
+            $storage,
+            $container->get(WriteEntryInterface::class),
+        );
+        self::assertSame(
+            $storage,
+            $container->get(TransactionalWriteInterface::class),
         );
     }
 
-    public function test_it_builds_a_pdo_backend_from_a_pdo_config(): void
+    public function test_a_pdo_config_reads_and_lists_in_place_but_writes_through_the_serializing_writer(): void
     {
         $container = Container::forServer(
             new ServerOptions(PdoConfig::forSqlite(':memory:')),
         );
 
         self::assertInstanceOf(
-            WriteSerializingStorage::class,
-            $container->get(EntryStorageInterface::class),
+            EntryReader::class,
+            $container->get(ReadEntryInterface::class),
+        );
+        self::assertInstanceOf(
+            EntryLister::class,
+            $container->get(ListEntryInterface::class),
+        );
+        self::assertInstanceOf(
+            SerializedEntryWriter::class,
+            $container->get(WriteEntryInterface::class),
+        );
+        self::assertSame(
+            $container->get(WriteEntryInterface::class),
+            $container->get(TransactionalWriteInterface::class),
         );
     }
 
@@ -343,7 +373,10 @@ class ContainerTest extends TestCase
     public static function sharedSingletonDataProvider(): array
     {
         return [
-            [EntryStorageInterface::class],
+            [ReadEntryInterface::class],
+            [ListEntryInterface::class],
+            [WriteEntryInterface::class],
+            [TransactionalWriteInterface::class],
             [DerivedResolver::class],
             [SchemaValidator::class],
         ];

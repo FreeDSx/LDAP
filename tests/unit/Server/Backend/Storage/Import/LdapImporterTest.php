@@ -21,9 +21,8 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
-use PHPUnit\Framework\MockObject\MockObject;
 use FreeDSx\Ldap\Server\Backend\Storage\Import\LdapImporter;
 use FreeDSx\Ldap\Server\Logging\EventContext;
 use FreeDSx\Ldap\Server\Logging\ServerEvent;
@@ -235,14 +234,16 @@ final class LdapImporterTest extends TestCase
     public function test_importEntries_records_a_failure_the_storage_layer_raised(): void
     {
         $logger = new RecordingLogger();
-        /** @var EntryStorageInterface&MockObject $storage */
-        $storage = $this->createMock(EntryStorageInterface::class);
-        $storage->method('atomic')
+        $transaction = $this->createMock(TransactionalWriteInterface::class);
+        $transaction->method('atomic')
             ->willThrowException(new StorageIoException('Unable to stage the import.'));
 
         try {
-            $this->importerFor($storage, $this->optionsLogging($logger))
-                ->importEntries([$this->domain()]);
+            $this->importerFor(
+                $this->storage,
+                $this->optionsLogging($logger),
+                [TransactionalWriteInterface::class => $transaction],
+            )->importEntries([$this->domain()]);
             self::fail('Expected StorageIoException was not thrown.');
         } catch (StorageIoException) {
         }
@@ -362,13 +363,18 @@ final class LdapImporterTest extends TestCase
         return $this->importerFor($this->storage);
     }
 
+    /**
+     * @param array<class-string, object> $sharedInstances
+     */
     private function importerFor(
-        EntryStorageInterface $storage,
+        InMemoryStorage $storage,
         ?ServerOptions $options = null,
+        array $sharedInstances = [],
     ): LdapImporter {
         return $this->containerFor(
             $storage,
             $options ?? TestServerOptions::unvalidatedCore(),
+            $sharedInstances,
         )->get(LdapImporter::class);
     }
 

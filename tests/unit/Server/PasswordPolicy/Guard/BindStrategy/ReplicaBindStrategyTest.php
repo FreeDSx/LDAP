@@ -17,7 +17,7 @@ use FreeDSx\Ldap\Control\PwdPolicyError;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
-use FreeDSx\Ldap\Server\Backend\Storage\EntryStorageInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -63,7 +63,7 @@ final class ReplicaBindStrategyTest extends TestCase
     protected function setUp(): void
     {
         // Both resolve from the memoised container, so the state store shares the storage holding the subject.
-        $this->fromContainer(EntryStorageInterface::class)
+        $this->fromContainer(WriteEntryInterface::class)
             ->store(new Entry(
                 new Dn(self::DN),
                 new Attribute('cn', 'foo'),
