@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support;
+namespace Tests\Support\FreeDSx\Ldap\Backend\Storage;
 
 use Closure;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriterQueueInterface;
@@ -30,14 +30,14 @@ final class TestSynchronousWriterQueue implements WriterQueueInterface
      */
     private bool $running = false;
 
-    public function run(Closure $job): void
+    public function run(Closure $job): mixed
     {
         $this->ranCount++;
         $wasRunning = $this->running;
         $this->running = true;
 
         try {
-            $job();
+            return $job();
         } finally {
             $this->running = $wasRunning;
         }

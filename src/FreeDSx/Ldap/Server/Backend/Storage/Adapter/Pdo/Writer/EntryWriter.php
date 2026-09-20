@@ -50,6 +50,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
         private PdoEntryWriteDialectInterface&PdoRowLockDialectInterface $dialect,
         private ReadEntryInterface $reader,
         private EntryIndexWriter $indexes,
+        private EntryLinkWriter $links,
         private EntryRowCodec $codec,
     ) {}
 
@@ -82,10 +83,18 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
                 $normDn,
             );
 
+            $entryId = $this->entryIdFor($normDn);
             $this->indexes->rewrite(
-                $this->entryIdFor($normDn),
+                $entryId,
                 $entry,
             );
+            $this->links->write(
+                $entryId,
+                $entry,
+            );
+
+            // The entry may be the one other entries were waiting on to resolve their own values.
+            $this->links->promote($normDn);
         });
     }
 
@@ -125,15 +134,21 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
 
             if ($current === null) {
                 $this->indexes->rewrite($entryId, $entry);
-
-                return;
+            } else {
+                $this->indexes->update(
+                    $entryId,
+                    $entry,
+                    $current,
+                );
             }
 
-            $this->indexes->update(
+            $this->links->write(
                 $entryId,
                 $entry,
-                $current,
             );
+
+            // An upsert may be what puts the entry there, so it can settle what others were waiting on.
+            $this->links->promote($normDn);
         });
     }
 
@@ -182,6 +197,9 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
                 },
                 $to->normalize(),
             );
+
+            // A moved subtree can put many DNs in place at once, so nothing narrows which parked values may settle.
+            $this->links->promote();
         });
     }
 

@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoTransactor;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\RoutingPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\SharedPdoConnectionProvider;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryIndexWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
@@ -82,7 +83,8 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             WriterQueueInterface::class => $this->makeWriterQueue(...),
             EntryIndexWriter::class => $this->makeEntryIndexWriter(...),
             EntryLinks::class => $this->makeEntryLinks(...),
-            EntryRowCodec::class => static fn(): EntryRowCodec => new EntryRowCodec(),
+            EntryLinkWriter::class => $this->makeEntryLinkWriter(...),
+            EntryRowCodec::class => $this->makeEntryRowCodec(...),
             EntryReader::class => $this->makeReader(...),
             PdoListQueryBuilder::class => static fn(Container $container): PdoListQueryBuilder => new PdoListQueryBuilder(
                 $container->get(PdoDialectInterface::class),
@@ -226,6 +228,11 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
         );
     }
 
+    private function makeEntryRowCodec(Container $container): EntryRowCodec
+    {
+        return new EntryRowCodec($container->get(LinkedAttributes::class));
+    }
+
     private function makeEntryIndexWriter(Container $container): EntryIndexWriter
     {
         return new EntryIndexWriter(
@@ -233,6 +240,15 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             $container->get(PdoConnection::class),
             $container->get(AttributeIndexForms::class),
             $container->get(SubstringIndexInterface::class),
+        );
+    }
+
+    private function makeEntryLinkWriter(Container $container): EntryLinkWriter
+    {
+        return new EntryLinkWriter(
+            $container->get(PdoDialectInterface::class),
+            $container->get(PdoConnection::class),
+            $container->get(LinkedAttributes::class),
         );
     }
 
@@ -299,6 +315,7 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
             $container->get(PdoDialectInterface::class),
             $container->get(EntryReader::class),
             $container->get(EntryIndexWriter::class),
+            $container->get(EntryLinkWriter::class),
             $container->get(EntryRowCodec::class),
         );
     }

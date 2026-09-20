@@ -22,7 +22,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
-use Tests\Unit\FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\TestSynchronousWriterQueue;
+use Tests\Support\FreeDSx\Ldap\Backend\Storage\TestSynchronousWriterQueue;
 
 final class SerializedEntryWriterTest extends TestCase
 {

@@ -15,8 +15,6 @@ namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
-use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\SubtreeMoveRecorder;
 use FreeDSx\Ldap\Server\Backend\Write\Command\MoveCommand;
@@ -31,12 +29,9 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
  */
 readonly class MoveEntryHandler
 {
-    use WritesLockedEntry;
-
     public function __construct(
         private WriteEntryInterface $storage,
-        private TransactionalWriteInterface $transaction,
-        private EntryLocator $locator,
+        private LockedEntryAccess $locked,
         private EntryMutation $mutation,
         private EntryPlacementGuard $placement,
         private ?SubtreeMoveRecorder $moveRecorder = null,
@@ -52,7 +47,7 @@ readonly class MoveEntryHandler
         $normOld = $command->dn->normalize();
 
         // Only the moved entry is locked; the destination is held by the unique key the rename and store land on.
-        $this->writeLockedEntry(
+        $this->locked->withEntry(
             $normOld,
             $context,
             function (Entry $current) use ($command, $context, $normOld): void {

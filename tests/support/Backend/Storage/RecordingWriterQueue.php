@@ -28,14 +28,14 @@ final class RecordingWriterQueue implements WriterQueueInterface
      */
     private bool $running = false;
 
-    public function run(Closure $job): void
+    public function run(Closure $job): mixed
     {
         $this->runs++;
         $wasRunning = $this->running;
         $this->running = true;
 
         try {
-            $job();
+            return $job();
         } finally {
             $this->running = $wasRunning;
         }

@@ -47,9 +47,15 @@ abstract class LdapReindexTestCase extends TestCase
         objectClass: domain
         dc: foo
 
+        dn: cn=admin,dc=foo,dc=bar
+        objectClass: person
+        cn: admin
+        sn: admin
+
         dn: cn=admins,dc=foo,dc=bar
         objectClass: groupOfNames
         cn: admins
+        description: Group  Of  Admins
         member: CN=Admin, DC=Foo, DC=Bar
 
         LDIF;

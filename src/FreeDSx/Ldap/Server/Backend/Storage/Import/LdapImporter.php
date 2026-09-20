@@ -25,6 +25,7 @@ use FreeDSx\Ldap\Schema\AttributeTypeSpelling;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Write\BulkLoadOptions;
+use FreeDSx\Ldap\Server\Backend\Write\Operation\ReferenceGuard;
 use FreeDSx\Ldap\Server\Backend\Write\Routing\WriteRequestRouter;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 use FreeDSx\Ldap\Server\Logging\EventContext;
@@ -46,6 +47,7 @@ final readonly class LdapImporter
         private TransactionalWriteInterface $transaction,
         private WriteRequestRouter $router,
         private AttributeTypeSpelling $spelling,
+        private ReferenceGuard $references,
         private EventLogger $eventLogger = new EventLogger(null),
     ) {}
 
@@ -72,13 +74,18 @@ final readonly class LdapImporter
         $result = new ImportResult();
 
         try {
-            $this->transaction->atomic(fn() => $this->load(
-                $entries,
-                $creatorDn,
-                $ignoreValidation,
-                $replaceExisting,
-                $result,
-            ));
+            $this->transaction->atomic(function () use ($entries, $creatorDn, $ignoreValidation, $replaceExisting, $result): void {
+                $this->load(
+                    $entries,
+                    $creatorDn,
+                    $ignoreValidation,
+                    $replaceExisting,
+                    $result,
+                );
+
+                // An import may name an entry before storing it, so its references settle here rather than per entry.
+                $this->references->assertNothingPending();
+            });
         } catch (AnswerableExceptionInterface $e) {
             $this->recordFailure(
                 $result,

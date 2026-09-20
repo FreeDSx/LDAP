@@ -23,6 +23,9 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryLister;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\SerializedEntryWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryLinkWriter;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\ReferenceIntegrityInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Capability\ResolvedReferences;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\UnlockedRows;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
@@ -63,6 +66,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
             WriteEntryInterface::class => $this->makeWrites(...),
             TransactionalWriteInterface::class => $this->makeTransaction(...),
             RowLockableInterface::class => $this->makeRowLocks(...),
+            ReferenceIntegrityInterface::class => $this->makeReferenceIntegrity(...),
             EntryIndexReindexer::class => $this->makeEntryIndexReindexer(...),
             ChangeJournalInterface::class => $this->makeChangeJournal(...),
         ];
@@ -110,6 +114,16 @@ final class StorageContainerProvider implements ContainerProviderInterface
         return $this->isPdo($container)
             ? $container->get(SerializedEntryWriter::class)
             : new UnlockedRows($container->get(ReadEntryInterface::class));
+    }
+
+    /**
+     * In memory storage keeps values as written, so nothing it holds can be left unresolved.
+     */
+    private function makeReferenceIntegrity(Container $container): ReferenceIntegrityInterface
+    {
+        return $this->isPdo($container)
+            ? $container->get(EntryLinkWriter::class)
+            : new ResolvedReferences();
     }
 
     private function makeEntryIndexReindexer(Container $container): EntryIndexReindexer

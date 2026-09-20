@@ -56,23 +56,31 @@ readonly class PdoConnection implements TransactionalWriteInterface, ResettableI
     }
 
     /**
-     * @param callable(): void $operation
+     * @template TResult
+     *
+     * @param callable(): TResult $operation
+     *
+     * @return TResult
      *
      * @throws StorageBusyException when a transient conflict outlasts the retry budget
      */
-    public function atomic(callable $operation): void
+    public function atomic(callable $operation): mixed
     {
-        $this->transactor->atomic($operation);
+        return $this->transactor->atomic($operation);
     }
 
     /**
      * Runs within the caller's open transaction, starting one only when none is active.
      *
-     * @param callable(): void $operation
+     * @template TResult
+     *
+     * @param callable(): TResult $operation
+     *
+     * @return TResult
      */
-    public function joinAtomic(callable $operation): void
+    public function joinAtomic(callable $operation): mixed
     {
-        $this->transactor->joinAtomic($operation);
+        return $this->transactor->joinAtomic($operation);
     }
 
     public function pdo(): PDO

@@ -14,9 +14,11 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Schema;
 
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Schema;
 
 use function array_keys;
+use function array_values;
 
 /**
  * The attribute types whose values name entries, which a store keeps as links rather than in the entry itself.
@@ -35,11 +37,15 @@ final class LinkedAttributes
     public function __construct(private readonly Schema $schema) {}
 
     /**
-     * Whether the type is stored as links; options bearing forms are not, since a link keys on the base name.
+     * Whether the attribute is stored as links; an option bearing form is not, since a link keys on the base name.
      */
-    public function links(string $attribute): bool
+    public function links(Attribute $attribute): bool
     {
-        return isset($this->resolved()[Attribute::normalizeName($attribute)]);
+        if ($attribute->hasOptions()) {
+            return false;
+        }
+
+        return isset($this->resolved()[Attribute::normalizeName($attribute->getName())]);
     }
 
     /**
@@ -56,6 +62,26 @@ final class LinkedAttributes
     public function isEmpty(): bool
     {
         return $this->resolved() === [];
+    }
+
+    /**
+     * The entry's linked values, keyed by lowercased name.
+     *
+     * @return array<string, list<string>>
+     */
+    public function valuesOf(Entry $entry): array
+    {
+        $values = [];
+
+        foreach ($entry->getAttributes() as $attribute) {
+            if (!$this->links($attribute)) {
+                continue;
+            }
+
+            $values[Attribute::normalizeName($attribute->getName())] = array_values($attribute->getValues());
+        }
+
+        return $values;
     }
 
     /**

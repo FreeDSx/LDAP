@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 
 /**
  * Converts between an entry and the row that stores it.
@@ -28,14 +29,20 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
  */
 readonly class EntryRowCodec
 {
+    public function __construct(private LinkedAttributes $linked) {}
+
     /**
-     * The attribute blob stored in an entry's row.
+     * The attribute blob stored in an entry's row; a linked attribute is kept in its own table instead.
      */
     public function encode(Entry $entry): string
     {
         $attributes = [];
 
         foreach ($entry->getAttributes() as $attribute) {
+            if ($this->linked->links($attribute)) {
+                continue;
+            }
+
             $attributes[$attribute->getDescription()] = array_values($attribute->getValues());
         }
 

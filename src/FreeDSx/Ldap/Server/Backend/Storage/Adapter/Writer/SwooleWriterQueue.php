@@ -20,6 +20,8 @@ use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
 use Throwable;
 
+use function is_array;
+
 /**
  * Funnels write closures from many coroutines through a single writer coroutine.
  *
@@ -59,7 +61,7 @@ final class SwooleWriterQueue implements WriterQueueInterface
      *
      * @throws Throwable
      */
-    public function run(Closure $job): void
+    public function run(Closure $job): mixed
     {
         $this->ensureStarted();
 
@@ -71,9 +73,18 @@ final class SwooleWriterQueue implements WriterQueueInterface
         ]);
         $result = $reply->pop();
 
-        if ($result instanceof Throwable) {
-            throw $result;
+        // The writer wraps every answer.
+        // anything else means the queue went away before it ran the job.
+        if (!is_array($result)) {
+            throw new StorageIoException('The write was not carried out.');
         }
+        $produced = $result[0];
+
+        if ($produced instanceof Throwable) {
+            throw $produced;
+        }
+
+        return $produced;
     }
 
     public function isWriter(): bool
@@ -125,7 +136,8 @@ final class SwooleWriterQueue implements WriterQueueInterface
                     $results[$i] = true;
 
                     try {
-                        $closure();
+                        // A job answers with what it produced, which the reply carries back to the caller it blocked.
+                        $results[$i] = $closure();
                     } catch (Throwable $e) {
                         $results[$i] = $e;
                     }
@@ -133,14 +145,14 @@ final class SwooleWriterQueue implements WriterQueueInterface
             });
         } catch (Throwable $e) {
             foreach ($batch as [, $reply]) {
-                $reply->push($e);
+                $reply->push([$e]);
             }
 
             return;
         }
 
         foreach ($batch as $i => [, $reply]) {
-            $reply->push($results[$i]);
+            $reply->push([$results[$i]]);
         }
     }
 
@@ -202,10 +214,10 @@ final class SwooleWriterQueue implements WriterQueueInterface
                     if (count($batch) === 1 || $batchWrapper === null) {
                         foreach ($batch as [$closure, $reply]) {
                             try {
-                                $closure();
-                                $reply->push(true);
+                                // Wrapped, so a job answering with null is not read as the closed channel's false.
+                                $reply->push([$closure()]);
                             } catch (Throwable $e) {
-                                $reply->push($e);
+                                $reply->push([$e]);
                             }
                         }
                     } else {
