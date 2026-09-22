@@ -34,12 +34,14 @@ final readonly class EntryProjection
      * @param ?int $linkCap Values read per linked attribute: null for every value, zero for none of them.
      * @param bool $withHasSubordinates Whether a read able to answer hasSubordinates alongside the row should.
      * @param array<string, LinkWindow> $windows The slice asked for, by lowercased linked attribute name.
+     * @param list<string> $backlinks Lowercased back-link names to read, which nothing but an explicit ask fills.
      */
     public function __construct(
         public ?array $attributes = null,
         public ?int $linkCap = self::DEFAULT_LINK_CAP,
         public bool $withHasSubordinates = false,
         public array $windows = [],
+        public array $backlinks = [],
     ) {}
 
     /**

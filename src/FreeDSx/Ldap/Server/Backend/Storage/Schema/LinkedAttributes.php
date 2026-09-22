@@ -36,6 +36,8 @@ final class LinkedAttributes
      */
     private ?array $names = null;
 
+    private ?Backlinks $reversed = null;
+
     public function __construct(private readonly Schema $schema) {}
 
     /**
@@ -59,6 +61,43 @@ final class LinkedAttributes
     }
 
     /**
+     * Whether the attribute is the reverse of a linked one.
+     */
+    public function isBacklink(Attribute $attribute): bool
+    {
+        if ($attribute->hasOptions()) {
+            return false;
+        }
+
+        return $this->linkedBy($attribute->getName()) !== null;
+    }
+
+    /**
+     * The linked attribute a back-link reverses. Null when it reverses none.
+     */
+    public function linkedBy(string $name): ?string
+    {
+        return $this->backlinks()->linkedBy($name);
+    }
+
+    /**
+     * Which attributes reverse which linked ones.
+     */
+    public function backlinks(): Backlinks
+    {
+        return $this->reversed ??= $this->resolveBacklinks();
+    }
+
+    /**
+     * Whether values live in the link table rather than on the entry.
+     */
+    public function heldApart(Attribute $attribute): bool
+    {
+        return $this->links($attribute)
+            || $this->isBacklink($attribute);
+    }
+
+    /**
      * Refuses a schema no store could keep: removing an entry removes every link naming it, which would leave an
      * object class without an attribute it requires.
      *
@@ -76,6 +115,46 @@ final class LinkedAttributes
                     'The object class "%s" requires "%s", which is stored as links and can be emptied by a removal.',
                     $objectClass->names[0] ?? $objectClass->oid,
                     $name,
+                ));
+            }
+        }
+    }
+
+    /**
+     * Refuses a back-link no store could maintain.
+     *
+     * @throws RuntimeException when a back-link declaration cannot be honoured
+     */
+    public function assertBacklinksAreDerivable(): void
+    {
+        foreach ($this->schema->getAttributeTypes() as $type) {
+            $forward = $type->linkedBy();
+
+            if ($forward === null) {
+                continue;
+            }
+            $name = $type->names[0] ?? $type->oid;
+
+            if (!$this->links(new Attribute($forward))) {
+                throw new RuntimeException(sprintf(
+                    'The attribute "%s" reverses "%s", which is not stored as links.',
+                    $name,
+                    $forward,
+                ));
+            }
+
+            if ($this->links(new Attribute($name))) {
+                throw new RuntimeException(sprintf(
+                    'The attribute "%s" is stored as links and cannot also reverse one.',
+                    $name,
+                ));
+            }
+
+            if (!$type->noUserModification) {
+                throw new RuntimeException(sprintf(
+                    'The attribute "%s" reverses "%s" and must be declared NO-USER-MODIFICATION.',
+                    $name,
+                    $forward,
                 ));
             }
         }
@@ -107,6 +186,32 @@ final class LinkedAttributes
         }
 
         return $values;
+    }
+
+    private function resolveBacklinks(): Backlinks
+    {
+        $reverses = [];
+        $read = [];
+
+        foreach ($this->schema->getAttributeTypes() as $type) {
+            $forward = $type->linkedBy();
+            if ($forward === null) {
+                continue;
+            }
+
+            $linked = Attribute::normalizeName($forward);
+            foreach ($type->names as $name) {
+                $reverses[Attribute::normalizeName($name)] = $linked;
+            }
+
+            // Values come back under one name per type, since repeating them under every alias would only duplicate.
+            $read[Attribute::normalizeName($type->names[0] ?? $type->oid)] = $linked;
+        }
+
+        return new Backlinks(
+            $reverses,
+            $read,
+        );
     }
 
     /**

@@ -33,6 +33,7 @@ use FreeDSx\Ldap\Search\Filter\SubstringFilter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\SubstringIndex\SubstringIndexInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedAttributeTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\AttributeFilterSupport;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDirection;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeContextInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\AttributeIndexForms;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
@@ -163,6 +164,18 @@ trait SqlFilterTranslatorTrait
     }
 
     /**
+     * The linked attribute this description reverses.
+     */
+    private function reversedBy(string $attributeDescription): ?string
+    {
+        $attribute = new Attribute($attributeDescription);
+
+        return $this->linked->isBacklink($attribute)
+            ? $this->linked->linkedBy($attribute->getName())
+            : null;
+    }
+
+    /**
      * Equality on a linked attribute, resolving the asserted DN through the unique key the entry table holds it under.
      *
      * @param string $attribute Pre-validated; safe to embed in SQL.
@@ -170,6 +183,7 @@ trait SqlFilterTranslatorTrait
     private function translateLinkedEquality(
         string $attribute,
         string $value,
+        LinkDirection $direction = LinkDirection::Forward,
     ): SqlFilterResult {
         $target = Dn::normalizedOrNull($value);
 
@@ -181,11 +195,15 @@ trait SqlFilterTranslatorTrait
                 isExact: false,
             );
         }
+        $alias = $direction === LinkDirection::Forward
+            ? 't'
+            : 'o';
 
         return $this->linkedResult(
             $attribute,
-            't.lc_dn = ?',
+            "$alias.lc_dn = ?",
             [$target],
+            $direction,
         );
     }
 
@@ -200,10 +218,15 @@ trait SqlFilterTranslatorTrait
         string $attribute,
         ?string $target,
         array $params,
+        LinkDirection $direction = LinkDirection::Forward,
     ): SqlFilterResult {
+        [$selected, $joined, $alias] = match ($direction) {
+            LinkDirection::Forward => ['l.owner_entry_id', 'l.target_entry_id', 't'],
+            LinkDirection::Backward => ['l.target_entry_id', 'l.owner_entry_id', 'o'],
+        };
         $join = $target === null
             ? ''
-            : "JOIN entries t ON t.entry_id = l.target_entry_id";
+            : "JOIN entries $alias ON $alias.entry_id = $joined";
         $match = $target === null
             ? ''
             : " AND $target";
@@ -211,7 +234,7 @@ trait SqlFilterTranslatorTrait
         return new SqlFilterResult(
             <<<SQL
                 entry_id IN (
-                    SELECT l.owner_entry_id
+                    SELECT $selected
                     FROM entry_attribute_links l
                     $join
                     WHERE l.attr_name_lower = '$attribute'$match)
@@ -222,7 +245,7 @@ trait SqlFilterTranslatorTrait
                     SELECT 1
                     FROM entry_attribute_links l
                     $join
-                    WHERE l.owner_entry_id = entry_id
+                    WHERE $selected = entry_id
                       AND l.attr_name_lower = '$attribute'$match)
                 SQL,
         );
@@ -290,6 +313,17 @@ trait SqlFilterTranslatorTrait
                 [],
             );
         }
+        $reversed = $this->reversedBy($filter->getAttribute());
+
+        // Derived from the links naming this entry. Its presence is whether any of them do.
+        if ($reversed !== null) {
+            return $this->linkedResult(
+                $reversed,
+                null,
+                [],
+                LinkDirection::Backward,
+            );
+        }
 
         return new SqlFilterResult(
             $this->buildPresenceCheck($attribute),
@@ -307,13 +341,21 @@ trait SqlFilterTranslatorTrait
         if ($this->isSubordinateCheck($filter->getAttribute())) {
             return $this->translateHasSubordinates($filter->getValue());
         }
-
         $attribute = $this->validateAttribute($filter->getAttribute());
 
         if ($this->linksValuesOf($filter->getAttribute())) {
             return $this->translateLinkedEquality(
                 $attribute,
                 $filter->getValue(),
+            );
+        }
+
+        $reversed = $this->reversedBy($filter->getAttribute());
+        if ($reversed !== null) {
+            return $this->translateLinkedEquality(
+                $reversed,
+                $filter->getValue(),
+                LinkDirection::Backward,
             );
         }
 

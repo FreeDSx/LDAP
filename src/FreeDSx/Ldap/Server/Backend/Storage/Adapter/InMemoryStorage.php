@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\ArrayEntryStorageTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SubtreeRename;
@@ -25,6 +26,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
@@ -68,8 +70,10 @@ final class InMemoryStorage implements
     public function __construct(
         array $entries = [],
         SortKeyComparator $sortKeyComparator = new SortKeyComparator(),
+        LinkedAttributes $linkedAttributes = new LinkedAttributes(new Schema()),
     ) {
         $this->sortKeyComparator = $sortKeyComparator;
+        $this->linkedAttributes = $linkedAttributes;
 
         foreach ($entries as $entry) {
             $this->store($entry);
@@ -81,8 +85,16 @@ final class InMemoryStorage implements
         EntryProjection $projection = new EntryProjection(),
     ): ?Entry {
         $entry = $this->entries[$dn->normalizedString()] ?? null;
+        if ($entry === null) {
+            return null;
+        }
+        $entry = $this->withBacklinksOn(
+            $entry,
+            $projection,
+            $this->entries,
+        );
 
-        return $entry === null || $projection->windows === []
+        return $projection->windows === []
             ? $entry
             : $this->sliced($entry, $projection);
     }
@@ -244,9 +256,29 @@ final class InMemoryStorage implements
         Dn $owner,
         string $attribute,
     ): ?string {
+        $reversed = $this->linkedAttributes->linkedBy($attribute);
+        if ($reversed !== null) {
+            return $this->namingEntries($owner, $reversed)[0] ?? null;
+        }
+
         return $this->find($owner)
             ?->get($attribute, true)
             ?->getValues()[0] ?? null;
+    }
+
+    /**
+     * The entries naming this one through a linked attribute, which is what its back-link holds.
+     *
+     * @return list<string>
+     */
+    private function namingEntries(
+        Dn $target,
+        string $linked,
+    ): array {
+        return $this->ownersByTarget(
+            $this->entries,
+            $linked,
+        )[$target->normalizedString()] ?? [];
     }
 
     /**
@@ -256,9 +288,12 @@ final class InMemoryStorage implements
         Dn $owner,
         string $attribute,
     ): array {
-        $values = $this->find($owner)
-            ?->get($attribute, true)
-            ?->getValues() ?? [];
+        $reversed = $this->linkedAttributes->linkedBy($attribute);
+        $values = $reversed !== null
+            ? $this->namingEntries($owner, $reversed)
+            : $this->find($owner)
+                ?->get($attribute, true)
+                ?->getValues() ?? [];
 
         return array_values(array_filter(array_map(
             static fn(string $value): ?string => Dn::normalizedOrNull($value),

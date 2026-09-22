@@ -200,7 +200,7 @@ final readonly class EntryIndexWriter
 
         foreach ($entry->getAttributes() as $attribute) {
             // Linked values are answered from the table holding them.
-            if ($this->linked->links($attribute)) {
+            if ($this->linked->heldApart($attribute)) {
                 continue;
             }
             $name = Attribute::normalizeName($attribute->getName());
@@ -298,7 +298,7 @@ final readonly class EntryIndexWriter
 
         foreach ($entry->getAttributes() as $attribute) {
             // Linked values are answered from the table holding them.
-            if ($this->linked->links($attribute)) {
+            if ($this->linked->heldApart($attribute)) {
                 continue;
             }
             $attrNameLower = Attribute::normalizeName($attribute->getName());

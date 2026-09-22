@@ -25,7 +25,7 @@ trait PdoLinkReadDialectTrait
     public function queryLinksForRange(): string
     {
         return <<<SQL
-            SELECT l.owner_entry_id, l.attr_name_lower, l.target_uid, e.dn
+            SELECT l.owner_entry_id AS key_entry_id, l.attr_name_lower, e.dn
             FROM entry_attribute_links l
             JOIN entries e ON e.entry_id = l.target_entry_id
             WHERE l.owner_entry_id BETWEEN ? AND ?
@@ -41,7 +41,7 @@ trait PdoLinkReadDialectTrait
     public function queryOversizedLinks(): string
     {
         return <<<SQL
-            SELECT owner_entry_id, attr_name_lower
+            SELECT owner_entry_id AS key_entry_id, attr_name_lower
             FROM entry_attribute_links
             WHERE owner_entry_id BETWEEN ? AND ?
             GROUP BY owner_entry_id, attr_name_lower
@@ -57,7 +57,7 @@ trait PdoLinkReadDialectTrait
         );
 
         return <<<SQL
-            SELECT l.owner_entry_id, l.attr_name_lower, l.target_uid, e.dn
+            SELECT l.owner_entry_id AS key_entry_id, l.attr_name_lower, e.dn
             FROM entry_attribute_links l
             JOIN entries e ON e.entry_id = l.target_entry_id
             WHERE l.owner_entry_id BETWEEN ? AND ?
@@ -94,7 +94,7 @@ trait PdoLinkReadDialectTrait
     public function queryLinksForAttribute(): string
     {
         return <<<SQL
-            SELECT l.owner_entry_id, l.attr_name_lower, l.target_uid, e.dn
+            SELECT l.owner_entry_id AS key_entry_id, l.attr_name_lower, e.dn
             FROM entry_attribute_links l
             JOIN entries e ON e.entry_id = l.target_entry_id
             WHERE l.owner_entry_id = ? AND l.attr_name_lower = ?

@@ -131,7 +131,11 @@ final readonly class LinkedLeafWitness
         $name = $filter->getAttribute();
 
         // An extensible match may name no attribute at all, which no linked value answers.
-        if ($name === null || !$this->linked->links(new Attribute($name))) {
+        if ($name === null) {
+            return;
+        }
+        // Held apart from the entry, so a bounded read may have stopped short of the values asserted.
+        if (!$this->linked->heldApart(new Attribute($name))) {
             return;
         }
         $normalized = Attribute::normalizeName($name);

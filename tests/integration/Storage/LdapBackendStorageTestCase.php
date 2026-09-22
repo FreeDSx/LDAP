@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Storage;
 
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\BacklinkAttributeTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\BindTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\ControlTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\DefaultAclTestsTrait;
@@ -37,6 +38,7 @@ abstract class LdapBackendStorageTestCase extends ServerTestCase
     use DefaultAclTestsTrait;
     use WriteTestsTrait;
     use LinkedAttributeTestsTrait;
+    use BacklinkAttributeTestsTrait;
     use SubtreeMoveTestsTrait;
     use ControlTestsTrait;
 

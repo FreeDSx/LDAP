@@ -117,6 +117,141 @@ final class LinkedAttributesTest extends TestCase
         $subject->assertNoneRequired();
     }
 
+    public function test_the_core_schema_declares_the_group_membership_backlink(): void
+    {
+        self::assertTrue($this->subject->isBacklink(new Attribute('memberOf')));
+        self::assertSame(
+            'member',
+            $this->subject->linkedBy('memberOf'),
+        );
+    }
+
+    public function test_a_backlink_is_resolved_however_it_is_named(): void
+    {
+        self::assertSame(
+            'member',
+            $this->subject->linkedBy('MEMBEROF'),
+        );
+    }
+
+    public function test_an_option_bearing_backlink_is_not_declared(): void
+    {
+        self::assertFalse($this->subject->isBacklink(new Attribute('memberOf;lang-en')));
+    }
+
+    public function test_a_linked_attribute_is_not_itself_a_backlink(): void
+    {
+        self::assertFalse($this->subject->isBacklink(new Attribute('member')));
+        self::assertNull($this->subject->linkedBy('member'));
+    }
+
+    public function test_it_reports_the_backlink_reversing_each_linked_name(): void
+    {
+        self::assertSame(
+            ['memberof'],
+            $this->subject->backlinks()->reversing('member'),
+        );
+        self::assertSame(
+            ['member'],
+            $this->subject->backlinks()->linkedNames(),
+        );
+    }
+
+    public function test_both_ends_of_a_link_are_held_apart_from_the_entry(): void
+    {
+        self::assertTrue($this->subject->heldApart(new Attribute('member')));
+        self::assertTrue($this->subject->heldApart(new Attribute('memberOf')));
+        self::assertFalse($this->subject->heldApart(new Attribute('cn')));
+    }
+
+    public function test_the_shipped_schema_derives_every_backlink_it_declares(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->subject->assertBacklinksAreDerivable();
+    }
+
+    public function test_a_backlink_reversing_an_attribute_that_is_not_linked_is_refused(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('dangling');
+
+        $this->derivableFor(
+            'dangling',
+            'cn',
+            noUserModification: true,
+        );
+    }
+
+    public function test_a_backlink_that_is_itself_linked_is_refused(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('bothWays');
+
+        $this->derivableFor(
+            'bothWays',
+            'owner',
+            noUserModification: true,
+            linked: true,
+        );
+    }
+
+    public function test_more_than_one_backlink_may_reverse_the_same_attribute(): void
+    {
+        $subject = new LinkedAttributes(
+            SchemaResource::Core->load()->addAttributeType(new AttributeType(
+                '1.400',
+                ['isMemberOf'],
+                noUserModification: true,
+                extensions: [AttributeType::EXTENSION_LINKED_BY => ['member']],
+            )),
+        );
+        $subject->assertBacklinksAreDerivable();
+
+        self::assertEqualsCanonicalizing(
+            ['memberof', 'ismemberof'],
+            $subject->backlinks()->reversing('member'),
+        );
+        self::assertSame(
+            ['member'],
+            $subject->backlinks()->linkedNames(),
+        );
+    }
+
+    public function test_a_backlink_is_read_under_one_of_its_names_only(): void
+    {
+        $subject = new LinkedAttributes(
+            SchemaResource::Core->load()->addAttributeType(new AttributeType(
+                '1.500',
+                ['ownedBy', 'ownedByAlias'],
+                noUserModification: true,
+                extensions: [AttributeType::EXTENSION_LINKED_BY => ['owner']],
+            )),
+        );
+
+        self::assertSame(
+            ['ownedby'],
+            $subject->backlinks()->reversing('owner'),
+        );
+        // Either name still resolves, so a filter naming the alias is answered from the same rows.
+        self::assertSame(
+            'owner',
+            $subject->backlinks()->linkedBy('ownedByAlias'),
+        );
+    }
+
+    public function test_a_backlink_a_client_could_write_is_refused(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('writable');
+
+        $this->derivableFor(
+            'writable',
+            'owner',
+            noUserModification: false,
+        );
+    }
+
     public function test_a_schema_declaring_none_is_empty(): void
     {
         $subject = new LinkedAttributes(
@@ -136,6 +271,29 @@ final class LinkedAttributesTest extends TestCase
     public function test_the_core_schema_is_not_empty(): void
     {
         self::assertFalse($this->subject->isEmpty());
+    }
+
+    private function derivableFor(
+        string $name,
+        string $reverses,
+        bool $noUserModification,
+        bool $linked = false,
+    ): void {
+        $extensions = [AttributeType::EXTENSION_LINKED_BY => [$reverses]];
+
+        if ($linked) {
+            $extensions[AttributeType::EXTENSION_LINKED] = [AttributeType::EXTENSION_ENABLED_VALUE];
+        }
+        $subject = new LinkedAttributes(
+            SchemaResource::Core->load()->addAttributeType(new AttributeType(
+                '1.300',
+                [$name],
+                noUserModification: $noUserModification,
+                extensions: $extensions,
+            )),
+        );
+
+        $subject->assertBacklinksAreDerivable();
     }
 
     private function links(string $description): bool

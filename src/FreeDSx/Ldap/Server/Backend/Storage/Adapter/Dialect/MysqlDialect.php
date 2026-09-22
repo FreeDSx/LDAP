@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoEntryListDialectT
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoEntryReadDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoEntryWriteDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoJournalDialectTrait;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoBacklinkReadDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoLinkReadDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoLinkWriteDialectTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Sql\PdoPendingLinkDialectTrait;
@@ -34,6 +35,7 @@ use PDOException;
  */
 final class MysqlDialect implements PdoDialectInterface
 {
+    use PdoBacklinkReadDialectTrait;
     use PdoEntryListDialectTrait;
     use PdoEntryReadDialectTrait;
     use PdoEntryWriteDialectTrait;

@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryListDia
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryWriteDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoJournalDialectInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoBacklinkReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkWriteDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoPendingLinkDialectInterface;
@@ -31,6 +32,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoTransactionD
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 interface PdoDialectInterface extends
+    PdoBacklinkReadDialectInterface,
     PdoEntryListDialectInterface,
     PdoEntryReadDialectInterface,
     PdoEntryWriteDialectInterface,

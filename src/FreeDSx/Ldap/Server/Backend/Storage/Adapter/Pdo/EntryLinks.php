@@ -15,8 +15,10 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo;
 
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoBacklinkReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoLinkReadDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Link\LinkSpanReader;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PooledStatement;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
@@ -26,14 +28,11 @@ use Generator;
 
 use function array_chunk;
 use function array_keys;
-use function array_map;
 use function array_slice;
 use function count;
 use function is_array;
-use function iterator_to_array;
 use function max;
 use function min;
-use function sprintf;
 
 /**
  * The values a linked attribute holds, kept as references to entries and resolved to their current DNs.
@@ -49,10 +48,16 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
      */
     private const ENTRIES_PER_FETCH = 100;
 
+    /**
+     * @param LinkSpanReader $forward Reads from the entry holding the values.
+     * @param LinkSpanReader $backward Reads from the entry they name.
+     */
     public function __construct(
-        private PdoLinkReadDialectInterface $dialect,
+        private PdoLinkReadDialectInterface&PdoBacklinkReadDialectInterface $dialect,
         private PdoConnection $connection,
         private LinkedAttributes $declared,
+        private LinkSpanReader $forward,
+        private LinkSpanReader $backward,
     ) {}
 
     /**
@@ -96,12 +101,15 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
         Dn $owner,
         string $attribute,
     ): ?string {
+        $reversed = $this->declared->linkedBy($attribute);
         $row = $this->connection
             ->execute(
-                $this->dialect->queryAnyLinkValue(),
+                $reversed === null
+                    ? $this->dialect->queryAnyLinkValue()
+                    : $this->dialect->queryAnyBacklinkValue(),
                 [
                     $owner->normalizedString(),
-                    Attribute::normalizeName($attribute),
+                    $reversed ?? Attribute::normalizeName($attribute),
                 ],
             )
             ->fetch();
@@ -131,7 +139,7 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
             }
         }
 
-        return false;
+        return $projection->backlinks !== [];
     }
 
     /**
@@ -146,7 +154,7 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
         $links = $this->forSpan(
             $entryId,
             $entryId,
-            $projection->linkCap,
+            $projection,
         )[$entryId] ?? [];
 
         return $projection->windows === []
@@ -187,6 +195,32 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
     }
 
     /**
+     * @return array<int, array<string, list<string>>>
+     */
+    private function forSpan(
+        int $first,
+        int $last,
+        EntryProjection $projection,
+    ): array {
+        $links = $this->forward->forSpan(
+            $first,
+            $last,
+            $projection->linkCap,
+        );
+        if ($projection->backlinks === []) {
+            return $links;
+        }
+
+        foreach ($this->backward->forSpan($first, $last, $projection->linkCap) as $entryId => $byName) {
+            foreach ($byName as $name => $values) {
+                $links[$entryId][$name] = $values;
+            }
+        }
+
+        return $links;
+    }
+
+    /**
      * The attributes a slice was asked of, read again for the values it names rather than the ones held first.
      *
      * @param array<string, list<string>> $links
@@ -203,12 +237,17 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
 
         foreach ($projection->windows as $name => $window) {
             // Whatever the capped read returned for it stands for a different slice than the one asked for.
-            $held = $this->rangedNames($links, $name);
-            unset($links[$name], $links[$held]);
-            $size = $window->size($cap);
-            $values = $this->valuesOfSlice(
-                $entryId,
+            $held = $this->rangedNames(
+                $links,
                 $name,
+            );
+            unset($links[$name], $links[$held]);
+
+            $size = $window->size($cap);
+            $reversed = $this->declared->linkedBy($name);
+            $values = ($reversed === null ? $this->forward : $this->backward)->valuesOfSlice(
+                $entryId,
+                $reversed ?? $name,
                 $window->first,
                 $size,
             );
@@ -222,7 +261,11 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
                 continue;
             }
 
-            $links[$window->nameFor($name, count($values), $more)] = $values;
+            $links[$window->nameFor(
+                $name,
+                count($values),
+                $more,
+            )] = $values;
         }
 
         return $links;
@@ -245,36 +288,6 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
     }
 
     /**
-     * One attribute's values from where a slice starts, read one past it to tell whether more are held.
-     *
-     * @return list<string>
-     */
-    private function valuesOfSlice(
-        int $entryId,
-        string $name,
-        int $first,
-        int $size,
-    ): array {
-        $values = [];
-        $rows = $this->rowsOf($this->connection->execute(
-            $this->dialect->queryLinksForAttributeFrom(),
-            [
-                $entryId,
-                $name,
-                // One past the slice, which is what tells the naming whether more are held behind it.
-                $size + 1,
-                $first,
-            ],
-        ));
-
-        foreach ($rows as $row) {
-            $values[] = $this->stringColumn($row['dn'] ?? null);
-        }
-
-        return $values;
-    }
-
-    /**
      * @param list<mixed> $chunk
      * @return Generator<int, array{mixed, array<string, list<string>>}>
      */
@@ -287,7 +300,7 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
         }
         $links = $this->forChunk(
             $chunk,
-            $projection->linkCap,
+            $projection,
         );
 
         foreach ($chunk as $row) {
@@ -312,7 +325,7 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
      */
     private function forChunk(
         array $chunk,
-        ?int $cap,
+        EntryProjection $projection,
     ): array {
         $ids = [];
 
@@ -328,178 +341,8 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
             : $this->forSpan(
                 min($ids),
                 max($ids),
-                $cap,
+                $projection,
             );
-    }
-
-    /**
-     * Reads optimistically: a span holding no more links than the cap cannot hold an attribute over it.
-     *
-     * @return array<int, array<string, list<string>>>
-     */
-    private function forSpan(
-        int $first,
-        int $last,
-        ?int $cap,
-    ): array {
-        if ($cap === null) {
-            return $this->grouped(
-                $this->rowsOf($this->connection->execute(
-                    $this->dialect->queryLinksForRange(),
-                    [
-                        $first,
-                        $last,
-                    ],
-                )),
-                null,
-            );
-        }
-        $rows = iterator_to_array(
-            $this->rowsOf($this->connection->execute(
-                $this->dialect->queryLinksForRangeUpTo(),
-                [
-                    $first,
-                    $last,
-                    $cap + 1,
-                ],
-            )),
-            false,
-        );
-
-        return $this->grouped(
-            count($rows) > $cap
-                ? $this->cappedRows(
-                    $first,
-                    $last,
-                    $cap,
-                )
-                : $rows,
-            $cap,
-        );
-    }
-
-    /**
-     * The span's links with each attribute over the cap read only as far as it, so no read grows with a group's size.
-     *
-     * @return Generator<int, array<array-key, mixed>>
-     */
-    private function cappedRows(
-        int $first,
-        int $last,
-        int $cap,
-    ): Generator {
-        $oversized = iterator_to_array(
-            $this->rowsOf($this->connection->execute(
-                $this->dialect->queryOversizedLinks(),
-                [
-                    $first,
-                    $last,
-                    $cap,
-                ],
-            )),
-            false,
-        );
-
-        yield from $this->rowsOf($this->connection->execute(
-            $oversized === []
-                ? $this->dialect->queryLinksForRange()
-                : $this->dialect->queryLinksForRangeExcept(count($oversized)),
-            $this->exceptParams(
-                $first,
-                $last,
-                $oversized,
-            ),
-        ));
-
-        foreach ($oversized as $pair) {
-            yield from $this->rowsOf($this->connection->execute(
-                $this->dialect->queryLinksForAttribute(),
-                [
-                    $this->intColumn($pair['owner_entry_id'] ?? null),
-                    $this->stringColumn($pair['attr_name_lower'] ?? null),
-                    $cap + 1,
-                ],
-            ));
-        }
-    }
-
-    /**
-     * @param list<array<array-key, mixed>> $oversized
-     * @return list<int|string>
-     */
-    private function exceptParams(
-        int $first,
-        int $last,
-        array $oversized,
-    ): array {
-        $params = [
-            $first,
-            $last,
-        ];
-
-        foreach ($oversized as $pair) {
-            $params[] = $this->intColumn($pair['owner_entry_id'] ?? null);
-            $params[] = $this->stringColumn($pair['attr_name_lower'] ?? null);
-        }
-
-        return $params;
-    }
-
-    /**
-     * Keyed by owner, then by the name each attribute is returned under.
-     *
-     * @param iterable<array<array-key, mixed>> $rows
-     * @return array<int, array<string, list<string>>>
-     */
-    private function grouped(
-        iterable $rows,
-        ?int $cap,
-    ): array {
-        $links = [];
-
-        foreach ($rows as $row) {
-            $links[$this->intColumn($row['owner_entry_id'] ?? null)]
-                [$this->stringColumn($row['attr_name_lower'] ?? null)][]
-                    = $this->stringColumn($row['dn'] ?? null);
-        }
-
-        return $cap === null
-            ? $links
-            : array_map(
-                fn(array $byName): array => $this->bounded(
-                    $byName,
-                    $cap,
-                ),
-                $links,
-            );
-    }
-
-    /**
-     * An attribute over the cap is renamed with the range it holds, so it can never pass for the whole value set.
-     *
-     * @param array<string, list<string>> $byName
-     * @return array<string, list<string>>
-     */
-    private function bounded(
-        array $byName,
-        int $cap,
-    ): array {
-        $bounded = [];
-
-        foreach ($byName as $name => $values) {
-            if (count($values) <= $cap) {
-                $bounded[$name] = $values;
-
-                continue;
-            }
-            $bounded[sprintf('%s;range=0-%d', $name, $cap - 1)] = array_slice(
-                $values,
-                0,
-                $cap,
-            );
-        }
-
-        return $bounded;
     }
 
     /**
@@ -512,15 +355,19 @@ final readonly class EntryLinks implements LinkedValueLookupInterface
         string $attribute,
         array $normalized,
     ): Generator {
+        $reversed = $this->declared->linkedBy($attribute);
+
         foreach (array_chunk($normalized, self::ENTRIES_PER_FETCH) as $chunk) {
             $params = [
                 $owner->normalizedString(),
-                Attribute::normalizeName($attribute),
+                $reversed ?? Attribute::normalizeName($attribute),
                 ...$chunk,
             ];
 
             yield from $this->rowsOf($this->connection->execute(
-                $this->dialect->queryHeldLinkValues(count($chunk)),
+                $reversed === null
+                    ? $this->dialect->queryHeldLinkValues(count($chunk))
+                    : $this->dialect->queryHeldBacklinkValues(count($chunk)),
                 $params,
             ));
         }

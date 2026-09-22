@@ -39,7 +39,7 @@ readonly class EntryRowCodec
         $attributes = [];
 
         foreach ($entry->getAttributes() as $attribute) {
-            if ($this->linked->links($attribute)) {
+            if ($this->linked->heldApart($attribute)) {
                 continue;
             }
 

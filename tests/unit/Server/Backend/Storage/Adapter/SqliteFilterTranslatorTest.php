@@ -1186,6 +1186,124 @@ final class SqliteFilterTranslatorTest extends TestCase
         );
     }
 
+    public function test_a_linked_leaf_selects_the_entries_holding_the_asserted_value(): void
+    {
+        $result = $this->subject->translate(new EqualityFilter(
+            'member',
+            'CN=Alice,DC=foo,DC=bar',
+        ));
+
+        self::assertNotNull($result);
+        self::assertStringContainsString(
+            'SELECT l.owner_entry_id',
+            $result->sql,
+        );
+        self::assertStringContainsString(
+            "l.attr_name_lower = 'member'",
+            $result->sql,
+        );
+        self::assertSame(
+            ['cn=alice,dc=foo,dc=bar'],
+            $result->params,
+        );
+        self::assertTrue($result->isExact);
+    }
+
+    public function test_a_backlink_leaf_selects_the_entries_the_asserted_value_names(): void
+    {
+        $result = $this->subject->translate(new EqualityFilter(
+            'memberOf',
+            'CN=Admins,DC=foo,DC=bar',
+        ));
+
+        self::assertNotNull($result);
+        self::assertStringContainsString(
+            'SELECT l.target_entry_id',
+            $result->sql,
+        );
+        // Read from the rows of the attribute it reverses, which is the only place the membership is written.
+        self::assertStringContainsString(
+            "l.attr_name_lower = 'member'",
+            $result->sql,
+        );
+        self::assertStringContainsString(
+            'o.lc_dn = ?',
+            $result->sql,
+        );
+        self::assertSame(
+            ['cn=admins,dc=foo,dc=bar'],
+            $result->params,
+        );
+        self::assertTrue($result->isExact);
+    }
+
+    public function test_a_backlink_leaf_correlates_on_the_end_it_selects(): void
+    {
+        $result = $this->subject->translate(new EqualityFilter(
+            'memberOf',
+            'cn=admins,dc=foo,dc=bar',
+        ));
+
+        self::assertNotNull($result?->correlatedSql);
+        self::assertStringContainsString(
+            'l.target_entry_id = entry_id',
+            $result->correlatedSql,
+        );
+    }
+
+    public function test_a_backlink_presence_leaf_asks_only_whether_anything_names_the_entry(): void
+    {
+        $result = $this->subject->translate(new PresentFilter('memberOf'));
+
+        self::assertNotNull($result);
+        self::assertStringContainsString(
+            'SELECT l.target_entry_id',
+            $result->sql,
+        );
+        self::assertStringNotContainsString(
+            'JOIN entries',
+            $result->sql,
+        );
+        self::assertSame(
+            [],
+            $result->params,
+        );
+    }
+
+    /**
+     * A leaf carrying one keeps the sidecar-only streaming paths from driving off a table holding no rows for it.
+     */
+    public function test_a_backlink_leaf_carries_no_sidecar_condition(): void
+    {
+        $result = $this->subject->translate(new EqualityFilter(
+            'memberOf',
+            'cn=admins,dc=foo,dc=bar',
+        ));
+
+        self::assertNull($result?->sidecarCondition);
+    }
+
+    /**
+     * Settled by the syntax gate above the leaf, so the link table is never consulted for a value no DN could equal.
+     */
+    public function test_a_backlink_asserted_against_something_that_is_not_a_dn_matches_nothing(): void
+    {
+        $result = $this->translateWith(
+            new EqualityFilter(
+                'memberOf',
+                'not a dn',
+            ),
+            $this->schemaContext,
+        );
+
+        self::assertNotNull($result);
+        self::assertSame(
+            '1 = 0',
+            $result->sql,
+        );
+        self::assertFalse($result->isExact);
+    }
+
     /**
      * The context is fixed at construction, so a test wanting different schema answers needs its own translator.
      */
