@@ -31,6 +31,11 @@ final readonly class AttributeType
     public const EXTENSION_LINKED = 'X-LINKED';
 
     /**
+     * Names the linked attribute this one is the reverse of, whose values are the entries linking here.
+     */
+    public const EXTENSION_LINKED_BY = 'X-LINKED-BY';
+
+    /**
      * The value an extension carries when it is set; extension values are qdstrings, not booleans.
      */
     public const EXTENSION_ENABLED_VALUE = 'TRUE';
@@ -78,6 +83,14 @@ final readonly class AttributeType
             $this->extensions[self::EXTENSION_LINKED] ?? [],
             true,
         );
+    }
+
+    /**
+     * The linked attribute this one reverses, whose values name entries linking here, or null when it reverses none.
+     */
+    public function linkedBy(): ?string
+    {
+        return $this->extensions[self::EXTENSION_LINKED_BY][0] ?? null;
     }
 
     /**

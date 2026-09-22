@@ -28,7 +28,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\PendingLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\LinkedValueLookupInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Capability\NoLinkedValues;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\ReferenceIntegrityInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\ResolvedReferences;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
@@ -140,7 +139,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
     {
         return $this->isPdo($container)
             ? $container->get(EntryLinks::class)
-            : new NoLinkedValues();
+            : $container->get(InMemoryStorage::class);
     }
 
     private function makeLinkedChanges(Container $container): LinkedChanges
@@ -192,6 +191,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
     {
         $linked = new LinkedAttributes($container->get(ServerOptions::class)->getSchema());
         $linked->assertNoneRequired();
+        $linked->assertBacklinksAreDerivable();
 
         return $linked;
     }
@@ -244,6 +244,7 @@ final class StorageContainerProvider implements ContainerProviderInterface
         return new InMemoryStorage(
             $config->entries(),
             $container->get(SortKeyComparator::class),
+            $container->get(LinkedAttributes::class),
         );
     }
 

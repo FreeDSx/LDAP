@@ -31,6 +31,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\PendingLinkWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer\EntryWriter;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryLinks;
+use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Link\LinkSpanReader;
+use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDirection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\EntryRowCodec;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\PdoSchema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Query\EntryLister;
@@ -269,10 +271,25 @@ final class PdoStorageContainerProvider implements ContainerProviderInterface
 
     private function makeEntryLinks(Container $container): EntryLinks
     {
+        $dialect = $container->get(PdoDialectInterface::class);
+        $connection = $container->get(PdoConnection::class);
+        $linked = $container->get(LinkedAttributes::class);
+
         return new EntryLinks(
-            $container->get(PdoDialectInterface::class),
-            $container->get(PdoConnection::class),
-            $container->get(LinkedAttributes::class),
+            $dialect,
+            $connection,
+            $linked,
+            new LinkSpanReader(
+                $dialect,
+                $connection,
+                LinkDirection::Forward,
+            ),
+            new LinkSpanReader(
+                $dialect,
+                $connection,
+                LinkDirection::Backward,
+                $linked->backlinks(),
+            ),
         );
     }
 

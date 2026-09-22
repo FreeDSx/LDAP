@@ -16,11 +16,14 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
+use FreeDSx\Ldap\Search\Filter\FilterAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\TimeLimitExceededException;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedEntry;
 use FreeDSx\Ldap\Server\Backend\Storage\Paging\PageCursor;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\Backlinks;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Server\Subentry\SubentryDetector;
@@ -37,6 +40,8 @@ trait ArrayEntryStorageTrait
 
     private SortKeyComparator $sortKeyComparator;
 
+    private LinkedAttributes $linkedAttributes;
+
     /**
      * @param array<string, Entry> $entries Entries keyed by normalised DN string
      * @param array<string, int> $keys Entry key per normalised DN string
@@ -47,17 +52,23 @@ trait ArrayEntryStorageTrait
         array $keys = [],
     ): EntryStream {
         $scoped = $this->yieldByScope($options, $entries);
+        $backlinks = $this->backlinksWanted($options);
+
+        if (!$backlinks->isEmpty()) {
+            $scoped = $this->withBacklinks(
+                $scoped,
+                $this->backlinksIn($entries, $backlinks),
+            );
+        }
         if ($options->projection->windows !== []) {
             $scoped = $this->slicing($scoped, $options->projection);
         }
-
         if ($options->projection->withHasSubordinates) {
             $scoped = $this->withChildFlag(
                 $scoped,
                 $this->parentDnsIn($entries),
             );
         }
-
         if ($options->sortKeys === []) {
             return EntryStream::positioned($this->pageByKey(
                 $scoped,
@@ -67,7 +78,10 @@ trait ArrayEntryStorageTrait
         }
 
         /** @var list<Entry> $collected */
-        $collected = iterator_to_array($scoped, false);
+        $collected = iterator_to_array(
+            $scoped,
+            preserve_keys: false,
+        );
 
         return EntryStream::positioned($this->pageByCount(
             $this->sortKeyComparator->sort($collected, $options->sortKeys),
@@ -123,6 +137,127 @@ trait ArrayEntryStorageTrait
         }
 
         return $sliced;
+    }
+
+    /**
+     * The back-links to derive.
+     */
+    private function backlinksWanted(StorageListOptions $options): Backlinks
+    {
+        $wanted = $options->projection->backlinks;
+
+        foreach (FilterAttributes::referenced($options->filter) ?? [] as $attribute) {
+            $wanted[] = $attribute;
+        }
+
+        return $this->linkedAttributes
+            ->backlinks()
+            ->only($wanted);
+    }
+
+    /**
+     * One entry carrying the back-links a read asked for.
+     *
+     * @param array<string, Entry> $entries
+     */
+    private function withBacklinksOn(
+        Entry $entry,
+        EntryProjection $projection,
+        array $entries,
+    ): Entry {
+        $backlinks = $this->linkedAttributes
+            ->backlinks()
+            ->only($projection->backlinks);
+
+        if ($backlinks->isEmpty()) {
+            return $entry;
+        }
+        $named = $this->backlinksIn($entries, $backlinks);
+
+        foreach ($this->withBacklinks([$entry], $named) as $withBacklinks) {
+            return $withBacklinks;
+        }
+
+        return $entry;
+    }
+
+    /**
+     * Which entries each entry is named by.
+     *
+     * @param array<string, Entry> $entries
+     *
+     * @return array<string, array<string, list<string>>>
+     */
+    private function backlinksIn(
+        array $entries,
+        Backlinks $backlinks,
+    ): array {
+        $named = [];
+
+        foreach ($backlinks->linkedNames() as $linked) {
+            $names = $backlinks->reversing($linked);
+
+            foreach ($this->ownersByTarget($entries, $linked) as $target => $owners) {
+                $named[$target] = [
+                    ...$named[$target] ?? [],
+                    ...array_fill_keys($names, $owners),
+                ];
+            }
+        }
+
+        return $named;
+    }
+
+    /**
+     * The entries naming each target through one linked attribute.
+     *
+     * @param array<string, Entry> $entries
+     *
+     * @return array<string, list<string>> Keyed by the target's normalised DN
+     */
+    private function ownersByTarget(
+        array $entries,
+        string $linked,
+    ): array {
+        $owners = [];
+
+        foreach ($entries as $entry) {
+            foreach ($entry->get($linked, true)?->getValues() ?? [] as $value) {
+                $target = Dn::normalizedOrNull($value);
+
+                if ($target !== null) {
+                    $owners[$target][] = $entry->getDn()->toString();
+                }
+            }
+        }
+
+        return $owners;
+    }
+
+    /**
+     * @param iterable<Entry> $entries
+     * @param array<string, array<string, list<string>>> $named
+     * @return Generator<int, Entry>
+     */
+    private function withBacklinks(
+        iterable $entries,
+        array $named,
+    ): Generator {
+        foreach ($entries as $entry) {
+            $held = $named[$entry->getDn()->normalizedString()] ?? [];
+            if ($held === []) {
+                yield $entry;
+
+                continue;
+            }
+            $copy = $entry->makeCopy();
+
+            foreach ($held as $backlink => $values) {
+                $copy->set($backlink, ...$values);
+            }
+
+            yield $copy;
+        }
     }
 
     /**

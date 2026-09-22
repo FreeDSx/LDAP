@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS entry_attribute_links (
     target_uid       VARCHAR(255) NOT NULL DEFAULT '',
     UNIQUE KEY uq_link (owner_entry_id, attr_name_lower, target_entry_id, target_uid),
     INDEX idx_link_owner (owner_entry_id, attr_name_lower, target_entry_id),
-    INDEX idx_link_target (target_entry_id, attr_name_lower),
+    INDEX idx_link_target (target_entry_id, attr_name_lower, owner_entry_id),
     CONSTRAINT fk_link_owner FOREIGN KEY (owner_entry_id)
         REFERENCES entries(entry_id) ON DELETE CASCADE,
     CONSTRAINT fk_link_target FOREIGN KEY (target_entry_id)
