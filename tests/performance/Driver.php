@@ -380,32 +380,44 @@ final class Driver
         foreach ($children as $child) {
             $status = 0;
             pcntl_waitpid($child['pid'], $status);
+            $failure = $this->childFailure($child['id'], $status);
 
-            if (!is_int($status)) {
-                continue;
-            }
-
-            if (pcntl_wifsignaled($status)) {
-                $failures[] = sprintf(
-                    'worker %d killed by signal %d',
-                    $child['id'],
-                    pcntl_wtermsig($status),
-                );
-
-                continue;
-            }
-
-            $exit = pcntl_wexitstatus($status);
-            if ($exit !== 0) {
-                $failures[] = sprintf(
-                    'worker %d exited with status %d',
-                    $child['id'],
-                    $exit,
-                );
+            if ($failure !== null) {
+                $failures[] = $failure;
             }
         }
 
         return $failures;
+    }
+
+    /**
+     * @return ?string How the worker failed, or null if it exited cleanly
+     */
+    private function childFailure(
+        int $id,
+        mixed $status,
+    ): ?string {
+        if (!is_int($status)) {
+            return sprintf('worker %d reported no readable exit status', $id);
+        }
+
+        if (pcntl_wifsignaled($status)) {
+            return sprintf(
+                'worker %d killed by signal %d',
+                $id,
+                pcntl_wtermsig($status),
+            );
+        }
+
+        $exit = pcntl_wexitstatus($status);
+
+        return $exit === 0
+            ? null
+            : sprintf(
+                'worker %d exited with status %d',
+                $id,
+                $exit,
+            );
     }
 
     /**
