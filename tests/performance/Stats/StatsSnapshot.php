@@ -21,6 +21,7 @@ final class StatsSnapshot
     /**
      * @param array<string, array<int, int>> $samples op -> nanosecond latencies
      * @param array<string, int> $counts op -> total successes
+     * @param array<string, int> $entries op -> entries returned
      * @param array<string, int> $errors op -> total errors
      * @param array<string, array<string, int>> $errorClasses op -> exception class -> count
      * @param array<string, int> $substituted "fromOp->toOp" -> count
@@ -28,6 +29,7 @@ final class StatsSnapshot
     public function __construct(
         public readonly array $samples,
         public readonly array $counts,
+        public readonly array $entries,
         public readonly array $errors,
         public readonly array $errorClasses,
         public readonly array $substituted,
@@ -45,6 +47,7 @@ final class StatsSnapshot
     ): self {
         $samples = [];
         $counts = [];
+        $entries = [];
         $errors = [];
         $errorClasses = [];
         $substituted = [];
@@ -57,6 +60,9 @@ final class StatsSnapshot
             }
             foreach ($snapshot->counts as $op => $count) {
                 $counts[$op] = ($counts[$op] ?? 0) + $count;
+            }
+            foreach ($snapshot->entries as $op => $count) {
+                $entries[$op] = ($entries[$op] ?? 0) + $count;
             }
             foreach ($snapshot->errors as $op => $count) {
                 $errors[$op] = ($errors[$op] ?? 0) + $count;
@@ -74,6 +80,7 @@ final class StatsSnapshot
         return new self(
             samples: $samples,
             counts: $counts,
+            entries: $entries,
             errors: $errors,
             errorClasses: $errorClasses,
             substituted: $substituted,
@@ -104,6 +111,31 @@ final class StatsSnapshot
     public function errorCount(string $op): int
     {
         return $this->errors[$op] ?? 0;
+    }
+
+    public function entryCount(string $op): int
+    {
+        return $this->entries[$op] ?? 0;
+    }
+
+    /**
+     * Ops that ran but never saw a single entry, which measures the refusal rather than the work.
+     *
+     * @param list<string> $expected Ops whose whole purpose is to return entries.
+     *
+     * @return list<string>
+     */
+    public function opsReturningNothing(array $expected): array
+    {
+        $barren = [];
+
+        foreach ($expected as $op) {
+            if ($this->successCount($op) > 0 && $this->entryCount($op) === 0) {
+                $barren[] = $op;
+            }
+        }
+
+        return $barren;
     }
 
     public function throughput(string $op): float

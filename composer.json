@@ -83,7 +83,7 @@
     ],
     "test-load": "@php -d xdebug.mode=off -d opcache.enable_cli=1 -d opcache.jit=off tests/bin/ldap-load-test.php --backend=sqlite --runner=pcntl --duration=10 --warmup=2 --clients=8 --output=text",
     "test-load-docker": "tests/profile/load-test.sh",
-    "test-load-compare": "@php -d xdebug.mode=off -d opcache.enable_cli=1 -d opcache.jit_buffer_size=128M -d opcache.jit=tracing tests/bin/ldap-bench-compare.php",
+    "test-load-compare": "@php -d xdebug.mode=off -d opcache.enable_cli=1 -d opcache.jit_buffer_size=128M -d opcache.jit=function tests/bin/ldap-bench-compare.php",
     "compare-ldap": "tests/profile/compare-ldap.sh",
     "profile": "tests/profile/profile.sh",
     "profile-up": "docker compose -f tests/profile/docker-compose.yml up -d --build --wait",
