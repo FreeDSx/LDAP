@@ -89,6 +89,14 @@ final class PdoConfigTest extends TestCase
         );
     }
 
+    public function test_sqlite_enables_foreign_keys_for_every_session(): void
+    {
+        self::assertContains(
+            'PRAGMA foreign_keys = ON',
+            PdoDriver::Sqlite->defaultSessionStatements(),
+        );
+    }
+
     public function test_it_takes_its_pdo_options_from_the_driver(): void
     {
         self::assertSame(

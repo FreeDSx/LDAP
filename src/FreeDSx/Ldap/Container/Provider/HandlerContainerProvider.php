@@ -40,6 +40,7 @@ use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
@@ -183,6 +184,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
             filterEvaluator: $container->get(FilterEvaluatorInterface::class),
             schema: $options->getSchema(),
             eventLogger: $context->eventLogger,
+            linked: $container->get(LinkedAttributes::class),
         );
 
         $stream = null;

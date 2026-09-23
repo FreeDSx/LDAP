@@ -90,10 +90,10 @@ final readonly class SubtreeEnumerator
     {
         $entries = [];
         foreach ($dnList as $dn) {
-            // @todo Unbounded because the journal judges a consumer's filter against it; journal it without linked attributes instead.
+            // Removing an entry takes its links with it, so journaling them would only record what is already gone.
             $entry = $this->reader->find(
                 $dn,
-                EntryProjection::unbounded(),
+                new EntryProjection(linkCap: 0),
             );
             if ($entry !== null) {
                 $entries[] = $entry;
