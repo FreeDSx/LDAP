@@ -23,6 +23,7 @@ use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -64,10 +65,12 @@ final class SyncResultProjectorTest extends TestCase
             ->method('evaluate')
             ->willReturnCallback(fn(): bool => $this->filterMatches);
 
+        $schema = SchemaResource::Core->load();
         $this->subject = new SyncResultProjector(
             accessControl: $this->accessControl,
             filterEvaluator: $this->filterEvaluator,
-            schema: SchemaResource::Core->load(),
+            schema: $schema,
+            linked: new LinkedAttributes($schema),
         );
     }
 
@@ -229,6 +232,49 @@ final class SyncResultProjectorTest extends TestCase
             SyncStateControl::STATE_DELETE,
             $result->control->getState(),
         );
+    }
+
+    public function test_a_delete_is_announced_when_the_filter_rests_on_linked_values(): void
+    {
+        $this->filterMatches = false;
+
+        $result = $this->subject->projectDeleted(
+            $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
+            (new SearchRequest(Filters::equal('member', 'cn=a,dc=example,dc=com')))
+                ->base('dc=example,dc=com')
+                ->useSubtreeScope(),
+            $this->token,
+        );
+
+        self::assertNotNull($result);
+        self::assertSame(
+            SyncStateControl::STATE_DELETE,
+            $result->control->getState(),
+        );
+    }
+
+    public function test_a_delete_the_filter_excludes_is_still_withheld(): void
+    {
+        $this->filterMatches = false;
+
+        self::assertNull($this->subject->projectDeleted(
+            $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
+            $this->request(),
+            $this->token,
+        ));
+    }
+
+    public function test_a_delete_hidden_by_access_control_is_withheld_even_with_a_linked_filter(): void
+    {
+        $this->hidden = true;
+
+        self::assertNull($this->subject->projectDeleted(
+            $this->deleteChange($this->entry('cn=a,dc=example,dc=com', self::UUID)),
+            (new SearchRequest(Filters::equal('member', 'cn=a,dc=example,dc=com')))
+                ->base('dc=example,dc=com')
+                ->useSubtreeScope(),
+            $this->token,
+        ));
     }
 
     public function test_a_delete_without_a_pre_image_is_null(): void

@@ -153,6 +153,8 @@ final readonly class TransactionalEntryWrite
                     $context,
                 );
             },
+            // Removing an entry takes its links with it, so journaling them would only record what is already gone.
+            new EntryProjection(linkCap: 0),
         );
     }
 

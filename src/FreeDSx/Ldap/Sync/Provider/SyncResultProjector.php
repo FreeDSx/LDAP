@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Sync\Provider;
 
 use FreeDSx\Ldap\Control\Sync\SyncStateControl;
+use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
@@ -23,7 +24,10 @@ use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AttributeProjection;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
+use FreeDSx\Ldap\Search\Filter\FilterAttributes;
+use FreeDSx\Ldap\Search\Filter\FilterInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Logging\EventContext;
@@ -56,6 +60,7 @@ final readonly class SyncResultProjector
         private FilterEvaluatorInterface $filterEvaluator,
         private Schema $schema,
         private EventLogger $eventLogger = new EventLogger(null),
+        private LinkedAttributes $linked = new LinkedAttributes(new Schema()),
     ) {
         $this->projections = new WeakMap();
     }
@@ -221,8 +226,30 @@ final readonly class SyncResultProjector
             return false;
         }
 
-        return $this->accessControl->isEntryVisible($token, $preImage)
-            && $this->filterEvaluator->evaluate($preImage, $request->getFilter());
+        if (!$this->accessControl->isEntryVisible($token, $preImage)) {
+            return false;
+        }
+
+        // A consumer ignores a delete for an entry it never held, where withholding one leaves it stale forever.
+        if ($this->namesSomethingHeldApart($request->getFilter())) {
+            return true;
+        }
+
+        return $this->filterEvaluator->evaluate($preImage, $request->getFilter());
+    }
+
+    /**
+     * Whether the filter rests on values kept outside the entry.
+     */
+    private function namesSomethingHeldApart(FilterInterface $filter): bool
+    {
+        foreach (FilterAttributes::referenced($filter) ?? [] as $attribute) {
+            if ($this->linked->heldApart(new Attribute($attribute))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
