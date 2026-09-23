@@ -62,7 +62,8 @@ abstract class JournalConcurrencyTestCase extends TestCase
         foreach ($pids as $pid) {
             $status = 0;
             pcntl_waitpid($pid, $status);
-            if (!is_int($status) || !pcntl_wifexited($status) || pcntl_wexitstatus($status) !== 0) {
+
+            if (!self::exitedCleanly($status)) {
                 $failed++;
             }
         }
@@ -87,6 +88,13 @@ abstract class JournalConcurrencyTestCase extends TestCase
      * A journal on its own connection/instance, sharing the prepared store across forks.
      */
     abstract protected function makeJournal(): ChangeJournalInterface;
+
+    private static function exitedCleanly(mixed $status): bool
+    {
+        return is_int($status)
+            && pcntl_wifexited($status)
+            && pcntl_wexitstatus($status) === 0;
+    }
 
     /**
      * Runs in a forked child on its own journal instance; returns the process exit code.

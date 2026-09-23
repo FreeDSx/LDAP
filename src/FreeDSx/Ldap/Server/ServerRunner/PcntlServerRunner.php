@@ -187,7 +187,7 @@ class PcntlServerRunner implements ServerRunnerInterface
                 $this->metricsRecorder->connectionObserved(ConnectionObservation::Closed);
                 $this->recordChildCloseReason(
                     $result,
-                    is_int($status) ? $status : 0,
+                    $status,
                 );
                 $this->logInfo(
                     'The child process has ended.',
@@ -292,9 +292,9 @@ class PcntlServerRunner implements ServerRunnerInterface
      */
     private function recordChildCloseReason(
         int $result,
-        int $status,
+        mixed $status,
     ): void {
-        if ($result <= 0 || !pcntl_wifexited($status)) {
+        if ($result <= 0 || !is_int($status) || !pcntl_wifexited($status)) {
             return;
         }
 
