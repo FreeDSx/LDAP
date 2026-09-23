@@ -9,6 +9,7 @@ how to manage it yourself.
 * [Managing the Schema Yourself](#managing-the-schema-yourself)
 * [Versioning](#versioning)
 * [Rebuilding the Indexes](#rebuilding-the-indexes)
+* [The Linked Attribute Tables](#the-linked-attribute-tables)
 * [The Change Journal Tables](#the-change-journal-tables)
 
 ## Automatic Setup
@@ -70,6 +71,23 @@ $server->reindex();
 It re-stores every entry in one transaction, leaving operational attributes untouched and journaling nothing. Run it
 after enabling substring indexing, changing which attributes it covers, or changing an attribute's `EQUALITY` or
 `SUBSTR` rule. It rewrites every row, so treat it as maintenance rather than a startup step.
+
+## The Linked Attribute Tables
+
+Values of an attribute the schema marks `X-LINKED` live in `entry_attribute_links`, one row per value, referencing the
+target entry by its id rather than sitting in the entry's own row. See
+[Linked Attributes](Schema.md#linked-attributes) for what that means for a client.
+
+Both ends reference `entries` with `ON DELETE CASCADE`, which is what drops a reference when its target is deleted and
+what makes a rename visible without writing the referring entry. On SQLite that depends on `PRAGMA foreign_keys = ON`,
+issued on every connection; a custom `sessionStatements` list that drops it leaves references pointing at entries that
+no longer exist.
+
+A value naming an entry that is not stored yet is held in `entry_link_pending`, invisible to reads, and promoted once
+an entry with that DN arrives. Client writes never leave anything pending, since an unresolvable name is refused
+outright. The table is there for bulk loads and replication, where entries can arrive in any order.
+
+`reindex()` re-resolves the references as it re-stores each entry.
 
 ## The Change Journal Tables
 

@@ -7,6 +7,7 @@ a large amount of members (ie. over 1500 or so members).
 
 A helper class is provided by the LdapClient to make working with ranged attributes easier.
 
+* [Against This Server](#against-this-server)
 * [General Usage](#general-usage)
     * [Paging Ranged Values](#paging-ranged-values)
     * [Get All Ranged Values](#get-all-ranged-values)
@@ -16,6 +17,19 @@ A helper class is provided by the LdapClient to make working with ranged attribu
     * [getRanged](#getranged)
     * [getAllRanged](#getallranged)
     * [hasRanged](#hasranged)
+
+# Against This Server
+
+The FreeDSx server answers the range option, with two differences worth knowing:
+
+* Only an attribute the schema keeps as links can be ranged, which is `member` and the rest of the
+  [Linked Attributes](../Server/Schema.md#linked-attributes). A range on anything else is refused with
+  `unwillingToPerform`, as is a range that ends before it starts.
+* A slice is always bounded by the server's own limit, so `member;range=0-*` returns at most that many values and is
+  named for what it actually returned.
+
+A slice is addressed by position rather than by a cursor, so a value removed between two requests shifts the ones not
+yet read. Walking the membership as entries instead, with a paged search on `memberOf`, is not subject to that.
 
 # General Usage
 

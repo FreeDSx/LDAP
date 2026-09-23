@@ -340,8 +340,9 @@ AclRules::secureDefault(
 );
 ```
 
-Widen the set with care. Granting `member` or `memberOf` lets an identity add itself to a group, and granting
-`objectClass` lets it change which attributes its own entry may hold.
+Widen the set with care. Granting `member` lets an identity add itself to a group, and granting `objectClass` lets it
+change which attributes its own entry may hold. Granting `memberOf` does nothing, since a back-link is derived rather
+than stored and no identity may write one.
 
 ## Subject Reference
 
