@@ -14,6 +14,10 @@ Schema Validation
         * [What Is Not Read](#what-is-not-read)
         * [SchemaLoadMode](#schemaloadmode)
     * [Confidential Attributes](#confidential-attributes)
+* [Linked Attributes](#linked-attributes)
+    * [What Changes for a Linked Attribute](#what-changes-for-a-linked-attribute)
+    * [How Many Values a Read Returns](#how-many-values-a-read-returns)
+    * [Back-Links](#back-links)
 * [Operational Attributes](#operational-attributes)
 * [String Matching and Internationalization (RFC 4518)](#string-matching-and-internationalization-rfc-4518)
 
@@ -287,6 +291,85 @@ standard `userPassword` definition without this extension drops its protection.
 
 Extensions are carried forward on merge. A definition replacing one that carries `X-CONFIDENTIAL` keeps that extension
 unless it sets a different value for it, so merging schema read from elsewhere cannot silently drop the protection.
+
+## Linked Attributes
+
+An attribute carrying the `X-LINKED` extension holds distinguished names that must resolve to entries in the
+directory. The PDO backends keep those values in a table of references to the target entries rather than in the entry
+itself:
+
+```
+attributeTypes: ( 2.5.4.31 NAME 'member' SUP 2.5.4.49 EQUALITY 2.5.13.1
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 X-LINKED 'TRUE' )
+```
+
+The shipped schema declares `member`, `owner`, `seeAlso`, `roleOccupant` and `pwdPolicySubentry` this way. The point
+is that a group no longer has to be rewritten to add one member, and that a reference cannot outlive the entry it
+names.
+
+An object class may not require a linked attribute. Removing an entry takes every reference to it along, which would
+leave such a class without an attribute it requires, so the server refuses to start on a schema that does this.
+
+### What Changes for a Linked Attribute
+
+| Behaviour | Effect |
+|---|---|
+| A value naming an entry that is not stored | Refused with `constraintViolation`. |
+| Reading a value back | The target's current stored DN, not the spelling that was written. |
+| Renaming the target | The new DN appears, with no write to the referring entry and no change to its `modifyTimestamp`. |
+| Deleting the target | The reference goes with it, again with no write to the referring entry. |
+| Value order | The order the references were created in, which RFC 4511 leaves unconstrained. |
+| An option-bearing form such as `member;lang-en` | Not linked, and kept on the entry as an ordinary value. |
+
+Because a delete or rename never writes the referring entry, neither produces a change record. A replication consumer
+learns of the removed entry itself, but sees no modification of the groups that named it, and picks the change up on
+its next full refresh.
+
+### How Many Values a Read Returns
+
+A read returns at most 1500 values of a linked attribute by default. An attribute cut short is returned under a ranged
+name such as `member;range=0-1499`, so a truncated value set can never be mistaken for a complete one, and so it
+cannot be written back as if it were whole.
+
+Raise or remove the bound with `maxLinkedValues` on the search limits, including per identity through a search limit
+rule. A client can read a large attribute either one slice at a time with the range option, covered in
+[Range Retrieval](../Client/Range-Retrieval.md), or as entries through a paged search on the back-link.
+
+The in-memory backend keeps linked values on the entry as written. It does not refuse a name that resolves to nothing,
+does not follow a rename, does not remove a reference when its target is deleted, and does not bound how many values a
+read returns.
+
+### Back-Links
+
+An attribute carrying the `X-LINKED-BY` extension is the reverse of a linked one. Its values are the entries that
+name this one, derived per read from the same table rather than stored:
+
+```
+attributeTypes: ( 1.2.840.113556.1.2.102 NAME 'memberOf' EQUALITY 2.5.13.1
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 NO-USER-MODIFICATION USAGE dSAOperation
+  X-LINKED-BY 'member' )
+```
+
+The shipped schema declares `memberOf` as the reverse of `member`, so an entry reports the groups holding it. More
+than one back-link may reverse the same attribute, which is how a directory can serve two client populations that
+know the membership by different names.
+
+A back-link is operational, so it is returned only when asked for by name or through the `+` shorthand, never under
+`*`. That is deliberate: deriving it costs a lookup, and an ordinary search should not pay for one it did not ask for.
+It is filterable, so `(memberOf=cn=admins,dc=example,dc=com)` finds the members of a group, and it can be sliced with
+the range option like the attribute it reverses.
+
+Writing one is refused with `constraintViolation`, and the server never stores a value for it even on a write it
+raised itself.
+
+The server refuses to start when a back-link reverses an attribute that is not itself linked, is itself linked, or is
+not declared `NO-USER-MODIFICATION`. Each would leave an attribute nothing can maintain.
+
+Membership is direct only. A back-link reports the entries that name this one, not the ones that name those in turn.
+
+**Values are not filtered individually.** An identity that cannot see a group entry can still read that group's DN
+from a member's back-link. Withhold the attribute itself where that matters, with an attribute rule or a
+[Filter Rule](Access-Control.md#filter-rules).
 
 ## Operational Attributes
 
