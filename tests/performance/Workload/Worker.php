@@ -36,6 +36,11 @@ use Throwable;
  */
 final class Worker
 {
+    /**
+     * Values per membership page, matching the server's default cap so a page and a range slice are the same size.
+     */
+    private const MEMBERSHIP_PAGE = 1500;
+
     private readonly string $compareDn;
 
     private readonly string $mailDomain;
@@ -71,6 +76,16 @@ final class Worker
      * @var ?Paging Active paged search; each search-paged op pulls one page, restarting when the walk is exhausted.
      */
     private ?Paging $paging = null;
+
+    /**
+     * @var ?Paging The same, over the entries a group names.
+     */
+    private ?Paging $membership = null;
+
+    /**
+     * Where the next membership slice starts, so an op reads one slice rather than the whole group.
+     */
+    private int $rangeAt = 0;
 
     public function __construct(
         private readonly int $workerId,
@@ -170,8 +185,8 @@ final class Worker
         $start = hrtime(true);
 
         try {
-            $this->dispatch($client, $effective);
-            $this->stats->recordSuccess($op, hrtime(true) - $start);
+            $entries = $this->dispatch($client, $effective);
+            $this->stats->recordSuccess($op, hrtime(true) - $start, $entries);
         } catch (OperationException $e) {
             if ($e->getCode() === ResultCode::SIZE_LIMIT_EXCEEDED) {
                 $this->stats->recordSuccess($op, hrtime(true) - $start);
@@ -221,9 +236,12 @@ final class Worker
         return null;
     }
 
-    private function dispatch(LdapClient $client, string $op): void
+    /**
+     * @return int Entries the op saw, which every op not meant to return any reports as none.
+     */
+    private function dispatch(LdapClient $client, string $op): int
     {
-        match ($op) {
+        return match ($op) {
             'bind' => $this->doBind($client),
             'search-read' => $this->doSearchRead($client),
             'search-eq' => $this->doSearchEq($client),
@@ -243,54 +261,58 @@ final class Worker
             'group-add-member' => $this->doGroupAddMember($client),
             'group-del-member' => $this->doGroupDelMember($client),
             'group-reset' => $this->doGroupReset($client),
+            'group-read-range' => $this->doGroupReadRange($client),
+            'search-memberof' => $this->doSearchMemberOf($client),
             default => throw new LogicException("Unknown load-test op: {$op}"),
         };
     }
 
-    private function doBind(LdapClient $client): void
+    private function doBind(LdapClient $client): int
     {
         $client->bind(
             $this->config->bindDn,
             $this->config->bindPassword,
         );
+
+        return 0;
     }
 
-    private function doSearchRead(LdapClient $client): void
+    private function doSearchRead(LdapClient $client): int
     {
         $request = $this->newSearch(Filters::present('objectClass'))
             ->base($this->randomReadDn())
             ->useBaseScope();
 
-        $client->search($request);
+        return count($client->search($request));
     }
 
-    private function doSearchEq(LdapClient $client): void
+    private function doSearchEq(LdapClient $client): int
     {
         $request = $this->newSearch($this->randomEqualityFilter())
             ->base($this->config->baseDn)
             ->useSubtreeScope();
 
-        $client->search($request);
+        return count($client->search($request));
     }
 
-    private function doSearchSub(LdapClient $client): void
+    private function doSearchSub(LdapClient $client): int
     {
         $request = $this->newSearch($this->searchValueFilter())
             ->base($this->config->baseDn)
             ->useSubtreeScope();
         $this->applySearchSizeLimit($request);
 
-        $client->search($request);
+        return count($client->search($request));
     }
 
-    private function doSearchList(LdapClient $client): void
+    private function doSearchList(LdapClient $client): int
     {
         $request = $this->newSearch(Filters::equal('objectClass', 'inetOrgPerson'))
             ->base($this->config->writeBase)
             ->useSingleLevelScope();
         $this->applySearchSizeLimit($request);
 
-        $client->search($request);
+        return count($client->search($request));
     }
 
     /**
@@ -310,83 +332,83 @@ final class Worker
             : Filters::present('cn');
     }
 
-    private function doSearchSubstr(LdapClient $client): void
+    private function doSearchSubstr(LdapClient $client): int
     {
         $filter = $this->config->seedEntries >= 100
             ? Filters::contains('cn', (string) mt_rand(100, $this->config->seedEntries))
             : Filters::contains('cn', 'eed');
 
-        $client->search(
+        return count($client->search(
             $this->newSearch($filter)
                 ->base($this->config->baseDn)
                 ->useSubtreeScope(),
-        );
+        ));
     }
 
-    private function doSearchSuffix(LdapClient $client): void
+    private function doSearchSuffix(LdapClient $client): int
     {
         $filter = $this->config->seedEntries > 0
             ? Filters::endsWith('cn', "d-{$this->randomSeedIdx()}")
             : Filters::endsWith('cn', 'e');
 
-        $client->search(
+        return count($client->search(
             $this->newSearch($filter)
                 ->base($this->config->baseDn)
                 ->useSubtreeScope(),
-        );
+        ));
     }
 
-    private function doSearchRange(LdapClient $client): void
+    private function doSearchRange(LdapClient $client): int
     {
         $threshold = $this->config->seedEntries > 0
             ? 1000 + max(1, $this->config->seedEntries - 99)
             : 1000;
 
-        $client->search(
+        return count($client->search(
             $this->newSearch(Filters::greaterThanOrEqual('uidNumber', (string) $threshold))
                 ->base($this->config->baseDn)
                 ->useSubtreeScope(),
-        );
+        ));
     }
 
     /**
      * Composed AND with a broad leaf and a selective leaf; streams off the selective leaf, then PHP-verifies the rest.
      */
-    private function doSearchAnd(LdapClient $client): void
+    private function doSearchAnd(LdapClient $client): int
     {
         $filter = Filters::and(
             Filters::equal('objectClass', 'inetOrgPerson'),
             $this->randomEqualityFilter(),
         );
 
-        $client->search(
+        return count($client->search(
             $this->newSearch($filter)
                 ->base($this->config->baseDn)
                 ->useSubtreeScope(),
-        );
+        ));
     }
 
     /**
      * Composed OR of two selective leaves; exercises the OR-composite path, which streaming does not yet cover.
      */
-    private function doSearchOr(LdapClient $client): void
+    private function doSearchOr(LdapClient $client): int
     {
         $filter = Filters::or(
             $this->randomEqualityFilter(),
             $this->randomEqualityFilter(),
         );
 
-        $client->search(
+        return count($client->search(
             $this->newSearch($filter)
                 ->base($this->config->baseDn)
                 ->useSubtreeScope(),
-        );
+        ));
     }
 
     /**
      * Server-side sort over a selective subset (a realistic sorted search filters first), size-limited to a display page.
      */
-    private function doSearchSort(LdapClient $client): void
+    private function doSearchSort(LdapClient $client): int
     {
         $request = $this->newSearch($this->searchValueFilter())
             ->base($this->config->baseDn)
@@ -396,17 +418,17 @@ final class Worker
             $request->sizeLimit($this->config->searchSortSizeLimit);
         }
 
-        $client->search(
+        return count($client->search(
             $request,
             Controls::sort('sn'),
-        );
+        ));
     }
 
     /**
      * Fetches ONE page of a paged (RFC 2696) subtree search per op, so each sample is a single page's latency; the
      * page size matches the shared search size limit, making a page directly comparable to a one-shot search.
      */
-    private function doSearchPaged(LdapClient $client): void
+    private function doSearchPaged(LdapClient $client): int
     {
         if ($this->paging === null || !$this->paging->hasEntries()) {
             $this->paging = $client->paging(
@@ -420,7 +442,7 @@ final class Worker
         }
 
         try {
-            $this->paging->getEntries();
+            return count($this->paging->getEntries());
         } catch (Throwable $e) {
             // Drop the cursor so the next op starts a fresh walk; re-throw so the outer handler records the outcome.
             $this->paging = null;
@@ -488,12 +510,14 @@ final class Worker
             : Filters::equal('mail', "alice@{$this->mailDomain}");
     }
 
-    private function doCompare(LdapClient $client): void
+    private function doCompare(LdapClient $client): int
     {
         $client->compare($this->compareDn, 'mail', "alice@{$this->mailDomain}");
+
+        return 0;
     }
 
-    private function doAdd(LdapClient $client): void
+    private function doAdd(LdapClient $client): int
     {
         $seq = ++$this->addSeq;
         $cn = "load-w{$this->workerId}-{$seq}";
@@ -508,9 +532,11 @@ final class Worker
         ));
 
         $this->ownedDns[] = $dn;
+
+        return 0;
     }
 
-    private function doModify(LdapClient $client): void
+    private function doModify(LdapClient $client): int
     {
         $dn = $this->ownedDns[array_rand($this->ownedDns)];
 
@@ -520,9 +546,11 @@ final class Worker
         );
 
         $client->send($request);
+
+        return 0;
     }
 
-    private function doGroupAddMember(LdapClient $client): void
+    private function doGroupAddMember(LdapClient $client): int
     {
         $dn = $this->drawMember($this->spareMembers);
 
@@ -532,9 +560,11 @@ final class Worker
         ));
 
         $this->addedMembers[] = $dn;
+
+        return 0;
     }
 
-    private function doGroupDelMember(LdapClient $client): void
+    private function doGroupDelMember(LdapClient $client): int
     {
         $dn = $this->drawMember($this->addedMembers);
 
@@ -544,9 +574,61 @@ final class Worker
         ));
 
         $this->spareMembers[] = $dn;
+
+        return 0;
     }
 
-    private function doGroupReset(LdapClient $client): void
+    private function doGroupReadRange(LdapClient $client): int
+    {
+        $entry = $client->read(
+            $this->groupDn,
+            [sprintf('member;range=%d-*', $this->rangeAt)],
+        );
+        $held = null;
+
+        foreach ($entry?->getAttributes() ?? [] as $attribute) {
+            if (Attribute::normalizeName($attribute->getDescription()) === 'member') {
+                $held = $attribute;
+            }
+        }
+
+        // Named to the end, or named plainly, means nothing is left behind it.
+        $more = $held !== null && !str_ends_with($held->getDescription(), '-*')
+            && $held->getDescription() !== 'member';
+        $values = count($held?->getValues() ?? []);
+
+        $this->rangeAt = $more
+            ? $this->rangeAt + $values
+            : 0;
+
+        return $values;
+    }
+
+    private function doSearchMemberOf(LdapClient $client): int
+    {
+        if ($this->membership === null || !$this->membership->hasEntries()) {
+            // Names no attribute, since a membership is the DNs, which is all ranging the group's own values gives.
+            $this->membership = $client->paging(
+                Operations::search(
+                    Filters::equal('memberOf', $this->groupDn),
+                    SearchRequest::ATTRIBUTES_NONE,
+                )
+                    ->base($this->config->baseDn)
+                    ->useSubtreeScope(),
+                self::MEMBERSHIP_PAGE,
+            );
+        }
+
+        try {
+            return count($this->membership->getEntries());
+        } catch (Throwable $e) {
+            $this->membership = null;
+
+            throw $e;
+        }
+    }
+
+    private function doGroupReset(LdapClient $client): int
     {
         $client->send(Operations::modify(
             $this->groupDn,
@@ -555,6 +637,8 @@ final class Worker
 
         $this->spareMembers = $this->buildSpareMembers();
         $this->addedMembers = [];
+
+        return 0;
     }
 
     /**
@@ -602,7 +686,7 @@ final class Worker
         return $members;
     }
 
-    private function doDelete(LdapClient $client): void
+    private function doDelete(LdapClient $client): int
     {
         $idx = array_rand($this->ownedDns);
         $dn = $this->ownedDns[$idx];
@@ -610,6 +694,8 @@ final class Worker
         $client->delete($dn);
 
         array_splice($this->ownedDns, $idx, 1);
+
+        return 0;
     }
 
     private function buildClient(): LdapClient

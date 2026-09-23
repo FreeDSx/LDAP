@@ -16,6 +16,7 @@ namespace Tests\Performance\FreeDSx\Ldap\Compare;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Output\OutputInterface;
 use Tests\Performance\FreeDSx\Ldap\Stats\StatsSnapshot;
+use Tests\Performance\FreeDSx\Ldap\Workload\WorkloadMix;
 
 /**
  * Side-by-side renderer for a target LDAP server vs the source server (FreeDSx by default) benchmark run.
@@ -110,6 +111,25 @@ final class ComparisonReport
             $this->sourceLabel,
             $this->source->elapsedSeconds,
         ));
+
+        $this->warnBarrenSides($output);
+    }
+
+    private function warnBarrenSides(OutputInterface $output): void
+    {
+        foreach ([[$this->targetLabel, $this->target], [$this->sourceLabel, $this->source]] as [$label, $snapshot]) {
+            $barren = $snapshot?->opsReturningNothing(WorkloadMix::ENTRY_OPS) ?? [];
+
+            if ($barren === []) {
+                continue;
+            }
+
+            $output->writeln(sprintf(
+                '<error>INVALID: %s returned no entries for %s; the comparison above is meaningless.</error>',
+                $label,
+                implode(', ', $barren),
+            ));
+        }
     }
 
     /**

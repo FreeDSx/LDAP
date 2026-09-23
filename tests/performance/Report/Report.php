@@ -154,7 +154,9 @@ final class Report
             $errPct,
         );
 
+        $line .= $this->renderBarrenOps();
         $topErrs = $this->snapshot->topErrorClasses();
+
         if ($topErrs === []) {
             return $line;
         }
@@ -166,6 +168,20 @@ final class Report
         }
 
         return $line . PHP_EOL . 'Top errors: ' . implode(', ', $parts);
+    }
+
+    private function renderBarrenOps(): string
+    {
+        $barren = $this->snapshot->opsReturningNothing(WorkloadMix::ENTRY_OPS);
+
+        if ($barren === []) {
+            return '';
+        }
+
+        return PHP_EOL . sprintf(
+            'INVALID: %s returned no entries at all; the numbers above measure nothing.',
+            implode(', ', $barren),
+        );
     }
 
     private function renderSubstitutions(): string

@@ -50,7 +50,7 @@ final class ServerManager
         if ($this->config->jit) {
             $command[] = '-dopcache.enable_cli=1';
             $command[] = '-dopcache.jit_buffer_size=128M';
-            $command[] = '-dopcache.jit=tracing';
+            $command[] = '-dopcache.jit=function';
         }
         $command[] = self::BOOTSTRAP_PATH;
         $command[] = '--transport=tcp';

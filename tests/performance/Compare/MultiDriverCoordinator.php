@@ -82,7 +82,7 @@ final class MultiDriverCoordinator
         if ($config->jit) {
             $command[] = '-dopcache.enable_cli=1';
             $command[] = '-dopcache.jit_buffer_size=128M';
-            $command[] = '-dopcache.jit=tracing';
+            $command[] = '-dopcache.jit=function';
         }
         $command[] = self::WORKER_PATH;
         if (!$config->jit) {
@@ -213,6 +213,7 @@ final class MultiDriverCoordinator
 
         $samples = [];
         $counts = [];
+        $entries = [];
         $errors = [];
         $errorClasses = [];
         $substituted = [];
@@ -231,6 +232,9 @@ final class MultiDriverCoordinator
             }
             foreach ($snap->counts as $op => $count) {
                 $counts[$op] = ($counts[$op] ?? 0) + $count;
+            }
+            foreach ($snap->entries as $op => $count) {
+                $entries[$op] = ($entries[$op] ?? 0) + $count;
             }
             foreach ($snap->errors as $op => $count) {
                 $errors[$op] = ($errors[$op] ?? 0) + $count;
@@ -251,6 +255,7 @@ final class MultiDriverCoordinator
         return new StatsSnapshot(
             samples: $samples,
             counts: $counts,
+            entries: $entries,
             errors: $errors,
             errorClasses: $errorClasses,
             substituted: $substituted,

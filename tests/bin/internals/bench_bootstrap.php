@@ -79,7 +79,7 @@ if (!function_exists('pcntl_exec')) {
 $execArgs = [
     '-dopcache.enable_cli=1',
     '-dopcache.jit_buffer_size=128M',
-    '-dopcache.jit=tracing',
+    '-dopcache.jit=function',
     $argv[0],
     ...array_slice($argv, 1),
 ];

@@ -161,6 +161,20 @@ setup_389ds() {
             --suffix "$base" --be-name userRoot --create-suffix
     fi
 
+    # Shipped off, and a membership mix against it measures an empty result rather than the work.
+    local needs_restart=0
+    if ! docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" plugin memberof show 2>/dev/null \
+        | grep -qi "nsslapd-pluginEnabled: on"; then
+        echo "==> enabling the 389ds memberOf plugin"
+        docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" plugin memberof enable
+        needs_restart=1
+    fi
+
+    # The bench OpenLDAP indexes memberOf, so without this one side seeks where the other scans.
+    docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" backend index add \
+        --attr memberOf --index-type eq --be-name userRoot >/dev/null 2>&1 \
+    || true
+
     echo "==> tuning 389ds (disable access log; raise ID list + lookthrough limits)"
     docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" \
         config replace nsslapd-accesslog-logging-enabled=off >/dev/null 2>&1 \
@@ -168,6 +182,26 @@ setup_389ds() {
     docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" backend config set \
         --idlistscanlimit 200000 --lookthroughlimit 200000 >/dev/null 2>&1 \
     || echo "   (scan-limit tweak skipped)"
+
+    # A plugin only loads at startup, and the bench seeds after this returns...
+    if [[ "$needs_restart" -eq 1 ]]; then
+        echo "==> restarting 389ds so the plugin loads"
+        docker restart freedsx-profile-389ds >/dev/null
+        await_389ds "$bind" "$pw" "$uri"
+    fi
+}
+
+await_389ds() {
+    local bind="$1" pw="$2" uri="$3" i
+    for i in $(seq 1 60); do
+        if docker exec freedsx-profile-389ds dsconf -D "$bind" -w "$pw" "$uri" backend suffix list >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 2
+    done
+
+    echo "389ds did not answer again after the restart" >&2
+    exit 1
 }
 
 run_setup() {

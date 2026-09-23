@@ -36,6 +36,11 @@ final class StatsCollector
     private array $counts = [];
 
     /**
+     * @var array<string, int> op -> entries the server returned while recording
+     */
+    private array $entries = [];
+
+    /**
      * @var array<string, int> op -> error count while recording
      */
     private array $errors = [];
@@ -60,14 +65,21 @@ final class StatsCollector
         $this->recording = false;
     }
 
-    public function recordSuccess(string $op, int $nanos): void
-    {
+    /**
+     * @param int $entries Entries the server returned, which an op measuring nothing would never see any of.
+     */
+    public function recordSuccess(
+        string $op,
+        int $nanos,
+        int $entries = 0,
+    ): void {
         if (!$this->recording) {
             return;
         }
 
         $seen = ($this->counts[$op] ?? 0) + 1;
         $this->counts[$op] = $seen;
+        $this->entries[$op] = ($this->entries[$op] ?? 0) + $entries;
 
         if (!isset($this->samples[$op])) {
             $this->samples[$op] = [];
@@ -110,6 +122,7 @@ final class StatsCollector
         return new StatsSnapshot(
             samples: $this->samples,
             counts: $this->counts,
+            entries: $this->entries,
             errors: $this->errors,
             errorClasses: $this->errorClasses,
             substituted: $this->substituted,

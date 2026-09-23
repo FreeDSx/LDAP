@@ -24,6 +24,7 @@ argsfile        /var/run/slapd/slapd.args
 
 modulepath      /usr/lib/ldap
 moduleload      back_mdb
+moduleload      memberof
 
 loglevel        none
 
@@ -38,6 +39,15 @@ maxsize         1073741824
 index           objectClass             eq
 index           cn,sn,uid,mail          eq,sub
 index           ou                      eq
+index           member,memberOf         eq
+
+# Maintains memberOf, which a membership comparison has no meaning without.
+overlay              memberof
+memberof-group-oc    groupOfNames
+memberof-member-ad   member
+memberof-memberof-ad memberOf
+memberof-dangling    ignore
+memberof-refint      TRUE
 
 access to attrs=userPassword
         by self write

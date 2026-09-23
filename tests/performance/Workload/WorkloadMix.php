@@ -40,6 +40,29 @@ final class WorkloadMix
         'group-add-member',
         'group-del-member',
         'group-reset',
+        'group-read-range',
+        'search-memberof',
+    ];
+
+    /**
+     * Ops whose whole purpose is to return entries.
+     *
+     * @var list<string>
+     */
+    public const ENTRY_OPS = [
+        'search-read',
+        'search-eq',
+        'search-sub',
+        'search-substr',
+        'search-suffix',
+        'search-range',
+        'search-list',
+        'search-and',
+        'search-or',
+        'search-sort',
+        'search-paged',
+        'group-read-range',
+        'search-memberof',
     ];
 
     /**
@@ -51,6 +74,8 @@ final class WorkloadMix
         'group-add-member',
         'group-del-member',
         'group-reset',
+        'group-read-range',
+        'search-memberof',
     ];
 
     /**
