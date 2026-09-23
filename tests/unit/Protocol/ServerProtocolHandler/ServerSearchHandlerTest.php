@@ -893,10 +893,7 @@ final class ServerSearchHandlerTest extends TestCase
         );
     }
 
-    /**
-     * Naming no rule asks only for the server's own order on that attribute, which it always has.
-     */
-    public function test_sort_by_attribute_without_ordering_rule_reports_success(): void
+    public function test_sort_by_attribute_without_ordering_rule_is_refused(): void
     {
         $search = new LdapMessageRequest(
             2,
@@ -914,7 +911,76 @@ final class ServerSearchHandlerTest extends TestCase
         );
 
         self::assertSame(
+            ResultCode::UNWILLING_TO_PERFORM,
+            $this->sortResultOf(),
+        );
+    }
+
+    public function test_sort_by_an_ordered_attribute_is_unaffected_by_a_backlink_in_the_filter(): void
+    {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::equal('memberOf', 'cn=admins,dc=foo,dc=bar')))->base('dc=foo,dc=bar'),
+            new SortingControl(SortKey::ascending('sn')),
+        );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturn(EntryStream::of($this->makeGenerator()));
+
+        $this->drive(
+            $this->subject,
+            $search,
+        );
+
+        self::assertSame(
             ResultCode::SUCCESS,
+            $this->sortResultOf(),
+        );
+    }
+
+    public function test_sort_by_a_linked_attribute_is_refused(): void
+    {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar'),
+            new SortingControl(SortKey::ascending('member')),
+        );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturn(EntryStream::of($this->makeGenerator()));
+
+        $this->drive(
+            $this->subject,
+            $search,
+        );
+
+        self::assertSame(
+            ResultCode::UNWILLING_TO_PERFORM,
+            $this->sortResultOf(),
+        );
+    }
+
+    public function test_sort_by_a_backlink_is_refused(): void
+    {
+        $search = new LdapMessageRequest(
+            2,
+            (new SearchRequest(Filters::present('cn')))->base('dc=foo,dc=bar'),
+            new SortingControl(SortKey::ascending('memberOf')),
+        );
+
+        $this->mockBackend
+            ->method('search')
+            ->willReturn(EntryStream::of($this->makeGenerator()));
+
+        $this->drive(
+            $this->subject,
+            $search,
+        );
+
+        self::assertSame(
+            ResultCode::UNWILLING_TO_PERFORM,
             $this->sortResultOf(),
         );
     }
