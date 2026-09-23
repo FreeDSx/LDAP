@@ -403,12 +403,19 @@ trait ServerSearchTrait
                 );
             }
 
-            // A rule the stored order cannot provide must not be reported as success (RFC 2891 §2). Naming no rule
-            // asks only for the server's own order on that attribute, which it always has.
+            // A rule the stored order cannot provide must not be reported as success (RFC 2891 §2).
             $orderingRule = $sortKey->getOrderingRule();
             if ($orderingRule !== null && !$this->ordersByRule($schema, $attribute, $orderingRule)) {
                 return new SortingResponseControl(
                     ResultCode::INAPPROPRIATE_MATCHING,
+                    $attribute,
+                );
+            }
+
+            // Naming no rule asks for the type's own, and a type declaring none can only be ordered by invention.
+            if ($orderingRule === null && $schema->getOrderingRuleOid($attribute) === null) {
+                return new SortingResponseControl(
+                    ResultCode::UNWILLING_TO_PERFORM,
                     $attribute,
                 );
             }
