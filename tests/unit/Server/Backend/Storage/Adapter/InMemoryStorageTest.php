@@ -17,8 +17,10 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -146,6 +148,33 @@ final class InMemoryStorageTest extends TestCase
 
         self::assertNull(
             $this->subject->find(new Dn('cn=admins,dc=ex,dc=com'))?->get('member'),
+        );
+    }
+
+    public function test_an_untouched_write_keeps_the_members_the_entry_was_read_without(): void
+    {
+        $schema = SchemaResource::Core->load();
+        $subject = new InMemoryStorage(
+            linkedAttributes: new LinkedAttributes($schema),
+        );
+        $subject->store(Entry::fromArray(
+            'cn=admins,dc=ex,dc=com',
+            ['cn' => ['admins'], 'member' => ['cn=bob,dc=ex,dc=com']],
+        ));
+
+        $subject->store(
+            Entry::fromArray('cn=admins,dc=ex,dc=com', ['cn' => ['admins'], 'description' => ['Renamed']]),
+            links: LinkDelta::untouched(),
+        );
+        $stored = $subject->find(new Dn('cn=admins,dc=ex,dc=com'));
+
+        self::assertSame(
+            ['cn=bob,dc=ex,dc=com'],
+            array_values($stored?->get('member')?->getValues() ?? []),
+        );
+        self::assertSame(
+            'Renamed',
+            $stored?->get('description')?->firstValue(),
         );
     }
 

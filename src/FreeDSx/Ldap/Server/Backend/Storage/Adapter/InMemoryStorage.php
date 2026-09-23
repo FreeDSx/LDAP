@@ -302,6 +302,25 @@ final class InMemoryStorage implements
     }
 
     /**
+     * The entry carrying the linked values the one it replaces held.
+     */
+    private function withStoredLinks(
+        Entry $entry,
+        ?Entry $previous,
+    ): Entry {
+        if ($previous === null) {
+            return $entry;
+        }
+        $restored = $entry->makeCopy();
+
+        foreach ($this->linkedAttributes->valuesOf($previous) as $name => $values) {
+            $restored->set($name, ...$values);
+        }
+
+        return $restored;
+    }
+
+    /**
      * A delta names only what changes, and the entry carrying it no longer holds the attribute it changes.
      */
     private function withLinks(
@@ -309,6 +328,13 @@ final class InMemoryStorage implements
         LinkDelta $links,
         ?Entry $previous,
     ): Entry {
+        if ($links->isUntouched()) {
+            return $this->withStoredLinks(
+                $entry,
+                $previous,
+            );
+        }
+
         if ($links->isEmpty()) {
             return $entry;
         }
