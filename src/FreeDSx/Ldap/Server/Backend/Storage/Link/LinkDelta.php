@@ -43,9 +43,26 @@ final readonly class LinkDelta
     public function __construct(
         array $added = [],
         array $removed = [],
+        private bool $untouched = false,
     ) {
         $this->added = self::keyed($added);
         $this->removed = self::keyed($removed);
+    }
+
+    /**
+     * Leaves the stored links as they are, for a write whose entry was read without them.
+     */
+    public static function untouched(): self
+    {
+        return new self(untouched: true);
+    }
+
+    /**
+     * Whether the entry says nothing about its links, which a write storing one read without them does not.
+     */
+    public function isUntouched(): bool
+    {
+        return $this->untouched;
     }
 
     /**

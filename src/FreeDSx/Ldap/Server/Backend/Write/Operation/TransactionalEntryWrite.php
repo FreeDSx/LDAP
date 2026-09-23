@@ -100,8 +100,8 @@ final readonly class TransactionalEntryWrite
                 $links,
                 $context,
             ),
-            // A delta names what it changes, so the entry is read without the values it leaves alone.
-            $links->isEmpty()
+            // Only a write the entry itself is the whole truth for has to read what it links.
+            $links->isEmpty() && !$links->isUntouched()
                 ? EntryProjection::unbounded()
                 : new EntryProjection(linkCap: 0),
         );
@@ -123,7 +123,7 @@ final readonly class TransactionalEntryWrite
             $dn,
             fn(Entry $current): ?Entry => $this->stored(
                 $produce($current),
-                new LinkDelta(),
+                LinkDelta::untouched(),
                 $context,
             ),
         );

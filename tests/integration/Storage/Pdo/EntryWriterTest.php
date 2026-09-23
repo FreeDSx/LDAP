@@ -614,6 +614,34 @@ final class EntryWriterTest extends TestCase
         );
     }
 
+    public function test_an_untouched_write_keeps_the_members_the_entry_was_read_without(): void
+    {
+        $this->storeNamed('Bob');
+        $this->storeNamed('Carol');
+        $this->storeAdminsNaming(
+            'cn=Bob,dc=example,dc=com',
+            'cn=Carol,dc=example,dc=com',
+        );
+        $group = $this->admins();
+        $group->set('description', 'Renamed');
+
+        $this->subject->store(
+            $group,
+            links: LinkDelta::untouched(),
+        );
+
+        $stored = $this->reader->find(new Dn('cn=admins,dc=example,dc=com'));
+
+        self::assertEqualsCanonicalizing(
+            ['cn=Bob,dc=example,dc=com', 'cn=Carol,dc=example,dc=com'],
+            $stored?->get('member')?->getValues(),
+        );
+        self::assertSame(
+            'Renamed',
+            $stored?->get('description')?->firstValue(),
+        );
+    }
+
     public function test_a_delta_removes_only_the_member_it_names(): void
     {
         $this->storeNamed('Bob');

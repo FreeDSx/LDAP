@@ -369,6 +369,10 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
         LinkDelta $links,
         bool $isNew,
     ): void {
+        if ($links->isUntouched()) {
+            return;
+        }
+
         if (!$links->isEmpty()) {
             $this->links->apply($entryId, $links);
 

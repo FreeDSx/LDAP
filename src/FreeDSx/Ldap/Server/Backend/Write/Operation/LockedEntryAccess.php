@@ -80,10 +80,10 @@ final readonly class LockedEntryAccess
         Closure $body,
     ): mixed {
         return $this->locked($dn, function () use ($dn, $body): mixed {
-            // @todo Unbounded because the whole derived entry is stored back; leave linked attributes out once writes apply them as deltas.
+            // Stored back with its links left alone.
             $current = $this->reader->find(
                 $dn,
-                EntryProjection::unbounded(),
+                new EntryProjection(linkCap: 0),
             );
 
             return $current === null
