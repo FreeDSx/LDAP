@@ -285,6 +285,67 @@ final class PasswordPolicyEngineTest extends TestCase
         );
     }
 
+    public function test_recordBindFailure_keeps_only_the_newest_failures_when_nothing_else_bounds_them(): void
+    {
+        $result = $this->subject->recordBindFailure(
+            new UserPasswordState(failureTimes: $this->failuresMinutesAgo(40)),
+            new PasswordPolicy(lockout: new PasswordLockoutRules()),
+        );
+        $values = $this->findChange(
+            $result->changes->changes,
+            PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
+        )->getAttribute()->getValues();
+
+        self::assertCount(16, $values);
+        self::assertSame(
+            GeneralizedTime::formatWithFraction($this->clock->now()),
+            $values[15],
+        );
+        self::assertSame(
+            GeneralizedTime::formatWithFraction($this->minutesAgo(15)),
+            $values[0],
+        );
+    }
+
+    public function test_recordBindFailure_keeps_enough_failures_for_a_lockout_threshold_above_the_default(): void
+    {
+        $result = $this->subject->recordBindFailure(
+            new UserPasswordState(failureTimes: $this->failuresMinutesAgo(40)),
+            new PasswordPolicy(
+                lockout: new PasswordLockoutRules(
+                    enabled: true,
+                    maxFailure: 25,
+                ),
+            ),
+        );
+
+        self::assertCount(
+            25,
+            $this->findChange(
+                $result->changes->changes,
+                PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
+            )->getAttribute()->getValues(),
+        );
+    }
+
+    public function test_recordBindFailure_keeps_what_the_policy_asks_it_to_record(): void
+    {
+        $result = $this->subject->recordBindFailure(
+            new UserPasswordState(failureTimes: $this->failuresMinutesAgo(40)),
+            new PasswordPolicy(
+                lockout: new PasswordLockoutRules(maxRecordedFailure: 3),
+            ),
+        );
+
+        self::assertCount(
+            3,
+            $this->findChange(
+                $result->changes->changes,
+                PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
+            )->getAttribute()->getValues(),
+        );
+    }
+
     public function test_recordBindFailure_at_threshold_trips_lockout(): void
     {
         $result = $this->subject->recordBindFailure(
@@ -964,6 +1025,20 @@ final class PasswordPolicyEngineTest extends TestCase
         );
 
         self::assertTrue($changes->isEmpty());
+    }
+
+    /**
+     * @return list<DateTimeImmutable>
+     */
+    private function failuresMinutesAgo(int $count): array
+    {
+        $times = [];
+
+        for ($minutes = $count; $minutes > 0; $minutes--) {
+            $times[] = $this->minutesAgo($minutes);
+        }
+
+        return $times;
     }
 
     private function changeAttempt(

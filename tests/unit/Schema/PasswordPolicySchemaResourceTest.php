@@ -34,10 +34,10 @@ final class PasswordPolicySchemaResourceTest extends TestCase
         $this->schema = SchemaResource::PasswordPolicy->load();
     }
 
-    public function test_registers_all_30_attribute_types(): void
+    public function test_registers_all_31_attribute_types(): void
     {
         self::assertCount(
-            30,
+            31,
             $this->schema->getAttributeTypes(),
         );
     }
@@ -56,7 +56,11 @@ final class PasswordPolicySchemaResourceTest extends TestCase
             $oc->must,
         );
         self::assertCount(
-            19,
+            20,
+            $oc->may,
+        );
+        self::assertContains(
+            PasswordPolicyOid::NAME_PWD_MAX_RECORDED_FAILURE,
             $oc->may,
         );
     }

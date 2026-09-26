@@ -24,6 +24,7 @@ final readonly class PasswordLockoutRules
      * @param int<0, max>|null $duration
      * @param int<0, max>|null $maxFailure
      * @param int<0, max>|null $failureCountInterval
+     * @param int<0, max>|null $maxRecordedFailure Failure timestamps kept, which lockout alone does not bound.
      * @param int<0, max>|null $minDelay
      * @param int<0, max>|null $maxDelay
      */
@@ -32,6 +33,7 @@ final readonly class PasswordLockoutRules
         public ?int $duration = null,
         public ?int $maxFailure = null,
         public ?int $failureCountInterval = null,
+        public ?int $maxRecordedFailure = null,
         public ?int $minDelay = null,
         public ?int $maxDelay = null,
     ) {}

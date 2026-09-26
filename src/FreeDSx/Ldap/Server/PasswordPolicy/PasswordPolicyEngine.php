@@ -32,6 +32,13 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Decision\RecordedOutcome;
  */
 final readonly class PasswordPolicyEngine
 {
+    /**
+     * Failure timestamps kept when a policy names no limit.
+     *
+     * Enough for the delay to keep doubling to any sane pwdMaxDelay.
+     */
+    private const DEFAULT_MAX_RECORDED_FAILURE = 16;
+
     private UniquePolicyTimeFactory $uniqueTimes;
 
     public function __construct(
@@ -88,6 +95,10 @@ final readonly class PasswordPolicyEngine
             $policy,
         );
         $retained[] = $this->uniqueTimes->next($retained);
+        $retained = $this->trimFailuresToRecordLimit(
+            $retained,
+            $policy,
+        );
 
         $changes = [Change::replace(
             PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
@@ -472,6 +483,27 @@ final readonly class PasswordPolicyEngine
             $failures,
             static fn(DateTimeImmutable $t): bool => ($nowTs - $t->getTimestamp()) < $interval,
         ));
+    }
+
+    /**
+     * The newest timestamps only, since nothing else bounds a list a failed bind appends to.
+     *
+     * @param list<DateTimeImmutable> $failures
+     * @return list<DateTimeImmutable>
+     */
+    private function trimFailuresToRecordLimit(
+        array $failures,
+        PasswordPolicy $policy,
+    ): array {
+        // Never below the lockout threshold, which is counted from what is kept.
+        $limit = max(
+            $policy->lockout->maxRecordedFailure ?: self::DEFAULT_MAX_RECORDED_FAILURE,
+            $policy->lockout->maxFailure ?? 0,
+        );
+
+        return count($failures) <= $limit
+            ? $failures
+            : array_slice($failures, -$limit);
     }
 
     /**

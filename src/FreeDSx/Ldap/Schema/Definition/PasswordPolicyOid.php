@@ -92,6 +92,17 @@ final class PasswordPolicyOid
 
     public const DESC_PWD_FAILURE_COUNT_INTERVAL = 'seconds before old failure counts are forgotten';
 
+    /**
+     * Retention is ours to define. The draft is silent on it. This sits under the FreeDSx OID arc:
+     *
+     * (IANA PEN 66207): .1 LDAP, .2 attribute types, .1 recorded failures.
+     */
+    public const OID_PWD_MAX_RECORDED_FAILURE = '1.3.6.1.4.1.66207.1.2.1';
+
+    public const NAME_PWD_MAX_RECORDED_FAILURE = 'pwdMaxRecordedFailure';
+
+    public const DESC_PWD_MAX_RECORDED_FAILURE = 'failure timestamps kept, whatever the lockout threshold';
+
     public const OID_PWD_MUST_CHANGE = '1.3.6.1.4.1.42.2.27.8.1.13';
 
     public const NAME_PWD_MUST_CHANGE = 'pwdMustChange';
