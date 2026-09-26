@@ -106,6 +106,48 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
         );
     }
 
+    public function test_failed_binds_stop_accumulating_once_the_recorded_limit_is_reached(): void
+    {
+        $authenticator = $this->authenticatorFor(
+            $this->user(),
+            new PasswordPolicy(lockout: new PasswordLockoutRules()),
+        );
+
+        for ($attempt = 0; $attempt < 20; $attempt++) {
+            $this->attemptBind(
+                $authenticator,
+                'wrong',
+            );
+        }
+
+        self::assertCount(
+            16,
+            $this->storedValues(PasswordPolicyOid::NAME_PWD_FAILURE_TIME),
+        );
+    }
+
+    public function test_a_policy_may_ask_for_fewer_recorded_failures(): void
+    {
+        $authenticator = $this->authenticatorFor(
+            $this->user(),
+            new PasswordPolicy(
+                lockout: new PasswordLockoutRules(maxRecordedFailure: 4),
+            ),
+        );
+
+        for ($attempt = 0; $attempt < 20; $attempt++) {
+            $this->attemptBind(
+                $authenticator,
+                'wrong',
+            );
+        }
+
+        self::assertCount(
+            4,
+            $this->storedValues(PasswordPolicyOid::NAME_PWD_FAILURE_TIME),
+        );
+    }
+
     public function test_repeated_failures_lock_the_account(): void
     {
         $authenticator = $this->authenticatorFor(
@@ -691,6 +733,19 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
             ->get(new Dn(self::USER_DN))
             ?->get($attribute)
             ?->firstValue();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function storedValues(string $attribute): array
+    {
+        return array_values(
+            $this->backend
+                ->get(new Dn(self::USER_DN))
+                ?->get($attribute)
+                ?->getValues() ?? [],
+        );
     }
 
     private function assertEventRecorded(ServerEvent $event): void

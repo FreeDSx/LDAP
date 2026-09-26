@@ -152,6 +152,10 @@ final readonly class PasswordPolicy
                 $entry,
                 PasswordPolicyOid::NAME_PWD_FAILURE_COUNT_INTERVAL,
             ),
+            maxRecordedFailure: self::readInt(
+                $entry,
+                PasswordPolicyOid::NAME_PWD_MAX_RECORDED_FAILURE,
+            ),
             minDelay: self::readInt(
                 $entry,
                 PasswordPolicyOid::NAME_PWD_MIN_DELAY,

@@ -245,6 +245,9 @@ When `pwdLockout` is `TRUE`, each failed bind is recorded in `pwdFailureTime`. R
 the account by setting `pwdAccountLockedTime`. `pwdFailureCountInterval`, when set, only counts failures within that
 recent window.
 
+Only the most recent failures are kept, oldest discarded first, so the attribute cannot grow with every failed bind.
+The number kept is the largest of `pwdMaxFailure`, `pwdMaxRecordedFailure`, and the default of 16 otherwise (to properly respect binding delays).
+
 `pwdLockoutDuration` controls how long a lock lasts:
 
 - `0` (or unset): the account stays locked until an administrator clears `pwdAccountLockedTime`, or a later successful
