@@ -31,7 +31,7 @@ trait AttributeValueLimitTestsTrait
         $this->authenticateAdmin();
 
         $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
 
         $this->ldapClient()->create($this->boundedEntry(
             'limit-add-over',
@@ -63,7 +63,7 @@ trait AttributeValueLimitTestsTrait
         ));
 
         $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
 
         $this->ldapClient()->send(Operations::modify(
             'cn=limit-modify-over,dc=foo,dc=bar',

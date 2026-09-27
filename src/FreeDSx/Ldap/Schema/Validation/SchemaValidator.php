@@ -618,7 +618,7 @@ final class SchemaValidator
                     $count,
                     $limit,
                 ),
-                ResultCode::CONSTRAINT_VIOLATION,
+                ResultCode::ADMIN_LIMIT_EXCEEDED,
             );
         }
     }

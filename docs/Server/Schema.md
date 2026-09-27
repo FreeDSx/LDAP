@@ -49,8 +49,8 @@ Every `add` and `modify` is checked before reaching storage:
 - No attribute holds more values than its limit allows.
 - Attributes marked `NO-USER-MODIFICATION` are not writable by clients.
 
-Failures return `objectClassViolation` (65), `undefinedAttributeType` (17), or `constraintViolation` (19)
-with a diagnostic message naming the offending attribute or class.
+Failures return `objectClassViolation` (65), `undefinedAttributeType` (17), `constraintViolation` (19), or
+`adminLimitExceeded` (11) for a value count, with a diagnostic message naming the offending attribute or class.
 
 ## Entry Requirements
 
@@ -377,7 +377,7 @@ from a member's back-link. Withhold the attribute itself where that matters, wit
 ## How Many Values an Attribute May Hold
 
 An attribute may hold at most 10,000 values by default. A write that would leave it holding more is refused with
-`constraintViolation` (19), naming the attribute and the limit.
+`adminLimitExceeded` (11), naming the attribute and the limit.
 
 The cap exists because an ordinary attribute is stored as one serialized value set, which every write decodes and
 re-encodes whole. Left unbounded, a single client can make one entry expensive enough to read and write that it
@@ -409,12 +409,14 @@ attributeTypes: ( 1.3.6.1.4.1.99999.1.1 NAME 'auditTrail' EQUALITY 2.5.13.2
 Zero lifts the cap, both as the configured default and as an extension value. Treat the number as what the server
 can survive rather than what is sensible, and raise it knowing the write cost grows with it.
 
-Two things worth knowing:
+A few things worth knowing:
 
 - It is checked on write, not held as an invariant over stored data. An entry written under a higher limit keeps its
   values until something writes it again, and lowering the limit refuses nothing retroactively.
 - It applies to writes the server raises itself, not only to client writes, so a replica holds to the same ceiling as
   the server it replicates. A topology should agree on the limit for the same reason it already agrees on schema.
+- Neither the Relax Rules control nor `Lenient` validation waives it, unlike the other schema rules here. The ceiling
+  is what the storage can carry rather than a rule about the data.
 
 ## Operational Attributes
 

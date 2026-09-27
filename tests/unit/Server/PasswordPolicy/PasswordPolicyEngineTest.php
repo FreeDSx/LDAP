@@ -901,6 +901,47 @@ final class PasswordPolicyEngineTest extends TestCase
         );
     }
 
+    public function test_a_forward_is_bounded_by_the_record_limit(): void
+    {
+        $forwarded = [];
+        for ($i = 40; $i > 0; $i--) {
+            $forwarded[] = $this->clock->now()->modify("-{$i} seconds");
+        }
+
+        $changes = $this->subject->recordForwardedState(
+            new UserPasswordState(),
+            new PasswordPolicy(lockout: new PasswordLockoutRules()),
+            $forwarded,
+            null,
+        );
+
+        self::assertCount(
+            16,
+            $this->changesByAttribute($changes)['pwdFailureTime'],
+        );
+    }
+
+    public function test_a_forward_beyond_the_record_limit_keeps_the_newest(): void
+    {
+        $newest = $this->clock->now();
+        $oldest = $this->clock->now()->modify('-1 hour');
+
+        // Newest first, since a forwarded set arrives in no guaranteed order.
+        $changes = $this->subject->recordForwardedState(
+            new UserPasswordState(),
+            new PasswordPolicy(lockout: new PasswordLockoutRules(maxRecordedFailure: 1)),
+            [$newest, $oldest],
+            null,
+        );
+
+        $retained = $this->changesByAttribute($changes)['pwdFailureTime'];
+
+        self::assertSame(
+            [GeneralizedTime::formatWithFraction($newest)],
+            $retained,
+        );
+    }
+
     public function test_record_forwarded_state_dedups_a_resent_value(): void
     {
         $existing = $this->clock->now()->modify('-1 minute');

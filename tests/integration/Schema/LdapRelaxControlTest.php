@@ -27,6 +27,8 @@ use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
  */
 final class LdapRelaxControlTest extends ServerTestCase
 {
+    private const VALUE_LIMIT = 20;
+
     public static function setUpBeforeClass(): void
     {
         parent::setUpBeforeClass();
@@ -38,7 +40,11 @@ final class LdapRelaxControlTest extends ServerTestCase
         static::initSharedServer(
             'ldap-backend-storage',
             'tcp',
-            ['--validation-mode=strict', '--allow-relax'],
+            [
+                '--validation-mode=strict',
+                '--allow-relax',
+                '--max-attribute-values=' . self::VALUE_LIMIT,
+            ],
         );
     }
 
@@ -141,6 +147,30 @@ final class LdapRelaxControlTest extends ServerTestCase
                     'sn' => 'Drift',
                     'objectClass' => 'person',
                     'seeAlso' => 'not a dn',
+                ],
+            ),
+            Controls::relaxRules(),
+        );
+    }
+
+    public function test_relax_control_does_not_bypass_the_attribute_value_limit(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+
+        $this->ldapClient()->create(
+            Entry::fromArray(
+                'cn=relax-too-many,dc=foo,dc=bar',
+                [
+                    'cn' => 'relax-too-many',
+                    'sn' => 'Drift',
+                    'objectClass' => 'person',
+                    'description' => array_map(
+                        static fn(int $i): string => "value {$i}",
+                        range(1, self::VALUE_LIMIT + 1),
+                    ),
                 ],
             ),
             Controls::relaxRules(),
