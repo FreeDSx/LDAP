@@ -329,6 +329,90 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
         }
     }
 
+    public function test_an_entry_deleted_and_readded_at_one_dn_in_one_window_replicates_as_the_new_entry(): void
+    {
+        $dn = 'cn=reused,ou=people,dc=foo,dc=bar';
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($dn): void {
+            $provider->create(Entry::fromArray(
+                $dn,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'reused',
+                    'sn' => 'Original',
+                    'userPassword' => 'oldpass',
+                ],
+            ));
+        });
+        self::assertNotNull($this->waitForReplica($dn));
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($dn): void {
+            $provider->delete($dn);
+            $provider->create(Entry::fromArray(
+                $dn,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'reused',
+                    'sn' => 'Recreated',
+                    'userPassword' => 'newpass',
+                ],
+            ));
+        });
+        $uuid = $this->providerUuidOf($dn);
+
+        self::assertSame(
+            $uuid,
+            $this->waitForReplicaUuid(
+                $dn,
+                $uuid,
+            ),
+        );
+        $this->assertBind(
+            $dn,
+            'newpass',
+            true,
+        );
+    }
+
+    public function test_an_entry_renamed_onto_a_dn_deleted_in_the_same_window_replicates_at_that_dn(): void
+    {
+        $target = 'cn=vacated,ou=people,dc=foo,dc=bar';
+        $mover = 'cn=arriving,ou=people,dc=foo,dc=bar';
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($target, $mover): void {
+            foreach ([$target, $mover] as $dn) {
+                $provider->create(Entry::fromArray(
+                    $dn,
+                    [
+                        'objectClass' => 'inetOrgPerson',
+                        'cn' => explode('=', explode(',', $dn)[0])[1],
+                        'sn' => 'Shuffled',
+                    ],
+                ));
+            }
+        });
+        self::assertNotNull($this->waitForReplica($target));
+        self::assertNotNull($this->waitForReplica($mover));
+        $moverUuid = $this->providerUuidOf($mover);
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($target, $mover): void {
+            $provider->delete($target);
+            $provider->rename(
+                $mover,
+                'cn=vacated',
+            );
+        });
+
+        self::assertSame(
+            $moverUuid,
+            $this->waitForReplicaUuid(
+                $target,
+                $moverUuid,
+            ),
+        );
+        self::assertNull($this->waitForReplicaGone($mover));
+    }
+
     public function test_repeated_failed_binds_lock_the_account_locally_on_the_replica(): void
     {
         $lockme = 'cn=lockme,ou=people,dc=foo,dc=bar';
@@ -429,21 +513,68 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
         return $entry;
     }
 
-    private function tryReadFromReplica(string $dn): ?Entry
-    {
+    private function waitForReplicaUuid(
+        string $dn,
+        string $uuid,
+        float $timeoutSeconds = 15.0,
+    ): ?string {
+        $deadline = microtime(true) + $timeoutSeconds;
+
+        do {
+            $held = $this->tryReadFromReplica(
+                $dn,
+                ['entryUUID'],
+            )?->get('entryUUID')?->firstValue();
+
+            if ($held === $uuid) {
+                return $held;
+            }
+
+            usleep(100_000);
+        } while (microtime(true) < $deadline);
+
+        return $held;
+    }
+
+    /**
+     * @param list<string> $attributes
+     */
+    private function tryReadFromReplica(
+        string $dn,
+        array $attributes = [],
+    ): ?Entry {
         try {
             $client = $this->buildClient('tcp');
             $client->bind(
                 'cn=user,dc=foo,dc=bar',
                 '12345',
             );
-            $entry = $client->read($dn);
+            $entry = $client->read(
+                $dn,
+                $attributes,
+            );
             $client->unbind();
 
             return $entry;
         } catch (Throwable) {
             return null;
         }
+    }
+
+    private function providerUuidOf(string $dn): string
+    {
+        $uuid = null;
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($dn, &$uuid): void {
+            $uuid = $provider->read(
+                $dn,
+                ['entryUUID'],
+            )?->get('entryUUID')?->firstValue();
+        });
+
+        self::assertIsString($uuid);
+
+        return $uuid;
     }
 
     /**

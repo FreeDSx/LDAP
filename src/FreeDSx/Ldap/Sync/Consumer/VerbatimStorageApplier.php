@@ -18,12 +18,15 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Session;
 
+use function strcasecmp;
 use function strtolower;
 
 /**
@@ -50,6 +53,7 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         private readonly ListEntryInterface $lister,
         private readonly WriteEntryInterface $writer,
         private readonly EntryUuidLocator $locator,
+        private readonly ReadEntryInterface $reader,
     ) {}
 
     public function beginRefresh(): void
@@ -61,15 +65,15 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
     public function apply(
         SyncEntryResult $result,
         Session $session,
-    ): void {
+    ): array {
         $entry = $result->getEntry();
         $dn = $entry->getDn()
             ->normalize();
+        $uuid = $result->getDecodedEntryUuid();
 
+        // RFC 4533 §3.6: a delete names its entry by UUID, and its DN may be a past one or empty.
         if ($result->isDelete()) {
-            $this->writer->remove($dn);
-
-            return;
+            return $this->removeByUuids([$uuid]);
         }
 
         if (!$session->isRefreshComplete()) {
@@ -77,19 +81,28 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         }
 
         if ($result->isPresent()) {
-            return;
+            return [];
         }
 
-        $uuid = $result->getDecodedEntryUuid();
+        $removed = [];
 
         // RFC 4533 §3.6 keys entries by UUID, so the same one arriving elsewhere is a move rather than a new entry.
         $heldAt = $this->dnHolding($uuid);
 
         if ($heldAt !== null && $heldAt->toString() !== $dn->toString()) {
             $this->writer->remove($heldAt);
+            $removed[] = $heldAt;
+        }
+
+        // Another UUID at this DN is another entry, which must go rather than hand the new one its local state.
+        if ($this->isHeldByAnotherEntry($dn, $uuid)) {
+            $this->writer->remove($dn);
+            $removed[] = $dn;
         }
 
         $this->writer->store($this->identified($entry, $uuid));
+
+        return $removed;
     }
 
     public function applyIdSet(
@@ -179,6 +192,26 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
             ?->firstValue();
 
         return $uuid !== null && isset($this->presentUuids[strtolower($uuid)]);
+    }
+
+    private function isHeldByAnotherEntry(
+        Dn $dn,
+        string $uuid,
+    ): bool {
+        $held = $this->reader->find(
+            $dn,
+            new EntryProjection(
+                [strtolower(AttributeTypeOid::NAME_ENTRY_UUID)],
+                linkCap: 0,
+            ),
+        );
+        $heldUuid = $held?->get(AttributeTypeOid::NAME_ENTRY_UUID)?->firstValue();
+
+        return $heldUuid !== null
+            && strcasecmp(
+                $heldUuid,
+                $uuid,
+            ) !== 0;
     }
 
     /**

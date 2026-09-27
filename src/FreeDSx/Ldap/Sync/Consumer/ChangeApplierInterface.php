@@ -35,11 +35,13 @@ interface ChangeApplierInterface
      *
      * During the refresh phase the entry's DN is recorded so {@see self::reconcile()} can find local entries the
      * upstream no longer has.
+     *
+     * @return list<Dn> the DNs whose stored entry this result took away, though one may now hold a different entry
      */
     public function apply(
         SyncEntryResult $result,
         Session $session,
-    ): void;
+    ): array;
 
     /**
      * Apply one bulk UUID set: a delete set removes each entry, a present set marks them seen for reconciliation.

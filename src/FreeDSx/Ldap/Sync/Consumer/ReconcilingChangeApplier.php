@@ -45,29 +45,38 @@ readonly class ReconcilingChangeApplier implements ChangeApplierInterface
     public function apply(
         SyncEntryResult $result,
         Session $session,
-    ): void {
-        $this->baseApplier->apply($result, $session);
+    ): array {
+        $removed = $this->baseApplier->apply(
+            $result,
+            $session,
+        );
+        $stores = !$result->isPresent() && !$result->isDelete();
+        $storedAt = $result->getEntry()
+            ->getDn()
+            ->normalizedString();
 
-        // A present marker changes nothing.
-        if ($result->isPresent()) {
-            return;
+        foreach ($removed as $dn) {
+            // Its DN now holds the entry just stored, and removing the one it replaced already cascaded that state.
+            if ($stores && $dn->normalizedString() === $storedAt) {
+                continue;
+            }
+
+            $this->passwordStateStore->discard($dn);
         }
 
-        $dn = $result->getEntry()
-            ->getDn()
-            ->normalize();
-
-        // Drops it outright on delete, whether the underlying storage already does.
-        if ($result->isDelete()) {
-            $this->passwordStateStore->discard($dn);
-
-            return;
+        // A present marker changes nothing, and a delete has nothing left to reconcile against.
+        if (!$stores) {
+            return $removed;
         }
 
         $this->passwordStateStore->discardIfSuperseded(
-            $dn,
+            $result->getEntry()
+                ->getDn()
+                ->normalize(),
             UserPasswordState::fromEntry($result->getEntry()),
         );
+
+        return $removed;
     }
 
     public function applyIdSet(

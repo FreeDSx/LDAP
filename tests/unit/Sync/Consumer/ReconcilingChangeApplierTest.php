@@ -143,20 +143,91 @@ final class ReconcilingChangeApplierTest extends TestCase
         );
     }
 
-    public function test_a_delete_discards_the_local_state_outright(): void
+    public function test_a_delete_discards_the_local_state_where_the_base_applier_removed_the_entry(): void
     {
+        $removed = [new Dn('cn=moved,dc=example,dc=com')];
+
+        $this->baseApplier
+            ->method('apply')
+            ->willReturn($removed);
         $this->passwordStateStore
             ->expects(self::never())
             ->method('discardIfSuperseded');
         $this->passwordStateStore
             ->expects(self::once())
             ->method('discard')
-            ->with(self::callback(static fn(Dn $dn): bool => $dn->toString() === (new Dn(self::DN))->normalizedString()));
+            ->with($removed[0]);
+
+        self::assertSame(
+            $removed,
+            $this->subject->apply(
+                $this->syncResult(
+                    SyncStateControl::STATE_DELETE,
+                    $this->entry(),
+                ),
+                $this->session(),
+            ),
+        );
+    }
+
+    public function test_a_delete_that_removed_nothing_discards_no_local_state(): void
+    {
+        $this->baseApplier
+            ->method('apply')
+            ->willReturn([]);
+        $this->passwordStateStore
+            ->expects(self::never())
+            ->method('discard');
 
         $this->subject->apply(
             $this->syncResult(
                 SyncStateControl::STATE_DELETE,
                 $this->entry(),
+            ),
+            $this->session(),
+        );
+    }
+
+    public function test_an_add_that_replaced_another_entry_at_its_dn_leaves_the_new_entrys_state_alone(): void
+    {
+        $this->baseApplier
+            ->method('apply')
+            ->willReturn([(new Dn(self::DN))->normalize()]);
+        $this->passwordStateStore
+            ->expects(self::never())
+            ->method('discard');
+        $this->passwordStateStore
+            ->expects(self::once())
+            ->method('discardIfSuperseded');
+
+        $this->subject->apply(
+            $this->syncResult(
+                SyncStateControl::STATE_ADD,
+                $this->lockedEntry(),
+            ),
+            $this->session(),
+        );
+    }
+
+    public function test_a_move_discards_the_local_state_left_at_the_dn_it_moved_from(): void
+    {
+        $from = (new Dn('cn=previous,dc=example,dc=com'))->normalize();
+
+        $this->baseApplier
+            ->method('apply')
+            ->willReturn([$from]);
+        $this->passwordStateStore
+            ->expects(self::once())
+            ->method('discard')
+            ->with($from);
+        $this->passwordStateStore
+            ->expects(self::once())
+            ->method('discardIfSuperseded');
+
+        $this->subject->apply(
+            $this->syncResult(
+                SyncStateControl::STATE_ADD,
+                $this->lockedEntry(),
             ),
             $this->session(),
         );
