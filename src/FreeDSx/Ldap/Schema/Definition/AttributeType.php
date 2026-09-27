@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Schema\Definition;
 /**
  * An attribute type definition per RFC 4512 §4.1.2.
  */
-final readonly class AttributeType
+final readonly class AttributeType implements NamedDefinitionInterface
 {
     use DefinitionStringTrait;
 
@@ -70,6 +70,11 @@ final readonly class AttributeType
         public bool $obsolete = false,
         public array $extensions = [],
     ) {}
+
+    public function primaryName(): string
+    {
+        return $this->names[0] ?? $this->oid;
+    }
 
     /**
      * Whether values are withheld from anyone without a confidential-access grant, in results and in filters.

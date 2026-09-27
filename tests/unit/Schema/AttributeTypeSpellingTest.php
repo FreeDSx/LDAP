@@ -30,7 +30,9 @@ final class AttributeTypeSpellingTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->subject = new AttributeTypeSpelling(SchemaResource::Core->load());
+        $this->subject = new AttributeTypeSpelling(
+            SchemaResource::Core->load()->merge(SchemaResource::PasswordPolicy->load()),
+        );
     }
 
     public function test_a_dn_respells_the_type_of_every_rdn(): void
@@ -155,6 +157,171 @@ final class AttributeTypeSpellingTest extends TestCase
 
         self::assertSame(
             '(&(sn=Smith)(!(cn=*))(sn>=A))',
+            $filter->toString(),
+        );
+    }
+
+    public function test_an_object_class_value_spelled_by_oid_is_respelled_by_its_primary_name(): void
+    {
+        $result = $this->subject->entry(new Entry(
+            new Dn('cn=policy,dc=example,dc=com'),
+            new Attribute('objectClass', 'top', '2.5.17.0', '2.5.6.1'),
+        ));
+
+        self::assertSame(
+            ['top', 'subentry', 'alias'],
+            $result->getAttributes()[0]->getValues(),
+        );
+    }
+
+    public function test_an_object_class_value_differing_only_by_case_is_kept_as_given(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('objectClass', 'PERSON'),
+        );
+
+        self::assertSame(
+            $entry,
+            $this->subject->entry($entry),
+        );
+    }
+
+    public function test_an_object_identifier_value_naming_an_attribute_type_is_respelled(): void
+    {
+        $result = $this->subject->entry(new Entry(
+            new Dn('cn=policy,dc=example,dc=com'),
+            new Attribute('pwdAttribute', '2.5.4.35'),
+        ));
+
+        self::assertSame(
+            ['userPassword'],
+            $result->getAttributes()[0]->getValues(),
+        );
+    }
+
+    public function test_an_unknown_object_identifier_value_is_kept_as_given(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('objectClass', '1.2.3.4.5'),
+        );
+
+        self::assertSame(
+            $entry,
+            $this->subject->entry($entry),
+        );
+    }
+
+    public function test_a_dn_value_respells_the_types_it_names(): void
+    {
+        $result = $this->subject->entry(new Entry(
+            new Dn('cn=staff,dc=example,dc=com'),
+            new Attribute('member', '2.5.4.3=Alice,dc=example,dc=com', 'commonName=Bob,dc=example,dc=com'),
+        ));
+
+        self::assertSame(
+            ['cn=Alice,dc=example,dc=com', 'cn=Bob,dc=example,dc=com'],
+            $result->getAttributes()[0]->getValues(),
+        );
+    }
+
+    public function test_a_dn_value_of_a_subtype_is_respelled(): void
+    {
+        $result = $this->subject->entry(new Entry(
+            new Dn('cn=staff,dc=example,dc=com'),
+            new Attribute('roleOccupant', 'commonName=Alice,dc=example,dc=com'),
+        ));
+
+        self::assertSame(
+            ['cn=Alice,dc=example,dc=com'],
+            $result->getAttributes()[0]->getValues(),
+        );
+    }
+
+    public function test_a_dn_value_that_does_not_parse_is_kept_as_given(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=staff,dc=example,dc=com'),
+            new Attribute('seeAlso', 'not a dn'),
+        );
+
+        self::assertSame(
+            $entry,
+            $this->subject->entry($entry),
+        );
+    }
+
+    public function test_a_name_and_optional_uid_value_respells_only_its_name(): void
+    {
+        $result = $this->subject->entry(new Entry(
+            new Dn('cn=staff,dc=example,dc=com'),
+            new Attribute(
+                'uniqueMember',
+                "2.5.4.3=Alice,dc=example,dc=com#'0101'B",
+                'commonName=Bob,dc=example,dc=com',
+            ),
+        ));
+
+        self::assertSame(
+            ["cn=Alice,dc=example,dc=com#'0101'B", 'cn=Bob,dc=example,dc=com'],
+            $result->getAttributes()[0]->getValues(),
+        );
+    }
+
+    public function test_a_change_respells_the_dn_values_it_carries(): void
+    {
+        $result = $this->subject->change(Change::add(new Attribute('member', '2.5.4.3=Alice,dc=example,dc=com')));
+
+        self::assertSame(
+            ['cn=Alice,dc=example,dc=com'],
+            $result->getAttribute()->getValues(),
+        );
+    }
+
+    public function test_a_value_of_a_syntax_naming_no_type_is_kept_as_given(): void
+    {
+        $entry = new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('description', '2.5.4.3=Alice'),
+        );
+
+        self::assertSame(
+            $entry,
+            $this->subject->entry($entry),
+        );
+    }
+
+    public function test_rewrite_filter_respells_assertion_values_naming_types(): void
+    {
+        $filter = Filters::and(
+            Filters::equal('objectClass', '2.5.17.0'),
+            Filters::equal('2.5.4.31', 'commonName=Alice,dc=example,dc=com'),
+            Filters::equal('description', '2.5.4.3=Alice'),
+        );
+
+        $this->subject->rewriteFilter($filter);
+
+        self::assertSame(
+            '(&(objectClass=subentry)(member=cn=Alice,dc=example,dc=com)(description=2.5.4.3=Alice))',
+            $filter->toString(),
+        );
+    }
+
+    public function test_rewrite_filter_respells_an_extensible_match_value_by_its_rule_assertion_syntax(): void
+    {
+        $filter = Filters::and(
+            Filters::extensible('seeAlso', 'commonName=Alice,dc=example,dc=com', 'distinguishedNameMatch'),
+            Filters::extensible(null, '2.5.4.3=Bob,dc=example,dc=com', '2.5.13.1'),
+            Filters::extensible('member', 'commonName=Carol,dc=example,dc=com', null),
+        );
+
+        $this->subject->rewriteFilter($filter);
+
+        self::assertSame(
+            '(&(seeAlso:distinguishedNameMatch:=cn=Alice,dc=example,dc=com)'
+            . '(:2.5.13.1:=cn=Bob,dc=example,dc=com)'
+            . '(member:=cn=Carol,dc=example,dc=com))',
             $filter->toString(),
         );
     }

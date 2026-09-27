@@ -254,13 +254,11 @@ final readonly class OperationalAttributeGenerator
 
         foreach ($structural as $candidate) {
             if (!$this->isSuperclassOfAny($candidate, $structural, $this->schema)) {
-                return $candidate->names[0] ?? $candidate->oid;
+                return $candidate->primaryName();
             }
         }
 
-        $first = array_values($structural)[0];
-
-        return $first->names[0] ?? $first->oid;
+        return array_values($structural)[0]->primaryName();
     }
 
     /**

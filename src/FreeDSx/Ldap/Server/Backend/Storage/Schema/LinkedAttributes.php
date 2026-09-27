@@ -113,7 +113,7 @@ final class LinkedAttributes
 
                 throw new RuntimeException(sprintf(
                     'The object class "%s" requires "%s", which is stored as links and can be emptied by a removal.',
-                    $objectClass->names[0] ?? $objectClass->oid,
+                    $objectClass->primaryName(),
                     $name,
                 ));
             }
@@ -133,7 +133,7 @@ final class LinkedAttributes
             if ($forward === null) {
                 continue;
             }
-            $name = $type->names[0] ?? $type->oid;
+            $name = $type->primaryName();
 
             if (!$this->links(new Attribute($forward))) {
                 throw new RuntimeException(sprintf(
@@ -205,7 +205,7 @@ final class LinkedAttributes
             }
 
             // Values come back under one name per type, since repeating them under every alias would only duplicate.
-            $read[Attribute::normalizeName($type->names[0] ?? $type->oid)] = $linked;
+            $read[Attribute::normalizeName($type->primaryName())] = $linked;
         }
 
         return new Backlinks(

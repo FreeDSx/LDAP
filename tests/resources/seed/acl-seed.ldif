@@ -1,0 +1,97 @@
+version: 1
+
+# Seed for the ACL test server.
+# Passwords are {SHA} hashes: admin and user are 12345, alice is alicepass, hidden is hiddenpass, delegate is delegatepass.
+
+dn: dc=foo,dc=bar
+objectClass: domain
+dc: foo
+
+dn: cn=admins,dc=foo,dc=bar
+objectClass: groupOfNames
+cn: admins
+member: cn=admin,dc=foo,dc=bar
+
+dn: cn=admin,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: admin
+sn: Admin
+userPassword: {SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=
+
+dn: cn=user,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: user
+sn: User
+userPassword: {SHA}jLIjfQZ5yojbZGTqxg2pY0VROWQ=
+
+dn: ou=people,dc=foo,dc=bar
+objectClass: organizationalUnit
+ou: people
+
+dn: cn=alice,ou=people,dc=foo,dc=bar
+objectClass: inetOrgPerson
+objectClass: extensibleObject
+cn: alice
+sn: Smith
+userPassword: {SHA}Ib9wL039Cd3QkElouncuPd0/kag=
+secretCode: S3CR3T-alice
+
+# RDN is uid, which is not writable under ou=people, so a rename that touches it must be refused.
+dn: uid=bob,ou=people,dc=foo,dc=bar
+objectClass: inetOrgPerson
+uid: bob
+cn: bob
+sn: Bob
+
+dn: uid=bob2,ou=people,dc=foo,dc=bar
+objectClass: inetOrgPerson
+uid: bob2
+cn: bob2
+sn: Bob
+telephoneNumber: 555-0100
+
+dn: cn=delegate,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: delegate
+sn: Delegate
+userPassword: {SHA}9paKbgGEIBfGxbmddIEhMminlmg=
+
+dn: cn=hidden,ou=people,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: hidden
+sn: Hidden
+userPassword: {SHA}8Qf/KGk50GBzmcL51KhuYxOpMqY=
+
+# Carries one attribute per spelled-member group below, each denied to that group's members.
+dn: cn=spelled-target,dc=foo,dc=bar
+objectClass: inetOrgPerson
+cn: spelled-target
+sn: Target
+description: desc-secret
+title: title-secret
+street: street-secret
+postalCode: postal-secret
+
+# Names cn=user by the numeric OID of cn.
+dn: cn=blocked-oid,dc=foo,dc=bar
+objectClass: groupOfNames
+cn: blocked-oid
+member: 2.5.4.3=user,dc=foo,dc=bar
+
+# Names cn=user by an alias of cn.
+dn: cn=blocked-alias,dc=foo,dc=bar
+objectClass: groupOfNames
+cn: blocked-alias
+member: commonName=user,dc=foo,dc=bar
+
+# Names cn=user by the numeric OID of cn through uniqueMember, which is not held as a link.
+dn: cn=blocked-unique,dc=foo,dc=bar
+objectClass: groupOfUniqueNames
+cn: blocked-unique
+uniqueMember: 2.5.4.3=user,dc=foo,dc=bar
+
+# Seeded without cn=user, so a test can add it over the wire.
+dn: cn=blocked-late,dc=foo,dc=bar
+objectClass: groupOfNames
+cn: blocked-late
+member: cn=delegate,dc=foo,dc=bar

@@ -48,7 +48,7 @@ trait AttributeValueAssertionTrait
     /**
      * @api
      */
-    public function setValue(string $value): self
+    public function setValue(string $value): static
     {
         $this->value = $value;
 

@@ -18,7 +18,7 @@ use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 /**
  * A matching rule definition per RFC 4512 §4.1.3; carries its comparator strategy.
  */
-final readonly class MatchingRule
+final readonly class MatchingRule implements NamedDefinitionInterface
 {
     use DefinitionStringTrait;
 
@@ -35,6 +35,11 @@ final readonly class MatchingRule
         public bool $obsolete = false,
         public array $extensions = [],
     ) {}
+
+    public function primaryName(): string
+    {
+        return $this->names[0] ?? $this->oid;
+    }
 
     /**
      * Returns a copy carrying the given extensions in place of the current ones.

@@ -30,6 +30,8 @@ final class LdapSubentryTest extends ServerTestCase
 {
     private const ADMIN_ROLE = '2.5.23.4';
 
+    private const SUBENTRY_OID = '2.5.17.0';
+
     private const MALFORMED = '{ base "ou=people"';
 
     private const EVERY_COMPONENT = '{ base "ou=people", specificExclusions { chopBefore:"cn=x", chopAfter:"ou=y" }, '
@@ -204,6 +206,97 @@ final class LdapSubentryTest extends ServerTestCase
         ));
     }
 
+    public function test_a_subentry_whose_class_is_spelled_by_oid_under_a_plain_parent_is_rejected(): void
+    {
+        $this->authenticateAdmin();
+        $this->makeParent('plain-oid-add', isAdministrative: false);
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
+
+        $this->ldapClient()->create($this->subentry(
+            'cn=under-plain,ou=plain-oid-add,dc=foo,dc=bar',
+            '{ }',
+            self::SUBENTRY_OID,
+        ));
+    }
+
+    public function test_a_subentry_whose_class_is_spelled_by_oid_is_stored_by_its_primary_name(): void
+    {
+        $this->authenticateAdmin();
+        $this->makeParent('oid-stored', isAdministrative: true);
+        $this->ldapClient()->create($this->subentry(
+            'cn=policy,ou=oid-stored,dc=foo,dc=bar',
+            '{ }',
+            self::SUBENTRY_OID,
+        ));
+
+        $entry = $this->ldapClient()->search(
+            Operations::search(
+                Filters::present('objectClass'),
+                'objectClass',
+            )
+                ->base('cn=policy,ou=oid-stored,dc=foo,dc=bar')
+                ->useBaseScope(),
+        )->first();
+
+        self::assertSame(
+            [ObjectClassOid::NAME_SUBENTRY, 'top'],
+            $entry?->get('objectClass')?->getValues(),
+        );
+    }
+
+    public function test_a_subentry_whose_class_is_spelled_by_oid_is_hidden_from_a_subtree_search(): void
+    {
+        $this->authenticateAdmin();
+        $this->makeParent('oid-hidden', isAdministrative: true);
+        $this->ldapClient()->create($this->subentry(
+            'cn=policy,ou=oid-hidden,dc=foo,dc=bar',
+            '{ }',
+            self::SUBENTRY_OID,
+        ));
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'))
+                ->base('ou=oid-hidden,dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+
+        self::assertSame(
+            ['ou=oid-hidden,dc=foo,dc=bar'],
+            array_map(
+                static fn(Entry $entry): string => $entry->getDn()->toString(),
+                $entries->toArray(),
+            ),
+        );
+    }
+
+    public function test_a_subentry_whose_class_is_spelled_by_oid_is_returned_under_the_subentries_control(): void
+    {
+        $this->authenticateAdmin();
+        $this->makeParent('oid-visible', isAdministrative: true);
+        $this->ldapClient()->create($this->subentry(
+            'cn=policy,ou=oid-visible,dc=foo,dc=bar',
+            '{ }',
+            self::SUBENTRY_OID,
+        ));
+
+        $entries = $this->ldapClient()->search(
+            Operations::search(Filters::present('objectClass'))
+                ->base('ou=oid-visible,dc=foo,dc=bar')
+                ->useSubtreeScope(),
+            Controls::subentries(),
+        );
+
+        self::assertSame(
+            ['cn=policy,ou=oid-visible,dc=foo,dc=bar'],
+            array_map(
+                static fn(Entry $entry): string => $entry->getDn()->toString(),
+                $entries->toArray(),
+            ),
+        );
+    }
+
     /**
      * The placement rule concerns subentries only.
      */
@@ -341,12 +434,13 @@ final class LdapSubentryTest extends ServerTestCase
     private function subentry(
         string $dn,
         string $specification,
+        string $objectClass = ObjectClassOid::NAME_SUBENTRY,
     ): Entry {
         return Entry::fromArray(
             $dn,
             [
                 'cn' => explode('=', explode(',', $dn, 2)[0], 2)[1],
-                'objectClass' => ObjectClassOid::NAME_SUBENTRY,
+                'objectClass' => $objectClass,
                 AttributeTypeOid::NAME_SUBTREE_SPECIFICATION => $specification,
             ],
         );

@@ -16,7 +16,7 @@ namespace FreeDSx\Ldap\Schema\Definition;
 /**
  * An object class definition per RFC 4512 §4.1.1.
  */
-final readonly class ObjectClass
+final readonly class ObjectClass implements NamedDefinitionInterface
 {
     use DefinitionStringTrait;
 
@@ -38,6 +38,11 @@ final readonly class ObjectClass
         public bool $obsolete = false,
         public array $extensions = [],
     ) {}
+
+    public function primaryName(): string
+    {
+        return $this->names[0] ?? $this->oid;
+    }
 
     /**
      * Returns a copy carrying the given extensions in place of the current ones.
