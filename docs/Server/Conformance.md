@@ -15,6 +15,7 @@ Conformance
     * [Attribute-Less Extensible Match](#attribute-less-extensible-match)
     * [Unauthenticated Bind Rides on the Anonymous Switch](#unauthenticated-bind-rides-on-the-anonymous-switch)
     * [Value Modification of an Unreadable Attribute](#value-modification-of-an-unreadable-attribute)
+    * [Attributes Have a Value Ceiling](#attributes-have-a-value-ceiling)
     * [Paging and the Client Size Limit](#paging-and-the-client-size-limit)
     * [Password Policy on Compare](#password-policy-on-compare)
     * [Replication Sends Full Entries](#replication-sends-full-entries)
@@ -138,6 +139,17 @@ RFC 4511 section 4.6 answers a modify `add` of a present value with `attributeOr
 A value-level `add` or `delete` against an unreadable attribute is refused with
 `insufficientAccessRights`, which makes those two codes unreachable in that context. A
 `replace` is unaffected, since it's an unconditional write.
+
+## Attributes Have a Value Ceiling
+
+RFC 4512 places no limits on the number of values a multi-value attribute may hold. An attribute here holds at most
+10,000 values by default, and a write beyond that is refused with `adminLimitExceeded`.
+
+Unbound values are not a scalable / sustainable directory configuration. Neither the Relax Rules control nor a lenient
+validation policy waives the limit. Linked attributes are exempt.
+
+See [Schema Validation](Schema.md#how-many-values-an-attribute-may-hold) for the configured default and
+the `X-MAX-VALUES` if you need to override it.
 
 ## Paging and the Client Size Limit
 

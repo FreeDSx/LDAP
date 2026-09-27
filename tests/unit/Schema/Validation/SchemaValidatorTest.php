@@ -74,7 +74,7 @@ final class SchemaValidatorTest extends TestCase
     public function test_add_beyond_the_default_value_limit_is_refused(): void
     {
         $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
         $this->expectExceptionMessage('Attribute "gadgetPlain" holds 4 values, which is beyond the limit of 3.');
 
         $this->gadgetValidator(3)->validateAdd(
@@ -94,7 +94,7 @@ final class SchemaValidatorTest extends TestCase
     public function test_a_type_declaring_a_stricter_cap_is_refused_below_the_default(): void
     {
         $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
         $this->expectExceptionMessage('Attribute "gadgetStricter" holds 2 values, which is beyond the limit of 1.');
 
         $this->gadgetValidator(3)->validateAdd(
@@ -114,7 +114,7 @@ final class SchemaValidatorTest extends TestCase
     public function test_a_type_declaring_a_looser_cap_is_still_refused_beyond_it(): void
     {
         $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
 
         $this->gadgetValidator(3)->validateAdd(
             $this->gadgetEntry(new Attribute('gadgetLooser', ...self::values(7))),
@@ -133,7 +133,7 @@ final class SchemaValidatorTest extends TestCase
     public function test_an_option_bearing_form_is_held_to_the_cap_of_the_type_it_subtypes(): void
     {
         $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
         $this->expectExceptionMessage('Attribute "gadgetStricter" holds 2 values, which is beyond the limit of 1.');
 
         $this->gadgetValidator(3)->validateAdd(
@@ -165,7 +165,7 @@ final class SchemaValidatorTest extends TestCase
     public function test_a_system_write_is_still_bounded(): void
     {
         $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
 
         $this->gadgetValidator(3)->validateAdd(
             $this->gadgetEntry(new Attribute('gadgetPlain', ...self::values(4))),
@@ -176,7 +176,7 @@ final class SchemaValidatorTest extends TestCase
     public function test_a_modify_crossing_the_value_limit_is_refused(): void
     {
         $this->expectException(OperationException::class);
-        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
 
         $result = $this->gadgetEntry(new Attribute('gadgetPlain', ...self::values(4)));
 

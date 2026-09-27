@@ -194,10 +194,13 @@ final readonly class PasswordPolicyEngine
         $prior = $this->hasExpiredLock($state, $policy)
             ? []
             : $state->failureTimes;
-        $retained = $this->trimFailuresToInterval(
-            $this->afterSuccess(
-                $this->unionTimes($prior, $forwardedFailures),
-                $observedSuccess,
+        $retained = $this->trimFailuresToRecordLimit(
+            $this->trimFailuresToInterval(
+                $this->afterSuccess(
+                    $this->unionTimes($prior, $forwardedFailures),
+                    $observedSuccess,
+                ),
+                $policy,
             ),
             $policy,
         );
@@ -486,7 +489,7 @@ final readonly class PasswordPolicyEngine
     }
 
     /**
-     * The newest timestamps only, since nothing else bounds a list a failed bind appends to.
+     * The newest timestamps only.
      *
      * @param list<DateTimeImmutable> $failures
      * @return list<DateTimeImmutable>
@@ -501,9 +504,18 @@ final readonly class PasswordPolicyEngine
             $policy->lockout->maxFailure ?? 0,
         );
 
-        return count($failures) <= $limit
-            ? $failures
-            : array_slice($failures, -$limit);
+        if (count($failures) <= $limit) {
+            return $failures;
+        }
+        usort(
+            $failures,
+            static fn(DateTimeImmutable $a, DateTimeImmutable $b): int => $a <=> $b,
+        );
+
+        return array_slice(
+            $failures,
+            -$limit,
+        );
     }
 
     /**

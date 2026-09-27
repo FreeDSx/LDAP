@@ -40,6 +40,13 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
 {
     private const PWD_LOCKED_TIME = 'pwdAccountLockedTime';
 
+    private const PWD_FAILURE_TIME = 'pwdFailureTime';
+
+    /**
+     * What the engine keeps when the policy names no maximum of its own.
+     */
+    private const RETAINED_FAILURES = 16;
+
     public function setUp(): void
     {
         $this->setServerMode('ldap-replica');
@@ -121,6 +128,42 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
         );
     }
 
+    public function test_a_forward_beyond_the_record_limit_stores_only_what_is_retained(): void
+    {
+        $dn = 'cn=carol,ou=people,dc=foo,dc=bar';
+        $uuid = $this->uuidOnProvider($dn);
+        self::assertNotNull($uuid);
+
+        $times = [];
+        for ($i = 40; $i > 0; $i--) {
+            $times[] = new DateTimeImmutable(
+                "-{$i} seconds",
+                new DateTimeZone('UTC'),
+            );
+        }
+
+        $client = $this->providerClient();
+
+        try {
+            $client->bind(
+                'cn=user,dc=foo,dc=bar',
+                '12345',
+            );
+            $client->sendAndReceive(new ForwardPasswordPolicyStateRequest(
+                $uuid,
+                $times,
+            ));
+        } finally {
+            $this->quietUnbind($client);
+        }
+
+        // The policy names no maximum, so retention falls to the engine's own bound.
+        self::assertCount(
+            self::RETAINED_FAILURES,
+            $this->failureTimesOnProvider($dn),
+        );
+    }
+
     public function test_a_forward_with_a_malformed_uuid_is_refused(): void
     {
         $client = $this->providerClient();
@@ -170,6 +213,48 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
             sort($dns);
 
             return $dns;
+        } finally {
+            $this->quietUnbind($manager);
+        }
+    }
+
+    private function uuidOnProvider(string $dn): ?string
+    {
+        $manager = $this->providerClient();
+
+        try {
+            $manager->bind(
+                LdapServerCommand::MANAGER_DN,
+                LdapServerCommand::MANAGER_PASSWORD,
+            );
+
+            return $manager->read(
+                $dn,
+                ['entryUUID'],
+            )?->get('entryUUID')?->firstValue();
+        } finally {
+            $this->quietUnbind($manager);
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function failureTimesOnProvider(string $dn): array
+    {
+        $manager = $this->providerClient();
+
+        try {
+            $manager->bind(
+                LdapServerCommand::MANAGER_DN,
+                LdapServerCommand::MANAGER_PASSWORD,
+            );
+            $entry = $manager->read(
+                $dn,
+                [self::PWD_FAILURE_TIME],
+            );
+
+            return array_values($entry?->get(self::PWD_FAILURE_TIME)?->getValues() ?? []);
         } finally {
             $this->quietUnbind($manager);
         }

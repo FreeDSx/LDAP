@@ -32,6 +32,14 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
  */
 final readonly class SchemaViolationGate
 {
+    /**
+     * Violations neither the Relax control nor a lenient policy waives.
+     */
+    private const NEVER_RELAXED = [
+        ResultCode::INVALID_ATTRIBUTE_SYNTAX,
+        ResultCode::ADMIN_LIMIT_EXCEEDED,
+    ];
+
     public function __construct(private SchemaValidator $validator) {}
 
     /**
@@ -156,7 +164,7 @@ final readonly class SchemaViolationGate
         OperationException $violation,
         WriteContext $context,
     ): SchemaViolationDisposition {
-        if ($violation->getCode() === ResultCode::INVALID_ATTRIBUTE_SYNTAX) {
+        if (in_array($violation->getCode(), self::NEVER_RELAXED, true)) {
             return SchemaViolationDisposition::Rejected;
         }
 
