@@ -23,8 +23,12 @@ use FreeDSx\Ldap\Entry\Dn;
  */
 final readonly class BulkLoadOptions
 {
+    /**
+     * @param bool $ignoreValidation Waives the schema rules a lenient policy would.
+     */
     public function __construct(
         public Dn $actorDn = new Dn(''),
         public bool $replaceExisting = false,
+        public bool $ignoreValidation = false,
     ) {}
 }

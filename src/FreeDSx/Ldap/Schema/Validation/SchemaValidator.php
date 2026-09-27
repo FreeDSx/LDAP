@@ -13,13 +13,17 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Schema\Validation;
 
+use Closure;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\SchemaValidationException;
+use FreeDSx\Ldap\Exception\SchemaViolationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
@@ -47,6 +51,27 @@ final class SchemaValidator
     public const DEFAULT_MAX_VALUES = 10000;
 
     private const EXTENSIBLE_OBJECT = 'extensibleObject';
+
+    /**
+     * The operational attributes draft-zeilenga-ldap-relax §3.6 lets a relaxed Add supply.
+     */
+    private const SETTABLE_ON_ADD = [
+        AttributeTypeOid::NAME_ENTRY_UUID,
+        AttributeTypeOid::NAME_CREATE_TIMESTAMP,
+        AttributeTypeOid::NAME_MODIFY_TIMESTAMP,
+        AttributeTypeOid::NAME_CREATORS_NAME,
+        AttributeTypeOid::NAME_MODIFIERS_NAME,
+    ];
+
+    /**
+     * The same on Modify less entryUUID, which replication and the password policy forward address an entry by.
+     */
+    private const SETTABLE_ON_MODIFY = [
+        AttributeTypeOid::NAME_CREATE_TIMESTAMP,
+        AttributeTypeOid::NAME_MODIFY_TIMESTAMP,
+        AttributeTypeOid::NAME_CREATORS_NAME,
+        AttributeTypeOid::NAME_MODIFIERS_NAME,
+    ];
 
     private readonly AttributeSyntaxResolver $syntaxResolver;
 
@@ -81,7 +106,7 @@ final class SchemaValidator
      * Validates an entry before it is added to storage.
      *
      * @param bool $isSystem Skip the NO-USER-MODIFICATION check for server-initiated writes.
-     * @throws OperationException
+     * @throws SchemaValidationException
      */
     public function validateAdd(
         Entry $entry,
@@ -90,25 +115,39 @@ final class SchemaValidator
         if ($this->mode === SchemaValidationMode::Off) {
             return;
         }
-        // Checked first, since a caller relaxing an earlier violation would otherwise stop validation before this.
-        $this->checkAttributeSyntaxes($entry);
+        $checks = [fn() => $this->checkAttributeSyntaxes($entry)];
 
         if (!$isSystem) {
-            $this->checkNoUserModificationInEntry($entry);
+            array_push(
+                $checks,
+                ...$this->noUserModificationChecks(
+                    array_map(
+                        static fn(Attribute $attribute): string => $attribute->getName(),
+                        $entry->getAttributes(),
+                    ),
+                    self::SETTABLE_ON_ADD,
+                    'Attribute "%s" cannot be set by users.',
+                ),
+            );
         }
-        $this->checkDistinctAttributeDescriptions($entry);
-        $this->checkNoEquivalentValues($entry);
+        $checks[] = fn() => $this->checkDistinctAttributeDescriptions($entry);
+        $checks[] = fn() => $this->checkNoEquivalentValues($entry);
+
         if (!$entry->getDn()->isRootDse()) {
-            $this->checkNamingAttributesAreMatchable($entry->getDn()->getRdn());
+            $checks[] = fn() => $this->checkNamingAttributesAreMatchable($entry->getDn()->getRdn());
         }
-        $this->validateStructure($entry);
+
+        $this->assertAll(
+            ...$checks,
+            ...$this->structureChecks($entry),
+        );
     }
 
     /**
      * Validates the changes and resulting entry from an update operation.
      *
      * @param bool $isSystem Skip the NO-USER-MODIFICATION check for server-initiated writes.
-     * @throws OperationException
+     * @throws SchemaValidationException
      */
     public function validateModify(
         UpdateCommand $command,
@@ -118,27 +157,39 @@ final class SchemaValidator
         if ($this->mode === SchemaValidationMode::Off) {
             return;
         }
-
-        // Checked first, since a caller relaxing an earlier violation would otherwise stop validation before this.
-        $this->checkAttributeSyntaxes($result);
+        $checks = [fn() => $this->checkAttributeSyntaxes($result)];
 
         if (!$isSystem) {
-            $this->checkNoUserModificationInChanges($command->changes);
+            array_push(
+                $checks,
+                ...$this->noUserModificationChecks(
+                    array_map(
+                        static fn(Change $change): string => $change->getAttribute()->getName(),
+                        $command->changes,
+                    ),
+                    self::SETTABLE_ON_MODIFY,
+                    'Attribute "%s" cannot be modified by users.',
+                ),
+            );
         }
         // Only what the change touched, since the rest was already checked when it was written.
-        $this->checkNoEquivalentValues(
+        $checks[] = fn() => $this->checkNoEquivalentValues(
             $result,
             self::namesChangedBy($command->changes),
         );
-        $this->checkStructuralClassUnchanged($result);
-        $this->validateStructure($result);
+        $checks[] = fn() => $this->checkStructuralClassUnchanged($result);
+
+        $this->assertAll(
+            ...$checks,
+            ...$this->structureChecks($result),
+        );
     }
 
     /**
      * Validates the entry resulting from a modifyDn, where the new RDN adds values and the old one may remove them.
      *
      * @param bool $isSystem Skip the NO-USER-MODIFICATION check for server-initiated writes.
-     * @throws OperationException
+     * @throws SchemaValidationException
      */
     public function validateModifyDn(
         Entry $result,
@@ -148,16 +199,29 @@ final class SchemaValidator
         if ($this->mode === SchemaValidationMode::Off) {
             return;
         }
+        $checks = [fn() => $this->checkAttributeSyntaxes($result)];
 
-        // Checked first, since a caller relaxing an earlier violation would otherwise stop validation before this.
-        $this->checkAttributeSyntaxes($result);
+        // The new RDN is client-supplied, so the values it puts on the entry face the same restriction as a modify.
         if (!$isSystem) {
-            $this->checkNoUserModificationInRdn($newRdn);
+            array_push(
+                $checks,
+                ...$this->noUserModificationChecks(
+                    array_map(
+                        static fn(Rdn $component): string => $component->getName(),
+                        $newRdn->getAll(),
+                    ),
+                    [],
+                    'Attribute "%s" cannot be set by users.',
+                ),
+            );
         }
+        $checks[] = fn() => $this->checkNoEquivalentValues($result);
+        $checks[] = fn() => $this->checkNamingAttributesAreMatchable($newRdn);
 
-        $this->checkNoEquivalentValues($result);
-        $this->checkNamingAttributesAreMatchable($newRdn);
-        $this->validateStructure($result);
+        $this->assertAll(
+            ...$checks,
+            ...$this->structureChecks($result),
+        );
     }
 
     /**
@@ -188,22 +252,62 @@ final class SchemaValidator
     }
 
     /**
-     * The new RDN is client-supplied, so the values it puts on the entry face the same restriction as a modify.
+     * Checked apart, so a settable attribute the Relax control waives cannot hide one it does not.
      *
+     * @param array<string> $names
+     * @param list<string> $settable
+     * @return list<Closure(): void>
+     */
+    private function noUserModificationChecks(
+        array $names,
+        array $settable,
+        string $message,
+    ): array {
+        return [
+            fn() => $this->checkNoUserModification(
+                $names,
+                $settable,
+                SchemaRule::NoUserModification,
+                $message,
+            ),
+            fn() => $this->checkNoUserModification(
+                $names,
+                $settable,
+                SchemaRule::SettableOperationalAttribute,
+                $message,
+            ),
+        ];
+    }
+
+    /**
+     * Reports the NO-USER-MODIFICATION attributes a write supplies that fall under the given rule.
+     *
+     * @param array<string> $names
+     * @param list<string> $settable
      * @throws OperationException
      */
-    private function checkNoUserModificationInRdn(Rdn $rdn): void
-    {
-        foreach ($rdn->getAll() as $component) {
-            $attrType = $this->schema->getAttributeType($component->getName());
+    private function checkNoUserModification(
+        array $names,
+        array $settable,
+        SchemaRule $rule,
+        string $message,
+    ): void {
+        $wantSettable = $rule === SchemaRule::SettableOperationalAttribute;
+
+        foreach ($names as $name) {
+            $attrType = $this->schema->getAttributeType($name);
 
             if ($attrType === null || !$attrType->noUserModification) {
                 continue;
             }
+            if (in_array($attrType->primaryName(), $settable, true) !== $wantSettable) {
+                continue;
+            }
 
             $this->fail(
-                sprintf('Attribute "%s" cannot be set by users.', $component->getName()),
+                sprintf($message, $name),
                 ResultCode::CONSTRAINT_VIOLATION,
+                $rule,
             );
         }
     }
@@ -228,6 +332,7 @@ final class SchemaValidator
                     $component->getName(),
                 ),
                 ResultCode::NAMING_VIOLATION,
+                SchemaRule::NamingAttributes,
             );
         }
     }
@@ -254,6 +359,7 @@ final class SchemaValidator
         $this->fail(
             sprintf('The structural object class cannot be changed from "%s" to "%s".', $recorded, $structural),
             ResultCode::OBJECT_CLASS_MODS_PROHIBITED,
+            SchemaRule::StructuralClassChange,
         );
     }
 
@@ -271,25 +377,62 @@ final class SchemaValidator
     }
 
     /**
-     * @throws OperationException
+     * Runs every check, so a violation a caller may waive cannot hide one it may not.
+     *
+     * @throws SchemaValidationException
      */
-    private function validateStructure(Entry $entry): void
+    private function assertAll(Closure ...$checks): void
+    {
+        $violations = [];
+
+        foreach ($checks as $check) {
+            try {
+                $check();
+            } catch (SchemaViolationException $violation) {
+                $violations[] = $violation;
+            }
+        }
+
+        if ($violations !== []) {
+            throw new SchemaValidationException($violations);
+        }
+    }
+
+    /**
+     * @return list<Closure(): void>
+     */
+    private function structureChecks(Entry $entry): array
     {
         $objectClasses = $this->collectObjectClasses($entry);
-
-        $this->checkStructuralClass($entry, $objectClasses);
-        $chain = new ObjectClassChain($this->schema, $objectClasses);
-        $this->checkRequiredAttributes($entry, $chain->must);
-        $this->checkAttributeTypesAreDefined($entry);
+        $chain = new ObjectClassChain(
+            $this->schema,
+            $objectClasses,
+        );
+        $checks = [
+            fn() => $this->checkStructuralClass(
+                $entry,
+                $objectClasses,
+            ),
+            fn() => $this->checkRequiredAttributes(
+                $entry,
+                $chain->must,
+            ),
+            fn() => $this->checkAttributeTypesAreDefined($entry),
+        ];
 
         // RFC 4512 §4.3 lets extensibleObject hold any user attribute, so only the MAY list is waived; the
         // structural class, the MUST attributes, and the types themselves still apply.
         if (!$this->hasExtensibleObject($entry)) {
-            $this->checkAllowedAttributes($entry, $chain->must, $chain->may);
+            $checks[] = fn() => $this->checkAllowedAttributes(
+                $entry,
+                $chain->must,
+                $chain->may,
+            );
         }
+        $checks[] = fn() => $this->checkSingleValuedAttributes($entry);
+        $checks[] = fn() => $this->checkValueCounts($entry);
 
-        $this->checkSingleValuedAttributes($entry);
-        $this->checkValueCounts($entry);
+        return $checks;
     }
 
     /**
@@ -308,6 +451,7 @@ final class SchemaValidator
                 $this->fail(
                     sprintf('Attribute "%s" is supplied more than once.', $attr->getDescription()),
                     ResultCode::ATTRIBUTE_OR_VALUE_EXISTS,
+                    SchemaRule::DistinctDescriptions,
                 );
             }
 
@@ -337,6 +481,7 @@ final class SchemaValidator
             $this->fail(
                 sprintf('Attribute "%s" is supplied an equivalent value more than once.', $attr->getDescription()),
                 ResultCode::ATTRIBUTE_OR_VALUE_EXISTS,
+                SchemaRule::EquivalentValues,
             );
         }
     }
@@ -382,6 +527,7 @@ final class SchemaValidator
             $this->fail(
                 sprintf('Undefined attribute type: "%s".', $attr->getName()),
                 ResultCode::UNDEFINED_ATTRIBUTE_TYPE,
+                SchemaRule::DefinedAttributeTypes,
             );
         }
     }
@@ -430,6 +576,7 @@ final class SchemaValidator
                     $entry->getDn()->toString(),
                 ),
                 ResultCode::OBJECT_CLASS_VIOLATION,
+                SchemaRule::StructuralClass,
             );
         }
 
@@ -443,6 +590,7 @@ final class SchemaValidator
                 $entry->getDn()->toString(),
             ),
             ResultCode::OBJECT_CLASS_VIOLATION,
+            SchemaRule::StructuralClass,
         );
     }
 
@@ -534,6 +682,7 @@ final class SchemaValidator
             $this->fail(
                 sprintf('Required attribute "%s" is missing.', $required),
                 ResultCode::OBJECT_CLASS_VIOLATION,
+                SchemaRule::RequiredAttributes,
             );
         }
     }
@@ -564,6 +713,7 @@ final class SchemaValidator
             $this->fail(
                 sprintf('Attribute "%s" is not permitted by any object class.', $attr->getName()),
                 ResultCode::OBJECT_CLASS_VIOLATION,
+                SchemaRule::AllowedAttributes,
             );
         }
     }
@@ -590,6 +740,7 @@ final class SchemaValidator
                     count($attr->getValues()),
                 ),
                 ResultCode::CONSTRAINT_VIOLATION,
+                SchemaRule::SingleValue,
             );
         }
     }
@@ -619,6 +770,7 @@ final class SchemaValidator
                     $limit,
                 ),
                 ResultCode::ADMIN_LIMIT_EXCEEDED,
+                SchemaRule::ValueLimit,
             );
         }
     }
@@ -659,43 +811,7 @@ final class SchemaValidator
                     $attr->getName(),
                 ),
                 ResultCode::INVALID_ATTRIBUTE_SYNTAX,
-            );
-        }
-    }
-
-    /**
-     * @throws OperationException
-     */
-    private function checkNoUserModificationInEntry(Entry $entry): void
-    {
-        foreach ($entry->getAttributes() as $attr) {
-            $attrType = $this->schema->getAttributeType($attr->getName());
-            if ($attrType === null || !$attrType->noUserModification) {
-                continue;
-            }
-
-            $this->fail(
-                sprintf('Attribute "%s" cannot be set by users.', $attr->getName()),
-                ResultCode::CONSTRAINT_VIOLATION,
-            );
-        }
-    }
-
-    /**
-     * @param Change[] $changes
-     * @throws OperationException
-     */
-    private function checkNoUserModificationInChanges(array $changes): void
-    {
-        foreach ($changes as $change) {
-            $attrType = $this->schema->getAttributeType($change->getAttribute()->getName());
-            if ($attrType === null || !$attrType->noUserModification) {
-                continue;
-            }
-
-            $this->fail(
-                sprintf('Attribute "%s" cannot be modified by users.', $change->getAttribute()->getName()),
-                ResultCode::CONSTRAINT_VIOLATION,
+                SchemaRule::AttributeSyntax,
             );
         }
     }
@@ -716,15 +832,17 @@ final class SchemaValidator
     }
 
     /**
-     * @throws OperationException
+     * @throws SchemaViolationException
      */
     private function fail(
         string $message,
         int $code,
+        SchemaRule $rule,
     ): never {
-        throw new OperationException(
+        throw new SchemaViolationException(
             $message,
             $code,
+            $rule,
         );
     }
 }

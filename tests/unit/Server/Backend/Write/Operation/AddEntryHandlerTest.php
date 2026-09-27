@@ -32,6 +32,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\InMemoryChangeJournal;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
+use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolation;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolationDisposition;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolations;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
@@ -44,6 +45,8 @@ use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 final class AddEntryHandlerTest extends TestCase
 {
     use WriteHandlerTestTrait;
+
+    private const SUPPLIED_UUID = '597ae2f6-16a6-1027-98f4-d28b5365dc14';
 
     protected function setUp(): void
     {
@@ -372,38 +375,175 @@ final class AddEntryHandlerTest extends TestCase
         );
 
         self::assertNotNull($this->find('cn=Invalid,dc=example,dc=com'));
-        self::assertCount(
-            1,
-            $violations->all(),
-        );
         self::assertSame(
-            ResultCode::OBJECT_CLASS_VIOLATION,
-            $violations->all()[0]->exception->getCode(),
-        );
-        self::assertSame(
-            SchemaViolationDisposition::RelaxedByPolicy,
-            $violations->all()[0]->disposition,
+            [
+                [ResultCode::OBJECT_CLASS_VIOLATION, SchemaViolationDisposition::RelaxedByPolicy],
+                [ResultCode::OBJECT_CLASS_VIOLATION, SchemaViolationDisposition::RelaxedByPolicy],
+            ],
+            $this->outcomes($violations),
         );
     }
 
-    public function test_the_relax_control_writes_anyway_under_a_strict_validator(): void
+    public function test_the_relax_control_writes_a_no_user_modification_attribute_under_a_strict_validator(): void
     {
         $this->validatedGraph(SchemaValidationMode::Strict);
         $violations = new SchemaViolations();
 
         $this->adds()->handle(
             new AddCommand(new Entry(
-                new Dn('cn=Invalid,dc=example,dc=com'),
-                new Attribute('cn', 'Invalid'),
+                new Dn('cn=Alice,dc=example,dc=com'),
+                new Attribute('objectClass', 'top', 'person'),
+                new Attribute('cn', 'Alice'),
+                new Attribute('sn', 'Smith'),
+                new Attribute('createTimestamp', '20200101000000Z'),
             )),
             $this->violationContext($violations, Controls::relaxRules()),
         );
 
-        self::assertNotNull($this->find('cn=Invalid,dc=example,dc=com'));
+        self::assertNotNull($this->find('cn=Alice,dc=example,dc=com'));
         self::assertSame(
-            SchemaViolationDisposition::RelaxedByControl,
-            $violations->all()[0]->disposition,
+            [[ResultCode::CONSTRAINT_VIOLATION, SchemaViolationDisposition::RelaxedByControl]],
+            $this->outcomes($violations),
         );
+    }
+
+    public function test_the_relax_control_keeps_a_supplied_entry_uuid(): void
+    {
+        $this->validatedGraph(SchemaValidationMode::Strict);
+
+        $this->adds()->handle(
+            new AddCommand($this->personWithUuid('cn=Alice,dc=example,dc=com')),
+            $this->violationContext(new SchemaViolations(), Controls::relaxRules()),
+        );
+
+        self::assertSame(
+            self::SUPPLIED_UUID,
+            $this->find('cn=Alice,dc=example,dc=com')?->get('entryUUID')?->firstValue(),
+        );
+    }
+
+    public function test_the_relax_control_refuses_an_entry_uuid_another_entry_holds(): void
+    {
+        $this->validatedGraph(SchemaValidationMode::Strict);
+        $this->adds()->handle(
+            new AddCommand($this->personWithUuid('cn=Alice,dc=example,dc=com')),
+            $this->violationContext(new SchemaViolations(), Controls::relaxRules()),
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionMessage('The supplied entryUUID is already held by another entry.');
+
+        $this->adds()->handle(
+            new AddCommand($this->personWithUuid('cn=Bob,dc=example,dc=com')),
+            $this->violationContext(new SchemaViolations(), Controls::relaxRules()),
+        );
+    }
+
+    public function test_a_taken_entry_uuid_is_not_revealed_to_a_client_without_the_relax_control(): void
+    {
+        $this->validatedGraph(SchemaValidationMode::Strict);
+        $this->adds()->handle(
+            new AddCommand($this->personWithUuid('cn=Alice,dc=example,dc=com')),
+            $this->violationContext(new SchemaViolations(), Controls::relaxRules()),
+        );
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionMessage('Attribute "entryUUID" cannot be set by users.');
+
+        $this->adds()->handle(
+            new AddCommand($this->personWithUuid('cn=Bob,dc=example,dc=com')),
+            $this->violationContext(new SchemaViolations()),
+        );
+    }
+
+    public function test_the_relax_control_does_not_excuse_an_entry_with_no_structural_class(): void
+    {
+        $this->validatedGraph(SchemaValidationMode::Strict);
+        $violations = new SchemaViolations();
+
+        $code = null;
+        try {
+            $this->adds()->handle(
+                new AddCommand(new Entry(
+                    new Dn('cn=Invalid,dc=example,dc=com'),
+                    new Attribute('cn', 'Invalid'),
+                )),
+                $this->violationContext($violations, Controls::relaxRules()),
+            );
+        } catch (OperationException $e) {
+            $code = $e->getCode();
+        }
+
+        self::assertSame(
+            ResultCode::OBJECT_CLASS_VIOLATION,
+            $code,
+        );
+        self::assertNull($this->find('cn=Invalid,dc=example,dc=com'));
+    }
+
+    public function test_a_relaxed_violation_does_not_hide_one_the_control_cannot_excuse(): void
+    {
+        $this->validatedGraph(SchemaValidationMode::Strict);
+        $violations = new SchemaViolations();
+
+        $code = null;
+        try {
+            $this->adds()->handle(
+                new AddCommand(new Entry(
+                    new Dn('cn=Alice,dc=example,dc=com'),
+                    new Attribute('objectClass', 'top', 'person'),
+                    new Attribute('cn', 'Alice'),
+                    new Attribute('sn', 'Smith'),
+                    new Attribute('createTimestamp', '20200101000000Z'),
+                    new Attribute('description', 'same', 'SAME'),
+                )),
+                $this->violationContext($violations, Controls::relaxRules()),
+            );
+        } catch (OperationException $e) {
+            $code = $e->getCode();
+        }
+
+        self::assertSame(
+            ResultCode::ATTRIBUTE_OR_VALUE_EXISTS,
+            $code,
+        );
+        self::assertSame(
+            [
+                [ResultCode::CONSTRAINT_VIOLATION, SchemaViolationDisposition::RelaxedByControl],
+                [ResultCode::ATTRIBUTE_OR_VALUE_EXISTS, SchemaViolationDisposition::Rejected],
+            ],
+            $this->outcomes($violations),
+        );
+    }
+
+    public function test_a_lenient_validator_does_not_excuse_equivalent_values(): void
+    {
+        $this->validatedGraph(SchemaValidationMode::Lenient);
+        $violations = new SchemaViolations();
+
+        $code = null;
+        try {
+            $this->adds()->handle(
+                new AddCommand(new Entry(
+                    new Dn('cn=Alice,dc=example,dc=com'),
+                    new Attribute('objectClass', 'top', 'person'),
+                    new Attribute('cn', 'Alice'),
+                    new Attribute('sn', 'Smith'),
+                    new Attribute('description', 'same', 'SAME'),
+                )),
+                $this->violationContext($violations),
+            );
+        } catch (OperationException $e) {
+            $code = $e->getCode();
+        }
+
+        self::assertSame(
+            ResultCode::ATTRIBUTE_OR_VALUE_EXISTS,
+            $code,
+        );
+        self::assertNull($this->find('cn=Alice,dc=example,dc=com'));
     }
 
     public function test_the_relax_control_does_not_excuse_invalid_attribute_syntax(): void
@@ -558,5 +698,30 @@ final class AddEntryHandlerTest extends TestCase
             new ControlBag(...$controls),
             schemaViolations: $violations,
         );
+    }
+
+    private function personWithUuid(string $dn): Entry
+    {
+        return new Entry(
+            new Dn($dn),
+            new Attribute('objectClass', 'top', 'person'),
+            new Attribute('cn', (string) (new Dn($dn))->getRdn()->getValue()),
+            new Attribute('sn', 'Smith'),
+            new Attribute('entryUUID', self::SUPPLIED_UUID),
+        );
+    }
+
+    /**
+     * @return list<array{int, SchemaViolationDisposition}>
+     */
+    private function outcomes(SchemaViolations $violations): array
+    {
+        return array_values(array_map(
+            static fn(SchemaViolation $violation): array => [
+                $violation->exception->getCode(),
+                $violation->disposition,
+            ],
+            $violations->all(),
+        ));
     }
 }

@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Storage\Import;
 
-use FreeDSx\Ldap\Control\Control;
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
@@ -59,7 +58,7 @@ final readonly class LdapImporter
      *
      * @param iterable<Entry> $entries
      * @param Dn $creatorDn recorded as creatorsName/modifiersName on entries that do not carry their own.
-     * @param bool $ignoreValidation when true, relaxes the schema rules.
+     * @param bool $ignoreValidation when true, waives the schema rules a lenient policy would.
      * @param bool $replaceExisting when true, an entry already at the same DN is overwritten rather than refused.
      * @throws InvalidArgumentException when the creator DN is malformed
      * @throws OperationException when an entry is refused by the add operation, including one whose parent is absent
@@ -138,17 +137,13 @@ final readonly class LdapImporter
         bool $ignoreValidation,
         bool $replaceExisting,
     ): WriteContext {
-        // Relaxing through the control keeps the violations recorded rather than discarded.
-        $controls = $ignoreValidation
-            ? new ControlBag(new Control(Control::OID_RELAX_RULES))
-            : new ControlBag();
-
         return WriteContext::bulkLoad(
             new SystemToken(),
-            $controls,
+            new ControlBag(),
             new BulkLoadOptions(
                 $creatorDn,
                 $replaceExisting,
+                $ignoreValidation,
             ),
         );
     }

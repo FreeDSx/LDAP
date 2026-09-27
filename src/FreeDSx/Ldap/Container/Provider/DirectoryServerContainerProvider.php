@@ -377,6 +377,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             schemaGate: $container->get(SchemaViolationGate::class),
             operationalAttrs: $container->get(OperationalAttributeGenerator::class),
             rdnValues: $container->get(RdnAttributeValues::class),
+            uuids: $container->get(EntryUuidLocator::class),
         );
     }
 

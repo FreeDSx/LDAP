@@ -15,8 +15,11 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Backend\Write;
 
 use FreeDSx\Ldap\Control\ControlBag;
 use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
 use FreeDSx\Ldap\Schema\Schema;
@@ -296,6 +299,118 @@ final class OperationalAttributeGeneratorTest extends TestCase
         self::assertSame(
             ['person'],
             $entry->get('structuralObjectClass')?->getValues(),
+        );
+    }
+
+    public function test_apply_for_add_keeps_the_operational_attributes_the_entry_supplies(): void
+    {
+        $this->entry->set('createTimestamp', '20200101000000Z');
+        $this->entry->set('modifyTimestamp', '20200102000000Z');
+        $this->entry->set('creatorsName', 'cn=Jane,dc=example,dc=com');
+        $this->entry->set('modifiersName', 'cn=Joe,dc=example,dc=com');
+        $this->entry->set('entryUUID', '597ae2f6-16a6-1027-98f4-d28b5365dc14');
+
+        $this->subject->applyForAdd(
+            $this->entry,
+            $this->boundContext('cn=admin,dc=example,dc=com'),
+        );
+
+        self::assertSame(
+            [
+                '20200101000000Z',
+                '20200102000000Z',
+                'cn=Jane,dc=example,dc=com',
+                'cn=Joe,dc=example,dc=com',
+                '597ae2f6-16a6-1027-98f4-d28b5365dc14',
+            ],
+            [
+                $this->entry->get('createTimestamp')?->firstValue(),
+                $this->entry->get('modifyTimestamp')?->firstValue(),
+                $this->entry->get('creatorsName')?->firstValue(),
+                $this->entry->get('modifiersName')?->firstValue(),
+                $this->entry->get('entryUUID')?->firstValue(),
+            ],
+        );
+    }
+
+    public function test_apply_for_add_refuses_a_supplied_create_timestamp_in_the_future(): void
+    {
+        $this->entry->set('createTimestamp', '20990101000000Z');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->subject->applyForAdd(
+            $this->entry,
+            $this->anonymousContext(),
+        );
+    }
+
+    public function test_apply_for_add_refuses_a_supplied_modify_timestamp_before_creation(): void
+    {
+        $this->entry->set('createTimestamp', '20200102000000Z');
+        $this->entry->set('modifyTimestamp', '20200101000000Z');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->subject->applyForAdd(
+            $this->entry,
+            $this->anonymousContext(),
+        );
+    }
+
+    public function test_apply_for_modify_keeps_the_modify_bookkeeping_the_changes_supply(): void
+    {
+        $this->entry->set('createTimestamp', '20200101000000Z');
+        $this->entry->set('modifyTimestamp', '20200102000000Z');
+        $this->entry->set('modifiersName', 'cn=Joe,dc=example,dc=com');
+
+        $this->subject->applyForModify(
+            $this->entry,
+            $this->boundContext('cn=admin,dc=example,dc=com'),
+            [
+                Change::replace('modifyTimestamp', '20200102000000Z'),
+                Change::replace('modifiersName', 'cn=Joe,dc=example,dc=com'),
+            ],
+        );
+
+        self::assertSame(
+            ['20200102000000Z', 'cn=Joe,dc=example,dc=com'],
+            [
+                $this->entry->get('modifyTimestamp')?->firstValue(),
+                $this->entry->get('modifiersName')?->firstValue(),
+            ],
+        );
+    }
+
+    public function test_apply_for_modify_refuses_a_supplied_create_timestamp_in_the_future(): void
+    {
+        $this->entry->set('createTimestamp', '20990101000000Z');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->subject->applyForModify(
+            $this->entry,
+            $this->anonymousContext(),
+            [Change::replace('createTimestamp', '20990101000000Z')],
+        );
+    }
+
+    public function test_apply_for_modify_does_not_judge_timestamps_the_changes_do_not_supply(): void
+    {
+        $this->entry->set('createTimestamp', '20990101000000Z');
+
+        $this->subject->applyForModify(
+            $this->entry,
+            $this->anonymousContext(),
+            [Change::replace('description', 'changed')],
+        );
+
+        self::assertSame(
+            '20990101000000Z',
+            $this->entry->get('createTimestamp')?->firstValue(),
         );
     }
 
