@@ -142,6 +142,46 @@ final class SyncResultBatcherTest extends TestCase
         );
     }
 
+    public function test_an_entry_reusing_a_held_deletes_dn_follows_that_delete(): void
+    {
+        $responses = $this->batch([
+            $this->delete('cn=alice,dc=example,dc=com'),
+            $this->add('cn=alice,dc=example,dc=com'),
+        ]);
+
+        self::assertSame(
+            [SyncStateControl::STATE_DELETE, SyncStateControl::STATE_ADD],
+            array_map(
+                static fn(LdapMessageResponse $response): ?int => $response->controls()
+                    ->getByClass(SyncStateControl::class)
+                    ?->getState(),
+                $responses,
+            ),
+        );
+    }
+
+    public function test_a_dn_reusing_entry_flushes_every_held_delete_as_one_set_ahead_of_it(): void
+    {
+        $responses = $this->batch([
+            $this->delete('cn=alice,dc=example,dc=com'),
+            $this->delete('cn=bob,dc=example,dc=com'),
+            $this->add('cn=ALICE,dc=example,dc=com'),
+            $this->delete('cn=carol,dc=example,dc=com'),
+        ]);
+
+        self::assertSame(
+            [SyncIdSet::class, SearchResultEntry::class, SearchResultEntry::class],
+            array_map(
+                static fn(LdapMessageResponse $response): string => $response->getResponse()::class,
+                $responses,
+            ),
+        );
+        self::assertSame(
+            SyncStateControl::STATE_ADD,
+            $responses[1]->controls()->getByClass(SyncStateControl::class)?->getState(),
+        );
+    }
+
     public function test_deletes_beyond_the_cap_split_across_sets(): void
     {
         $this->subject = new SyncResultBatcher(maxSetSize: 2);

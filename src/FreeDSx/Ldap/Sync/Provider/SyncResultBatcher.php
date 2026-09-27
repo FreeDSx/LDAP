@@ -21,7 +21,7 @@ use function array_map;
 use function count;
 
 /**
- * Wraps sync results in their message envelope, coalescing runs of deletes into a syncIdSet per RFC 4533 §3.3.2.
+ * Wraps sync results in their message envelope, coalescing deletes into a syncIdSet per RFC 4533 §3.3.2.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -43,9 +43,23 @@ final readonly class SyncResultBatcher
         int $messageId,
     ): Generator {
         $deletes = [];
+        $deletedDns = [];
 
         foreach ($results as $result) {
-            if (!$result->control->isDelete()) {
+            $dn = $result->entry->getEntry()->getDn()->normalizedString();
+            $isDelete = $result->control->isDelete();
+
+            // An entry reusing a held delete's DN follows that delete, as it did in the journal.
+            if (!$isDelete && isset($deletedDns[$dn])) {
+                yield from $this->flush(
+                    $messageId,
+                    $deletes,
+                );
+                $deletes = [];
+                $deletedDns = [];
+            }
+
+            if (!$isDelete) {
                 yield $this->entry(
                     $messageId,
                     $result,
@@ -54,6 +68,7 @@ final readonly class SyncResultBatcher
                 continue;
             }
             $deletes[] = $result;
+            $deletedDns[$dn] = true;
             if (count($deletes) < $this->maxSetSize) {
                 continue;
             }
@@ -63,6 +78,7 @@ final readonly class SyncResultBatcher
                 $deletes,
             );
             $deletes = [];
+            $deletedDns = [];
         }
 
         yield from $this->flush(

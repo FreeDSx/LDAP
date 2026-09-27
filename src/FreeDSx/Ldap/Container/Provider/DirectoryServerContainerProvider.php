@@ -855,6 +855,7 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             $container->get(ListEntryInterface::class),
             $container->get(WriteEntryInterface::class),
             $container->get(EntryUuidLocator::class),
+            $container->get(ReadEntryInterface::class),
         );
 
         return new LdapReplica(

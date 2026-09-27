@@ -57,6 +57,7 @@ final class VerbatimStorageApplierTest extends TestCase
                 $this->storage,
                 $this->fromContainer(FilterEvaluatorInterface::class),
             ),
+            $this->storage,
         );
     }
 
@@ -119,6 +120,92 @@ final class VerbatimStorageApplierTest extends TestCase
         );
 
         self::assertFalse($this->exists('cn=carol,dc=example,dc=com'));
+    }
+
+    public function test_a_delete_removes_the_entry_holding_its_uuid_whatever_dn_it_names(): void
+    {
+        $this->storage->store($this->entry('cn=moved,dc=example,dc=com', self::UUID_B));
+
+        $removed = $this->subject->apply(
+            $this->syncResult(
+                SyncStateControl::STATE_DELETE,
+                $this->entry('cn=old,dc=example,dc=com', self::UUID_B),
+            ),
+            $this->persistSession(),
+        );
+
+        self::assertFalse($this->exists('cn=moved,dc=example,dc=com'));
+        self::assertSame(
+            ['cn=moved,dc=example,dc=com'],
+            $this->dnStrings($removed),
+        );
+    }
+
+    public function test_a_delete_whose_uuid_the_replica_does_not_hold_leaves_the_entry_at_its_dn(): void
+    {
+        $this->storage->store($this->entry('cn=carol,dc=example,dc=com', self::UUID_A));
+
+        $removed = $this->subject->apply(
+            $this->syncResult(
+                SyncStateControl::STATE_DELETE,
+                $this->entry('cn=carol,dc=example,dc=com', self::UUID_B),
+            ),
+            $this->persistSession(),
+        );
+
+        self::assertTrue($this->exists('cn=carol,dc=example,dc=com'));
+        self::assertSame(
+            [],
+            $removed,
+        );
+    }
+
+    public function test_an_add_at_a_dn_held_by_another_uuid_replaces_the_holder(): void
+    {
+        $this->storage->store($this->entry('cn=carol,dc=example,dc=com', self::UUID_A));
+
+        $removed = $this->subject->apply(
+            $this->syncResult(
+                SyncStateControl::STATE_ADD,
+                $this->entry('cn=carol,dc=example,dc=com', self::UUID_B),
+            ),
+            $this->persistSession(),
+        );
+
+        self::assertSame(
+            self::UUID_B,
+            $this->value('cn=carol,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            ['cn=carol,dc=example,dc=com'],
+            $this->dnStrings($removed),
+        );
+    }
+
+    public function test_a_readd_announced_before_the_delete_of_its_predecessor_is_kept(): void
+    {
+        $this->storage->store($this->entry('cn=carol,dc=example,dc=com', self::UUID_A));
+        $session = $this->persistSession();
+
+        $this->subject->apply(
+            $this->syncResult(
+                SyncStateControl::STATE_ADD,
+                $this->entry('cn=carol,dc=example,dc=com', self::UUID_B),
+            ),
+            $session,
+        );
+        $this->subject->apply(
+            $this->syncResult(
+                SyncStateControl::STATE_DELETE,
+                $this->entry('cn=carol,dc=example,dc=com', self::UUID_A),
+            ),
+            $session,
+        );
+
+        self::assertSame(
+            self::UUID_B,
+            $this->value('cn=carol,dc=example,dc=com', 'entryUUID'),
+        );
     }
 
     public function test_reconcile_removes_locals_absent_from_the_present_phase(): void
@@ -411,6 +498,18 @@ final class VerbatimStorageApplierTest extends TestCase
                 $deleted,
             ),
         ));
+    }
+
+    /**
+     * @param list<Dn> $dns
+     * @return list<string>
+     */
+    private function dnStrings(array $dns): array
+    {
+        return array_map(
+            static fn(Dn $dn): string => $dn->toString(),
+            $dns,
+        );
     }
 
     private function refreshSession(): Session
