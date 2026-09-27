@@ -63,7 +63,7 @@ final class MysqlLdapBackendStorageTest extends LdapBackendStorageTestCase
      */
     protected static function storageExtraArgs(): array
     {
-        return ['--storage=mysql'];
+        return [...parent::storageExtraArgs(), '--storage=mysql'];
     }
 
     private static function isMysqlAvailable(): bool

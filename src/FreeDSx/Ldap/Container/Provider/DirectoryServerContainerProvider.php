@@ -40,6 +40,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Capability\RowLockableInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Derived\DerivedResolver;
 use FreeDSx\Ldap\Server\Backend\Storage\Export\DirectoryDumper;
@@ -496,6 +497,8 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             $options->getSchema(),
             $options->getSchemaValidationMode(),
             equalityResolver: $container->get(EqualityComparatorResolver::class),
+            maxValues: $options->getSchemaConfig()->getMaxAttributeValues(),
+            linked: $container->get(LinkedAttributes::class),
         );
     }
 

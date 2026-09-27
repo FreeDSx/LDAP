@@ -68,6 +68,6 @@ final class LdapBackendSqliteSwooleStorageTest extends LdapBackendStorageTestCas
 
     protected static function storageExtraArgs(): array
     {
-        return ['--storage=sqlite', '--runner=swoole'];
+        return [...parent::storageExtraArgs(), '--storage=sqlite', '--runner=swoole'];
     }
 }

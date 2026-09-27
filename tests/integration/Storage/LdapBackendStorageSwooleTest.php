@@ -84,6 +84,6 @@ final class LdapBackendStorageSwooleTest extends LdapBackendStorageTestCase
      */
     protected static function storageExtraArgs(): array
     {
-        return ['--storage=memory', '--runner=swoole'];
+        return [...parent::storageExtraArgs(), '--storage=memory', '--runner=swoole'];
     }
 }

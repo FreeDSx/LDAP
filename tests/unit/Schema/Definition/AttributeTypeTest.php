@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Schema\Definition;
 
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class AttributeTypeTest extends TestCase
@@ -157,6 +158,67 @@ final class AttributeTypeTest extends TestCase
 
         self::assertSame(
             "( 2.5.4.35 NAME 'userPassword' X-CONFIDENTIAL 'TRUE' )",
+            $attr->toDescriptionString(),
+        );
+    }
+
+    public function test_an_attribute_declares_no_value_cap_by_default(): void
+    {
+        $attr = new AttributeType(
+            oid: '2.5.4.13',
+            names: ['description'],
+        );
+
+        self::assertNull($attr->maxValues());
+    }
+
+    #[DataProvider('maxValuesProvider')]
+    public function test_the_declared_value_cap_is_read(
+        string $declared,
+        ?int $expected,
+    ): void {
+        $attr = new AttributeType(
+            oid: '2.5.4.13',
+            names: ['description'],
+            extensions: [
+                AttributeType::EXTENSION_MAX_VALUES => [$declared],
+            ],
+        );
+
+        self::assertSame(
+            $expected,
+            $attr->maxValues(),
+        );
+    }
+
+    /**
+     * @return array<string, array{string, int|null}>
+     */
+    public static function maxValuesProvider(): array
+    {
+        return [
+            'a cap' => ['250', 250],
+            'one' => ['1', 1],
+            'zero lifts the cap' => ['0', AttributeType::EXTENSION_UNLIMITED_VALUES],
+            'not a number' => ['many', null],
+            'negative' => ['-5', null],
+            'not a whole number' => ['2.5', null],
+            'empty' => ['', null],
+        ];
+    }
+
+    public function test_the_value_cap_round_trips_through_the_description_string(): void
+    {
+        $attr = new AttributeType(
+            oid: '2.5.4.13',
+            names: ['description'],
+            extensions: [
+                AttributeType::EXTENSION_MAX_VALUES => ['250'],
+            ],
+        );
+
+        self::assertSame(
+            "( 2.5.4.13 NAME 'description' X-MAX-VALUES '250' )",
             $attr->toDescriptionString(),
         );
     }

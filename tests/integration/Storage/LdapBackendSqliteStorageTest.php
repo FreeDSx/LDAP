@@ -168,6 +168,6 @@ final class LdapBackendSqliteStorageTest extends LdapBackendStorageTestCase
      */
     protected static function storageExtraArgs(): array
     {
-        return ['--storage=sqlite'];
+        return [...parent::storageExtraArgs(), '--storage=sqlite'];
     }
 }
