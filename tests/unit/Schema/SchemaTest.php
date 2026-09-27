@@ -682,6 +682,102 @@ final class SchemaTest extends TestCase
         );
     }
 
+    public function test_a_standard_ordering_rule_is_an_ordering_rule_when_no_type_names_it(): void
+    {
+        $this->subject->addMatchingRule(new MatchingRule(
+            oid: MatchingRuleOid::OID_INTEGER_ORDERING_MATCH,
+            names: [MatchingRuleOid::NAME_INTEGER_ORDERING_MATCH],
+            syntaxOid: SyntaxOid::OID_INTEGER,
+            comparator: new CaseIgnoreComparator(),
+        ));
+
+        self::assertTrue($this->subject->isOrderingRule(MatchingRuleOid::NAME_INTEGER_ORDERING_MATCH));
+    }
+
+    public function test_a_custom_rule_named_as_an_ordering_by_oid_is_an_ordering_rule(): void
+    {
+        $this->subject->addMatchingRule($this->customOrderingRule());
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.30',
+            names: ['ordered'],
+            orderingOid: '1.2.3.99',
+        ));
+
+        self::assertTrue($this->subject->isOrderingRule('customOrderingMatch'));
+    }
+
+    public function test_a_custom_rule_named_as_an_ordering_by_descriptor_is_an_ordering_rule(): void
+    {
+        $this->subject->addMatchingRule($this->customOrderingRule());
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.30',
+            names: ['ordered'],
+            orderingOid: 'customOrderingMatch',
+        ));
+
+        self::assertTrue($this->subject->isOrderingRule('1.2.3.99'));
+    }
+
+    public function test_a_rule_no_type_names_as_an_ordering_is_not_an_ordering_rule(): void
+    {
+        $this->subject->addMatchingRule($this->caseIgnore);
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.30',
+            names: ['compared'],
+            equalityOid: '2.5.13.2',
+        ));
+
+        self::assertFalse($this->subject->isOrderingRule('caseIgnoreMatch'));
+    }
+
+    public function test_an_unknown_rule_is_not_an_ordering_rule(): void
+    {
+        self::assertFalse($this->subject->isOrderingRule('1.2.3.4.5'));
+    }
+
+    public function test_a_type_added_after_an_ordering_lookup_is_seen_by_the_next_lookup(): void
+    {
+        $this->subject->addMatchingRule($this->customOrderingRule());
+        self::assertFalse($this->subject->isOrderingRule('1.2.3.99'));
+
+        $this->subject->addAttributeType(new AttributeType(
+            oid: '1.2.3.30',
+            names: ['ordered'],
+            orderingOid: '1.2.3.99',
+        ));
+
+        self::assertTrue($this->subject->isOrderingRule('1.2.3.99'));
+    }
+
+    public function test_a_rule_asserting_a_substring_assertion_is_a_substring_rule(): void
+    {
+        $this->subject->addMatchingRule(new MatchingRule(
+            oid: '2.5.13.4',
+            names: ['caseIgnoreSubstringsMatch'],
+            syntaxOid: SyntaxOid::OID_SUBSTRING_ASSERTION,
+            comparator: new CaseIgnoreComparator(),
+        ));
+
+        self::assertTrue($this->subject->isSubstringRule('caseIgnoreSubstringsMatch'));
+    }
+
+    public function test_a_rule_asserting_a_whole_value_is_not_a_substring_rule(): void
+    {
+        $this->subject->addMatchingRule($this->caseIgnore);
+
+        self::assertFalse($this->subject->isSubstringRule('2.5.13.2'));
+    }
+
+    private function customOrderingRule(): MatchingRule
+    {
+        return new MatchingRule(
+            oid: '1.2.3.99',
+            names: ['customOrderingMatch'],
+            syntaxOid: SyntaxOid::OID_DIRECTORY_STRING,
+            comparator: new CaseIgnoreComparator(),
+        );
+    }
+
     /**
      * A supertype declaring every rule, an intermediate declaring none, and a subtype declaring none.
      */
