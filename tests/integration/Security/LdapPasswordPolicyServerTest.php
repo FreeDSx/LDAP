@@ -273,6 +273,17 @@ final class LdapPasswordPolicyServerTest extends ServerTestCase
         $this->ldapClient()->bind($dn, self::PASSWORD);
     }
 
+    public function testAUserGovernedByAPolicySubentryWhoseClassesAreSpelledByOidIsLockedOut(): void
+    {
+        $this->useSubentryPolicyServer();
+        $dn = 'cn=inside-oid-user,ou=secure-oid,dc=foo,dc=bar';
+        $this->failBinds($dn, self::MAX_FAILURE);
+
+        $this->expectException(BindException::class);
+
+        $this->ldapClient()->bind($dn, self::PASSWORD);
+    }
+
     public function testAUserOutsideAnyAdministrativePointIsNotGoverned(): void
     {
         $this->useSubentryPolicyServer();

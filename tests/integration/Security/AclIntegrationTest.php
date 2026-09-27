@@ -535,6 +535,98 @@ final class AclIntegrationTest extends ServerTestCase
         self::assertNull($delegate->get('sn'));
     }
 
+    public function testAReadDenyAppliesToAGroupMemberSpelledByNumericOid(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        self::assertNull($this->readSpelledTarget('description'));
+    }
+
+    public function testAReadDenyAppliesToAGroupMemberSpelledByAnAlias(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        self::assertNull($this->readSpelledTarget('title'));
+    }
+
+    public function testAReadDenyAppliesToAUniqueMemberSpelledByNumericOid(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        self::assertNull($this->readSpelledTarget('postalCode'));
+    }
+
+    public function testTheSpelledMemberDeniesDoNotReachAnIdentityOutsideThoseGroups(): void
+    {
+        $this->bindDelegate();
+
+        self::assertSame(
+            ['desc-secret', 'title-secret', 'postal-secret'],
+            [
+                $this->readSpelledTarget('description'),
+                $this->readSpelledTarget('title'),
+                $this->readSpelledTarget('postalCode'),
+            ],
+        );
+    }
+
+    public function testAnOperationDenyAppliesToAGroupMemberSpelledByNumericOid(): void
+    {
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::INSUFFICIENT_ACCESS_RIGHTS);
+
+        $this->ldapClient()->compare(
+            LdapAclCommand::SPELLED_TARGET_DN,
+            'sn',
+            'Target',
+        );
+    }
+
+    public function testAReadDenyAppliesToAGroupMemberAddedByModifyInAnotherSpelling(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->send(Operations::modify(
+            LdapAclCommand::LATE_MEMBER_GROUP_DN,
+            Change::add(
+                'member',
+                '2.5.4.3=user,dc=foo,dc=bar',
+            ),
+        ));
+
+        $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
+
+        self::assertNull($this->readSpelledTarget('street'));
+    }
+
+    public function testAnEqualityFilterOnMemberMatchesEverySpellingTheMemberWasWrittenIn(): void
+    {
+        $this->authenticateAdmin();
+
+        $groups = $this->ldapClient()->search(
+            Operations::search(Filters::and(
+                Filters::equal('member', '2.5.4.3=user,dc=foo,dc=bar'),
+                Filters::or(
+                    Filters::equal('cn', 'blocked-oid'),
+                    Filters::equal('cn', 'blocked-alias'),
+                ),
+            ))
+                ->base('dc=foo,dc=bar')
+                ->useSubtreeScope(),
+        );
+        $dns = array_map(
+            static fn(Entry $entry): string => $entry->getDn()->toString(),
+            $groups->toArray(),
+        );
+        sort($dns);
+
+        self::assertSame(
+            [LdapAclCommand::ALIAS_MEMBER_GROUP_DN, LdapAclCommand::OID_MEMBER_GROUP_DN],
+            $dns,
+        );
+    }
+
     public function testRenameAuthorizesEveryComponentOfAMultivaluedRdn(): void
     {
         $this->ldapClient()->bind('cn=user,dc=foo,dc=bar', '12345');
@@ -1189,6 +1281,22 @@ final class AclIntegrationTest extends ServerTestCase
             LdapAclCommand::HIDDEN_DN,
             LdapAclCommand::HIDDEN_PASSWORD,
         );
+    }
+
+    private function readSpelledTarget(string $attribute): ?string
+    {
+        $entry = $this->ldapClient()->search(
+            Operations::search(
+                Filters::present('objectClass'),
+                $attribute,
+            )
+                ->base(LdapAclCommand::SPELLED_TARGET_DN)
+                ->useBaseScope(),
+        )->first();
+
+        self::assertNotNull($entry);
+
+        return $entry->get($attribute)?->firstValue();
     }
 
     private static function alicePasswordHash(): string

@@ -23,8 +23,12 @@ interface AttributeValueAssertionInterface extends FilterAttributeInterface
      */
     public function getAttribute(): string;
 
+    public function setAttribute(string $attribute): static;
+
     /**
      * The value being asserted.
      */
     public function getValue(): string;
+
+    public function setValue(string $value): static;
 }

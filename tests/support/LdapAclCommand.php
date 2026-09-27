@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Support\FreeDSx\Ldap;
 
-use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
+use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Schema\LdifSchemaSource;
 use FreeDSx\Ldap\Server\AccessControl\AclRules;
 use FreeDSx\Ldap\Operation\OperationType;
@@ -50,9 +48,36 @@ class LdapAclCommand extends Command
     public const DELEGATE_PASSWORD = 'delegatepass';
 
     /**
+     * Carries one attribute per spelled-member group, each denied to that group's members.
+     */
+    public const SPELLED_TARGET_DN = 'cn=spelled-target,dc=foo,dc=bar';
+
+    /**
+     * Names cn=user by the numeric OID of cn.
+     */
+    public const OID_MEMBER_GROUP_DN = 'cn=blocked-oid,dc=foo,dc=bar';
+
+    /**
+     * Names cn=user by an alias of cn.
+     */
+    public const ALIAS_MEMBER_GROUP_DN = 'cn=blocked-alias,dc=foo,dc=bar';
+
+    /**
+     * Names cn=user by the numeric OID of cn through uniqueMember, which is not held as a link.
+     */
+    public const UNIQUE_MEMBER_GROUP_DN = 'cn=blocked-unique,dc=foo,dc=bar';
+
+    /**
+     * Seeded without cn=user, so a test can add it over the wire.
+     */
+    public const LATE_MEMBER_GROUP_DN = 'cn=blocked-late,dc=foo,dc=bar';
+
+    /**
      * Defines secretCode as confidential; loaded so the harness exercises the same path an operator would.
      */
     private const SECRET_CODE_SCHEMA = __DIR__ . '/../resources/schema/acl-secret-code.ldif';
+
+    private const SEED_LDIF = __DIR__ . '/../resources/seed/acl-seed.ldif';
 
     protected function configure(): void
     {
@@ -73,83 +98,6 @@ class LdapAclCommand extends Command
         OutputInterface $output,
     ): int {
         $transport = $this->getStringOption($input, 'transport');
-
-        $adminPasswordHash = '{SHA}' . base64_encode(sha1('12345', true));
-        $userPasswordHash = '{SHA}' . base64_encode(sha1('12345', true));
-        $alicePasswordHash = '{SHA}' . base64_encode(sha1('alicepass', true));
-        $hiddenPasswordHash = '{SHA}' . base64_encode(sha1(self::HIDDEN_PASSWORD, true));
-        $delegatePasswordHash = '{SHA}' . base64_encode(sha1(self::DELEGATE_PASSWORD, true));
-
-        $entries = [
-            new Entry(
-                new Dn('dc=foo,dc=bar'),
-                new Attribute('dc', 'foo'),
-                new Attribute('objectClass', 'domain'),
-            ),
-            new Entry(
-                new Dn('cn=admins,dc=foo,dc=bar'),
-                new Attribute('cn', 'admins'),
-                new Attribute('objectClass', 'groupOfNames'),
-                new Attribute('member', 'cn=admin,dc=foo,dc=bar'),
-            ),
-            new Entry(
-                new Dn('cn=admin,dc=foo,dc=bar'),
-                new Attribute('cn', 'admin'),
-                new Attribute('sn', 'Admin'),
-                new Attribute('objectClass', 'inetOrgPerson'),
-                new Attribute('userPassword', $adminPasswordHash),
-            ),
-            new Entry(
-                new Dn('cn=user,dc=foo,dc=bar'),
-                new Attribute('cn', 'user'),
-                new Attribute('sn', 'User'),
-                new Attribute('objectClass', 'inetOrgPerson'),
-                new Attribute('userPassword', $userPasswordHash),
-            ),
-            new Entry(
-                new Dn('ou=people,dc=foo,dc=bar'),
-                new Attribute('ou', 'people'),
-                new Attribute('objectClass', 'organizationalUnit'),
-            ),
-            new Entry(
-                new Dn('cn=alice,ou=people,dc=foo,dc=bar'),
-                new Attribute('cn', 'alice'),
-                new Attribute('sn', 'Smith'),
-                new Attribute('objectClass', 'inetOrgPerson', 'extensibleObject'),
-                new Attribute('userPassword', $alicePasswordHash),
-                new Attribute('secretCode', self::SECRET_CODE),
-            ),
-            // RDN is uid, which is not writable under ou=people, so a rename that touches it must be refused.
-            new Entry(
-                new Dn('uid=bob,ou=people,dc=foo,dc=bar'),
-                new Attribute('uid', 'bob'),
-                new Attribute('cn', 'bob'),
-                new Attribute('sn', 'Bob'),
-                new Attribute('objectClass', 'inetOrgPerson'),
-            ),
-            new Entry(
-                new Dn('uid=bob2,ou=people,dc=foo,dc=bar'),
-                new Attribute('uid', 'bob2'),
-                new Attribute('cn', 'bob2'),
-                new Attribute('sn', 'Bob'),
-                new Attribute('objectClass', 'inetOrgPerson'),
-                new Attribute('telephoneNumber', '555-0100'),
-            ),
-            new Entry(
-                new Dn(self::DELEGATE_DN),
-                new Attribute('cn', 'delegate'),
-                new Attribute('sn', 'Delegate'),
-                new Attribute('objectClass', 'inetOrgPerson'),
-                new Attribute('userPassword', $delegatePasswordHash),
-            ),
-            new Entry(
-                new Dn(self::HIDDEN_DN),
-                new Attribute('cn', 'hidden'),
-                new Attribute('sn', 'Hidden'),
-                new Attribute('objectClass', 'inetOrgPerson'),
-                new Attribute('userPassword', $hiddenPasswordHash),
-            ),
-        ];
 
         $network = (new NetworkConfig())
             ->setPort(TestWorker::port())
@@ -185,6 +133,12 @@ class LdapAclCommand extends Command
                                 Target::dn(self::HIDDEN_DN),
                                 OperationType::Search,
                             ),
+                            // Only bites if the member value spelled by OID is recognized as cn=user.
+                            OperationRule::deny(
+                                Subject::group(self::OID_MEMBER_GROUP_DN),
+                                Target::dn(self::SPELLED_TARGET_DN),
+                                OperationType::Compare,
+                            ),
                             OperationRule::allow(
                                 Subject::authenticated(),
                                 Target::any(),
@@ -211,6 +165,30 @@ class LdapAclCommand extends Command
                             OperationRule::deny(Subject::anyone()),
                         )
                         ->replaceAttributeRules(
+                            // Each only bites if its group's member value, spelled another way, is recognized.
+                            AttributeRule::deny(
+                                Subject::group(self::OID_MEMBER_GROUP_DN),
+                                Target::dn(self::SPELLED_TARGET_DN),
+                                'description',
+                            )->forRead(),
+                            AttributeRule::deny(
+                                Subject::group(self::ALIAS_MEMBER_GROUP_DN),
+                                Target::dn(self::SPELLED_TARGET_DN),
+                                'title',
+                            )->forRead(),
+                            AttributeRule::deny(
+                                Subject::group(self::LATE_MEMBER_GROUP_DN),
+                                Target::dn(self::SPELLED_TARGET_DN),
+                                'street',
+                            )->forRead(),
+                            AttributeRule::deny(
+                                Subject::group(
+                                    self::UNIQUE_MEMBER_GROUP_DN,
+                                    'uniqueMember',
+                                ),
+                                Target::dn(self::SPELLED_TARGET_DN),
+                                'postalCode',
+                            )->forRead(),
                             // Spelled with an alias, so the rule only bites if rule names are canonicalized.
                             AttributeRule::deny(
                                 Subject::anyone(),
@@ -285,7 +263,7 @@ class LdapAclCommand extends Command
             $container,
         );
 
-        $server->seedEntries($entries);
+        $server->seed(new FileLdifLoader(self::SEED_LDIF));
         $server->run();
 
         return Command::SUCCESS;

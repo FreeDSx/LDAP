@@ -1862,6 +1862,35 @@ trait QueryTestsTrait
         }
     }
 
+    public function testABaseAliasWhoseClassAndTargetAreSpelledByOidAndAliasIsDereferenced(): void
+    {
+        $this->stopServer();
+        $this->createServerProcess('tcp', static::storageExtraArgs());
+        $this->authenticateAdmin();
+
+        $this->ldapClient()->create(Entry::fromArray('cn=oid-ref,dc=foo,dc=bar', [
+            'objectClass' => ['top', '2.5.6.1', 'extensibleObject'],
+            'cn' => 'oid-ref',
+            'aliasedObjectName' => 'commonName=user,dc=foo,dc=bar',
+        ]));
+
+        try {
+            $viaAlias = $this->ldapClient()->search(
+                Operations::search(Filters::present('objectClass'))
+                    ->base('cn=oid-ref,dc=foo,dc=bar')
+                    ->useBaseScope()
+                    ->setDereferenceAliases(SearchRequest::DEREF_FINDING_BASE_OBJECT),
+            );
+
+            self::assertSame(
+                'cn=user,dc=foo,dc=bar',
+                strtolower((string) $viaAlias->first()?->getDn()),
+            );
+        } finally {
+            $this->ldapClient()->delete('cn=oid-ref,dc=foo,dc=bar');
+        }
+    }
+
     public function testABaseAliasNamingAMissingEntryIsAnAliasProblem(): void
     {
         $this->stopServer();

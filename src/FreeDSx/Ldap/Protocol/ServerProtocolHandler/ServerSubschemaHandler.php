@@ -96,7 +96,7 @@ readonly class ServerSubschemaHandler implements ServerProtocolHandlerInterface
     {
         $ruleToAttrs = [];
         foreach ($schema->getAttributeTypes() as $attrType) {
-            $name = $attrType->names[0] ?? $attrType->oid;
+            $name = $attrType->primaryName();
             $ruleOids = [
                 $schema->getEqualityRuleOid($attrType->oid),
                 $schema->getOrderingRuleOid($attrType->oid),

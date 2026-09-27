@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\LdapSyntax;
 use FreeDSx\Ldap\Schema\Definition\MatchingRule;
 use FreeDSx\Ldap\Schema\Definition\MatchingRuleOid;
+use FreeDSx\Ldap\Schema\Definition\NamedDefinitionInterface;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\SyntaxOid;
 use FreeDSx\Ldap\Schema\Matching\Comparator\ObjectIdentifierComparator;
@@ -307,16 +308,24 @@ final class Schema
      */
     public function canonicalAttributeName(string $nameOrOid): string
     {
-        $attributeType = $this->getAttributeType($nameOrOid);
-        if ($attributeType === null) {
-            return $nameOrOid;
-        }
         // RFC 4512 §2.5 lets an alias or the numeric OID name the type.
-        $primary = $attributeType->names[0] ?? $attributeType->oid;
+        return self::primarySpelling(
+            $this->getAttributeType($nameOrOid),
+            $nameOrOid,
+        );
+    }
 
-        return strcasecmp($primary, $nameOrOid) === 0
-            ? $nameOrOid
-            : $primary;
+    /**
+     * The primary name of the definition an object identifier value names, or the value as given when unknown or a case variant.
+     */
+    public function canonicalObjectIdentifier(string $nameOrOid): string
+    {
+        return self::primarySpelling(
+            $this->getObjectClass($nameOrOid)
+                ?? $this->getAttributeType($nameOrOid)
+                ?? $this->getMatchingRule($nameOrOid),
+            $nameOrOid,
+        );
     }
 
     public function getObjectClass(string $nameOrOid): ?ObjectClass
@@ -410,6 +419,20 @@ final class Schema
         }
 
         return $merged;
+    }
+
+    private static function primarySpelling(
+        ?NamedDefinitionInterface $definition,
+        string $nameOrOid,
+    ): string {
+        if ($definition === null) {
+            return $nameOrOid;
+        }
+        $primary = $definition->primaryName();
+
+        return strcasecmp($primary, $nameOrOid) === 0
+            ? $nameOrOid
+            : $primary;
     }
 
     /**

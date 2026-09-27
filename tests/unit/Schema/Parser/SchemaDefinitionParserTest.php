@@ -506,7 +506,7 @@ final class SchemaDefinitionParserTest extends TestCase
 
         foreach (self::shippedSchemas() as $label => $schema) {
             foreach ($schema->getAttributeTypes() as $type) {
-                $definitions["$label: " . ($type->names[0] ?? $type->oid)] = [$type->toDescriptionString()];
+                $definitions["$label: " . $type->primaryName()] = [$type->toDescriptionString()];
             }
         }
 
@@ -532,7 +532,7 @@ final class SchemaDefinitionParserTest extends TestCase
 
         foreach (self::shippedSchemas() as $label => $schema) {
             foreach ($schema->getObjectClasses() as $class) {
-                $definitions["$label: " . ($class->names[0] ?? $class->oid)] = [$class->toDescriptionString()];
+                $definitions["$label: " . $class->primaryName()] = [$class->toDescriptionString()];
             }
         }
 

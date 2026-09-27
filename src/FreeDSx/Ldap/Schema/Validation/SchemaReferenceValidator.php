@@ -73,7 +73,7 @@ final readonly class SchemaReferenceValidator
         Schema $parsed,
         AttributeType $type,
     ): void {
-        $label = $type->names[0] ?? $type->oid;
+        $label = $type->primaryName();
         $superTypeOid = $type->superTypeOid;
         $syntaxOid = $type->syntaxOid;
 
@@ -101,7 +101,7 @@ final readonly class SchemaReferenceValidator
         Schema $parsed,
         ObjectClass $class,
     ): void {
-        $label = $class->names[0] ?? $class->oid;
+        $label = $class->primaryName();
 
         $this->assertResolvable(
             $class->superClassOids,
