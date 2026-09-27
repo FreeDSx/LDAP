@@ -71,6 +71,139 @@ final class SchemaValidatorTest extends TestCase
         $this->subject->validateAdd($this->personEntry());
     }
 
+    public function test_add_beyond_the_default_value_limit_is_refused(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionMessage('Attribute "gadgetPlain" holds 4 values, which is beyond the limit of 3.');
+
+        $this->gadgetValidator(3)->validateAdd(
+            $this->gadgetEntry(new Attribute('gadgetPlain', ...self::values(4))),
+        );
+    }
+
+    public function test_add_at_the_default_value_limit_passes(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->gadgetValidator(3)->validateAdd(
+            $this->gadgetEntry(new Attribute('gadgetPlain', ...self::values(3))),
+        );
+    }
+
+    public function test_a_type_declaring_a_stricter_cap_is_refused_below_the_default(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionMessage('Attribute "gadgetStricter" holds 2 values, which is beyond the limit of 1.');
+
+        $this->gadgetValidator(3)->validateAdd(
+            $this->gadgetEntry(new Attribute('gadgetStricter', ...self::values(2))),
+        );
+    }
+
+    public function test_a_type_declaring_a_looser_cap_passes_above_the_default(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->gadgetValidator(3)->validateAdd(
+            $this->gadgetEntry(new Attribute('gadgetLooser', ...self::values(6))),
+        );
+    }
+
+    public function test_a_type_declaring_a_looser_cap_is_still_refused_beyond_it(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->gadgetValidator(3)->validateAdd(
+            $this->gadgetEntry(new Attribute('gadgetLooser', ...self::values(7))),
+        );
+    }
+
+    public function test_a_type_declaring_a_zero_cap_is_unbounded(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $this->gadgetValidator(3)->validateAdd(
+            $this->gadgetEntry(new Attribute('gadgetUnbounded', ...self::values(50))),
+        );
+    }
+
+    public function test_an_option_bearing_form_is_held_to_the_cap_of_the_type_it_subtypes(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+        $this->expectExceptionMessage('Attribute "gadgetStricter" holds 2 values, which is beyond the limit of 1.');
+
+        $this->gadgetValidator(3)->validateAdd(
+            $this->gadgetEntry(new Attribute('gadgetStricter;lang-en', ...self::values(2))),
+        );
+    }
+
+    public function test_a_linked_attribute_is_not_bounded(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $validator = new SchemaValidator(
+            SchemaResource::Core->load(),
+            SchemaValidationMode::Strict,
+            maxValues: 3,
+        );
+
+        $validator->validateAdd(new Entry(
+            new Dn('cn=Team,dc=example,dc=com'),
+            new Attribute('objectClass', 'top', 'groupOfNames'),
+            new Attribute('cn', 'Team'),
+            new Attribute('member', ...array_map(
+                static fn(int $i): string => "cn=user$i,dc=example,dc=com",
+                range(1, 50),
+            )),
+        ));
+    }
+
+    public function test_a_system_write_is_still_bounded(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->gadgetValidator(3)->validateAdd(
+            $this->gadgetEntry(new Attribute('gadgetPlain', ...self::values(4))),
+            isSystem: true,
+        );
+    }
+
+    public function test_a_modify_crossing_the_value_limit_is_refused(): void
+    {
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $result = $this->gadgetEntry(new Attribute('gadgetPlain', ...self::values(4)));
+
+        $this->gadgetValidator(3)->validateModify(
+            new UpdateCommand(
+                $result->getDn(),
+                [Change::add(new Attribute('gadgetPlain', 'value 4'))],
+            ),
+            $result,
+        );
+    }
+
+    public function test_a_modify_staying_within_the_value_limit_passes(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        $result = $this->gadgetEntry(new Attribute('gadgetPlain', ...self::values(3)));
+
+        $this->gadgetValidator(3)->validateModify(
+            new UpdateCommand(
+                $result->getDn(),
+                [Change::add(new Attribute('gadgetPlain', 'value 3'))],
+            ),
+            $result,
+        );
+    }
+
     #[DataProvider('unmatchableNamingAttributeProvider')]
     public function test_add_named_by_a_type_with_no_equality_rule_throws_naming_violation(string $dn): void
     {
@@ -678,6 +811,75 @@ final class SchemaValidatorTest extends TestCase
         $this->expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);
 
         $this->structuralChainValidator()->validateAdd($entry);
+    }
+
+    /**
+     * A schema whose gadget attributes declare their own caps, so a test can pit one against the default.
+     */
+    private function gadgetValidator(int $maxValues): SchemaValidator
+    {
+        $schema = (new Schema())
+            ->addAttributeType(new AttributeType(
+                '1.5',
+                ['objectClass'],
+                syntaxOid: SyntaxOid::OID_OID,
+            ))
+            ->addAttributeType(new AttributeType(
+                '1.30',
+                ['gadgetPlain'],
+                syntaxOid: SyntaxOid::OID_DIRECTORY_STRING,
+            ))
+            ->addAttributeType(new AttributeType(
+                '1.31',
+                ['gadgetStricter'],
+                syntaxOid: SyntaxOid::OID_DIRECTORY_STRING,
+                extensions: [AttributeType::EXTENSION_MAX_VALUES => ['1']],
+            ))
+            ->addAttributeType(new AttributeType(
+                '1.32',
+                ['gadgetLooser'],
+                syntaxOid: SyntaxOid::OID_DIRECTORY_STRING,
+                extensions: [AttributeType::EXTENSION_MAX_VALUES => ['6']],
+            ))
+            ->addAttributeType(new AttributeType(
+                '1.33',
+                ['gadgetUnbounded'],
+                syntaxOid: SyntaxOid::OID_DIRECTORY_STRING,
+                extensions: [AttributeType::EXTENSION_MAX_VALUES => ['0']],
+            ))
+            ->addObjectClass(new ObjectClass(
+                '2.30',
+                ['gadget'],
+                ObjectClassType::StructuralClass,
+                must: ['objectClass'],
+                may: ['gadgetPlain', 'gadgetStricter', 'gadgetLooser', 'gadgetUnbounded'],
+            ));
+
+        return new SchemaValidator(
+            $schema,
+            SchemaValidationMode::Strict,
+            maxValues: $maxValues,
+        );
+    }
+
+    private function gadgetEntry(Attribute ...$attributes): Entry
+    {
+        return new Entry(
+            new Dn('cn=gadget,dc=example,dc=com'),
+            new Attribute('objectClass', 'gadget'),
+            ...$attributes,
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function values(int $count): array
+    {
+        return array_map(
+            static fn(int $i): string => "value $i",
+            range(1, $count),
+        );
     }
 
     private function personEntry(string $dn = 'cn=Alice,dc=example,dc=com'): Entry

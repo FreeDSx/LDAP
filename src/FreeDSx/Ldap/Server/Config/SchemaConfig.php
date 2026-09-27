@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Config;
 
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Exception\SchemaParseException;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaLoadMode;
@@ -20,6 +21,7 @@ use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Schema\SchemaSourceInterface;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaReferenceValidator;
+use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 
 /**
  * The schema the server enforces and publishes, and where it is published.
@@ -45,6 +47,8 @@ final class SchemaConfig
     private SchemaValidationMode $validationMode = SchemaValidationMode::Strict;
 
     private SchemaLoadMode $loadMode = SchemaLoadMode::Strict;
+
+    private int $maxAttributeValues = SchemaValidator::DEFAULT_MAX_VALUES;
 
     private ?Schema $resolved = null;
 
@@ -107,6 +111,27 @@ final class SchemaConfig
     {
         $this->loadMode = $mode;
         $this->resolved = null;
+
+        return $this;
+    }
+
+    /**
+     * How many values an attribute may hold when its type declares no X-MAX-VALUES of its own.
+     */
+    public function getMaxAttributeValues(): int
+    {
+        return $this->maxAttributeValues;
+    }
+
+    /**
+     * Zero lifts the cap, leaving only the types that declare one of their own bounded.
+     */
+    public function setMaxAttributeValues(int $maxAttributeValues): self
+    {
+        if ($maxAttributeValues < 0) {
+            throw new InvalidArgumentException('The attribute value limit cannot be negative.');
+        }
+        $this->maxAttributeValues = $maxAttributeValues;
 
         return $this;
     }

@@ -27,6 +27,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Import\SeedOptions;
 use FreeDSx\Ldap\Ldif\Loader\FileLdifLoader;
 use FreeDSx\Ldap\Schema\LdifSchemaSource;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
+use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Config\NetworkConfig;
 use FreeDSx\Ldap\Server\Config\Replication\ProviderConfig;
 use FreeDSx\Ldap\Server\Config\ReplicationConfig;
@@ -176,6 +177,13 @@ final class LdapBackendStorageCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Path to a subschema LDIF file whose definitions are merged into the schema',
                 '',
+            )
+            ->addOption(
+                'max-attribute-values',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'How many values an attribute may hold when its type declares no cap of its own',
+                (string) SchemaValidator::DEFAULT_MAX_VALUES,
             )
             ->addOption(
                 'allow-relax',
@@ -385,6 +393,7 @@ final class LdapBackendStorageCommand extends Command
             schemaConfig: $this->buildSchemaConfig(
                 $validationMode,
                 $this->getStringOption($input, 'schema-ldif'),
+                (int) $this->getStringOption($input, 'max-attribute-values'),
             ),
         ))
             ->setAdministrators(Subject::group('cn=admins,dc=foo,dc=bar'))
@@ -617,9 +626,11 @@ final class LdapBackendStorageCommand extends Command
     private function buildSchemaConfig(
         SchemaValidationMode $validationMode,
         string $schemaLdif,
+        int $maxAttributeValues,
     ): SchemaConfig {
         $config = (new SchemaConfig())
-            ->setValidationMode($validationMode);
+            ->setValidationMode($validationMode)
+            ->setMaxAttributeValues($maxAttributeValues);
 
         if ($schemaLdif !== '') {
             $config->addSource(new LdifSchemaSource($schemaLdif));

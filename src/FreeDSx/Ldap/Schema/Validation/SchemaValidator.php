@@ -19,6 +19,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
+use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\AttributeUsage;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
@@ -28,6 +29,7 @@ use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\Syntax\AttributeSyntaxResolver;
 use FreeDSx\Ldap\Schema\Validation\Syntax\SyntaxValidatorInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 
 /**
@@ -37,20 +39,37 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
  */
 final class SchemaValidator
 {
+    /**
+     * What an attribute may hold when its type declares no cap of its own.
+     *
+     * Enough for any reasonable entry, and well below the size at which a single entry becomes expensive to read and write.
+     */
+    public const DEFAULT_MAX_VALUES = 10000;
+
     private const EXTENSIBLE_OBJECT = 'extensibleObject';
 
     private readonly AttributeSyntaxResolver $syntaxResolver;
 
     private readonly EqualityComparatorResolver $equalityResolver;
 
+    private readonly LinkedAttributes $linked;
+
+    /**
+     * @var array<string, int> Keyed on the base type, resolved on first use since the schema is fixed after startup.
+     */
+    private array $valueLimits = [];
+
     public function __construct(
         private readonly Schema $schema,
         private readonly SchemaValidationMode $mode,
         ?AttributeSyntaxResolver $syntaxResolver = null,
         ?EqualityComparatorResolver $equalityResolver = null,
+        private readonly int $maxValues = self::DEFAULT_MAX_VALUES,
+        ?LinkedAttributes $linked = null,
     ) {
         $this->syntaxResolver = $syntaxResolver ?? new AttributeSyntaxResolver($schema);
         $this->equalityResolver = $equalityResolver ?? new EqualityComparatorResolver($schema);
+        $this->linked = $linked ?? new LinkedAttributes($schema);
     }
 
     public function mode(): SchemaValidationMode
@@ -270,6 +289,7 @@ final class SchemaValidator
         }
 
         $this->checkSingleValuedAttributes($entry);
+        $this->checkValueCounts($entry);
     }
 
     /**
@@ -572,6 +592,46 @@ final class SchemaValidator
                 ResultCode::CONSTRAINT_VIOLATION,
             );
         }
+    }
+
+    /**
+     * @throws OperationException
+     */
+    private function checkValueCounts(Entry $entry): void
+    {
+        foreach ($entry->getAttributes() as $attr) {
+            // Values held apart from the entry cost one row each, so their count is not what this bounds.
+            if ($this->linked->heldApart($attr)) {
+                continue;
+            }
+            $limit = $this->valueLimitFor($attr);
+            $count = count($attr->getValues());
+
+            if ($limit === AttributeType::EXTENSION_UNLIMITED_VALUES || $count <= $limit) {
+                continue;
+            }
+
+            $this->fail(
+                sprintf(
+                    'Attribute "%s" holds %d values, which is beyond the limit of %d.',
+                    $attr->getName(),
+                    $count,
+                    $limit,
+                ),
+                ResultCode::CONSTRAINT_VIOLATION,
+            );
+        }
+    }
+
+    /**
+     * Keyed case-insensitively so every spelling of a type shares one entry.
+     */
+    private function valueLimitFor(Attribute $attribute): int
+    {
+        $name = Attribute::normalizeName($attribute->getName());
+
+        return $this->valueLimits[$name] ??= $this->schema->getAttributeType($name)?->maxValues()
+            ?? $this->maxValues;
     }
 
     private function checkAttributeSyntaxes(Entry $entry): void

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Storage;
 
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
+use Tests\Integration\FreeDSx\Ldap\Storage\Concern\AttributeValueLimitTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\BacklinkAttributeTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\BindTestsTrait;
 use Tests\Integration\FreeDSx\Ldap\Storage\Concern\ControlTestsTrait;
@@ -37,10 +38,13 @@ abstract class LdapBackendStorageTestCase extends ServerTestCase
     use QueryTestsTrait;
     use DefaultAclTestsTrait;
     use WriteTestsTrait;
+    use AttributeValueLimitTestsTrait;
     use LinkedAttributeTestsTrait;
     use BacklinkAttributeTestsTrait;
     use SubtreeMoveTestsTrait;
     use ControlTestsTrait;
+
+    protected const SHARED_MAX_ATTRIBUTE_VALUES = 500;
 
     public static function setUpBeforeClass(): void
     {
@@ -71,12 +75,12 @@ abstract class LdapBackendStorageTestCase extends ServerTestCase
     }
 
     /**
-     * Hook for subclasses to route the shared server through a different backend.
+     * Hook for subclasses to route the shared server through a different backend, spreading these to keep them.
      *
      * @return list<string>
      */
     protected static function storageExtraArgs(): array
     {
-        return [];
+        return ['--max-attribute-values=' . self::SHARED_MAX_ATTRIBUTE_VALUES];
     }
 }

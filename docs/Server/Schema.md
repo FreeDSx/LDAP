@@ -18,6 +18,8 @@ Schema Validation
     * [What Changes for a Linked Attribute](#what-changes-for-a-linked-attribute)
     * [How Many Values a Read Returns](#how-many-values-a-read-returns)
     * [Back-Links](#back-links)
+* [How Many Values an Attribute May Hold](#how-many-values-an-attribute-may-hold)
+    * [Raising or Lowering the Limit](#raising-or-lowering-the-limit)
 * [Operational Attributes](#operational-attributes)
 * [String Matching and Internationalization (RFC 4518)](#string-matching-and-internationalization-rfc-4518)
 
@@ -44,6 +46,7 @@ Every `add` and `modify` is checked before reaching storage:
 - All `MUST` attributes for the object class chain are present.
 - No attributes outside the `MUST` + `MAY` set appear (unless `extensibleObject` is included).
 - Single-valued attributes carry at most one value.
+- No attribute holds more values than its limit allows.
 - Attributes marked `NO-USER-MODIFICATION` are not writable by clients.
 
 Failures return `objectClassViolation` (65), `undefinedAttributeType` (17), or `constraintViolation` (19)
@@ -370,6 +373,48 @@ Membership is direct only. A back-link reports the entries that name this one, n
 **Values are not filtered individually.** An identity that cannot see a group entry can still read that group's DN
 from a member's back-link. Withhold the attribute itself where that matters, with an attribute rule or a
 [Filter Rule](Access-Control.md#filter-rules).
+
+## How Many Values an Attribute May Hold
+
+An attribute may hold at most 10,000 values by default. A write that would leave it holding more is refused with
+`constraintViolation` (19), naming the attribute and the limit.
+
+The cap exists because an ordinary attribute is stored as one serialized value set, which every write decodes and
+re-encodes whole. Left unbounded, a single client can make one entry expensive enough to read and write that it
+takes the directory with it.
+
+Linked attributes and their back-links are exempt. One value is one row there, an add touches only that row, and a
+read is already bounded by `maxLinkedValues`, so the cost the cap protects against does not arise. That is why a
+group's `member` is not subject to it at any size.
+
+### Raising or Lowering the Limit
+
+`maxAttributeValues` on `SchemaConfig` sets the default for every attribute that declares none of its own:
+
+```php
+use FreeDSx\Ldap\Server\Config\SchemaConfig;
+
+$schemaConfig = (new SchemaConfig())
+    ->setMaxAttributeValues(2500);
+```
+
+A single type can override it in either direction with the `X-MAX-VALUES` extension, which wins over the default
+wherever it is declared:
+
+```
+attributeTypes: ( 1.3.6.1.4.1.99999.1.1 NAME 'auditTrail' EQUALITY 2.5.13.2
+  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 X-MAX-VALUES '50000' )
+```
+
+Zero lifts the cap, both as the configured default and as an extension value. Treat the number as what the server
+can survive rather than what is sensible, and raise it knowing the write cost grows with it.
+
+Two things worth knowing:
+
+- It is checked on write, not held as an invariant over stored data. An entry written under a higher limit keeps its
+  values until something writes it again, and lowering the limit refuses nothing retroactively.
+- It applies to writes the server raises itself, not only to client writes, so a replica holds to the same ceiling as
+  the server it replicates. A topology should agree on the limit for the same reason it already agrees on schema.
 
 ## Operational Attributes
 

@@ -36,9 +36,19 @@ final readonly class AttributeType
     public const EXTENSION_LINKED_BY = 'X-LINKED-BY';
 
     /**
+     * Caps how many values an entry may hold for this type.
+     */
+    public const EXTENSION_MAX_VALUES = 'X-MAX-VALUES';
+
+    /**
      * The value an extension carries when it is set; extension values are qdstrings, not booleans.
      */
     public const EXTENSION_ENABLED_VALUE = 'TRUE';
+
+    /**
+     * The value X-MAX-VALUES carries to lift the cap for a type entirely.
+     */
+    public const EXTENSION_UNLIMITED_VALUES = 0;
 
     /**
      * @param list<string> $names
@@ -91,6 +101,18 @@ final readonly class AttributeType
     public function linkedBy(): ?string
     {
         return $this->extensions[self::EXTENSION_LINKED_BY][0] ?? null;
+    }
+
+    /**
+     * How many values an entry may hold. Zero for no cap, or null to leave the server default in force.
+     */
+    public function maxValues(): ?int
+    {
+        $declared = $this->extensions[self::EXTENSION_MAX_VALUES][0] ?? null;
+
+        return $declared !== null && ctype_digit($declared)
+            ? (int) $declared
+            : null;
     }
 
     /**

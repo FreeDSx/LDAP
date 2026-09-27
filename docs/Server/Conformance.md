@@ -52,11 +52,12 @@ it.
 
 The following are FreeDSx specific schema extensions. 
 
-| Extension | Purpose                                                                                                               |
-| --- |-----------------------------------------------------------------------------------------------------------------------|
-| `X-CONFIDENTIAL` | Reading the attribute needs an explicit grant. Without one it is neither returned nor matched by a filter.            |
+| Extension | Purpose                                                                                                              |
+| --- |----------------------------------------------------------------------------------------------------------------------|
+| `X-CONFIDENTIAL` | Reading the attribute needs an explicit grant. Without one it is neither returned nor matched by a filter.           |
 | `X-LINKED` | Values are DNs stored as rows in the link table rather than in the entry itself. This enforces referential integrity. |
-| `X-LINKED-BY` | The attribute is the reverse of a linked attribute and is derived from it (as `memberOf` is derived from `member`.    |
+| `X-LINKED-BY` | The attribute is the reverse of a linked attribute and is derived from it (as `memberOf` is derived from `member`.   |
+| `X-MAX-VALUES` | How many values the attribute may hold. Zero lifts the cap. |
 
 [Schema Validation](Schema.md) covers what each one changes in practice.
 
