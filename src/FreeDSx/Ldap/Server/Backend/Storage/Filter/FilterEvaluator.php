@@ -486,7 +486,10 @@ final class FilterEvaluator implements FilterEvaluatorInterface
 
         $schemaComparator = $this->schema->getComparator($rule);
         if ($schemaComparator !== null) {
-            return $schemaComparator->equals(...);
+            return $this->schemaRuleMatcher(
+                $rule,
+                $schemaComparator,
+            );
         }
 
         return match ($rule) {
@@ -500,6 +503,28 @@ final class FilterEvaluator implements FilterEvaluatorInterface
                 => ((int) $v & (int) $a) !== 0,
             default => null,
         };
+    }
+
+    /**
+     * @return null|callable(string, string): bool
+     */
+    private function schemaRuleMatcher(
+        string $rule,
+        MatchingRuleComparatorInterface $comparator,
+    ): ?callable {
+        if ($this->schema->isSubstringRule($rule)) {
+            return null;
+        }
+
+        // RFC 4517: an ordering rule is TRUE when the attribute value is less than the assertion value.
+        if ($this->schema->isOrderingRule($rule)) {
+            return static fn(string $value, string $assertion): bool => $comparator->compare(
+                $value,
+                $assertion,
+            ) < 0;
+        }
+
+        return $comparator->equals(...);
     }
 
     /**

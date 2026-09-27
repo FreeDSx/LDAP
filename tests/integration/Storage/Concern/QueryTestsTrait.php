@@ -255,6 +255,53 @@ trait QueryTestsTrait
             Filters::extensible('cn', 'Smith, John', null, true),
             1,
         ];
+        // RFC 4517 4.2.20: an ordering rule is TRUE when the value is less than the assertion, so 99 and 100 match.
+        yield 'extensible with an integer ordering rule matches values below the assertion' => [
+            Filters::extensible(
+                'uidNumber',
+                '101',
+                '2.5.13.15',
+                false,
+            ),
+            2,
+        ];
+        yield 'extensible with an integer ordering rule excludes the assertion itself' => [
+            Filters::extensible(
+                'uidNumber',
+                '99',
+                'integerOrderingMatch',
+                false,
+            ),
+            0,
+        ];
+        // RFC 4517 4.2.12: admin and admins sort before alice once case is folded.
+        yield 'extensible with a case ignore ordering rule matches values below the assertion' => [
+            Filters::extensible(
+                'cn',
+                'ALICE',
+                'caseIgnoreOrderingMatch',
+                false,
+            ),
+            2,
+        ];
+        yield 'extensible with a substring rule is Undefined' => [
+            Filters::extensible(
+                'cn',
+                'alice',
+                'caseIgnoreSubstringsMatch',
+                false,
+            ),
+            0,
+        ];
+        yield 'negating an extensible with a substring rule is still Undefined' => [
+            Filters::not(Filters::extensible(
+                'cn',
+                'al*',
+                '2.5.13.4',
+                false,
+            )),
+            0,
+        ];
 
         // RFC 4518 appendix B: a space at the edge of a fragment stays significant, so these must not match a value
         // holding no space there. Collapsing and trimming both sides alike would wrongly match all three.

@@ -40,6 +40,18 @@ final class Schema
     ];
 
     /**
+     * Rules RFC 4517 and RFC 4530 define as ordering rules.
+     */
+    private const STANDARD_ORDERING_OIDS = [
+        MatchingRuleOid::OID_CASE_IGNORE_ORDERING_MATCH,
+        MatchingRuleOid::OID_CASE_EXACT_ORDERING_MATCH,
+        MatchingRuleOid::OID_NUMERIC_STRING_ORDERING_MATCH,
+        MatchingRuleOid::OID_INTEGER_ORDERING_MATCH,
+        MatchingRuleOid::OID_GENERALIZED_TIME_ORDERING_MATCH,
+        MatchingRuleOid::OID_UUID_ORDERING_MATCH,
+    ];
+
+    /**
      * @var array<string, AttributeType>
      */
     private array $attributeTypes = [];
@@ -50,6 +62,13 @@ final class Schema
      * @var array<string, true>|null
      */
     private ?array $superTypeOids = null;
+
+    /**
+     * Every ordering rule OID, built on first use and dropped whenever the type or rule set changes.
+     *
+     * @var array<string, true>|null
+     */
+    private ?array $orderingRuleOids = null;
 
     /**
      * Bound to this schema, so it is built once rather than per lookup.
@@ -78,6 +97,7 @@ final class Schema
             $this->attributeTypes[strtolower($name)] = $type;
         }
         $this->superTypeOids = null;
+        $this->orderingRuleOids = null;
 
         return $this;
     }
@@ -98,6 +118,7 @@ final class Schema
         foreach ($rule->names as $name) {
             $this->matchingRules[strtolower($name)] = $rule;
         }
+        $this->orderingRuleOids = null;
 
         return $this;
     }
@@ -251,6 +272,28 @@ final class Schema
         }
 
         return isset($this->superTypeOids[$attributeType->oid]);
+    }
+
+    /**
+     * Whether the rule is a standard ordering rule or one an attribute type names as its ORDERING.
+     */
+    public function isOrderingRule(string $ruleNameOrOid): bool
+    {
+        $rule = $this->getMatchingRule($ruleNameOrOid);
+        if ($rule === null) {
+            return false;
+        }
+        $this->orderingRuleOids ??= $this->collectOrderingRuleOids();
+
+        return isset($this->orderingRuleOids[$rule->oid]);
+    }
+
+    /**
+     * Whether the rule asserts a substring pattern rather than a whole value (RFC 4517 §3.3.30).
+     */
+    public function isSubstringRule(string $ruleNameOrOid): bool
+    {
+        return $this->getMatchingRule($ruleNameOrOid)?->syntaxOid === SyntaxOid::OID_SUBSTRING_ASSERTION;
     }
 
     /**
@@ -419,6 +462,28 @@ final class Schema
         }
 
         return $merged;
+    }
+
+    /**
+     * A type may name its ORDERING by descriptor.
+     *
+     * @return array<string, true>
+     */
+    private function collectOrderingRuleOids(): array
+    {
+        $oids = array_fill_keys(
+            self::STANDARD_ORDERING_OIDS,
+            true,
+        );
+
+        foreach ($this->attributeTypes as $type) {
+            if ($type->orderingOid === null) {
+                continue;
+            }
+            $oids[$this->getMatchingRule($type->orderingOid)->oid ?? $type->orderingOid] = true;
+        }
+
+        return $oids;
     }
 
     private static function primarySpelling(

@@ -148,5 +148,9 @@ final class SyntaxOid
 
     public const DESC_UUID = 'UUID';
 
+    public const OID_SUBSTRING_ASSERTION = '1.3.6.1.4.1.1466.115.121.1.58';
+
+    public const DESC_SUBSTRING_ASSERTION = 'Substring Assertion';
+
     private function __construct() {}
 }

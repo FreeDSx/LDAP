@@ -505,6 +505,137 @@ final class FilterEvaluatorTest extends TestCase
         );
     }
 
+    #[DataProvider('orderingRuleProvider')]
+    public function test_an_ordering_rule_matches_a_value_less_than_the_assertion(
+        string $rule,
+        string $attribute,
+        string $value,
+        string $assertion,
+        bool $expected,
+    ): void {
+        $entry = new Entry(
+            new Dn('cn=Test,dc=example,dc=com'),
+            new Attribute($attribute, $value),
+        );
+
+        self::assertSame(
+            $expected,
+            $this->subject->evaluate(
+                $entry,
+                new MatchingRuleFilter(
+                    $rule,
+                    $attribute,
+                    $assertion,
+                ),
+            ),
+        );
+    }
+
+    /**
+     * @return Generator<string, array{rule: string, attribute: string, value: string, assertion: string, expected: bool}>
+     */
+    public static function orderingRuleProvider(): Generator
+    {
+        yield 'integer less than' => [
+            'rule' => '2.5.13.15',
+            'attribute' => 'uidNumber',
+            'value' => '5',
+            'assertion' => '10',
+            'expected' => true,
+        ];
+
+        yield 'integer equal' => [
+            'rule' => '2.5.13.15',
+            'attribute' => 'uidNumber',
+            'value' => '10',
+            'assertion' => '10',
+            'expected' => false,
+        ];
+
+        yield 'integer greater than' => [
+            'rule' => '2.5.13.15',
+            'attribute' => 'uidNumber',
+            'value' => '20',
+            'assertion' => '10',
+            'expected' => false,
+        ];
+
+        yield 'integer by name' => [
+            'rule' => 'integerOrderingMatch',
+            'attribute' => 'uidNumber',
+            'value' => '5',
+            'assertion' => '10',
+            'expected' => true,
+        ];
+
+        yield 'case ignore less than' => [
+            'rule' => 'caseIgnoreOrderingMatch',
+            'attribute' => 'cn',
+            'value' => 'alice',
+            'assertion' => 'BOB',
+            'expected' => true,
+        ];
+
+        yield 'case ignore greater than' => [
+            'rule' => 'caseIgnoreOrderingMatch',
+            'attribute' => 'cn',
+            'value' => 'carol',
+            'assertion' => 'BOB',
+            'expected' => false,
+        ];
+    }
+
+    #[DataProvider('substringRuleProvider')]
+    public function test_a_substring_rule_is_undefined_in_both_polarities(
+        string $rule,
+        string $attribute,
+        string $assertion,
+    ): void {
+        $filter = new MatchingRuleFilter(
+            $rule,
+            $attribute,
+            $assertion,
+        );
+
+        self::assertSame(
+            [false, false],
+            [
+                $this->subject->evaluate($this->entry, $filter),
+                $this->subject->evaluate($this->entry, Filters::not($filter)),
+            ],
+        );
+    }
+
+    /**
+     * @return Generator<string, array{rule: string, attribute: string, assertion: string}>
+     */
+    public static function substringRuleProvider(): Generator
+    {
+        yield 'caseIgnoreSubstringsMatch by oid, a whole value' => [
+            'rule' => '2.5.13.4',
+            'attribute' => 'cn',
+            'assertion' => 'Alice',
+        ];
+
+        yield 'caseIgnoreSubstringsMatch by name, a pattern' => [
+            'rule' => 'caseIgnoreSubstringsMatch',
+            'attribute' => 'cn',
+            'assertion' => 'Al*',
+        ];
+
+        yield 'caseExactSubstringsMatch' => [
+            'rule' => 'caseExactSubstringsMatch',
+            'attribute' => 'cn',
+            'assertion' => '*lic*',
+        ];
+
+        yield 'caseIgnoreIA5SubstringsMatch' => [
+            'rule' => 'caseIgnoreIA5SubstringsMatch',
+            'attribute' => 'mail',
+            'assertion' => '*@example.com',
+        ];
+    }
+
     public function test_matching_rule_dn_attributes(): void
     {
         $filter = new MatchingRuleFilter(
