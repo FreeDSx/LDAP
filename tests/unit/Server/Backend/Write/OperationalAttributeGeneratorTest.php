@@ -242,6 +242,63 @@ final class OperationalAttributeGeneratorTest extends TestCase
         );
     }
 
+    public function test_apply_for_modify_restamps_the_structural_class_of_a_replaced_class_set(): void
+    {
+        $entry = $this->personEntry('person');
+        $entry->set(
+            'structuralObjectClass',
+            'inetOrgPerson',
+        );
+
+        $this->classAwareGenerator()->applyForModify(
+            $entry,
+            $this->anonymousContext(),
+        );
+
+        self::assertSame(
+            ['person'],
+            $entry->get('structuralObjectClass')?->getValues(),
+        );
+    }
+
+    public function test_apply_for_modify_restamps_a_more_specific_class_added_beside_the_recorded_one(): void
+    {
+        $entry = $this->personEntry('person', 'inetOrgPerson');
+        $entry->set(
+            'structuralObjectClass',
+            'person',
+        );
+
+        $this->classAwareGenerator()->applyForModify(
+            $entry,
+            $this->anonymousContext(),
+        );
+
+        self::assertSame(
+            ['inetOrgPerson'],
+            $entry->get('structuralObjectClass')?->getValues(),
+        );
+    }
+
+    public function test_apply_for_modify_keeps_the_recorded_structural_class_when_none_remains(): void
+    {
+        $entry = $this->personEntry('top');
+        $entry->set(
+            'structuralObjectClass',
+            'person',
+        );
+
+        $this->classAwareGenerator()->applyForModify(
+            $entry,
+            $this->anonymousContext(),
+        );
+
+        self::assertSame(
+            ['person'],
+            $entry->get('structuralObjectClass')?->getValues(),
+        );
+    }
+
     public function test_apply_for_add_with_schema_but_no_object_class_skips_structural_object_class(): void
     {
         $schema = new Schema();
