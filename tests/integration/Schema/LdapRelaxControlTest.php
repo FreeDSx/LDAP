@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Schema;
 
 use FreeDSx\Ldap\Controls;
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
@@ -153,6 +154,64 @@ final class LdapRelaxControlTest extends ServerTestCase
         );
     }
 
+    public function test_a_relaxed_structural_class_replace_restamps_the_structural_object_class(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=relax-replace-class,dc=foo,dc=bar',
+            [
+                'cn' => 'relax-replace-class',
+                'sn' => 'Drift',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        $this->ldapClient()->send(
+            Operations::modify(
+                'cn=relax-replace-class,dc=foo,dc=bar',
+                Change::replace(
+                    'objectClass',
+                    'organizationalPerson',
+                ),
+            ),
+            Controls::relaxRules(),
+        );
+
+        self::assertSame(
+            'organizationalPerson',
+            $this->structuralObjectClassOf('cn=relax-replace-class,dc=foo,dc=bar'),
+        );
+    }
+
+    public function test_a_relaxed_addition_of_a_more_specific_structural_class_restamps_it(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=relax-add-class,dc=foo,dc=bar',
+            [
+                'cn' => 'relax-add-class',
+                'sn' => 'Drift',
+                'objectClass' => 'person',
+            ],
+        ));
+
+        $this->ldapClient()->send(
+            Operations::modify(
+                'cn=relax-add-class,dc=foo,dc=bar',
+                Change::add(
+                    'objectClass',
+                    'inetOrgPerson',
+                ),
+            ),
+            Controls::relaxRules(),
+        );
+
+        self::assertSame(
+            'inetOrgPerson',
+            $this->structuralObjectClassOf('cn=relax-add-class,dc=foo,dc=bar'),
+        );
+    }
+
     public function test_relax_control_does_not_bypass_the_attribute_value_limit(): void
     {
         $this->authenticateAdmin();
@@ -175,5 +234,17 @@ final class LdapRelaxControlTest extends ServerTestCase
             ),
             Controls::relaxRules(),
         );
+    }
+
+    private function structuralObjectClassOf(string $dn): ?string
+    {
+        return $this->ldapClient()->search(
+            Operations::search(
+                Filters::present('objectClass'),
+                'structuralObjectClass',
+            )
+                ->base($dn)
+                ->useBaseScope(),
+        )->first()?->get('structuralObjectClass')?->firstValue();
     }
 }

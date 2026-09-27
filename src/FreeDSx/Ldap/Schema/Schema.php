@@ -465,8 +465,6 @@ final class Schema
     }
 
     /**
-     * A type may name its ORDERING by descriptor.
-     *
      * @return array<string, true>
      */
     private function collectOrderingRuleOids(): array

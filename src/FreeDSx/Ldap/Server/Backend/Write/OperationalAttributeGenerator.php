@@ -62,15 +62,7 @@ final readonly class OperationalAttributeGenerator
             Uuid::v4(),
         );
         $this->applySuperclasses($entry);
-
-        $structuralOc = $this->resolveStructuralObjectClass($entry);
-
-        if ($structuralOc !== null) {
-            $entry->set(
-                AttributeTypeOid::NAME_STRUCTURAL_OBJECT_CLASS,
-                $structuralOc,
-            );
-        }
+        $this->stampStructuralObjectClass($entry);
     }
 
     /**
@@ -113,7 +105,7 @@ final readonly class OperationalAttributeGenerator
     }
 
     /**
-     * Updates modifyTimestamp and modifiersName, and supplies any superclass a changed objectClass now implies.
+     * Updates modifyTimestamp and modifiersName, and restamps the classes a changed objectClass now implies.
      */
     public function applyForModify(
         Entry $entry,
@@ -128,6 +120,7 @@ final readonly class OperationalAttributeGenerator
             $context->getBoundDn() ?? '',
         );
         $this->applySuperclasses($entry);
+        $this->stampStructuralObjectClass($entry);
     }
 
     /**
@@ -216,6 +209,14 @@ final readonly class OperationalAttributeGenerator
             return;
         }
 
+        $this->stampStructuralObjectClass($entry);
+    }
+
+    /**
+     * Left as recorded when the classes name no structural class, which only a relaxed write can leave behind.
+     */
+    private function stampStructuralObjectClass(Entry $entry): void
+    {
         $structuralOc = $this->resolveStructuralObjectClass($entry);
 
         if ($structuralOc === null) {
