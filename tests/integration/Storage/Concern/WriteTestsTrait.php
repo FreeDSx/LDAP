@@ -1496,21 +1496,85 @@ trait WriteTestsTrait
         }
     }
 
-    public function testAnAttributeTypeWithinTheStorageBoundIsStored(): void
+    public function testARelaxedAddRefusesAnEntryUuidAnotherEntryHolds(): void
     {
+        // The lookup runs inside the add's transaction, which on Swoole is the writer's connection.
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::storageExtraArgs(),
+                '--allow-relax',
+            ],
+        );
         $this->authenticateAdmin();
-        $type = 'a' . str_repeat('b', Attribute::MAX_TYPE_LENGTH - 1);
+        $uuid = '597ae2f6-16a6-1027-98f4-d28b5365dc14';
 
         $this->ldapClient()->send(
             Operations::add(new Entry(
-                'cn=longattr,dc=foo,dc=bar',
-                new Attribute('objectClass', 'top', 'inetOrgPerson'),
-                new Attribute('cn', 'longattr'),
-                new Attribute('sn', 'Long'),
-                new Attribute($type, 'value'),
+                'cn=uuid-first,dc=foo,dc=bar',
+                new Attribute('objectClass', 'top', 'person'),
+                new Attribute('cn', 'uuid-first'),
+                new Attribute('sn', 'First'),
+                new Attribute('entryUUID', $uuid),
             )),
             Controls::relaxRules(),
         );
+
+        try {
+            $this->ldapClient()->send(
+                Operations::add(new Entry(
+                    'cn=uuid-second,dc=foo,dc=bar',
+                    new Attribute('objectClass', 'top', 'person'),
+                    new Attribute('cn', 'uuid-second'),
+                    new Attribute('sn', 'Second'),
+                    new Attribute('entryUUID', $uuid),
+                )),
+                Controls::relaxRules(),
+            );
+            self::fail('The second add reuses an entryUUID and should be refused.');
+        } catch (OperationException $e) {
+            self::assertSame(
+                ResultCode::CONSTRAINT_VIOLATION,
+                $e->getCode(),
+            );
+        }
+
+        $first = $this->ldapClient()->read(
+            'cn=uuid-first,dc=foo,dc=bar',
+            ['entryUUID'],
+        );
+
+        self::assertSame(
+            [$uuid, null],
+            [
+                $first?->get('entryUUID')?->firstValue(),
+                $this->ldapClient()->read('cn=uuid-second,dc=foo,dc=bar'),
+            ],
+        );
+    }
+
+    public function testAnAttributeTypeWithinTheStorageBoundIsStored(): void
+    {
+        // The type is undefined, which only a lenient policy waives.
+        $this->stopServer();
+        $this->createServerProcess(
+            'tcp',
+            [
+                ...static::storageExtraArgs(),
+                '--validation-mode=lenient',
+            ],
+        );
+        $this->authenticateAdmin();
+        $type = 'a' . str_repeat('b', Attribute::MAX_TYPE_LENGTH - 1);
+
+        $this->ldapClient()->send(Operations::add(new Entry(
+            'cn=longattr,dc=foo,dc=bar',
+            new Attribute('objectClass', 'top', 'inetOrgPerson'),
+            new Attribute('cn', 'longattr'),
+            new Attribute('sn', 'Long'),
+            new Attribute($type, 'value'),
+        )));
 
         self::assertSame(
             'value',

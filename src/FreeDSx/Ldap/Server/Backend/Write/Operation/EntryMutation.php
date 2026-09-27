@@ -52,6 +52,7 @@ readonly class EntryMutation
         $this->operationalAttrs->applyForModify(
             $updated,
             $context,
+            array_values($command->changes),
         );
 
         return $updated;

@@ -579,7 +579,7 @@ The optional second argument is a `SeedOptions`:
 | Setter | Effect |
 |---|---|
 | `setCreatorDn()` | Stamped as `creatorsName`/`modifiersName` on entries carrying neither. Defaults to the empty DN. |
-| `setIgnoreValidation()` | Relaxes the structural, naming and duplicate-value rules. Still refuses a value its attribute syntax rejects. |
+| `setIgnoreValidation()` | Waives the schema rules `Lenient` validation waives, for this load. See [Validation Mode](Schema.md#validation-mode). |
 | `setReplaceExisting()` | Overwrites a DN already present, which is otherwise refused with `entryAlreadyExists`. |
 | `setUrlResolver()` | Enables RFC 2849 URL values. |
 

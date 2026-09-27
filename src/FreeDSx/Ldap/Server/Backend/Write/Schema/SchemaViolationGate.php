@@ -18,6 +18,8 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Exception\SchemaRuleException;
+use FreeDSx\Ldap\Exception\SchemaValidationException;
+use FreeDSx\Ldap\Exception\SchemaViolationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
@@ -26,20 +28,12 @@ use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
 
 /**
- * Decides whether a write proceeds: schema violations under the relax policy, and backend limits that nothing waives.
+ * Decides whether a write proceeds: each schema violation by the rule it breaks, and backend limits nothing waives.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
 final readonly class SchemaViolationGate
 {
-    /**
-     * Violations neither the Relax control nor a lenient policy waives.
-     */
-    private const NEVER_RELAXED = [
-        ResultCode::INVALID_ATTRIBUTE_SYNTAX,
-        ResultCode::ADMIN_LIMIT_EXCEEDED,
-    ];
-
     public function __construct(private SchemaValidator $validator) {}
 
     /**
@@ -56,7 +50,7 @@ final readonly class SchemaViolationGate
                 $entry,
                 $context->isSystem(),
             );
-        } catch (OperationException $e) {
+        } catch (SchemaValidationException $e) {
             $this->recordOrReject(
                 $e,
                 $context,
@@ -80,7 +74,7 @@ final readonly class SchemaViolationGate
                 $updated,
                 $context->isSystem(),
             );
-        } catch (OperationException $e) {
+        } catch (SchemaValidationException $e) {
             $this->recordOrReject(
                 $e,
                 $context,
@@ -104,7 +98,7 @@ final readonly class SchemaViolationGate
                 $command->newRdn,
                 $context->isSystem(),
             );
-        } catch (OperationException $e) {
+        } catch (SchemaValidationException $e) {
             $this->recordOrReject(
                 $e,
                 $context,
@@ -135,45 +129,55 @@ final readonly class SchemaViolationGate
     }
 
     /**
-     * Records the violation for audit and rejects it, unless policy or the Relax control allows the write.
-     *
-     * @throws OperationException
+     * @throws SchemaRuleException
      */
     private function recordOrReject(
-        OperationException $violation,
+        SchemaValidationException $validation,
         WriteContext $context,
     ): void {
-        $disposition = $this->dispositionFor(
-            $violation,
-            $context,
-        );
-        $context->schemaViolations()->record(
-            $violation,
-            $disposition,
-        );
+        $rejected = null;
 
-        if ($disposition === SchemaViolationDisposition::Rejected) {
-            throw new SchemaRuleException(
+        foreach ($validation->violations as $violation) {
+            $disposition = $this->dispositionFor(
                 $violation,
+                $context,
+            );
+            $context->schemaViolations()->record(
+                $violation,
+                $disposition,
+            );
+
+            if ($disposition === SchemaViolationDisposition::Rejected) {
+                $rejected ??= $violation;
+            }
+        }
+
+        if ($rejected !== null) {
+            throw new SchemaRuleException(
+                $rejected,
                 $context->schemaViolations(),
             );
         }
     }
 
     private function dispositionFor(
-        OperationException $violation,
+        SchemaViolationException $violation,
         WriteContext $context,
     ): SchemaViolationDisposition {
-        if (in_array($violation->getCode(), self::NEVER_RELAXED, true)) {
-            return SchemaViolationDisposition::Rejected;
-        }
-
-        if ($context->getControls()->has(Control::OID_RELAX_RULES)) {
+        if ($violation->rule->isRelaxableByControl() && $context->getControls()->has(Control::OID_RELAX_RULES)) {
             return SchemaViolationDisposition::RelaxedByControl;
         }
 
+        if ($violation->rule->isRelaxableByPolicy() && $this->isLenient($context)) {
+            return SchemaViolationDisposition::RelaxedByPolicy;
+        }
+
+        return SchemaViolationDisposition::Rejected;
+    }
+
+    private function isLenient(WriteContext $context): bool
+    {
         return $this->validator->mode() === SchemaValidationMode::Lenient
-            ? SchemaViolationDisposition::RelaxedByPolicy
-            : SchemaViolationDisposition::Rejected;
+            || $context->bulkLoadOptions()?->ignoreValidation === true;
     }
 }

@@ -117,7 +117,7 @@ $entry = Entry::fromArray(
 | Mode      | Behaviour                                                     |
 |-----------|---------------------------------------------------------------|
 | `Strict`  | Violations are rejected with an LDAP error.                   |
-| `Lenient` | Violations are logged, but the write is allowed.              |
+| `Lenient` | Most violations are logged and the write is allowed.          |
 | `Off`     | All writes pass through without checks (and without logging). |
 
 `Lenient` logs each relaxed violation as a `schema.violation` event with `validation_mode: lenient` (see
@@ -136,8 +136,25 @@ $schemaConfig = (new SchemaConfig())
 $server = new LdapServer(new ServerOptions(schemaConfig: $schemaConfig));
 ```
 
-Beyond the server-wide mode, an authorized client can relax validation for a *single* Add/Modify with the Relax Rules
-control (logged with `validation_mode: relaxed`). It is ACL-gated — see [Control Rules](Access-Control.md#control-rules).
+Beyond the server-wide mode, an authorized client can relax validation for a single Add, Modify or ModifyDN with the
+Relax Rules control (logged with `validation_mode: relaxed`). It is ACL-gated. See
+[Control Rules](Access-Control.md#control-rules). The control waives only the rules the draft RFC names for an
+existing entry.
+
+| Rule                                                                                                                | Relax Rules control | `Lenient` |
+|---------------------------------------------------------------------------------------------------------------------|---------------------|-----------|
+| Changing the structural object class                                                                                | Waived              | Waived    |
+| Writing `createTimestamp`, `modifyTimestamp`, `creatorsName` or `modifiersName`                                     | Waived              | Waived    |
+| Writing `entryUUID` on Add                                                                                          | Waived              | Waived    |
+| Writing `entryUUID` on Modify, or any other `NO-USER-MODIFICATION` attribute                                        | Refused             | Waived    |
+| Required and allowed attributes, a structural object class, undefined types, single-valued types, naming attributes | Refused             | Waived    |
+| Attribute syntax, the value limit, equivalent values, an attribute description given twice                          | Refused             | Refused   |
+
+Each violation is logged and the first that is not waived decides the result code.
+
+A value a relaxed write supplies for one of these attributes is stored as given. A timestamp may not be in the future,
+and `createTimestamp` may not be later than `modifyTimestamp`. A supplied `entryUUID` may not be one another entry holds.
+Each of these is refused with `constraintViolation`.
 
 ## Custom Schema
 
@@ -415,8 +432,8 @@ A few things worth knowing:
   values until something writes it again, and lowering the limit refuses nothing retroactively.
 - It applies to writes the server raises itself, not only to client writes, so a replica holds to the same ceiling as
   the server it replicates. A topology should agree on the limit for the same reason it already agrees on schema.
-- Neither the Relax Rules control nor `Lenient` validation waives it, unlike the other schema rules here. The ceiling
-  is what the storage can carry rather than a rule about the data.
+- Neither the Relax Rules control nor `Lenient` validation waives it. The ceiling is what the storage can carry rather
+  than a rule about the data.
 
 ## Operational Attributes
 

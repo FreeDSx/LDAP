@@ -13,8 +13,15 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Backend\Write;
 
+use DateTimeImmutable;
+use FreeDSx\Ldap\Entry\Attribute;
+use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
+use FreeDSx\Ldap\Schema\Definition\GeneralizedTime;
 use FreeDSx\Ldap\Schema\Definition\ObjectClass;
 use FreeDSx\Ldap\Schema\Definition\ObjectClassType;
 use FreeDSx\Ldap\Schema\Schema;
@@ -32,7 +39,9 @@ final readonly class OperationalAttributeGenerator
     ) {}
 
     /**
-     * Sets createTimestamp, modifyTimestamp, creatorsName, modifiersName, entryUUID, and structuralObjectClass.
+     * Stamps the server-managed attributes, keeping any the schema gate already allowed the write to supply.
+     *
+     * @throws OperationException when a supplied timestamp is in the future or out of order
      */
     public function applyForAdd(
         Entry $entry,
@@ -40,29 +49,40 @@ final readonly class OperationalAttributeGenerator
     ): void {
         $timestamp = $this->generateTimestamp();
         $boundDn = $context->getBoundDn() ?? '';
+        $suppliesTimestamp = $entry->has(AttributeTypeOid::NAME_CREATE_TIMESTAMP)
+            || $entry->has(AttributeTypeOid::NAME_MODIFY_TIMESTAMP);
 
-        $entry->set(
+        $this->setIfMissing(
+            $entry,
             AttributeTypeOid::NAME_CREATE_TIMESTAMP,
             $timestamp,
         );
-        $entry->set(
+        $this->setIfMissing(
+            $entry,
             AttributeTypeOid::NAME_MODIFY_TIMESTAMP,
             $timestamp,
         );
-        $entry->set(
+        $this->setIfMissing(
+            $entry,
             AttributeTypeOid::NAME_CREATORS_NAME,
             $boundDn,
         );
-        $entry->set(
+        $this->setIfMissing(
+            $entry,
             AttributeTypeOid::NAME_MODIFIERS_NAME,
             $boundDn,
         );
-        $entry->set(
+        $this->setIfMissing(
+            $entry,
             AttributeTypeOid::NAME_ENTRY_UUID,
             Uuid::v4(),
         );
         $this->applySuperclasses($entry);
         $this->stampStructuralObjectClass($entry);
+
+        if ($suppliesTimestamp) {
+            $this->assertTimestampsAppropriate($entry);
+        }
     }
 
     /**
@@ -105,22 +125,44 @@ final readonly class OperationalAttributeGenerator
     }
 
     /**
-     * Updates modifyTimestamp and modifiersName, and restamps the classes a changed objectClass now implies.
+     * Updates modifyTimestamp and modifiersName unless the changes supply them, and restamps the implied classes.
+     *
+     * @param list<Change> $changes
+     * @throws OperationException when a supplied timestamp is in the future or out of order
      */
     public function applyForModify(
         Entry $entry,
         WriteContext $context,
+        array $changes = [],
     ): void {
-        $entry->set(
-            AttributeTypeOid::NAME_MODIFY_TIMESTAMP,
-            $this->generateTimestamp(),
+        $supplied = array_fill_keys(
+            array_map(
+                static fn(Change $change): string => Attribute::normalizeName($change->getAttribute()->getName()),
+                $changes,
+            ),
+            true,
         );
-        $entry->set(
-            AttributeTypeOid::NAME_MODIFIERS_NAME,
-            $context->getBoundDn() ?? '',
-        );
+
+        if (!isset($supplied[strtolower(AttributeTypeOid::NAME_MODIFY_TIMESTAMP)])) {
+            $entry->set(
+                AttributeTypeOid::NAME_MODIFY_TIMESTAMP,
+                $this->generateTimestamp(),
+            );
+        }
+        if (!isset($supplied[strtolower(AttributeTypeOid::NAME_MODIFIERS_NAME)])) {
+            $entry->set(
+                AttributeTypeOid::NAME_MODIFIERS_NAME,
+                $context->getBoundDn() ?? '',
+            );
+        }
         $this->applySuperclasses($entry);
         $this->stampStructuralObjectClass($entry);
+        $suppliesTimestamp = isset($supplied[strtolower(AttributeTypeOid::NAME_CREATE_TIMESTAMP)])
+            || isset($supplied[strtolower(AttributeTypeOid::NAME_MODIFY_TIMESTAMP)]);
+
+        if ($suppliesTimestamp) {
+            $this->assertTimestampsAppropriate($entry);
+        }
     }
 
     /**
@@ -186,6 +228,68 @@ final readonly class OperationalAttributeGenerator
     private function generateTimestamp(): string
     {
         return gmdate('YmdHis') . 'Z';
+    }
+
+    /**
+     * draft-zeilenga-ldap-relax §3.6: a timestamp may not be in the future, nor creation follow modification.
+     *
+     * @throws OperationException
+     */
+    private function assertTimestampsAppropriate(Entry $entry): void
+    {
+        $now = new DateTimeImmutable();
+        $created = $this->timestampOf(
+            $entry,
+            AttributeTypeOid::NAME_CREATE_TIMESTAMP,
+        );
+        $modified = $this->timestampOf(
+            $entry,
+            AttributeTypeOid::NAME_MODIFY_TIMESTAMP,
+        );
+
+        $inOrder = self::isNotAfter($created, $now)
+            && self::isNotAfter($modified, $now)
+            && self::isNotAfter($created, $modified);
+
+        if ($inOrder) {
+            return;
+        }
+
+        throw new OperationException(
+            'A supplied timestamp is in the future, or puts creation after modification.',
+            ResultCode::CONSTRAINT_VIOLATION,
+        );
+    }
+
+    /**
+     * An absent timestamp constrains nothing.
+     */
+    private static function isNotAfter(
+        ?DateTimeImmutable $earlier,
+        ?DateTimeImmutable $later,
+    ): bool {
+        return $earlier === null
+            || $later === null
+            || $earlier <= $later;
+    }
+
+    /**
+     * Null when absent or unparseable, which only unvalidated writes can store.
+     */
+    private function timestampOf(
+        Entry $entry,
+        string $attribute,
+    ): ?DateTimeImmutable {
+        $value = $entry->get($attribute)?->firstValue();
+        if ($value === null) {
+            return null;
+        }
+
+        try {
+            return GeneralizedTime::parse($value);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
     }
 
     private function setIfMissing(

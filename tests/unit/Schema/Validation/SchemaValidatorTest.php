@@ -13,12 +13,15 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Schema\Validation;
 
+use Closure;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Exception\SchemaValidationException;
+use FreeDSx\Ldap\Exception\SchemaViolationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\AttributeType;
 use FreeDSx\Ldap\Schema\Definition\MatchingRule;
@@ -31,8 +34,10 @@ use FreeDSx\Ldap\Schema\Matching\MatchingRuleComparatorInterface;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Schema\SchemaResource;
+use FreeDSx\Ldap\Schema\Validation\SchemaRule;
 use FreeDSx\Ldap\Schema\Validation\SchemaValidator;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
+use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Rule\InvocationOrder;
@@ -69,6 +74,108 @@ final class SchemaValidatorTest extends TestCase
     {
         $this->expectNotToPerformAssertions();
         $this->subject->validateAdd($this->personEntry());
+    }
+
+    public function test_an_add_reports_every_rule_it_breaks_in_check_order(): void
+    {
+        $entry = $this->personEntry();
+        $entry->add(new Attribute('createTimestamp', '20200101000000Z'));
+        $entry->add(new Attribute('description', 'same', 'SAME'));
+        $entry->add(new Attribute('mail', 'alice@example.com'));
+
+        try {
+            $this->subject->validateAdd($entry);
+            self::fail('The entry breaks three rules and should be refused.');
+        } catch (SchemaValidationException $e) {
+            self::assertSame(
+                [SchemaRule::SettableOperationalAttribute, SchemaRule::EquivalentValues, SchemaRule::AllowedAttributes],
+                array_map(
+                    static fn(SchemaViolationException $violation): SchemaRule => $violation->rule,
+                    $e->violations,
+                ),
+            );
+            self::assertSame(
+                ResultCode::CONSTRAINT_VIOLATION,
+                $e->getCode(),
+            );
+        }
+    }
+
+    /**
+     * @param list<SchemaRule> $expected
+     */
+    #[DataProvider('noUserModificationAddProvider')]
+    public function test_an_add_reports_a_no_user_modification_attribute_under_the_rule_that_governs_it(
+        string $attribute,
+        string $value,
+        array $expected,
+    ): void {
+        $entry = $this->personEntry();
+        $entry->add(new Attribute(
+            $attribute,
+            $value,
+        ));
+
+        self::assertSame(
+            $expected,
+            $this->rulesBrokenBy(fn() => $this->subject->validateAdd($entry)),
+        );
+    }
+
+    /**
+     * @return Generator<string, array{attribute: string, value: string, expected: list<SchemaRule>}>
+     */
+    public static function noUserModificationAddProvider(): Generator
+    {
+        yield 'entryUUID may be supplied on add' => [
+            'attribute' => 'entryUUID',
+            'value' => '597ae2f6-16a6-1027-98f4-d28b5365dc14',
+            'expected' => [SchemaRule::SettableOperationalAttribute],
+        ];
+
+        yield 'creatorsName may be supplied on add' => [
+            'attribute' => 'creatorsName',
+            'value' => 'cn=Jane,dc=example,dc=com',
+            'expected' => [SchemaRule::SettableOperationalAttribute],
+        ];
+
+        yield 'structuralObjectClass may not' => [
+            'attribute' => 'structuralObjectClass',
+            'value' => 'device',
+            'expected' => [SchemaRule::NoUserModification],
+        ];
+    }
+
+    public function test_an_add_reports_an_unsettable_attribute_beside_a_settable_one(): void
+    {
+        $entry = $this->personEntry();
+        $entry->add(new Attribute('createTimestamp', '20200101000000Z'));
+        $entry->add(new Attribute('structuralObjectClass', 'device'));
+
+        self::assertSame(
+            [SchemaRule::NoUserModification, SchemaRule::SettableOperationalAttribute],
+            $this->rulesBrokenBy(fn() => $this->subject->validateAdd($entry)),
+        );
+    }
+
+    public function test_a_modify_may_supply_a_timestamp_but_not_the_entry_uuid(): void
+    {
+        $entry = $this->personEntry();
+        $command = new UpdateCommand(
+            $entry->getDn(),
+            [
+                Change::replace('modifyTimestamp', '20200101000000Z'),
+                Change::replace('entryUUID', '597ae2f6-16a6-1027-98f4-d28b5365dc14'),
+            ],
+        );
+
+        self::assertSame(
+            [SchemaRule::NoUserModification, SchemaRule::SettableOperationalAttribute],
+            $this->rulesBrokenBy(fn() => $this->subject->validateModify(
+                $command,
+                $entry,
+            )),
+        );
     }
 
     public function test_add_beyond_the_default_value_limit_is_refused(): void
@@ -880,6 +987,24 @@ final class SchemaValidatorTest extends TestCase
             static fn(int $i): string => "value $i",
             range(1, $count),
         );
+    }
+
+    /**
+     * @param Closure(): void $validation
+     * @return list<SchemaRule>
+     */
+    private function rulesBrokenBy(Closure $validation): array
+    {
+        try {
+            $validation();
+        } catch (SchemaValidationException $e) {
+            return array_map(
+                static fn(SchemaViolationException $violation): SchemaRule => $violation->rule,
+                $e->violations,
+            );
+        }
+
+        return [];
     }
 
     private function personEntry(string $dn = 'cn=Alice,dc=example,dc=com'): Entry

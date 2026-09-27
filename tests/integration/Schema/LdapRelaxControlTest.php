@@ -62,11 +62,10 @@ final class LdapRelaxControlTest extends ServerTestCase
         parent::setUp();
     }
 
-    public function test_relax_control_allows_a_schema_violating_add(): void
+    public function test_a_relaxed_add_keeps_the_operational_attributes_it_supplies(): void
     {
         $this->authenticateAdmin();
 
-        // 'mail' is not permitted by the 'person' object class; rejected under Strict without the control.
         $this->ldapClient()->create(
             Entry::fromArray(
                 'cn=relax-add,dc=foo,dc=bar',
@@ -74,22 +73,259 @@ final class LdapRelaxControlTest extends ServerTestCase
                     'cn' => 'relax-add',
                     'sn' => 'Drift',
                     'objectClass' => 'person',
-                    'mail' => 'relax-add@foo.bar',
+                    'createTimestamp' => '20200101000000Z',
+                    'modifyTimestamp' => '20200102000000Z',
+                    'creatorsName' => 'cn=jane,dc=foo,dc=bar',
+                    'modifiersName' => 'cn=joe,dc=foo,dc=bar',
+                    'entryUUID' => '597ae2f6-16a6-1027-98f4-d28b5365dc14',
                 ],
             ),
             Controls::relaxRules(),
         );
 
-        $entries = $this->ldapClient()->search(
-            Operations::search(Filters::equal('cn', 'relax-add'))
-                ->base('dc=foo,dc=bar')
-                ->useSubtreeScope(),
+        self::assertSame(
+            [
+                'createTimestamp' => '20200101000000Z',
+                'modifyTimestamp' => '20200102000000Z',
+                'creatorsName' => 'cn=jane,dc=foo,dc=bar',
+                'modifiersName' => 'cn=joe,dc=foo,dc=bar',
+                'entryUUID' => '597ae2f6-16a6-1027-98f4-d28b5365dc14',
+            ],
+            $this->operationalValuesOf('cn=relax-add,dc=foo,dc=bar'),
+        );
+    }
+
+    public function test_a_relaxed_modify_keeps_the_modify_bookkeeping_it_supplies(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=relax-modify-stamp,dc=foo,dc=bar',
+            [
+                'cn' => 'relax-modify-stamp',
+                'sn' => 'Drift',
+                'objectClass' => 'person',
+            ],
+        ));
+
+        $this->ldapClient()->send(
+            Operations::modify(
+                'cn=relax-modify-stamp,dc=foo,dc=bar',
+                Change::replace(
+                    'createTimestamp',
+                    '20200101000000Z',
+                ),
+                Change::replace(
+                    'modifyTimestamp',
+                    '20200102000000Z',
+                ),
+                Change::replace(
+                    'modifiersName',
+                    'cn=joe,dc=foo,dc=bar',
+                ),
+            ),
+            Controls::relaxRules(),
         );
 
-        self::assertCount(1, $entries);
+        $values = $this->operationalValuesOf('cn=relax-modify-stamp,dc=foo,dc=bar');
+
         self::assertSame(
-            'relax-add@foo.bar',
-            $entries->first()?->get('mail')?->firstValue(),
+            ['20200101000000Z', '20200102000000Z', 'cn=joe,dc=foo,dc=bar'],
+            [$values['createTimestamp'], $values['modifyTimestamp'], $values['modifiersName']],
+        );
+    }
+
+    public function test_a_relaxed_add_refuses_a_create_timestamp_in_the_future(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->ldapClient()->create(
+            Entry::fromArray(
+                'cn=relax-future,dc=foo,dc=bar',
+                [
+                    'cn' => 'relax-future',
+                    'sn' => 'Drift',
+                    'objectClass' => 'person',
+                    'createTimestamp' => '20990101000000Z',
+                ],
+            ),
+            Controls::relaxRules(),
+        );
+    }
+
+    public function test_a_relaxed_add_refuses_an_entry_uuid_another_entry_holds(): void
+    {
+        $this->authenticateAdmin();
+        $held = $this->operationalValuesOf('cn=user,dc=foo,dc=bar')['entryUUID'];
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->ldapClient()->create(
+            Entry::fromArray(
+                'cn=relax-uuid-taken,dc=foo,dc=bar',
+                [
+                    'cn' => 'relax-uuid-taken',
+                    'sn' => 'Drift',
+                    'objectClass' => 'person',
+                    'entryUUID' => (string) $held,
+                ],
+            ),
+            Controls::relaxRules(),
+        );
+    }
+
+    public function test_a_relaxed_modify_refuses_to_change_the_entry_uuid(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->ldapClient()->send(
+            Operations::modify(
+                'cn=user,dc=foo,dc=bar',
+                Change::replace(
+                    'entryUUID',
+                    '6f1c5a4e-2b8d-4c3a-9e7f-0a1b2c3d4e5f',
+                ),
+            ),
+            Controls::relaxRules(),
+        );
+    }
+
+    public function test_relax_control_does_not_allow_an_unlisted_no_user_modification_attribute(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->ldapClient()->create(
+            Entry::fromArray(
+                'cn=relax-structural,dc=foo,dc=bar',
+                [
+                    'cn' => 'relax-structural',
+                    'sn' => 'Drift',
+                    'objectClass' => 'person',
+                    'structuralObjectClass' => 'device',
+                ],
+            ),
+            Controls::relaxRules(),
+        );
+    }
+
+    public function test_the_no_user_modification_rule_holds_on_add_without_the_control(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=relax-add-refused,dc=foo,dc=bar',
+            [
+                'cn' => 'relax-add-refused',
+                'sn' => 'Drift',
+                'objectClass' => 'person',
+                'createTimestamp' => '20200101000000Z',
+            ],
+        ));
+    }
+
+    public function test_relax_control_does_not_allow_an_attribute_no_object_class_permits(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);
+
+        $this->ldapClient()->create(
+            Entry::fromArray(
+                'cn=relax-disallowed,dc=foo,dc=bar',
+                [
+                    'cn' => 'relax-disallowed',
+                    'sn' => 'Drift',
+                    'objectClass' => 'person',
+                    'mail' => 'relax-disallowed@foo.bar',
+                ],
+            ),
+            Controls::relaxRules(),
+        );
+    }
+
+    public function test_a_relaxed_structural_class_change_must_still_leave_a_conforming_entry(): void
+    {
+        $this->authenticateAdmin();
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=relax-to-device,dc=foo,dc=bar',
+            [
+                'cn' => 'relax-to-device',
+                'sn' => 'Drift',
+                'objectClass' => 'inetOrgPerson',
+            ],
+        ));
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::OBJECT_CLASS_VIOLATION);
+
+        $this->ldapClient()->send(
+            Operations::modify(
+                'cn=relax-to-device,dc=foo,dc=bar',
+                Change::replace(
+                    'objectClass',
+                    'device',
+                ),
+            ),
+            Controls::relaxRules(),
+        );
+    }
+
+    public function test_relax_control_does_not_allow_equivalent_values(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ATTRIBUTE_OR_VALUE_EXISTS);
+
+        $this->ldapClient()->create(
+            Entry::fromArray(
+                'cn=relax-equivalent,dc=foo,dc=bar',
+                [
+                    'cn' => 'relax-equivalent',
+                    'sn' => 'Drift',
+                    'objectClass' => 'person',
+                    'description' => ['same', 'SAME'],
+                ],
+            ),
+            Controls::relaxRules(),
+        );
+    }
+
+    public function test_a_relaxed_violation_does_not_hide_the_attribute_value_limit(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
+
+        $this->ldapClient()->create(
+            Entry::fromArray(
+                'cn=relax-hidden-limit,dc=foo,dc=bar',
+                [
+                    'cn' => 'relax-hidden-limit',
+                    'sn' => 'Drift',
+                    'objectClass' => 'person',
+                    'createTimestamp' => '20200101000000Z',
+                    'description' => array_map(
+                        static fn(int $i): string => "value {$i}",
+                        range(1, self::VALUE_LIMIT + 1),
+                    ),
+                ],
+            ),
+            Controls::relaxRules(),
         );
     }
 
@@ -234,6 +470,29 @@ final class LdapRelaxControlTest extends ServerTestCase
             ),
             Controls::relaxRules(),
         );
+    }
+
+    /**
+     * @return array<string, ?string>
+     */
+    private function operationalValuesOf(string $dn): array
+    {
+        $names = ['createTimestamp', 'modifyTimestamp', 'creatorsName', 'modifiersName', 'entryUUID'];
+        $entry = $this->ldapClient()->search(
+            Operations::search(
+                Filters::present('objectClass'),
+                ...$names,
+            )
+                ->base($dn)
+                ->useBaseScope(),
+        )->first();
+
+        $values = [];
+        foreach ($names as $name) {
+            $values[$name] = $entry?->get($name)?->firstValue();
+        }
+
+        return $values;
     }
 
     private function structuralObjectClassOf(string $dn): ?string

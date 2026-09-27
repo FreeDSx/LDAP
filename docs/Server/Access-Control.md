@@ -533,7 +533,7 @@ rule grants it.
 
 The gated controls are:
 
-* Relax Rules control** (`Control::OID_RELAX_RULES`). With it, an authorized client (see [Schema Validation](Schema.md#validation-mode)).
+* **Relax Rules control** (`Control::OID_RELAX_RULES`). See [Schema Validation](Schema.md#validation-mode).
 
 The set is fixed. These are the controls whose routes carry no other gate, so the grant is the whole authorization.
 

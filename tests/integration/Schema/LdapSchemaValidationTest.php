@@ -14,6 +14,8 @@ declare(strict_types=1);
 namespace Tests\Integration\FreeDSx\Ldap\Schema;
 
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\OperationException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Operations;
 use FreeDSx\Ldap\Search\Filters;
 use Tests\Integration\FreeDSx\Ldap\ServerTestCase;
@@ -107,5 +109,23 @@ final class LdapSchemaValidationTest extends ServerTestCase
             'drift-modify@foo.bar',
             $entries->first()?->get('mail')?->firstValue(),
         );
+    }
+
+    public function test_lenient_mode_does_not_allow_equivalent_values(): void
+    {
+        $this->authenticateAdmin();
+
+        $this->expectException(OperationException::class);
+        $this->expectExceptionCode(ResultCode::ATTRIBUTE_OR_VALUE_EXISTS);
+
+        $this->ldapClient()->create(Entry::fromArray(
+            'cn=drift-equivalent,dc=foo,dc=bar',
+            [
+                'cn' => 'drift-equivalent',
+                'sn' => 'Drift',
+                'objectClass' => 'person',
+                'description' => ['same', 'SAME'],
+            ],
+        ));
     }
 }
