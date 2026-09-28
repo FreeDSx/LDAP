@@ -242,35 +242,6 @@ final class PasswordPolicyForwarderTest extends TestCase
         );
     }
 
-    public function test_a_subject_without_an_entry_uuid_is_left_pending_and_not_forwarded(): void
-    {
-        $this->recordSends();
-        $dn = 'cn=nouuid,dc=example,dc=com';
-        $this->fromContainer(WriteEntryInterface::class)->store(new Entry(
-            $dn,
-            new Attribute('cn', 'nouuid'),
-        ));
-        $this->seedFailure('20260520120000Z', $dn);
-
-        $forwarded = $this->subject->forwardOnce();
-
-        self::assertSame(
-            0,
-            $forwarded,
-        );
-        self::assertSame(
-            [],
-            $this->sent,
-        );
-        self::assertSame(
-            [$dn],
-            array_map(
-                static fn($pending): string => $pending->dn->toString(),
-                $this->store->listUnforwarded(),
-            ),
-        );
-    }
-
     protected function makeServerOptions(): ServerOptions
     {
         return TestServerOptions::sqlite();

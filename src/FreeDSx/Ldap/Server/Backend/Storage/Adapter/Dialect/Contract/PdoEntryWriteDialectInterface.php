@@ -43,12 +43,12 @@ interface PdoEntryWriteDialectInterface
     public function queryEntryId(): string;
 
     /**
-     * Insert or replace one entry. Parameters: [lc_dn, dn, lc_parent_dn, attributes]
+     * Insert or replace one entry. Parameters: [entry_uuid, lc_dn, dn, lc_parent_dn, attributes]
      */
     public function queryUpsert(): string;
 
     /**
-     * Insert one entry, failing when the DN is taken. Parameters: [lc_dn, dn, lc_parent_dn, attributes]
+     * Insert one entry, failing when the DN is taken. Parameters: [entry_uuid, lc_dn, dn, lc_parent_dn, attributes]
      */
     public function queryInsert(): string;
 

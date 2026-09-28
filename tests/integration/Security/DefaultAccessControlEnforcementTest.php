@@ -25,11 +25,11 @@ use FreeDSx\Ldap\Server\Backend\Auth\ManagerAwareAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Auth\ManagerIdentity;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticatableInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Token\AuthenticatedTokenInterface;
 use FreeDSx\Ldap\Server\Token\ManagerToken;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 /**
  * Composes the real manager authenticator with the bypass-wrapped secure-default ACL, as the server wires them.
@@ -54,7 +54,7 @@ final class DefaultAccessControlEnforcementTest extends TestCase
 
     protected function setUp(): void
     {
-        $container = $this->containerFor(new InMemoryStorage([
+        $container = $this->containerFor(EntryFixture::inMemoryStorage(
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [
@@ -80,7 +80,7 @@ final class DefaultAccessControlEnforcementTest extends TestCase
                     'userPassword' => [self::HASH],
                 ],
             ),
-        ]));
+        ));
 
         $this->authenticator = new ManagerAwareAuthenticator(
             $container->get(PasswordAuthenticatableInterface::class),

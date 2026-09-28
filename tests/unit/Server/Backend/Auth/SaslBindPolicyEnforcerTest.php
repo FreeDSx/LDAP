@@ -22,7 +22,6 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\SaslBindPolicyEnforcer;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -40,6 +39,7 @@ use FreeDSx\Ldap\Server\PasswordPolicy\Rules\PasswordLockoutRules;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class SaslBindPolicyEnforcerTest extends TestCase
 {
@@ -172,7 +172,7 @@ final class SaslBindPolicyEnforcerTest extends TestCase
         ?PasswordPolicy $policy,
         array $userAttrs = [],
     ): SaslBindPolicyEnforcer {
-        $container = $this->containerFor(new InMemoryStorage([
+        $container = $this->containerFor(EntryFixture::inMemoryStorage(
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [
@@ -189,7 +189,7 @@ final class SaslBindPolicyEnforcerTest extends TestCase
                     'userPassword' => ['12345'],
                 ] + $userAttrs,
             ),
-        ]));
+        ));
         $this->backend = $container->get(StorageReadBackend::class);
 
         $engine = new PasswordPolicyEngine(

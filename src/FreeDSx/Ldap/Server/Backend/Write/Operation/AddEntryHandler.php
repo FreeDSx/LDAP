@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\RdnAttributeValues;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
 use FreeDSx\Ldap\Server\Backend\Write\OperationalAttributeGenerator;
@@ -70,7 +69,7 @@ readonly class AddEntryHandler
         Entry $entry,
         WriteContext $context,
     ): void {
-        $uuid = $entry->get(AttributeTypeOid::NAME_ENTRY_UUID)?->firstValue();
+        $uuid = $entry->getUuid();
 
         if ($uuid === null || $context->bulkLoadOptions() !== null) {
             return;

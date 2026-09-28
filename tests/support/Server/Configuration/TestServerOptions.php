@@ -84,7 +84,7 @@ final class TestServerOptions
      */
     public static function transientStorage(): StorageConfigInterface
     {
-        return InMemoryStorageConfig::withEntries();
+        return new InMemoryStorageConfig();
     }
 
     /**

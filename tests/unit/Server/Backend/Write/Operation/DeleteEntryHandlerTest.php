@@ -21,7 +21,6 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
@@ -35,6 +34,7 @@ use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Backend\Write\WriteHandlerTestTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class DeleteEntryHandlerTest extends TestCase
 {
@@ -139,9 +139,9 @@ final class DeleteEntryHandlerTest extends TestCase
 
     public function test_it_refuses_a_naming_context(): void
     {
-        $this->writeGraph(new InMemoryStorage([
+        $this->writeGraph(EntryFixture::inMemoryStorage(
             new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
-        ]));
+        ));
 
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::UNWILLING_TO_PERFORM);
@@ -154,10 +154,10 @@ final class DeleteEntryHandlerTest extends TestCase
 
     public function test_it_allows_an_entry_whose_parent_is_present(): void
     {
-        $this->writeGraph(new InMemoryStorage([
+        $this->writeGraph(EntryFixture::inMemoryStorage(
             new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
             new Entry(new Dn('cn=Alice,dc=example,dc=com'), new Attribute('cn', 'Alice')),
-        ]));
+        ));
 
         $this->deletes()->handle(
             new DeleteCommand(new Dn('cn=Alice,dc=example,dc=com')),
@@ -220,7 +220,7 @@ final class DeleteEntryHandlerTest extends TestCase
 
         // Seeded directly so only the operations under test are journaled.
         $this->writeGraph(
-            new InMemoryStorage([new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))]),
+            EntryFixture::inMemoryStorage(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
             TestServerOptions::unvalidatedCore()
                 ->setChangeJournalConfig(new ChangeJournalConfig()),
             [ChangeJournalInterface::class => $journal],

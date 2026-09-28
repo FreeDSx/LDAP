@@ -22,7 +22,6 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Command\UpdateCommand;
@@ -48,6 +47,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class PasswordPolicyWriteHandlerTest extends TestCase
 {
@@ -398,24 +398,27 @@ final class PasswordPolicyWriteHandlerTest extends TestCase
         ?WriteHandlerInterface $writes = null,
     ): PasswordPolicyWriteHandler {
         $options ??= TestServerOptions::cheaplyHashed();
-        $container = $this->containerFor(new InMemoryStorage([
-            Entry::fromArray(
-                'dc=foo,dc=bar',
-                [
-                    'objectClass' => ['domain'],
-                    'dc' => ['foo'],
-                ],
+        $container = $this->containerFor(
+            EntryFixture::inMemoryStorage(
+                Entry::fromArray(
+                    'dc=foo,dc=bar',
+                    [
+                        'objectClass' => ['domain'],
+                        'dc' => ['foo'],
+                    ],
+                ),
+                Entry::fromArray(
+                    self::USER_DN,
+                    [
+                        'objectClass' => ['inetOrgPerson'],
+                        'cn' => ['user'],
+                        'sn' => ['User'],
+                        'userPassword' => ['original-pass'],
+                    ] + $userAttrs,
+                ),
             ),
-            Entry::fromArray(
-                self::USER_DN,
-                [
-                    'objectClass' => ['inetOrgPerson'],
-                    'cn' => ['user'],
-                    'sn' => ['User'],
-                    'userPassword' => ['original-pass'],
-                ] + $userAttrs,
-            ),
-        ]), $options);
+            $options,
+        );
         $this->backend = $container->get(StorageReadBackend::class);
         $writes ??= $container->get(WriteOperationDispatcher::class);
 

@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\MissingEntryUuidException;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
@@ -25,6 +26,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 
 final class InMemoryStorageTest extends TestCase
@@ -42,7 +44,7 @@ final class InMemoryStorageTest extends TestCase
             new Dn('cn=Alice,dc=example,dc=com'),
             new Attribute('cn', 'Alice'),
         );
-        $this->subject = new InMemoryStorage([$this->alice]);
+        $this->subject = EntryFixture::inMemoryStorage($this->alice);
     }
 
     public function test_find_returns_entry_by_norm_dn(): void
@@ -58,10 +60,10 @@ final class InMemoryStorageTest extends TestCase
 
     public function test_atomic_discards_entries_stored_before_a_failure(): void
     {
-        $bob = new Entry(
+        $bob = EntryFixture::withUuid(new Entry(
             new Dn('cn=Bob,dc=example,dc=com'),
             new Attribute('cn', 'Bob'),
-        );
+        ));
 
         try {
             $this->subject->atomic(function () use ($bob): void {
@@ -98,10 +100,10 @@ final class InMemoryStorageTest extends TestCase
 
     public function test_atomic_keeps_its_changes_when_the_operation_succeeds(): void
     {
-        $bob = new Entry(
+        $bob = EntryFixture::withUuid(new Entry(
             new Dn('cn=Bob,dc=example,dc=com'),
             new Attribute('cn', 'Bob'),
-        );
+        ));
 
         $this->subject->atomic(function () use ($bob): void {
             $this->subject->store($bob);
@@ -112,14 +114,14 @@ final class InMemoryStorageTest extends TestCase
 
     public function test_a_delta_applies_against_the_members_already_stored(): void
     {
-        $this->subject->store(Entry::fromArray(
+        $this->subject->store(EntryFixture::withUuid(Entry::fromArray(
             'cn=admins,dc=ex,dc=com',
             ['cn' => ['admins'], 'member' => ['cn=bob,dc=ex,dc=com', 'cn=carol,dc=ex,dc=com']],
-        ));
+        )));
 
         // The entry a delta write carries no longer holds the attribute the delta changes.
         $this->subject->store(
-            Entry::fromArray('cn=admins,dc=ex,dc=com', ['cn' => ['admins']]),
+            EntryFixture::withUuid(Entry::fromArray('cn=admins,dc=ex,dc=com', ['cn' => ['admins']])),
             links: new LinkDelta(
                 added: ['member' => ['cn=dan,dc=ex,dc=com']],
                 removed: ['member' => ['cn=bob,dc=ex,dc=com']],
@@ -136,13 +138,13 @@ final class InMemoryStorageTest extends TestCase
 
     public function test_a_delta_emptying_an_attribute_drops_it(): void
     {
-        $this->subject->store(Entry::fromArray(
+        $this->subject->store(EntryFixture::withUuid(Entry::fromArray(
             'cn=admins,dc=ex,dc=com',
             ['cn' => ['admins'], 'member' => ['cn=bob,dc=ex,dc=com']],
-        ));
+        )));
 
         $this->subject->store(
-            Entry::fromArray('cn=admins,dc=ex,dc=com', ['cn' => ['admins']]),
+            EntryFixture::withUuid(Entry::fromArray('cn=admins,dc=ex,dc=com', ['cn' => ['admins']])),
             links: new LinkDelta(removed: ['member' => ['cn=bob,dc=ex,dc=com']]),
         );
 
@@ -157,13 +159,16 @@ final class InMemoryStorageTest extends TestCase
         $subject = new InMemoryStorage(
             linkedAttributes: new LinkedAttributes($schema),
         );
-        $subject->store(Entry::fromArray(
+        $subject->store(EntryFixture::withUuid(Entry::fromArray(
             'cn=admins,dc=ex,dc=com',
             ['cn' => ['admins'], 'member' => ['cn=bob,dc=ex,dc=com']],
-        ));
+        )));
 
         $subject->store(
-            Entry::fromArray('cn=admins,dc=ex,dc=com', ['cn' => ['admins'], 'description' => ['Renamed']]),
+            EntryFixture::withUuid(Entry::fromArray(
+                'cn=admins,dc=ex,dc=com',
+                ['cn' => ['admins'], 'description' => ['Renamed']],
+            )),
             links: LinkDelta::untouched(),
         );
         $stored = $subject->find(new Dn('cn=admins,dc=ex,dc=com'));
@@ -213,7 +218,11 @@ final class InMemoryStorageTest extends TestCase
         $parent = new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'));
         $child = new Entry(new Dn('cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Bob'));
         $grandchild = new Entry(new Dn('cn=Sub,cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Sub'));
-        $storage = new InMemoryStorage([$parent, $child, $grandchild]);
+        $storage = EntryFixture::inMemoryStorage(
+            $parent,
+            $child,
+            $grandchild,
+        );
 
         $entries = iterator_to_array($storage->list(StorageListOptions::matchAll(new Dn('dc=example,dc=com'), false))->entries());
 
@@ -232,7 +241,11 @@ final class InMemoryStorageTest extends TestCase
         $parent = new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'));
         $child = new Entry(new Dn('cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Bob'));
         $grandchild = new Entry(new Dn('cn=Sub,cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Sub'));
-        $storage = new InMemoryStorage([$parent, $child, $grandchild]);
+        $storage = EntryFixture::inMemoryStorage(
+            $parent,
+            $child,
+            $grandchild,
+        );
 
         $entries = iterator_to_array(
             $storage->list(StorageListOptions::matchAll(
@@ -273,7 +286,7 @@ final class InMemoryStorageTest extends TestCase
             new Dn('cn=Doe\,John,dc=example,dc=com'),
             new Attribute('cn', 'Doe,John'),
         );
-        $storage = new InMemoryStorage([$entry]);
+        $storage = EntryFixture::inMemoryStorage($entry);
 
         $entries = iterator_to_array($storage->list(StorageListOptions::matchAll(
             new Dn('John,dc=example,dc=com'),
@@ -290,7 +303,10 @@ final class InMemoryStorageTest extends TestCase
     {
         $parent = new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'));
         $child = new Entry(new Dn('cn=Alice,dc=example,dc=com'), new Attribute('cn', 'Alice'));
-        $storage = new InMemoryStorage([$parent, $child]);
+        $storage = EntryFixture::inMemoryStorage(
+            $parent,
+            $child,
+        );
 
         self::assertTrue($storage->hasChildren(new Dn('dc=example,dc=com')));
     }
@@ -302,16 +318,30 @@ final class InMemoryStorageTest extends TestCase
 
     public function test_store_adds_entry(): void
     {
-        $bob = new Entry(new Dn('cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Bob'));
-        $this->subject->store($bob);
+        $this->subject->store(EntryFixture::withUuid(new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('cn', 'Bob'),
+        )));
 
         self::assertNotNull($this->subject->find(new Dn('cn=bob,dc=example,dc=com')));
     }
 
+    public function test_store_refuses_an_entry_without_an_entry_uuid(): void
+    {
+        self::expectException(MissingEntryUuidException::class);
+
+        $this->subject->store(new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('cn', 'Bob'),
+        ));
+    }
+
     public function test_store_replaces_existing_entry(): void
     {
-        $updated = new Entry(new Dn('cn=Alice,dc=example,dc=com'), new Attribute('cn', 'Alicia'));
-        $this->subject->store($updated);
+        $this->subject->store(EntryFixture::withUuid(new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('cn', 'Alicia'),
+        )));
 
         $entry = $this->subject->find(new Dn('cn=alice,dc=example,dc=com'));
 
@@ -348,8 +378,10 @@ final class InMemoryStorageTest extends TestCase
 
     public function test_constructor_normalises_dn_keys(): void
     {
-        $entry = new Entry(new Dn('CN=ALICE,DC=EXAMPLE,DC=COM'), new Attribute('cn', 'Alice'));
-        $storage = new InMemoryStorage([$entry]);
+        $storage = EntryFixture::inMemoryStorage(new Entry(
+            new Dn('CN=ALICE,DC=EXAMPLE,DC=COM'),
+            new Attribute('cn', 'Alice'),
+        ));
 
         self::assertNotNull($storage->find(new Dn('cn=alice,dc=example,dc=com')));
     }
@@ -368,7 +400,10 @@ final class InMemoryStorageTest extends TestCase
     {
         $parent = new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'));
         $child = new Entry(new Dn('cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Bob'));
-        $storage = new InMemoryStorage([$parent, $child]);
+        $storage = EntryFixture::inMemoryStorage(
+            $parent,
+            $child,
+        );
 
         $entries = iterator_to_array(
             $storage->list(StorageListOptions::matchAll(
@@ -384,7 +419,10 @@ final class InMemoryStorageTest extends TestCase
     {
         $parent = new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'));
         $child = new Entry(new Dn('cn=Bob,dc=example,dc=com'), new Attribute('cn', 'Bob'));
-        $storage = new InMemoryStorage([$parent, $child]);
+        $storage = EntryFixture::inMemoryStorage(
+            $parent,
+            $child,
+        );
 
         $entries = iterator_to_array(
             $storage->list(StorageListOptions::matchAll(
@@ -407,11 +445,11 @@ final class InMemoryStorageTest extends TestCase
 
     public function test_naming_contexts_returns_entries_whose_parent_is_missing(): void
     {
-        $storage = new InMemoryStorage([
+        $storage = EntryFixture::inMemoryStorage(
             new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
             new Entry(new Dn('cn=Alice,dc=example,dc=com'), new Attribute('cn', 'Alice')),
             new Entry(new Dn('dc=other,dc=org'), new Attribute('dc', 'other')),
-        ]);
+        );
 
         $contexts = array_map(
             fn(Dn $dn): string => $dn->toString(),
@@ -427,9 +465,9 @@ final class InMemoryStorageTest extends TestCase
 
     public function test_naming_contexts_returns_orphans_whose_parent_is_not_in_storage(): void
     {
-        $storage = new InMemoryStorage([
+        $storage = EntryFixture::inMemoryStorage(
             new Entry(new Dn('cn=Alice,dc=example,dc=com'), new Attribute('cn', 'Alice')),
-        ]);
+        );
 
         $contexts = array_map(
             fn(Dn $dn): string => $dn->toString(),
@@ -444,6 +482,6 @@ final class InMemoryStorageTest extends TestCase
 
     protected function makeRenameContainer(Entry ...$entries): Container
     {
-        return $this->containerFor(new InMemoryStorage($entries));
+        return $this->containerFor(EntryFixture::inMemoryStorage(...$entries));
     }
 }

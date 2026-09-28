@@ -22,7 +22,6 @@ use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\AliasResolver;
 use FreeDSx\Ldap\Server\Middleware\AliasDereferenceMiddleware;
 use FreeDSx\Ldap\Server\Middleware\Pipeline\ServerRequestContext;
@@ -31,6 +30,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Middleware\CallLog;
 use Tests\Support\FreeDSx\Ldap\Middleware\RecordingMiddlewareHandler;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class AliasDereferenceMiddlewareTest extends TestCase
 {
@@ -52,7 +52,7 @@ final class AliasDereferenceMiddlewareTest extends TestCase
             ->willReturnCallback(fn(): bool => $this->visible);
 
         $this->subject = new AliasDereferenceMiddleware(
-            new AliasResolver(new InMemoryStorage([
+            new AliasResolver(EntryFixture::inMemoryStorage(
                 Entry::fromArray(self::BASE, ['objectClass' => ['top', 'domain'], 'dc' => 'example']),
                 Entry::fromArray('cn=target,' . self::BASE, [
                     'objectClass' => ['top', 'person'],
@@ -64,7 +64,7 @@ final class AliasDereferenceMiddlewareTest extends TestCase
                     'cn' => 'ptr',
                     'aliasedObjectName' => 'cn=target,' . self::BASE,
                 ]),
-            ])),
+            )),
             $this->accessControl,
         );
         $this->next = new RecordingMiddlewareHandler(new CallLog());

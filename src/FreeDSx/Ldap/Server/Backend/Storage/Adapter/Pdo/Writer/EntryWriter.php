@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Writer;
 use Closure;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\MissingEntryUuidException;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryWriteDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoRowLockDialectInterface;
@@ -60,6 +61,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
      * @throws EntryAlreadyExistsException when the DN is already taken
      * @throws DnTooLongException when the DN exceeds what the database can store
      * @throws PartialValuesException when an attribute holds only a range of its values
+     * @throws MissingEntryUuidException when the entry carries no entryUUID
      */
     public function insert(Entry $entry): void
     {
@@ -73,6 +75,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
             $this->translatingRefusal(
                 function () use ($stored, $entry): void {
                     $this->connection->execute($this->dialect->queryInsert(), [
+                        $entry->getUuidOrFail(),
                         $stored->lcDn,
                         $stored->dn,
                         $stored->parentLcDn,
@@ -100,6 +103,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
     /**
      * @throws DnTooLongException when the DN exceeds what the database can store
      * @throws PartialValuesException when an attribute holds only a range of its values
+     * @throws MissingEntryUuidException when the entry carries no entryUUID
      */
     public function store(
         Entry $entry,
@@ -119,6 +123,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
                 : $this->lockedEntry($stored->normalized);
 
             $this->connection->execute($this->dialect->queryUpsert(), [
+                $entry->getUuidOrFail(),
                 $stored->lcDn,
                 $stored->dn,
                 $stored->parentLcDn,

@@ -34,6 +34,8 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
 
     private const DN = 'cn=foo,dc=example,dc=com';
 
+    private const UUID = '3f2b9c1e-7a4d-4e8b-9c6f-1d2e3f4a5b6c';
+
     private WriteEntryInterface $storage;
 
     private ReplicaPasswordStateStoreInterface $subject;
@@ -51,6 +53,7 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         $this->storage->store(new Entry(
             new Dn(self::DN),
             new Attribute('cn', 'foo'),
+            new Attribute('entryUUID', self::UUID),
         ));
     }
 
@@ -110,6 +113,7 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         $this->storage->store(new Entry(
             $dn,
             new Attribute('cn', 'foo'),
+            new Attribute('entryUUID', self::UUID),
         ));
 
         self::assertTrue(

@@ -31,7 +31,6 @@ use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\PasswordPolicyWriteHandler;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
@@ -54,6 +53,7 @@ use FreeDSx\Ldap\ServerOptions;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 /**
  * In-process integration of a plain ldapmodify of userPassword flowing through the dispatch handler.
@@ -380,7 +380,7 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
         PasswordPolicy $policy,
         array $userAttrs = [],
     ): ServerDispatchHandler {
-        $container = $this->containerFor(new InMemoryStorage([
+        $container = $this->containerFor(EntryFixture::inMemoryStorage(
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [
@@ -397,7 +397,7 @@ final class PasswordPolicyPlainModifyEnforcementTest extends TestCase
                     'userPassword' => ['original-pass'],
                 ] + $userAttrs,
             ),
-        ]));
+        ));
         $this->backend = $container->get(StorageReadBackend::class);
 
         $guard = new PasswordPolicyChangeGuard(

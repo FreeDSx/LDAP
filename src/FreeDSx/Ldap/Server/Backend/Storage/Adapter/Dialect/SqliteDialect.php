@@ -113,9 +113,10 @@ final class SqliteDialect implements PdoDialectInterface
     public function queryUpsert(): string
     {
         return <<<SQL
-            INSERT INTO entries (lc_dn, dn, lc_parent_dn, attributes)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO entries (entry_uuid, lc_dn, dn, lc_parent_dn, attributes)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(lc_dn) DO UPDATE SET
+                entry_uuid = excluded.entry_uuid,
                 dn = excluded.dn,
                 lc_parent_dn = excluded.lc_parent_dn,
                 attributes = excluded.attributes

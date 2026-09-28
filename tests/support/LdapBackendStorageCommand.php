@@ -515,7 +515,7 @@ final class LdapBackendStorageCommand extends Command
     private function createStorageConfig(string $storage): StorageConfigInterface
     {
         if ($storage === 'memory') {
-            return InMemoryStorageConfig::withEntries();
+            return new InMemoryStorageConfig();
         }
 
         if ($storage === 'sqlite') {

@@ -30,7 +30,6 @@ use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordHashService;
 use FreeDSx\Ldap\Server\Clock\ClockInterface;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -53,6 +52,7 @@ use FreeDSx\Ldap\ServerOptions;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 /**
  * In-process integration of RFC 3062 password-modify policy enforcement.
@@ -347,7 +347,7 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
         PasswordPolicy $policy,
         array $extra = [],
     ): ServerPasswordModifyHandler {
-        $container = $this->containerFor(new InMemoryStorage([
+        $container = $this->containerFor(EntryFixture::inMemoryStorage(
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [
@@ -364,7 +364,7 @@ final class PasswordPolicyChangeEnforcementTest extends TestCase
                     'userPassword' => [self::OLD_PASSWORD],
                 ] + $extra,
             ),
-        ]));
+        ));
         $this->backend = $container->get(StorageReadBackend::class);
 
         return new ServerPasswordModifyHandler(

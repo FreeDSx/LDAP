@@ -15,6 +15,8 @@ namespace FreeDSx\Ldap\Entry;
 
 use ArrayIterator;
 use Countable;
+use FreeDSx\Ldap\Exception\MissingEntryUuidException;
+use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use IteratorAggregate;
 use Stringable;
 use Traversable;
@@ -22,6 +24,8 @@ use Traversable;
 use function array_map;
 use function count;
 use function is_array;
+use function sprintf;
+use function strtolower;
 
 /**
  * Represents an Entry in LDAP.
@@ -268,6 +272,31 @@ class Entry implements IteratorAggregate, Countable, Stringable
     public function getDn(): Dn
     {
         return $this->dn;
+    }
+
+    /**
+     * The entryUUID (RFC 4530) lowercased, or null when the entry does not have one.
+     */
+    public function getUuid(): ?string
+    {
+        $uuid = $this->get(AttributeTypeOid::NAME_ENTRY_UUID)?->firstValue();
+
+        return $uuid === null || $uuid === ''
+            ? null
+            : strtolower($uuid);
+    }
+
+    /**
+     * The entryUUID (RFC 4530) or an exception if it does not exist.
+     *
+     * @throws MissingEntryUuidException when the entry does not have one
+     */
+    public function getUuidOrFail(): string
+    {
+        return $this->getUuid() ?? throw new MissingEntryUuidException(sprintf(
+            'The entry "%s" has no entryUUID.',
+            $this->dn->toString(),
+        ));
     }
 
     /**

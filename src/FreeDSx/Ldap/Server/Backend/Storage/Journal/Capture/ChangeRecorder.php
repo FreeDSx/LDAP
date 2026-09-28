@@ -94,11 +94,11 @@ final readonly class ChangeRecorder implements ChangeRecorderInterface
         ?Dn $previousDn = null,
         ?Entry $preImage = null,
     ): void {
-        $uuid = $entry->get(AttributeTypeOid::NAME_ENTRY_UUID)?->firstValue();
+        $uuid = $entry->getUuid();
 
         // entryUUID is stamped on every write.
         // but account for bad data by skipping journal entries on potentially corrupt data (maybe a seed import).
-        if ($uuid === null || $uuid === '') {
+        if ($uuid === null) {
             $this->logger->warning(
                 'Skipping journal record for an entry missing a required attribute.',
                 [

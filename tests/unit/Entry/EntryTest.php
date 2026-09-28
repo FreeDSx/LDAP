@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Change;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\MissingEntryUuidException;
 use PHPUnit\Framework\TestCase;
 
 class EntryTest extends TestCase
@@ -155,6 +156,31 @@ class EntryTest extends TestCase
     public function test_it_should_return_null_for_an_attribute_that_doesnt_exist(): void
     {
         self::assertNull($this->subject->get('foobar'));
+    }
+
+    public function test_it_should_get_the_uuid_lowercased(): void
+    {
+        $this->subject->set(
+            'entryUUID',
+            'A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D',
+        );
+
+        self::assertSame(
+            'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+            $this->subject->getUuid(),
+        );
+    }
+
+    public function test_it_should_get_a_null_uuid_when_the_entry_has_none(): void
+    {
+        self::assertNull($this->subject->getUuid());
+    }
+
+    public function test_it_should_throw_when_a_uuid_is_required_and_the_entry_has_none(): void
+    {
+        self::expectException(MissingEntryUuidException::class);
+
+        $this->subject->getUuidOrFail();
     }
 
     public function test_it_should_get_an_attribute_using_a_string(): void

@@ -17,9 +17,9 @@ use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\AliasResolver;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class AliasResolverTest extends TestCase
 {
@@ -129,10 +129,10 @@ final class AliasResolverTest extends TestCase
      */
     private function resolverFor(array $entries): AliasResolver
     {
-        return new AliasResolver(new InMemoryStorage([
+        return new AliasResolver(EntryFixture::inMemoryStorage(
             Entry::fromArray(self::BASE, ['objectClass' => ['top', 'domain'], 'dc' => 'example']),
             ...$entries,
-        ]));
+        ));
     }
 
     private function target(): Entry

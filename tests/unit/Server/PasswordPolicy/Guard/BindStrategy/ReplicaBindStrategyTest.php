@@ -41,6 +41,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
 use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
 use Tests\Support\FreeDSx\Ldap\Server\Clock\RecordingSleeper;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class ReplicaBindStrategyTest extends TestCase
 {
@@ -64,10 +65,10 @@ final class ReplicaBindStrategyTest extends TestCase
     {
         // Both resolve from the memoised container, so the state store shares the storage holding the subject.
         $this->fromContainer(WriteEntryInterface::class)
-            ->store(new Entry(
+            ->store(EntryFixture::withUuid(new Entry(
                 new Dn(self::DN),
                 new Attribute('cn', 'foo'),
-            ));
+            )));
         $this->store = $this->fromContainer(ReplicaPasswordStateStoreInterface::class);
         $this->backend = $this->createMock(ReadBackendInterface::class);
         $this->context = new PasswordPolicyContext();

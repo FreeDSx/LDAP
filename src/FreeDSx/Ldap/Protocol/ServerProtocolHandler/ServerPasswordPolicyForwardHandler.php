@@ -24,7 +24,6 @@ use FreeDSx\Ldap\Operation\Response\ExtendedResponse;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
-use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
@@ -174,10 +173,9 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
         Entry $entry,
         string $uuid,
     ): bool {
-        $current = $entry->get(AttributeTypeOid::NAME_ENTRY_UUID)
-            ?->firstValue();
+        $current = $entry->getUuid();
 
-        return $current !== null && strtolower($current) === strtolower($uuid);
+        return $current !== null && $current === strtolower($uuid);
     }
 
     /**

@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS entries (
     entry_id      INTEGER PRIMARY KEY,
+    entry_uuid    TEXT NOT NULL,
     lc_dn         TEXT NOT NULL UNIQUE,
     dn            TEXT NOT NULL,
     lc_parent_dn  TEXT NOT NULL DEFAULT '',

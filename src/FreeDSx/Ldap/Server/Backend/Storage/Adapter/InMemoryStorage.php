@@ -15,6 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\MissingEntryUuidException;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\ArrayEntryStorageTrait;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Support\SortKeyComparator;
@@ -126,11 +127,15 @@ final class InMemoryStorage implements
         $this->store($entry);
     }
 
+    /**
+     * @throws MissingEntryUuidException when the entry carries no entryUUID, as the database adapters' column requires
+     */
     public function store(
         Entry $entry,
         bool $rebuildIndexes = false,
         LinkDelta $links = new LinkDelta(),
     ): void {
+        $entry->getUuidOrFail();
         $lcDn = $entry->getDn()->normalizedString();
 
         // Overwriting an entry keeps its key, matching the upsert the database adapters do.
