@@ -24,7 +24,6 @@ use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\Backend\Auth\NameResolver\BindNameResolverInterface;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordAuthenticator;
 use FreeDSx\Ldap\Server\Backend\Auth\PasswordPolicyAwareAuthenticator;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\StorageReadBackend;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
 use FreeDSx\Ldap\Server\Logging\EventLogger;
@@ -45,6 +44,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
 use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 /**
  * In-process integration of the real bind-enforcement stack against a writable backend.
@@ -647,7 +647,7 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
         Entry $user,
         PasswordPolicy $policy,
     ): PasswordPolicyAwareAuthenticator {
-        $container = $this->containerFor(new InMemoryStorage([
+        $container = $this->containerFor(EntryFixture::inMemoryStorage(
             Entry::fromArray(
                 'dc=foo,dc=bar',
                 [
@@ -656,7 +656,7 @@ final class PasswordPolicyBindEnforcementTest extends TestCase
                 ],
             ),
             $user,
-        ]));
+        ));
         $this->backend = $container->get(StorageReadBackend::class);
 
         $nameResolver = $container->get(BindNameResolverInterface::class);

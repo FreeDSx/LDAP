@@ -25,7 +25,6 @@ use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
@@ -43,6 +42,7 @@ use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Backend\Write\WriteHandlerTestTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class UpdateEntryHandlerTest extends TestCase
 {
@@ -403,12 +403,12 @@ final class UpdateEntryHandlerTest extends TestCase
 
     private function seedAdmins(string ...$members): void
     {
-        $this->storage->store(new Entry(
+        $this->storage->store(EntryFixture::withUuid(new Entry(
             new Dn(self::ADMINS),
             new Attribute('objectClass', 'groupOfNames'),
             new Attribute('cn', 'Admins'),
             new Attribute('member', 'cn=Bob,ou=People,dc=example,dc=com', ...$members),
-        ));
+        )));
     }
 
     private function modifyAdmins(Change ...$changes): void
@@ -439,7 +439,7 @@ final class UpdateEntryHandlerTest extends TestCase
     private function validatedGraph(SchemaValidationMode $mode): void
     {
         $this->writeGraph(
-            new InMemoryStorage([
+            EntryFixture::inMemoryStorage(
                 new Entry(
                     new Dn('dc=example,dc=com'),
                     new Attribute('dc', 'example'),
@@ -451,7 +451,7 @@ final class UpdateEntryHandlerTest extends TestCase
                     new Attribute('cn', 'Alice'),
                     new Attribute('sn', 'Smith'),
                 ),
-            ]),
+            ),
             TestServerOptions::validatedCore($mode),
         );
     }
@@ -462,7 +462,7 @@ final class UpdateEntryHandlerTest extends TestCase
 
         // Seeded directly so only the operations under test are journaled.
         $this->writeGraph(
-            new InMemoryStorage([new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))]),
+            EntryFixture::inMemoryStorage(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
             TestServerOptions::unvalidatedCore()
                 ->setChangeJournalConfig(new ChangeJournalConfig()),
             [ChangeJournalInterface::class => $journal],

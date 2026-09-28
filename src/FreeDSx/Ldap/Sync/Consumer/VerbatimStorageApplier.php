@@ -26,7 +26,6 @@ use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Session;
 
-use function strcasecmp;
 use function strtolower;
 
 /**
@@ -188,10 +187,9 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
             return true;
         }
 
-        $uuid = $entry->get(AttributeTypeOid::NAME_ENTRY_UUID)
-            ?->firstValue();
+        $uuid = $entry->getUuid();
 
-        return $uuid !== null && isset($this->presentUuids[strtolower($uuid)]);
+        return $uuid !== null && isset($this->presentUuids[$uuid]);
     }
 
     private function isHeldByAnotherEntry(
@@ -205,13 +203,10 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
                 linkCap: 0,
             ),
         );
-        $heldUuid = $held?->get(AttributeTypeOid::NAME_ENTRY_UUID)?->firstValue();
+        $heldUuid = $held?->getUuid();
 
         return $heldUuid !== null
-            && strcasecmp(
-                $heldUuid,
-                $uuid,
-            ) !== 0;
+            && $heldUuid !== strtolower($uuid);
     }
 
     /**

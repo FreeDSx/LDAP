@@ -242,9 +242,8 @@ final class StorageContainerProvider implements ContainerProviderInterface
         }
 
         return new InMemoryStorage(
-            $config->entries(),
-            $container->get(SortKeyComparator::class),
-            $container->get(LinkedAttributes::class),
+            sortKeyComparator: $container->get(SortKeyComparator::class),
+            linkedAttributes: $container->get(LinkedAttributes::class),
         );
     }
 

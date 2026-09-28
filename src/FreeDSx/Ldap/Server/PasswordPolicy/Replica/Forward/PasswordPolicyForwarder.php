@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward;
 use FreeDSx\Ldap\Exception\ForwardStateException;
 use FreeDSx\Ldap\Exception\ForwardStateRejectedException;
 use FreeDSx\Ldap\Operation\Request\ForwardPasswordPolicyStateRequest;
-use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Logging\ExceptionLogging;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaForwardState;
@@ -164,8 +163,7 @@ class PasswordPolicyForwarder
     {
         return $this->backend
             ->get($pending->dn)
-            ?->get(AttributeTypeOid::NAME_ENTRY_UUID)
-            ?->firstValue();
+            ?->getUuid();
     }
 
     private function requestFor(

@@ -23,7 +23,6 @@ use FreeDSx\Ldap\Entry\Rdn;
 use FreeDSx\Ldap\Exception\OperationException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Search\Filters;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeRecord;
@@ -37,6 +36,7 @@ use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Backend\Write\WriteHandlerTestTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class MoveEntryHandlerTest extends TestCase
 {
@@ -202,7 +202,7 @@ final class MoveEntryHandlerTest extends TestCase
     public function test_it_refuses_a_target_that_already_holds_subordinates(): void
     {
         // Seeded straight into storage: no write reaches this state, since one cannot land under a missing parent.
-        $this->writeGraph(new InMemoryStorage([
+        $this->writeGraph(EntryFixture::inMemoryStorage(
             new Entry(
                 new Dn('dc=example,dc=com'),
                 new Attribute('dc', 'example'),
@@ -212,7 +212,7 @@ final class MoveEntryHandlerTest extends TestCase
                 new Dn('cn=Orphan,ou=Staff,dc=example,dc=com'),
                 new Attribute('cn', 'Orphan'),
             ),
-        ]));
+        ));
         $this->addPeopleOu();
 
         self::expectException(OperationException::class);
@@ -242,7 +242,7 @@ final class MoveEntryHandlerTest extends TestCase
 
     public function test_it_refuses_a_target_dn_that_already_exists(): void
     {
-        $this->writeGraph(new InMemoryStorage([
+        $this->writeGraph(EntryFixture::inMemoryStorage(
             new Entry(
                 new Dn('dc=example,dc=com'),
                 new Attribute('dc', 'example'),
@@ -254,7 +254,7 @@ final class MoveEntryHandlerTest extends TestCase
                 new Attribute('cn', 'Alice'),
             ),
             new Entry(new Dn('cn=Alicia,dc=example,dc=com'), new Attribute('cn', 'Alicia')),
-        ]));
+        ));
 
         self::expectException(OperationException::class);
         self::expectExceptionCode(ResultCode::ENTRY_ALREADY_EXISTS);
@@ -369,7 +369,7 @@ final class MoveEntryHandlerTest extends TestCase
 
         // Seeded directly so only the operation under test is journaled.
         $this->writeGraph(
-            new InMemoryStorage([new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))]),
+            EntryFixture::inMemoryStorage(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
             TestServerOptions::unvalidatedCore()
                 ->setChangeJournalConfig(new ChangeJournalConfig()),
             [ChangeJournalInterface::class => $journal],

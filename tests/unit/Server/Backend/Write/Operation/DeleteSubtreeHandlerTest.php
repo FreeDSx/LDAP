@@ -35,6 +35,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Backend\Write\WriteHandlerTestTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class DeleteSubtreeHandlerTest extends TestCase
 {
@@ -59,12 +60,12 @@ final class DeleteSubtreeHandlerTest extends TestCase
 
     public function test_it_reaches_a_deeply_nested_subtree(): void
     {
-        $this->subtreeGraph(new InMemoryStorage([
+        $this->subtreeGraph(EntryFixture::inMemoryStorage(
             new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
             new Entry(new Dn('ou=people,dc=example,dc=com'), new Attribute('ou', 'people')),
             new Entry(new Dn('ou=staff,ou=people,dc=example,dc=com'), new Attribute('ou', 'staff')),
             new Entry(new Dn('cn=deep,ou=staff,ou=people,dc=example,dc=com'), new Attribute('cn', 'deep')),
-        ]));
+        ));
 
         $this->deleteSubtree('ou=people,dc=example,dc=com');
 
@@ -222,12 +223,12 @@ final class DeleteSubtreeHandlerTest extends TestCase
     {
         $this->accessControl = $this->createMock(AccessControlInterface::class);
         $this->writeGraph(
-            $storage ?? new InMemoryStorage([
+            $storage ?? EntryFixture::inMemoryStorage(
                 new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
                 new Entry(new Dn('ou=people,dc=example,dc=com'), new Attribute('ou', 'people')),
                 new Entry(new Dn('cn=alice,ou=people,dc=example,dc=com'), new Attribute('cn', 'alice')),
                 new Entry(new Dn('cn=bob,ou=people,dc=example,dc=com'), new Attribute('cn', 'bob')),
-            ]),
+            ),
             sharedInstances: [AccessControlInterface::class => $this->accessControl],
         );
     }
@@ -239,7 +240,7 @@ final class DeleteSubtreeHandlerTest extends TestCase
 
         // Seeded directly so only the operations under test are journaled.
         $this->writeGraph(
-            new InMemoryStorage([new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))]),
+            EntryFixture::inMemoryStorage(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
             TestServerOptions::unvalidatedCore()
                 ->setChangeJournalConfig(new ChangeJournalConfig()),
             [

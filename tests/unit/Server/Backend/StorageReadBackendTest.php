@@ -36,6 +36,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class StorageReadBackendTest extends TestCase
 {
@@ -68,11 +69,11 @@ final class StorageReadBackendTest extends TestCase
             new Attribute('cn', 'Bob'),
         );
 
-        $this->subject = $this->backendFor(new InMemoryStorage([
+        $this->subject = $this->backendFor(EntryFixture::inMemoryStorage(
             $this->base,
             $this->alice,
             $this->bob,
-        ]));
+        ));
     }
 
     public function test_get_returns_entry_by_dn(): void
@@ -217,7 +218,11 @@ final class StorageReadBackendTest extends TestCase
     public function test_search_trips_lookthrough_limit_when_examined_exceeds_cap(): void
     {
         $subject = $this->backendFor(
-            new InMemoryStorage([$this->base, $this->alice, $this->bob]),
+            EntryFixture::inMemoryStorage(
+                $this->base,
+                $this->alice,
+                $this->bob,
+            ),
             TestServerOptions::unvalidatedCore()
                 ->setMaxSearchLookthrough(2),
         );
@@ -234,7 +239,11 @@ final class StorageReadBackendTest extends TestCase
     public function test_search_does_not_trip_lookthrough_limit_within_cap(): void
     {
         $subject = $this->backendFor(
-            new InMemoryStorage([$this->base, $this->alice, $this->bob]),
+            EntryFixture::inMemoryStorage(
+                $this->base,
+                $this->alice,
+                $this->bob,
+            ),
             TestServerOptions::unvalidatedCore()
                 ->setMaxSearchLookthrough(100),
         );
@@ -663,7 +672,7 @@ final class StorageReadBackendTest extends TestCase
         return $this->fromContainer(
             StorageReadBackend::class,
             [
-                InMemoryStorage::class => new InMemoryStorage([$this->base]),
+                InMemoryStorage::class => EntryFixture::inMemoryStorage($this->base),
                 ListEntryInterface::class => $lister,
             ],
             $options,
@@ -672,7 +681,7 @@ final class StorageReadBackendTest extends TestCase
 
     private function aliasBackend(): StorageReadBackend
     {
-        return $this->backendFor(new InMemoryStorage([
+        return $this->backendFor(EntryFixture::inMemoryStorage(
             $this->base,
             $this->alice,
             new Entry(
@@ -680,7 +689,7 @@ final class StorageReadBackendTest extends TestCase
                 new Attribute('objectClass', 'alias'),
                 new Attribute('aliasedObjectName', 'cn=Alice,dc=example,dc=com'),
             ),
-        ]));
+        ));
     }
 
     /**

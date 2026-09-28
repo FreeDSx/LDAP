@@ -35,6 +35,7 @@ use FreeDSx\Ldap\Server\Backend\Write\WriteControlEvaluator;
 use FreeDSx\Ldap\Server\Token\AnonToken;
 use FreeDSx\Ldap\ServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 /**
  * Builds one object graph per test, so a handler and the backend that reads its result share their storage.
@@ -63,7 +64,7 @@ trait WriteHandlerTestTrait
         ?ServerOptions $options = null,
         array $sharedInstances = [],
     ): void {
-        $this->storage = $storage ?? new InMemoryStorage($this->fixture());
+        $this->storage = $storage ?? EntryFixture::inMemoryStorage(...$this->fixture());
         $this->graph = $this->containerFor(
             $this->storage,
             $options,

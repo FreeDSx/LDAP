@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Schema\Backlinks;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class LinkSpanReaderTest extends TestCase
 {
@@ -118,18 +119,18 @@ final class LinkSpanReaderTest extends TestCase
 
     private function seed(): void
     {
-        $this->storage->store(new Entry(
+        $this->storage->store(EntryFixture::withUuid(new Entry(
             new Dn(self::BASE),
             new Attribute('dc', 'example'),
-        ));
-        $this->storage->store(new Entry(
+        )));
+        $this->storage->store(EntryFixture::withUuid(new Entry(
             new Dn(self::MEMBER),
             new Attribute('cn', 'alice'),
-        ));
-        $this->storage->store(new Entry(
+        )));
+        $this->storage->store(EntryFixture::withUuid(new Entry(
             new Dn(self::GROUP),
             new Attribute('cn', 'admins'),
             new Attribute('member', self::MEMBER),
-        ));
+        )));
     }
 }

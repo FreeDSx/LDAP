@@ -36,6 +36,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Pdo\EntryLinkFixtureTrait;
 use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class EntryListerTest extends TestCase
 {
@@ -61,10 +62,10 @@ final class EntryListerTest extends TestCase
         $this->subject = $container->get(EntryLister::class);
         $this->storage = $container->get(EntryWriter::class);
 
-        $this->storage->store(new Entry(
-            new Dn(self::BASE),
+        $this->store(
+            self::BASE,
             new Attribute('dc', 'example'),
-        ));
+        );
     }
 
     /**
@@ -209,11 +210,11 @@ final class EntryListerTest extends TestCase
     public function test_a_substring_match_past_the_indexed_window_is_still_a_candidate(): void
     {
         [$subject, $storage] = $this->trigramIndexed();
-        $storage->store(new Entry(
+        $storage->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=late,dc=example,dc=com'),
             new Attribute('cn', 'late'),
             new Attribute('sn', str_repeat('x', 300) . 'needle'),
-        ));
+        )));
 
         self::assertSame(
             ['cn=late,dc=example,dc=com'],
@@ -227,16 +228,16 @@ final class EntryListerTest extends TestCase
     public function test_a_substring_inside_the_indexed_window_still_narrows(): void
     {
         [$subject, $storage] = $this->trigramIndexed();
-        $storage->store(new Entry(
+        $storage->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=hit,dc=example,dc=com'),
             new Attribute('cn', 'hit'),
             new Attribute('sn', 'haystack-needle'),
-        ));
-        $storage->store(new Entry(
+        )));
+        $storage->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=miss,dc=example,dc=com'),
             new Attribute('cn', 'miss'),
             new Attribute('sn', 'nothing-here'),
-        ));
+        )));
 
         self::assertSame(
             ['cn=hit,dc=example,dc=com'],
@@ -398,10 +399,10 @@ final class EntryListerTest extends TestCase
         string $dn,
         Attribute ...$attributes,
     ): void {
-        $this->storage->store(new Entry(
+        $this->storage->store(EntryFixture::withUuid(new Entry(
             new Dn($dn),
             ...$attributes,
-        ));
+        )));
     }
 
     private function matching(FilterInterface $filter): StorageListOptions
@@ -527,10 +528,10 @@ final class EntryListerTest extends TestCase
                 ->setSubstringIndexMode(SubstringIndexMode::Trigram),
         ));
         $storage = $container->get(EntryWriter::class);
-        $storage->store(new Entry(
+        $storage->store(EntryFixture::withUuid(new Entry(
             new Dn(self::BASE),
             new Attribute('dc', 'example'),
-        ));
+        )));
 
         return [
             $container->get(EntryLister::class),

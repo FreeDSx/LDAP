@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use Generator;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class DirectoryDumperTest extends TestCase
 {
@@ -260,7 +261,7 @@ final class DirectoryDumperTest extends TestCase
 
     private function storageWithEntries(): InMemoryStorage
     {
-        return new InMemoryStorage([
+        return EntryFixture::inMemoryStorage(
             new Entry(
                 new Dn('dc=foo,dc=bar'),
                 new Attribute('dc', 'foo'),
@@ -275,6 +276,6 @@ final class DirectoryDumperTest extends TestCase
                 new Attribute('cn', 'bob'),
                 new Attribute('sn', 'Builder'),
             ),
-        ]);
+        );
     }
 }

@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS entries (
     entry_id      BIGINT NOT NULL AUTO_INCREMENT,
+    entry_uuid    VARCHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
     lc_dn         VARBINARY(3072) NOT NULL,
     dn            VARBINARY(3072) NOT NULL,
     lc_parent_dn  VARBINARY(3072) NOT NULL DEFAULT '',

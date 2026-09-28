@@ -33,6 +33,7 @@ use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class Fts5SubstringIndexTest extends TestCase
 {
@@ -111,14 +112,14 @@ final class Fts5SubstringIndexTest extends TestCase
         );
         $writer = $container->get(WriteEntryInterface::class);
 
-        $writer->store(new Entry(
+        $writer->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=blacksmith,dc=example,dc=com'),
             new Attribute('cn', 'blacksmith'),
-        ));
-        $writer->store(new Entry(
+        )));
+        $writer->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=scatter,dc=example,dc=com'),
             new Attribute('cn', 'smi mit ith'),
-        ));
+        )));
 
         $stream = $container->get(ListEntryInterface::class)->list(new StorageListOptions(
             scope: new ListScope(

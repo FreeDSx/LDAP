@@ -26,6 +26,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Pdo\EntryLinkFixtureTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class EntryReaderTest extends TestCase
 {
@@ -269,7 +270,7 @@ final class EntryReaderTest extends TestCase
 
     private function store(string $dn): void
     {
-        $this->storage->store(new Entry(new Dn($dn)));
+        $this->storage->store(EntryFixture::withUuid(new Entry(new Dn($dn))));
     }
 
     private function groupOf(int $members): void
@@ -294,6 +295,9 @@ final class EntryReaderTest extends TestCase
         $values = [];
 
         foreach ($entry?->getAttributes() ?? [] as $attribute) {
+            if ($attribute->getName() !== 'member') {
+                continue;
+            }
             $values[$attribute->getDescription()] = array_values($attribute->getValues());
         }
 

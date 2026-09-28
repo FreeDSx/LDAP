@@ -30,6 +30,7 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 /**
  * What a write joins when it runs inside an atomic block, which no unit test can answer against a real database.
@@ -139,9 +140,9 @@ final class PdoTransactionTest extends TestCase
 
     private function storeNamed(string $cn): void
     {
-        $this->writer->store(new Entry(
+        $this->writer->store(EntryFixture::withUuid(new Entry(
             new Dn("cn={$cn},dc=example,dc=com"),
             new Attribute('cn', $cn),
-        ));
+        )));
     }
 }

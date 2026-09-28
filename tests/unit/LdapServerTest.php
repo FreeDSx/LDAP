@@ -180,7 +180,7 @@ class LdapServerTest extends TestCase
     public function test_run_does_not_throw_for_a_non_replica_on_unshared_storage_under_swoole(): void
     {
         $this->options
-            ->setStorageConfig(InMemoryStorageConfig::withEntries())
+            ->setStorageConfig(new InMemoryStorageConfig())
             ->setRunnerConfig(new RunnerConfig(RunnerMode::Swoole));
 
         $this->mockServerRunner
@@ -213,8 +213,8 @@ class LdapServerTest extends TestCase
     public static function nonPdoReplicaStorageDataProvider(): array
     {
         return [
-            'in-memory under pcntl' => [InMemoryStorageConfig::withEntries(), RunnerMode::Pcntl],
-            'in-memory under swoole' => [InMemoryStorageConfig::withEntries(), RunnerMode::Swoole],
+            'in-memory under pcntl' => [new InMemoryStorageConfig(), RunnerMode::Pcntl],
+            'in-memory under swoole' => [new InMemoryStorageConfig(), RunnerMode::Swoole],
         ];
     }
 
@@ -224,7 +224,7 @@ class LdapServerTest extends TestCase
     public static function unsharedStorageDataProvider(): array
     {
         return [
-            'in-memory' => [InMemoryStorageConfig::withEntries()],
+            'in-memory' => [new InMemoryStorageConfig()],
             // Keyed on the config rather than the backend: an in-memory database belongs to one connection.
             'sqlite in-memory' => [PdoConfig::forSqlite(':memory:')],
         ];

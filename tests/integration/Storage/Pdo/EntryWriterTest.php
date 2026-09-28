@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Container;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\MissingEntryUuidException;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filter\FilterInterface;
@@ -46,6 +47,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Pdo\EntryLinkFixtureTrait;
 use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 
 final class EntryWriterTest extends TestCase
@@ -89,30 +91,78 @@ final class EntryWriterTest extends TestCase
     {
         $this->expectException(PartialValuesException::class);
 
-        $this->subject->store(new Entry(
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=Admins,dc=example,dc=com'),
             new Attribute('member;range=0-2', 'cn=Bob,dc=example,dc=com'),
-        ));
+        )));
     }
 
     public function test_store_persists_the_entry(): void
     {
-        $this->subject->store(new Entry(
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=Persistent,dc=example,dc=com'),
             new Attribute('cn', 'Persistent'),
-        ));
+        )));
 
         self::assertNotNull($this->reader->find(new Dn('cn=persistent,dc=example,dc=com')));
     }
 
     public function test_insert_persists_the_entry(): void
     {
-        $this->subject->insert(new Entry(
+        $this->subject->insert(EntryFixture::withUuid(new Entry(
             new Dn('cn=Fresh,dc=example,dc=com'),
             new Attribute('cn', 'Fresh'),
-        ));
+        )));
 
         self::assertNotNull($this->reader->find(new Dn('cn=fresh,dc=example,dc=com')));
+    }
+
+    public function test_store_refuses_an_entry_without_an_entry_uuid(): void
+    {
+        $this->expectException(MissingEntryUuidException::class);
+
+        $this->subject->store(new Entry(
+            new Dn(self::ALICE),
+            new Attribute('cn', 'Alice'),
+        ));
+    }
+
+    public function test_insert_refuses_an_entry_without_an_entry_uuid(): void
+    {
+        $this->expectException(MissingEntryUuidException::class);
+
+        $this->subject->insert(new Entry(
+            new Dn(self::ALICE),
+            new Attribute('cn', 'Alice'),
+        ));
+    }
+
+    public function test_insert_keeps_the_entry_uuid_lowercased_in_its_own_column(): void
+    {
+        $this->subject->insert(new Entry(
+            new Dn(self::ALICE),
+            new Attribute('cn', 'Alice'),
+            new Attribute('entryUUID', 'A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D'),
+        ));
+
+        self::assertSame(
+            'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+            $this->entryUuidColumnOf(self::ALICE),
+        );
+    }
+
+    public function test_store_keeps_the_entry_uuid_lowercased_in_its_own_column(): void
+    {
+        $this->subject->store(new Entry(
+            new Dn(self::ALICE),
+            new Attribute('cn', 'Alice'),
+            new Attribute('entryUUID', 'A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D'),
+        ));
+
+        self::assertSame(
+            'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+            $this->entryUuidColumnOf(self::ALICE),
+        );
     }
 
     public function test_insert_refuses_a_dn_that_is_taken(): void
@@ -121,10 +171,10 @@ final class EntryWriterTest extends TestCase
 
         $this->expectException(EntryAlreadyExistsException::class);
 
-        $this->subject->insert(new Entry(
+        $this->subject->insert(EntryFixture::withUuid(new Entry(
             new Dn(self::ALICE),
             new Attribute('cn', 'Alice'),
-        ));
+        )));
     }
 
     public function test_insert_leaves_the_entry_it_refused_untouched(): void
@@ -132,11 +182,11 @@ final class EntryWriterTest extends TestCase
         $this->storeNamed('Alice');
 
         try {
-            $this->subject->insert(new Entry(
+            $this->subject->insert(EntryFixture::withUuid(new Entry(
                 new Dn(self::ALICE),
                 new Attribute('cn', 'Alice'),
                 new Attribute('description', 'overwritten'),
-            ));
+            )));
         } catch (EntryAlreadyExistsException) {
             // Expected, since the DN is taken.
         }
@@ -214,31 +264,31 @@ final class EntryWriterTest extends TestCase
         $this->expectExceptionCode(ResultCode::ADMIN_LIMIT_EXCEEDED);
         $this->expectExceptionMessage('exceeds the storage backend limit');
 
-        $subject->store(new Entry(
+        $subject->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=VeryLongNameThatExceedsTheLimit,dc=example,dc=com'),
             new Attribute('cn', 'VeryLongNameThatExceedsTheLimit'),
-        ));
+        )));
     }
 
     public function test_a_long_dn_is_stored_when_the_dialect_has_no_length_limit(): void
     {
         $longDn = 'cn=' . str_repeat('a', 500) . ',dc=example,dc=com';
 
-        $this->subject->store(new Entry(
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             new Dn($longDn),
             new Attribute('cn', str_repeat('a', 500)),
-        ));
+        )));
 
         self::assertNotNull($this->reader->find(new Dn($longDn)));
     }
 
     public function test_an_attribute_wider_than_one_statement_writes_every_index_row(): void
     {
-        $this->subject->store(new Entry(
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=wide,dc=example,dc=com'),
             new Attribute('cn', 'wide'),
             new Attribute('description', ...$this->values('wide value', 1000)),
-        ));
+        )));
 
         self::assertSame(
             200,
@@ -291,20 +341,20 @@ final class EntryWriterTest extends TestCase
     {
         $dn = new Dn('cn=stable,dc=example,dc=com');
         $values = $this->values('stable value', 300);
-        $this->subject->store(new Entry(
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             $dn,
             new Attribute('cn', 'stable'),
             new Attribute('title', 'before'),
             new Attribute('description', ...$values),
-        ));
+        )));
         $this->pdo->prepared = [];
 
-        $this->subject->store(new Entry(
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             $dn,
             new Attribute('cn', 'stable'),
             new Attribute('title', 'after'),
             new Attribute('description', ...$values),
-        ));
+        )));
 
         self::assertSame(
             1,
@@ -339,19 +389,19 @@ final class EntryWriterTest extends TestCase
     public function test_a_modified_value_stops_matching_its_old_value_and_starts_matching_the_new(): void
     {
         $dn = new Dn('cn=drift,dc=example,dc=com');
-        $this->subject->store(new Entry(
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             $dn,
             new Attribute('cn', 'drift'),
             new Attribute('sn', 'before'),
             new Attribute('description', 'untouched'),
-        ));
+        )));
 
-        $this->subject->store(new Entry(
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             $dn,
             new Attribute('cn', 'drift'),
             new Attribute('sn', 'after'),
             new Attribute('description', 'untouched'),
-        ));
+        )));
 
         self::assertSame(
             [],
@@ -371,16 +421,16 @@ final class EntryWriterTest extends TestCase
     public function test_a_removed_attribute_stops_matching_after_a_modify(): void
     {
         $dn = new Dn('cn=shrink,dc=example,dc=com');
-        $this->subject->store(new Entry(
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             $dn,
             new Attribute('cn', 'shrink'),
             new Attribute('sn', 'gone'),
-        ));
+        )));
 
-        $this->subject->store(new Entry(
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             $dn,
             new Attribute('cn', 'shrink'),
-        ));
+        )));
 
         self::assertSame(
             [],
@@ -395,19 +445,19 @@ final class EntryWriterTest extends TestCase
     public function test_an_update_reindexes_a_base_form_an_option_bearing_form_shares_a_name_with(): void
     {
         $dn = new Dn('cn=subtyped,dc=example,dc=com');
-        $this->subject->store(new Entry(
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             $dn,
             new Attribute('cn', 'subtyped'),
             new Attribute('mail', 'base@example.com'),
             new Attribute('mail;lang-en', 'tagged@example.com'),
-        ));
+        )));
 
-        $this->subject->store(new Entry(
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             $dn,
             new Attribute('cn', 'subtyped'),
             new Attribute('mail', 'replaced@example.com'),
             new Attribute('mail;lang-en', 'tagged@example.com'),
-        ));
+        )));
 
         self::assertSame(
             ['cn=subtyped,dc=example,dc=com'],
@@ -427,10 +477,10 @@ final class EntryWriterTest extends TestCase
     {
         [$subject, $pdo] = $this->indexedWith(SubstringIndexMode::Trigram);
 
-        $subject->store(new Entry(
+        $subject->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=Smith,dc=example,dc=com'),
             new Attribute('cn', 'Smith'),
-        ));
+        )));
 
         self::assertSame(
             1,
@@ -469,15 +519,8 @@ final class EntryWriterTest extends TestCase
 
     public function test_a_linked_value_is_kept_only_as_a_link(): void
     {
-        $this->subject->store(new Entry(
-            new Dn('cn=Alice,dc=example,dc=com'),
-            new Attribute('cn', 'Alice'),
-        ));
-        $this->subject->store(new Entry(
-            new Dn('cn=Admins,dc=example,dc=com'),
-            new Attribute('cn', 'Admins'),
-            new Attribute('member', 'cn=Alice,dc=example,dc=com'),
-        ));
+        $this->storeNamed('Alice');
+        $this->storeAdminsNaming('cn=Alice,dc=example,dc=com');
 
         self::assertSame(
             1,
@@ -507,15 +550,12 @@ final class EntryWriterTest extends TestCase
         string $asserted,
     ): void {
         // A value naming an entry is kept as a reference to it, which only a stored entry can be.
-        $this->subject->store(new Entry(
-            new Dn('cn=Alice,dc=example,dc=com'),
-            new Attribute('cn', 'Alice'),
-        ));
-        $this->subject->store(new Entry(
+        $this->storeNamed('Alice');
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=spelling,dc=example,dc=com'),
             new Attribute('cn', 'spelling'),
             new Attribute($attribute, $stored),
-        ));
+        )));
 
         self::assertContains(
             'cn=spelling,dc=example,dc=com',
@@ -567,11 +607,11 @@ final class EntryWriterTest extends TestCase
             [PdoConnectionProviderInterface::class => new SharedPdoConnectionProvider($pdo)],
         );
 
-        $container->get(EntryWriter::class)->store(new Entry(
+        $container->get(EntryWriter::class)->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=stamped,dc=example,dc=com'),
             new Attribute('cn', 'stamped'),
             new Attribute('pwdChangedTime', '20260101070000-0500'),
-        ));
+        )));
 
         self::assertSame(
             ['cn=stamped,dc=example,dc=com'],
@@ -690,10 +730,10 @@ final class EntryWriterTest extends TestCase
     {
         $this->storeAdminsNaming('cn=Ghost,dc=example,dc=com');
 
-        $this->subject->insert(new Entry(
+        $this->subject->insert(EntryFixture::withUuid(new Entry(
             new Dn('cn=Ghost,dc=example,dc=com'),
             new Attribute('cn', 'Ghost'),
-        ));
+        )));
 
         self::assertSame(
             ['cn=Ghost,dc=example,dc=com'],
@@ -764,7 +804,7 @@ final class EntryWriterTest extends TestCase
         );
         $writer = $container->get(EntryWriter::class);
 
-        foreach ($entries as $entry) {
+        foreach (EntryFixture::allWithUuid(...$entries) as $entry) {
             $writer->store($entry);
         }
 
@@ -776,7 +816,7 @@ final class EntryWriterTest extends TestCase
         $group = $this->admins();
         $group->set('member', ...$members);
 
-        $this->subject->store($group);
+        $this->subject->store(EntryFixture::withUuid($group));
     }
 
     /**
@@ -784,10 +824,10 @@ final class EntryWriterTest extends TestCase
      */
     private function admins(): Entry
     {
-        return new Entry(
+        return EntryFixture::withUuid(new Entry(
             new Dn('cn=Admins,dc=example,dc=com'),
             new Attribute('cn', 'Admins'),
-        );
+        ));
     }
 
     /**
@@ -807,10 +847,10 @@ final class EntryWriterTest extends TestCase
     private function storeNamed(string $cn): Dn
     {
         $dn = new Dn("cn={$cn},dc=example,dc=com");
-        $this->subject->store(new Entry(
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             $dn,
             new Attribute('cn', $cn),
-        ));
+        )));
 
         return $dn->normalize();
     }
@@ -819,11 +859,11 @@ final class EntryWriterTest extends TestCase
         string $cn,
         string ...$descriptions,
     ): void {
-        $this->subject->store(new Entry(
+        $this->subject->store(EntryFixture::withUuid(new Entry(
             new Dn("cn={$cn},dc=example,dc=com"),
             new Attribute('cn', $cn),
             new Attribute('description', ...$descriptions),
-        ));
+        )));
     }
 
     /**
@@ -915,11 +955,11 @@ final class EntryWriterTest extends TestCase
     private function originalValuesFor(SubstringIndexMode $mode): array
     {
         [$subject, $pdo] = $this->indexedWith($mode);
-        $subject->store(new Entry(
+        $subject->store(EntryFixture::withUuid(new Entry(
             new Dn('cn=Smith,dc=example,dc=com'),
             new Attribute('cn', 'Smith'),
             new Attribute('description', 'Not an indexed attribute'),
-        ));
+        )));
 
         $rows = $pdo->query(
             "SELECT attr_name_lower, value_original FROM entry_attribute_values
@@ -937,6 +977,15 @@ final class EntryWriterTest extends TestCase
         ksort($found);
 
         return $found;
+    }
+
+    private function entryUuidColumnOf(string $dn): mixed
+    {
+        $statement = $this->pdo->prepare('SELECT entry_uuid FROM entries WHERE lc_dn = ?');
+        self::assertNotFalse($statement);
+        $statement->execute([(new Dn($dn))->normalizedString()]);
+
+        return $statement->fetchColumn();
     }
 
     private function intQuery(

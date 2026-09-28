@@ -550,6 +550,6 @@ final class LdapServerCommand extends Command
             return PdoConfig::forMysql($dsn, $user, $password);
         }
 
-        return InMemoryStorageConfig::withEntries();
+        return new InMemoryStorageConfig();
     }
 }

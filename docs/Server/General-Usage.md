@@ -94,8 +94,8 @@ $server->run();
 
 Clients bind as `cn=admin,dc=example,dc=com` with password `secret`. No further configuration needed.
 
-For a transient server that should leave nothing behind, swap in `InMemoryStorageConfig::withEntries()` and the Swoole
-runner. See [InMemoryStorage](#inmemorystorage).
+For a transient server that should leave nothing behind, swap in `new InMemoryStorageConfig()` and the Swoole runner,
+and seed it the same way. See [InMemoryStorage](#inmemorystorage).
 
 ---
 
@@ -352,7 +352,7 @@ Three storage backends are included, each selected via a config object passed to
 
 - **SQLite** (`PdoConfig::forSqlite()`): recommended for most deployments. It is the most optimized backend and gives durable persistence with concurrent access.
 - **MySQL** (`PdoConfig::forMysql()`): durable persistence backed by a shared MySQL/MariaDB server.
-- **InMemoryStorage** (`InMemoryStorageConfig::withEntries()`): non-persistent, for transient servers under the Swoole runner.
+- **InMemoryStorage** (`new InMemoryStorageConfig()`): non-persistent, for transient servers under the Swoole runner.
 
 #### InMemoryStorage
 
@@ -363,9 +363,9 @@ The forking runner gives each connection its own copy of the store at fork time,
 be invisible to the rest and lost when it closes. That pairing is refused at startup. Use a SQLite or MySQL `PdoConfig`
 under the forking runner.
 
+It starts empty and is seeded like any other storage, here with `seedEntries()` for entries built in code.
+
 ```php
-use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\LdapServer;
 use FreeDSx\Ldap\Server\Config\RunnerConfig;
@@ -374,16 +374,23 @@ use FreeDSx\Ldap\ServerOptions;
 
 $passwordHash = '{SHA}' . base64_encode(sha1('secret', true));
 
-$options = (new ServerOptions(InMemoryStorageConfig::withEntries([
-    new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example')),
-    new Entry(
-        new Dn('cn=admin,dc=example,dc=com'),
-        new Attribute('cn', 'admin'),
-        new Attribute('userPassword', $passwordHash),
-    ),
-])))->setRunnerConfig(RunnerConfig::forSwoole());
+$server = new LdapServer(
+    (new ServerOptions(new InMemoryStorageConfig()))->setRunnerConfig(RunnerConfig::forSwoole()),
+);
 
-$server = new LdapServer($options);
+$server->seedEntries([
+    Entry::fromArray('dc=example,dc=com', [
+        'objectClass' => 'domain',
+        'dc' => 'example',
+    ]),
+    Entry::fromArray('cn=admin,dc=example,dc=com', [
+        'objectClass' => 'person',
+        'cn' => 'admin',
+        'sn' => 'admin',
+        'userPassword' => $passwordHash,
+    ]),
+]);
+
 $server->run();
 ```
 

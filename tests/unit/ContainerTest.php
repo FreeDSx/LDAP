@@ -109,7 +109,7 @@ class ContainerTest extends TestCase
     public function test_every_storage_contract_resolves_to_one_in_memory_store(): void
     {
         $container = Container::forServer(
-            new ServerOptions(InMemoryStorageConfig::withEntries()),
+            new ServerOptions(new InMemoryStorageConfig()),
         );
         $storage = $container->get(InMemoryStorage::class);
 
@@ -223,7 +223,7 @@ class ContainerTest extends TestCase
     public function test_a_reload_keeps_the_change_journal_so_in_memory_records_survive(): void
     {
         $container = Container::forServer(
-            (new ServerOptions(InMemoryStorageConfig::withEntries()))
+            (new ServerOptions(new InMemoryStorageConfig()))
                 ->setChangeJournalConfig(new ChangeJournalConfig()),
         );
 
@@ -235,7 +235,7 @@ class ContainerTest extends TestCase
 
     public function test_a_reload_carries_no_change_journal_when_journaling_is_off(): void
     {
-        $container = Container::forServer(new ServerOptions(InMemoryStorageConfig::withEntries()));
+        $container = Container::forServer(new ServerOptions(new InMemoryStorageConfig()));
 
         self::assertArrayNotHasKey(
             ChangeJournalInterface::class,
@@ -258,7 +258,7 @@ class ContainerTest extends TestCase
     public function test_a_fork_resets_nothing_for_in_memory_storage(): void
     {
         $container = Container::forServer(
-            new ServerOptions(InMemoryStorageConfig::withEntries()),
+            new ServerOptions(new InMemoryStorageConfig()),
         );
 
         self::assertInstanceOf(

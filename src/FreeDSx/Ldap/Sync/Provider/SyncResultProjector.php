@@ -21,7 +21,6 @@ use FreeDSx\Ldap\Exception\InvalidArgumentException;
 use FreeDSx\Ldap\Operation\Request\SearchRequest;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\AttributeProjection;
-use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Schema\Schema;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Search\Filter\FilterAttributes;
@@ -184,9 +183,9 @@ final readonly class SyncResultProjector
         int $state = SyncStateControl::STATE_ADD,
     ): ?SyncResult {
         // Read before projecting: the UUID keys the entry for the consumer, but a selection may exclude it.
-        $uuid = $entry->get(AttributeTypeOid::NAME_ENTRY_UUID)?->firstValue();
+        $uuid = $entry->getUuid();
 
-        if ($uuid === null || $uuid === '') {
+        if ($uuid === null) {
             return null;
         }
 

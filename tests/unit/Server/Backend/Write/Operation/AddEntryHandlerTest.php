@@ -41,6 +41,7 @@ use FreeDSx\Ldap\ServerOptions;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Backend\Write\WriteHandlerTestTrait;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class AddEntryHandlerTest extends TestCase
 {
@@ -160,7 +161,7 @@ final class AddEntryHandlerTest extends TestCase
         self::expectExceptionCode(ResultCode::ENTRY_ALREADY_EXISTS);
 
         $this->adds()->handle(
-            new AddCommand($this->alice),
+            new AddCommand($this->anotherAlice()),
             $this->controlledContext(Controls::assertion(Filters::equal('cn', 'Other'))),
         );
     }
@@ -171,7 +172,7 @@ final class AddEntryHandlerTest extends TestCase
         self::expectExceptionCode(ResultCode::ENTRY_ALREADY_EXISTS);
 
         $this->adds()->handle(
-            new AddCommand($this->alice),
+            new AddCommand($this->anotherAlice()),
             $this->context(),
         );
     }
@@ -629,7 +630,7 @@ final class AddEntryHandlerTest extends TestCase
     {
         $journal = new InMemoryChangeJournal();
         $this->writeGraph(
-            new InMemoryStorage([new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))]),
+            EntryFixture::inMemoryStorage(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
             sharedInstances: [ChangeJournalInterface::class => $journal],
         );
 
@@ -658,7 +659,7 @@ final class AddEntryHandlerTest extends TestCase
     private function validatedGraph(SchemaValidationMode $mode): void
     {
         $this->writeGraph(
-            new InMemoryStorage([$this->base]),
+            EntryFixture::inMemoryStorage($this->base),
             TestServerOptions::validatedCore($mode),
         );
     }
@@ -669,13 +670,22 @@ final class AddEntryHandlerTest extends TestCase
 
         // Seeded directly so only the operation under test is journaled.
         $this->writeGraph(
-            new InMemoryStorage([new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))]),
+            EntryFixture::inMemoryStorage(new Entry(new Dn('dc=example,dc=com'), new Attribute('dc', 'example'))),
             TestServerOptions::unvalidatedCore()
                 ->setChangeJournalConfig(new ChangeJournalConfig()),
             [ChangeJournalInterface::class => $journal],
         );
 
         return $journal;
+    }
+
+    private function anotherAlice(): Entry
+    {
+        return new Entry(
+            new Dn('cn=Alice,dc=example,dc=com'),
+            new Attribute('objectClass', 'person'),
+            new Attribute('cn', 'Alice'),
+        );
     }
 
     private function badSyntaxEntry(): Entry

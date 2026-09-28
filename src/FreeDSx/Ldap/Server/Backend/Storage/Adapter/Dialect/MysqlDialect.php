@@ -127,9 +127,10 @@ final class MysqlDialect implements PdoDialectInterface
     public function queryUpsert(): string
     {
         return <<<SQL
-            INSERT INTO entries (lc_dn, dn, lc_parent_dn, attributes)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO entries (entry_uuid, lc_dn, dn, lc_parent_dn, attributes)
+            VALUES (?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
+                entry_uuid = VALUES(entry_uuid),
                 dn = VALUES(dn),
                 lc_parent_dn = VALUES(lc_parent_dn),
                 attributes = VALUES(attributes)
