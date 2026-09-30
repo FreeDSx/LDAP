@@ -48,15 +48,12 @@ readonly class AddEntryHandler
         AddCommand $command,
         WriteContext $context,
     ): void {
-        $bulkLoad = $context->bulkLoadOptions();
-
         $this->writes->add(
             $context,
             fn(): Entry => $this->prepared(
                 $command,
                 $context,
             ),
-            replaceExisting: $bulkLoad !== null && $bulkLoad->replaceExisting,
         );
     }
 
@@ -111,7 +108,6 @@ readonly class AddEntryHandler
             $entry,
             $entry->getDn()->normalize(),
             $context->isSystem(),
-            $bulkLoad !== null && $bulkLoad->replaceExisting,
         );
 
         // A bulk load keeps the operational attributes its source supplied.

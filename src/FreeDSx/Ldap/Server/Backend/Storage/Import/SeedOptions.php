@@ -30,7 +30,7 @@ final class SeedOptions
         private Dn $creatorDn = new Dn(''),
         private bool $ignoreValidation = false,
         private LdifUrlResolverInterface $urlResolver = new RefusingUrlResolver(),
-        private bool $replaceExisting = false,
+        private bool $skipExisting = false,
     ) {}
 
     public function getCreatorDn(): Dn
@@ -63,20 +63,17 @@ final class SeedOptions
         return $this;
     }
 
-    public function isReplaceExisting(): bool
+    public function isSkipExisting(): bool
     {
-        return $this->replaceExisting;
+        return $this->skipExisting;
     }
 
     /**
-     * Overwrites an entry already at the same DN, rather than refusing the seed with entryAlreadyExists.
-     *
-     * Supply entryUUID for every entry replaced. An omitted one is generated fresh, which reads as a delete
-     * and an add to anything keyed on it.
+     * Leaves an entry already at the same DN untouched, rather than refusing the seed with entryAlreadyExists.
      */
-    public function setReplaceExisting(bool $replaceExisting): self
+    public function setSkipExisting(bool $skipExisting): self
     {
-        $this->replaceExisting = $replaceExisting;
+        $this->skipExisting = $skipExisting;
 
         return $this;
     }

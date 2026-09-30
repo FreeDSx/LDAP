@@ -35,7 +35,7 @@ enum ServerEvent: string
     case EntryModified                  = 'entry.modified';
     case EntryDeleted                   = 'entry.deleted';
     case EntryRenamed                   = 'entry.renamed';
-    case EntryReplaced                  = 'entry.replaced';
+    case EntrySkipped                   = 'entry.skipped';
     case BulkImportCompleted            = 'import.completed';
     case BulkImportFailed               = 'import.failed';
     case SearchAuthorized               = 'search.authorized';

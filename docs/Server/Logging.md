@@ -47,8 +47,8 @@ $server = new LdapServer((new ServerOptions($storageConfig))->setLogger($logger)
 | `schema.violation`          | on      | notice | Add/Modify violates the schema (rejected, or allowed under Lenient mode / the Relax control) |
 | `session.disconnect_notice` | on      | notice | Server sends an unsolicited Notice of Disconnect          |
 | `paging.session_evicted`    | on      | notice | A connection hit `setMaxPagingSessions`, so its least recently started paged search was discarded |
-| `entry.replaced`            | on      | info   | While seeding, an entry already at that DN was overwritten |
-| `import.completed`          | on      | info   | Seeding committed, carrying the entries added and replaced |
+| `entry.skipped`             | on      | info   | While seeding with `setSkipExisting()`, an entry already at that DN was left untouched |
+| `import.completed`          | on      | info   | Seeding committed, carrying the entries added and skipped |
 | `import.failed`             | on      | warning | Seeding was rolled back, carrying how far it got          |
 | `entry.added`               | off     | info   | Add succeeds (audit-trail)                                |
 | `entry.modified`            | off     | info   | Modify succeeds (audit-trail)                             |
@@ -76,7 +76,7 @@ Every event carries a structured `context` array with a stable shape:
 | `reason`                                                   | failure events, `starttls.buffer_discarded`                        | Human-readable diagnostic. Taken from the exception on failure events.                             |
 | `validation_mode`                                          | `schema.violation`                                                 | How it was handled: `strict` (rejected), `lenient` (allowed by policy), or `relaxed` (Relax control). |
 | `mechanism`, `version`                                     | bind events                                                        | SASL mechanism name (or `simple`) and LDAP protocol version.                                       |
-| `entries_added`, `entries_replaced`                        | `import.completed`, `import.failed`                                | Counts for the batch. On a failure they say how far it got before the rollback.                    |
+| `entries_added`, `entries_skipped`                         | `import.completed`, `import.failed`                                | Counts for the batch. On a failure they say how far it got before the rollback.                    |
 | `match`, `attribute`                                       | compare events                                                     | Match outcome + attribute compared.                                                                |
 | `entries_returned`                                         | search events                                                      | Count of entries delivered to the client.                                                          |
 | `base_dn`, `scope`                                         | search events                                                      | Inside `target`.                                                                                   |

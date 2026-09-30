@@ -28,7 +28,6 @@ final readonly class BulkLoadOptions
      */
     public function __construct(
         public Dn $actorDn = new Dn(''),
-        public bool $replaceExisting = false,
         public bool $ignoreValidation = false,
     ) {}
 }

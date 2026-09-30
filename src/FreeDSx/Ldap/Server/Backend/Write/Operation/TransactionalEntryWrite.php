@@ -44,26 +44,17 @@ final readonly class TransactionalEntryWrite
      * Opens the transaction the entry is built and added in.
      *
      * @param Closure(): Entry $produce Runs inside the transaction, so a reissued attempt builds the entry again.
-     * @param bool $replaceExisting Overwrite an entry already at the DN rather than refusing it.
      *
      * @throws OperationException
      */
     public function add(
         WriteContext $context,
         Closure $produce,
-        bool $replaceExisting = false,
     ): Entry {
-        return $this->transaction->atomic(function () use ($produce, $context, $replaceExisting): Entry {
+        return $this->transaction->atomic(function () use ($produce, $context): Entry {
             $entry = $produce();
 
-            if ($replaceExisting) {
-                $this->writes->store(
-                    $entry,
-                    rebuildIndexes: true,
-                );
-            } else {
-                $this->writes->insert($entry);
-            }
+            $this->writes->insert($entry);
             $this->resolved($entry, $context);
 
             // Journaled within the same transaction, so a record can never outlive the write it describes.
