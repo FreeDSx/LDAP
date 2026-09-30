@@ -37,7 +37,7 @@ use FreeDSx\Ldap\Protocol\Queue\ServerQueue;
 use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
-use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
@@ -63,7 +63,7 @@ final class SyncPersistStreamerTest extends TestCase
 
     private ServerQueue&MockObject $queue;
 
-    private ReadBackendInterface&MockObject $backend;
+    private ReadEntryInterface&MockObject $entries;
 
     private TokenInterface&MockObject $token;
 
@@ -112,10 +112,10 @@ final class SyncPersistStreamerTest extends TestCase
             ->method('peekForCancelSignal')
             ->willReturnCallback(fn(): ?LdapMessageRequest => array_shift($this->cancelSignals));
 
-        $this->backend = $this->createMock(ReadBackendInterface::class);
-        $this->backend
-            ->method('get')
-            ->willReturnCallback(fn(Dn $dn): ?Entry => $this->liveEntries[$dn->toString()] ?? null);
+        $this->entries = $this->createMock(ReadEntryInterface::class);
+        $this->entries
+            ->method('findByUuid')
+            ->willReturnCallback(fn(string $uuid): ?Entry => $this->liveEntryHolding($uuid));
 
         $accessControl = $this->createMock(AccessControlInterface::class);
         $accessControl
@@ -127,7 +127,7 @@ final class SyncPersistStreamerTest extends TestCase
             ->willReturn(true);
 
         $this->subject = new SyncPersistStreamer(
-            backend: $this->backend,
+            entries: $this->entries,
             projector: new SyncResultProjector(
                 accessControl: $accessControl,
                 filterEvaluator: $filterEvaluator,
@@ -218,7 +218,7 @@ final class SyncPersistStreamerTest extends TestCase
             ->willReturn(new ReplicaId(self::ORIGIN));
 
         $subject = new SyncPersistStreamer(
-            backend: $this->backend,
+            entries: $this->entries,
             projector: new SyncResultProjector(
                 accessControl: $this->createMock(AccessControlInterface::class),
                 filterEvaluator: $this->createMock(FilterEvaluatorInterface::class),
@@ -295,6 +295,17 @@ final class SyncPersistStreamerTest extends TestCase
             entryUuid: self::ENTRY_UUID,
             authzId: AuthzId::anonymous(),
         ));
+    }
+
+    private function liveEntryHolding(string $uuid): ?Entry
+    {
+        foreach ($this->liveEntries as $entry) {
+            if ($entry->getUuid() === strtolower($uuid)) {
+                return $entry;
+            }
+        }
+
+        return null;
     }
 
     private function entry(): Entry

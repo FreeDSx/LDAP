@@ -37,6 +37,7 @@ use FreeDSx\Ldap\Schema\SchemaResource;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\EntryStream;
 use FreeDSx\Ldap\Server\Backend\Storage\FetchedBatch;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
@@ -69,6 +70,8 @@ final class ServerSyncHandlerTest extends TestCase
     private ServerQueue&MockObject $queue;
 
     private ReadBackendInterface&MockObject $backend;
+
+    private ReadEntryInterface&MockObject $entries;
 
     private FilterEvaluatorInterface&MockObject $filterEvaluator;
 
@@ -104,7 +107,7 @@ final class ServerSyncHandlerTest extends TestCase
     private bool $filterMatches = true;
 
     /**
-     * @var array<string, Entry> live entries returned by backend::get(), keyed by DN
+     * @var array<string, Entry> live entries the change stream reads back by entryUUID, keyed by DN
      */
     private array $liveEntries = [];
 
@@ -117,6 +120,7 @@ final class ServerSyncHandlerTest extends TestCase
     {
         $this->queue = $this->createMock(ServerQueue::class);
         $this->backend = $this->createMock(ReadBackendInterface::class);
+        $this->entries = $this->createMock(ReadEntryInterface::class);
         $this->filterEvaluator = $this->createMock(FilterEvaluatorInterface::class);
         $this->accessControl = $this->createMock(AccessControlInterface::class);
         $this->token = $this->createMock(TokenInterface::class);
@@ -135,9 +139,9 @@ final class ServerSyncHandlerTest extends TestCase
         $this->backend
             ->method('search')
             ->willReturnCallback(fn(): EntryStream => EntryStream::of($this->stream(...$this->searchEntries)));
-        $this->backend
-            ->method('get')
-            ->willReturnCallback(fn(Dn $dn): ?Entry => $this->liveEntries[$dn->toString()] ?? null);
+        $this->entries
+            ->method('findByUuid')
+            ->willReturnCallback(fn(string $uuid): ?Entry => $this->liveEntryHolding($uuid));
         $this->queue
             ->method('sendMessages')
             ->willReturnCallback(function (iterable $messages): ServerQueue {
@@ -162,7 +166,7 @@ final class ServerSyncHandlerTest extends TestCase
             schema: SchemaResource::Core->load(),
         );
         $this->persistStreamer = new SyncPersistStreamer(
-            backend: $this->backend,
+            entries: $this->entries,
             projector: $this->syncProjector,
             stream: $this->changeStream,
             sleeper: new BlockingSleeper(),
@@ -366,10 +370,53 @@ final class ServerSyncHandlerTest extends TestCase
         );
     }
 
+    public function test_a_changed_entry_renamed_since_the_change_is_sent_from_where_it_lives(): void
+    {
+        $this->append(ChangeType::Modify, 'cn=a,dc=example,dc=com', self::UUID_A);
+        $this->liveEntries['cn=renamed,dc=example,dc=com'] = $this->entry('cn=renamed,dc=example,dc=com', self::UUID_A);
+
+        $this->handle($this->cookieAt(0));
+
+        self::assertSame(
+            [[SyncStateControl::STATE_MODIFY, self::UUID_A]],
+            $this->states(),
+        );
+        self::assertSame(
+            ['cn=renamed,dc=example,dc=com'],
+            $this->sentEntryDns(),
+        );
+    }
+
+    public function test_a_changed_entry_moved_out_of_the_content_since_the_change_is_not_sent(): void
+    {
+        $this->append(ChangeType::Modify, 'cn=a,dc=example,dc=com', self::UUID_A);
+        $this->liveEntries['cn=a,dc=elsewhere,dc=org'] = $this->entry('cn=a,dc=elsewhere,dc=org', self::UUID_A);
+
+        $this->handle($this->cookieAt(0));
+
+        self::assertSame(
+            [],
+            $this->states(),
+        );
+    }
+
+    public function test_another_entry_now_at_the_changed_dn_is_not_sent_in_its_place(): void
+    {
+        $this->append(ChangeType::Modify, 'cn=a,dc=example,dc=com', self::UUID_A);
+        $this->liveEntries['cn=a,dc=example,dc=com'] = $this->entry('cn=a,dc=example,dc=com', self::UUID_B);
+
+        $this->handle($this->cookieAt(0));
+
+        self::assertSame(
+            [],
+            $this->states(),
+        );
+    }
+
     public function test_a_changed_entry_gone_since_the_change_is_skipped(): void
     {
         $this->append(ChangeType::Modify, 'cn=a,dc=example,dc=com', self::UUID_A);
-        // No live entry registered: backend::get() returns null.
+        // No live entry registered, so nothing holds its entryUUID.
 
         $this->handle($this->cookieAt(0));
 
@@ -522,6 +569,17 @@ final class ServerSyncHandlerTest extends TestCase
         );
     }
 
+    private function liveEntryHolding(string $uuid): ?Entry
+    {
+        foreach ($this->liveEntries as $entry) {
+            if ($entry->getUuid() === strtolower($uuid)) {
+                return $entry;
+            }
+        }
+
+        return null;
+    }
+
     private function persistHandler(): ServerSyncHandler
     {
         return new ServerSyncHandler(
@@ -655,6 +713,24 @@ final class ServerSyncHandlerTest extends TestCase
         }
 
         return $states;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function sentEntryDns(): array
+    {
+        $dns = [];
+
+        foreach ($this->sent as $message) {
+            $response = $message->getResponse();
+
+            if ($response instanceof SearchResultEntry) {
+                $dns[] = $response->getEntry()->getDn()->toString();
+            }
+        }
+
+        return $dns;
     }
 
     private function lastSent(): LdapMessageResponse
