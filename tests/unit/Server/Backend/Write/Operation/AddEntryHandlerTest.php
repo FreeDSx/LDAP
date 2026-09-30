@@ -26,6 +26,7 @@ use FreeDSx\Ldap\Schema\SchemaValidationMode;
 use FreeDSx\Ldap\Search\Filters;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryUuidTakenException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\StorageIoException;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalConfig;
@@ -431,9 +432,8 @@ final class AddEntryHandlerTest extends TestCase
             $this->violationContext(new SchemaViolations(), Controls::relaxRules()),
         );
 
-        $this->expectException(OperationException::class);
+        $this->expectException(EntryUuidTakenException::class);
         $this->expectExceptionCode(ResultCode::CONSTRAINT_VIOLATION);
-        $this->expectExceptionMessage('The supplied entryUUID is already held by another entry.');
 
         $this->adds()->handle(
             new AddCommand($this->personWithUuid('cn=Bob,dc=example,dc=com')),

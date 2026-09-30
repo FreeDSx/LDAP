@@ -49,7 +49,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluator;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\LinkedLeafWitness;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryLocator;
-use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Directory\SubtreeEnumerator;
 use FreeDSx\Ldap\Server\Backend\Storage\Capability\ReferenceIntegrityInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Capture\ChangeRecorder;
@@ -167,10 +166,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             LdifParser::class => static fn(): LdifParser => new LdifParser(),
             EntryLocator::class => static fn(Container $c): EntryLocator => new EntryLocator(
                 $c->get(ReadEntryInterface::class),
-            ),
-            EntryUuidLocator::class => static fn(Container $c): EntryUuidLocator => new EntryUuidLocator(
-                $c->get(ListEntryInterface::class),
-                $c->get(FilterEvaluatorInterface::class),
             ),
             SubtreeEnumerator::class => static fn(Container $c): SubtreeEnumerator => new SubtreeEnumerator(
                 $c->get(ReadEntryInterface::class),
@@ -377,7 +372,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             schemaGate: $container->get(SchemaViolationGate::class),
             operationalAttrs: $container->get(OperationalAttributeGenerator::class),
             rdnValues: $container->get(RdnAttributeValues::class),
-            uuids: $container->get(EntryUuidLocator::class),
         );
     }
 
@@ -854,7 +848,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         $applier = new VerbatimStorageApplier(
             $container->get(ListEntryInterface::class),
             $container->get(WriteEntryInterface::class),
-            $container->get(EntryUuidLocator::class),
             $container->get(ReadEntryInterface::class),
         );
 

@@ -25,6 +25,8 @@ use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryUuidTakenException;
 use RuntimeException;
 
+use function strtoupper;
+
 /**
  * @mixin \PHPUnit\Framework\TestCase
  */
@@ -185,6 +187,69 @@ trait EntryIdentityStorageContractTests
         self::assertNotNull($this->identityEntry($container, 'cn=carol,dc=foo,dc=bar'));
     }
 
+    public function test_an_entry_is_found_by_its_entry_uuid(): void
+    {
+        self::assertSame(
+            'cn=Alice,dc=foo,dc=bar',
+            $this->foundByUuid(
+                $this->identityContainer(),
+                self::IDENTITY_UUID_A,
+            )?->getDn()->toString(),
+        );
+    }
+
+    public function test_an_entry_uuid_is_found_whatever_its_case(): void
+    {
+        self::assertSame(
+            'cn=Alice,dc=foo,dc=bar',
+            $this->foundByUuid(
+                $this->identityContainer(),
+                strtoupper(self::IDENTITY_UUID_A),
+            )?->getDn()->toString(),
+        );
+    }
+
+    public function test_an_entry_uuid_no_entry_holds_finds_nothing(): void
+    {
+        self::assertNull($this->foundByUuid(
+            $this->identityContainer(),
+            self::IDENTITY_UUID_B,
+        ));
+    }
+
+    public function test_a_renamed_entry_is_found_by_its_entry_uuid_at_its_new_dn(): void
+    {
+        $container = $this->identityContainer();
+
+        $container->get(WriteEntryInterface::class)->renameSubtree(
+            new Dn('cn=alice,dc=foo,dc=bar'),
+            new Dn('cn=Alicia,dc=foo,dc=bar'),
+        );
+
+        self::assertSame(
+            'cn=Alicia,dc=foo,dc=bar',
+            $this->foundByUuid(
+                $container,
+                self::IDENTITY_UUID_A,
+            )?->getDn()->toString(),
+        );
+    }
+
+    public function test_the_entry_uuid_of_a_replaced_entry_finds_nothing(): void
+    {
+        $container = $this->identityContainer();
+
+        $container->get(WriteEntryInterface::class)->store($this->identified(
+            'cn=Alice,dc=foo,dc=bar',
+            self::IDENTITY_UUID_B,
+        ));
+
+        self::assertNull($this->foundByUuid(
+            $container,
+            self::IDENTITY_UUID_A,
+        ));
+    }
+
     abstract protected function makeStorageContainer(Entry ...$entries): Container;
 
     private function identityContainer(): Container
@@ -215,5 +280,13 @@ trait EntryIdentityStorageContractTests
     ): ?Entry {
         return $container->get(ReadEntryInterface::class)
             ->find(new Dn($dn));
+    }
+
+    private function foundByUuid(
+        Container $container,
+        string $uuid,
+    ): ?Entry {
+        return $container->get(ReadEntryInterface::class)
+            ->findByUuid($uuid);
     }
 }

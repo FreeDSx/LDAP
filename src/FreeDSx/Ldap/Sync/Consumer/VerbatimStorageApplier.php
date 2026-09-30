@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Sync\Consumer;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
-use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
@@ -51,7 +50,6 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
     public function __construct(
         private readonly ListEntryInterface $lister,
         private readonly WriteEntryInterface $writer,
-        private readonly EntryUuidLocator $locator,
         private readonly ReadEntryInterface $reader,
     ) {}
 
@@ -214,8 +212,14 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
      */
     private function dnHolding(string $uuid): ?Dn
     {
-        return $this->locator
-            ->findByUuid($uuid)
+        return $this->reader
+            ->findByUuid(
+                $uuid,
+                new EntryProjection(
+                    [],
+                    linkCap: 0,
+                ),
+            )
             ?->getDn()
             ->normalize();
     }

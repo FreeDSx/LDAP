@@ -48,24 +48,24 @@ readonly class EntryReader implements ReadEntryInterface
         Dn $dn,
         EntryProjection $projection = new EntryProjection(),
     ): ?Entry {
-        $row = $this->connection
-            ->execute(
-                $this->dialect->queryFetchEntry(),
-                [$dn->normalizedString()],
-            )
-            ->fetch();
+        return $this->fetched(
+            $this->dialect->queryFetchEntry(),
+            $dn->normalizedString(),
+            $projection,
+        );
+    }
 
-        if (!is_array($row)) {
-            return null;
-        }
-
-        return $this->codec->decode(
-            $row,
-            $projection->allowed(),
-            $this->linksFor(
-                $row,
-                $projection,
-            ),
+    /**
+     * @throws StorageIoException when the stored row cannot be decoded
+     */
+    public function findByUuid(
+        string $uuid,
+        EntryProjection $projection = new EntryProjection(),
+    ): ?Entry {
+        return $this->fetched(
+            $this->dialect->queryFetchEntryByUuid(),
+            strtolower($uuid),
+            $projection,
         );
     }
 
@@ -107,6 +107,37 @@ readonly class EntryReader implements ReadEntryInterface
         }
 
         return $contexts;
+    }
+
+    /**
+     * The one entry the query selects by its single key, decoded under the projection.
+     *
+     * @throws StorageIoException when the stored row cannot be decoded
+     */
+    private function fetched(
+        string $query,
+        string $key,
+        EntryProjection $projection,
+    ): ?Entry {
+        $row = $this->connection
+            ->execute(
+                $query,
+                [$key],
+            )
+            ->fetch();
+
+        if (!is_array($row)) {
+            return null;
+        }
+
+        return $this->codec->decode(
+            $row,
+            $projection->allowed(),
+            $this->linksFor(
+                $row,
+                $projection,
+            ),
+        );
     }
 
     /**

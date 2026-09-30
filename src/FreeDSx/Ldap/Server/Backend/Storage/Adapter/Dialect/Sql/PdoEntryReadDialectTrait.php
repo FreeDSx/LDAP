@@ -39,6 +39,15 @@ trait PdoEntryReadDialectTrait
         SQL;
     }
 
+    public function queryFetchEntryByUuid(): string
+    {
+        return <<<SQL
+            SELECT entry_id, dn, attributes
+            FROM entries
+            WHERE entry_uuid = ?
+        SQL;
+    }
+
     public function queryHasChildren(): string
     {
         return <<<SQL
