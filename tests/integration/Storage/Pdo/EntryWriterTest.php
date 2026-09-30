@@ -48,10 +48,12 @@ use Tests\Support\FreeDSx\Ldap\Pdo\EntryLinkFixtureTrait;
 use Tests\Support\FreeDSx\Ldap\Pdo\RecordingPdo;
 use Tests\Support\FreeDSx\Ldap\Server\Configuration\TestServerOptions;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryIdentityStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 
 final class EntryWriterTest extends TestCase
 {
+    use EntryIdentityStorageContractTests;
     use EntryLinkFixtureTrait;
     use SubtreeRenameStorageContractTests;
 
@@ -162,6 +164,67 @@ final class EntryWriterTest extends TestCase
         self::assertSame(
             'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
             $this->entryUuidColumnOf(self::ALICE),
+        );
+    }
+
+    public function test_storing_the_same_entry_uuid_keeps_the_storage_key(): void
+    {
+        $this->storeNamed('Alice');
+        $before = $this->entryIdOf(self::ALICE);
+
+        $this->storeDescribed('Alice', 'updated');
+
+        self::assertSame(
+            $before,
+            $this->entryIdOf(self::ALICE),
+        );
+    }
+
+    public function test_storing_a_different_entry_uuid_gives_the_replacement_a_new_storage_key(): void
+    {
+        $this->storeNamed('Alice');
+        $before = $this->entryIdOf(self::ALICE);
+        // SQLite reissues the highest key once its row is gone, so a later row holds it above the one replaced.
+        $this->storeNamed('Bob');
+
+        $this->subject->store(new Entry(
+            new Dn(self::ALICE),
+            new Attribute('cn', 'Alice'),
+            new Attribute('entryUUID', 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'),
+        ));
+
+        self::assertNotSame(
+            $before,
+            $this->entryIdOf(self::ALICE),
+        );
+    }
+
+    public function test_storing_the_same_entry_uuid_keeps_the_links_naming_it(): void
+    {
+        $this->linkAdminsToBob();
+
+        $this->storeNamed('Bob');
+
+        self::assertSame(
+            ['cn=Bob,dc=example,dc=com'],
+            $this->reader->find(new Dn('cn=admins,dc=example,dc=com'))
+                ?->get('member')
+                ?->getValues(),
+        );
+    }
+
+    public function test_a_replaced_entry_drops_out_of_the_linked_attributes_naming_it(): void
+    {
+        $this->linkAdminsToBob();
+
+        $this->subject->store(new Entry(
+            new Dn('cn=Bob,dc=example,dc=com'),
+            new Attribute('cn', 'Bob'),
+            new Attribute('entryUUID', 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d'),
+        ));
+
+        self::assertNull(
+            $this->reader->find(new Dn('cn=admins,dc=example,dc=com'))?->get('member'),
         );
     }
 
@@ -793,7 +856,7 @@ final class EntryWriterTest extends TestCase
         );
     }
 
-    protected function makeRenameContainer(Entry ...$entries): Container
+    protected function makeStorageContainer(Entry ...$entries): Container
     {
         $pdo = new RecordingPdo('sqlite::memory:');
         (new PdoSchema(new SqliteDialect()))->apply($pdo);
@@ -977,6 +1040,15 @@ final class EntryWriterTest extends TestCase
         ksort($found);
 
         return $found;
+    }
+
+    private function entryIdOf(string $dn): mixed
+    {
+        $statement = $this->pdo->prepare('SELECT entry_id FROM entries WHERE lc_dn = ?');
+        self::assertNotFalse($statement);
+        $statement->execute([(new Dn($dn))->normalizedString()]);
+
+        return $statement->fetchColumn();
     }
 
     private function entryUuidColumnOf(string $dn): mixed

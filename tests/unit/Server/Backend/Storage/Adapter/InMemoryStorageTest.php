@@ -27,10 +27,12 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
+use Tests\Support\FreeDSx\Ldap\Storage\EntryIdentityStorageContractTests;
 use Tests\Support\FreeDSx\Ldap\Storage\SubtreeRenameStorageContractTests;
 
 final class InMemoryStorageTest extends TestCase
 {
+    use EntryIdentityStorageContractTests;
     use ServerContainerTrait;
     use SubtreeRenameStorageContractTests;
 
@@ -181,6 +183,27 @@ final class InMemoryStorageTest extends TestCase
             'Renamed',
             $stored?->get('description')?->firstValue(),
         );
+    }
+
+    public function test_a_replacing_entry_does_not_inherit_the_members_of_the_entry_it_replaces(): void
+    {
+        $subject = new InMemoryStorage(
+            linkedAttributes: new LinkedAttributes(SchemaResource::Core->load()),
+        );
+        $subject->store(EntryFixture::withUuid(Entry::fromArray(
+            'cn=admins,dc=ex,dc=com',
+            ['cn' => ['admins'], 'member' => ['cn=bob,dc=ex,dc=com']],
+        )));
+
+        $subject->store(
+            Entry::fromArray(
+                'cn=admins,dc=ex,dc=com',
+                ['cn' => ['admins'], 'entryUUID' => ['a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d']],
+            ),
+            links: LinkDelta::untouched(),
+        );
+
+        self::assertNull($subject->find(new Dn('cn=admins,dc=ex,dc=com'))?->get('member'));
     }
 
     public function test_find_returns_null_for_unknown_norm_dn(): void
@@ -480,7 +503,7 @@ final class InMemoryStorageTest extends TestCase
         );
     }
 
-    protected function makeRenameContainer(Entry ...$entries): Container
+    protected function makeStorageContainer(Entry ...$entries): Container
     {
         return $this->containerFor(EntryFixture::inMemoryStorage(...$entries));
     }

@@ -16,6 +16,7 @@ namespace FreeDSx\Ldap\Server\Backend\Storage\Contract;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryUuidTakenException;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 
 /**
@@ -28,10 +29,11 @@ use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 interface WriteEntryInterface
 {
     /**
-     * Persist the entry keyed by its normalised DN, replacing any existing entry at the same DN.
+     * Persist the entry at its normalised DN, updating the entry there with the same entryUUID or replacing one without.
      *
      * @param bool $rebuildIndexes Rewrite every secondary-index row rather than only those whose values changed.
      * @param LinkDelta $links Linked values to add and remove, for an attribute the entry no longer carries whole.
+     * @throws EntryUuidTakenException when an entry at another DN holds the entryUUID.
      */
     public function store(
         Entry $entry,
@@ -40,9 +42,10 @@ interface WriteEntryInterface
     ): void;
 
     /**
-     * Persist the entry only if its normalised DN is free (handles concurrency races).
+     * Persist the entry only if its normalised DN and entryUUID are free (handles concurrency races).
      *
      * @throws EntryAlreadyExistsException when the DN is taken.
+     * @throws EntryUuidTakenException when another entry holds the entryUUID.
      */
     public function insert(Entry $entry): void;
 

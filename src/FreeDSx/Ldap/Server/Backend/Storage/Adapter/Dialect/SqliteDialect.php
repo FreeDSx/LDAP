@@ -59,7 +59,7 @@ final class SqliteDialect implements PdoDialectInterface
     private const ERROR_LOCKED = 6;
 
     /**
-     * A constraint was violated. For an entry insert that's the unique key on lc_dn.
+     * A constraint was violated, which the message then names.
      */
     private const ERROR_CONSTRAINT = 19;
 
@@ -74,9 +74,20 @@ final class SqliteDialect implements PdoDialectInterface
             || $driverCode === self::ERROR_LOCKED;
     }
 
-    public function isDuplicateEntry(PDOException $exception): bool
+    public function isDuplicateDn(PDOException $exception): bool
     {
-        return ($exception->errorInfo[1] ?? null) === self::ERROR_CONSTRAINT;
+        return $this->isUniqueFailureOn(
+            $exception,
+            'entries.lc_dn',
+        );
+    }
+
+    public function isDuplicateEntryUuid(PDOException $exception): bool
+    {
+        return $this->isUniqueFailureOn(
+            $exception,
+            'entries.entry_uuid',
+        );
     }
 
     /**
@@ -104,23 +115,6 @@ final class SqliteDialect implements PdoDialectInterface
     public function rollBack(PDO $pdo): void
     {
         $pdo->exec('ROLLBACK');
-    }
-
-    /**
-     * Upserts an entry in place via ON CONFLICT rather than INSERT OR REPLACE, because REPLACE deletes the row first and
-     * fires ON DELETE CASCADE, which would wipe child rows such as the replica password-policy state.
-     */
-    public function queryUpsert(): string
-    {
-        return <<<SQL
-            INSERT INTO entries (entry_uuid, lc_dn, dn, lc_parent_dn, attributes)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(lc_dn) DO UPDATE SET
-                entry_uuid = excluded.entry_uuid,
-                dn = excluded.dn,
-                lc_parent_dn = excluded.lc_parent_dn,
-                attributes = excluded.attributes
-        SQL;
     }
 
     public function maxDnLength(): ?int
@@ -174,5 +168,16 @@ final class SqliteDialect implements PdoDialectInterface
     protected function schemaName(): string
     {
         return 'sqlite';
+    }
+
+    /**
+     * The constraint code covers every kind of constraint, so the message's table and column say which key refused.
+     */
+    private function isUniqueFailureOn(
+        PDOException $exception,
+        string $column,
+    ): bool {
+        return ($exception->errorInfo[1] ?? null) === self::ERROR_CONSTRAINT
+            && ($exception->errorInfo[2] ?? null) === 'UNIQUE constraint failed: ' . $column;
     }
 }

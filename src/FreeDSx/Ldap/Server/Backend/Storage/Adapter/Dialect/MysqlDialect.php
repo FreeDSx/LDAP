@@ -79,9 +79,20 @@ final class MysqlDialect implements PdoDialectInterface
             || $driverCode === self::ERROR_LOCK_WAIT_TIMEOUT;
     }
 
-    public function isDuplicateEntry(PDOException $exception): bool
+    public function isDuplicateDn(PDOException $exception): bool
     {
-        return ($exception->errorInfo[1] ?? null) === self::ERROR_DUPLICATE_ENTRY;
+        return $this->isDuplicateOnKey(
+            $exception,
+            'uq_lc_dn',
+        );
+    }
+
+    public function isDuplicateEntryUuid(PDOException $exception): bool
+    {
+        return $this->isDuplicateOnKey(
+            $exception,
+            'uq_entry_uuid',
+        );
     }
 
     public function isValueTooLong(PDOException $exception): bool
@@ -119,22 +130,6 @@ final class MysqlDialect implements PdoDialectInterface
         $statement->execute([$key]);
 
         return $statement->fetch() !== false;
-    }
-
-    /**
-     * @todo Replace VALUES() with row alias syntax once MariaDB supports it.
-     */
-    public function queryUpsert(): string
-    {
-        return <<<SQL
-            INSERT INTO entries (entry_uuid, lc_dn, dn, lc_parent_dn, attributes)
-            VALUES (?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                entry_uuid = VALUES(entry_uuid),
-                dn = VALUES(dn),
-                lc_parent_dn = VALUES(lc_parent_dn),
-                attributes = VALUES(attributes)
-        SQL;
     }
 
     /**
@@ -192,5 +187,19 @@ final class MysqlDialect implements PdoDialectInterface
     protected function schemaName(): string
     {
         return 'mysql';
+    }
+
+    /**
+     * The message ends with the key name, which MySQL prefixes with the table and MariaDB does not.
+     */
+    private function isDuplicateOnKey(
+        PDOException $exception,
+        string $key,
+    ): bool {
+        $message = $exception->errorInfo[2] ?? null;
+
+        return ($exception->errorInfo[1] ?? null) === self::ERROR_DUPLICATE_ENTRY
+            && is_string($message)
+            && str_ends_with($message, $key . "'");
     }
 }

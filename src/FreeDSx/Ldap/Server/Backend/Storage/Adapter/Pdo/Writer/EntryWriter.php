@@ -28,6 +28,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\DnTooLongException;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryUuidTakenException;
 use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\PartialValuesException;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
@@ -59,6 +60,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
 
     /**
      * @throws EntryAlreadyExistsException when the DN is already taken
+     * @throws EntryUuidTakenException when another entry already holds the entryUUID
      * @throws DnTooLongException when the DN exceeds what the database can store
      * @throws PartialValuesException when an attribute holds only a range of its values
      * @throws MissingEntryUuidException when the entry carries no entryUUID
@@ -71,18 +73,10 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
         $this->assertWhole($entry);
 
         $this->connection->atomic(function () use ($entry, $stored): void {
-            // The unique key on lc_dn is the arbiter, since a row lock on a DN that holds no row locks only the gap.
-            $this->translatingRefusal(
-                function () use ($stored, $entry): void {
-                    $this->connection->execute($this->dialect->queryInsert(), [
-                        $entry->getUuidOrFail(),
-                        $stored->lcDn,
-                        $stored->dn,
-                        $stored->parentLcDn,
-                        $this->codec->encode($entry),
-                    ]);
-                },
-                $stored->normalized,
+            // The unique keys are the arbiter, since a row lock on a DN that holds no row locks only the gap.
+            $this->insertRow(
+                $entry,
+                $stored,
             );
 
             $entryId = $this->entryIdFor($stored->normalized);
@@ -101,6 +95,7 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
     }
 
     /**
+     * @throws EntryUuidTakenException when another entry already holds the entryUUID
      * @throws DnTooLongException when the DN exceeds what the database can store
      * @throws PartialValuesException when an attribute holds only a range of its values
      * @throws MissingEntryUuidException when the entry carries no entryUUID
@@ -111,26 +106,28 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
         LinkDelta $links = new LinkDelta(),
     ): void {
         $stored = StoredDn::of($entry->getDn());
+        $uuid = $entry->getUuidOrFail();
 
         $this->assertDnFits($stored);
         $this->assertWhole($entry);
 
-        $this->connection->atomic(function () use ($entry, $stored, $rebuildIndexes, $links): void {
+        $this->connection->atomic(function () use ($entry, $stored, $uuid, $rebuildIndexes, $links): void {
+            $exists = $this->claimRow(
+                $stored->normalized,
+                $uuid,
+            );
+
             // Read the row we are about to overwrite under its write lock, so the diff is against what is actually
             // stored; a second writer then repairs whatever the first left behind instead of drifting from it.
-            $current = $rebuildIndexes
-                ? null
-                : $this->lockedEntry($stored->normalized);
+            $current = $exists && !$rebuildIndexes
+                ? $this->indexedEntry($stored->normalized)
+                : null;
 
-            $this->connection->execute($this->dialect->queryUpsert(), [
-                $entry->getUuidOrFail(),
-                $stored->lcDn,
-                $stored->dn,
-                $stored->parentLcDn,
-                $this->codec->encode($entry),
-            ]);
+            $exists
+                ? $this->updateRow($entry, $stored)
+                : $this->insertRow($entry, $stored);
 
-            // Neither dialect reports the key from an upsert, so it is read back before the index rows are written.
+            // Neither write reports the key, so it is read back before the index rows are written.
             $entryId = $this->entryIdFor($stored->normalized);
 
             if ($current === null) {
@@ -147,10 +144,10 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
                 $entryId,
                 $entry,
                 $links,
-                isNew: !$rebuildIndexes && $current === null,
+                isNew: !$exists,
             );
 
-            // An upsert may be what puts the entry there, so it can settle what others were waiting on.
+            // The write may be what puts the entry there, so it can settle what others were waiting on.
             $this->pending->promote($stored->normalized);
         });
     }
@@ -254,11 +251,72 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
     }
 
     /**
+     * Whether the row at the DN holds this entry, deleting it first when it holds a different one.
+     */
+    private function claimRow(
+        Dn $normDn,
+        string $uuid,
+    ): bool {
+        $this->lockForWrite($normDn);
+        $storedUuid = $this->connection
+            ->execute(
+                $this->dialect->queryEntryUuid(),
+                [$normDn->toString()],
+            )
+            ->fetchStringColumn();
+
+        if ($storedUuid === null) {
+            return false;
+        }
+        if ($storedUuid === $uuid) {
+            return true;
+        }
+        $this->remove($normDn);
+
+        return false;
+    }
+
+    /**
+     * @throws EntryAlreadyExistsException
+     * @throws EntryUuidTakenException
+     */
+    private function insertRow(
+        Entry $entry,
+        StoredDn $stored,
+    ): void {
+        $this->translatingRefusal(
+            function () use ($entry, $stored): void {
+                $this->connection->execute($this->dialect->queryInsert(), [
+                    $entry->getUuidOrFail(),
+                    $stored->lcDn,
+                    $stored->dn,
+                    $stored->parentLcDn,
+                    $this->codec->encode($entry),
+                ]);
+            },
+            $stored->normalized,
+        );
+    }
+
+    private function updateRow(
+        Entry $entry,
+        StoredDn $stored,
+    ): void {
+        $this->connection->execute($this->dialect->queryUpdate(), [
+            $stored->dn,
+            $stored->parentLcDn,
+            $this->codec->encode($entry),
+            $stored->lcDn,
+        ]);
+    }
+
+    /**
      * Runs a write, turning the driver failures the dialect recognises into the directory conditions they mean.
      *
      * @param Closure(): void $write
      * @param ?Dn $landsOn The DN written, where the write lands on exactly one.
      * @throws EntryAlreadyExistsException
+     * @throws EntryUuidTakenException
      * @throws DnTooLongException
      */
     private function translatingRefusal(
@@ -268,9 +326,15 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
         try {
             $write();
         } catch (PDOException $e) {
-            if ($landsOn !== null && $this->dialect->isDuplicateEntry($e)) {
+            if ($landsOn !== null && $this->dialect->isDuplicateDn($e)) {
                 throw new EntryAlreadyExistsException(
                     sprintf('Entry already exists: %s', $landsOn->toString()),
+                    previous: $e,
+                );
+            }
+            if ($landsOn !== null && $this->dialect->isDuplicateEntryUuid($e)) {
+                throw new EntryUuidTakenException(
+                    sprintf('Another entry already holds the entryUUID of: %s', $landsOn->toString()),
                     previous: $e,
                 );
             }
@@ -295,6 +359,14 @@ readonly class EntryWriter implements WriteEntryInterface, RowLockableInterface
     {
         $this->lockForWrite($normDn);
 
+        return $this->indexedEntry($normDn);
+    }
+
+    /**
+     * The stored entry as its sidecar index sees it, or null when there is none.
+     */
+    private function indexedEntry(Dn $normDn): ?Entry
+    {
         // Only the sidecar index is diffed against this, and no linked value is ever indexed there.
         return $this->reader->find(
             $normDn,

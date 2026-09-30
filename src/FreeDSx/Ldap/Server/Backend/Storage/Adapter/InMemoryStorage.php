@@ -30,6 +30,7 @@ use FreeDSx\Ldap\Server\Backend\Storage\Link\LinkDelta;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryUuidTakenException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 use Throwable;
 
@@ -62,6 +63,11 @@ final class InMemoryStorage implements
     private array $keys = [];
 
     private int $nextKey = 1;
+
+    /**
+     * @var array<string, string> normalised DN string, keyed by lowercased entryUUID
+     */
+    private array $dnsByUuid = [];
 
     private int $atomicDepth = 0;
 
@@ -128,23 +134,36 @@ final class InMemoryStorage implements
     }
 
     /**
+     * A different entry at the DN is replaced rather than rewritten, so it gets a new key and keeps none of its links.
+     *
      * @throws MissingEntryUuidException when the entry carries no entryUUID, as the database adapters' column requires
+     * @throws EntryUuidTakenException when an entry at another DN holds the entryUUID
      */
     public function store(
         Entry $entry,
         bool $rebuildIndexes = false,
         LinkDelta $links = new LinkDelta(),
     ): void {
-        $entry->getUuidOrFail();
+        $uuid = $entry->getUuidOrFail();
         $lcDn = $entry->getDn()->normalizedString();
+        $holder = $this->dnsByUuid[$uuid] ?? $lcDn;
 
-        // Overwriting an entry keeps its key, matching the upsert the database adapters do.
+        if ($holder !== $lcDn) {
+            throw new EntryUuidTakenException(
+                sprintf('Another entry already holds the entryUUID of: %s', $lcDn),
+            );
+        }
+        if (($this->entries[$lcDn] ?? null)?->getUuid() !== $uuid) {
+            $this->remove($entry->getDn());
+        }
+
         $this->keys[$lcDn] ??= $this->nextKey++;
         $this->entries[$lcDn] = $this->withLinks(
             $entry,
             $links,
             $this->entries[$lcDn] ?? null,
         );
+        $this->dnsByUuid[$uuid] = $lcDn;
     }
 
     public function renameSubtree(
@@ -175,12 +194,21 @@ final class InMemoryStorage implements
             $this->keys,
             static fn(int $key): int => $key,
         );
+
+        // A rename keeps every entry's identity, so only where each one lives changes.
+        foreach ($this->entries as $lcDn => $entry) {
+            $this->dnsByUuid[$entry->getUuidOrFail()] = $lcDn;
+        }
     }
 
     public function remove(Dn $dn): void
     {
         $lcDn = $dn->normalizedString();
+        $uuid = ($this->entries[$lcDn] ?? null)?->getUuid();
 
+        if ($uuid !== null) {
+            unset($this->dnsByUuid[$uuid]);
+        }
         unset($this->entries[$lcDn], $this->keys[$lcDn]);
     }
 
@@ -213,6 +241,7 @@ final class InMemoryStorage implements
         );
         $keys = $this->keys;
         $nextKey = $this->nextKey;
+        $dnsByUuid = $this->dnsByUuid;
         $this->atomicDepth = 1;
 
         try {
@@ -221,6 +250,7 @@ final class InMemoryStorage implements
             $this->entries = $entries;
             $this->keys = $keys;
             $this->nextKey = $nextKey;
+            $this->dnsByUuid = $dnsByUuid;
 
             throw $e;
         } finally {
