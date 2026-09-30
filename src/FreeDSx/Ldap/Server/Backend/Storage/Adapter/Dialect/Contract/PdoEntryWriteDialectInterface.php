@@ -25,7 +25,12 @@ interface PdoEntryWriteDialectInterface
     /**
      * Whether the failure is the unique key on lc_dn refusing a second entry at one DN.
      */
-    public function isDuplicateEntry(PDOException $exception): bool;
+    public function isDuplicateDn(PDOException $exception): bool;
+
+    /**
+     * Whether the failure is the unique key on entry_uuid refusing a second entry with one entryUUID.
+     */
+    public function isDuplicateEntryUuid(PDOException $exception): bool;
 
     /**
      * Whether the failure is a value exceeding its column's declared length.
@@ -43,14 +48,19 @@ interface PdoEntryWriteDialectInterface
     public function queryEntryId(): string;
 
     /**
-     * Insert or replace one entry. Parameters: [entry_uuid, lc_dn, dn, lc_parent_dn, attributes]
+     * The entryUUID of the entry at the DN. Parameters: [lc_dn]
      */
-    public function queryUpsert(): string;
+    public function queryEntryUuid(): string;
 
     /**
-     * Insert one entry, failing when the DN is taken. Parameters: [entry_uuid, lc_dn, dn, lc_parent_dn, attributes]
+     * Insert one entry, failing when the DN or entryUUID is taken. Parameters: [entry_uuid, lc_dn, dn, lc_parent_dn, attributes]
      */
     public function queryInsert(): string;
+
+    /**
+     * Rewrite the entry at the DN, keeping its identity. Parameters: [dn, lc_parent_dn, attributes, lc_dn]
+     */
+    public function queryUpdate(): string;
 
     /**
      * Re-key one entry in place. Parameters: [dn, lc_dn, lc_parent_dn, current lc_dn]

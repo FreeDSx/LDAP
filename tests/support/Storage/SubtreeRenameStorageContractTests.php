@@ -117,7 +117,7 @@ trait SubtreeRenameStorageContractTests
 
     public function test_renaming_a_subtree_slices_multibyte_dns_on_character_boundaries(): void
     {
-        $container = $this->makeRenameContainer(
+        $container = $this->makeStorageContainer(
             new Entry(new Dn('dc=foo,dc=bar')),
             new Entry(new Dn('ou=Москва,dc=foo,dc=bar')),
             new Entry(new Dn('cn=Zoë,ou=Москва,dc=foo,dc=bar')),
@@ -160,14 +160,14 @@ trait SubtreeRenameStorageContractTests
     }
 
     /**
-     * @param Entry ...$entries Seeded before the rename runs.
+     * @param Entry ...$entries Seeded, each given an entryUUID, before the contract runs.
      * @return Container the graph holding the seeded entries, which every storage contract resolves from
      */
-    abstract protected function makeRenameContainer(Entry ...$entries): Container;
+    abstract protected function makeStorageContainer(Entry ...$entries): Container;
 
     private function renameContainer(): Container
     {
-        return $this->makeRenameContainer(
+        return $this->makeStorageContainer(
             new Entry(new Dn('dc=foo,dc=bar')),
             new Entry(new Dn('ou=People,dc=foo,dc=bar')),
             new Entry(new Dn('ou=Groups,dc=foo,dc=bar')),

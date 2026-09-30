@@ -30,10 +30,30 @@ trait PdoEntryWriteDialectTrait
         SQL;
     }
 
+    public function queryUpdate(): string
+    {
+        return <<<SQL
+            UPDATE entries
+            SET dn = ?,
+                lc_parent_dn = ?,
+                attributes = ?
+            WHERE lc_dn = ?
+        SQL;
+    }
+
     public function queryEntryId(): string
     {
         return <<<SQL
             SELECT entry_id
+            FROM entries
+            WHERE lc_dn = ?
+        SQL;
+    }
+
+    public function queryEntryUuid(): string
+    {
+        return <<<SQL
+            SELECT entry_uuid
             FROM entries
             WHERE lc_dn = ?
         SQL;

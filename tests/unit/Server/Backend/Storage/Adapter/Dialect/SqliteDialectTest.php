@@ -52,13 +52,48 @@ final class SqliteDialectTest extends TestCase
         self::assertFalse($this->subject->isValueTooLong($this->exceptionWithDriverCode(19)));
     }
 
-    private function exceptionWithDriverCode(int $driverCode): PDOException
+    public function test_a_unique_failure_on_the_dn_is_a_duplicate_dn_only(): void
     {
+        $exception = $this->exceptionWithDriverCode(
+            19,
+            'UNIQUE constraint failed: entries.lc_dn',
+        );
+
+        self::assertTrue($this->subject->isDuplicateDn($exception));
+        self::assertFalse($this->subject->isDuplicateEntryUuid($exception));
+    }
+
+    public function test_a_unique_failure_on_the_uuid_is_a_duplicate_entry_uuid_only(): void
+    {
+        $exception = $this->exceptionWithDriverCode(
+            19,
+            'UNIQUE constraint failed: entries.entry_uuid',
+        );
+
+        self::assertTrue($this->subject->isDuplicateEntryUuid($exception));
+        self::assertFalse($this->subject->isDuplicateDn($exception));
+    }
+
+    public function test_another_kind_of_constraint_failure_is_not_a_duplicate(): void
+    {
+        $exception = $this->exceptionWithDriverCode(
+            19,
+            'NOT NULL constraint failed: entries.entry_uuid',
+        );
+
+        self::assertFalse($this->subject->isDuplicateDn($exception));
+        self::assertFalse($this->subject->isDuplicateEntryUuid($exception));
+    }
+
+    private function exceptionWithDriverCode(
+        int $driverCode,
+        string $message = 'Database failure.',
+    ): PDOException {
         $exception = new PDOException('Database failure.');
         $exception->errorInfo = [
             'HY000',
             $driverCode,
-            'Database failure.',
+            $message,
         ];
 
         return $exception;

@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS entries (
     attributes    LONGBLOB NOT NULL,
     PRIMARY KEY (entry_id),
     UNIQUE KEY uq_lc_dn (lc_dn),
+    UNIQUE KEY uq_entry_uuid (entry_uuid),
     INDEX idx_lc_parent_dn (lc_parent_dn)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

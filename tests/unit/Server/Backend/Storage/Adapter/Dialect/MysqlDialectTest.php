@@ -63,13 +63,69 @@ final class MysqlDialectTest extends TestCase
         self::assertFalse($this->subject->isValueTooLong(new PDOException('Connection refused')));
     }
 
-    private function exceptionWithDriverCode(int $driverCode): PDOException
+    public function test_a_duplicate_on_the_dn_key_is_a_duplicate_dn_only(): void
     {
+        $exception = $this->exceptionWithDriverCode(
+            1062,
+            "Duplicate entry 'cn=a,dc=example,dc=com' for key 'entries.uq_lc_dn'",
+        );
+
+        self::assertTrue($this->subject->isDuplicateDn($exception));
+        self::assertFalse($this->subject->isDuplicateEntryUuid($exception));
+    }
+
+    public function test_a_duplicate_on_the_uuid_key_is_a_duplicate_entry_uuid_only(): void
+    {
+        $exception = $this->exceptionWithDriverCode(
+            1062,
+            "Duplicate entry 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d' for key 'entries.uq_entry_uuid'",
+        );
+
+        self::assertTrue($this->subject->isDuplicateEntryUuid($exception));
+        self::assertFalse($this->subject->isDuplicateDn($exception));
+    }
+
+    public function test_a_key_named_without_its_table_is_still_recognised(): void
+    {
+        $exception = $this->exceptionWithDriverCode(
+            1062,
+            "Duplicate entry 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d' for key 'uq_entry_uuid'",
+        );
+
+        self::assertTrue($this->subject->isDuplicateEntryUuid($exception));
+    }
+
+    public function test_a_duplicate_value_naming_the_other_key_does_not_decide_which_key_refused(): void
+    {
+        $exception = $this->exceptionWithDriverCode(
+            1062,
+            "Duplicate entry 'cn=uq_entry_uuid\\',dc=example,dc=com' for key 'entries.uq_lc_dn'",
+        );
+
+        self::assertTrue($this->subject->isDuplicateDn($exception));
+        self::assertFalse($this->subject->isDuplicateEntryUuid($exception));
+    }
+
+    public function test_an_unrelated_database_error_is_not_a_duplicate(): void
+    {
+        $exception = $this->exceptionWithDriverCode(
+            1406,
+            "Data too long for column 'lc_dn' at row 1",
+        );
+
+        self::assertFalse($this->subject->isDuplicateDn($exception));
+        self::assertFalse($this->subject->isDuplicateEntryUuid($exception));
+    }
+
+    private function exceptionWithDriverCode(
+        int $driverCode,
+        string $message = 'Database failure.',
+    ): PDOException {
         $exception = new PDOException('Database failure.');
         $exception->errorInfo = [
             '40001',
             $driverCode,
-            'Database failure.',
+            $message,
         ];
 
         return $exception;
