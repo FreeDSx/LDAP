@@ -29,16 +29,16 @@ final class ImportResult
     /**
      * @var list<Dn>
      */
-    private array $replaced = [];
+    private array $skipped = [];
 
     public function recordAdded(): void
     {
         $this->added++;
     }
 
-    public function recordReplaced(Dn $dn): void
+    public function recordSkipped(Dn $dn): void
     {
-        $this->replaced[] = $dn;
+        $this->skipped[] = $dn;
     }
 
     public function added(): int
@@ -49,13 +49,13 @@ final class ImportResult
     /**
      * @return list<Dn>
      */
-    public function replaced(): array
+    public function skipped(): array
     {
-        return $this->replaced;
+        return $this->skipped;
     }
 
-    public function replacedCount(): int
+    public function skippedCount(): int
     {
-        return count($this->replaced);
+        return count($this->skipped);
     }
 }

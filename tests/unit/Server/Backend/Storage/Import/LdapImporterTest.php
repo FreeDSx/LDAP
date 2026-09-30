@@ -190,25 +190,32 @@ final class LdapImporterTest extends TestCase
         );
     }
 
-    public function test_importEntries_records_each_entry_it_replaced(): void
+    public function test_importEntries_records_each_entry_it_skipped(): void
     {
+        $this->importerFor(
+            $this->storage,
+            $this->optionsLogging(new RecordingLogger()),
+        )->importEntries([$this->domain()]);
         $logger = new RecordingLogger();
-        $options = $this->optionsLogging($logger);
 
-        $this->importerFor($this->storage, $options)->importEntries([$this->domain()]);
-        $logger->records = [];
-
-        $this->importerFor($this->storage, $options)->importEntries(
+        $this->importerFor(
+            $this->storage,
+            $this->optionsLogging($logger),
+        )->importEntries(
             entries: [$this->domain()],
-            replaceExisting: true,
+            skipExisting: true,
         );
 
         self::assertSame(
             [
-                ServerEvent::EntryReplaced->value,
+                ServerEvent::EntrySkipped->value,
                 ServerEvent::BulkImportCompleted->value,
             ],
             $this->loggedEvents($logger),
+        );
+        self::assertSame(
+            1,
+            $logger->records[1]['context'][EventContext::ENTRIES_SKIPPED] ?? null,
         );
     }
 

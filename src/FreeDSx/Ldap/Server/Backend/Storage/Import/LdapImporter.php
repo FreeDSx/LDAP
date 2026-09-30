@@ -59,7 +59,7 @@ final readonly class LdapImporter
      * @param iterable<Entry> $entries
      * @param Dn $creatorDn recorded as creatorsName/modifiersName on entries that do not carry their own.
      * @param bool $ignoreValidation when true, waives the schema rules a lenient policy would.
-     * @param bool $replaceExisting when true, an entry already at the same DN is overwritten rather than refused.
+     * @param bool $skipExisting when true, an entry already at the same DN is left untouched rather than refused.
      * @throws InvalidArgumentException when the creator DN is malformed
      * @throws OperationException when an entry is refused by the add operation, including one whose parent is absent
      */
@@ -67,18 +67,18 @@ final readonly class LdapImporter
         iterable $entries,
         Dn $creatorDn = new Dn(''),
         bool $ignoreValidation = false,
-        bool $replaceExisting = false,
+        bool $skipExisting = false,
     ): void {
         $this->assertValidCreatorDn($creatorDn);
         $result = new ImportResult();
 
         try {
-            $this->transaction->atomic(function () use ($entries, $creatorDn, $ignoreValidation, $replaceExisting, $result): void {
+            $this->transaction->atomic(function () use ($entries, $creatorDn, $ignoreValidation, $skipExisting, $result): void {
                 $this->load(
                     $entries,
                     $creatorDn,
                     $ignoreValidation,
-                    $replaceExisting,
+                    $skipExisting,
                     $result,
                 );
 
@@ -105,27 +105,26 @@ final readonly class LdapImporter
         iterable $entries,
         Dn $creatorDn,
         bool $ignoreValidation,
-        bool $replaceExisting,
+        bool $skipExisting,
         ImportResult $result,
     ): void {
         foreach ($entries as $entry) {
             $entry = $this->spelling->entry($entry);
-            // Read before the write, since afterwards the entry is present either way.
-            $wasPresent = $replaceExisting
-                && $this->storage->exists($entry->getDn()->normalize());
+
+            if ($skipExisting && $this->storage->exists($entry->getDn()->normalize())) {
+                $result->recordSkipped($entry->getDn());
+
+                continue;
+            }
 
             $this->router->route(
                 new AddRequest($entry),
                 $this->contextFor(
                     $creatorDn,
                     $ignoreValidation,
-                    $replaceExisting,
                 ),
             );
-
-            $wasPresent
-                ? $result->recordReplaced($entry->getDn())
-                : $result->recordAdded();
+            $result->recordAdded();
         }
     }
 
@@ -135,14 +134,12 @@ final readonly class LdapImporter
     private function contextFor(
         Dn $creatorDn,
         bool $ignoreValidation,
-        bool $replaceExisting,
     ): WriteContext {
         return WriteContext::bulkLoad(
             new SystemToken(),
             new ControlBag(),
             new BulkLoadOptions(
                 $creatorDn,
-                $replaceExisting,
                 $ignoreValidation,
             ),
         );
@@ -153,9 +150,9 @@ final readonly class LdapImporter
      */
     private function recordOutcome(ImportResult $result): void
     {
-        foreach ($result->replaced() as $dn) {
+        foreach ($result->skipped() as $dn) {
             $this->eventLogger->record(
-                ServerEvent::EntryReplaced,
+                ServerEvent::EntrySkipped,
                 [EventContext::TARGET => [EventContext::DN => $dn->toString()]],
             );
         }
@@ -194,7 +191,7 @@ final readonly class LdapImporter
     {
         return [
             EventContext::ENTRIES_ADDED => $result->added(),
-            EventContext::ENTRIES_REPLACED => $result->replacedCount(),
+            EventContext::ENTRIES_SKIPPED => $result->skippedCount(),
         ];
     }
 

@@ -46,7 +46,6 @@ readonly class EntryPlacementGuard
         Entry $entry,
         Dn $normDn,
         bool $isSystem,
-        bool $replaceExisting = false,
     ): void {
         $this->assertParentExists(
             $normDn,
@@ -57,12 +56,6 @@ readonly class EntryPlacementGuard
             $normDn,
             $isSystem,
         );
-
-        // A bulk load may deliberately overwrite.
-        if ($replaceExisting) {
-            return;
-        }
-
         $this->assertDoesNotExist(
             $normDn,
             $entry->getDn(),

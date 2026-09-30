@@ -59,7 +59,7 @@ in-memory implementations. Authentication is a separate, independently configura
 
 The simplest useful setup. A SQLite file holds the directory, so it survives restarts and works under the default
 forking runner. Seeding refuses an entry that already exists, so running this again fails unless you set
-`setReplaceExisting(true)`.
+`setSkipExisting(true)`, which leaves the entries already there untouched.
 
 The built-in `PasswordAuthenticator` handles bind authentication automatically — it reads the `userPassword` attribute
 from entries and verifies credentials against it. Supported hash schemes: `{SHA}`, `{SSHA}`, `{MD5}`, `{SMD5}`, and
@@ -587,11 +587,14 @@ The optional second argument is a `SeedOptions`:
 |---|---|
 | `setCreatorDn()` | Stamped as `creatorsName`/`modifiersName` on entries carrying neither. Defaults to the empty DN. |
 | `setIgnoreValidation()` | Waives the schema rules `Lenient` validation waives, for this load. See [Validation Mode](Schema.md#validation-mode). |
-| `setReplaceExisting()` | Overwrites a DN already present, which is otherwise refused with `entryAlreadyExists`. |
+| `setSkipExisting()` | Leaves an entry already at its DN untouched, which is otherwise refused with `entryAlreadyExists`. |
 | `setUrlResolver()` | Enables RFC 2849 URL values. |
 
-Supply `entryUUID` for every entry `setReplaceExisting()` replaces: an omitted one is generated fresh, which reads as a
-delete and an add to anything keyed on it. Each replacement is logged, with a record of the counts once the import commits.
+Seeding never overwrites an existing entry. To change one, modify it, or delete it and seed it again. Each skipped entry
+is logged, with a record of the counts once the import commits.
+
+Supplied operational attributes such as `entryUUID` are kept, as the
+[Relax Rules control](Schema.md#validation-mode) allows a client's Add.
 
 `seed()` accepts only content records (entries without `changetype:`) and requires depth-first input (parents first,
 then children entries). LDIF produced by `dump()` is already in this order.

@@ -96,28 +96,22 @@ final class LdapSeedServerTest extends TestCase
         );
     }
 
-    public function test_a_replacement_named_by_a_numeric_oid_replaces_the_existing_entry(): void
+    public function test_an_existing_entry_named_by_a_numeric_oid_is_skipped_when_asked(): void
     {
         $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
 
         $this->subject->seed(
             new StringLdifLoader(str_replace(
                 ['dn: cn=alice', 'sn: Anderson'],
-                ['dn: 2.5.4.3=alice', 'sn: Replaced'],
+                ['dn: 2.5.4.3=alice', 'sn: Skipped'],
                 self::SEED_LDIF,
             )),
-            (new SeedOptions())->setReplaceExisting(true),
+            (new SeedOptions())->setSkipExisting(true),
         );
 
-        $alice = $this->storage->find(new Dn('cn=alice,dc=example,dc=com'));
-        self::assertNotNull($alice);
         self::assertSame(
-            'cn=alice,dc=example,dc=com',
-            $alice->getDn()->toString(),
-        );
-        self::assertSame(
-            'Replaced',
-            $alice->get('sn')?->firstValue(),
+            'Anderson',
+            $this->storage->find(new Dn('cn=alice,dc=example,dc=com'))?->get('sn')?->firstValue(),
         );
     }
 
@@ -131,47 +125,46 @@ final class LdapSeedServerTest extends TestCase
         $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
     }
 
-    public function test_it_replaces_an_existing_entry_when_asked(): void
+    public function test_it_leaves_an_existing_entry_untouched_when_asked_to_skip_it(): void
     {
         $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
-        $uuid = $this->storage->find(new Dn('cn=alice,dc=example,dc=com'))
-            ?->get('entryUUID')
-            ?->firstValue();
+        $uuid = $this->storage->find(new Dn('cn=alice,dc=example,dc=com'))?->getUuid();
 
         $this->subject->seed(
-            new StringLdifLoader(str_replace('sn: Anderson', 'sn: Replaced', self::SEED_LDIF)),
-            (new SeedOptions())->setReplaceExisting(true),
+            new StringLdifLoader(str_replace('sn: Anderson', 'sn: Skipped', self::SEED_LDIF)),
+            (new SeedOptions())->setSkipExisting(true),
         );
 
         $alice = $this->storage->find(new Dn('cn=alice,dc=example,dc=com'));
         self::assertNotNull($alice);
         self::assertSame(
-            'Replaced',
+            'Anderson',
             $alice->get('sn')?->firstValue(),
         );
-        self::assertNotSame(
+        self::assertSame(
             $uuid,
-            $alice->get('entryUUID')?->firstValue(),
-            'An LDIF carrying no entryUUID gives the replacement a new one.',
+            $alice->getUuid(),
         );
     }
 
-    public function test_a_replacement_keeps_the_entry_uuid_the_source_supplies(): void
+    public function test_skipping_existing_entries_still_adds_the_new_ones(): void
     {
-        $withUuid = self::SEED_LDIF . "\nentryUUID: 11111111-2222-4333-8444-555555555555\n";
+        $this->subject->seed(new StringLdifLoader(self::SEED_LDIF));
 
-        $this->subject->seed(new StringLdifLoader($withUuid));
         $this->subject->seed(
-            new StringLdifLoader($withUuid),
-            (new SeedOptions())->setReplaceExisting(true),
+            new StringLdifLoader(self::SEED_LDIF . <<<LDIF
+
+
+                dn: cn=bob,dc=example,dc=com
+                objectClass: top
+                objectClass: person
+                cn: bob
+                sn: Builder
+                LDIF),
+            (new SeedOptions())->setSkipExisting(true),
         );
 
-        self::assertSame(
-            '11111111-2222-4333-8444-555555555555',
-            $this->storage->find(new Dn('cn=alice,dc=example,dc=com'))
-                ?->get('entryUUID')
-                ?->firstValue(),
-        );
+        self::assertNotNull($this->storage->find(new Dn('cn=bob,dc=example,dc=com')));
     }
 
     public function test_a_failure_rolls_the_whole_batch_back(): void

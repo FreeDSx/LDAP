@@ -115,7 +115,7 @@ class LdapServer
             $entries,
             $options->getCreatorDn(),
             $options->isIgnoreValidation(),
-            $options->isReplaceExisting(),
+            $options->isSkipExisting(),
         );
 
         $this->drainWrites();
