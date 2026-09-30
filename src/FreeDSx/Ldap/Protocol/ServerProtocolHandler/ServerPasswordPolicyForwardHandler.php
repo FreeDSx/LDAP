@@ -26,7 +26,7 @@ use FreeDSx\Ldap\Protocol\LdapMessageRequest;
 use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Server\AccessControl\AccessControlInterface;
 use FreeDSx\Ldap\Server\AccessControl\Rule\AttributeAccess;
-use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Command\ComputeUpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
@@ -53,7 +53,7 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
     private const CLOCK_SKEW_TOLERANCE_SECONDS = 30;
 
     public function __construct(
-        private EntryUuidLocator $locator,
+        private ReadEntryInterface $entries,
         private WriteHandlerInterface $writes,
         private PasswordPolicyResolver $policyResolver,
         private PasswordPolicyEngine $engine,
@@ -125,7 +125,7 @@ readonly class ServerPasswordPolicyForwardHandler implements ServerProtocolHandl
         TokenInterface $token,
     ): void {
         $uuid = $request->getEntryUuid();
-        $target = $this->locator->findByUuid($uuid);
+        $target = $this->entries->findByUuid($uuid);
 
         if ($target === null) {
             return;

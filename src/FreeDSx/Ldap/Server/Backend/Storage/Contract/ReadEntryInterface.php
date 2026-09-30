@@ -36,6 +36,14 @@ interface ReadEntryInterface
     ): ?Entry;
 
     /**
+     * Return the entry holding the entryUUID, matched case-insensitively, or null if no entry holds it.
+     */
+    public function findByUuid(
+        string $uuid,
+        EntryProjection $projection = new EntryProjection(),
+    ): ?Entry;
+
+    /**
      * Return true if an entry with the given normalised DN exists.
      */
     public function exists(Dn $dn): bool;

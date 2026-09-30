@@ -15,9 +15,7 @@ namespace FreeDSx\Ldap\Server\Backend\Write\Operation;
 
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\OperationException;
-use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Operation\RdnAttributeValues;
-use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
 use FreeDSx\Ldap\Server\Backend\Write\OperationalAttributeGenerator;
 use FreeDSx\Ldap\Server\Backend\Write\Command\AddCommand;
 use FreeDSx\Ldap\Server\Backend\Write\Schema\SchemaViolationGate;
@@ -38,7 +36,6 @@ readonly class AddEntryHandler
         private SchemaViolationGate $schemaGate,
         private OperationalAttributeGenerator $operationalAttrs,
         private RdnAttributeValues $rdnValues,
-        private EntryUuidLocator $uuids,
     ) {}
 
     /**
@@ -58,30 +55,6 @@ readonly class AddEntryHandler
     }
 
     /**
-     * A bulk load keeps the entryUUID its source supplied, so only a client-supplied one is checked.
-     *
-     * @throws OperationException when another entry already holds it
-     */
-    private function assertSuppliedUuidUnheld(
-        Entry $entry,
-        WriteContext $context,
-    ): void {
-        $uuid = $entry->getUuid();
-
-        if ($uuid === null || $context->bulkLoadOptions() !== null) {
-            return;
-        }
-        if ($this->uuids->findByUuid($uuid) === null) {
-            return;
-        }
-
-        throw new OperationException(
-            'The supplied entryUUID is already held by another entry.',
-            ResultCode::CONSTRAINT_VIOLATION,
-        );
-    }
-
-    /**
      * @throws OperationException
      */
     private function prepared(
@@ -95,12 +68,8 @@ readonly class AddEntryHandler
 
         $bulkLoad = $context->bulkLoadOptions();
 
+        // Before the insert, whose entryUUID key would otherwise tell a client barred from supplying one which are held.
         $this->schemaGate->assertAddAllowed(
-            $entry,
-            $context,
-        );
-        // After the gate: a client barred from supplying entryUUID must not learn which ones exist.
-        $this->assertSuppliedUuidUnheld(
             $entry,
             $context,
         );

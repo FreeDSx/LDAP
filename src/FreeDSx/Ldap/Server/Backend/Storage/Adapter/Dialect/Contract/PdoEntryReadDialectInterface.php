@@ -31,6 +31,13 @@ interface PdoEntryReadDialectInterface
     public function queryFetchEntry(): string;
 
     /**
+     * The entry holding the lowercased entryUUID.
+     *
+     * Parameters: [entry_uuid]
+     */
+    public function queryFetchEntryByUuid(): string;
+
+    /**
      * A row when any entry sits directly below the parent. Parameters: [lc_parent_dn]
      */
     public function queryHasChildren(): string;

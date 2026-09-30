@@ -106,6 +106,20 @@ final class InMemoryStorage implements
             : $this->sliced($entry, $projection);
     }
 
+    public function findByUuid(
+        string $uuid,
+        EntryProjection $projection = new EntryProjection(),
+    ): ?Entry {
+        $lcDn = $this->dnsByUuid[strtolower($uuid)] ?? null;
+
+        return $lcDn === null
+            ? null
+            : $this->find(
+                new Dn($lcDn),
+                $projection,
+            );
+    }
+
     public function exists(Dn $dn): bool
     {
         return isset($this->entries[$dn->normalizedString()]);

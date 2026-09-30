@@ -27,8 +27,6 @@ use FreeDSx\Ldap\Protocol\Queue\Response\ResponseStream;
 use FreeDSx\Ldap\Protocol\ServerProtocolHandler\ServerPasswordPolicyForwardHandler;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
-use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
-use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Write\Command\ComputeUpdateCommand;
 use FreeDSx\Ldap\Server\Backend\Write\WriteHandlerInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteContext;
@@ -43,12 +41,9 @@ use FreeDSx\Ldap\Server\Token\TokenInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
-use Tests\Support\FreeDSx\Ldap\ServerContainerTrait;
 
 final class ServerPasswordPolicyForwardHandlerTest extends TestCase
 {
-    use ServerContainerTrait;
-
     private const NOW = '2026-05-20T12:00:00Z';
 
     private const DN = 'cn=user,dc=foo,dc=bar';
@@ -74,7 +69,7 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
         $this->writes = $this->createMock(WriteHandlerInterface::class);
         $this->accessControl = $this->createMock(AccessControlInterface::class);
         $this->subject = new ServerPasswordPolicyForwardHandler(
-            $this->locator(),
+            $this->storage,
             $this->writes,
             $this->resolverWith(new PasswordPolicy(lockout: new PasswordLockoutRules(
                 enabled: true,
@@ -151,7 +146,7 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
 
         // A resolver with no source at all, so nothing governs the target.
         $subject = new ServerPasswordPolicyForwardHandler(
-            $this->locator(),
+            $this->storage,
             $this->writes,
             $this->resolverWith(null),
             new PasswordPolicyEngine(
@@ -307,14 +302,6 @@ final class ServerPasswordPolicyForwardHandlerTest extends TestCase
         $this->subject->handleRequest(
             $this->messageFor(new ExtendedRequest(ExtendedRequest::OID_PPOLICY_STATE_FORWARD)),
             $this->createMock(TokenInterface::class),
-        );
-    }
-
-    private function locator(): EntryUuidLocator
-    {
-        return new EntryUuidLocator(
-            $this->storage,
-            $this->fromContainer(FilterEvaluatorInterface::class),
         );
     }
 

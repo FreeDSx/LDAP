@@ -41,7 +41,6 @@ use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Filter\FilterEvaluatorInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ChangeJournalInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Schema\LinkedAttributes;
-use FreeDSx\Ldap\Server\Backend\Storage\Directory\EntryUuidLocator;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Read\ChangeStream;
 use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Write\WriteOperationDispatcher;
@@ -144,7 +143,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
     private function makeForwardHandler(Container $container): ServerProtocolHandlerInterface
     {
         return new ServerPasswordPolicyForwardHandler(
-            locator: $container->get(EntryUuidLocator::class),
+            entries: $container->get(ReadEntryInterface::class),
             writes: $container->get(WriteOperationDispatcher::class),
             policyResolver: $container->get(PasswordPolicyResolver::class),
             engine: $container->get(PasswordPolicyEngine::class),
