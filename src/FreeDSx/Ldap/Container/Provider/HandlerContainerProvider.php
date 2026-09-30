@@ -195,7 +195,7 @@ final class HandlerContainerProvider implements ContainerProviderInterface
         if ($journal !== null && $provider !== null) {
             $stream = new ChangeStream($journal);
             $streamer = new SyncPersistStreamer(
-                backend: $backend,
+                entries: $container->get(ReadEntryInterface::class),
                 projector: $projector,
                 stream: $stream,
                 sleeper: $container->get(SleeperInterface::class),

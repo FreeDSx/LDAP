@@ -23,7 +23,7 @@ use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncNewCookie;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
 use FreeDSx\Ldap\Protocol\Queue\Response\Cancellation;
-use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\ChangeType;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\Change\PendingChange;
 use FreeDSx\Ldap\Server\Backend\Storage\Journal\ReplicaId;
@@ -47,7 +47,7 @@ final readonly class SyncPersistStreamer
     public const DEFAULT_POLL_INTERVAL = 1.0;
 
     public function __construct(
-        private ReadBackendInterface $backend,
+        private ReadEntryInterface $entries,
         private SyncResultProjector $projector,
         private ChangeStream $stream,
         private SleeperInterface $sleeper,
@@ -73,23 +73,18 @@ final readonly class SyncPersistStreamer
         }
 
         foreach ($netByUuid as $change) {
-            $result = match (true) {
-                $change->changeType === ChangeType::Delete => $this->projector->projectDeleted(
+            $result = $change->changeType === ChangeType::Delete
+                ? $this->projector->projectDeleted(
                     $change,
                     $request,
                     $token,
-                ),
-                // Left the content, so RFC 4533 §4.1 wants it deleted rather than sent from where it went.
-                !$scope->contains($change->dn) => $this->fetchAndProjectMovedOut(
+                )
+                : $this->fetchAndProject(
                     $change,
-                    $token,
-                ),
-                default => $this->fetchAndProject(
-                    $change,
+                    $scope,
                     $request,
                     $token,
-                ),
-            };
+                );
 
             if ($result !== null) {
                 yield $result;
@@ -184,38 +179,32 @@ final readonly class SyncPersistStreamer
     }
 
     /**
-     * The entry is read where it went, since that is the only place it still exists to judge visibility from.
+     * Read by entryUUID, so it is the entry the change is about, judged against the content where it lives now.
      */
-    private function fetchAndProjectMovedOut(
-        PendingChange $change,
-        TokenInterface $token,
-    ): ?SyncResult {
-        $entry = $this->backend->get($change->dn);
-
-        if ($entry === null) {
-            return null;
-        }
-
-        return $this->projector->projectMovedOut(
-            $entry,
-            $change,
-            $token,
-        );
-    }
-
     private function fetchAndProject(
         PendingChange $change,
+        ChangeScope $scope,
         SearchRequest $request,
         TokenInterface $token,
     ): ?SyncResult {
         // @todo A replica needs every value, sent as one message; offer ranged values to consumers that can complete them.
-        $entry = $this->backend->get(
-            $change->dn,
+        $entry = $this->entries->findByUuid(
+            $change->entryUuid,
             EntryProjection::unbounded(),
         );
 
+        // Deleted since, and its own journaled delete announces that.
         if ($entry === null) {
             return null;
+        }
+
+        // Left the content, so RFC 4533 §4.1 wants it deleted rather than sent from where it went.
+        if (!$scope->contains($entry->getDn())) {
+            return $this->projector->projectMovedOut(
+                $entry,
+                $change,
+                $token,
+            );
         }
 
         return $this->projector->projectFetched(
