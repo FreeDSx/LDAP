@@ -69,6 +69,9 @@ final readonly class SyncPersistStreamer
         $netByUuid = [];
 
         foreach ($this->stream->since($sinceSeq, $scope) as $record) {
+            // Re-keyed at its latest change.
+            // An entry relocating is sent before one that might later take it.
+            unset($netByUuid[$record->change->entryUuid]);
             $netByUuid[$record->change->entryUuid] = $record->change;
         }
 
