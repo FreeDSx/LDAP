@@ -17,6 +17,7 @@ use FreeDSx\Ldap\Control\Sync\SyncStateControl;
 use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
+use FreeDSx\Ldap\Exception\UnresolvedReplicaMovesException;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Operation\Response\SyncInfo\SyncIdSet;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -24,6 +25,7 @@ use FreeDSx\Ldap\Search\Result\EntryResult;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\InMemoryStorage;
 use FreeDSx\Ldap\Server\Utility\Uuid;
 use FreeDSx\Ldap\Sync\Consumer\ChangeApplierInterface;
+use FreeDSx\Ldap\Sync\Consumer\ReplicaMoves;
 use FreeDSx\Ldap\Sync\Consumer\VerbatimStorageApplier;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
@@ -38,6 +40,8 @@ final class VerbatimStorageApplierTest extends TestCase
 
     private const UUID_C = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
+    private const UUID_D = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
     private InMemoryStorage $storage;
 
     private ChangeApplierInterface $subject;
@@ -49,6 +53,12 @@ final class VerbatimStorageApplierTest extends TestCase
             $this->storage,
             $this->storage,
             $this->storage,
+            $this->storage,
+            new ReplicaMoves(
+                $this->storage,
+                $this->storage,
+                $this->storage,
+            ),
         );
     }
 
@@ -260,6 +270,244 @@ final class VerbatimStorageApplierTest extends TestCase
         self::assertTrue($this->exists('cn=new,dc=example,dc=com'));
     }
 
+    /**
+     * RFC 4533 §4.1 lets a provider send no message for an entry whose DN changed only because an ancestor moved.
+     */
+    public function test_a_moved_entry_takes_its_descendants_when_only_its_own_message_arrives(): void
+    {
+        $this->storage->store($this->entry('ou=staff,dc=example,dc=com', self::UUID_A));
+        $this->storage->store($this->entry('cn=grace,ou=staff,dc=example,dc=com', self::UUID_B));
+
+        $this->subject->apply(
+            $this->syncResult(
+                SyncStateControl::STATE_MODIFY,
+                $this->entry('ou=crew,dc=example,dc=com', self::UUID_A),
+            ),
+            $this->persistSession(),
+        );
+
+        self::assertFalse($this->exists('cn=grace,ou=staff,dc=example,dc=com'));
+        self::assertSame(
+            self::UUID_B,
+            $this->value('cn=grace,ou=crew,dc=example,dc=com', 'entryUUID'),
+        );
+    }
+
+    public function test_a_move_onto_a_dn_held_by_an_entry_moving_away_is_placed_at_settle(): void
+    {
+        $this->storage->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
+        $this->storage->store($this->entry('cn=b,dc=example,dc=com', self::UUID_B));
+        $this->storage->store($this->entry('cn=kid,cn=b,dc=example,dc=com', self::UUID_C));
+
+        $this->applyMove('cn=b,dc=example,dc=com', self::UUID_A);
+        $this->applyMove('cn=c,dc=example,dc=com', self::UUID_B);
+        $this->subject->settle();
+
+        self::assertSame(
+            self::UUID_A,
+            $this->value('cn=b,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            self::UUID_C,
+            $this->value('cn=kid,cn=c,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertFalse($this->exists('cn=a,dc=example,dc=com'));
+    }
+
+    public function test_two_entries_trading_dns_are_both_placed_at_settle_with_their_descendants(): void
+    {
+        $this->storage->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
+        $this->storage->store($this->entry('cn=kid,cn=a,dc=example,dc=com', self::UUID_C));
+        $this->storage->store($this->entry('cn=b,dc=example,dc=com', self::UUID_B));
+        $this->storage->store($this->entry('cn=pup,cn=b,dc=example,dc=com', self::UUID_D));
+
+        $this->applyMove('cn=b,dc=example,dc=com', self::UUID_A);
+        $this->applyMove('cn=a,dc=example,dc=com', self::UUID_B);
+        $this->subject->settle();
+
+        self::assertSame(
+            self::UUID_A,
+            $this->value('cn=b,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            self::UUID_B,
+            $this->value('cn=a,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            self::UUID_C,
+            $this->value('cn=kid,cn=b,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            self::UUID_D,
+            $this->value('cn=pup,cn=a,dc=example,dc=com', 'entryUUID'),
+        );
+    }
+
+    public function test_a_newer_message_for_an_entry_supersedes_its_deferred_move(): void
+    {
+        $this->storage->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
+        $this->storage->store($this->entry('cn=b,dc=example,dc=com', self::UUID_B));
+
+        $this->applyMove('cn=b,dc=example,dc=com', self::UUID_A);
+        $this->applyMove('cn=z,dc=example,dc=com', self::UUID_A);
+        $this->subject->settle();
+
+        self::assertSame(
+            self::UUID_A,
+            $this->value('cn=z,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            self::UUID_B,
+            $this->value('cn=b,dc=example,dc=com', 'entryUUID'),
+        );
+    }
+
+    public function test_a_delete_drops_the_deferred_move_of_its_entry(): void
+    {
+        $this->storage->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
+        $this->storage->store($this->entry('cn=b,dc=example,dc=com', self::UUID_B));
+
+        $this->applyMove('cn=b,dc=example,dc=com', self::UUID_A);
+        $this->subject->apply(
+            $this->syncResult(
+                SyncStateControl::STATE_DELETE,
+                $this->entry('cn=b,dc=example,dc=com', self::UUID_A),
+            ),
+            $this->persistSession(),
+        );
+        $this->subject->settle();
+
+        self::assertFalse($this->exists('cn=a,dc=example,dc=com'));
+        self::assertSame(
+            self::UUID_B,
+            $this->value('cn=b,dc=example,dc=com', 'entryUUID'),
+        );
+    }
+
+    public function test_a_move_blocked_by_an_entry_with_no_pending_move_is_reported_and_removes_nothing(): void
+    {
+        $this->storage->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
+        $this->storage->store($this->entry('cn=b,dc=example,dc=com', self::UUID_B));
+
+        $this->applyMove('cn=b,dc=example,dc=com', self::UUID_A);
+
+        try {
+            $this->subject->settle();
+            self::fail('The blocked move should have been reported.');
+        } catch (UnresolvedReplicaMovesException $e) {
+            self::assertSame(
+                ['cn=b,dc=example,dc=com'],
+                $e->dns,
+            );
+        }
+
+        self::assertSame(
+            self::UUID_A,
+            $this->value('cn=a,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            self::UUID_B,
+            $this->value('cn=b,dc=example,dc=com', 'entryUUID'),
+        );
+    }
+
+    public function test_a_parking_dn_held_by_malformed_data_is_reported_and_places_nothing(): void
+    {
+        $this->storage->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
+        $this->storage->store($this->entry('cn=b,dc=example,dc=com', self::UUID_B));
+        $this->storage->store($this->entry('entryUUID=' . self::UUID_A . ',dc=example,dc=com', self::UUID_C));
+
+        $this->applyMove('cn=b,dc=example,dc=com', self::UUID_A);
+        $this->applyMove('cn=a,dc=example,dc=com', self::UUID_B);
+
+        try {
+            $this->subject->settle();
+            self::fail('The taken parking DN should have been reported.');
+        } catch (UnresolvedReplicaMovesException $e) {
+            self::assertEqualsCanonicalizing(
+                ['cn=a,dc=example,dc=com', 'cn=b,dc=example,dc=com'],
+                $e->dns,
+            );
+        }
+
+        self::assertSame(
+            self::UUID_A,
+            $this->value('cn=a,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            self::UUID_B,
+            $this->value('cn=b,dc=example,dc=com', 'entryUUID'),
+        );
+    }
+
+    public function test_begin_refresh_discards_deferred_moves(): void
+    {
+        $this->storage->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
+        $this->storage->store($this->entry('cn=b,dc=example,dc=com', self::UUID_B));
+
+        $this->applyMove('cn=b,dc=example,dc=com', self::UUID_A);
+        $this->subject->beginRefresh();
+        $this->subject->settle();
+
+        self::assertTrue($this->exists('cn=a,dc=example,dc=com'));
+    }
+
+    public function test_an_entry_named_by_its_own_uuid_takes_part_in_a_swap(): void
+    {
+        $selfNamed = 'entryUUID=' . self::UUID_A . ',dc=example,dc=com';
+        $this->storage->store($this->entry($selfNamed, self::UUID_A));
+        $this->storage->store($this->entry('cn=b,dc=example,dc=com', self::UUID_B));
+
+        $this->applyMove('cn=b,dc=example,dc=com', self::UUID_A);
+        $this->applyMove($selfNamed, self::UUID_B);
+        $this->subject->settle();
+
+        self::assertSame(
+            self::UUID_A,
+            $this->value('cn=b,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            self::UUID_B,
+            $this->value($selfNamed, 'entryUUID'),
+        );
+    }
+
+    public function test_resolvable_moves_past_what_one_window_may_hold_are_placed_rather_than_reported(): void
+    {
+        for ($pair = 0; $pair <= 500; $pair++) {
+            $this->storage->store($this->entry("cn=x{$pair},dc=example,dc=com", $this->uuidFor("x{$pair}")));
+            $this->storage->store($this->entry("cn=y{$pair},dc=example,dc=com", $this->uuidFor("y{$pair}")));
+        }
+
+        for ($pair = 0; $pair <= 500; $pair++) {
+            $this->applyMove("cn=y{$pair},dc=example,dc=com", $this->uuidFor("x{$pair}"));
+            $this->applyMove("cn=x{$pair},dc=example,dc=com", $this->uuidFor("y{$pair}"));
+        }
+        $this->subject->settle();
+
+        self::assertSame(
+            $this->uuidFor('x0'),
+            $this->value('cn=y0,dc=example,dc=com', 'entryUUID'),
+        );
+        self::assertSame(
+            $this->uuidFor('y500'),
+            $this->value('cn=x500,dc=example,dc=com', 'entryUUID'),
+        );
+    }
+
+    public function test_more_unresolvable_deferred_moves_than_one_window_may_hold_is_reported(): void
+    {
+        $this->storage->store($this->entry('cn=b,dc=example,dc=com', self::UUID_B));
+
+        $this->expectException(UnresolvedReplicaMovesException::class);
+
+        for ($i = 0; $i <= 1000; $i++) {
+            $uuid = Uuid::v4();
+            $this->storage->store($this->entry("cn=e{$i},dc=example,dc=com", $uuid));
+            $this->applyMove('cn=b,dc=example,dc=com', $uuid);
+        }
+    }
+
     public function test_a_modify_at_the_same_dn_replaces_in_place(): void
     {
         $this->storage->store($this->entry('cn=alice,dc=example,dc=com'));
@@ -414,6 +662,30 @@ final class VerbatimStorageApplierTest extends TestCase
         $this->subject->reconcile();
 
         self::assertFalse($this->exists('cn=a,dc=example,dc=com'));
+    }
+
+    /**
+     * A stable UUID per name, so a test can refer to the same entry before and after it moves.
+     */
+    private function uuidFor(string $name): string
+    {
+        return Uuid::fromBinary(md5(
+            $name,
+            true,
+        ));
+    }
+
+    private function applyMove(
+        string $dn,
+        string $uuid,
+    ): void {
+        $this->subject->apply(
+            $this->syncResult(
+                SyncStateControl::STATE_MODIFY,
+                $this->entry($dn, $uuid),
+            ),
+            $this->persistSession(),
+        );
     }
 
     /**

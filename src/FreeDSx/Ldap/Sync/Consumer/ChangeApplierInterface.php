@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Sync\Consumer;
 
+use FreeDSx\Ldap\Exception\UnresolvedReplicaMovesException;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Session;
@@ -47,6 +48,13 @@ interface ChangeApplierInterface
         SyncIdSetResult $result,
         Session $session,
     ): void;
+
+    /**
+     * Place what was held back since the last sync point. Called before that sync point is checkpointed.
+     *
+     * @throws UnresolvedReplicaMovesException when a moved entry's new DN is still held by an entry with no pending move
+     */
+    public function settle(): void;
 
     /**
      * Delete local entries not seen during a present-phase refresh (reconcile by absence).

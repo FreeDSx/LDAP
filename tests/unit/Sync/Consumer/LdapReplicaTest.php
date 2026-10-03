@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace Tests\Unit\FreeDSx\Ldap\Sync\Consumer;
 
 use Closure;
+use FreeDSx\Ldap\Exception\UnresolvedReplicaMovesException;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BackoffSleeper;
 use FreeDSx\Ldap\Server\Clock\Sleeper\SleeperInterface;
 use FreeDSx\Ldap\Server\Config\ReconnectBackoff;
@@ -28,6 +29,7 @@ use FreeDSx\Ldap\Sync\Session;
 use FreeDSx\Ldap\Sync\SyncRepl;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use RuntimeException;
 
 final class LdapReplicaTest extends TestCase
@@ -41,6 +43,8 @@ final class LdapReplicaTest extends TestCase
     private ShutdownSignalsInterface&MockObject $signals;
 
     private SyncRepl&MockObject $syncRepl;
+
+    private PrimaryConnectionFactory&MockObject $connectionFactory;
 
     private LdapReplica $subject;
 
@@ -97,19 +101,133 @@ final class LdapReplicaTest extends TestCase
                 return $this->syncRepl;
             });
 
-        $connectionFactory = $this->createMock(PrimaryConnectionFactory::class);
-        $connectionFactory->method('connectSyncRepl')
+        $this->connectionFactory = $this->createMock(PrimaryConnectionFactory::class);
+        $this->connectionFactory->method('connectSyncRepl')
             ->willReturn($this->syncRepl);
 
-        $this->subject = new LdapReplica(
-            connectionFactory: $connectionFactory,
-            applier: $this->applier,
-            checkpoint: $this->checkpoint,
-            backoff: new BackoffSleeper(
-                new ReconnectBackoff(),
-                $this->sleeper,
-            ),
-            signals: $this->signals,
+        $this->subject = $this->replica();
+    }
+
+    public function test_held_back_moves_are_settled_before_a_persist_checkpoint(): void
+    {
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        );
+        $checkpointsAtSettle = [];
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function () use ($session): void {
+                ($this->cookieHandler)('cookie-refresh');
+                ($this->refreshDoneHandler)($session);
+                ($this->cookieHandler)('cookie-persist');
+                ($this->shutdown)();
+            });
+        $this->applier->method('settle')
+            ->willReturnCallback(function () use (&$checkpointsAtSettle): void {
+                $checkpointsAtSettle[] = $this->checkpoint->read();
+            });
+
+        $this->subject->run();
+
+        self::assertSame(
+            [null, 'cookie-refresh'],
+            $checkpointsAtSettle,
+        );
+    }
+
+    public function test_held_back_moves_are_settled_after_reconciling_and_before_the_refresh_checkpoint(): void
+    {
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        );
+        $calls = [];
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function () use ($session): void {
+                ($this->cookieHandler)('cookie-after');
+                ($this->refreshDoneHandler)($session);
+                ($this->shutdown)();
+            });
+        $this->applier->method('reconcile')
+            ->willReturnCallback(function () use (&$calls): void {
+                $calls[] = 'reconcile';
+            });
+        $this->applier->method('settle')
+            ->willReturnCallback(function () use (&$calls): void {
+                $calls[] = 'settle:' . ($this->checkpoint->read() ?? 'none');
+            });
+
+        $this->subject->run();
+
+        self::assertSame(
+            ['reconcile', 'settle:none'],
+            $calls,
+        );
+    }
+
+    public function test_moves_left_unplaced_in_a_window_reload_the_content_on_the_next_sync(): void
+    {
+        $this->checkpoint->write('resume-me');
+        $session = (new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        ))->markRefreshComplete(true);
+        $syncs = 0;
+        $settles = 0;
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function () use ($session, &$syncs): void {
+                if (++$syncs > 1) {
+                    ($this->shutdown)();
+
+                    return;
+                }
+                ($this->refreshDoneHandler)($session);
+                ($this->cookieHandler)('cookie-persist');
+            });
+        $this->applier->method('settle')
+            ->willReturnCallback(function () use (&$settles): void {
+                if (++$settles === 2) {
+                    throw new UnresolvedReplicaMovesException(['cn=b,dc=example,dc=com']);
+                }
+            });
+
+        $this->subject->run();
+
+        self::assertNull($this->usedCookie);
+        self::assertSame(
+            'resume-me',
+            $this->checkpoint->read(),
+        );
+    }
+
+    public function test_moves_left_unplaced_by_a_full_refresh_are_logged_and_the_checkpoint_is_written(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $subject = $this->replica($logger);
+        $session = new Session(
+            Session::MODE_LISTEN,
+            'from-primary',
+        );
+
+        $this->syncRepl->method('listen')
+            ->willReturnCallback(function () use ($session): void {
+                ($this->cookieHandler)('cookie-after');
+                ($this->refreshDoneHandler)($session);
+                ($this->shutdown)();
+            });
+        $this->applier->method('settle')
+            ->willThrowException(new UnresolvedReplicaMovesException(['cn=b,dc=example,dc=com']));
+        $logger->expects(self::once())
+            ->method('error');
+
+        $subject->run();
+
+        self::assertSame(
+            'cookie-after',
+            $this->checkpoint->read(),
         );
     }
 
@@ -278,5 +396,20 @@ final class LdapReplicaTest extends TestCase
             });
 
         $this->subject->run();
+    }
+
+    private function replica(?LoggerInterface $logger = null): LdapReplica
+    {
+        return new LdapReplica(
+            connectionFactory: $this->connectionFactory,
+            applier: $this->applier,
+            checkpoint: $this->checkpoint,
+            backoff: new BackoffSleeper(
+                new ReconnectBackoff(),
+                $this->sleeper,
+            ),
+            signals: $this->signals,
+            logger: $logger,
+        );
     }
 }

@@ -14,6 +14,7 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Sync\Consumer;
 
 use FreeDSx\Ldap\Exception\CancelRequestException;
+use FreeDSx\Ldap\Exception\UnresolvedReplicaMovesException;
 use FreeDSx\Ldap\Server\Clock\Sleeper\BackoffSleeper;
 use FreeDSx\Ldap\Server\Logging\ExceptionLogging;
 use FreeDSx\Ldap\Server\Process\Signals\ShutdownSignalsInterface;
@@ -48,6 +49,15 @@ final class LdapReplica
     private ?string $pendingCookie = null;
 
     /**
+     * Set when moves could not be placed.
+     *
+     * The next sync reloads the content.
+     */
+    private bool $reload = false;
+
+    private bool $fullRefresh = false;
+
+    /**
      * @param ?ShutdownSignalsInterface $signals null when a host server owns SIGTERM and drives {@see stop()} instead
      */
     public function __construct(
@@ -73,6 +83,12 @@ final class LdapReplica
                 $this->backoff->reset();
             } catch (CancelRequestException) {
                 // A shutdown was requested; listen() was cancelled cleanly by the entry handler.
+            } catch (UnresolvedReplicaMovesException $e) {
+                $this->reload = true;
+                $this->logger?->warning(
+                    'Replicated moves could not be placed; reloading the content from the primary.',
+                    ['dns' => $e->dns],
+                );
             } catch (Throwable $e) {
                 if ($this->stopping) {
                     break;
@@ -100,9 +116,14 @@ final class LdapReplica
 
     private function sync(): void
     {
+        $cookie = $this->reload
+            ? null
+            : $this->checkpoint->read();
+        $this->fullRefresh = $cookie === null;
+
         $syncRepl = $this->connectionFactory->connectSyncRepl();
         $syncRepl
-            ->useCookie($this->checkpoint->read())
+            ->useCookie($cookie)
             ->useCookieHandler($this->persistCookie(...))
             ->useIdSetHandler($this->applyIdSet(...))
             ->useRefreshDoneHandler($this->reconcileRefresh(...));
@@ -147,16 +168,43 @@ final class LdapReplica
         );
     }
 
+    /**
+     * Moves are settled after reconciling.
+     */
     private function reconcileRefresh(Session $session): void
     {
         if (!$session->hasRefreshDeletes()) {
             $this->applier->reconcile();
         }
 
+        $this->settleRefresh();
         $this->flushCookie();
         $this->refreshing = false;
+        $this->reload = false;
     }
 
+    /**
+     * @throws UnresolvedReplicaMovesException when the refresh resumed from a cookie
+     */
+    private function settleRefresh(): void
+    {
+        try {
+            $this->applier->settle();
+        } catch (UnresolvedReplicaMovesException $e) {
+            if (!$this->fullRefresh) {
+                throw $e;
+            }
+
+            $this->logger?->error(
+                'Replicated moves could not be placed after a full refresh; leaving those entries where they are.',
+                ['dns' => $e->dns],
+            );
+        }
+    }
+
+    /**
+     * Anything held back is settled first, so the checkpoint never moves past a change that was not applied.
+     */
     private function persistCookie(?string $cookie): void
     {
         if ($cookie === null) {
@@ -169,6 +217,7 @@ final class LdapReplica
             return;
         }
 
+        $this->applier->settle();
         $this->checkpoint->write($cookie);
     }
 
