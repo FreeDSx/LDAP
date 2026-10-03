@@ -133,6 +133,7 @@ use FreeDSx\Ldap\ServerOptions;
 use FreeDSx\Ldap\Sync\Consumer\LdapReplica;
 use FreeDSx\Ldap\Sync\Consumer\PrimaryConnectionFactory;
 use FreeDSx\Ldap\Sync\Consumer\ReconcilingChangeApplier;
+use FreeDSx\Ldap\Sync\Consumer\ReplicaMoves;
 use FreeDSx\Ldap\Sync\Consumer\VerbatimStorageApplier;
 use Psr\Log\NullLogger;
 
@@ -848,6 +849,12 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
             $container->get(ListEntryInterface::class),
             $container->get(WriteEntryInterface::class),
             $container->get(ReadEntryInterface::class),
+            $container->get(TransactionalWriteInterface::class),
+            new ReplicaMoves(
+                $container->get(ReadEntryInterface::class),
+                $container->get(WriteEntryInterface::class),
+                $container->get(TransactionalWriteInterface::class),
+            ),
         );
 
         return new LdapReplica(

@@ -501,6 +501,89 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
         );
     }
 
+    public function test_a_locally_locked_account_stays_locked_after_the_provider_renames_it(): void
+    {
+        $dn = 'cn=renamelock,ou=people,dc=foo,dc=bar';
+        $renamed = 'cn=renamedlock,ou=people,dc=foo,dc=bar';
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($dn): void {
+            $provider->create(Entry::fromArray(
+                $dn,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'renamelock',
+                    'sn' => 'Locked',
+                    'userPassword' => 'secret',
+                ],
+            ));
+        });
+        self::assertNotNull($this->waitForReplica($dn));
+        $this->assertBind(
+            $dn,
+            'wrong',
+            false,
+        );
+        $this->assertBind(
+            $dn,
+            'wrong',
+            false,
+        );
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($dn): void {
+            $provider->rename(
+                $dn,
+                'cn=renamedlock',
+            );
+        });
+        self::assertNotNull($this->waitForReplica($renamed));
+
+        $this->assertBind(
+            $renamed,
+            'secret',
+            false,
+        );
+    }
+
+    public function test_a_group_keeps_a_member_the_provider_renames(): void
+    {
+        $member = 'cn=teammate,ou=people,dc=foo,dc=bar';
+        $renamed = 'cn=renamedmate,ou=people,dc=foo,dc=bar';
+        $group = 'cn=team,ou=people,dc=foo,dc=bar';
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($member, $group): void {
+            $provider->create(Entry::fromArray(
+                $member,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'teammate',
+                    'sn' => 'Mate',
+                ],
+            ));
+            $provider->create(Entry::fromArray(
+                $group,
+                [
+                    'objectClass' => 'groupOfNames',
+                    'cn' => 'team',
+                    'member' => $member,
+                ],
+            ));
+        });
+        self::assertNotNull($this->waitForReplica($group));
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($member): void {
+            $provider->rename(
+                $member,
+                'cn=renamedmate',
+            );
+        });
+        self::assertNotNull($this->waitForReplica($renamed));
+
+        self::assertSame(
+            [$renamed],
+            array_values($this->tryReadFromReplica($group, ['member'])?->get('member')?->getValues() ?? []),
+        );
+    }
+
     private function assertBind(
         string $dn,
         string $password,

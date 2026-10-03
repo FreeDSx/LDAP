@@ -18,9 +18,11 @@ use FreeDSx\Ldap\Entry\Attribute;
 use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Exception\InvalidArgumentException;
+use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Exception\EntryAlreadyExistsException;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
 
 /**
@@ -157,6 +159,27 @@ trait SubtreeRenameStorageContractTests
             new Dn('ou=people,dc=foo,dc=bar'),
             new Dn('ou=Staff,ou=people,dc=foo,dc=bar'),
         );
+    }
+
+    public function test_renaming_a_subtree_onto_an_occupied_dn_is_refused_and_moves_nothing(): void
+    {
+        $container = $this->renameContainer();
+
+        try {
+            $container->get(WriteEntryInterface::class)->renameSubtree(
+                new Dn('ou=people,dc=foo,dc=bar'),
+                new Dn('ou=Groups,dc=foo,dc=bar'),
+            );
+            self::fail('Renaming onto an occupied DN should have been refused.');
+        } catch (EntryAlreadyExistsException $e) {
+            self::assertSame(
+                ResultCode::ENTRY_ALREADY_EXISTS,
+                $e->getCode(),
+            );
+        }
+
+        self::assertNotNull($this->storedEntry($container, 'cn=alice,ou=people,dc=foo,dc=bar'));
+        self::assertNotNull($this->storedEntry($container, 'cn=carol,ou=groups,dc=foo,dc=bar'));
     }
 
     /**

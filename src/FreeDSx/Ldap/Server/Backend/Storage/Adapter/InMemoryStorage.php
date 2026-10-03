@@ -180,6 +180,9 @@ final class InMemoryStorage implements
         $this->dnsByUuid[$uuid] = $lcDn;
     }
 
+    /**
+     * @throws EntryAlreadyExistsException when the new DN is already taken
+     */
     public function renameSubtree(
         Dn $from,
         Dn $to,
@@ -194,6 +197,13 @@ final class InMemoryStorage implements
             $to,
             $base->getDn()->toString(),
         );
+
+        if ($this->exists($to)) {
+            throw new EntryAlreadyExistsException(sprintf(
+                'Entry already exists: %s',
+                $to->normalizedString(),
+            ));
+        }
 
         $this->entries = $rename->applyTo(
             $this->entries,

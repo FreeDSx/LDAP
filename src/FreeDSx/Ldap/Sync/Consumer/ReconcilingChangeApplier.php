@@ -76,4 +76,9 @@ readonly class ReconcilingChangeApplier implements ChangeApplierInterface
     {
         $this->baseApplier->reconcile();
     }
+
+    public function settle(): void
+    {
+        $this->baseApplier->settle();
+    }
 }

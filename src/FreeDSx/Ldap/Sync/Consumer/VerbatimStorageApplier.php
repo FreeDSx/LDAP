@@ -18,6 +18,7 @@ use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Schema\Definition\AttributeTypeOid;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ListEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\ReadEntryInterface;
+use FreeDSx\Ldap\Server\Backend\Storage\Contract\TransactionalWriteInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Search\EntryProjection;
 use FreeDSx\Ldap\Server\Backend\Storage\StorageListOptions;
@@ -35,15 +36,10 @@ use function strtolower;
 final class VerbatimStorageApplier implements ChangeApplierInterface
 {
     /**
-     * @var array<string, true> Normalized DNs seen during the current refresh phase.
+     * @var array<string, true> Lower-cased UUIDs announced present during the current refresh phase.
      *
      * @todo Held entirely in memory, so a full refresh of a very large directory is costly. Should be refactored to a
      *       threshold-based on-disk (or generation-marked) present-set.
-     */
-    private array $presentDns = [];
-
-    /**
-     * @var array<string, true> Lower-cased UUIDs announced present in bulk during the current refresh phase.
      */
     private array $presentUuids = [];
 
@@ -51,22 +47,22 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         private readonly ListEntryInterface $lister,
         private readonly WriteEntryInterface $writer,
         private readonly ReadEntryInterface $reader,
+        private readonly TransactionalWriteInterface $transaction,
+        private readonly ReplicaMoves $moves,
     ) {}
 
     public function beginRefresh(): void
     {
-        $this->presentDns = [];
         $this->presentUuids = [];
+        $this->moves->clear();
     }
 
     public function apply(
         SyncEntryResult $result,
         Session $session,
     ): void {
-        $entry = $result->getEntry();
-        $dn = $entry->getDn()
-            ->normalize();
         $uuid = $result->getDecodedEntryUuid();
+        $this->moves->forget($uuid);
 
         // RFC 4533 §3.6: a delete names its entry by UUID, and its DN may be a past one or empty.
         if ($result->isDelete()) {
@@ -76,21 +72,34 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         }
 
         if (!$session->isRefreshComplete()) {
-            $this->presentDns[$dn->toString()] = true;
+            $this->presentUuids[strtolower($uuid)] = true;
         }
 
         if ($result->isPresent()) {
             return;
         }
 
-        // RFC 4533 §3.6 keys entries by UUID, so the same one arriving elsewhere is a move rather than a new entry.
-        $heldAt = $this->dnHolding($uuid);
+        $entry = $this->identified(
+            $result->getEntry(),
+            $uuid,
+        );
 
-        if ($heldAt !== null && $heldAt->toString() !== $dn->toString()) {
-            $this->writer->remove($heldAt);
-        }
+        $this->transaction->atomic(function () use ($entry, $uuid): void {
+            $heldAt = $this->dnHolding($uuid);
 
-        $this->writer->store($this->identified($entry, $uuid));
+            if ($heldAt === null || $heldAt->toString() === $entry->getDn()->normalize()->toString()) {
+                $this->writer->store($entry);
+
+                return;
+            }
+
+            // RFC 4533 §3.6 keys entries by UUID, so the same one arriving elsewhere is a move rather than a new entry.
+            $this->moves->move(
+                $uuid,
+                $heldAt,
+                $entry,
+            );
+        });
     }
 
     public function applyIdSet(
@@ -100,6 +109,9 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         $uuids = $result->getDecodedEntryUuids();
 
         if ($result->isDeleted()) {
+            foreach ($uuids as $uuid) {
+                $this->moves->forget($uuid);
+            }
             $this->removeByUuids($uuids);
 
             return;
@@ -124,11 +136,8 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
 
         $stale = [];
         foreach ($this->lister->list($options)->entries() as $entry) {
-            $dn = $entry->getDn()
-                ->normalize();
-
-            if (!$this->wasAnnouncedPresent($entry, $dn)) {
-                $stale[] = $dn;
+            if (!$this->wasAnnouncedPresent($entry)) {
+                $stale[] = $entry->getDn()->normalize();
             }
         }
 
@@ -136,8 +145,12 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
             $this->writer->remove($dn);
         }
 
-        $this->presentDns = [];
         $this->presentUuids = [];
+    }
+
+    public function settle(): void
+    {
+        $this->moves->settle();
     }
 
     /**
@@ -163,16 +176,10 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
     }
 
     /**
-     * Whether the upstream announced this entry as still present, individually by DN or in bulk by UUID.
+     * Whether the upstream announced this entry as still present, by the UUID that identifies it wherever it lives.
      */
-    private function wasAnnouncedPresent(
-        Entry $entry,
-        Dn $dn,
-    ): bool {
-        if (isset($this->presentDns[$dn->toString()])) {
-            return true;
-        }
-
+    private function wasAnnouncedPresent(Entry $entry): bool
+    {
         $uuid = $entry->getUuid();
 
         return $uuid !== null && isset($this->presentUuids[$uuid]);
