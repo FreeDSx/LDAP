@@ -387,6 +387,40 @@ final class ServerSyncHandlerTest extends TestCase
         );
     }
 
+    public function test_an_entry_vacating_a_dn_is_sent_before_one_that_later_takes_it(): void
+    {
+        $this->append(
+            ChangeType::Modify,
+            'cn=a,dc=example,dc=com',
+            self::UUID_A,
+        );
+        $this->append(
+            ChangeType::ModRdn,
+            'cn=c,dc=example,dc=com',
+            self::UUID_B,
+        );
+        $this->append(
+            ChangeType::ModRdn,
+            'cn=b,dc=example,dc=com',
+            self::UUID_A,
+        );
+        $this->liveEntries['cn=b,dc=example,dc=com'] = $this->entry(
+            'cn=b,dc=example,dc=com',
+            self::UUID_A,
+        );
+        $this->liveEntries['cn=c,dc=example,dc=com'] = $this->entry(
+            'cn=c,dc=example,dc=com',
+            self::UUID_B,
+        );
+
+        $this->handle($this->cookieAt(0));
+
+        self::assertSame(
+            ['cn=c,dc=example,dc=com', 'cn=b,dc=example,dc=com'],
+            $this->sentEntryDns(),
+        );
+    }
+
     public function test_a_changed_entry_moved_out_of_the_content_since_the_change_is_not_sent(): void
     {
         $this->append(ChangeType::Modify, 'cn=a,dc=example,dc=com', self::UUID_A);
