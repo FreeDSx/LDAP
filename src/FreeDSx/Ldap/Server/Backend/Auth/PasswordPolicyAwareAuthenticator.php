@@ -74,6 +74,7 @@ final readonly class PasswordPolicyAwareAuthenticator implements PasswordAuthent
         $attempt = new PasswordBindAttempt(
             name: $name,
             dn: $entry->getDn(),
+            uuid: $entry->getUuidOrFail(),
             state: UserPasswordState::fromEntry($entry),
             policy: $policy,
         );

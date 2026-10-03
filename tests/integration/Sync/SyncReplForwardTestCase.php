@@ -99,6 +99,54 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
         );
     }
 
+    public function test_a_deleted_accounts_failures_are_not_forwarded_to_an_account_recreated_at_its_dn(): void
+    {
+        $dn = 'cn=recreated,ou=people,dc=foo,dc=bar';
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($dn): void {
+            $provider->create(Entry::fromArray(
+                $dn,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'recreated',
+                    'sn' => 'Original',
+                    'userPassword' => 'oldpass',
+                ],
+            ));
+        });
+        self::assertNotNull($this->waitForReplica($dn));
+        $this->tryReplicaBind($dn, 'wrong');
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($dn): void {
+            $provider->delete($dn);
+            $provider->create(Entry::fromArray(
+                $dn,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'recreated',
+                    'sn' => 'Recreated',
+                    'userPassword' => 'newpass',
+                ],
+            ));
+        });
+        self::assertTrue(
+            $this->pollUntil(fn(): bool => $this->tryReadFromReplica($dn)?->get('sn')?->firstValue() === 'Recreated'),
+            'The recreated account should replicate.',
+        );
+        $this->tryReplicaBind($dn, 'wrong');
+
+        // Once the recreated account's own failure is forwarded, it is the only one the provider holds for it.
+        self::assertTrue(
+            $this->pollUntil(fn(): bool => $this->failureTimesOnProvider($dn) !== []),
+            'The recreated account\'s own failure should forward.',
+        );
+        self::assertCount(
+            1,
+            $this->failureTimesOnProvider($dn),
+        );
+        self::assertFalse($this->providerHasLock($dn));
+    }
+
     public function test_a_forward_naming_an_unknown_uuid_applies_nowhere(): void
     {
         $before = $this->lockedDnsOnProvider();
@@ -385,6 +433,24 @@ abstract class SyncReplForwardTestCase extends ServerTestCase
         } while (microtime(true) < $deadline);
 
         return false;
+    }
+
+    /**
+     * @param callable(LdapClient): void $write
+     */
+    private function writeToProvider(callable $write): void
+    {
+        $provider = $this->providerClient();
+
+        try {
+            $provider->bind(
+                'cn=admin,dc=foo,dc=bar',
+                '12345',
+            );
+            $write($provider);
+        } finally {
+            $this->quietUnbind($provider);
+        }
     }
 
     private function providerClient(): LdapClient

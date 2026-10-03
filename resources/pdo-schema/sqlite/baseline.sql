@@ -81,13 +81,13 @@ CREATE TABLE IF NOT EXISTS ldap_change_journal_seq (
 
 INSERT OR IGNORE INTO ldap_change_journal_seq (id, seq) VALUES (1, 0);
 
--- Keyed by entry_id so parent and DN changes are seamless.
+-- Keyed by entry_uuid so the state survives a rename and goes with the entry it describes.
 CREATE TABLE IF NOT EXISTS ldap_replica_pwpolicy_state (
-    entry_id       INTEGER NOT NULL PRIMARY KEY,
+    entry_uuid     TEXT NOT NULL PRIMARY KEY,
     state          TEXT NOT NULL,
     seq            INTEGER NOT NULL DEFAULT 0,
     forwarded_seq  INTEGER NOT NULL DEFAULT 0,
-    FOREIGN KEY (entry_id) REFERENCES entries(entry_id) ON DELETE CASCADE
+    FOREIGN KEY (entry_uuid) REFERENCES entries(entry_uuid) ON DELETE CASCADE
 );
 
 -- Stamped from PdoStorage::SCHEMA_VERSION on connect, so a database states which schema it holds.

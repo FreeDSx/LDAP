@@ -254,7 +254,7 @@ final class PasswordPolicyAwareAuthenticatorTest extends TestCase
     {
         return Entry::fromArray(
             new Dn(self::DN),
-            $attributes,
+            $attributes + ['entryUUID' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'],
         );
     }
 

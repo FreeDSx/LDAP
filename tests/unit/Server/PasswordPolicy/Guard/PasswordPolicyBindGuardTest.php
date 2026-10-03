@@ -303,6 +303,7 @@ final class PasswordPolicyBindGuardTest extends TestCase
         return new PasswordBindAttempt(
             name: 'foo',
             dn: new Dn(self::DN),
+            uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             state: $state,
             policy: $policy,
         );

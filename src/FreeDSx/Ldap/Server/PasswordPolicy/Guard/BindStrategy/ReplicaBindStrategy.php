@@ -53,7 +53,7 @@ final readonly class ReplicaBindStrategy implements PasswordPolicyBindStrategyIn
         }
 
         $localOutcome = $this->engine->evaluateLocalLockout(
-            $this->store->load($attempt->dn)->toUserPasswordState($attempt->dn),
+            $this->store->load($attempt->uuid)->toUserPasswordState($attempt->dn),
             $attempt->policy,
         );
 
@@ -71,7 +71,7 @@ final readonly class ReplicaBindStrategy implements PasswordPolicyBindStrategyIn
         $recorded = null;
 
         $this->store->atomicMutate(
-            $attempt->dn,
+            $attempt->uuid,
             function (ReplicaPasswordState $local) use ($attempt, $decide, &$recorded): OperationalChanges {
                 $recorded = $decide($this->combine(
                     $attempt->state,

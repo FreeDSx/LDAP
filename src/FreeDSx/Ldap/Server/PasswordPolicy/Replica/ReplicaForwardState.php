@@ -22,16 +22,24 @@ use FreeDSx\Ldap\Entry\Dn;
  */
 final readonly class ReplicaForwardState
 {
+    /**
+     * @param string $uuid The subject's lowercased entryUUID.
+     * @param Dn $dn Where the subject lives now.
+     */
     public function __construct(
+        public string $uuid,
         public Dn $dn,
         public ReplicaPasswordState $state,
         public int $sequence,
         public int $forwarded = 0,
     ) {}
 
-    public static function initial(Dn $dn): self
-    {
+    public static function initial(
+        string $uuid,
+        Dn $dn,
+    ): self {
         return new self(
+            $uuid,
             $dn,
             ReplicaPasswordState::empty(),
             0,
@@ -41,6 +49,7 @@ final readonly class ReplicaForwardState
     public function applied(ReplicaPasswordState $state): self
     {
         return new self(
+            $this->uuid,
             $this->dn,
             $state,
             $this->sequence + 1,

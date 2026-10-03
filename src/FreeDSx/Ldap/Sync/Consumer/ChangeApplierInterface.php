@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Sync\Consumer;
 
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
 use FreeDSx\Ldap\Sync\Result\SyncIdSetResult;
 use FreeDSx\Ldap\Sync\Session;
@@ -35,23 +34,19 @@ interface ChangeApplierInterface
      *
      * During the refresh phase the entry's DN is recorded so {@see self::reconcile()} can find local entries the
      * upstream no longer has.
-     *
-     * @return list<Dn> the DNs whose stored entry this result took away, though one may now hold a different entry
      */
     public function apply(
         SyncEntryResult $result,
         Session $session,
-    ): array;
+    ): void;
 
     /**
      * Apply one bulk UUID set: a delete set removes each entry, a present set marks them seen for reconciliation.
-     *
-     * @return list<Dn> the DNs the set removed, which only a UUID lookup against storage can resolve
      */
     public function applyIdSet(
         SyncIdSetResult $result,
         Session $session,
-    ): array;
+    ): void;
 
     /**
      * Delete local entries not seen during a present-phase refresh (reconcile by absence).

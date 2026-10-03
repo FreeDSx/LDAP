@@ -14,7 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\PasswordPolicy\Replica;
 
 use Closure;
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Writer\WriterQueueInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
@@ -31,20 +30,20 @@ final readonly class SerializingReplicaPasswordStateStore implements ReplicaPass
         private WriterQueueInterface $queue,
     ) {}
 
-    public function load(Dn $dn): ReplicaPasswordState
+    public function load(string $uuid): ReplicaPasswordState
     {
-        return $this->store->load($dn);
+        return $this->store->load($uuid);
     }
 
     /**
      * @param callable(ReplicaPasswordState): OperationalChanges $merge
      */
     public function atomicMutate(
-        Dn $dn,
+        string $uuid,
         callable $merge,
     ): void {
         $this->submit(fn() => $this->store->atomicMutate(
-            $dn,
+            $uuid,
             $merge,
         ));
     }
@@ -55,28 +54,23 @@ final readonly class SerializingReplicaPasswordStateStore implements ReplicaPass
     }
 
     public function markForwarded(
-        Dn $dn,
+        string $uuid,
         int $sequence,
     ): void {
         $this->submit(fn() => $this->store->markForwarded(
-            $dn,
+            $uuid,
             $sequence,
         ));
     }
 
     public function discardIfSuperseded(
-        Dn $dn,
+        string $uuid,
         UserPasswordState $authoritative,
     ): void {
         $this->submit(fn() => $this->store->discardIfSuperseded(
-            $dn,
+            $uuid,
             $authoritative,
         ));
-    }
-
-    public function discard(Dn $dn): void
-    {
-        $this->submit(fn() => $this->store->discard($dn));
     }
 
     /**

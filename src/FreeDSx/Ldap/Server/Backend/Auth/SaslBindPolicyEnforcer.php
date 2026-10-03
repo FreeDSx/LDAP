@@ -97,6 +97,7 @@ final readonly class SaslBindPolicyEnforcer
         return new PasswordBindAttempt(
             name: $username,
             dn: $entry->getDn(),
+            uuid: $entry->getUuidOrFail(),
             state: UserPasswordState::fromEntry($entry),
             policy: $policy,
         );

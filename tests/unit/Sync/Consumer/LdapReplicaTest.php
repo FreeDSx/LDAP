@@ -220,8 +220,7 @@ final class LdapReplicaTest extends TestCase
             ->with(
                 $idSet,
                 $session,
-            )
-            ->willReturn([]);
+            );
 
         $this->subject->run();
     }

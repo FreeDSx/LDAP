@@ -45,54 +45,31 @@ readonly class ReconcilingChangeApplier implements ChangeApplierInterface
     public function apply(
         SyncEntryResult $result,
         Session $session,
-    ): array {
-        $removed = $this->baseApplier->apply(
+    ): void {
+        $this->baseApplier->apply(
             $result,
             $session,
         );
-        $stores = !$result->isPresent() && !$result->isDelete();
-        $storedAt = $result->getEntry()
-            ->getDn()
-            ->normalizedString();
 
-        foreach ($removed as $dn) {
-            // Its DN now holds the entry just stored, and removing the one it replaced already cascaded that state.
-            if ($stores && $dn->normalizedString() === $storedAt) {
-                continue;
-            }
-
-            $this->passwordStateStore->discard($dn);
-        }
-
-        // A present marker changes nothing, and a delete has nothing left to reconcile against.
-        if (!$stores) {
-            return $removed;
+        // A present marker changes nothing, and a removed entry already took its state with it.
+        if ($result->isPresent() || $result->isDelete()) {
+            return;
         }
 
         $this->passwordStateStore->discardIfSuperseded(
-            $result->getEntry()
-                ->getDn()
-                ->normalize(),
+            $result->getDecodedEntryUuid(),
             UserPasswordState::fromEntry($result->getEntry()),
         );
-
-        return $removed;
     }
 
     public function applyIdSet(
         SyncIdSetResult $result,
         Session $session,
-    ): array {
-        $removed = $this->baseApplier->applyIdSet(
+    ): void {
+        $this->baseApplier->applyIdSet(
             $result,
             $session,
         );
-
-        foreach ($removed as $dn) {
-            $this->passwordStateStore->discard($dn);
-        }
-
-        return $removed;
     }
 
     public function reconcile(): void

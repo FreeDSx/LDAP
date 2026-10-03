@@ -15,7 +15,6 @@ namespace Tests\Unit\FreeDSx\Ldap\Sync\Consumer;
 
 use FreeDSx\Ldap\Control\Sync\SyncStateControl;
 use FreeDSx\Ldap\Entry\Attribute;
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Entry\Entry;
 use FreeDSx\Ldap\Operation\Response\SearchResultEntry;
 use FreeDSx\Ldap\Protocol\LdapMessageResponse;
@@ -23,6 +22,7 @@ use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Search\Result\EntryResult;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
+use FreeDSx\Ldap\Server\Utility\Uuid;
 use FreeDSx\Ldap\Sync\Consumer\ChangeApplierInterface;
 use FreeDSx\Ldap\Sync\Consumer\ReconcilingChangeApplier;
 use FreeDSx\Ldap\Sync\Result\SyncEntryResult;
@@ -34,6 +34,8 @@ use PHPUnit\Framework\TestCase;
 final class ReconcilingChangeApplierTest extends TestCase
 {
     private const DN = 'cn=alice,dc=example,dc=com';
+
+    private const UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
     private ChangeApplierInterface&MockObject $baseApplier;
 
@@ -97,7 +99,7 @@ final class ReconcilingChangeApplierTest extends TestCase
             ->expects(self::once())
             ->method('discardIfSuperseded')
             ->with(
-                self::callback(static fn(Dn $dn): bool => $dn->toString() === (new Dn(self::DN))->normalizedString()),
+                self::UUID,
                 self::callback(static fn(UserPasswordState $state): bool => $state->isLocked()),
             );
 
@@ -130,9 +132,6 @@ final class ReconcilingChangeApplierTest extends TestCase
         $this->passwordStateStore
             ->expects(self::never())
             ->method('discardIfSuperseded');
-        $this->passwordStateStore
-            ->expects(self::never())
-            ->method('discard');
 
         $this->subject->apply(
             $this->syncResult(
@@ -143,41 +142,14 @@ final class ReconcilingChangeApplierTest extends TestCase
         );
     }
 
-    public function test_a_delete_discards_the_local_state_where_the_base_applier_removed_the_entry(): void
+    public function test_a_delete_does_not_reconcile(): void
     {
-        $removed = [new Dn('cn=moved,dc=example,dc=com')];
-
         $this->baseApplier
-            ->method('apply')
-            ->willReturn($removed);
+            ->expects(self::once())
+            ->method('apply');
         $this->passwordStateStore
             ->expects(self::never())
             ->method('discardIfSuperseded');
-        $this->passwordStateStore
-            ->expects(self::once())
-            ->method('discard')
-            ->with($removed[0]);
-
-        self::assertSame(
-            $removed,
-            $this->subject->apply(
-                $this->syncResult(
-                    SyncStateControl::STATE_DELETE,
-                    $this->entry(),
-                ),
-                $this->session(),
-            ),
-        );
-    }
-
-    public function test_a_delete_that_removed_nothing_discards_no_local_state(): void
-    {
-        $this->baseApplier
-            ->method('apply')
-            ->willReturn([]);
-        $this->passwordStateStore
-            ->expects(self::never())
-            ->method('discard');
 
         $this->subject->apply(
             $this->syncResult(
@@ -188,57 +160,8 @@ final class ReconcilingChangeApplierTest extends TestCase
         );
     }
 
-    public function test_an_add_that_replaced_another_entry_at_its_dn_leaves_the_new_entrys_state_alone(): void
+    public function test_an_id_set_passes_through_to_the_base_applier(): void
     {
-        $this->baseApplier
-            ->method('apply')
-            ->willReturn([(new Dn(self::DN))->normalize()]);
-        $this->passwordStateStore
-            ->expects(self::never())
-            ->method('discard');
-        $this->passwordStateStore
-            ->expects(self::once())
-            ->method('discardIfSuperseded');
-
-        $this->subject->apply(
-            $this->syncResult(
-                SyncStateControl::STATE_ADD,
-                $this->lockedEntry(),
-            ),
-            $this->session(),
-        );
-    }
-
-    public function test_a_move_discards_the_local_state_left_at_the_dn_it_moved_from(): void
-    {
-        $from = (new Dn('cn=previous,dc=example,dc=com'))->normalize();
-
-        $this->baseApplier
-            ->method('apply')
-            ->willReturn([$from]);
-        $this->passwordStateStore
-            ->expects(self::once())
-            ->method('discard')
-            ->with($from);
-        $this->passwordStateStore
-            ->expects(self::once())
-            ->method('discardIfSuperseded');
-
-        $this->subject->apply(
-            $this->syncResult(
-                SyncStateControl::STATE_ADD,
-                $this->lockedEntry(),
-            ),
-            $this->session(),
-        );
-    }
-
-    public function test_an_id_set_discards_the_local_state_of_every_dn_it_removed(): void
-    {
-        $removed = [
-            new Dn(self::DN),
-            new Dn('cn=bob,dc=example,dc=com'),
-        ];
         $idSet = $this->createMock(SyncIdSetResult::class);
         $session = $this->session();
 
@@ -248,33 +171,14 @@ final class ReconcilingChangeApplierTest extends TestCase
             ->with(
                 $idSet,
                 $session,
-            )
-            ->willReturn($removed);
-        $this->passwordStateStore
-            ->expects(self::exactly(2))
-            ->method('discard');
-
-        self::assertSame(
-            $removed,
-            $this->subject->applyIdSet(
-                $idSet,
-                $session,
-            ),
-        );
-    }
-
-    public function test_an_id_set_that_removed_nothing_discards_no_local_state(): void
-    {
-        $this->baseApplier
-            ->method('applyIdSet')
-            ->willReturn([]);
+            );
         $this->passwordStateStore
             ->expects(self::never())
-            ->method('discard');
+            ->method('discardIfSuperseded');
 
         $this->subject->applyIdSet(
-            $this->createMock(SyncIdSetResult::class),
-            $this->session(),
+            $idSet,
+            $session,
         );
     }
 
@@ -307,7 +211,7 @@ final class ReconcilingChangeApplierTest extends TestCase
             new SearchResultEntry($entry),
             new SyncStateControl(
                 $state,
-                'uuid-' . $entry->getDn()->toString(),
+                Uuid::toBinary(self::UUID),
             ),
         );
 
