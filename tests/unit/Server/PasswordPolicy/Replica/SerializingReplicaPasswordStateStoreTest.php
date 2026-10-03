@@ -13,7 +13,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\FreeDSx\Ldap\Server\PasswordPolicy\Replica;
 
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordState;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
@@ -25,7 +24,7 @@ use Tests\Support\FreeDSx\Ldap\Backend\Storage\RecordingWriterQueue;
 
 final class SerializingReplicaPasswordStateStoreTest extends TestCase
 {
-    private const DN = 'cn=foo,dc=example,dc=com';
+    private const UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
     private ReplicaPasswordStateStoreInterface&MockObject $store;
 
@@ -53,7 +52,7 @@ final class SerializingReplicaPasswordStateStoreTest extends TestCase
 
         self::assertSame(
             $state,
-            $this->subject->load(new Dn(self::DN)),
+            $this->subject->load(self::UUID),
         );
         self::assertSame(
             0,
@@ -85,12 +84,12 @@ final class SerializingReplicaPasswordStateStoreTest extends TestCase
             ->expects(self::once())
             ->method('atomicMutate')
             ->with(
-                new Dn(self::DN),
+                self::UUID,
                 $merge,
             );
 
         $this->subject->atomicMutate(
-            new Dn(self::DN),
+            self::UUID,
             $merge,
         );
 
@@ -106,12 +105,12 @@ final class SerializingReplicaPasswordStateStoreTest extends TestCase
             ->expects(self::once())
             ->method('markForwarded')
             ->with(
-                new Dn(self::DN),
+                self::UUID,
                 7,
             );
 
         $this->subject->markForwarded(
-            new Dn(self::DN),
+            self::UUID,
             7,
         );
 
@@ -128,29 +127,14 @@ final class SerializingReplicaPasswordStateStoreTest extends TestCase
             ->expects(self::once())
             ->method('discardIfSuperseded')
             ->with(
-                new Dn(self::DN),
+                self::UUID,
                 $authoritative,
             );
 
         $this->subject->discardIfSuperseded(
-            new Dn(self::DN),
+            self::UUID,
             $authoritative,
         );
-
-        self::assertSame(
-            1,
-            $this->queue->runs,
-        );
-    }
-
-    public function test_discard_runs_through_the_queue(): void
-    {
-        $this->store
-            ->expects(self::once())
-            ->method('discard')
-            ->with(new Dn(self::DN));
-
-        $this->subject->discard(new Dn(self::DN));
 
         self::assertSame(
             1,

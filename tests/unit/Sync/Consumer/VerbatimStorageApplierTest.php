@@ -117,7 +117,7 @@ final class VerbatimStorageApplierTest extends TestCase
     {
         $this->storage->store($this->entry('cn=moved,dc=example,dc=com', self::UUID_B));
 
-        $removed = $this->subject->apply(
+        $this->subject->apply(
             $this->syncResult(
                 SyncStateControl::STATE_DELETE,
                 $this->entry('cn=old,dc=example,dc=com', self::UUID_B),
@@ -126,17 +126,13 @@ final class VerbatimStorageApplierTest extends TestCase
         );
 
         self::assertFalse($this->exists('cn=moved,dc=example,dc=com'));
-        self::assertSame(
-            ['cn=moved,dc=example,dc=com'],
-            $this->dnStrings($removed),
-        );
     }
 
     public function test_a_delete_whose_uuid_the_replica_does_not_hold_leaves_the_entry_at_its_dn(): void
     {
         $this->storage->store($this->entry('cn=carol,dc=example,dc=com', self::UUID_A));
 
-        $removed = $this->subject->apply(
+        $this->subject->apply(
             $this->syncResult(
                 SyncStateControl::STATE_DELETE,
                 $this->entry('cn=carol,dc=example,dc=com', self::UUID_B),
@@ -145,17 +141,13 @@ final class VerbatimStorageApplierTest extends TestCase
         );
 
         self::assertTrue($this->exists('cn=carol,dc=example,dc=com'));
-        self::assertSame(
-            [],
-            $removed,
-        );
     }
 
     public function test_an_add_at_a_dn_held_by_another_uuid_replaces_the_holder(): void
     {
         $this->storage->store($this->entry('cn=carol,dc=example,dc=com', self::UUID_A));
 
-        $removed = $this->subject->apply(
+        $this->subject->apply(
             $this->syncResult(
                 SyncStateControl::STATE_ADD,
                 $this->entry('cn=carol,dc=example,dc=com', self::UUID_B),
@@ -166,10 +158,6 @@ final class VerbatimStorageApplierTest extends TestCase
         self::assertSame(
             self::UUID_B,
             $this->value('cn=carol,dc=example,dc=com', 'entryUUID'),
-        );
-        self::assertSame(
-            ['cn=carol,dc=example,dc=com'],
-            $this->dnStrings($removed),
         );
     }
 
@@ -331,7 +319,7 @@ final class VerbatimStorageApplierTest extends TestCase
         $this->storage->store($this->entry('cn=b,dc=example,dc=com', self::UUID_B));
         $this->storage->store($this->entry('cn=c,dc=example,dc=com', self::UUID_C));
 
-        $removed = $this->subject->applyIdSet(
+        $this->subject->applyIdSet(
             $this->idSet(
                 [self::UUID_A, self::UUID_C],
                 deleted: true,
@@ -342,23 +330,13 @@ final class VerbatimStorageApplierTest extends TestCase
         self::assertFalse($this->exists('cn=a,dc=example,dc=com'));
         self::assertTrue($this->exists('cn=b,dc=example,dc=com'));
         self::assertFalse($this->exists('cn=c,dc=example,dc=com'));
-        self::assertSame(
-            [
-                'cn=a,dc=example,dc=com',
-                'cn=c,dc=example,dc=com',
-            ],
-            array_map(
-                static fn(Dn $dn): string => $dn->toString(),
-                $removed,
-            ),
-        );
     }
 
     public function test_a_delete_set_naming_an_unheld_uuid_is_a_no_op(): void
     {
         $this->storage->store($this->entry('cn=a,dc=example,dc=com', self::UUID_A));
 
-        $removed = $this->subject->applyIdSet(
+        $this->subject->applyIdSet(
             $this->idSet(
                 [self::UUID_B],
                 deleted: true,
@@ -367,10 +345,6 @@ final class VerbatimStorageApplierTest extends TestCase
         );
 
         self::assertTrue($this->exists('cn=a,dc=example,dc=com'));
-        self::assertSame(
-            [],
-            $removed,
-        );
     }
 
     /**
@@ -489,18 +463,6 @@ final class VerbatimStorageApplierTest extends TestCase
                 $deleted,
             ),
         ));
-    }
-
-    /**
-     * @param list<Dn> $dns
-     * @return list<string>
-     */
-    private function dnStrings(array $dns): array
-    {
-        return array_map(
-            static fn(Dn $dn): string => $dn->toString(),
-            $dns,
-        );
     }
 
     private function refreshSession(): Session

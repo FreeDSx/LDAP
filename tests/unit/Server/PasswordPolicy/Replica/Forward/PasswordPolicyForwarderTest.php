@@ -26,7 +26,6 @@ use FreeDSx\Ldap\Schema\Definition\PasswordPolicyOid;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\ForwardStateSenderInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward\PasswordPolicyForwarder;
-use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Contract\WriteEntryInterface;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
 use FreeDSx\Ldap\ServerOptions;
@@ -83,7 +82,6 @@ final class PasswordPolicyForwarderTest extends TestCase
         $this->subject = new PasswordPolicyForwarder(
             $this->store,
             $this->sender,
-            $this->fromContainer(ReadBackendInterface::class),
         );
     }
 
@@ -122,8 +120,8 @@ final class PasswordPolicyForwarderTest extends TestCase
     public function test_it_drains_every_pending_subject(): void
     {
         $this->recordSends();
-        $this->seedFailure('20260520120000Z', 'cn=a,dc=example,dc=com');
-        $this->seedFailure('20260520120000Z', 'cn=b,dc=example,dc=com');
+        $this->seedFailure('20260520120000Z', self::UUID_A);
+        $this->seedFailure('20260520120000Z', self::UUID_B);
 
         self::assertSame(
             2,
@@ -132,6 +130,47 @@ final class PasswordPolicyForwarderTest extends TestCase
         self::assertSame(
             [],
             $this->store->listUnforwarded(),
+        );
+    }
+
+    public function test_a_subject_replaced_at_its_dn_leaves_nothing_to_forward(): void
+    {
+        $this->recordSends();
+        $this->seedFailure('20260520120000Z');
+
+        $this->fromContainer(WriteEntryInterface::class)->store(new Entry(
+            new Dn(self::DN),
+            new Attribute('cn', 'foo'),
+            new Attribute('entryUUID', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'),
+        ));
+
+        self::assertSame(
+            0,
+            $this->subject->forwardOnce(),
+        );
+        self::assertSame(
+            [],
+            $this->sent,
+        );
+    }
+
+    public function test_a_renamed_subject_is_forwarded_under_its_own_entry_uuid(): void
+    {
+        $this->recordSends();
+        $this->seedFailure('20260520120000Z');
+
+        $this->fromContainer(WriteEntryInterface::class)->renameSubtree(
+            new Dn(self::DN),
+            new Dn('cn=renamed,dc=example,dc=com'),
+        );
+        $this->subject->forwardOnce();
+
+        self::assertSame(
+            [self::UUID],
+            array_map(
+                static fn(ForwardPasswordPolicyStateRequest $request): string => $request->getEntryUuid(),
+                $this->sent,
+            ),
         );
     }
 
@@ -165,8 +204,8 @@ final class PasswordPolicyForwarderTest extends TestCase
 
                 $this->sent[] = $request;
             });
-        $this->seedFailure('20260520120000Z', 'cn=a,dc=example,dc=com');
-        $this->seedFailure('20260520120000Z', 'cn=b,dc=example,dc=com');
+        $this->seedFailure('20260520120000Z', self::UUID_A);
+        $this->seedFailure('20260520120000Z', self::UUID_B);
 
         $forwarded = $this->subject->forwardOnce();
 
@@ -258,10 +297,10 @@ final class PasswordPolicyForwarderTest extends TestCase
 
     private function seedFailure(
         string $time,
-        string $dn = self::DN,
+        string $uuid = self::UUID,
     ): void {
         $this->store->atomicMutate(
-            new Dn($dn),
+            $uuid,
             static fn(): OperationalChanges => OperationalChanges::of(Change::replace(
                 PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
                 $time,

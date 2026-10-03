@@ -16,7 +16,6 @@ namespace FreeDSx\Ldap\Server\PasswordPolicy\Replica\Forward;
 use FreeDSx\Ldap\Exception\ForwardStateException;
 use FreeDSx\Ldap\Exception\ForwardStateRejectedException;
 use FreeDSx\Ldap\Operation\Request\ForwardPasswordPolicyStateRequest;
-use FreeDSx\Ldap\Server\Backend\ReadBackendInterface;
 use FreeDSx\Ldap\Server\Logging\ExceptionLogging;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaForwardState;
 use FreeDSx\Ldap\Server\PasswordPolicy\Replica\ReplicaPasswordStateStoreInterface;
@@ -40,7 +39,6 @@ class PasswordPolicyForwarder
     public function __construct(
         private readonly ReplicaPasswordStateStoreInterface $store,
         private readonly ForwardStateSenderInterface $sender,
-        private readonly ReadBackendInterface $backend,
         private readonly ?LoggerInterface $logger = null,
     ) {}
 
@@ -66,16 +64,8 @@ class PasswordPolicyForwarder
                 continue;
             }
 
-            $uuid = $this->uuidFor($pending);
-            if ($uuid === null) {
-                $this->reportUnaddressable($pending, $previous);
-                $refused[$key] = $this->nextRefusal($pending, $previous);
-
-                continue;
-            }
-
             try {
-                $this->sender->send($this->requestFor($pending, $uuid));
+                $this->sender->send($this->requestFor($pending));
             } catch (ForwardStateRejectedException $e) {
                 // One subject the primary refuses must not hold back every other subject behind it.
                 $this->reportRefusal($pending, $previous, $e);
@@ -85,7 +75,7 @@ class PasswordPolicyForwarder
             }
 
             $this->store->markForwarded(
-                $pending->dn,
+                $pending->uuid,
                 $pending->sequence,
             );
             ++$forwarded;
@@ -119,12 +109,9 @@ class PasswordPolicyForwarder
             ?? RefusedForward::after($pending->sequence, $this->drain);
     }
 
-    /**
-     * Normalized, so one subject cannot occupy two entries under two spellings of its DN.
-     */
     private static function keyFor(ReplicaForwardState $pending): string
     {
-        return $pending->dn->normalizedString();
+        return $pending->uuid;
     }
 
     /**
@@ -145,35 +132,12 @@ class PasswordPolicyForwarder
         );
     }
 
-    private function reportUnaddressable(
-        ReplicaForwardState $pending,
-        ?RefusedForward $previous,
-    ): void {
-        if ($previous !== null) {
-            return;
-        }
-
-        $this->logger?->warning(
-            'A pending password-policy forward has no resolvable entry UUID; leaving it pending and continuing.',
-            ['dn' => $pending->dn->toString()],
-        );
-    }
-
-    private function uuidFor(ReplicaForwardState $pending): ?string
+    private function requestFor(ReplicaForwardState $pending): ForwardPasswordPolicyStateRequest
     {
-        return $this->backend
-            ->get($pending->dn)
-            ?->getUuid();
-    }
-
-    private function requestFor(
-        ReplicaForwardState $pending,
-        string $uuid,
-    ): ForwardPasswordPolicyStateRequest {
         $state = $pending->state->toUserPasswordState($pending->dn);
 
         return new ForwardPasswordPolicyStateRequest(
-            $uuid,
+            $pending->uuid,
             failureTimes: $state->failureTimes,
             lastSuccess: $state->lastSuccess,
         );

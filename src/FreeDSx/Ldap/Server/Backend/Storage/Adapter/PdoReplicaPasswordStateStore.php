@@ -14,8 +14,6 @@ declare(strict_types=1);
 namespace FreeDSx\Ldap\Server\Backend\Storage\Adapter;
 
 use FreeDSx\Ldap\Entry\Dn;
-use FreeDSx\Ldap\Exception\RuntimeException;
-use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoEntryWriteDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Dialect\Contract\PdoRowLockDialectInterface;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Connection\PdoConnection;
 use FreeDSx\Ldap\Server\Backend\Storage\Adapter\Pdo\Statement\PdoColumnCastTrait;
@@ -32,7 +30,7 @@ use function json_encode;
 use function max;
 
 /**
- * Replica-local password-policy state persisted as a JSON row per subject, sharing the PDO storage connection.
+ * Replica-local password-policy state persisted as a JSON row per entryUUID.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -44,25 +42,29 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
 
     public function __construct(
         private PdoConnection $connection,
-        private PdoEntryWriteDialectInterface&PdoRowLockDialectInterface $dialect,
+        private PdoRowLockDialectInterface $dialect,
     ) {}
 
-    public function load(Dn $dn): ReplicaPasswordState
+    public function load(string $uuid): ReplicaPasswordState
     {
-        return $this->loadRecord($dn)->state;
+        return $this->recordFor($uuid)->state ?? ReplicaPasswordState::empty();
     }
 
     /**
      * @param callable(ReplicaPasswordState): OperationalChanges $merge
      */
     public function atomicMutate(
-        Dn $dn,
+        string $uuid,
         callable $merge,
     ): void {
-        $this->connection->atomic(function () use ($dn, $merge): void {
-            $this->lockStateRow($dn);
+        $this->connection->atomic(function () use ($uuid, $merge): void {
+            $this->lockStateRow($uuid);
 
-            $record = $this->loadRecord($dn);
+            $record = $this->recordFor($uuid);
+            if ($record === null) {
+                return;
+            }
+
             $changes = $merge($record->state);
             if ($changes->isEmpty()) {
                 return;
@@ -82,9 +84,9 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
         $table = self::TABLE;
         $statement = $this->connection->execute(
             <<<SQL
-                SELECT e.lc_dn, s.state, s.seq, s.forwarded_seq
+                SELECT s.entry_uuid, e.lc_dn, s.state, s.seq, s.forwarded_seq
                 FROM $table s
-                INNER JOIN entries e ON e.entry_id = s.entry_id
+                INNER JOIN entries e ON e.entry_uuid = s.entry_uuid
                 WHERE s.seq > s.forwarded_seq
                 ORDER BY s.seq ASC
                 LIMIT ?
@@ -99,6 +101,7 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
             }
 
             $pending[] = new ReplicaForwardState(
+                $this->stringColumn($row['entry_uuid']),
                 new Dn($this->stringColumn($row['lc_dn'])),
                 $this->decode($this->stringColumn($row['state'])),
                 $this->intColumn($row['seq']),
@@ -110,25 +113,19 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
     }
 
     public function markForwarded(
-        Dn $dn,
+        string $uuid,
         int $sequence,
     ): void {
-        $entryId = $this->entryId($dn);
-
-        if ($entryId === null) {
-            return;
-        }
-
         $table = self::TABLE;
         $this->connection->execute(
             <<<SQL
                 UPDATE $table
                 SET forwarded_seq = ?
-                WHERE entry_id = ? AND forwarded_seq < ? AND seq >= ?
+                WHERE entry_uuid = ? AND forwarded_seq < ? AND seq >= ?
                 SQL,
             [
                 $sequence,
-                $entryId,
+                $uuid,
                 $sequence,
                 $sequence,
             ],
@@ -139,68 +136,66 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
      * The row lock plus re-load makes the supersession check atomic, so a failure from a racing bind is never dropped.
      */
     public function discardIfSuperseded(
-        Dn $dn,
+        string $uuid,
         UserPasswordState $authoritative,
     ): void {
-        $this->connection->atomic(function () use ($dn, $authoritative): void {
-            $this->lockStateRow($dn);
+        $this->connection->atomic(function () use ($uuid, $authoritative): void {
+            $this->lockStateRow($uuid);
 
-            $local = $this->loadRecord($dn)
-                ->state
-                ->toUserPasswordState($dn);
+            $record = $this->recordFor($uuid);
+            if ($record === null) {
+                return;
+            }
+
+            $local = $record->state->toUserPasswordState($record->dn);
             if (!$local->isSupersededBy($authoritative)) {
                 return;
             }
 
-            $this->deleteRow($dn);
+            $this->deleteRow($uuid);
         });
     }
 
-    public function discard(Dn $dn): void
+    private function deleteRow(string $uuid): void
     {
-        $this->deleteRow($dn);
-    }
-
-    private function deleteRow(Dn $dn): void
-    {
-        $entryId = $this->entryId($dn);
-        if ($entryId === null) {
-            return;
-        }
-
         $table = self::TABLE;
         $this->connection->execute(
             <<<SQL
                 DELETE FROM $table
-                WHERE entry_id = ?
+                WHERE entry_uuid = ?
                 SQL,
-            [$entryId],
+            [$uuid],
         );
     }
 
-    private function loadRecord(Dn $dn): ReplicaForwardState
+    private function recordFor(string $uuid): ?ReplicaForwardState
     {
-        $entryId = $this->entryId($dn);
-        if ($entryId === null) {
-            return ReplicaForwardState::initial($dn);
-        }
-
         $table = self::TABLE;
         $row = $this->connection
             ->execute(
                 <<<SQL
-                    SELECT state, seq, forwarded_seq
-                    FROM $table
-                    WHERE entry_id = ?
+                    SELECT e.lc_dn, s.state, s.seq, s.forwarded_seq
+                    FROM entries e
+                    LEFT JOIN $table s ON s.entry_uuid = e.entry_uuid
+                    WHERE e.entry_uuid = ?
                     SQL,
-                [$entryId],
+                [$uuid],
             )
             ->fetch();
         if (!is_array($row)) {
-            return ReplicaForwardState::initial($dn);
+            return null;
+        }
+
+        $dn = new Dn($this->stringColumn($row['lc_dn']));
+        if ($row['state'] === null) {
+            return ReplicaForwardState::initial(
+                $uuid,
+                $dn,
+            );
         }
 
         return new ReplicaForwardState(
+            $uuid,
             $dn,
             $this->decode($this->stringColumn($row['state'])),
             $this->intColumn($row['seq']),
@@ -210,23 +205,15 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
 
     private function upsert(ReplicaForwardState $record): void
     {
-        $entryId = $this->entryId($record->dn);
-        if ($entryId === null) {
-            throw new RuntimeException(sprintf(
-                'Replica password state cannot be held for "%s", which this backend does not store.',
-                $record->dn->toString(),
-            ));
-        }
-
-        $this->deleteRow($record->dn);
+        $this->deleteRow($record->uuid);
         $table = self::TABLE;
         $this->connection->execute(
             <<<SQL
-                INSERT INTO $table (entry_id, state, seq, forwarded_seq)
+                INSERT INTO $table (entry_uuid, state, seq, forwarded_seq)
                 VALUES (?, ?, ?, ?)
                 SQL,
             [
-                $entryId,
+                $record->uuid,
                 $this->encode($record->state),
                 $record->sequence,
                 $record->forwarded,
@@ -234,39 +221,14 @@ final readonly class PdoReplicaPasswordStateStore implements ReplicaPasswordStat
         );
     }
 
-    /**
-     * A DN with no entry has no state row to lock, and loading it then yields the initial state.
-     */
-    private function lockStateRow(Dn $dn): void
+    private function lockStateRow(string $uuid): void
     {
-        $entryId = $this->entryId($dn);
-        if ($entryId === null) {
-            return;
-        }
-
         $this->dialect->lockRowForWrite(
             $this->connection->pdo(),
             self::TABLE,
-            'entry_id',
-            $entryId,
+            'entry_uuid',
+            $uuid,
         );
-    }
-
-    /**
-     * The state hangs off the entry key, so it survives a rename; null when this backend holds no such entry.
-     */
-    private function entryId(Dn $dn): ?int
-    {
-        $row = $this->connection
-            ->execute(
-                $this->dialect->queryEntryId(),
-                [$dn->normalizedString()],
-            )
-            ->fetch();
-
-        return is_array($row) && isset($row['entry_id'])
-            ? $this->intColumn($row['entry_id'])
-            : null;
     }
 
     private function encode(ReplicaPasswordState $state): string

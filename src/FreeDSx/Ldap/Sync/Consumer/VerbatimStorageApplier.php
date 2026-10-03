@@ -62,7 +62,7 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
     public function apply(
         SyncEntryResult $result,
         Session $session,
-    ): array {
+    ): void {
         $entry = $result->getEntry();
         $dn = $entry->getDn()
             ->normalize();
@@ -70,7 +70,9 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
 
         // RFC 4533 §3.6: a delete names its entry by UUID, and its DN may be a past one or empty.
         if ($result->isDelete()) {
-            return $this->removeByUuids([$uuid]);
+            $this->removeByUuids([$uuid]);
+
+            return;
         }
 
         if (!$session->isRefreshComplete()) {
@@ -78,50 +80,39 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         }
 
         if ($result->isPresent()) {
-            return [];
+            return;
         }
-
-        $removed = [];
 
         // RFC 4533 §3.6 keys entries by UUID, so the same one arriving elsewhere is a move rather than a new entry.
         $heldAt = $this->dnHolding($uuid);
 
         if ($heldAt !== null && $heldAt->toString() !== $dn->toString()) {
             $this->writer->remove($heldAt);
-            $removed[] = $heldAt;
-        }
-
-        // Another UUID at this DN is another entry, which must go rather than hand the new one its local state.
-        if ($this->isHeldByAnotherEntry($dn, $uuid)) {
-            $this->writer->remove($dn);
-            $removed[] = $dn;
         }
 
         $this->writer->store($this->identified($entry, $uuid));
-
-        return $removed;
     }
 
     public function applyIdSet(
         SyncIdSetResult $result,
         Session $session,
-    ): array {
+    ): void {
         $uuids = $result->getDecodedEntryUuids();
 
         if ($result->isDeleted()) {
-            return $this->removeByUuids($uuids);
+            $this->removeByUuids($uuids);
+
+            return;
         }
 
         // A present set only feeds the sweep, so it is worthless once the refresh that would run it is over.
         if ($session->isRefreshComplete()) {
-            return [];
+            return;
         }
 
         foreach ($uuids as $uuid) {
             $this->presentUuids[strtolower($uuid)] = true;
         }
-
-        return [];
     }
 
     public function reconcile(): void
@@ -151,9 +142,8 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
 
     /**
      * @param string[] $uuids
-     * @return list<Dn>
      */
-    private function removeByUuids(array $uuids): array
+    private function removeByUuids(array $uuids): void
     {
         $removed = [];
 
@@ -170,8 +160,6 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         }
 
         $this->writer->removeAll($removed);
-
-        return $removed;
     }
 
     /**
@@ -188,23 +176,6 @@ final class VerbatimStorageApplier implements ChangeApplierInterface
         $uuid = $entry->getUuid();
 
         return $uuid !== null && isset($this->presentUuids[$uuid]);
-    }
-
-    private function isHeldByAnotherEntry(
-        Dn $dn,
-        string $uuid,
-    ): bool {
-        $held = $this->reader->find(
-            $dn,
-            new EntryProjection(
-                [strtolower(AttributeTypeOid::NAME_ENTRY_UUID)],
-                linkCap: 0,
-            ),
-        );
-        $heldUuid = $held?->getUuid();
-
-        return $heldUuid !== null
-            && $heldUuid !== strtolower($uuid);
     }
 
     /**

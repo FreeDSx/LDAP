@@ -36,6 +36,8 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
 
     private const UUID = '3f2b9c1e-7a4d-4e8b-9c6f-1d2e3f4a5b6c';
 
+    private const OTHER_UUID = '8a7b6c5d-4e3f-4a2b-9c1d-0e9f8a7b6c5d';
+
     private WriteEntryInterface $storage;
 
     private ReplicaPasswordStateStoreInterface $subject;
@@ -50,31 +52,24 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         $this->storage = $this->fromContainer(WriteEntryInterface::class);
         $this->subject = $this->fromContainer(ReplicaPasswordStateStoreInterface::class);
 
-        $this->storage->store(new Entry(
-            new Dn(self::DN),
-            new Attribute('cn', 'foo'),
-            new Attribute('entryUUID', self::UUID),
-        ));
+        $this->storeEntry(self::UUID);
     }
 
     public function test_load_is_empty_when_nothing_was_recorded(): void
     {
-        self::assertTrue($this->subject->load(new Dn(self::DN))->isEmpty());
+        self::assertTrue($this->subject->load(self::UUID)->isEmpty());
     }
 
     public function test_apply_persists_and_reloads_state(): void
     {
-        $this->applyChanges(
-            new Dn(self::DN),
-            OperationalChanges::of(Change::replace(
-                PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
-                '20260520120000Z',
-            )),
-        );
+        $this->applyChanges(OperationalChanges::of(Change::replace(
+            PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
+            '20260520120000Z',
+        )));
 
         self::assertTrue(
             $this->subject
-                ->load(new Dn(self::DN))
+                ->load(self::UUID)
                 ->toUserPasswordState(new Dn(self::DN))
                 ->isLocked(),
         );
@@ -82,49 +77,75 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
 
     public function test_apply_reset_removes_the_row(): void
     {
-        $dn = new Dn(self::DN);
-        $this->applyChanges(
-            $dn,
-            OperationalChanges::of(Change::replace(
+        $this->applyFailure('20260520120000Z');
+
+        $this->applyChanges(OperationalChanges::of(Change::reset(PasswordPolicyOid::NAME_PWD_FAILURE_TIME)));
+
+        self::assertTrue($this->subject->load(self::UUID)->isEmpty());
+    }
+
+    public function test_local_state_survives_a_verbatim_entry_store(): void
+    {
+        $this->applyChanges(OperationalChanges::of(Change::replace(
+            PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
+            '20260520120000Z',
+        )));
+
+        $this->storeEntry(self::UUID);
+
+        self::assertTrue(
+            $this->subject
+                ->load(self::UUID)
+                ->toUserPasswordState(new Dn(self::DN))
+                ->isLocked(),
+        );
+    }
+
+    public function test_local_state_follows_the_entry_through_a_rename(): void
+    {
+        $this->applyFailure('20260520120000Z');
+
+        $this->storage->renameSubtree(
+            new Dn(self::DN),
+            new Dn('cn=bar,dc=example,dc=com'),
+        );
+
+        self::assertSame(
+            'cn=bar,dc=example,dc=com',
+            $this->subject->listUnforwarded()[0]->dn->toString(),
+        );
+    }
+
+    public function test_a_different_entry_stored_at_the_dn_takes_none_of_the_replaced_entrys_state(): void
+    {
+        $this->applyFailure('20260520120000Z');
+
+        $this->storeEntry(self::OTHER_UUID);
+
+        self::assertTrue($this->subject->load(self::OTHER_UUID)->isEmpty());
+        self::assertSame(
+            [],
+            $this->subject->listUnforwarded(),
+        );
+    }
+
+    public function test_recording_for_an_entry_storage_no_longer_holds_records_nothing(): void
+    {
+        $this->subject->atomicMutate(
+            self::OTHER_UUID,
+            static fn(): OperationalChanges => OperationalChanges::of(Change::replace(
                 PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
                 '20260520120000Z',
             )),
         );
 
-        $this->applyChanges(
-            $dn,
-            OperationalChanges::of(Change::reset(PasswordPolicyOid::NAME_PWD_FAILURE_TIME)),
-        );
-
-        self::assertTrue($this->subject->load($dn)->isEmpty());
-    }
-
-    public function test_local_state_survives_a_verbatim_entry_store(): void
-    {
-        $dn = new Dn(self::DN);
-        $this->applyChanges(
-            $dn,
-            OperationalChanges::of(Change::replace(
-                PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
-                '20260520120000Z',
-            )),
-        );
-
-        $this->storage->store(new Entry(
-            $dn,
-            new Attribute('cn', 'foo'),
-            new Attribute('entryUUID', self::UUID),
-        ));
-
-        self::assertTrue(
-            $this->subject
-                ->load($dn)
-                ->toUserPasswordState($dn)
-                ->isLocked(),
+        self::assertSame(
+            [],
+            $this->subject->listUnforwarded(),
         );
     }
 
-    public function test_a_recorded_change_becomes_a_pending_forward(): void
+    public function test_a_recorded_change_becomes_a_pending_forward_under_its_entry_uuid(): void
     {
         $this->applyFailure('20260520120000Z');
 
@@ -133,6 +154,10 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         self::assertCount(
             1,
             $pending,
+        );
+        self::assertSame(
+            self::UUID,
+            $pending[0]->uuid,
         );
         self::assertSame(
             self::DN,
@@ -149,12 +174,27 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         $this->applyFailure('20260520120000Z');
 
         $this->subject->markForwarded(
-            new Dn(self::DN),
+            self::UUID,
             1,
         );
 
         self::assertSame(
             [],
+            $this->subject->listUnforwarded(),
+        );
+    }
+
+    public function test_marking_another_entry_uuid_forwarded_leaves_this_one_pending(): void
+    {
+        $this->applyFailure('20260520120000Z');
+
+        $this->subject->markForwarded(
+            self::OTHER_UUID,
+            1,
+        );
+
+        self::assertCount(
+            1,
             $this->subject->listUnforwarded(),
         );
     }
@@ -165,7 +205,7 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         $this->applyFailure('20260520120500Z');
 
         $this->subject->markForwarded(
-            new Dn(self::DN),
+            self::UUID,
             1,
         );
 
@@ -186,11 +226,11 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         $this->applyFailure('20260520120000Z');
 
         $this->subject->discardIfSuperseded(
-            new Dn(self::DN),
+            self::UUID,
             new UserPasswordState(accountLockedAt: GeneralizedTime::parse('20260520120500Z')),
         );
 
-        self::assertTrue($this->subject->load(new Dn(self::DN))->isEmpty());
+        self::assertTrue($this->subject->load(self::UUID)->isEmpty());
     }
 
     public function test_discard_drops_local_state_when_a_success_is_newer_than_the_failure(): void
@@ -198,11 +238,11 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         $this->applyFailure('20260520120000Z');
 
         $this->subject->discardIfSuperseded(
-            new Dn(self::DN),
+            self::UUID,
             new UserPasswordState(lastSuccess: GeneralizedTime::parse('20260520120500Z')),
         );
 
-        self::assertTrue($this->subject->load(new Dn(self::DN))->isEmpty());
+        self::assertTrue($this->subject->load(self::UUID)->isEmpty());
     }
 
     public function test_discard_keeps_sub_threshold_state_the_entry_has_not_reflected(): void
@@ -210,44 +250,40 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         $this->applyFailure('20260520120000Z');
 
         $this->subject->discardIfSuperseded(
-            new Dn(self::DN),
+            self::UUID,
             new UserPasswordState(),
         );
 
-        self::assertFalse($this->subject->load(new Dn(self::DN))->isEmpty());
+        self::assertFalse($this->subject->load(self::UUID)->isEmpty());
     }
 
     public function test_discard_is_a_noop_for_an_unknown_subject(): void
     {
         $this->subject->discardIfSuperseded(
-            new Dn(self::DN),
+            self::OTHER_UUID,
             new UserPasswordState(accountLockedAt: GeneralizedTime::parse('20260520120500Z')),
         );
 
-        self::assertTrue($this->subject->load(new Dn(self::DN))->isEmpty());
+        self::assertTrue($this->subject->load(self::OTHER_UUID)->isEmpty());
     }
 
-    public function test_discard_removes_state_unconditionally(): void
+    public function test_removing_the_entry_removes_its_state(): void
     {
         $this->applyFailure('20260520120000Z');
 
-        $this->subject->discard(new Dn(self::DN));
+        $this->storage->remove(new Dn(self::DN));
 
-        self::assertTrue($this->subject->load(new Dn(self::DN))->isEmpty());
-    }
-
-    public function test_discard_of_an_unknown_subject_is_a_noop(): void
-    {
-        $this->subject->discard(new Dn(self::DN));
-
-        self::assertTrue($this->subject->load(new Dn(self::DN))->isEmpty());
+        self::assertSame(
+            [],
+            $this->subject->listUnforwarded(),
+        );
     }
 
     public function test_a_change_after_forwarding_re_lists_at_a_higher_sequence(): void
     {
         $this->applyFailure('20260520120000Z');
         $this->subject->markForwarded(
-            new Dn(self::DN),
+            self::UUID,
             1,
         );
         $this->applyFailure('20260520120500Z');
@@ -269,24 +305,11 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         $this->applyFailure('20260520120000Z');
 
         $this->subject->discardIfSuperseded(
-            new Dn(self::DN),
+            self::UUID,
             new UserPasswordState(lastSuccess: GeneralizedTime::parse('20260520115500Z')),
         );
 
-        self::assertFalse($this->subject->load(new Dn(self::DN))->isEmpty());
-    }
-
-    public function test_state_is_keyed_by_the_canonical_dn(): void
-    {
-        $this->applyChanges(
-            new Dn('CN=Foo,DC=Example,DC=Com'),
-            OperationalChanges::of(Change::replace(
-                PasswordPolicyOid::NAME_PWD_ACCOUNT_LOCKED_TIME,
-                '20260520120000Z',
-            )),
-        );
-
-        self::assertFalse($this->subject->load(new Dn(self::DN))->isEmpty());
+        self::assertFalse($this->subject->load(self::UUID)->isEmpty());
     }
 
     protected function makeServerOptions(): ServerOptions
@@ -294,23 +317,27 @@ final class PdoReplicaPasswordStateStoreTest extends TestCase
         return TestServerOptions::sqlite();
     }
 
-    private function applyFailure(string $time): void
+    private function storeEntry(string $uuid): void
     {
-        $this->applyChanges(
+        $this->storage->store(new Entry(
             new Dn(self::DN),
-            OperationalChanges::of(Change::replace(
-                PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
-                $time,
-            )),
-        );
+            new Attribute('cn', 'foo'),
+            new Attribute('entryUUID', $uuid),
+        ));
     }
 
-    private function applyChanges(
-        Dn $dn,
-        OperationalChanges $changes,
-    ): void {
+    private function applyFailure(string $time): void
+    {
+        $this->applyChanges(OperationalChanges::of(Change::replace(
+            PasswordPolicyOid::NAME_PWD_FAILURE_TIME,
+            $time,
+        )));
+    }
+
+    private function applyChanges(OperationalChanges $changes): void
+    {
         $this->subject->atomicMutate(
-            $dn,
+            self::UUID,
             static fn(): OperationalChanges => $changes,
         );
     }

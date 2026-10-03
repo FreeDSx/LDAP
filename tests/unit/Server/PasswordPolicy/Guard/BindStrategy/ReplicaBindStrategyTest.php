@@ -41,7 +41,6 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\FreeDSx\Ldap\Clock\FrozenClock;
 use Tests\Support\FreeDSx\Ldap\Logging\RecordingLogger;
 use Tests\Support\FreeDSx\Ldap\Server\Clock\RecordingSleeper;
-use Tests\Support\FreeDSx\Ldap\Storage\EntryFixture;
 
 final class ReplicaBindStrategyTest extends TestCase
 {
@@ -50,6 +49,8 @@ final class ReplicaBindStrategyTest extends TestCase
     private const NOW = '2026-05-20T12:00:00Z';
 
     private const DN = 'cn=foo,dc=example,dc=com';
+
+    private const UUID = '6c5d4e3f-2a1b-4c0d-9e8f-7a6b5c4d3e2f';
 
     private ReplicaPasswordStateStoreInterface $store;
 
@@ -65,10 +66,11 @@ final class ReplicaBindStrategyTest extends TestCase
     {
         // Both resolve from the memoised container, so the state store shares the storage holding the subject.
         $this->fromContainer(WriteEntryInterface::class)
-            ->store(EntryFixture::withUuid(new Entry(
+            ->store(new Entry(
                 new Dn(self::DN),
                 new Attribute('cn', 'foo'),
-            )));
+                new Attribute('entryUUID', self::UUID),
+            ));
         $this->store = $this->fromContainer(ReplicaPasswordStateStoreInterface::class);
         $this->backend = $this->createMock(ReadBackendInterface::class);
         $this->context = new PasswordPolicyContext();
@@ -162,7 +164,7 @@ final class ReplicaBindStrategyTest extends TestCase
         ));
 
         self::assertFalse(
-            $this->store->load(new Dn(self::DN))->isEmpty(),
+            $this->store->load(self::UUID)->isEmpty(),
             'A replica-observed failure must be recorded to the local store.',
         );
     }
@@ -203,7 +205,7 @@ final class ReplicaBindStrategyTest extends TestCase
     private function localState(): UserPasswordState
     {
         return $this->store
-            ->load(new Dn(self::DN))
+            ->load(self::UUID)
             ->toUserPasswordState(new Dn(self::DN));
     }
 
@@ -214,6 +216,7 @@ final class ReplicaBindStrategyTest extends TestCase
         return new PasswordBindAttempt(
             name: 'foo',
             dn: new Dn(self::DN),
+            uuid: self::UUID,
             state: $state,
             policy: $policy,
         );

@@ -13,12 +13,11 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\PasswordPolicy\Replica;
 
-use FreeDSx\Ldap\Entry\Dn;
 use FreeDSx\Ldap\Server\PasswordPolicy\Decision\OperationalChanges;
 use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
 
 /**
- * Persists replica-observed password-policy bind state locally, separate from replicated entries.
+ * Persists replica-observed password-policy bind state locally, keyed by each subject's lowercased entryUUID.
  *
  * @author Chad Sikorra <Chad.Sikorra@gmail.com>
  */
@@ -27,7 +26,7 @@ interface ReplicaPasswordStateStoreInterface
     /**
      * The locally tracked state for a subject, or an empty state when none has been recorded.
      */
-    public function load(Dn $dn): ReplicaPasswordState;
+    public function load(string $uuid): ReplicaPasswordState;
 
     /**
      * Atomically read the subject's current local state, derive changes from it via $merge, and apply them under an
@@ -36,7 +35,7 @@ interface ReplicaPasswordStateStoreInterface
      * @param callable(ReplicaPasswordState): OperationalChanges $merge
      */
     public function atomicMutate(
-        Dn $dn,
+        string $uuid,
         callable $merge,
     ): void;
 
@@ -51,7 +50,7 @@ interface ReplicaPasswordStateStoreInterface
      * Advance a subject's forwarded watermark to $sequence, so state no newer than it is no longer pending forward.
      */
     public function markForwarded(
-        Dn $dn,
+        string $uuid,
         int $sequence,
     ): void;
 
@@ -60,12 +59,7 @@ interface ReplicaPasswordStateStoreInterface
      * single source of truth. It's a no-op while the local state still enforces something the entry has not yet reflected.
      */
     public function discardIfSuperseded(
-        Dn $dn,
+        string $uuid,
         UserPasswordState $authoritative,
     ): void;
-
-    /**
-     * Drop a subject's local state outright, used when the subject is deleted on the primary; a no-op when none exists.
-     */
-    public function discard(Dn $dn): void;
 }

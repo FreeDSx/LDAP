@@ -445,6 +445,62 @@ abstract class SyncReplReplicaTestCase extends ServerTestCase
         );
     }
 
+    public function test_an_account_recreated_at_a_dn_starts_without_the_deleted_accounts_failures(): void
+    {
+        $dn = 'cn=recreated,ou=people,dc=foo,dc=bar';
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($dn): void {
+            $provider->create(Entry::fromArray(
+                $dn,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'recreated',
+                    'sn' => 'Original',
+                    'userPassword' => 'oldpass',
+                ],
+            ));
+        });
+        self::assertNotNull($this->waitForReplica($dn));
+        $this->assertBind(
+            $dn,
+            'wrong',
+            false,
+        );
+
+        $this->writeToProvider(static function (LdapClient $provider) use ($dn): void {
+            $provider->delete($dn);
+            $provider->create(Entry::fromArray(
+                $dn,
+                [
+                    'objectClass' => 'inetOrgPerson',
+                    'cn' => 'recreated',
+                    'sn' => 'Recreated',
+                    'userPassword' => 'newpass',
+                ],
+            ));
+        });
+        $uuid = $this->providerUuidOf($dn);
+        self::assertSame(
+            $uuid,
+            $this->waitForReplicaUuid(
+                $dn,
+                $uuid,
+            ),
+        );
+
+        // One genuine failure stays below the threshold of two, unless the deleted account's failure carried over.
+        $this->assertBind(
+            $dn,
+            'wrong',
+            false,
+        );
+        $this->assertBind(
+            $dn,
+            'newpass',
+            true,
+        );
+    }
+
     private function assertBind(
         string $dn,
         string $password,

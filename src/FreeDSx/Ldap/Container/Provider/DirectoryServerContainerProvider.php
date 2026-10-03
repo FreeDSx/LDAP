@@ -809,7 +809,6 @@ final class DirectoryServerContainerProvider implements ContainerProviderInterfa
         $forwarder = new PasswordPolicyForwarder(
             $container->get(ReplicaPasswordStateStoreInterface::class),
             new LdapClientForwardStateSender(new PrimaryConnectionFactory($config)),
-            $container->get(ReadBackendInterface::class),
             $options->getLogger(),
         );
 

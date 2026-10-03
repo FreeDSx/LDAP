@@ -22,9 +22,13 @@ use FreeDSx\Ldap\Server\PasswordPolicy\UserPasswordState;
  */
 final readonly class PasswordBindAttempt
 {
+    /**
+     * @param string $uuid The entryUUID of the entry the bind read.
+     */
     public function __construct(
         public string $name,
         public Dn $dn,
+        public string $uuid,
         public UserPasswordState $state,
         public PasswordPolicy $policy,
     ) {}
