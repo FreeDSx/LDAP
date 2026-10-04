@@ -17,14 +17,17 @@ use FreeDSx\Ldap\Exception\RuntimeException;
 
 use function explode;
 use function fclose;
+use function fmod;
 use function fread;
 use function fwrite;
+use function is_array;
 use function is_resource;
 use function json_decode;
 use function json_encode;
+use function microtime;
+use function stream_select;
 use function stream_set_blocking;
 use function stream_socket_pair;
-use function strlen;
 use function strrpos;
 use function substr;
 
@@ -50,6 +53,11 @@ final class ChildChannel
     private $writeEnd;
 
     private string $readBuffer = '';
+
+    /**
+     * Frames the socket has not taken yet.
+     */
+    private string $writeBuffer = '';
 
     /**
      * @param resource $readEnd
@@ -79,10 +87,12 @@ final class ChildChannel
             throw new RuntimeException('Unable to create a child process channel.');
         }
 
-        // The parent reads without blocking
-        // The write end stays blocking so the child's small frames flush whole.
         stream_set_blocking(
             $pair[0],
+            false,
+        );
+        stream_set_blocking(
+            $pair[1],
             false,
         );
 
@@ -113,18 +123,69 @@ final class ChildChannel
         }
     }
 
-    public function send(ChannelMessage $message): void
+    /**
+     * @return bool whether nothing is left pending
+     */
+    public function send(ChannelMessage $message): bool
     {
         if (!is_resource($this->writeEnd)) {
-            return;
+            return false;
         }
 
         $encoded = json_encode($message->toArray());
         if ($encoded === false) {
-            return;
+            return $this->flush();
+        }
+        $this->writeBuffer .= $encoded . self::FRAME_DELIMITER;
+
+        return $this->flush();
+    }
+
+    /**
+     * Writes as much of the pending frames as the socket takes without blocking.
+     *
+     * @return bool whether nothing is left pending
+     */
+    public function flush(): bool
+    {
+        while ($this->writeBuffer !== '' && is_resource($this->writeEnd)) {
+            $written = fwrite(
+                $this->writeEnd,
+                $this->writeBuffer,
+            );
+
+            if ($written === false || $written === 0) {
+                return false;
+            }
+
+            $this->writeBuffer = substr(
+                $this->writeBuffer,
+                $written,
+            );
         }
 
-        $this->writeAll($encoded . self::FRAME_DELIMITER);
+        return $this->writeBuffer === '';
+    }
+
+    /**
+     * Waits up to the timeout for the pending frames to be written.
+     *
+     * @return bool whether nothing is left pending
+     */
+    public function drain(float $timeoutSeconds): bool
+    {
+        $deadline = microtime(true) + $timeoutSeconds;
+
+        while (!$this->flush()) {
+            $remaining = $deadline - microtime(true);
+            if ($remaining <= 0 || !is_resource($this->writeEnd)) {
+                return false;
+            }
+
+            $this->awaitWritable($remaining);
+        }
+
+        return true;
     }
 
     /**
@@ -211,22 +272,18 @@ final class ChildChannel
         }
     }
 
-    private function writeAll(string $payload): void
+    private function awaitWritable(float $seconds): void
     {
-        $length = strlen($payload);
-        $written = 0;
+        $read = null;
+        $write = [$this->writeEnd];
+        $except = null;
 
-        while ($written < $length) {
-            $result = fwrite(
-                $this->writeEnd,
-                substr($payload, $written),
-            );
-
-            if ($result === false || $result === 0) {
-                return;
-            }
-
-            $written += $result;
-        }
+        @stream_select(
+            $read,
+            $write,
+            $except,
+            (int) $seconds,
+            (int) (fmod($seconds, 1.0) * 1_000_000),
+        );
     }
 }

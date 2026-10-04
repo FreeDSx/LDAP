@@ -17,7 +17,10 @@ use FreeDSx\Ldap\Operation\OperationType;
 use FreeDSx\Ldap\Operation\ResultCode;
 use FreeDSx\Ldap\Server\Metrics\Observation\OperationObservation;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
+use FreeDSx\Ldap\Server\Metrics\Rollup\MetricsDelta;
+use FreeDSx\Ldap\Server\Metrics\Rollup\MetricsDeltaMessage;
 use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
+use FreeDSx\Ldap\Server\Process\ChildChannel;
 use PHPUnit\Framework\TestCase;
 
 final class OperationRollupCoordinatorTest extends TestCase
@@ -144,6 +147,47 @@ final class OperationRollupCoordinatorTest extends TestCase
         );
     }
 
+    public function test_operations_while_the_parent_is_not_reading_merge_into_the_next_frame(): void
+    {
+        $channel = $this->child->openChannel();
+        $this->child->enterChild($channel);
+        $this->fill($channel);
+
+        for ($i = 0; $i < 3; $i++) {
+            $this->childRecorder->operationObserved(new OperationObservation(
+                OperationType::Search,
+                true,
+                0.1,
+                ResultCode::SUCCESS,
+            ));
+            usleep(120000);
+            $this->child->flush();
+        }
+        $this->parent->collect($channel);
+        $this->child->finish();
+        $this->parent->collect($channel);
+
+        self::assertSame(
+            ['search' => 3],
+            $this->parentRecorder->snapshot()->operations->counts,
+        );
+    }
+
+    public function test_finishing_while_the_parent_is_not_reading_gives_up_rather_than_hanging(): void
+    {
+        $channel = $this->child->openChannel();
+        $this->child->enterChild($channel);
+        $this->fill($channel);
+        $startedAt = microtime(true);
+
+        $this->child->finish();
+
+        self::assertLessThan(
+            2.0,
+            microtime(true) - $startedAt,
+        );
+    }
+
     public function test_finishing_flushes_remaining_operations_and_signals_eof(): void
     {
         $channel = $this->child->openChannel();
@@ -166,5 +210,11 @@ final class OperationRollupCoordinatorTest extends TestCase
             [],
             $channel->receive(),
         );
+    }
+
+    private function fill(ChildChannel $channel): void
+    {
+        while ($channel->send(new MetricsDeltaMessage(new MetricsDelta()))) {
+        }
     }
 }
