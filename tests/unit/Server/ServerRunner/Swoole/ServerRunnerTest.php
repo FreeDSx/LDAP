@@ -16,7 +16,6 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\ServerRunner\Swoole;
 use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\ServerProtocolFactory;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\PooledServerRunner;
-use FreeDSx\Ldap\Server\ServerRunner\Swoole\ServerRunner;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\WorkerFactory;
 use FreeDSx\Ldap\Server\SocketServerFactory;
 use FreeDSx\Ldap\ServerListenerOptionsInterface;
@@ -41,18 +40,6 @@ final class ServerRunnerTest extends TestCase
             protocolFactoryProvider: static fn(ServerListenerOptionsInterface $options) => $factory,
             applyReload: static function (ServerListenerOptionsInterface $options): void {},
         );
-    }
-
-    public function test_constructor_throws_when_swoole_not_loaded(): void
-    {
-        if (extension_loaded('swoole')) {
-            $this->markTestSkipped('This test requires the swoole extension to NOT be loaded.');
-        }
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessageMatches('/Swoole extension/');
-
-        new ServerRunner($this->workers);
     }
 
     public function test_a_pool_refuses_to_run_a_single_worker(): void

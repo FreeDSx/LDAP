@@ -1013,6 +1013,29 @@ final class LdapServerTest extends ServerTestCase
         }
     }
 
+    public function testTheOperationsAClosedConnectionPerformedAreCountedInTheMonitor(): void
+    {
+        $this->createServerProcess(
+            'tcp',
+            ['--monitor', '--log'],
+        );
+        $session = $this->buildClient('tcp');
+        $session->bind(
+            'cn=user,dc=foo,dc=bar',
+            '12345',
+        );
+        $session->read('cn=user,dc=foo,dc=bar');
+
+        $session->unbind();
+        $this->waitForServerOutput('The child process has ended.');
+        $this->authenticateAdmin();
+
+        $this->assertContains(
+            'search=1',
+            $this->monitorValues('operationsByType'),
+        );
+    }
+
     public function testSighupDoesNotShutdownTheServer(): void
     {
         $this->requirePosix();

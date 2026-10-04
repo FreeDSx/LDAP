@@ -22,8 +22,6 @@ use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ReloadState;
 use Swoole\Process;
 use Swoole\Process\Pool;
 
-use function extension_loaded;
-
 /**
  * Runs the coroutine accept loop in a pool of worker processes.
  *
@@ -50,10 +48,6 @@ class PooledServerRunner implements CoroutineServerRunnerInterface
         private readonly int $workers,
         private readonly ResettableInterface $resettable = new NonResettable(),
     ) {
-        if (!extension_loaded('swoole')) {
-            throw new RuntimeException('The Swoole extension is required to use the Swoole PooledServerRunner.');
-        }
-
         if ($this->workers < 2) {
             throw new RuntimeException('A worker pool needs more than one worker.');
         }

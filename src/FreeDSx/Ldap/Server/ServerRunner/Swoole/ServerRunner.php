@@ -13,12 +13,9 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\ServerRunner\Swoole;
 
-use FreeDSx\Ldap\Exception\RuntimeException;
 use FreeDSx\Ldap\Server\ServerRunner\CoroutineServerRunnerInterface;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ConnectionSlots;
 use FreeDSx\Ldap\Server\ServerRunner\Swoole\Shared\ReloadState;
-
-use function extension_loaded;
 
 /**
  * A server runner that uses Swoole coroutines.
@@ -31,10 +28,6 @@ readonly class ServerRunner implements CoroutineServerRunnerInterface
 
     public function __construct(WorkerFactory $workers)
     {
-        if (!extension_loaded('swoole')) {
-            throw new RuntimeException('The Swoole extension is required to use the Swoole ServerRunner.');
-        }
-
         $this->worker = $workers->make(
             new ConnectionSlots(),
             new ReloadState(),
