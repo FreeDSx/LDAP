@@ -11,7 +11,7 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace FreeDSx\Ldap\Server\Process;
+namespace FreeDSx\Ldap\Server\Process\Channel;
 
 /**
  * A message that can be sent between processes over a ChildChannel.

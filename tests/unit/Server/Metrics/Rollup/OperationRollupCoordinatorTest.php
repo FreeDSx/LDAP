@@ -20,7 +20,7 @@ use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
 use FreeDSx\Ldap\Server\Metrics\Rollup\MetricsDelta;
 use FreeDSx\Ldap\Server\Metrics\Rollup\MetricsDeltaMessage;
 use FreeDSx\Ldap\Server\Metrics\Rollup\OperationRollupCoordinator;
-use FreeDSx\Ldap\Server\Process\ChildChannel;
+use FreeDSx\Ldap\Server\Process\Channel\ChildChannel;
 use PHPUnit\Framework\TestCase;
 
 final class OperationRollupCoordinatorTest extends TestCase

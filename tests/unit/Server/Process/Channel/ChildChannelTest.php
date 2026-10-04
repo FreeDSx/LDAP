@@ -11,12 +11,12 @@ declare(strict_types=1);
  * file that was distributed with this source code.
  */
 
-namespace Tests\Unit\FreeDSx\Ldap\Server\Process;
+namespace Tests\Unit\FreeDSx\Ldap\Server\Process\Channel;
 
-use FreeDSx\Ldap\Server\Process\ChildChannel;
+use FreeDSx\Ldap\Server\Process\Channel\ChildChannel;
 use PHPUnit\Framework\TestCase;
-use Tests\Support\FreeDSx\Ldap\Server\Process\FakeChannelMessage;
-use Tests\Support\FreeDSx\Ldap\Server\Process\FakeChannelMessageFactory;
+use Tests\Support\FreeDSx\Ldap\Server\Process\Channel\FakeChannelMessage;
+use Tests\Support\FreeDSx\Ldap\Server\Process\Channel\FakeChannelMessageFactory;
 
 final class ChildChannelTest extends TestCase
 {

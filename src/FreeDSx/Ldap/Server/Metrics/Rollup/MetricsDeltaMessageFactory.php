@@ -15,8 +15,8 @@ namespace FreeDSx\Ldap\Server\Metrics\Rollup;
 
 use FreeDSx\Ldap\Server\Metrics\Snapshot\OperationMetrics;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\TrafficMetrics;
-use FreeDSx\Ldap\Server\Process\ChannelMessage;
-use FreeDSx\Ldap\Server\Process\ChannelMessageFactory;
+use FreeDSx\Ldap\Server\Process\Channel\ChannelMessage;
+use FreeDSx\Ldap\Server\Process\Channel\ChannelMessageFactory;
 
 use function is_array;
 

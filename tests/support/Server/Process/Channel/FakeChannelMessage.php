@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Tests\Support\FreeDSx\Ldap\Server\Process;
+namespace Tests\Support\FreeDSx\Ldap\Server\Process\Channel;
 
-use FreeDSx\Ldap\Server\Process\ChannelMessage;
+use FreeDSx\Ldap\Server\Process\Channel\ChannelMessage;
 
 final readonly class FakeChannelMessage implements ChannelMessage
 {
