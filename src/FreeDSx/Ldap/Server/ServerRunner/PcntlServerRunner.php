@@ -65,7 +65,7 @@ class PcntlServerRunner implements ServerRunnerInterface
     /**
      * @var array<string, mixed>
      */
-    private array $defaultContext = [];
+    private array $defaultContext;
 
     public function __construct(
         private readonly RunnerConfiguration $configuration,
