@@ -53,7 +53,7 @@ interface ServerListenerOptionsInterface
 
     public function isMonitorEnabled(): bool;
 
-    public function getMonitorSnapshotPath(): string;
+    public function getMonitorSnapshotPath(): ?string;
 
     public function getMetricsRecorder(): MetricsRecorderInterface;
 

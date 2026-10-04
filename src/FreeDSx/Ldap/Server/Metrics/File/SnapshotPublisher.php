@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 namespace FreeDSx\Ldap\Server\Metrics\File;
 
+use FreeDSx\Ldap\Exception\MetricsSnapshotException;
 use FreeDSx\Ldap\Server\Metrics\MetricsSnapshotProvider;
 
 /**
@@ -26,6 +27,14 @@ final readonly class SnapshotPublisher
         private MetricsSnapshotProvider $source,
         private FileSnapshotWriter $writer,
     ) {}
+
+    /**
+     * @throws MetricsSnapshotException when the location cannot be readied.
+     */
+    public function prepare(): void
+    {
+        $this->writer->prepare();
+    }
 
     public function publish(): void
     {

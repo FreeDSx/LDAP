@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Metrics\File;
 
 use FreeDSx\Ldap\Exception\MetricsSnapshotException;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotWriter;
+use FreeDSx\Ldap\Server\Metrics\File\SnapshotFile;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\ConnectionMetrics;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\LifecycleMetrics;
 use FreeDSx\Ldap\Server\Metrics\Snapshot\MetricsSnapshot;
@@ -29,7 +30,7 @@ final class FileSnapshotWriterTest extends TestCase
     protected function setUp(): void
     {
         $this->path = sys_get_temp_dir() . '/freedsx_metrics_' . uniqid('', true) . '.json';
-        $this->subject = new FileSnapshotWriter($this->path);
+        $this->subject = new FileSnapshotWriter(SnapshotFile::at($this->path));
     }
 
     protected function tearDown(): void
@@ -76,16 +77,39 @@ final class FileSnapshotWriterTest extends TestCase
         $this->subject->write(new MetricsSnapshot());
 
         self::assertSame(
-            [],
-            glob($this->path . '.*.tmp') ?: [],
+            [$this->path],
+            glob($this->path . '*') ?: [],
+        );
+    }
+
+    public function test_the_temporary_file_never_reuses_a_name_another_user_could_plant(): void
+    {
+        $planted = $this->path . '.' . getmypid() . '.tmp';
+        file_put_contents(
+            $planted,
+            'planted',
+        );
+
+        $this->subject->write(new MetricsSnapshot(new LifecycleMetrics(1_000)));
+
+        self::assertSame(
+            'planted',
+            file_get_contents($planted),
+        );
+        self::assertSame(
+            (new MetricsSnapshot(new LifecycleMetrics(1_000)))->toArray(),
+            json_decode(
+                (string) file_get_contents($this->path),
+                true,
+            ),
         );
     }
 
     public function test_a_path_that_cannot_be_written_is_reported_rather_than_swallowed(): void
     {
-        $subject = new FileSnapshotWriter(
+        $subject = new FileSnapshotWriter(SnapshotFile::at(
             sys_get_temp_dir() . '/freedsx_metrics_absent_' . uniqid('', true) . '/snapshot.json',
-        );
+        ));
 
         $this->expectException(MetricsSnapshotException::class);
 

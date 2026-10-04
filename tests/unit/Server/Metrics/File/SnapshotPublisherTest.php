@@ -15,6 +15,7 @@ namespace Tests\Unit\FreeDSx\Ldap\Server\Metrics\File;
 
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotProvider;
 use FreeDSx\Ldap\Server\Metrics\File\FileSnapshotWriter;
+use FreeDSx\Ldap\Server\Metrics\File\SnapshotFile;
 use FreeDSx\Ldap\Server\Metrics\File\SnapshotPublisher;
 use FreeDSx\Ldap\Server\Metrics\Observation\ConnectionObservation;
 use FreeDSx\Ldap\Server\Metrics\Recorder\InMemoryMetricsRecorder;
@@ -34,7 +35,7 @@ final class SnapshotPublisherTest extends TestCase
         $this->source = new InMemoryMetricsRecorder();
         $this->subject = new SnapshotPublisher(
             $this->source,
-            new FileSnapshotWriter($this->path),
+            new FileSnapshotWriter(SnapshotFile::at($this->path)),
         );
     }
 
@@ -55,7 +56,7 @@ final class SnapshotPublisherTest extends TestCase
 
         self::assertEquals(
             $this->source->snapshot(),
-            (new FileSnapshotProvider($this->path))->snapshot(),
+            (new FileSnapshotProvider(SnapshotFile::at($this->path)))->snapshot(),
         );
     }
 
@@ -67,7 +68,7 @@ final class SnapshotPublisherTest extends TestCase
 
         self::assertSame(
             1,
-            (new FileSnapshotProvider($this->path))->snapshot()->connections->active,
+            (new FileSnapshotProvider(SnapshotFile::at($this->path)))->snapshot()->connections->active,
         );
     }
 

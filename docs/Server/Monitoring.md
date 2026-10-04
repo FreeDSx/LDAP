@@ -89,7 +89,7 @@ authenticated-only. To restrict it further, add `RuleBasedAccessControl` rules t
 * Connection gauges are authoritative.
 * Operation counts, traffic totals, and breakdowns are best-effort and current to within about one accept cycle.
 * `operationsInProgressByType` is omitted: it is a per-child gauge the parent serving `cn=monitor` cannot aggregate.
-* Monitor data is published to a JSON file, by default under the system temp directory keyed by port; set `setMonitorSnapshotPath()` to relocate it or avoid collisions across instances.
+* Monitor data is published to a JSON file, by default a uniquely named file the parent creates in the system temp directory for each run; set `setMonitorSnapshotPath()` to relocate it.
 
 For per-operation aggregation that survives saturation or spans instances, prefer a push exporter.
 
