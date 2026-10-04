@@ -119,25 +119,34 @@ final class LdapReplica
         $cookie = $this->reload
             ? null
             : $this->checkpoint->read();
-        $this->fullRefresh = $cookie === null;
 
         $syncRepl = $this->connectionFactory->connectSyncRepl();
         $syncRepl
             ->useCookie($cookie)
             ->useCookieHandler($this->persistCookie(...))
             ->useIdSetHandler($this->applyIdSet(...))
-            ->useRefreshDoneHandler($this->reconcileRefresh(...));
+            ->useRefreshDoneHandler($this->reconcileRefresh(...))
+            ->useRefreshRequiredHandler($this->startRefresh(...));
 
         $this->activeSync = $syncRepl;
-        $this->refreshing = true;
-        $this->pendingCookie = null;
 
         try {
-            $this->applier->beginRefresh();
+            $this->startRefresh($cookie);
             $syncRepl->listen($this->applyEntry(...));
         } finally {
             $this->activeSync = null;
         }
+    }
+
+    /**
+     * Holds the cookie back until the refresh is reconciled (RFC 4533 §3.8).
+     */
+    private function startRefresh(?string $cookie): void
+    {
+        $this->refreshing = true;
+        $this->pendingCookie = null;
+        $this->fullRefresh = $cookie === null;
+        $this->applier->beginRefresh();
     }
 
     private function applyEntry(

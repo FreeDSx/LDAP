@@ -130,6 +130,18 @@ class SyncRepl
     }
 
     /**
+     * Define a closure that fires when the server requires a refresh (RFC 4533 §3.8) and the sync is re-issued.
+     *
+     * It receives the cookie the new request carries, null for a full refresh, before any message of that refresh.
+     */
+    public function useRefreshRequiredHandler(Closure $handler): self
+    {
+        $this->syncRequest->useRefreshRequiredHandler($handler);
+
+        return $this;
+    }
+
+    /**
      * A convenience method to set the filter to use for this sync. This can also be set using {@see self::request()}.
      */
     public function useFilter(FilterInterface $filter): self

@@ -57,6 +57,8 @@ class ClientSyncHandler extends ClientBasicHandler
 
     private ?Closure $refreshDoneHandler = null;
 
+    private ?Closure $refreshRequiredHandler = null;
+
     public function __construct(
         private readonly ClientQueue $queue,
         private readonly ClientOptions $options,
@@ -98,13 +100,13 @@ class ClientSyncHandler extends ClientBasicHandler
                 // @todo This should be a configurable option or a specific exception...
                 if ($this->isRefreshRequired($searchDone)) {
                     // We need to regenerate a search request / response with a new cookie...
-                    $this->syncRequestControl->setCookie(
-                        $searchDone
-                            ->controls()
-                            ->getByClass(SyncDoneControl::class)
-                            ?->getCookie(),
-                    );
+                    $cookie = $searchDone
+                        ->controls()
+                        ->getByClass(SyncDoneControl::class)
+                        ?->getCookie();
+                    $this->syncRequestControl->setCookie($cookie);
                     $this->session->resetRefreshState();
+                    $this->notifyRefreshRequired($cookie);
                     $messageTo = new LdapMessageRequest(
                         $this->queue->generateId(),
                         $this->syncRequest,
@@ -162,6 +164,7 @@ class ClientSyncHandler extends ClientBasicHandler
         $this->syncIdSetHandler = $this->syncRequest->getIdSetHandler();
         $this->cookieHandler = $this->syncRequest->getCookieHandler();
         $this->refreshDoneHandler = $this->syncRequest->getRefreshDoneHandler();
+        $this->refreshRequiredHandler = $this->syncRequest->getRefreshRequiredHandler();
 
         $this->syncRequest->useEntryHandler($this->processSyncEntry(...));
         $this->syncRequest->useReferralHandler($this->processSyncReferral(...));
@@ -284,6 +287,21 @@ class ClientSyncHandler extends ClientBasicHandler
                 $this->session,
             );
         }
+    }
+
+    /**
+     * Fired before the re-issued sync sends anything.
+     */
+    private function notifyRefreshRequired(?string $cookie): void
+    {
+        if ($this->refreshRequiredHandler === null) {
+            return;
+        }
+
+        call_user_func(
+            $this->refreshRequiredHandler,
+            $cookie,
+        );
     }
 
     /**
